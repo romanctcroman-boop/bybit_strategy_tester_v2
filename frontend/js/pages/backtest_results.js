@@ -1409,7 +1409,7 @@ function updateTVSummaryCards(metrics) {
     netProfit.className = `tv-summary-card-value ${val >= 0 ? 'tv-value-positive' : 'tv-value-negative'}`;
   }
   if (netProfitPct) {
-    const pct = metrics.net_profit_pct || metrics.total_return || 0;
+    const pct = metrics.net_profit_pct ?? 0;
     netProfitPct.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   }
 
@@ -1691,7 +1691,9 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     const growthPeriods = [];
     const drawdownPeriods = [];
     const runupValues = []; // All runup values from local lows to peaks
+    const runupBases = []; // Base (local low) for each runup — for % calculation
     const drawdownValues = []; // All drawdown values from peaks to local lows
+    const drawdownPeaks = []; // Peak at start of each drawdown — for % calculation
     let runningMax = equityValues[0];
     let localLow = equityValues[0]; // Lowest point before current growth period
     let periodStartLow = equityValues[0]; // Low at start of current growth period
@@ -1699,6 +1701,7 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     let currentDrawdownBars = 0;
     let inDrawdown = false;
     let currentDrawdownDepth = 0; // Current drawdown from running max
+    let currentDrawdownPeak = equityValues[0]; // Peak at start of current drawdown
 
     for (let i = 1; i < equityValues.length; i++) {
       const eq = equityValues[i];
@@ -1709,6 +1712,7 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
           // Record the max drawdown depth for this period
           if (currentDrawdownDepth > 0) {
             drawdownValues.push(currentDrawdownDepth);
+            drawdownPeaks.push(currentDrawdownPeak);
           }
           currentDrawdownBars = 0;
           currentDrawdownDepth = 0;
@@ -1727,8 +1731,12 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
           growthPeriods.push(currentGrowthBars);
           // Record runup from period start low to peak
           const runup = runningMax - periodStartLow;
-          if (runup > 0) runupValues.push(runup);
+          if (runup > 0) {
+            runupValues.push(runup);
+            runupBases.push(periodStartLow);
+          }
           currentGrowthBars = 0;
+          currentDrawdownPeak = runningMax; // Remember peak for % calculation
         }
         currentDrawdownBars++;
         inDrawdown = true;
@@ -1741,12 +1749,16 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
       growthPeriods.push(currentGrowthBars);
       // Total runup = current max - starting low
       const totalRunup = runningMax - periodStartLow;
-      if (totalRunup > 0) runupValues.push(totalRunup);
+      if (totalRunup > 0) {
+        runupValues.push(totalRunup);
+        runupBases.push(periodStartLow);
+      }
     }
     if (currentDrawdownBars > 0) {
       drawdownPeriods.push(currentDrawdownBars);
       if (currentDrawdownDepth > 0) {
         drawdownValues.push(currentDrawdownDepth);
+        drawdownPeaks.push(currentDrawdownPeak);
       }
     }
 
@@ -1762,22 +1774,34 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
       );
     }
 
-    // Calculate max and avg runup values
+    // Calculate max and avg runup values (% relative to base, not initialCapital)
     if (maxRunupValue === 0 && runupValues.length > 0) {
-      maxRunupValue = Math.max(...runupValues);
-      maxRunupPct = (maxRunupValue / initialCapital) * 100;
+      const maxIdx = runupValues.indexOf(Math.max(...runupValues));
+      maxRunupValue = runupValues[maxIdx];
+      const base = runupBases[maxIdx] || initialCapital;
+      maxRunupPct = base > 0 ? (maxRunupValue / base) * 100 : 0;
     }
     if (runupValues.length > 0) {
       avgRunupValue =
         runupValues.reduce((a, b) => a + b, 0) / runupValues.length;
-      avgRunupPct = (avgRunupValue / initialCapital) * 100;
+      // Average % relative to each period's base (low before growth)
+      const avgRunupPctSum = runupValues.reduce((sum, v, i) => {
+        const base = runupBases[i] || initialCapital;
+        return sum + (base > 0 ? (v / base) * 100 : 0);
+      }, 0);
+      avgRunupPct = avgRunupPctSum / runupValues.length;
     }
 
-    // Calculate avg drawdown value
+    // Calculate avg drawdown value (% relative to peak, not initialCapital)
     if (avgDrawdownValue === 0 && drawdownValues.length > 0) {
       avgDrawdownValue =
         drawdownValues.reduce((a, b) => a + b, 0) / drawdownValues.length;
-      avgDrawdownPct = (avgDrawdownValue / initialCapital) * 100;
+      // Average % relative to each period's peak (high before drawdown)
+      const avgDDPctSum = drawdownValues.reduce((sum, v, i) => {
+        const peak = drawdownPeaks[i] || initialCapital;
+        return sum + (peak > 0 ? (v / peak) * 100 : 0);
+      }, 0);
+      avgDrawdownPct = avgDDPctSum / drawdownValues.length;
     }
   }
 
@@ -1836,19 +1860,10 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
   }
 
   // Recovery / Return on Drawdown - All, Long, Short
-  setValue('dyn-return-on-dd', metrics.recovery_factor || 0, 'number');
-  const longRecovery =
-    metrics.max_drawdown > 0 && metrics.long_net_profit
-      ? metrics.long_net_profit /
-      ((initialCapital * metrics.max_drawdown) / 100)
-      : 0;
-  const shortRecovery =
-    metrics.max_drawdown > 0 && metrics.short_net_profit
-      ? metrics.short_net_profit /
-      ((initialCapital * metrics.max_drawdown) / 100)
-      : 0;
-  setValue('dyn-return-on-dd-long', longRecovery, 'number');
-  setValue('dyn-return-on-dd-short', shortRecovery, 'number');
+  // Use backend-computed values directly (correct per-direction drawdown denominators)
+  setValue('dyn-return-on-dd', metrics.recovery_factor ?? 0, 'number');
+  setValue('dyn-return-on-dd-long', metrics.recovery_long ?? 0, 'number');
+  setValue('dyn-return-on-dd-short', metrics.recovery_short ?? 0, 'number');
 
   // Net Profit vs Max Loss - All, Long, Short
   const maxLoss = Math.abs(metrics.largest_loss || metrics.worst_trade || 1);
@@ -2116,7 +2131,25 @@ function updateTVTradeAnalysisTab(metrics, config, _trades) {
 function updateTVRiskReturnTab(metrics, _trades, _config) {
   if (!metrics) return;
 
-  const setValue = (id, value) => {
+  // Color thresholds for ratio metrics
+  const ratioThresholds = {
+    sharpe:  { red: 0, green: 1 },     // < 0 red, 0-1 neutral, > 1 green
+    sortino: { red: 0, green: 1.5 },
+    calmar:  { red: 0, green: 1 },
+    pf:      { red: 1, green: 1 },     // < 1 red, = 1 neutral, > 1 green
+    recovery:{ red: 1, green: 2 },
+    kelly:   { red: 0, green: 0 },     // < 0 red, >= 0 neutral/green
+    default: { red: 0, green: 0 }      // simple sign-based
+  };
+
+  const getColorClass = (value, thresholdKey) => {
+    const t = ratioThresholds[thresholdKey] || ratioThresholds.default;
+    if (value < t.red) return 'tv-value-negative';
+    if (value > t.green) return 'tv-value-positive';
+    return 'tv-value-neutral';
+  };
+
+  const setValue = (id, value, thresholdKey) => {
     const el = document.getElementById(id);
     if (!el) return;
 
@@ -2127,15 +2160,17 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
     }
 
     el.textContent = value.toFixed(3);
-    el.className = 'tv-value-neutral';
+    el.className = thresholdKey
+      ? getColorClass(value, thresholdKey)
+      : 'tv-value-neutral';
   };
 
   // All - use backend values
-  setValue('rr-sharpe', metrics.sharpe_ratio);
-  setValue('rr-sortino', metrics.sortino_ratio);
-  setValue('rr-profit-factor', metrics.profit_factor);
-  setValue('rr-calmar', metrics.calmar_ratio);
-  setValue('rr-recovery', metrics.recovery_factor);
+  setValue('rr-sharpe', metrics.sharpe_ratio, 'sharpe');
+  setValue('rr-sortino', metrics.sortino_ratio, 'sortino');
+  setValue('rr-profit-factor', metrics.profit_factor, 'pf');
+  setValue('rr-calmar', metrics.calmar_ratio, 'calmar');
+  setValue('rr-recovery', metrics.recovery_factor, 'recovery');
 
   // New Advanced Metrics
   setValue('rr-ulcer', metrics.ulcer_index);
@@ -2152,24 +2187,24 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
   setValue('rr-sqn-short', metrics.sqn_short || null);
 
   // Long - use backend values
-  setValue('rr-sharpe-long', metrics.sharpe_long);
-  setValue('rr-sortino-long', metrics.sortino_long);
-  setValue('rr-profit-factor-long', metrics.long_profit_factor);
-  setValue('rr-calmar-long', metrics.calmar_long);
-  setValue('rr-recovery-long', metrics.recovery_long);
+  setValue('rr-sharpe-long', metrics.sharpe_long, 'sharpe');
+  setValue('rr-sortino-long', metrics.sortino_long, 'sortino');
+  setValue('rr-profit-factor-long', metrics.long_profit_factor, 'pf');
+  setValue('rr-calmar-long', metrics.calmar_long, 'calmar');
+  setValue('rr-recovery-long', metrics.recovery_long, 'recovery');
 
   // Short - use backend values
-  setValue('rr-sharpe-short', metrics.sharpe_short);
-  setValue('rr-sortino-short', metrics.sortino_short);
-  setValue('rr-profit-factor-short', metrics.short_profit_factor);
-  setValue('rr-calmar-short', metrics.calmar_short);
-  setValue('rr-recovery-short', metrics.recovery_short);
+  setValue('rr-sharpe-short', metrics.sharpe_short, 'sharpe');
+  setValue('rr-sortino-short', metrics.sortino_short, 'sortino');
+  setValue('rr-profit-factor-short', metrics.short_profit_factor, 'pf');
+  setValue('rr-calmar-short', metrics.calmar_short, 'calmar');
+  setValue('rr-recovery-short', metrics.recovery_short, 'recovery');
 
   // Additional metrics (Kelly, Payoff, Consecutive)
   const kellyValue = metrics.kelly_percent || 0;
-  setValue('rr-kelly', kellyValue * 100); // Convert to percentage
-  setValue('rr-kelly-long', (metrics.kelly_percent_long || 0) * 100);
-  setValue('rr-kelly-short', (metrics.kelly_percent_short || 0) * 100);
+  setValue('rr-kelly', kellyValue * 100, 'kelly'); // Convert to percentage
+  setValue('rr-kelly-long', (metrics.kelly_percent_long || 0) * 100, 'kelly');
+  setValue('rr-kelly-short', (metrics.kelly_percent_short || 0) * 100, 'kelly');
 
   // Payoff Ratio = Avg Win / |Avg Loss|
   const payoff =
