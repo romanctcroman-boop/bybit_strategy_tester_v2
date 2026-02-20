@@ -190,7 +190,7 @@ def strategy_to_response(strategy: MarketplaceStrategy) -> dict:
 @router.get("/strategies", response_model=list[StrategyResponse])
 async def list_strategies(
     db: Session = Depends(get_db),
-    search: str | None = Query(None, description="Search by name or description"),
+    search: str | None = Query(None, max_length=100, description="Search by name or description"),
     strategy_type: str | None = Query(None, description="Filter by strategy type"),
     sort_by: str = Query(
         "downloads", description="Sort by: downloads, rating, newest, return"
