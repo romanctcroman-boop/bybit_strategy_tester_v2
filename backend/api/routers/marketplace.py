@@ -192,9 +192,7 @@ async def list_strategies(
     db: Session = Depends(get_db),
     search: str | None = Query(None, max_length=100, description="Search by name or description"),
     strategy_type: str | None = Query(None, description="Filter by strategy type"),
-    sort_by: str = Query(
-        "downloads", description="Sort by: downloads, rating, newest, return"
-    ),
+    sort_by: str = Query("downloads", description="Sort by: downloads, rating, newest, return"),
     min_rating: float | None = Query(None, ge=0, le=5),
     featured_only: bool = Query(False),
     limit: int = Query(20, ge=1, le=100),
@@ -265,7 +263,7 @@ async def get_strategy(
         raise HTTPException(status_code=404, detail="Strategy not found")
 
     # Increment view count
-    strategy.views += 1
+    strategy.views += 1  # type: ignore[assignment]
     db.commit()
 
     # Get reviews
@@ -278,7 +276,7 @@ async def get_strategy(
     )
 
     response = strategy_to_response(strategy)
-    response["strategy_params"] = json.loads(strategy.strategy_params)
+    response["strategy_params"] = json.loads(str(strategy.strategy_params))
     response["reviews"] = [
         {
             "id": r.id,
@@ -323,9 +321,7 @@ async def publish_strategy(
         profit_factor=request.profit_factor,
         total_trades=request.total_trades,
         backtest_period=request.backtest_period,
-        published_at=datetime.now(UTC)
-        if request.visibility == "public"
-        else None,
+        published_at=datetime.now(UTC) if request.visibility == "public" else None,
     )
 
     db.add(strategy)
@@ -367,12 +363,12 @@ async def download_strategy(
     db.add(download)
 
     # Increment counter
-    strategy.downloads += 1
+    strategy.downloads += 1  # type: ignore[assignment]
     db.commit()
 
     return {
         "strategy_type": strategy.strategy_type,
-        "strategy_params": json.loads(strategy.strategy_params),
+        "strategy_params": json.loads(str(strategy.strategy_params)),
         "version": strategy.version,
         "name": strategy.name,
     }
@@ -387,11 +383,7 @@ async def review_strategy(
     """
     Add or update a review for a strategy.
     """
-    strategy = (
-        db.query(MarketplaceStrategy)
-        .filter(MarketplaceStrategy.id == strategy_id)
-        .first()
-    )
+    strategy = db.query(MarketplaceStrategy).filter(MarketplaceStrategy.id == strategy_id).first()
 
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -422,10 +414,10 @@ async def review_strategy(
 
     if existing:
         # Update existing review
-        existing.rating = request.rating
-        existing.title = request.title
-        existing.comment = request.comment
-        existing.updated_at = datetime.now(UTC)
+        existing.rating = request.rating  # type: ignore[assignment]
+        existing.title = request.title  # type: ignore[assignment]
+        existing.comment = request.comment  # type: ignore[assignment]
+        existing.updated_at = datetime.now(UTC)  # type: ignore[assignment]
         review = existing
     else:
         # Create new review
@@ -441,13 +433,11 @@ async def review_strategy(
         db.add(review)
 
     # Update strategy rating
-    all_reviews = (
-        db.query(StrategyReview).filter(StrategyReview.strategy_id == strategy_id).all()
-    )
+    all_reviews = db.query(StrategyReview).filter(StrategyReview.strategy_id == strategy_id).all()
 
     if all_reviews:
-        strategy.rating_avg = sum(r.rating for r in all_reviews) / len(all_reviews)
-        strategy.rating_count = len(all_reviews)
+        strategy.rating_avg = sum(r.rating for r in all_reviews) / len(all_reviews)  # type: ignore[assignment]
+        strategy.rating_count = len(all_reviews)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(review)
@@ -463,11 +453,7 @@ async def like_strategy(
     """
     Like or unlike a strategy.
     """
-    strategy = (
-        db.query(MarketplaceStrategy)
-        .filter(MarketplaceStrategy.id == strategy_id)
-        .first()
-    )
+    strategy = db.query(MarketplaceStrategy).filter(MarketplaceStrategy.id == strategy_id).first()
 
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -486,13 +472,13 @@ async def like_strategy(
     if existing:
         # Unlike
         db.delete(existing)
-        strategy.likes -= 1
+        strategy.likes -= 1  # type: ignore[assignment]
         action = "unliked"
     else:
         # Like
         like = StrategyLike(strategy_id=strategy_id, user_id=user_id)
         db.add(like)
-        strategy.likes += 1
+        strategy.likes += 1  # type: ignore[assignment]
         action = "liked"
 
     db.commit()
@@ -537,7 +523,7 @@ async def get_marketplace_stats(
     )
 
     # Category counts
-    categories = (
+    category_rows = (
         db.query(
             MarketplaceStrategy.strategy_type,
             func.count(MarketplaceStrategy.id).label("count"),
@@ -548,6 +534,9 @@ async def get_marketplace_stats(
         .group_by(MarketplaceStrategy.strategy_type)
         .all()
     )
+    categories: dict[str, int] = {
+        row[0]: int(row[1]) for row in category_rows
+    }
 
     return MarketplaceStatsResponse(
         total_strategies=total_strategies,
@@ -555,7 +544,7 @@ async def get_marketplace_stats(
         total_reviews=total_reviews,
         featured_count=featured_count,
         top_rated_count=top_rated_count,
-        categories={c.strategy_type: c.count for c in categories},
+        categories=categories,
     )
 
 
@@ -579,7 +568,4 @@ async def get_categories(
         .all()
     )
 
-    return [
-        {"type": c.strategy_type, "count": c.count, "label": c.strategy_type.upper()}
-        for c in categories
-    ]
+    return [{"type": c.strategy_type, "count": c.count, "label": c.strategy_type.upper()} for c in categories]

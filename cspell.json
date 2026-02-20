@@ -50,6 +50,7 @@
         "ilike",
         "pmessage",
         "psubscribe",
+        "unliked",
         "savez",
         "venv",
         "Venv",
