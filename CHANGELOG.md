@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **P5.1a: Agent Memory SQLite WAL backend — 2026-02-21:**
+    - `AgentMemoryManager` now supports dual backend: SQLite WAL (`AGENT_MEMORY_BACKEND=sqlite`) or JSON files (default)
+    - Separate database at `data/agent_conversations.db` with WAL mode for concurrent reads
+    - New methods: `_init_sqlite()`, `_get_sqlite()`, `_persist_conversation_sqlite()`, `_load_conversation_sqlite()`, `_clear_conversation_sqlite()`
+    - 12 unit tests including concurrent write stress test (5 threads x 20 messages)
+
+- **P5.1b: Redis distributed lock for pipeline — 2026-02-21:**
+    - `backend/services/distributed_lock.py`: `DistributedLock` with Redis SET NX EX pattern
+    - Graceful fallback to `asyncio.Lock` when Redis unavailable
+    - Integrated into `ai_pipeline.py` `generate_strategy` endpoint with 429 on lock timeout
+    - Extracted `_execute_pipeline()` helper for clean separation
+    - 8 unit tests covering acquire/release, contention, timeout, fallback
+
+- **P5.3a: Comprehensive metrics calculator tests — 2026-02-21:**
+    - 147 known-value unit tests for `backend/core/metrics_calculator.py` (86% coverage)
+    - Tests every standalone function: `safe_divide`, `calculate_win_rate`, `calculate_profit_factor`, `calculate_margin_efficiency`, `calculate_ulcer_index`, `calculate_sharpe`, `calculate_sortino`, `calculate_calmar`, `calculate_max_drawdown`, `calculate_cagr`, `calculate_expectancy`, `calculate_consecutive_streaks`, `calculate_stability_r2`, `calculate_sqn`
+    - Tests `calculate_trade_metrics`, `calculate_risk_metrics`, `calculate_long_short_metrics` with hand-calculated expected values
+    - Tests `calculate_all()` output: 90+ keys present, all values finite, caching, Kelly criterion, expectancy
+    - Tests `enrich_metrics_with_percentages`, Numba parity, edge cases (single trade, all winners, all losers, breakeven only, large PnL, negative equity)
+    - Full output key verification: all documented metric keys present in result dict
+
+- **P5.3d: XSS E2E protection tests — 2026-02-21:**
+    - 98 tests without Playwright dependency (httpx AsyncClient against FastAPI app)
+    - `escapeHtml` parity with `Sanitizer.js` (19 OWASP payloads, angle bracket verification, stdlib parity)
+    - XSS detection patterns (dangerous tags, event handler attributes, no false positives)
+    - API endpoint reflection tests (health, klines, backtest, 404 path)
+    - Security headers verification (X-Content-Type-Options, server header, JSON content-type)
+    - Template injection payloads (Jinja2, JS, Ruby, ERB)
+    - Sanitizer.js allowed/dangerous tag verification, input length limits, null byte injection
+
 ### Fixed
 
 - **P1 Critical Bug Fixes — 2026-02-20:**
