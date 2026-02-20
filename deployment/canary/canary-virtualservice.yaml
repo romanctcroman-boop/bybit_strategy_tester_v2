@@ -1,0 +1,55 @@
+# Canary Traffic Splitting via Istio VirtualService
+#
+# Progressive rollout stages:
+#   Stage 1: 10% canary / 90% stable
+#   Stage 2: 25% canary / 75% stable
+#   Stage 3: 50% canary / 50% stable
+#   Stage 4: 100% canary (promote)
+#
+# To advance stages, update the weight values and apply.
+# Monitor error rates at /metrics before each advancement.
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: bybit-strategy-tester-vs
+  namespace: bybit
+spec:
+  hosts:
+    - bybit-strategy-tester
+  http:
+    - match:
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: bybit-strategy-tester
+            subset: canary
+          weight: 100
+    - route:
+        # Stage 1: 10% canary
+        - destination:
+            host: bybit-strategy-tester
+            subset: stable
+          weight: 90
+        - destination:
+            host: bybit-strategy-tester
+            subset: canary
+          weight: 10
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: bybit-strategy-tester-dr
+  namespace: bybit
+spec:
+  host: bybit-strategy-tester
+  subsets:
+    - name: stable
+      labels:
+        track: stable
+    - name: canary
+      labels:
+        track: canary

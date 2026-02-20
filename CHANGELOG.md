@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional Improvement: Canary Deployment Infrastructure — 2026-02-20:**
+    - `deployment/canary/canary-deployment.yaml` — K8s Deployment with canary track labels, health probes, resource limits, Prometheus annotations
+    - `deployment/canary/canary-virtualservice.yaml` — Istio VirtualService for progressive traffic splitting (10→25→50→100% stages) with DestinationRule subsets
+    - `deployment/canary/canary-rollback-rules.yaml` — PrometheusRule for automatic rollback on >5% error rate (critical) and >2s p99 latency (warning)
+    - `deployment/canary/canary.ps1` — PowerShell management script (deploy/promote/rollback/status actions with health checks)
+
+- **Optional Improvement: GraphQL API Schema — 2026-02-20:**
+    - `backend/api/graphql_schema.py` — Strawberry GraphQL schema with Query (health, strategies, symbols, timeframes) + Mutation (run_backtest)
+    - Graceful fallback router if `strawberry` package not installed (returns 501 with install instructions)
+
+- **Optional Improvement: WebSocket Scaling Service — 2026-02-20:**
+    - `backend/services/ws_scaling.py` — High-level Redis Pub/Sub broadcaster for multi-worker WebSocket delivery
+    - `BroadcastMessage` serialization, channel registry, local asyncio.Queue fallback when Redis unavailable
+    - Module-level `get_ws_broadcaster()` singleton
+    - Extends existing `tick_redis_broadcaster.py` for backtest progress, pipeline status, and system alerts
+
+- **Optional Improvement: RL Training Pipeline — 2026-02-20:**
+    - `backend/services/rl_training.py` — Experiment tracking & model management wrapping `backend/ml/rl_trading_agent.py`
+    - `LocalExperimentTracker` (file-based JSON storage, run listing, best-model selection by metric)
+    - `RLTrainingPipeline` with `train()`, `evaluate()`, `list_runs()`, `best_model()` methods
+    - Synthetic episode generation, epsilon-greedy training loop, batch DQN with `train_step()`
+    - NumPy `.npz` checkpoint saving
+
+- **Optional Improvement: News Feed Service — 2026-02-20:**
+    - `backend/services/news_feed.py` — Real-time news aggregation wrapping `backend/ml/news_nlp_analyzer.py`
+    - `MockNewsSource` for dev/testing, `RSSNewsSource` stub, pluggable `BaseNewsSource` adapter
+    - `ArticleCache` with TTL-based eviction and symbol/date filtering
+    - `NewsFeedService.get_feed()` and `get_sentiment_summary()` with bullish/bearish/neutral aggregation
+    - Module-level `get_news_feed_service()` singleton
+
+- **Tests for new optional modules — 2026-02-20:**
+    - `tests/backend/services/test_rl_training.py` — 19 tests: TrainingRun serialization, LocalExperimentTracker CRUD, RLTrainingPipeline train/evaluate/list
+    - `tests/backend/services/test_news_feed.py` — 18 tests: MockNewsSource, ArticleCache, FeedArticle, SentimentSummary, NewsFeedService integration
+    - `tests/backend/services/test_ws_scaling.py` — 9 tests: BroadcastMessage JSON roundtrip, WSBroadcaster local pub/sub, singleton
+
+### Fixed
+
+- **Perplexity cache `invalidate_cache()` TypeError on tuple keys — 2026-02-20:**
+    - `backend/agents/consensus/perplexity_integration.py` line 673: `key.startswith()` failed when cache contained tuple keys `("SYMBOL", "strategy")`. Fixed to handle both `str` and `tuple` key formats.
+    - 17/17 perplexity tests pass.
+
+- **AI pipeline status tests TTL eviction — 2026-02-20:**
+    - `tests/backend/api/test_ai_pipeline_endpoints.py`: 6 tests used hardcoded `"2025-01-01T12:00:00"` timestamps that were evicted by `_evict_stale_jobs()` (1hr TTL). Added `_recent_ts()` helper using `datetime.now(UTC)`.
+    - 28/28 pipeline endpoint tests pass.
+
+- **Ruff UP041: `asyncio.TimeoutError` → `TimeoutError` — 2026-02-20:**
+    - Updated deprecated `asyncio.TimeoutError` alias in `perplexity_integration.py`.
+
+- **Mypy annotation fix in `agent_memory.py` — 2026-02-20:**
+    - Explicit `self._db_path: str | None = None` annotation to satisfy Mypy type checker.
+
+### Confirmed Pre-Existing (No Changes Needed)
+
+- **Performance Profiling** — `backend/services/profiler.py` (244 lines) already implements `@profile_time`, `@profile_memory`, `profiling_session` context manager
+- **A/B Testing Framework** — `backend/services/ab_testing.py` (713 lines) already implements full A/B test suite with scipy
+- **WebSocket Scaling (low-level)** — `backend/services/tick_redis_broadcaster.py` (301 lines) already implements Redis pub/sub for trade data
+- **RL Trading Agent** — `backend/ml/rl_trading_agent.py` (820 lines) already implements DQN/PPO agents with experience replay
+- **News NLP Analyzer** — `backend/ml/news_nlp_analyzer.py` (797 lines) already implements sentiment analysis with lexicon + optional FinBERT
+
+---
+
+### Added
+
 - **P5.1a: Agent Memory SQLite WAL backend — 2026-02-21:**
     - `AgentMemoryManager` now supports dual backend: SQLite WAL (`AGENT_MEMORY_BACKEND=sqlite`) or JSON files (default)
     - Separate database at `data/agent_conversations.db` with WAL mode for concurrent reads
