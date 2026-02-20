@@ -61,13 +61,13 @@ class AgentMemoryManager:
 
         # Select backend
         self._backend = backend or _get_backend_setting()
+        self._db_path: str | None = None
         if self._backend == "sqlite":
             self._db_path = str(self.project_root / "data" / "agent_conversations.db")
             Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
             self._init_sqlite()
             logger.info("AgentMemoryManager initialized (SQLite WAL): %s", self._db_path)
         else:
-            self._db_path = None
             logger.info("AgentMemoryManager initialized (JSON files): %s", self.memory_dir)
 
     # ------------------------------------------------------------------

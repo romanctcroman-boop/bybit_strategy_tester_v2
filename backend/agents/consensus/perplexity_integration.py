@@ -391,7 +391,7 @@ Format your response as JSON:
 
             try:
                 response = await asyncio.wait_for(client.chat(messages), timeout=30.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(f"🟣 Perplexity enrichment timeout for {symbol}/{strategy_type}")
                 context["market_context"] = {"status": "timeout", "error": "Perplexity request timed out"}
                 return context
@@ -670,7 +670,12 @@ Format your response as JSON:
             logger.info(f"🟣 Perplexity cache cleared ({count} entries)")
             return count
 
-        keys_to_remove = [key for key in self._context_cache if key.startswith(f"{symbol}:")]
+        keys_to_remove = [
+            key
+            for key in self._context_cache
+            if (isinstance(key, str) and key.startswith(f"{symbol}:"))
+            or (isinstance(key, tuple) and len(key) >= 1 and key[0] == symbol)
+        ]
         for key in keys_to_remove:
             del self._context_cache[key]
         if keys_to_remove:

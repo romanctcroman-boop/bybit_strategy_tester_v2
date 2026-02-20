@@ -12,7 +12,7 @@ Tests cover all 6 endpoints in /ai-pipeline/:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -55,6 +55,11 @@ def clear_jobs():
     _pipeline_jobs.clear()
     yield
     _pipeline_jobs.clear()
+
+
+def _recent_ts(minutes_ago: int = 0) -> str:
+    """Generate a recent ISO timestamp that survives TTL eviction (1h max)."""
+    return (datetime.now(UTC) - timedelta(minutes=minutes_ago)).isoformat()
 
 
 @pytest.fixture
@@ -453,7 +458,7 @@ class TestPipelineStatusEndpoint:
         """Running job returns status with progress."""
         _pipeline_jobs["job-123"] = {
             "status": "running",
-            "created_at": "2025-01-01T12:00:00",
+            "created_at": _recent_ts(),
             "current_stage": "strategy_generation",
         }
 
@@ -468,10 +473,12 @@ class TestPipelineStatusEndpoint:
 
     def test_status_completed(self, client):
         """Completed job shows 100% progress."""
+        created = _recent_ts(5)
+        completed = _recent_ts(0)
         _pipeline_jobs["job-456"] = {
             "status": "completed",
-            "created_at": "2025-01-01T12:00:00",
-            "completed_at": "2025-01-01T12:05:00",
+            "created_at": created,
+            "completed_at": completed,
             "current_stage": "complete",
         }
 
@@ -480,13 +487,13 @@ class TestPipelineStatusEndpoint:
         data = response.json()
         assert data["status"] == "completed"
         assert data["progress_pct"] == 100
-        assert data["completed_at"] == "2025-01-01T12:05:00"
+        assert data["completed_at"] == completed
 
     def test_status_walk_forward_stage(self, client):
         """Walk-forward stage shows 95% progress."""
         _pipeline_jobs["job-wf"] = {
             "status": "running",
-            "created_at": "2025-01-01T12:00:00",
+            "created_at": _recent_ts(),
             "current_stage": "walk_forward",
         }
 
@@ -513,7 +520,7 @@ class TestPipelineResultEndpoint:
         """Running job returns 400."""
         _pipeline_jobs["job-run"] = {
             "status": "running",
-            "created_at": "2025-01-01T12:00:00",
+            "created_at": _recent_ts(),
             "current_stage": "strategy_generation",
         }
 
@@ -524,10 +531,12 @@ class TestPipelineResultEndpoint:
 
     def test_result_completed(self, client):
         """Completed job returns full result."""
+        created = _recent_ts(5)
+        completed = _recent_ts(0)
         _pipeline_jobs["job-done"] = {
             "status": "completed",
-            "created_at": "2025-01-01T12:00:00",
-            "completed_at": "2025-01-01T12:05:00",
+            "created_at": created,
+            "completed_at": completed,
             "current_stage": "evaluation",
             "result": {
                 "success": True,
@@ -544,7 +553,7 @@ class TestPipelineResultEndpoint:
                 "consensus_summary": "Selected RSI",
                 "stages": [],
                 "total_duration_ms": 5000.0,
-                "timestamp": "2025-01-01T12:05:00",
+                "timestamp": completed,
             },
         }
 
@@ -561,7 +570,7 @@ class TestPipelineResultEndpoint:
         """Failed job returns result with error."""
         _pipeline_jobs["job-fail"] = {
             "status": "failed",
-            "created_at": "2025-01-01T12:00:00",
+            "created_at": _recent_ts(),
             "error": "LLM API timeout",
         }
 
