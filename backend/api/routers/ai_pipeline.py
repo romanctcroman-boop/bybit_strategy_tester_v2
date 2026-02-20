@@ -597,16 +597,38 @@ async def _load_ohlcv_data(
     """Load OHLCV data from the database."""
     import asyncio
 
-    from backend.services.data_service import DataService
+    from backend.database.repository.kline_repository import KlineRepository
+    from backend.database.session import get_session
 
-    data_service = DataService()
-    df = await asyncio.to_thread(
-        data_service.get_klines,
-        symbol=symbol,
-        interval=timeframe,
-        start_date=datetime.strptime(start_date, "%Y-%m-%d"),
-        end_date=datetime.strptime(end_date, "%Y-%m-%d"),
-    )
+    def _fetch() -> pd.DataFrame:
+        start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000)
+        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000)
+        with get_session() as session:
+            repo = KlineRepository(session)
+            klines = repo.get_klines(
+                symbol=symbol,
+                interval=timeframe,
+                start_time=start_ts,
+                end_time=end_ts,
+                limit=100_000,
+                ascending=True,
+            )
+            if not klines:
+                return pd.DataFrame()
+            records = [
+                {
+                    "open_time": k.open_time,
+                    "open": float(k.open_price),
+                    "high": float(k.high_price),
+                    "low": float(k.low_price),
+                    "close": float(k.close_price),
+                    "volume": float(k.volume),
+                }
+                for k in klines
+            ]
+            return pd.DataFrame(records)
+
+    df = await asyncio.to_thread(_fetch)
 
     if df is None or df.empty:
         raise ValueError(f"No OHLCV data for {symbol} {timeframe} from {start_date} to {end_date}")

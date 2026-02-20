@@ -70,6 +70,20 @@ line-length = 120
 fix = true
 
 [tool.ruff.lint]
+allowed-confusables = [
+    "с",
+    "С",
+    "а",
+    "А",
+    "е",
+    "Е",
+    "о",
+    "О",
+    "р",
+    "Р",
+    "х",
+    "Х",
+]
 select = [
     "E",   # pycodestyle errors
     "F",   # pyflakes

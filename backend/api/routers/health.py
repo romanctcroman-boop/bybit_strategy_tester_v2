@@ -259,11 +259,11 @@ async def readiness_check():
         from backend.agents.circuit_breaker_manager import get_circuit_manager
 
         manager = get_circuit_manager()
-        if manager._persistence_enabled and manager._redis:
-            await manager._redis.ping()
+        if manager._persistence_enabled and manager._persistence_redis:
+            await manager._persistence_redis.ping()
             checks["redis"] = True
         else:
-            checks["redis"] = None  # Not enabled
+            checks["redis"] = None  # type: ignore[assignment]  # Not enabled
     except Exception as e:
         checks["redis"] = False
         not_ready_reasons.append(f"Redis connection failed: {e!s}")
@@ -283,7 +283,7 @@ async def readiness_check():
         from backend.agents.circuit_breaker_manager import get_circuit_manager
 
         manager = get_circuit_manager()
-        checks["circuit_breakers"] = len(manager._breakers) > 0
+        checks["circuit_breakers"] = len(manager.breakers) > 0
         if not checks["circuit_breakers"]:
             not_ready_reasons.append("No circuit breakers registered")
     except Exception as e:
@@ -456,9 +456,8 @@ async def phase2_status():
             config_status = {
                 "yaml_loaded": True,
                 "config_file": "backend/config/agents.yaml",
-                "circuit_breakers": len(config.circuit_breakers),
+                "circuit_breaker": "enabled",
                 "prompt_max_length": config.prompt.max_length,
-                "tool_calls_max": config.budget.tool_calls_max,
             }
         except Exception as e:
             config_status = {
@@ -467,6 +466,7 @@ async def phase2_status():
             }
 
         # Build response
+        breakers_data: dict[str, Any] = {}
         response = {
             "phase2_enabled": True,
             "persistence": {
@@ -476,18 +476,18 @@ async def phase2_status():
                 "breakers_tracked": len(circuit_mgr._configs),
             },
             "config": config_status,
-            "breakers": {},
+            "breakers": breakers_data,
         }
 
         # Add breaker details
-        for name, config in metrics.breakers.items():
-            response["breakers"][name] = {
-                "total_calls": config["total_calls"],
-                "failed_calls": config["failed_calls"],
-                "successful_calls": config["successful_calls"],
-                "total_trips": config["total_trips"],
-                "current_state": config["current_state"],
-                "success_rate_24h": config["success_rate_24h"],
+        for name, breaker_info in metrics.breakers.items():
+            breakers_data[name] = {
+                "total_calls": breaker_info["total_calls"],
+                "failed_calls": breaker_info["failed_calls"],
+                "successful_calls": breaker_info["successful_calls"],
+                "total_trips": breaker_info["total_trips"],
+                "current_state": breaker_info["current_state"],
+                "success_rate_24h": breaker_info["success_rate_24h"],
             }
 
         return response

@@ -20,9 +20,7 @@ class BybitKlineAudit(Base):
     __tablename__ = "bybit_kline_audit"
     id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String(64), nullable=False)
-    interval = Column(
-        String(16), nullable=True, default="1", server_default="1"
-    )  # timeframe: 1, 5, 15, 60, D, etc.
+    interval = Column(String(16), nullable=True, default="1", server_default="1")  # timeframe: 1, 5, 15, 60, D, etc.
     market_type = Column(
         String(16), nullable=False, default="linear", server_default="linear"
     )  # 'spot' or 'linear' (perpetual)
@@ -35,9 +33,7 @@ class BybitKlineAudit(Base):
     volume = Column(Float, nullable=True)
     turnover = Column(Float, nullable=True)
     raw = Column(Text, nullable=False)  # JSON text of original row/payload
-    inserted_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    inserted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         # Unique constraint including market_type for SPOT/LINEAR distinction

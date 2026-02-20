@@ -192,19 +192,19 @@ async def list_domain_agents():
         from backend.agents.consensus.domain_agents import DomainAgentRegistry
 
         registry = DomainAgentRegistry()
-        agents = registry.list_agents()
+        agent_names = registry.list_agents()
 
         return {
             "agents": [
                 {
-                    "id": agent.agent_id,
-                    "type": agent.agent_type,
-                    "specialty": agent.specialty,
-                    "capabilities": agent.capabilities,
+                    "id": name,
+                    "type": "domain",
+                    "specialty": name,
+                    "capabilities": [],
                 }
-                for agent in agents
+                for name in agent_names
             ],
-            "total": len(agents),
+            "total": len(agent_names),
         }
 
     except Exception as e:
@@ -362,13 +362,13 @@ async def submit_feedback(request: SelfImprovementFeedbackRequest):
         else:
             await rlhf.collect_ai_feedback(
                 prompt=request.prompt,
-                response=request.response,
+                responses=[request.response],
             )
 
         return {
             "success": True,
             "feedback_type": request.feedback_type,
-            "total_feedback": len(rlhf.feedback_data),
+            "total_feedback": rlhf.stats.get("total_feedback", 0),
         }
 
     except Exception as e:
@@ -388,18 +388,18 @@ async def evaluate_response(request: SelfImprovementFeedbackRequest):
 
         rlhf = RLHFModule()
 
-        evaluation = await rlhf.self_evaluate_response(
+        evaluation = await rlhf.self_evaluate(
             prompt=request.prompt,
             response=request.response,
         )
 
         return {
-            "overall_score": evaluation.overall_score,
-            "accuracy_score": evaluation.accuracy_score,
-            "helpfulness_score": evaluation.helpfulness_score,
-            "safety_score": evaluation.safety_score,
-            "coherence_score": evaluation.coherence_score,
-            "feedback": evaluation.feedback,
+            "overall_score": evaluation.overall,
+            "accuracy_score": evaluation.accuracy,
+            "helpfulness_score": evaluation.helpfulness,
+            "safety_score": evaluation.safety,
+            "coherence_score": evaluation.clarity,
+            "feedback": "",
         }
 
     except Exception as e:
@@ -504,8 +504,7 @@ async def get_agent_metrics():
         collector = MetricsCollector()
 
         return {
-            "counters": dict(collector._counters),
-            "gauges": dict(collector._gauges),
+            "stats": collector.get_stats(),
             "prometheus": collector.export_prometheus(),
         }
 
@@ -521,21 +520,11 @@ async def get_agent_traces(limit: int = 50):
         from backend.agents.monitoring.tracing import DistributedTracer
 
         tracer = DistributedTracer()
-        spans = list(tracer._completed_spans.values())[-limit:]
+        traces = tracer.get_recent_traces(limit=limit)
 
         return {
-            "traces": [
-                {
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "name": span.name,
-                    "duration_ms": span.duration_ms,
-                    "status": span.status.value if hasattr(span, "status") else "ok",
-                    "attributes": span.attributes,
-                }
-                for span in spans
-            ],
-            "total": len(spans),
+            "traces": [trace.to_dict() for trace in traces],
+            "total": len(traces),
         }
 
     except Exception as e:
@@ -553,16 +542,7 @@ async def get_agent_alerts():
         alerts = manager.get_active_alerts()
 
         return {
-            "alerts": [
-                {
-                    "id": alert.id,
-                    "rule_name": alert.rule_name,
-                    "severity": alert.severity.value,
-                    "message": alert.message,
-                    "fired_at": alert.fired_at.isoformat(),
-                }
-                for alert in alerts
-            ],
+            "alerts": [alert.to_dict() for alert in alerts],
             "total": len(alerts),
         }
 
@@ -606,17 +586,14 @@ async def get_system_overview():
     """Get complete AI agent system overview"""
     try:
         # Collect stats from all subsystems
-        overview = {
-            "status": "operational",
-            "components": {},
-        }
+        components: dict[str, Any] = {}
 
         # Memory stats
         try:
             memory = get_memory()
-            overview["components"]["memory"] = memory.get_stats()
+            components["memory"] = memory.get_stats()
         except Exception:
-            overview["components"]["memory"] = {"status": "unavailable"}
+            components["memory"] = {"status": "unavailable"}
 
         # Self-improvement stats
         try:
@@ -625,31 +602,32 @@ async def get_system_overview():
             )
 
             evaluator = PerformanceEvaluator()
-            overview["components"]["self_improvement"] = evaluator.get_stats()
+            components["self_improvement"] = evaluator.get_stats()
         except Exception:
-            overview["components"]["self_improvement"] = {"status": "unavailable"}
+            components["self_improvement"] = {"status": "unavailable"}
 
         # MCP stats
         try:
             from backend.agents.mcp.tool_registry import get_tool_registry
 
             registry = get_tool_registry()
-            overview["components"]["mcp"] = registry.get_stats()
+            components["mcp"] = registry.get_stats()
         except Exception:
-            overview["components"]["mcp"] = {"status": "unavailable"}
+            components["mcp"] = {"status": "unavailable"}
 
         # Monitoring stats
         try:
             from backend.agents.monitoring.metrics_collector import MetricsCollector
 
             collector = MetricsCollector()
-            overview["components"]["monitoring"] = {
-                "metrics_count": len(collector._counters) + len(collector._gauges),
-            }
+            components["monitoring"] = collector.get_stats()
         except Exception:
-            overview["components"]["monitoring"] = {"status": "unavailable"}
+            components["monitoring"] = {"status": "unavailable"}
 
-        return overview
+        return {
+            "status": "operational",
+            "components": components,
+        }
 
     except Exception as e:
         logger.error(f"System overview error: {e}", exc_info=True)

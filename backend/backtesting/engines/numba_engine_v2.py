@@ -285,13 +285,8 @@ if NUMBA_AVAILABLE:
                 # FIXED: Entry at NEXT bar's open (TradingView style)
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
-                # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    # Fixed amount per trade (like TradingView)
-                    allocated = min(fixed_amount, cash)
-                else:
-                    # Percentage-based position sizing
-                    allocated = cash * position_size
+                # Fixed amount or percentage-based position sizing (TV parity)
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 # Skip if allocated is too small (prevents micro-positions)
                 if allocated >= 1.0:
@@ -326,13 +321,8 @@ if NUMBA_AVAILABLE:
                 # FIXED: Entry at NEXT bar's open (TradingView style)
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
-                # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    # Fixed amount per trade (like TradingView)
-                    allocated = min(fixed_amount, cash)
-                else:
-                    # Percentage-based position sizing
-                    allocated = cash * position_size
+                # Fixed amount or percentage-based position sizing (TV parity)
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 # Skip if allocated is too small (prevents micro-positions)
                 if allocated >= 1.0:
@@ -672,10 +662,7 @@ if NUMBA_AVAILABLE:
 
             if can_enter_long:
                 entry_price = open_prices[i + 1]
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -705,10 +692,7 @@ if NUMBA_AVAILABLE:
 
             if can_enter_short:
                 entry_price = open_prices[i + 1]
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -1100,10 +1084,9 @@ if NUMBA_AVAILABLE:
                         exited_this_bar = True
 
                 # === TRAILING STOP UPDATE ===
-                if use_trailing and long_trail_active and not exited_this_bar:
-                    if high_price > long_best_price:
-                        long_best_price = high_price
-                        long_trail_stop = long_best_price * (1.0 - trail_offset)
+                if use_trailing and long_trail_active and not exited_this_bar and high_price > long_best_price:
+                    long_best_price = high_price
+                    long_trail_stop = long_best_price * (1.0 - trail_offset)
 
                 # === CALCULATE SL PRICE ===
                 # Use current_atr (not entry ATR) for parity with FallbackV4
@@ -1488,10 +1471,9 @@ if NUMBA_AVAILABLE:
                         exited_this_bar = True
 
                 # === TRAILING STOP UPDATE ===
-                if use_trailing and short_trail_active and not exited_this_bar:
-                    if low_price < short_best_price:
-                        short_best_price = low_price
-                        short_trail_stop = short_best_price * (1.0 + trail_offset)
+                if use_trailing and short_trail_active and not exited_this_bar and low_price < short_best_price:
+                    short_best_price = low_price
+                    short_trail_stop = short_best_price * (1.0 + trail_offset)
 
                 # === CALCULATE SL PRICE ===
                 # Use current_atr (not entry ATR) for parity with FallbackV4
@@ -1994,20 +1976,20 @@ if NUMBA_AVAILABLE:
                                         break
 
             # === FUNDING RATE DEDUCTION ===
-            if include_funding and funding_interval > 0:
-                if i % funding_interval == 0:  # Funding payment time
-                    # Long positions pay funding when rate > 0
-                    # Short positions receive funding when rate > 0
-                    if n_long_entries > 0:
-                        for j in range(n_long_entries):
-                            notional = long_entry_sizes[j] * close_price
-                            funding_cost = notional * funding_rate
-                            cash -= funding_cost  # Long pays
-                    if n_short_entries > 0:
-                        for j in range(n_short_entries):
-                            notional = short_entry_sizes[j] * close_price
-                            funding_income = notional * funding_rate
-                            cash += funding_income  # Short receives
+            if include_funding and funding_interval > 0 and i % funding_interval == 0:
+                # Funding payment time
+                # Long positions pay funding when rate > 0
+                # Short positions receive funding when rate > 0
+                if n_long_entries > 0:
+                    for j in range(n_long_entries):
+                        notional = long_entry_sizes[j] * close_price
+                        funding_cost = notional * funding_rate
+                        cash -= funding_cost  # Long pays
+                if n_short_entries > 0:
+                    for j in range(n_short_entries):
+                        notional = short_entry_sizes[j] * close_price
+                        funding_income = notional * funding_rate
+                        cash += funding_income  # Short receives
 
             # === UPDATE EQUITY ===
             equity = cash
@@ -2391,11 +2373,8 @@ if NUMBA_AVAILABLE:
                 # Enter at NEXT bar's open (i+1), not current bar
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
-                # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                # Fixed amount or percentage-based position sizing (TV parity)
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 # Skip if allocated is too small (prevents micro-positions)
                 if allocated >= 1.0:
@@ -2429,11 +2408,8 @@ if NUMBA_AVAILABLE:
                 # Enter at NEXT bar's open (i+1), not current bar
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
-                # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                # Fixed amount or percentage-based position sizing (TV parity)
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 # Skip if allocated is too small (prevents micro-positions)
                 if allocated >= 1.0:
@@ -3068,7 +3044,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         param_values = list(param_ranges.values())
 
         for combo in product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=True))
             modified_input = self._apply_params(input_data, params)
             result = self.run(modified_input)
 
@@ -3290,8 +3266,8 @@ class NumbaEngineV2(BaseBacktestEngine):
         entry_prices: np.ndarray,
         exit_prices: np.ndarray,
         exit_reasons: np.ndarray,
-        trade_sizes: np.ndarray = None,
-        trade_fees: np.ndarray = None,
+        trade_sizes: np.ndarray | None = None,
+        trade_fees: np.ndarray | None = None,
         initial_capital: float = 10000.0,
     ) -> list[TradeRecord]:
         """Convert Numba output to TradeRecord list with EXACT data"""
@@ -3310,10 +3286,7 @@ class NumbaEngineV2(BaseBacktestEngine):
             pnl = pnls[i]
 
             # Use exact values if provided, otherwise estimate
-            if trade_sizes is not None and len(trade_sizes) > i:
-                size = trade_sizes[i]
-            else:
-                size = 0.0
+            size = trade_sizes[i] if trade_sizes is not None and len(trade_sizes) > i else 0.0
 
             if trade_fees is not None and len(trade_fees) > i:
                 fees = trade_fees[i]
@@ -3379,11 +3352,8 @@ class NumbaEngineV2(BaseBacktestEngine):
         # === DRAWDOWN ===
         peak = np.maximum.accumulate(equity_curve)
         drawdown_pct = (peak - equity_curve) / np.maximum(peak, 1) * 100
-        drawdown_usdt = peak - equity_curve  # Absolute drawdown in USDT
-        metrics.max_drawdown = np.max(drawdown_pct)  # Percentage for consistency
-        metrics.max_drawdown_pct = np.max(drawdown_pct)  # Keep percentage version
-        metrics.max_drawdown_usdt = np.max(drawdown_usdt)  # USDT version for display
-        metrics.avg_drawdown = np.mean(drawdown_pct)
+        metrics.max_drawdown = float(np.max(drawdown_pct))  # Percentage for consistency
+        metrics.avg_drawdown = float(np.mean(drawdown_pct))
 
         # === TRADES ===
         metrics.total_trades = len(trades)
@@ -3398,11 +3368,11 @@ class NumbaEngineV2(BaseBacktestEngine):
         wins = [t.pnl for t in trades if t.pnl > 0]
         losses = [t.pnl for t in trades if t.pnl < 0]
 
-        metrics.avg_win = np.mean(wins) if wins else 0
-        metrics.avg_loss = np.mean(losses) if losses else 0
-        metrics.avg_trade = np.mean(pnls)
-        metrics.largest_win = max(pnls) if pnls else 0
-        metrics.largest_loss = min(pnls) if pnls else 0
+        metrics.avg_win = float(np.mean(wins)) if wins else 0.0
+        metrics.avg_loss = float(np.mean(losses)) if losses else 0.0
+        metrics.avg_trade = float(np.mean(pnls))
+        metrics.largest_win = float(max(pnls)) if pnls else 0.0
+        metrics.largest_loss = float(min(pnls)) if pnls else 0.0
 
         # === LONG/SHORT BREAKDOWN ===
         long_trades = [t for t in trades if t.direction == "long"]
@@ -3417,25 +3387,25 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         # === DURATION ===
         durations = [t.duration_bars for t in trades]
-        metrics.avg_trade_duration = np.mean(durations) if durations else 0
+        metrics.avg_trade_duration = float(np.mean(durations)) if durations else 0.0
 
         winning_durations = [t.duration_bars for t in trades if t.pnl > 0]
         losing_durations = [t.duration_bars for t in trades if t.pnl < 0]
-        metrics.avg_winning_duration = np.mean(winning_durations) if winning_durations else 0
-        metrics.avg_losing_duration = np.mean(losing_durations) if losing_durations else 0
+        metrics.avg_winning_duration = float(np.mean(winning_durations)) if winning_durations else 0.0
+        metrics.avg_losing_duration = float(np.mean(losing_durations)) if losing_durations else 0.0
 
         # === SHARPE RATIO ===
         returns = np.diff(equity_curve) / np.maximum(equity_curve[:-1], 1)
         returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
         if len(returns) > 1 and np.std(returns) > 0:
-            metrics.sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)
+            metrics.sharpe_ratio = float(np.mean(returns) / np.std(returns) * np.sqrt(252 * 24))
 
         # === SORTINO RATIO ===
         downside_returns = returns[returns < 0]
         if len(downside_returns) > 1:
-            downside_std = np.std(downside_returns)
+            downside_std = float(np.std(downside_returns))
             if downside_std > 0:
-                metrics.sortino_ratio = np.mean(returns) / downside_std * np.sqrt(252 * 24)
+                metrics.sortino_ratio = float(np.mean(returns) / downside_std * np.sqrt(252 * 24))
 
         # === CALMAR RATIO ===
         if metrics.max_drawdown > 0:

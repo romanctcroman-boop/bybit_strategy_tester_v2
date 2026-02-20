@@ -159,8 +159,8 @@ async def query_deepseek(request: AgentQueryRequest) -> AgentQueryResponse:
         result = await agent_interface.query_deepseek(
             prompt=request.prompt,
             model=request.model or "deepseek-chat",
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            temperature=request.temperature or 0.7,
+            max_tokens=request.max_tokens or 4096,
         )
 
         return AgentQueryResponse(
@@ -196,8 +196,8 @@ async def query_perplexity(request: AgentQueryRequest) -> AgentQueryResponse:
         result = await agent_interface.query_perplexity(
             prompt=request.prompt,
             model=request.model or "llama-3.1-sonar-small-128k-online",
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            temperature=request.temperature or 0.7,
+            max_tokens=request.max_tokens or 4096,
         )
 
         return AgentQueryResponse(
@@ -234,8 +234,8 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
             result = await agent_interface.query_deepseek(
                 prompt=request.prompt,
                 model=request.model or "deepseek-chat",
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                temperature=request.temperature or 0.7,
+                max_tokens=request.max_tokens or 4096,
             )
 
             return AgentQueryResponse(
@@ -254,8 +254,8 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
             result = await agent_interface.query_perplexity(
                 prompt=request.prompt,
                 model=request.model or "llama-3.1-sonar-small-128k-online",
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                temperature=request.temperature or 0.7,
+                max_tokens=request.max_tokens or 4096,
             )
 
             return AgentQueryResponse(
@@ -521,12 +521,14 @@ async def execute_backtest_series(request: BacktestExecutorRequest):
 
 
 @router.post("/backtest/ai-analyze", summary="AI Analyze Backtest Results")
-async def analyze_backtest_results_endpoint(results: list[dict[str, Any]] = []):
+async def analyze_backtest_results_endpoint(results: list[dict[str, Any]] | None = None):
     """
     Ask AI to analyze backtest results and recommend best strategy
 
     Evaluates multiple backtest results and provides AI-driven recommendations.
     """
+    if results is None:
+        results = []
     try:
         from backend.ml.ai_backtest_executor import AIBacktestExecutor
 
@@ -1097,8 +1099,9 @@ async def agent_list_tools() -> AgentToolListResponse:
     Returns tool names, descriptions, categories, and parameter info.
     """
     try:
-        from backend.agents.mcp.tool_registry import registry
+        from backend.agents.mcp.tool_registry import get_tool_registry
 
+        registry = get_tool_registry()
         all_tools = registry.list_tools()
         categories: dict[str, int] = {}
 

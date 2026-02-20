@@ -161,7 +161,7 @@ def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -
         # Sort indices by criterion value
         sorted_indices = sorted(
             range(n),
-            key=lambda i, gv=get_value: gv(results[i]),
+            key=lambda i: get_value(results[i]),
             reverse=higher_is_better,
         )
 
