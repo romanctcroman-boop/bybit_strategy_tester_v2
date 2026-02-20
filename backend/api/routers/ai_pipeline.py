@@ -22,6 +22,8 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from backend.services.distributed_lock import get_distributed_lock
+
 # In-memory pipeline job store (lightweight — no DB needed)
 # Eviction: max 200 entries, stale jobs removed after 1 hour.
 _pipeline_jobs: dict[str, dict[str, Any]] = {}
@@ -262,90 +264,108 @@ async def generate_strategy(request: GenerateRequest) -> PipelineResponse:
     **Agents**: deepseek (quantitative), qwen (technical), perplexity (market research)
     """
     try:
-        from backend.agents.strategy_controller import StrategyController
+        # Distributed lock: prevent duplicate pipeline runs for same symbol/timeframe
+        lock = get_distributed_lock()
+        lock_key = f"pipeline:{request.symbol}:{request.timeframe}"
 
-        # Load OHLCV data
-        df = await _load_ohlcv_data(
-            symbol=request.symbol,
-            timeframe=request.timeframe,
-            start_date=request.start_date,
-            end_date=request.end_date,
-        )
-
-        # Create pipeline job (evict stale entries first)
-        _evict_stale_jobs()
-        pipeline_id = str(uuid.uuid4())[:12]
-        _pipeline_jobs[pipeline_id] = {
-            "status": "running",
-            "created_at": datetime.now(UTC).isoformat(),
-            "current_stage": "context_analysis",
-        }
-
-        controller = StrategyController()
-        result = await controller.generate_strategy(
-            symbol=request.symbol,
-            timeframe=request.timeframe,
-            df=df,
-            agents=request.agents,
-            run_backtest=request.run_backtest,
-            enable_walk_forward=request.enable_walk_forward,
-            backtest_config={
-                "initial_capital": request.initial_capital,
-                "leverage": request.leverage,
-            },
-        )
-
-        # Build response
-        strategy_resp = None
-        if result.strategy:
-            strategy_resp = StrategyResponse(
-                strategy_name=result.strategy.strategy_name,
-                strategy_type=result.strategy.get_strategy_type_for_engine(),
-                strategy_params=result.strategy.get_engine_params(),
-                description=result.strategy.description,
-                signals_count=len(result.strategy.signals),
-                quality_score=result.validation.quality_score if result.validation else 0,
-                agent=result.strategy.agent_metadata.agent_name if result.strategy.agent_metadata else "",
+        try:
+            async with lock.acquire(lock_key, ttl=600, max_retries=3):
+                return await _execute_pipeline(request)
+        except TimeoutError:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Pipeline for {request.symbol}/{request.timeframe} is already running. Try again later.",
             )
 
-        pipeline_response = PipelineResponse(
-            success=result.success,
-            pipeline_id=pipeline_id,
-            strategy=strategy_resp,
-            backtest_metrics=result.backtest_metrics,
-            walk_forward=result.walk_forward,
-            proposals_count=len(result.proposals),
-            consensus_summary=result.consensus_summary,
-            stages=[
-                {
-                    "stage": s.stage.value,
-                    "success": s.success,
-                    "duration_ms": round(s.duration_ms, 1),
-                    "error": s.error,
-                }
-                for s in result.stages
-            ],
-            total_duration_ms=round(result.total_duration_ms, 1),
-            timestamp=result.timestamp.isoformat(),
-        )
-
-        # Store result for later retrieval
-        _pipeline_jobs[pipeline_id] = {
-            "status": "completed" if result.success else "failed",
-            "created_at": _pipeline_jobs[pipeline_id]["created_at"],
-            "completed_at": datetime.now(UTC).isoformat(),
-            "current_stage": result.final_stage.value,
-            "result": pipeline_response.model_dump(),
-        }
-
-        return pipeline_response
-
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.warning(f"Validation error in generate: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         raise HTTPException(status_code=500, detail=f"Pipeline failed: {e}")
+
+
+async def _execute_pipeline(request: GenerateRequest) -> PipelineResponse:
+    """Execute the pipeline (called under distributed lock)."""
+    from backend.agents.strategy_controller import StrategyController
+
+    # Load OHLCV data
+    df = await _load_ohlcv_data(
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        start_date=request.start_date,
+        end_date=request.end_date,
+    )
+
+    # Create pipeline job (evict stale entries first)
+    _evict_stale_jobs()
+    pipeline_id = str(uuid.uuid4())[:12]
+    _pipeline_jobs[pipeline_id] = {
+        "status": "running",
+        "created_at": datetime.now(UTC).isoformat(),
+        "current_stage": "context_analysis",
+    }
+
+    controller = StrategyController()
+    result = await controller.generate_strategy(
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        df=df,
+        agents=request.agents,
+        run_backtest=request.run_backtest,
+        enable_walk_forward=request.enable_walk_forward,
+        backtest_config={
+            "initial_capital": request.initial_capital,
+            "leverage": request.leverage,
+        },
+    )
+
+    # Build response
+    strategy_resp = None
+    if result.strategy:
+        strategy_resp = StrategyResponse(
+            strategy_name=result.strategy.strategy_name,
+            strategy_type=result.strategy.get_strategy_type_for_engine(),
+            strategy_params=result.strategy.get_engine_params(),
+            description=result.strategy.description,
+            signals_count=len(result.strategy.signals),
+            quality_score=result.validation.quality_score if result.validation else 0,
+            agent=result.strategy.agent_metadata.agent_name if result.strategy.agent_metadata else "",
+        )
+
+    pipeline_response = PipelineResponse(
+        success=result.success,
+        pipeline_id=pipeline_id,
+        strategy=strategy_resp,
+        backtest_metrics=result.backtest_metrics,
+        walk_forward=result.walk_forward,
+        proposals_count=len(result.proposals),
+        consensus_summary=result.consensus_summary,
+        stages=[
+            {
+                "stage": s.stage.value,
+                "success": s.success,
+                "duration_ms": round(s.duration_ms, 1),
+                "error": s.error,
+            }
+            for s in result.stages
+        ],
+        total_duration_ms=round(result.total_duration_ms, 1),
+        timestamp=result.timestamp.isoformat(),
+    )
+
+    # Store result for later retrieval
+    _pipeline_jobs[pipeline_id] = {
+        "status": "completed" if result.success else "failed",
+        "created_at": _pipeline_jobs[pipeline_id]["created_at"],
+        "completed_at": datetime.now(UTC).isoformat(),
+        "current_stage": result.final_stage.value,
+        "result": pipeline_response.model_dump(),
+    }
+
+    return pipeline_response
 
 
 @router.get("/agents", response_model=list[AgentInfo])
