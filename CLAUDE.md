@@ -28,10 +28,10 @@
 
 AI-powered trading strategy backtesting platform for Bybit exchange. Visual block-based strategy builder with multi-agent AI pipeline.
 
-**Stack:** FastAPI · PostgreSQL · Redis · VectorBT · Numba · LangGraph
+**Stack:** FastAPI · SQLite (local dev) / PostgreSQL (prod) · Redis · VectorBT · Numba · LangGraph
 **AI agents:** DeepSeek · Qwen (Alibaba DashScope) · Perplexity — direct API mode (MCP disabled)
 **Frontend:** Vanilla HTML/CSS/ES modules (no build step, no npm/webpack)
-**Python:** 3.11+
+**Python:** 3.11+ (3.14 recommended on this machine — use `py -3.14`)
 **Entry point:** `python main.py server` → http://localhost:8000
 
 ---
@@ -63,18 +63,19 @@ FastAPI router                                          → JSON response + warn
 
 ### Key modules
 
-| Module                   | Path                                              | Responsibility                                  |
-| ------------------------ | ------------------------------------------------- | ----------------------------------------------- |
-| `BacktestConfig`         | `backend/backtesting/models.py`                   | All backtest parameters (single Pydantic model) |
-| `BacktestEngine`         | `backend/backtesting/engine.py`                   | FallbackEngineV4 — gold standard engine         |
-| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder_adapter.py` | Graph → BaseStrategy                            |
-| `MetricsCalculator`      | `backend/core/metrics_calculator.py`              | Single source of truth for 166 metrics          |
-| `DataService`            | `backend/services/data_service.py`                | OHLCV loading                                   |
-| `UnifiedAgentInterface`  | `backend/agents/unified_agent_interface.py`       | All AI agent calls                              |
-| `database_policy`        | `backend/config/database_policy.py`               | DATA_START_DATE, retention constants            |
-| Strategies (built-in)    | `backend/backtesting/strategies.py`               | SMA, RSI, MACD, BB, Grid, DCA                   |
-| Indicators               | `backend/core/indicators/`                        | 30+ technical indicators                        |
-| Optimization             | `backend/optimization/`                           | Optuna (TPE/CMA-ES), Ray, grid                  |
+| Module                   | Path                                              | Responsibility                                            |
+| ------------------------ | ------------------------------------------------- | --------------------------------------------------------- |
+| `BacktestConfig`         | `backend/backtesting/models.py`                   | All backtest parameters (single Pydantic model)           |
+| `BacktestEngine`         | `backend/backtesting/engine.py`                   | FallbackEngineV4 — gold standard engine                   |
+| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder_adapter.py` | Graph → BaseStrategy (2888 lines)                         |
+| `indicator_handlers`     | `backend/backtesting/indicator_handlers.py`       | 36 indicator handlers extracted from adapter (1345 lines) |
+| `MetricsCalculator`      | `backend/core/metrics_calculator.py`              | Single source of truth for 166 metrics                    |
+| `DataService`            | `backend/services/data_service.py`                | OHLCV loading                                             |
+| `UnifiedAgentInterface`  | `backend/agents/unified_agent_interface.py`       | All AI agent calls                                        |
+| `database_policy`        | `backend/config/database_policy.py`               | DATA_START_DATE, retention constants                      |
+| Strategies (built-in)    | `backend/backtesting/strategies.py`               | SMA, RSI, MACD, BB, Grid, DCA                             |
+| Indicators               | `backend/core/indicators/`                        | 30+ technical indicators                                  |
+| Optimization             | `backend/optimization/`                           | Optuna (TPE/CMA-ES), Ray, grid                            |
 
 ### API entry points
 
@@ -119,7 +120,7 @@ The adapter (`StrategyBuilderAdapter`) accepts a `strategy_graph: dict` with thi
             "from": "block_1",
             "fromPort": "long", // output port of source block
             "to": "strategy_node",
-            "toPort": "longEntry", // input port of target block
+            "toPort": "entry_long", // input port of target block
         },
     ],
     // optional shortcut — auto-merged into blocks[] with isMain=True:
@@ -129,7 +130,7 @@ The adapter (`StrategyBuilderAdapter`) accepts a `strategy_graph: dict` with thi
 
 **Block types:** `rsi`, `macd`, `stochastic`, `stoch_rsi`, `bollinger`, `ema`, `sma`, `wma`, `dema`, `tema`, `hull_ma`, `supertrend`, `ichimoku`, `atr`, `adx`, `cci`, `cmf`, `mfi`, `roc`, `williams_r`, `rvi`, `cmo`, `qqe`, `obv`, `pvt`, `ad_line`, `vwap`, `donchian`, `keltner`, `parabolic_sar`, `aroon`, `atrp`, `stddev`, `pivot_points`, `divergence`, `highest_lowest_bar`, `two_mas`, `channel`, `momentum`, `price_action`, `strategy`, `condition`, `filter`, `exit`.
 
-**Strategy node input ports:** `longEntry`, `shortEntry`, `longExit`, `shortExit`.
+**Strategy node input ports:** `entry_long`, `entry_short`, `exit_long`, `exit_short`.
 
 ### SignalResult contract
 
@@ -239,7 +240,8 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── engine_selector.py       # Engine selection: auto / fallback / numba / gpu
 │   │   ├── models.py                # BacktestConfig, BacktestResult, PerformanceMetrics
 │   │   ├── strategies.py            # Built-in: SMA, RSI, MACD, Bollinger, Grid, DCA
-│   │   ├── strategy_builder_adapter.py  # Builder graph → BaseStrategy (key adapter)
+│   │   ├── strategy_builder_adapter.py  # Builder graph → BaseStrategy (2888 lines)
+│   │   ├── indicator_handlers.py    # 36 indicator handlers + INDICATOR_DISPATCH table (1345 lines)
 │   │   ├── numba_engine.py          # JIT engine (Numba)
 │   │   ├── vectorbt_sltp.py         # VectorBT SL/TP (for optimization only)
 │   │   ├── fast_optimizer.py        # [DEPRECATED] RSI-only Numba optimizer
@@ -394,7 +396,23 @@ Keys: `timeframe`, `two_mas_timeframe`, `channel_timeframe`, `rvi_timeframe`,
 
 ### Port alias mapping (adapter)
 
-When a frontend port name doesn't match backend output key, the adapter applies:
+When a frontend port name doesn't match backend output key, the adapter applies class-level constants:
+
+```python
+# StrategyBuilderAdapter class constants (strategy_builder_adapter.py:98-115)
+_PORT_ALIASES: dict[str, list[str]] = {
+    "long":   ["bullish", "signal", "output", "value", "result"],
+    "short":  ["bearish", "signal", "output", "value", "result"],
+    "output": ["value",   "signal", "result"],
+    "result": ["signal",  "output", "value"],
+}
+_SIGNAL_PORT_ALIASES: dict[str, list[str]] = {
+    "long":  ["bullish"],
+    "short": ["bearish"],
+}
+```
+
+Primary canonical aliases (for docs):
 
 ```
 "long"    ↔ "bullish"
@@ -516,12 +534,12 @@ These parameters from §6–§7 are used in **3+ subsystems**. Changing any of t
 
 #### Known inconsistencies (as of 2026-02-21)
 
-1. **commission_rate 0.001 vs 0.0007** — `universal_engine/live_trading.py:263` uses `0.001`, all other files use `0.0007`. Live trading diverges from backtest.
-2. **position_size: fraction vs percent** — Engine/Optimization use fraction `0.0–1.0`; `live_trading/strategy_runner.py:72` uses `position_size_percent` (percent). Unit mismatch.
+1. **~~commission_rate 0.001 vs 0.0007~~ — FIXED (commit d5d0eb2):** `live_trading.py` was fixed to 0.0007. Two remaining 0.001 defaults exist in `backend/tasks/optimize_tasks.py:309,470` (fallback for missing strategy_config key — acceptable as guard) and `backend/ml/ai_backtest_executor.py:170` (ML experimental path, not core). Also `backend/api/routers/backtests.py:1533` reads `_commission` param from saved strategy — this 0.001 is a **param default for legacy DB records**, not the engine default.
+2. **position_size: fraction vs percent** — Engine/Optimization use fraction `0.0–1.0`; `live_trading/strategy_runner.py:72` uses `position_size_percent` (percent). Unit mismatch documented in ADR-006.
 3. **leverage default: 10 vs 1.0** — Optimization and Frontend default to `10`; live trading defaults to `1.0`.
-4. **pyramiding silently overridden** — `optimization/utils.py:84` hardcodes `pyramiding=1`, ignoring user's value.
+4. **~~pyramiding silently overridden~~ — FIXED (commit d5d0eb2):** `optimization/utils.py:84` now reads `request_params.get("pyramiding", 1)` instead of hardcoding `1`.
 
-> **Rule for AI agents:** Before changing any parameter from this table, `grep -rn <param_name> backend/ frontend/` and update ALL locations. Run the commission parity check: `grep -rn commission backend/ | grep -v 0.0007 | grep -v .pyc | grep -v __pycache__`
+> **Rule for AI agents:** Before changing any parameter from this table, `grep -rn <param_name> backend/ frontend/` and update ALL locations. Run the commission parity check: `grep -rn commission backend/ | grep -v 0.0007 | grep -v .pyc | grep -v __pycache__ | grep -v "0.001.*tolerance\|0.001.*qty\|optimize_tasks\|ai_backtest_executor.*0.001\|_commission.*0.001"`
 
 ---
 
@@ -694,7 +712,39 @@ Collected here for clarity — do **not** use in new code:
 
 ## 14. Recent Major Changes
 
-### 2026-02-21
+### 2026-02-21 (Canvas audit + adapter refactor)
+
+- **Strategy Builder Canvas — 7 bugs fixed** (`strategy_builder.js`):
+    - BUG#1–3 🔴: Drag / Marquee / Drop coordinates now correctly divided by `zoom` → logical space
+    - BUG#4 🟡: Removed double `renderConnections()` in `deleteConnection` and `restoreStateSnapshot`
+    - BUG#5 🟡: `pushUndo()` deferred to first real mouse movement (>3px) — no longer fires on bare clicks
+    - BUG#6 🟡: Removed `console.log` from `renderBlocks()` and `addBlockToCanvas()` hot paths
+    - BUG#7 🟢: All `block_${Date.now()}` and `conn_${Date.now()}` IDs now have `_${random}` suffix
+
+- **Adapter refactor — `_execute_indicator()` decomposed** (commit `cc2d3b4`):
+    - Extracted 36 indicator handler functions into new `backend/backtesting/indicator_handlers.py` (1345 lines)
+    - Replaced 1280-line elif chain with `INDICATOR_DISPATCH` lookup table (~20 lines)
+    - `strategy_builder_adapter.py`: 4608 → 2888 lines (−1720 lines total over multiple passes)
+
+- **Adapter refactor — connection normalization** (commit `8ddaf22`):
+    - `_normalize_connections()` runs once in `__init__` — all formats → canonical `{source_id, target_id, source_port, target_port}`
+    - Removed 4 per-call parser methods (~140 lines); 14 call sites now use direct dict access
+
+- **Quick wins** (commit `d5d0eb2`):
+    - `live_trading.py`: `commission_rate 0.001 → 0.0007` ✅
+    - `optimization/utils.py`: `pyramiding` now reads from `request_params` (was hardcoded=1) ✅
+    - `strategy_builder_adapter.py`: `queue list+pop(0)` → `deque+popleft()` O(1)
+    - `_PORT_ALIASES` / `_SIGNAL_PORT_ALIASES` promoted to class-level constants
+
+- **Commission parity — 5 more files fixed** (commit `979dcfc`):
+    - `reinforcement_learning.py`, `trade_executor.py`, `interfaces.py`, `core.py`, `core_v23.py`, `bayesian.py` all updated to 0.0007
+    - ADR-006 added to DECISIONS.md: position_size fraction vs percent convention
+
+- **Full refactor + audit pass** (commit `d78b6db`):
+    - VectorBT ownership audit, deque toposort, class-level port aliases — all stabilized
+    - 179 tests passing
+
+### 2026-02-21 (earlier — docs)
 
 - Full project map added to CLAUDE.md (directory structure, parameter tables, MM dependencies)
 - Added: Strategy Builder graph JSON format, SignalResult contract, Engine Selection table
