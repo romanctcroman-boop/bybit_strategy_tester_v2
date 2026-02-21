@@ -87,9 +87,11 @@
 - **Backend API** (`position_size` в BacktestConfig, BacktestInput, стратегиях): **всегда fraction** (0.01–1.0).
 - **Frontend** (Properties Panel): показывает **проценты** (1–100%), конвертирует при отправке (`/ 100`) и при получении (`* 100`).
 - **Конвертация** происходит ТОЛЬКО в `strategy_builder.js` (строка ~10199):
+
     ```js
     position_size: positionSizeType === "percent" ? positionSizeVal / 100 : positionSizeVal;
     ```
+
 - Для `position_size_type = "fixed_amount"` значение передаётся как есть (например, 5000.0).
 - Backend валидирует: `ge=0.01, le=1.0` для percent-mode.
 
