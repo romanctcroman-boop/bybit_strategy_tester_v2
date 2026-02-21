@@ -81,7 +81,7 @@ def build_backtest_input(
         slippage=0.0005,
         use_bar_magnifier=False,
         max_drawdown_limit=0.0,
-        pyramiding=1,
+        pyramiding=request_params.get("pyramiding", 1),
         market_regime_enabled=request_params.get("market_regime_enabled", False),
         market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
         market_regime_lookback=request_params.get("market_regime_lookback", 50),

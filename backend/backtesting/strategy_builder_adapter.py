@@ -7,6 +7,7 @@ BaseStrategy instances that can be used with backtesting engines.
 
 from __future__ import annotations
 
+from collections import deque
 from typing import Any
 
 import numpy as np
@@ -117,6 +118,26 @@ class StrategyBuilderAdapter(BaseStrategy):
         adapter = StrategyBuilderAdapter(graph)
         signals = adapter.generate_signals(ohlcv)
     """
+
+    # Port alias maps — class-level constants (avoid re-creation on every call)
+    _PORT_ALIASES: dict[str, list[str]] = {
+        "output": ["value", "close"],
+        "value": ["output", "close"],
+        "result": ["signal", "output"],
+        "signal": ["result", "output"],
+        "input": ["value", "close"],
+    }
+
+    _SIGNAL_PORT_ALIASES: dict[str, list[str]] = {
+        "long": ["bullish", "entry_long", "signal"],
+        "short": ["bearish", "entry_short", "signal"],
+        "bullish": ["long", "entry_long", "signal"],
+        "bearish": ["short", "entry_short", "signal"],
+        "output": ["value", "result", "signal"],
+        "value": ["output", "result", "signal"],
+        "result": ["signal", "output", "value"],
+        "signal": ["result", "output", "value"],
+    }
 
     def __init__(self, strategy_graph: dict[str, Any]):
         """
@@ -289,11 +310,11 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # Topological sort (Kahn's algorithm)
         in_degree = {block_id: len(deps) for block_id, deps in dependencies.items()}
-        queue = [block_id for block_id, degree in in_degree.items() if degree == 0]
+        queue = deque(block_id for block_id, degree in in_degree.items() if degree == 0)
         result = []
 
         while queue:
-            block_id = queue.pop(0)
+            block_id = queue.popleft()
             result.append(block_id)
 
             # Find blocks that depend on this one
@@ -609,15 +630,6 @@ class StrategyBuilderAdapter(BaseStrategy):
         Supports port name aliases: "output" ↔ "value", "result" ↔ "signal".
         This allows connections to use either canonical or alias port names.
         """
-        # Port alias map: if requested port not found, try the alias
-        _PORT_ALIASES: dict[str, list[str]] = {
-            "output": ["value", "close"],
-            "value": ["output", "close"],
-            "result": ["signal", "output"],
-            "signal": ["result", "output"],
-            "input": ["value", "close"],
-        }
-
         inputs = {}
         for conn in self.connections:
             target_id = self._get_connection_target_id(conn)
@@ -634,7 +646,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     else:
                         # Try port aliases (e.g. "output" → "value")
                         resolved = False
-                        for alias in _PORT_ALIASES.get(source_port, []):
+                        for alias in self._PORT_ALIASES.get(source_port, []):
                             if alias in source_outputs:
                                 inputs[target_port] = source_outputs[alias]
                                 resolved = True
@@ -4386,19 +4398,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Case 2: Main node is a pure strategy aggregator — collect from
             # connections ONLY when Case 1 didn't produce signals (avoid
             # double-counting if main node is both cached and wired to).
-            # Port alias map for Case 2 signal routing.
-            # When source_port is not found in source_outputs, try aliases.
+            # Port alias map is defined at class level: self._SIGNAL_PORT_ALIASES
             # e.g. frontend sends "long" but backend might return "bullish".
-            _SIGNAL_PORT_ALIASES: dict[str, list[str]] = {
-                "long": ["bullish", "entry_long", "signal"],
-                "short": ["bearish", "entry_short", "signal"],
-                "bullish": ["long", "entry_long", "signal"],
-                "bearish": ["short", "entry_short", "signal"],
-                "output": ["value", "result", "signal"],
-                "value": ["output", "result", "signal"],
-                "result": ["signal", "output", "value"],
-                "signal": ["result", "output", "value"],
-            }
 
             if not case1_found:
                 for conn in self.connections:
@@ -4418,7 +4419,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                                 signal = source_outputs[source_port]
                             else:
                                 # Try port aliases (e.g. "long" → "bullish")
-                                for alias in _SIGNAL_PORT_ALIASES.get(source_port, []):
+                                for alias in self._SIGNAL_PORT_ALIASES.get(source_port, []):
                                     if alias in source_outputs:
                                         signal = source_outputs[alias]
                                         logger.debug(

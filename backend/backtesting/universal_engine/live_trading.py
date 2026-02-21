@@ -260,7 +260,7 @@ class PaperTradingEngine(ExchangeConnection):
     def __init__(
         self,
         initial_balance: float = 10000.0,
-        commission_rate: float = 0.001,
+        commission_rate: float = 0.0007,  # Must match BacktestConfig (TradingView parity)
         slippage_rate: float = 0.0005,
         latency_ms: float = 50.0,
     ):
@@ -349,7 +349,9 @@ class PaperTradingEngine(ExchangeConnection):
 
         # Check for limit order
         if order.order_type == OrderType.LIMIT:
-            if (order.side == OrderSide.BUY and fill_price > order.price) or (order.side == OrderSide.SELL and fill_price < order.price):
+            if (order.side == OrderSide.BUY and fill_price > order.price) or (
+                order.side == OrderSide.SELL and fill_price < order.price
+            ):
                 order.status = OrderStatus.OPEN
                 self._orders[order.order_id] = order
                 return ExecutionReport(
@@ -450,9 +452,7 @@ class PaperTradingEngine(ExchangeConnection):
             ):
                 # Adding to position
                 total_qty = pos.quantity + order.quantity
-                pos.entry_price = (
-                    pos.entry_price * pos.quantity + fill_price * order.quantity
-                ) / total_qty
+                pos.entry_price = (pos.entry_price * pos.quantity + fill_price * order.quantity) / total_qty
                 pos.quantity = total_qty
             else:
                 # Reducing or closing position
@@ -465,11 +465,7 @@ class PaperTradingEngine(ExchangeConnection):
 
                     if remaining > 0:
                         # Reverse position
-                        new_side = (
-                            PositionSide.LONG
-                            if order.side == OrderSide.BUY
-                            else PositionSide.SHORT
-                        )
+                        new_side = PositionSide.LONG if order.side == OrderSide.BUY else PositionSide.SHORT
                         self._positions[symbol] = Position(
                             symbol=symbol,
                             side=new_side,
@@ -485,9 +481,7 @@ class PaperTradingEngine(ExchangeConnection):
                     self._realized_pnl += pnl
                     pos.quantity -= order.quantity
 
-    def _calculate_pnl(
-        self, pos: Position, exit_price: float, quantity: float
-    ) -> float:
+    def _calculate_pnl(self, pos: Position, exit_price: float, quantity: float) -> float:
         """Calculate PnL for closed position."""
         if pos.side == PositionSide.LONG:
             return (exit_price - pos.entry_price) * quantity
@@ -555,9 +549,7 @@ class BybitConnection(ExchangeConnection):
         self.api_secret = api_secret
         self.testnet = testnet
 
-        self.base_url = (
-            "https://api-testnet.bybit.com" if testnet else "https://api.bybit.com"
-        )
+        self.base_url = "https://api-testnet.bybit.com" if testnet else "https://api.bybit.com"
 
         self._connected = False
         self._positions: dict[str, Position] = {}
@@ -565,9 +557,7 @@ class BybitConnection(ExchangeConnection):
     def _sign_request(self, params: dict) -> str:
         """Create signature for request."""
         param_str = urlencode(sorted(params.items()))
-        signature = hmac.new(
-            self.api_secret.encode("utf-8"), param_str.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(self.api_secret.encode("utf-8"), param_str.encode("utf-8"), hashlib.sha256).hexdigest()
         return signature
 
     async def connect(self) -> bool:
@@ -641,9 +631,7 @@ class OrderManager:
     Manages order lifecycle and execution.
     """
 
-    def __init__(
-        self, connection: ExchangeConnection, risk_limits: RiskLimits | None = None
-    ):
+    def __init__(self, connection: ExchangeConnection, risk_limits: RiskLimits | None = None):
         self.connection = connection
         self.risk_limits = risk_limits or RiskLimits()
 
@@ -759,20 +747,14 @@ class OrderManager:
 
         # Check quantity limits
         if quantity < self.risk_limits.min_order_size:
-            errors.append(
-                f"Quantity {quantity} below minimum {self.risk_limits.min_order_size}"
-            )
+            errors.append(f"Quantity {quantity} below minimum {self.risk_limits.min_order_size}")
 
         if quantity > self.risk_limits.max_order_size:
-            errors.append(
-                f"Quantity {quantity} above maximum {self.risk_limits.max_order_size}"
-            )
+            errors.append(f"Quantity {quantity} above maximum {self.risk_limits.max_order_size}")
 
         # Check max open orders
         if len(self._open_orders) >= self.risk_limits.max_open_orders:
-            errors.append(
-                f"Max open orders ({self.risk_limits.max_open_orders}) reached"
-            )
+            errors.append(f"Max open orders ({self.risk_limits.max_open_orders}) reached")
 
         # Check limit order has price
         if order_type == OrderType.LIMIT and price is None:
@@ -891,9 +873,7 @@ class RiskManager:
     Live risk management controls.
     """
 
-    def __init__(
-        self, connection: ExchangeConnection, limits: RiskLimits | None = None
-    ):
+    def __init__(self, connection: ExchangeConnection, limits: RiskLimits | None = None):
         self.connection = connection
         self.limits = limits or RiskLimits()
 
@@ -921,9 +901,7 @@ class RiskManager:
         current_equity = balance.total_equity
         self._max_equity = max(self._max_equity, current_equity)
         self._drawdown = (self._max_equity - current_equity) / self._max_equity
-        self._daily_pnl = (
-            current_equity - self._daily_start_equity
-        ) / self._daily_start_equity
+        self._daily_pnl = (current_equity - self._daily_start_equity) / self._daily_start_equity
 
         # Check drawdown
         if self._drawdown > self.limits.max_drawdown:
@@ -1027,9 +1005,7 @@ class ExecutionAnalytics:
         self._executions: list[ExecutionReport] = []
         self._market_prices_at_order: dict[str, float] = {}
 
-    def record_execution(
-        self, report: ExecutionReport, market_price_at_order: float
-    ) -> None:
+    def record_execution(self, report: ExecutionReport, market_price_at_order: float) -> None:
         """Record execution for analysis."""
         self._executions.append(report)
         self._market_prices_at_order[report.order_id] = market_price_at_order

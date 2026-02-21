@@ -2133,12 +2133,12 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
 
   // Color thresholds for ratio metrics
   const ratioThresholds = {
-    sharpe:  { red: 0, green: 1 },     // < 0 red, 0-1 neutral, > 1 green
+    sharpe: { red: 0, green: 1 },     // < 0 red, 0-1 neutral, > 1 green
     sortino: { red: 0, green: 1.5 },
-    calmar:  { red: 0, green: 1 },
-    pf:      { red: 1, green: 1 },     // < 1 red, = 1 neutral, > 1 green
-    recovery:{ red: 1, green: 2 },
-    kelly:   { red: 0, green: 0 },     // < 0 red, >= 0 neutral/green
+    calmar: { red: 0, green: 1 },
+    pf: { red: 1, green: 1 },     // < 1 red, = 1 neutral, > 1 green
+    recovery: { red: 1, green: 2 },
+    kelly: { red: 0, green: 0 },     // < 0 red, >= 0 neutral/green
     default: { red: 0, green: 0 }      // simple sign-based
   };
 

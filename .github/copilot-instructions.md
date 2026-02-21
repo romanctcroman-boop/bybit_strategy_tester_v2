@@ -229,13 +229,13 @@ See `AGENTS.MD` section "VS Code Agent Mode Configuration" for full details.
 
 ### Before ANY change to these areas, read `CLAUDE.md` sections:
 
-| Area | Sections to read |
-| --- | --- |
-| `BacktestConfig`, engine, `MetricsCalculator` | §5 (Critical Constants), §7 (Cross-cutting Parameters), §15 (Refactor Checklist) |
-| Strategy Builder adapter, strategies | §3 (Architecture), §6 (Strategy Parameters), §15 |
-| Optimization, scoring | §7 (Key Optimization Metrics, Cross-cutting Parameters), §15 |
-| Risk management, position sizing | §7 (Global Parameters, MM Dependencies), §15 |
-| Frontend (strategy_builder.js, leverageManager.js) | §3 (Direction Defaults), §7 (Cross-cutting Parameters), §15 |
+| Area                                               | Sections to read                                                                 |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `BacktestConfig`, engine, `MetricsCalculator`      | §5 (Critical Constants), §7 (Cross-cutting Parameters), §15 (Refactor Checklist) |
+| Strategy Builder adapter, strategies               | §3 (Architecture), §6 (Strategy Parameters), §15                                 |
+| Optimization, scoring                              | §7 (Key Optimization Metrics, Cross-cutting Parameters), §15                     |
+| Risk management, position sizing                   | §7 (Global Parameters, MM Dependencies), §15                                     |
+| Frontend (strategy_builder.js, leverageManager.js) | §3 (Direction Defaults), §7 (Cross-cutting Parameters), §15                      |
 
 ### High-risk parameters — NEVER change without explicit plan
 
