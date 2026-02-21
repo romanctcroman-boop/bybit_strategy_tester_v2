@@ -11897,8 +11897,15 @@ async function runAiBuild() {
     return;
   }
 
+  // User description takes priority as the strategy name when present
+  const descriptionEl = document.getElementById('aiDescription');
+  const description = descriptionEl?.value?.trim() || '';
+  const nameEl = document.getElementById('aiName');
+  // If user typed a description, send it as the name so _plan_blocks() uses it
+  const strategyName = description || nameEl?.value || 'AI Strategy';
+
   const payload = {
-    name: document.getElementById('aiName').value,
+    name: strategyName,
     symbol: symbol,
     timeframe: timeframe,
     direction: direction,
@@ -11918,41 +11925,109 @@ async function runAiBuild() {
     payload.blocks = [];
     payload.connections = [];
   } else {
-    // Build mode: use preset blocks
     const presetSelect = document.getElementById('aiPreset');
-    if (!presetSelect) return;
-    const presetKey = presetSelect.value;
-    const preset = AI_PRESETS[presetKey];
-    payload.blocks = preset.blocks;
-    payload.connections = preset.connections;
+    const presetKey = presetSelect?.value || 'custom';
+    if (description || presetKey === 'custom') {
+      // Free-text description or "custom" → let LLM decide the blocks
+      payload.blocks = [];
+      payload.connections = [];
+    } else {
+      // Named preset selected → use hardcoded template as starting point
+      const preset = AI_PRESETS[presetKey] || AI_PRESETS.rsi;
+      payload.blocks = preset.blocks;
+      payload.connections = preset.connections;
+    }
   }
 
-  // Show progress
+  // Show progress panel
   document.getElementById('aiBuildConfig').classList.add('hidden');
   document.getElementById('aiBuildProgress').classList.remove('hidden');
-  document.getElementById('aiBuildStage').textContent = _aiBuildMode === 'optimize'
-    ? 'Optimizing strategy with AI agent...'
-    : 'Building strategy with AI agent...';
+  const stageEl = document.getElementById('aiBuildStage');
+  if (stageEl) {
+    stageEl.textContent = _aiBuildMode === 'optimize'
+      ? 'Optimizing strategy with AI agent…'
+      : (description ? `Planning: "${description.substring(0, 60)}…"` : 'Building strategy with AI agent…');
+  }
 
   try {
-    const response = await fetch('/api/v1/agents/advanced/builder/task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    await showAiBuildResults(data);
-
+    await _runAiBuildWithSSE(payload);
   } catch (err) {
     document.getElementById('aiBuildProgress').classList.add('hidden');
     document.getElementById('aiBuildResults').classList.remove('hidden');
     document.getElementById('aiBuildResultContent').innerHTML =
       `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+/**
+ * Run the AI Build workflow using SSE streaming for live stage updates.
+ * Falls back to plain POST if EventSource/fetch-SSE is unavailable.
+ */
+async function _runAiBuildWithSSE(payload) {
+  const stageEl = document.getElementById('aiBuildStage');
+
+  // Use fetch + ReadableStream to consume text/event-stream from a POST endpoint
+  const response = await fetch('/api/v1/agents/advanced/builder/task/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok || !response.body) {
+    // Fallback: plain POST to non-streaming endpoint
+    const fallback = await fetch('/api/v1/agents/advanced/builder/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!fallback.ok) throw new Error(`HTTP ${fallback.status}: ${fallback.statusText}`);
+    const data = await fallback.json();
+    await showAiBuildResults(data);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are separated by double newline
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() || '';  // keep incomplete last frame
+
+    for (const frame of frames) {
+      if (!frame.trim()) continue;
+      let eventType = 'message';
+      let dataStr = '';
+
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('event:')) eventType = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataStr = line.slice(5).trim();
+      }
+
+      if (!dataStr) continue;
+
+      try {
+        const msg = JSON.parse(dataStr);
+
+        if (eventType === 'stage' && stageEl) {
+          stageEl.textContent = msg.label || msg.stage || '…';
+        } else if (eventType === 'result') {
+          await showAiBuildResults(msg);
+          return;
+        } else if (eventType === 'error') {
+          throw new Error(msg.message || 'Unknown error from agent');
+        }
+        // heartbeat: ignore
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) continue;
+        throw parseErr;
+      }
+    }
   }
 }
 

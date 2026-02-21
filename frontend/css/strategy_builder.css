@@ -3488,20 +3488,24 @@ body {
 /* Spine hidden state - когда другое окно открыто */
 /* Используем !important для гарантии перекрытия селекторов с ID */
 .floating-window-spine.spine-hidden {
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
+    /* Dim other spines but keep them present and clickable.
+       Previously we hid them completely (visibility:hidden + pointer-events:none)
+       which made it impossible to click other spines/tabs to open their windows.
+       Keep a low opacity and allow pointer events so users can click the tab to open it. */
+    opacity: 0.18 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
     transform: rotate(180deg) translateX(20px) !important;
     transition:
         opacity 0.3s ease,
-        visibility 0.3s ease,
         transform 0.3s ease;
 }
 
-/* Скрытый spine не должен реагировать на hover */
+/* Allow hover to indicate interactivity even when dimmed */
 .floating-window-spine.spine-hidden:hover {
-    box-shadow: none !important;
-    cursor: default !important;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.18) !important;
+    cursor: pointer !important;
+    opacity: 0.32 !important;
 }
 
 /* Active window spine - когда окно открыто */
@@ -7678,6 +7682,11 @@ body.floating-window-open .zoom-controls {
 
 .ai-build-preset-heading {
     margin-top: 12px;
+}
+
+.ai-preset-hint {
+    font-weight: normal;
+    font-size: 0.75em;
 }
 
 .ai-build-row label,

@@ -1083,7 +1083,7 @@ class TestIterativeOptimization:
         ]
         metrics = {"win_rate": 0.2, "sharpe_ratio": 0.1, "max_drawdown_pct": -10}
 
-        adjustments = wf._suggest_adjustments([], blocks_added, 1, metrics)
+        adjustments = wf._heuristic_adjustments(blocks_added, 1, metrics)
         assert len(adjustments) == 1
         adj = adjustments[0]
         assert adj["block_id"] == "rsi_001"
@@ -1102,7 +1102,7 @@ class TestIterativeOptimization:
         ]
         metrics = {"win_rate": 0.5, "sharpe_ratio": 0.5, "max_drawdown_pct": -25}
 
-        adjustments = wf._suggest_adjustments([], blocks_added, 1, metrics)
+        adjustments = wf._heuristic_adjustments(blocks_added, 1, metrics)
         assert len(adjustments) == 1
         assert adjustments[0]["params"]["period"] > 21
 
@@ -1118,7 +1118,7 @@ class TestIterativeOptimization:
         ]
         metrics = {"win_rate": 0.2, "sharpe_ratio": 0.1, "max_drawdown_pct": -10}
 
-        adjustments = wf._suggest_adjustments([], blocks_added, 1, metrics)
+        adjustments = wf._heuristic_adjustments(blocks_added, 1, metrics)
         assert len(adjustments) == 0
 
     def test_suggest_adjustments_progressive_step(self):
@@ -1132,8 +1132,8 @@ class TestIterativeOptimization:
         ]
         metrics = {"win_rate": 0.2, "sharpe_ratio": 0.1, "max_drawdown_pct": -10}
 
-        adj1 = wf._suggest_adjustments([], blocks, 1, metrics)
-        adj2 = wf._suggest_adjustments([], blocks, 2, metrics)
+        adj1 = wf._heuristic_adjustments(blocks, 1, metrics)
+        adj2 = wf._heuristic_adjustments(blocks, 2, metrics)
 
         # Iteration 2 should have bigger adjustments
         ob1 = adj1[0]["params"]["overbought"]

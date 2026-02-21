@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="./css/variables.css?v=20260204d" />
   <link rel="stylesheet" href="./css/components.css?v=20260204d" />
   <link rel="stylesheet" href="./css/common.css?v=20260204d" />
-  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260218b" />
+  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260221a" />
 
   <!-- auto-event-binding.js removed - using native event listeners in strategy_builder.js -->
 </head>
@@ -266,14 +266,19 @@
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestCommission" class="property-label">Commission %</label>
                   <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.07"
-                    min="0" max="1" step="0.01" title="0.07% = TradingView parity" />
+                    min="0" max="1" step="0.01" title="0.07% = TradingView parity. 0% = без комиссии (для тестов)" />
+                </div>
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestSlippage" class="property-label">Slippage %</label>
+                  <input type="number" class="property-input property-input-full" id="backtestSlippage" value="0.05"
+                    min="0" max="5" step="0.01" title="Проскальзывание в %. 0.05% = 0.0005 (дефолт)" />
                 </div>
               </div>
               <div class="property-row property-row-vertical properties-leverage-block">
                 <label for="backtestLeverage" class="property-label">Плечо:
                   <span id="backtestLeverageValue" class="leverage-value">10x</span></label>
                 <input type="range" class="property-input-full properties-leverage-range" id="backtestLeverageRange"
-                  min="1" max="50" step="1" value="10" title="Кредитное плечо 1–50x" />
+                  min="1" max="100" step="1" value="10" title="Кредитное плечо 1–100x (обновляется динамически по данным биржи)" />
                 <input type="hidden" id="backtestLeverage" value="10" />
                 <div id="backtestLeverageRiskIndicator" class="leverage-risk-indicator properties-leverage-risk"></div>
               </div>
@@ -286,12 +291,12 @@
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestStartDate" class="property-label">Start Date</label>
                   <input type="date" class="property-input property-input-full" id="backtestStartDate"
-                    value="2025-01-01" />
+                    value="2025-01-01" min="2025-01-01" title="Данные в БД начинаются с 2025-01-01" />
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestEndDate" class="property-label">End Date</label>
                   <input type="date" class="property-input property-input-full" id="backtestEndDate"
-                    value="2030-01-01" />
+                    value="" />
                 </div>
               </div>
               <div class="property-row property-row-vertical">
@@ -699,7 +704,7 @@
       <script src="./js/init-production.js"></script>
       <script src="./js/sidebar-toggle.js"></script>
       <script src="./js/pages/strategy_builder_debug.js"></script>
-      <script type="module" src="./js/pages/strategy_builder.js?v=20260218d"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260221l"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
       <script src="./js/pages/optimization_panels.js?v=20260204"></script>
       <script src="./js/pages/optimization.js"></script>
@@ -727,6 +732,12 @@
               <label>Strategy Name</label>
               <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm" title="Strategy name for AI-built strategy">
             </div>
+            <div class="ai-build-row">
+              <label>Describe your strategy <small class="text-muted">(optional — AI will design blocks from your description)</small></label>
+              <textarea id="aiDescription" rows="2" class="form-control form-control-sm"
+                placeholder="e.g. RSI mean-reversion with EMA trend filter, tight stop-loss 1.5%, take-profit 3%"
+                title="Describe the strategy in plain language. Leave empty to use a preset below."></textarea>
+            </div>
             <div class="ai-build-row-half">
               <div>
                 <label>Max Iterations</label>
@@ -744,13 +755,13 @@
               </label>
             </div>
 
-            <h5 class="ai-build-preset-heading">Preset Blocks</h5>
+            <h5 class="ai-build-preset-heading">Preset Blocks <small class="text-muted ai-preset-hint">(ignored when description is filled)</small></h5>
             <select id="aiPreset" class="form-select form-select-sm" title="Select preset strategy blocks">
               <option value="rsi">RSI Overbought/Oversold</option>
               <option value="ema_cross">EMA Crossover (9/21)</option>
               <option value="macd">MACD Signal</option>
               <option value="bb">Bollinger Bands</option>
-              <option value="custom">Custom (empty)</option>
+              <option value="custom">Let AI decide (from description above)</option>
             </select>
             <pre id="aiBlocksPreview" class="ai-blocks-preview"></pre>
 

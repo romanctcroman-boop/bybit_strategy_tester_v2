@@ -9,11 +9,15 @@ Extended endpoints for the AI Agent System:
 - MCP Tools
 """
 
+import asyncio
 import functools
+import json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -1003,6 +1007,152 @@ async def run_builder_task(request: BuilderTaskRequest):
     except Exception as e:
         logger.error(f"Builder task error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# SSE helper
+# ---------------------------------------------------------------------------
+
+def _sse_event(event: str, data: Any) -> str:
+    """Format a single Server-Sent Events frame."""
+    payload = json.dumps(data, ensure_ascii=False)
+    return f"event: {event}\ndata: {payload}\n\n"
+
+
+async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[str]:
+    """Yield SSE events as the BuilderWorkflow progresses through stages.
+
+    Strategy:
+    - Monkey-patch ``BuilderWorkflow._result`` status writes via a thin
+      wrapper so each stage change emits a ``stage`` SSE event.
+    - Emit a ``progress`` event every ~2 s during long-running stages.
+    - Emit ``result`` on completion or ``error`` on failure.
+    """
+    from backend.agents.workflows.builder_workflow import (
+        BuilderStage,
+        BuilderWorkflow,
+        BuilderWorkflowConfig,
+    )
+
+    config = BuilderWorkflowConfig(
+        name=request.name,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        direction=request.direction,
+        initial_capital=request.initial_capital,
+        leverage=request.leverage,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        commission=0.0007,
+        stop_loss=request.stop_loss,
+        take_profit=request.take_profit,
+        blocks=request.blocks,
+        connections=request.connections,
+        max_iterations=request.max_iterations,
+        min_acceptable_sharpe=request.min_sharpe,
+        min_acceptable_win_rate=request.min_win_rate,
+        enable_deliberation=request.enable_deliberation,
+        existing_strategy_id=request.existing_strategy_id,
+    )
+
+    _stage_labels: dict[str, str] = {
+        BuilderStage.PLANNING: "🔍 Planning strategy…",
+        BuilderStage.CREATING: "🏗️ Creating strategy canvas…",
+        BuilderStage.ADDING_BLOCKS: "🧩 Adding indicator blocks…",
+        BuilderStage.CONNECTING: "🔗 Connecting blocks…",
+        BuilderStage.VALIDATING: "✅ Validating strategy…",
+        BuilderStage.GENERATING_CODE: "💾 Generating Python code…",
+        BuilderStage.BACKTESTING: "📊 Running backtest…",
+        BuilderStage.EVALUATING: "📈 Evaluating results…",
+        BuilderStage.ITERATING: "🔄 Optimizing parameters…",
+        BuilderStage.COMPLETED: "🎉 Done!",
+        BuilderStage.FAILED: "❌ Failed",
+    }
+
+    # Queue for inter-task communication
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    workflow = BuilderWorkflow()
+
+    # Intercept status changes via property monkey-patch on the result object
+    _orig_setattr = workflow._result.__class__.__setattr__
+
+    def _intercept(obj: Any, name: str, value: Any) -> None:
+        _orig_setattr(obj, name, value)
+        if name == "status" and isinstance(value, BuilderStage):
+            queue.put_nowait({"type": "stage", "stage": value.value, "label": _stage_labels.get(value, value.value)})
+
+    workflow._result.__class__.__setattr__ = _intercept  # type: ignore[method-assign]
+
+    # Run workflow in background task
+    async def _run() -> None:
+        try:
+            result = await workflow.run(config)
+            queue.put_nowait({"type": "done", "result": result.to_dict()})
+        except Exception as exc:
+            queue.put_nowait({"type": "error", "message": str(exc)})
+
+    task = asyncio.create_task(_run())
+
+    try:
+        # Yield SSE events from the queue
+        while True:
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=2.0)
+            except TimeoutError:
+                # Heartbeat — keep connection alive
+                current_stage = workflow._result.status.value if workflow._result else "running"
+                yield _sse_event("heartbeat", {"stage": current_stage})
+                continue
+
+            if msg["type"] == "stage":
+                yield _sse_event("stage", {"stage": msg["stage"], "label": msg["label"]})
+
+            elif msg["type"] == "done":
+                yield _sse_event("result", {
+                    "success": msg["result"].get("status") == "completed",
+                    "workflow": msg["result"],
+                })
+                break
+
+            elif msg["type"] == "error":
+                yield _sse_event("error", {"message": msg["message"]})
+                break
+
+    finally:
+        # Restore original __setattr__ and cancel task if still running
+        workflow._result.__class__.__setattr__ = _orig_setattr  # type: ignore[method-assign]
+        task.cancel()
+
+
+@router.post("/builder/task/stream")
+async def run_builder_task_stream(request: BuilderTaskRequest) -> StreamingResponse:
+    """
+    Run a full Strategy Builder workflow with Server-Sent Events (SSE) progress.
+
+    Same as ``POST /builder/task`` but streams real-time stage updates:
+
+    - ``stage``     — workflow stage changed (planning/backtesting/…)
+    - ``heartbeat`` — keepalive every 2 s while waiting
+    - ``result``    — final workflow result (mirrors /builder/task response)
+    - ``error``     — fatal error
+
+    JavaScript usage::
+
+        const source = new EventSource('/api/v1/agents/advanced/builder/task/stream', {
+            method: 'POST'  // requires fetch-event-source polyfill
+        });
+
+    Or use ``fetch`` with ``text/event-stream`` content-type — see JS implementation
+    in ``strategy_builder.js``.
+    """
+    return StreamingResponse(
+        _builder_sse_stream(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )
 
 
 @router.get("/builder/block-library")

@@ -21,6 +21,8 @@ Added 2026-02-14 — Agent x Strategy Builder Integration.
 
 from __future__ import annotations
 
+import json
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -225,6 +227,10 @@ class BuilderWorkflow:
             if config.enable_deliberation:
                 await self._run_deliberation(config)
 
+            # LLM block planning: if no blocks provided, ask DeepSeek to design them
+            if not config.existing_strategy_id and not config.blocks:
+                await self._plan_blocks(config)
+
             # Check mode: existing strategy (optimize) vs new strategy (build)
             if config.existing_strategy_id:
                 # ── Optimize mode: skip Stages 2-4, reuse existing strategy ──
@@ -342,7 +348,9 @@ class BuilderWorkflow:
 
                 # --- Iterative parameter adjustment ---
                 self._result.status = BuilderStage.ITERATING
-                adjustments = self._suggest_adjustments(config.blocks, self._result.blocks_added, iteration, metrics)
+                adjustments = await self._suggest_adjustments(
+                    config.blocks, self._result.blocks_added, iteration, metrics
+                )
 
                 if not adjustments:
                     logger.info("[BuilderWorkflow] No adjustments possible, stopping iteration")
@@ -445,6 +453,145 @@ class BuilderWorkflow:
         "close_short": "exit_short",
         "close_all": "exit_long",  # plus exit_short below
     }
+
+    async def _plan_blocks(self, config: BuilderWorkflowConfig) -> None:
+        """Ask DeepSeek to design the block graph from a free-text strategy description.
+
+        Called when ``config.blocks`` is empty — i.e. the user typed a description
+        instead of picking a preset.  The LLM returns a JSON object with ``blocks``
+        and ``connections`` arrays that are merged into ``config``.
+
+        If the LLM call fails or returns invalid JSON the workflow falls back to
+        a minimal RSI preset so that build stages can still proceed.
+
+        Args:
+            config: Mutable workflow config.  ``config.blocks`` and
+                ``config.connections`` are updated in-place on success.
+        """
+        description = config.name  # frontend passes user description as name
+        logger.info(f"[BuilderWorkflow] 🤖 LLM block planning for: {description!r}")
+
+        # Available block types exposed in the system
+        available = (
+            "Indicators: rsi, ema, sma, macd, bollinger, atr, stochastic, adx, "
+            "supertrend, vwap, cci, williams_r, mfi, roc, momentum, obv. "
+            "Conditions: crossover, crossunder, greater_than, less_than, between, and, or, not. "
+            "Actions: buy, sell, close_long, close_short, close_all. "
+            "Risk: static_sltp, atr_sltp. "
+            "Data: price."
+        )
+
+        prompt = f"""You are a quantitative trading strategy designer.
+
+User request: "{description}"
+Market: {config.symbol}, timeframe {config.timeframe}min, direction {config.direction}.
+Commission: {config.commission} (0.07%).
+Min acceptable Sharpe: {config.min_acceptable_sharpe}, min win rate: {config.min_acceptable_win_rate:.0%}.
+
+Available block types:
+{available}
+
+Design a complete strategy as a JSON object with two arrays:
+- "blocks": list of {{type, id, params}} objects
+- "connections": list of {{source, source_port, target, target_port}} objects
+
+Rules:
+1. Every strategy MUST have at least one buy and one sell action block.
+2. id values must be unique slugs (e.g. "rsi_14", "ema_fast").
+3. connections reference blocks by their id.
+4. params must only include keys the block type actually supports.
+5. Always include a static_sltp block with sensible stop_loss_percent and take_profit_percent.
+6. Return ONLY the JSON object, no explanation.
+
+Example for a simple RSI mean-reversion:
+{{
+  "blocks": [
+    {{"type": "rsi", "id": "rsi_14", "params": {{"period": 14, "use_cross_level": true, "cross_long_level": 30, "cross_short_level": 70}}}},
+    {{"type": "buy", "id": "buy_1", "params": {{}}}},
+    {{"type": "sell", "id": "sell_1", "params": {{}}}},
+    {{"type": "static_sltp", "id": "sltp_1", "params": {{"stop_loss_percent": 2.0, "take_profit_percent": 4.0}}}}
+  ],
+  "connections": [
+    {{"source": "rsi_14", "source_port": "long", "target": "buy_1", "target_port": "signal"}},
+    {{"source": "rsi_14", "source_port": "short", "target": "sell_1", "target_port": "signal"}}
+  ]
+}}"""
+
+        try:
+            from backend.agents.unified_agent_interface import get_agent_interface
+
+            agent = get_agent_interface()
+            result = await agent.query_deepseek(
+                prompt,
+                model="deepseek-chat",
+                temperature=0.3,  # low temp for structured JSON output
+                max_tokens=1500,
+                use_cache=False,
+            )
+
+            raw_text: str = result.get("response", "") or ""
+            logger.debug(f"[BuilderWorkflow] LLM plan raw response ({len(raw_text)} chars)")
+
+            # Extract JSON from response — model may wrap in ```json ... ```
+            json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if not json_match:
+                raise ValueError("No JSON object found in LLM response")
+
+            plan = json.loads(json_match.group())
+            planned_blocks: list[dict[str, Any]] = plan.get("blocks", [])
+            planned_conns: list[dict[str, Any]] = plan.get("connections", [])
+
+            if not planned_blocks:
+                raise ValueError("LLM returned empty blocks array")
+
+            # Validate required action blocks present
+            has_buy = any(b.get("type") in ("buy", "buy_market") for b in planned_blocks)
+            has_sell = any(b.get("type") in ("sell", "sell_market") for b in planned_blocks)
+            if not has_buy or not has_sell:
+                raise ValueError(f"LLM plan missing buy/sell actions (has_buy={has_buy}, has_sell={has_sell})")
+
+            config.blocks = planned_blocks
+            config.connections = planned_conns
+            self._result.deliberation["llm_plan"] = {
+                "blocks": len(planned_blocks),
+                "connections": len(planned_conns),
+                "prompt_tokens": result.get("tokens_used", {}).get("prompt_tokens")
+                if result.get("tokens_used")
+                else None,
+            }
+            logger.info(
+                f"[BuilderWorkflow] ✅ LLM planned {len(planned_blocks)} blocks, {len(planned_conns)} connections"
+            )
+
+        except Exception as e:
+            logger.warning(f"[BuilderWorkflow] LLM block planning failed ({e}), falling back to RSI preset")
+            config.blocks = [
+                {
+                    "type": "rsi",
+                    "id": "rsi_14",
+                    "params": {
+                        "period": 14,
+                        "use_cross_level": True,
+                        "cross_long_level": 30,
+                        "cross_short_level": 70,
+                    },
+                },
+                {"type": "buy", "id": "buy_1", "params": {}},
+                {"type": "sell", "id": "sell_1", "params": {}},
+                {
+                    "type": "static_sltp",
+                    "id": "sltp_1",
+                    "params": {
+                        "stop_loss_percent": 2.0,
+                        "take_profit_percent": 4.0,
+                    },
+                },
+            ]
+            config.connections = [
+                {"source": "rsi_14", "source_port": "long", "target": "buy_1", "target_port": "signal"},
+                {"source": "rsi_14", "source_port": "short", "target": "sell_1", "target_port": "signal"},
+            ]
+            self._result.errors.append(f"LLM planning failed (fallback to RSI preset): {e}")
 
     async def _run_build_stages(self, config: BuilderWorkflowConfig) -> None:
         """Execute Stages 2-4: create strategy, add blocks, connect blocks.
@@ -826,34 +973,105 @@ class BuilderWorkflow:
         logger.info(f"[BuilderWorkflow] Auto-wired {len(auto_connections)} connections")
         return auto_connections
 
-    def _suggest_adjustments(
+    async def _suggest_adjustments(
         self,
         block_defs: list[dict[str, Any]],
         blocks_added: list[dict[str, Any]],
         iteration: int,
         metrics: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """
-        Suggest parameter adjustments for the next iteration.
+        """Ask DeepSeek to suggest parameter adjustments based on backtest metrics.
 
-        Uses a simple heuristic strategy:
-        - If Sharpe is low and drawdown is high → tighten indicator periods
-        - If win rate is low → widen overbought/oversold thresholds
-        - Each iteration applies a progressively larger adjustment step
+        Sends the current blocks + metrics to the LLM and asks for a JSON array
+        of ``{"block_id": ..., "params": {...}}`` adjustments.  Falls back to a
+        rule-based heuristic if the LLM call fails.
 
         Args:
-            block_defs: Original block definitions from config
-            blocks_added: Actual blocks added (with IDs)
-            iteration: Current iteration number (1-based)
-            metrics: Current backtest metrics
+            block_defs: Original block definitions from config.
+            blocks_added: Actual blocks added (with IDs and current params).
+            iteration: Current iteration number (1-based).
+            metrics: Backtest metrics from the last run.
 
         Returns:
-            List of {"block_id": ..., "params": {...}} adjustments
+            List of ``{"block_id": ..., "params": {...}}`` adjustments.
+        """
+        try:
+            from backend.agents.unified_agent_interface import get_agent_interface
+
+            blocks_summary = [
+                {"id": b.get("id"), "type": b.get("type"), "params": b.get("params", {})}
+                for b in blocks_added
+                if b.get("params")
+            ]
+
+            win_rate = metrics.get("win_rate", 0)
+            # Normalise — API returns percentage (52.11) not fraction (0.52)
+            if win_rate > 1:
+                win_rate = win_rate / 100.0
+
+            prompt = f"""You are a quant strategy optimizer.
+
+Current backtest results (iteration {iteration}):
+- Sharpe Ratio: {metrics.get("sharpe_ratio", 0):.3f}
+- Win Rate: {win_rate:.1%}
+- Max Drawdown: {abs(metrics.get("max_drawdown_pct", 0)):.1f}%
+- Net Profit: {metrics.get("net_profit", 0):.2f}
+- Total Trades: {metrics.get("total_trades", 0)}
+
+Current blocks and parameters:
+{json.dumps(blocks_summary, indent=2)}
+
+Suggest parameter adjustments to improve Sharpe ratio and win rate.
+Return ONLY a JSON array of adjustments. Each item: {{"block_id": "...", "params": {{"key": value}}}}.
+Only include blocks that need changes. Only include changed parameters.
+Return [] if no adjustments are needed.
+Do not include explanations, only the JSON array."""
+
+            agent = get_agent_interface()
+            result = await agent.query_deepseek(
+                prompt,
+                model="deepseek-chat",
+                temperature=0.2,
+                max_tokens=800,
+                use_cache=False,
+            )
+
+            raw_text: str = result.get("response", "") or ""
+            # Extract JSON array from response
+            arr_match = re.search(r"\[.*\]", raw_text, re.DOTALL)
+            if not arr_match:
+                raise ValueError("No JSON array in LLM adjustments response")
+
+            adjustments = json.loads(arr_match.group())
+            if not isinstance(adjustments, list):
+                raise ValueError("LLM returned non-list adjustments")
+
+            logger.info(f"[BuilderWorkflow] 🤖 LLM suggested {len(adjustments)} adjustments (iteration {iteration})")
+            for adj in adjustments:
+                logger.debug(f"[BuilderWorkflow] LLM adj: {adj}")
+            return adjustments
+
+        except Exception as e:
+            logger.warning(f"[BuilderWorkflow] LLM adjustment failed ({e}), using heuristic fallback")
+            return self._heuristic_adjustments(blocks_added, iteration, metrics)
+
+    def _heuristic_adjustments(
+        self,
+        blocks_added: list[dict[str, Any]],
+        iteration: int,
+        metrics: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Rule-based fallback when LLM adjustment call fails.
+
+        Kept as a private method so it is still unit-testable and can be
+        called from ``_suggest_adjustments`` on error.
         """
         adjustments: list[dict[str, Any]] = []
-        step = iteration  # Progressively larger adjustments
+        step = iteration
 
         win_rate = metrics.get("win_rate", 0)
+        if win_rate > 1:
+            win_rate = win_rate / 100.0
         sharpe = metrics.get("sharpe_ratio", 0)
         max_dd = abs(metrics.get("max_drawdown_pct", 0))
 
@@ -867,41 +1085,33 @@ class BuilderWorkflow:
 
             new_params: dict[str, Any] = {}
 
-            # RSI adjustments
             if block_type == "rsi":
                 if win_rate < 0.4:
-                    # Widen thresholds to filter more noise
                     if "overbought" in params:
                         new_params["overbought"] = min(85, params["overbought"] + 3 * step)
                     if "oversold" in params:
                         new_params["oversold"] = max(15, params["oversold"] - 3 * step)
                 if sharpe < 0.3 and "period" in params:
-                    # Longer period for smoother signal
                     new_params["period"] = min(30, params["period"] + 2 * step)
 
-            # EMA / SMA adjustments
             elif block_type in ("ema", "sma"):
                 if max_dd > 20 and "period" in params:
-                    # Longer MA for trend following in volatile markets
                     new_params["period"] = min(50, params["period"] + 3 * step)
                 elif sharpe < 0.3 and "period" in params:
                     new_params["period"] = max(5, params["period"] - 2 * step)
 
-            # MACD adjustments
             elif block_type == "macd":
                 if win_rate < 0.4 and "signal_period" in params:
                     new_params["signal_period"] = min(15, params["signal_period"] + step)
                 if "fast_period" in params and sharpe < 0.3:
                     new_params["fast_period"] = max(5, params["fast_period"] - step)
 
-            # Bollinger Bands adjustments
             elif block_type in ("bollinger", "bbands"):
                 if win_rate < 0.4 and "std_dev" in params:
                     new_params["std_dev"] = min(3.0, params["std_dev"] + 0.2 * step)
                 if "period" in params and max_dd > 20:
                     new_params["period"] = min(30, params["period"] + 2 * step)
 
-            # Stochastic adjustments
             elif block_type in ("stochastic", "stoch"):
                 if win_rate < 0.4:
                     if "overbought" in params:
@@ -909,7 +1119,6 @@ class BuilderWorkflow:
                     if "oversold" in params:
                         new_params["oversold"] = max(10, params["oversold"] - 3 * step)
 
-            # ATR / stop-loss/take-profit adjustments
             elif block_type in ("atr", "static_sltp"):
                 if max_dd > 20:
                     if "stop_loss" in params:
@@ -919,19 +1128,23 @@ class BuilderWorkflow:
 
             if new_params:
                 adjustments.append({"block_id": block_id, "params": new_params})
-                logger.debug(f"[BuilderWorkflow] Adjustment for {block_type} ({block_id}): {new_params}")
+                logger.debug(f"[BuilderWorkflow] Heuristic adj {block_type} ({block_id}): {new_params}")
 
         return adjustments
 
     async def _run_deliberation(self, config: BuilderWorkflowConfig) -> None:
-        """
-        Run AI deliberation to get expert consensus on strategy blocks.
+        """Run AI deliberation and apply the resulting block plan to ``config``.
 
         Uses RealLLMDeliberation with DeepSeek + Perplexity agents to
-        analyze the planned blocks and suggest improvements before building.
+        analyse the planned blocks and suggest improvements before building.
         Qwen is excluded due to invalid API key.
 
-        Results are stored in self._result.deliberation and logged.
+        If the deliberation response contains a JSON object with ``blocks``
+        and ``connections`` arrays those values **replace** ``config.blocks``
+        and ``config.connections`` so that the build stages use the LLM-
+        recommended design.
+
+        Results are stored in ``self._result.deliberation`` and logged.
         """
         try:
             from backend.agents.consensus.real_llm_deliberation import (
@@ -946,12 +1159,15 @@ class BuilderWorkflow:
             block_names = [b.get("type", "?") for b in config.blocks]
             question = (
                 f"I'm building a trading strategy for {config.symbol} on {config.timeframe}m timeframe. "
-                f"Direction: {config.direction}. Planned blocks: {', '.join(block_names)}. "
-                f"Parameters: {config.blocks}. "
+                f"Direction: {config.direction}. Planned blocks: {', '.join(block_names) or 'none yet'}. "
+                f"Parameters: {json.dumps(config.blocks)}. "
                 f"Capital: ${config.initial_capital}, Leverage: {config.leverage}x, "
                 f"Commission: {config.commission} (0.07%). "
                 f"Should I use these blocks and parameters, or suggest improvements? "
-                f"Focus on Sharpe ratio optimization and win rate above {config.min_acceptable_win_rate:.0%}."
+                f"Focus on Sharpe ratio optimization and win rate above {config.min_acceptable_win_rate:.0%}. "
+                f"If you recommend changes, include a JSON object at the END of your reply with "
+                f'keys "blocks" and "connections" (same schema as the builder API) '
+                f"so the changes can be applied automatically."
             )
 
             # Enrich with market context first
@@ -971,16 +1187,42 @@ class BuilderWorkflow:
                 min_confidence=0.5,
             )
 
+            decision_text: str = result.decision or ""
             self._result.deliberation = {
-                "decision": result.decision,
+                "decision": decision_text,
                 "confidence": result.confidence,
                 "agent_count": len(agents),
                 "agents_used": agents,
             }
 
+            # ── Apply deliberation output to config if JSON plan found ──
+            json_match = re.search(r"\{.*\}", decision_text, re.DOTALL)
+            if json_match:
+                try:
+                    plan = json.loads(json_match.group())
+                    new_blocks = plan.get("blocks")
+                    new_conns = plan.get("connections")
+                    if new_blocks and isinstance(new_blocks, list):
+                        has_buy = any(b.get("type") in ("buy", "buy_market") for b in new_blocks)
+                        has_sell = any(b.get("type") in ("sell", "sell_market") for b in new_blocks)
+                        if has_buy and has_sell:
+                            config.blocks = new_blocks
+                            config.connections = new_conns or []
+                            self._result.deliberation["applied_to_config"] = True
+                            logger.info(
+                                f"[BuilderWorkflow] ✅ Deliberation plan applied: "
+                                f"{len(new_blocks)} blocks, {len(new_conns or [])} connections"
+                            )
+                        else:
+                            logger.warning(
+                                "[BuilderWorkflow] Deliberation JSON found but missing buy/sell — not applied"
+                            )
+                except Exception as parse_err:
+                    logger.warning(f"[BuilderWorkflow] Could not parse deliberation JSON: {parse_err}")
+
             logger.info(
                 f"[BuilderWorkflow] 🤖 Deliberation result: "
-                f"confidence={result.confidence:.2f}, decision={result.decision[:100]}..."
+                f"confidence={result.confidence:.2f}, decision={decision_text[:100]}..."
             )
 
         except Exception as e:
