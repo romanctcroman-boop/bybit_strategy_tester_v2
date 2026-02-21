@@ -160,7 +160,11 @@ class StrategyBuilderAdapter(BaseStrategy):
         # When a block's timeframe is "Chart", it resolves to this value.
         self.main_interval = strategy_graph.get("interval", "")
         self.blocks = {block["id"]: block for block in strategy_graph.get("blocks", [])}
-        self.connections = strategy_graph.get("connections", [])
+
+        # Normalize connections into canonical format once
+        # so the rest of the code can do simple dict access instead of
+        # probing 5 possible key names on every call.
+        self.connections = self._normalize_connections(strategy_graph.get("connections", []))
 
         # Handle main_strategy node if present
         # This is the "strategy" node that collects all entry/exit signals
@@ -191,6 +195,91 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # Validate
         self._validate_params()
+
+    # ── Connection normalization ──────────────────────────────────────
+    # The frontend, AI Builder, and tests send connections in 5+ different
+    # key schemas.  _normalize_connections() runs once in __init__ and
+    # converts every connection to a flat canonical dict:
+    #   {"source_id": str, "target_id": str, "source_port": str, "target_port": str}
+    # After that the rest of the codebase does simple key lookups.
+
+    @staticmethod
+    def _parse_source_id(conn: dict[str, Any]) -> str:
+        """Extract source block ID from any known connection format."""
+        if "source" in conn and isinstance(conn["source"], dict):
+            return str(conn["source"].get("blockId", ""))
+        if "source" in conn and isinstance(conn["source"], str):
+            return conn["source"]
+        if "source_id" in conn:
+            return str(conn["source_id"])
+        if "source_block" in conn:
+            return str(conn["source_block"])
+        return str(conn.get("from", ""))
+
+    @staticmethod
+    def _parse_target_id(conn: dict[str, Any]) -> str:
+        """Extract target block ID from any known connection format."""
+        if "target" in conn and isinstance(conn["target"], dict):
+            return str(conn["target"].get("blockId", ""))
+        if "target" in conn and isinstance(conn["target"], str):
+            return conn["target"]
+        if "target_id" in conn:
+            return str(conn["target_id"])
+        if "target_block" in conn:
+            return str(conn["target_block"])
+        return str(conn.get("to", ""))
+
+    @staticmethod
+    def _parse_source_port(conn: dict[str, Any]) -> str:
+        """Extract source port from any known connection format."""
+        if "source" in conn and isinstance(conn["source"], dict):
+            return str(conn["source"].get("portId", "value"))
+        if "source_port" in conn:
+            return str(conn["source_port"])
+        if "source_output" in conn:
+            return str(conn["source_output"])
+        if "sourcePort" in conn:
+            return str(conn["sourcePort"])
+        return str(conn.get("fromPort", "value"))
+
+    @staticmethod
+    def _parse_target_port(conn: dict[str, Any]) -> str:
+        """Extract target port from any known connection format."""
+        if "target" in conn and isinstance(conn["target"], dict):
+            return str(conn["target"].get("portId", "value"))
+        if "target_port" in conn:
+            return str(conn["target_port"])
+        if "target_input" in conn:
+            return str(conn["target_input"])
+        if "targetPort" in conn:
+            return str(conn["targetPort"])
+        return str(conn.get("toPort", "value"))
+
+    @classmethod
+    def _normalize_connections(cls, raw_connections: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """Normalize connections to canonical format once at init time.
+
+        Supports 5+ connection schemas (old nested, AI Build, frontend camelCase,
+        etc.) and converts each to a flat dict with 4 string keys:
+        ``source_id``, ``target_id``, ``source_port``, ``target_port``.
+
+        Args:
+            raw_connections: List of connection dicts in any supported format.
+
+        Returns:
+            List of normalized connection dicts.
+        """
+        normalized: list[dict[str, str]] = []
+        for conn in raw_connections:
+            normalized.append(
+                {
+                    "source_id": cls._parse_source_id(conn),
+                    "target_id": cls._parse_target_id(conn),
+                    "source_port": cls._parse_source_port(conn),
+                    "target_port": cls._parse_target_port(conn),
+                }
+            )
+        return normalized
 
     def _validate_params(self) -> None:
         """Validate strategy graph structure"""
@@ -258,40 +347,6 @@ class StrategyBuilderAdapter(BaseStrategy):
                 params[block_id] = block_params
         return params
 
-    def _get_connection_source_id(self, conn: dict[str, Any]) -> str:
-        """Get source block ID from connection, supporting multiple formats."""
-        # Format 1: conn["source"]["blockId"] (old format)
-        if "source" in conn and isinstance(conn["source"], dict):
-            return str(conn["source"].get("blockId", ""))
-        # Format 1b: conn["source"] is a string block ID (frontend/test format)
-        if "source" in conn and isinstance(conn["source"], str):
-            return conn["source"]
-        # Format 2: conn["source_id"] (builder_workflow / AI Build format)
-        if "source_id" in conn:
-            return str(conn.get("source_id", ""))
-        # Format 3: conn["source_block"] (new API format)
-        if "source_block" in conn:
-            return str(conn.get("source_block", ""))
-        # Format 4: conn["from"] (frontend/Strategy Builder format)
-        return str(conn.get("from", ""))
-
-    def _get_connection_target_id(self, conn: dict[str, Any]) -> str:
-        """Get target block ID from connection, supporting multiple formats."""
-        # Format 1: conn["target"]["blockId"] (old format)
-        if "target" in conn and isinstance(conn["target"], dict):
-            return str(conn["target"].get("blockId", ""))
-        # Format 1b: conn["target"] is a string block ID (frontend/test format)
-        if "target" in conn and isinstance(conn["target"], str):
-            return conn["target"]
-        # Format 2: conn["target_id"] (builder_workflow / AI Build format)
-        if "target_id" in conn:
-            return str(conn.get("target_id", ""))
-        # Format 3: conn["target_block"] (new API format)
-        if "target_block" in conn:
-            return str(conn.get("target_block", ""))
-        # Format 4: conn["to"] (frontend/Strategy Builder format)
-        return str(conn.get("to", ""))
-
     def _build_execution_order(self) -> list[str]:
         """
         Build topological sort of blocks based on connections.
@@ -303,8 +358,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         dependencies: dict[str, list[str]] = {block_id: [] for block_id in self.blocks}
 
         for conn in self.connections:
-            source_id = self._get_connection_source_id(conn)
-            target_id = self._get_connection_target_id(conn)
+            source_id = conn["source_id"]
+            target_id = conn["target_id"]
             if target_id in dependencies and source_id:
                 dependencies[target_id].append(source_id)
 
@@ -319,8 +374,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # Find blocks that depend on this one
             for conn in self.connections:
-                if self._get_connection_source_id(conn) == block_id:
-                    target_id = self._get_connection_target_id(conn)
+                if conn["source_id"] == block_id:
+                    target_id = conn["target_id"]
                     # Only decrement for actual blocks, not special targets like 'main_strategy'
                     if target_id in in_degree:
                         in_degree[target_id] -= 1
@@ -331,8 +386,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         remaining = [bid for bid in self.blocks if bid not in result]
         if remaining:
             # Blocks with in_degree > 0 after Kahn's are part of a cycle
-            connected_block_ids = {self._get_connection_source_id(c) for c in self.connections} | {
-                self._get_connection_target_id(c) for c in self.connections
+            connected_block_ids = {c["source_id"] for c in self.connections} | {
+                c["target_id"] for c in self.connections
             }
             cyclic = [bid for bid in remaining if bid in connected_block_ids and in_degree.get(bid, 0) > 0]
             if cyclic:
@@ -590,40 +645,6 @@ class StrategyBuilderAdapter(BaseStrategy):
             logger.warning(f"Unknown block category: {category} for block {block_id}")
             return {}
 
-    def _get_connection_source_port(self, conn: dict[str, Any]) -> str:
-        """Get source port ID from connection, supporting multiple formats."""
-        # Format 1: conn["source"]["portId"] (old format)
-        if "source" in conn and isinstance(conn["source"], dict):
-            return str(conn["source"].get("portId", "value"))
-        # Format 2: conn["source_port"] (builder_workflow / AI Build format)
-        if "source_port" in conn:
-            return str(conn.get("source_port", "value"))
-        # Format 3: conn["source_output"] (new API format)
-        if "source_output" in conn:
-            return str(conn.get("source_output", "value"))
-        # Format 4: conn["sourcePort"] (frontend/Strategy Builder format)
-        if "sourcePort" in conn:
-            return str(conn.get("sourcePort", "value"))
-        # Format 5: conn["fromPort"] (test/API format)
-        return str(conn.get("fromPort", "value"))
-
-    def _get_connection_target_port(self, conn: dict[str, Any]) -> str:
-        """Get target port ID from connection, supporting multiple formats."""
-        # Format 1: conn["target"]["portId"] (old format)
-        if "target" in conn and isinstance(conn["target"], dict):
-            return str(conn["target"].get("portId", "value"))
-        # Format 2: conn["target_port"] (builder_workflow / AI Build format)
-        if "target_port" in conn:
-            return str(conn.get("target_port", "value"))
-        # Format 3: conn["target_input"] (new API format)
-        if "target_input" in conn:
-            return str(conn.get("target_input", "value"))
-        # Format 4: conn["targetPort"] (frontend/Strategy Builder format)
-        if "targetPort" in conn:
-            return str(conn.get("targetPort", "value"))
-        # Format 5: conn["toPort"] (test/API format)
-        return str(conn.get("toPort", "value"))
-
     def _get_block_inputs(self, block_id: str) -> dict[str, pd.Series]:
         """Get input values for a block from connections.
 
@@ -632,11 +653,11 @@ class StrategyBuilderAdapter(BaseStrategy):
         """
         inputs = {}
         for conn in self.connections:
-            target_id = self._get_connection_target_id(conn)
+            target_id = conn["target_id"]
             if target_id == block_id:
-                source_id = self._get_connection_source_id(conn)
-                source_port = self._get_connection_source_port(conn)
-                target_port = self._get_connection_target_port(conn)
+                source_id = conn["source_id"]
+                source_port = conn["source_port"]
+                target_port = conn["target_port"]
 
                 # Get value from cache
                 if source_id in self._value_cache:
@@ -4403,12 +4424,12 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             if not case1_found:
                 for conn in self.connections:
-                    target_id = self._get_connection_target_id(conn)
+                    target_id = conn["target_id"]
                     if target_id == main_node_id:
                         has_connections_to_main = True
-                        source_id = self._get_connection_source_id(conn)
-                        source_port = self._get_connection_source_port(conn)
-                        target_port = self._get_connection_target_port(conn)
+                        source_id = conn["source_id"]
+                        source_port = conn["source_port"]
+                        target_port = conn["target_port"]
 
                         if source_id in self._value_cache:
                             source_outputs = self._value_cache[source_id]
