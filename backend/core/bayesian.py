@@ -49,7 +49,7 @@ class BayesianOptimizer:
         self,
         data: pd.DataFrame,
         initial_capital: float = 10000.0,
-        commission: float = 0.001,
+        commission: float = 0.0007,  # TradingView parity (CLAUDE.md §5)
         n_trials: int = 100,
         n_jobs: int = 1,
         random_state: int | None = None,

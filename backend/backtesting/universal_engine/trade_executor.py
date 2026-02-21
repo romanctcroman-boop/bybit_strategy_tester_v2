@@ -224,9 +224,7 @@ class ActiveTrade:
 
 
 @njit(cache=True)
-def calculate_atr(
-    high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int
-) -> np.ndarray:
+def calculate_atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
     """Calculate ATR using Numba."""
     n = len(close)
     atr = np.zeros(n, dtype=np.float64)
@@ -501,11 +499,7 @@ class UniversalTradeExecutor:
             atr = (
                 atr_value
                 if atr_value > 0
-                else (
-                    self.atr_values[bar_index]
-                    if self.atr_values is not None
-                    else entry_price * 0.02
-                )
+                else (self.atr_values[bar_index] if self.atr_values is not None else entry_price * 0.02)
             )
             sl_price, tp_price = calculate_sl_tp_atr(
                 entry_price,
@@ -517,9 +511,7 @@ class UniversalTradeExecutor:
                 cfg.sl_max_limit_enabled,
             )
         else:
-            sl_price, tp_price = calculate_sl_tp_fixed(
-                entry_price, dir_int, cfg.stop_loss, cfg.take_profit
-            )
+            sl_price, tp_price = calculate_sl_tp_fixed(entry_price, dir_int, cfg.stop_loss, cfg.take_profit)
 
         # Create trade
         trade = ActiveTrade(
@@ -583,9 +575,7 @@ class UniversalTradeExecutor:
             dir_int = 0 if trade.direction == "long" else 1
 
             # Update MFE/MAE
-            trade.mfe, trade.mae = calculate_mfe_mae(
-                dir_int, trade.avg_entry_price, high, low, trade.mfe, trade.mae
-            )
+            trade.mfe, trade.mae = calculate_mfe_mae(dir_int, trade.avg_entry_price, high, low, trade.mfe, trade.mae)
 
             # Update highest/lowest for trailing
             if high > trade.highest_price:
@@ -600,19 +590,15 @@ class UniversalTradeExecutor:
             # 1. Check trailing stop
             if cfg.trailing_stop_enabled:
                 activation_price = trade.entry_price * (
-                    1 + cfg.trailing_stop_activation
-                    if trade.direction == "long"
-                    else 1 - cfg.trailing_stop_activation
+                    1 + cfg.trailing_stop_activation if trade.direction == "long" else 1 - cfg.trailing_stop_activation
                 )
-                trade.trailing_stop_price, trade.trailing_activated = (
-                    update_trailing_stop(
-                        dir_int,
-                        close,
-                        trade.trailing_stop_price,
-                        cfg.trailing_stop_distance,
-                        activation_price,
-                        trade.trailing_activated,
-                    )
+                trade.trailing_stop_price, trade.trailing_activated = update_trailing_stop(
+                    dir_int,
+                    close,
+                    trade.trailing_stop_price,
+                    cfg.trailing_stop_distance,
+                    activation_price,
+                    trade.trailing_activated,
                 )
 
                 if trade.trailing_activated:
@@ -624,27 +610,17 @@ class UniversalTradeExecutor:
 
             # 2. Check stop loss (if not trailing triggered)
             if exit_reason is None:
-                sl_price = (
-                    trade.breakeven_price
-                    if trade.breakeven_activated
-                    else trade.sl_price
-                )
+                sl_price = trade.breakeven_price if trade.breakeven_activated else trade.sl_price
 
                 if check_sl_hit(dir_int, sl_price, low, high):
-                    exit_reason = (
-                        ExitReason.BREAKEVEN
-                        if trade.breakeven_activated
-                        else ExitReason.STOP_LOSS
-                    )
+                    exit_reason = ExitReason.BREAKEVEN if trade.breakeven_activated else ExitReason.STOP_LOSS
                     exit_price = sl_price
 
             # 3. Check take profit
             if exit_reason is None:
                 if cfg.tp_mode == TpMode.MULTI and trade.tp_prices:
                     # Multi-level TP
-                    for i, (tp_price, tp_portion) in enumerate(
-                        zip(trade.tp_prices, trade.tp_portions)
-                    ):
+                    for i, (tp_price, tp_portion) in enumerate(zip(trade.tp_prices, trade.tp_portions)):
                         if i in trade.tp_levels_hit:
                             continue
                         if check_tp_hit(dir_int, tp_price, low, high):
@@ -671,10 +647,7 @@ class UniversalTradeExecutor:
                                 trade.total_fees += exit_fee
 
                             # Full exit if all TPs hit or last TP
-                            if (
-                                trade.remaining_size <= 0
-                                or i == len(trade.tp_prices) - 1
-                            ):
+                            if trade.remaining_size <= 0 or i == len(trade.tp_prices) - 1:
                                 exit_reason = ExitReason[f"TAKE_PROFIT_{i + 1}"]
                                 exit_price = tp_price
                                 break
@@ -775,9 +748,7 @@ class UniversalTradeExecutor:
             trade.total_fees += exit_fee
 
             # Calculate PnL
-            pnl, pnl_pct = calculate_pnl(
-                dir_int, trade.avg_entry_price, exit_price, trade.size, trade.total_fees
-            )
+            pnl, pnl_pct = calculate_pnl(dir_int, trade.avg_entry_price, exit_price, trade.size, trade.total_fees)
 
             record = TradeRecord(
                 entry_time=trade.entry_time,
@@ -801,9 +772,7 @@ class UniversalTradeExecutor:
         self.active_trades = []
         return closed
 
-    def add_dca_entry(
-        self, trade: ActiveTrade, bar_index: int, entry_price: float, size: float
-    ):
+    def add_dca_entry(self, trade: ActiveTrade, bar_index: int, entry_price: float, size: float):
         """Add a DCA entry to an existing trade."""
         cfg = self.config
         dir_int = 0 if trade.direction == "long" else 1
@@ -868,9 +837,7 @@ class UniversalTradeExecutor:
             tp_portions=getattr(input_data, "tp_portions", (0.25, 0.25, 0.25, 0.25)),
             atr_period=getattr(input_data, "atr_period", 14),
             trailing_stop_enabled=getattr(input_data, "trailing_stop_enabled", False),
-            trailing_stop_activation=getattr(
-                input_data, "trailing_stop_activation", 0.01
-            ),
+            trailing_stop_activation=getattr(input_data, "trailing_stop_activation", 0.01),
             trailing_stop_distance=getattr(input_data, "trailing_stop_distance", 0.005),
             breakeven_enabled=getattr(input_data, "breakeven_enabled", False),
             breakeven_mode=getattr(input_data, "breakeven_mode", "average"),
@@ -880,7 +847,7 @@ class UniversalTradeExecutor:
             session_end_hour=getattr(input_data, "session_end_hour", 24),
             exit_end_of_week=getattr(input_data, "exit_end_of_week", False),
             exit_before_weekend=getattr(input_data, "exit_before_weekend", 0),
-            taker_fee=getattr(input_data, "taker_fee", 0.001),
+            taker_fee=getattr(input_data, "taker_fee", 0.0007),  # TradingView parity (CLAUDE.md §5)
             maker_fee=getattr(input_data, "maker_fee", 0.0006),
             slippage=getattr(input_data, "slippage", 0.0005),
             slippage_model=getattr(input_data, "slippage_model", "fixed"),

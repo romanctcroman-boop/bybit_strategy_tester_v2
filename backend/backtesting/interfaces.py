@@ -206,7 +206,7 @@ class BacktestInput:
     sl_max_limit_enabled: bool = True
 
     # === ИЗДЕРЖКИ ===
-    taker_fee: float = 0.001  # 0.1%
+    taker_fee: float = 0.0007  # 0.07% — TradingView parity (CLAUDE.md §5)
     maker_fee: float = 0.0006  # 0.06%
     slippage: float = 0.0005  # 0.05%
 

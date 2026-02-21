@@ -78,7 +78,7 @@ class RLConfig:
 
     # Environment
     initial_capital: float = 10000.0
-    commission: float = 0.001  # 0.1%
+    commission: float = 0.0007  # 0.07% — TradingView parity (see CLAUDE.md §5)
     slippage: float = 0.0005  # 0.05%
     max_position: int = 1  # Max position size
 
@@ -125,9 +125,7 @@ class TradingEnvironment:
     Provides market simulation for RL agent training.
     """
 
-    def __init__(
-        self, prices: NDArray, features: NDArray, config: RLConfig | None = None
-    ):
+    def __init__(self, prices: NDArray, features: NDArray, config: RLConfig | None = None):
         """
         Initialize environment.
 
@@ -730,9 +728,7 @@ class DQNAgent(BaseAgent):
     Uses experience replay and target network for stable training.
     """
 
-    def __init__(
-        self, state_dim: int, action_dim: int, config: RLConfig | None = None
-    ):
+    def __init__(self, state_dim: int, action_dim: int, config: RLConfig | None = None):
         config = config or RLConfig()
         super().__init__(config)
 
@@ -828,9 +824,7 @@ class DQNAgent(BaseAgent):
             self.target_network = self.q_network.copy()
 
         # Decay epsilon
-        self.epsilon = max(
-            self.config.epsilon_end, self.epsilon * self.config.epsilon_decay
-        )
+        self.epsilon = max(self.config.epsilon_end, self.epsilon * self.config.epsilon_decay)
 
         return {"loss": float(loss), "epsilon": self.epsilon}
 
@@ -865,9 +859,7 @@ class PPOAgent(BaseAgent):
     Uses clipped surrogate objective for stable policy updates.
     """
 
-    def __init__(
-        self, state_dim: int, action_dim: int, config: RLConfig | None = None
-    ):
+    def __init__(self, state_dim: int, action_dim: int, config: RLConfig | None = None):
         config = config or RLConfig()
         super().__init__(config)
 
@@ -958,9 +950,7 @@ class PPOAgent(BaseAgent):
         advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-8)
 
         # Store old action probabilities
-        old_probs = np.array(
-            [self.get_action_prob(states[i], actions[i]) for i in range(len(states))]
-        )
+        old_probs = np.array([self.get_action_prob(states[i], actions[i]) for i in range(len(states))])
 
         # PPO update (multiple epochs)
         total_actor_loss = 0.0
@@ -969,22 +959,14 @@ class PPOAgent(BaseAgent):
 
         for _ in range(n_updates):
             # Get current probabilities
-            new_probs = np.array(
-                [
-                    self.get_action_prob(states[i], actions[i])
-                    for i in range(len(states))
-                ]
-            )
+            new_probs = np.array([self.get_action_prob(states[i], actions[i]) for i in range(len(states))])
 
             # Ratio
             ratios = new_probs / (old_probs + 1e-8)
 
             # Clipped surrogate objective
             surr1 = ratios * advantages
-            surr2 = (
-                np.clip(ratios, 1 - self.config.clip_ratio, 1 + self.config.clip_ratio)
-                * advantages
-            )
+            surr2 = np.clip(ratios, 1 - self.config.clip_ratio, 1 + self.config.clip_ratio) * advantages
             actor_loss = -np.mean(np.minimum(surr1, surr2))
 
             # Value loss
@@ -992,19 +974,13 @@ class PPOAgent(BaseAgent):
             critic_loss = np.mean((current_values - returns) ** 2)
 
             # Entropy bonus (encourage exploration)
-            logits = np.array(
-                [self.actor.forward(s.reshape(1, -1)).flatten() for s in states]
-            )
+            logits = np.array([self.actor.forward(s.reshape(1, -1)).flatten() for s in states])
             exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))
             probs_all = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
             entropy = -np.mean(np.sum(probs_all * np.log(probs_all + 1e-8), axis=1))
 
             # Total loss (for logging purposes)
-            _ = (
-                actor_loss
-                + self.config.value_loss_coef * critic_loss
-                - self.config.entropy_coef * entropy
-            )
+            _ = actor_loss + self.config.value_loss_coef * critic_loss - self.config.entropy_coef * entropy
 
             total_actor_loss += actor_loss
             total_critic_loss += critic_loss
@@ -1045,9 +1021,7 @@ class A3CAgent(BaseAgent):
     For true A3C, would use multiprocessing.
     """
 
-    def __init__(
-        self, state_dim: int, action_dim: int, config: RLConfig | None = None
-    ):
+    def __init__(self, state_dim: int, action_dim: int, config: RLConfig | None = None):
         config = config or RLConfig()
         super().__init__(config)
 
@@ -1166,9 +1140,7 @@ class SACAgent(BaseAgent):
     For discrete actions, treats Q-values as action preferences.
     """
 
-    def __init__(
-        self, state_dim: int, action_dim: int, config: RLConfig | None = None
-    ):
+    def __init__(self, state_dim: int, action_dim: int, config: RLConfig | None = None):
         config = config or RLConfig()
         super().__init__(config)
 
@@ -1236,9 +1208,7 @@ class SACAgent(BaseAgent):
 
         # Compute target Q values
         next_logits = self.actor.forward(next_states)
-        next_exp_logits = np.exp(
-            next_logits - np.max(next_logits, axis=1, keepdims=True)
-        )
+        next_exp_logits = np.exp(next_logits - np.max(next_logits, axis=1, keepdims=True))
         next_probs = next_exp_logits / np.sum(next_exp_logits, axis=1, keepdims=True)
 
         next_q1 = self.q1_target.forward(next_states)
@@ -1246,9 +1216,7 @@ class SACAgent(BaseAgent):
         next_q = np.minimum(next_q1, next_q2)
 
         # Soft Q target
-        next_v = np.sum(
-            next_probs * (next_q - self.alpha * np.log(next_probs + 1e-8)), axis=1
-        )
+        next_v = np.sum(next_probs * (next_q - self.alpha * np.log(next_probs + 1e-8)), axis=1)
         target_q = rewards + self.config.gamma * next_v * (1 - dones)
 
         # Current Q values
@@ -1269,20 +1237,14 @@ class SACAgent(BaseAgent):
 
         q_values = np.minimum(self.q1.forward(states), self.q2.forward(states))
 
-        actor_loss = np.mean(
-            np.sum(probs * (self.alpha * np.log(probs + 1e-8) - q_values), axis=1)
-        )
+        actor_loss = np.mean(np.sum(probs * (self.alpha * np.log(probs + 1e-8) - q_values), axis=1))
 
         # Soft update targets
-        for param, target_param in zip(
-            self.q1.get_params(), self.q1_target.get_params()
-        ):
+        for param, target_param in zip(self.q1.get_params(), self.q1_target.get_params()):
             for p, tp in zip(param, target_param):
                 tp[:] = self.config.tau * p + (1 - self.config.tau) * tp
 
-        for param, target_param in zip(
-            self.q2.get_params(), self.q2_target.get_params()
-        ):
+        for param, target_param in zip(self.q2.get_params(), self.q2_target.get_params()):
             for p, tp in zip(param, target_param):
                 tp[:] = self.config.tau * p + (1 - self.config.tau) * tp
 

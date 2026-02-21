@@ -73,4 +73,43 @@
 
 ---
 
+## ADR-006: position_size — fraction vs percent
+
+**Дата:** 2026-02-21  
+**Статус:** Принято
+
+### Контекст
+
+Параметр `position_size` используется в 12+ файлах. Frontend отображает его в **процентах** (0–100%), а backend — в **дробях** (0.0–1.0). Это создаёт потенциал для ошибок при передаче данных.
+
+### Решение
+
+- **Backend API** (`position_size` в BacktestConfig, BacktestInput, стратегиях): **всегда fraction** (0.01–1.0).
+- **Frontend** (Properties Panel): показывает **проценты** (1–100%), конвертирует при отправке (`/ 100`) и при получении (`* 100`).
+- **Конвертация** происходит ТОЛЬКО в `strategy_builder.js` (строка ~10199):
+    ```js
+    position_size: positionSizeType === "percent" ? positionSizeVal / 100 : positionSizeVal;
+    ```
+- Для `position_size_type = "fixed_amount"` значение передаётся как есть (например, 5000.0).
+- Backend валидирует: `ge=0.01, le=1.0` для percent-mode.
+
+### Affected files
+
+| Слой      | Файл                              | Формат                                      |
+| --------- | --------------------------------- | ------------------------------------------- |
+| Frontend  | `strategy_builder.js`             | percent (0-100) → fraction при отправке     |
+| Frontend  | `leverageManager.js`              | percent (0-100) → `/100` при расчёте margin |
+| API       | `backtests.py`                    | fraction (0.01–1.0)                         |
+| API       | `strategy_builder.py`             | fraction (0.01–1.0)                         |
+| Engine    | `engine.py`, `fallback_*.py`      | fraction (0.01–1.0)                         |
+| Optimizer | `utils.py`, `optuna_optimizer.py` | fraction                                    |
+
+### Правило
+
+> Никогда не передавать position_size в процентах через API. Конвертация — ответственность frontend.
+
+**Ссылка:** CLAUDE.md §7 (Cross-cutting Parameters).
+
+---
+
 _При добавлении новых решений добавляйте секцию ADR-NNN с датой, статусом и ссылками._

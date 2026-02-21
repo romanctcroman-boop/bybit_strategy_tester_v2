@@ -189,7 +189,7 @@ class UniversalMathEngine:
         take_profit: float = 0.03,
         leverage: int = 10,
         position_size: float = 0.10,
-        taker_fee: float = 0.001,
+        taker_fee: float = 0.0007,  # TradingView parity (CLAUDE.md §5)
         slippage: float = 0.0005,
         # Advanced options
         filter_config: FilterConfig | None = None,
