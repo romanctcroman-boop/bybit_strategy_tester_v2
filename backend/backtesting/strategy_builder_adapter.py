@@ -112,6 +112,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         "value": ["output", "result", "signal"],
         "result": ["signal", "output", "value"],
         "signal": ["result", "output", "value"],
+        # Close-condition blocks expose "config" as their single output port on the frontend.
+        # Resolve it to the actual signal keys present in the cached output.
+        "config": ["exit_long", "exit_short", "exit", "signal"],
     }
 
     def __init__(self, strategy_graph: dict[str, Any]):
@@ -208,27 +211,31 @@ class StrategyBuilderAdapter(BaseStrategy):
     def _parse_source_port(conn: dict[str, Any]) -> str:
         """Extract source port from any known connection format."""
         if "source" in conn and isinstance(conn["source"], dict):
-            return str(conn["source"].get("portId", "value"))
+            # Bug #6 fix: use "" not "value" so missing portId doesn't silently
+            # match a real port named "value" and lose the signal.
+            return str(conn["source"].get("portId", ""))
         if "source_port" in conn:
             return str(conn["source_port"])
         if "source_output" in conn:
             return str(conn["source_output"])
         if "sourcePort" in conn:
             return str(conn["sourcePort"])
-        return str(conn.get("fromPort", "value"))
+        return str(conn.get("fromPort", ""))
 
     @staticmethod
     def _parse_target_port(conn: dict[str, Any]) -> str:
         """Extract target port from any known connection format."""
         if "target" in conn and isinstance(conn["target"], dict):
-            return str(conn["target"].get("portId", "value"))
+            # Bug #6 fix: use "" not "value" so missing portId doesn't silently
+            # match a real port named "value" and lose the signal.
+            return str(conn["target"].get("portId", ""))
         if "target_port" in conn:
             return str(conn["target_port"])
         if "target_input" in conn:
             return str(conn["target_input"])
         if "targetPort" in conn:
             return str(conn["targetPort"])
-        return str(conn.get("toPort", "value"))
+        return str(conn.get("toPort", ""))
 
     @classmethod
     def _normalize_connections(cls, raw_connections: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -467,7 +474,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         "session_filter": "filter",
         # Exit blocks
         "trailing_stop_exit": "exit",
-        "atr_exit": "atr_exit",
+        "atr_exit": "exit",  # Fix: route to _execute_exit, not empty stub
         "multi_tp_exit": "multiple_tp",
         # Position sizing
         "fixed_size": "sizing",
@@ -586,9 +593,6 @@ class StrategyBuilderAdapter(BaseStrategy):
             return self._execute_dca_block(block_type, params)
         elif category == "multiple_tp":
             # Multi-TP blocks are config-only
-            return {}
-        elif category == "atr_exit":
-            # ATR exit blocks are config-only
             return {}
         elif category == "signal_memory":
             # Signal memory blocks are config-only
@@ -3192,15 +3196,46 @@ class StrategyBuilderAdapter(BaseStrategy):
                                 # Universal exit - applies to both long and short
                                 exits = exits | signal
                                 short_exits = short_exits | signal
+                            elif target_port == "close_cond":
+                                # Close-condition blocks (close_by_time, close_channel, close_rsi,
+                                # close_ma_cross, close_stochastic, close_psar) — their "config"
+                                # output port carries both exit_long and exit_short signals.
+                                # Extract each independently from the raw cache so both directions
+                                # are honoured instead of collapsing to a single alias match.
+                                raw = source_outputs
+                                if "exit_long" in raw:
+                                    exits = exits | raw["exit_long"]
+                                if "exit_short" in raw:
+                                    short_exits = short_exits | raw["exit_short"]
+                                if "exit" in raw and "exit_long" not in raw and "exit_short" not in raw:
+                                    # Fallback: universal exit key — apply to both sides
+                                    exits = exits | raw["exit"]
+                                    short_exits = short_exits | raw["exit"]
+                                logger.debug(
+                                    f"[SignalRouting] close_cond port: block '{source_id}' "
+                                    f"→ exits updated from {list(raw.keys())}"
+                                )
 
         # Fallback: Look for signal blocks by category ONLY when:
         # 1. No main node exists at all, OR
         # 2. Main node exists but has NO incoming connections AND produced 0 signals.
-        # If user wired connections to main node, respect that wiring even if
-        # it produced 0 signals вЂ” don't silently override with category-based routing.
+        # 3. (Bug #2 fix) Connections exist but ALL blocks produced 0 signals --
+        #    log diagnostic warning and enable fallback so user is not left with 0 trades.
         use_fallback = not main_node_id or (
             not has_connections_to_main and entries.sum() == 0 and short_entries.sum() == 0
         )
+
+        if has_connections_to_main and not use_fallback and entries.sum() == 0 and short_entries.sum() == 0:
+            _conn_count = sum(1 for conn in self.connections if conn.get("target", {}).get("nodeId") == main_node_id)
+            logger.warning(
+                "[SignalRouting] Strategy '%s': %d connection(s) to main node but "
+                "ALL signal series are empty (0 long, 0 short entries). "
+                "Possible causes: indicator period > data length, wrong port wiring, "
+                "or block execution error. Enabling category-based fallback routing.",
+                self.name,
+                _conn_count,
+            )
+            use_fallback = True  # Bug #2 fix: don't silently return 0 trades
 
         if use_fallback:
             for block_id, block in self.blocks.items():

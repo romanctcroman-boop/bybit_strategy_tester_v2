@@ -3004,6 +3004,8 @@ async def run_backtest_from_builder(
                 "_commission": request.commission,
                 "_slippage": request.slippage,
                 "_pyramiding": request.pyramiding,
+                "_start_date": request.start_date,
+                "_end_date": request.end_date,
                 "_market_type": market_type,
                 "breakeven_enabled": block_breakeven_enabled,
                 "breakeven_activation_pct": block_breakeven_activation_pct,
