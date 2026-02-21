@@ -207,6 +207,15 @@ class BacktestConfig(BaseModel):
         "SL/TP exits still work regardless. Prevents closing losing positions on signal.",
     )
 
+    # ===== Max Bars In Trade / Close by Time (Strategy Builder: close_by_time block) =====
+    # Close position after N bars regardless of signal. 0 = disabled.
+    max_bars_in_trade: int = Field(
+        default=0,
+        ge=0,
+        description="Close position after this many bars (0 = disabled). "
+        "Matches TradingView 'close_by_time' / 'max_bars_back' behavior.",
+    )
+
     # ===== SL Type (Strategy Builder: Static SL/TP block) =====
     # Controls which price is used as reference for Stop Loss calculation:
     #   average_price — SL is calculated from average entry price (default, standard for DCA)
@@ -912,7 +921,7 @@ class PerformanceMetrics(BaseModel):
     # Recovery Factor = Net Profit / Max Drawdown
     recovery_factor: float = Field(default=0.0, description="Recovery factor (net profit / max drawdown)")
 
-    # Expectancy = (Win% × Avg Win) - (Loss% × Avg Loss)
+    # Expectancy = (Win% x Avg Win) - (Loss% x Avg Loss)
     expectancy: float = Field(default=0.0, description="Mathematical expectancy per trade (%)")
     expectancy_ratio: float = Field(default=0.0, description="Expectancy ratio (expectancy / avg loss)")
 

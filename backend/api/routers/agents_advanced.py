@@ -1078,7 +1078,11 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
     def _stage_cb(stage: BuilderStage) -> None:
         queue.put_nowait({"type": "stage", "stage": stage.value, "label": _stage_labels.get(stage, stage.value)})
 
-    workflow = BuilderWorkflow(on_stage_change=_stage_cb)
+    def _agent_log_cb(log: dict[str, Any]) -> None:
+        """Forward agent LLM call details to the SSE queue."""
+        queue.put_nowait({"type": "agent_log", **log})
+
+    workflow = BuilderWorkflow(on_stage_change=_stage_cb, on_agent_log=_agent_log_cb)
 
     # Run workflow in background task
     async def _run() -> None:
@@ -1103,6 +1107,19 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
 
             if msg["type"] == "stage":
                 yield _sse_event("stage", {"stage": msg["stage"], "label": msg["label"]})
+
+            elif msg["type"] == "agent_log":
+                yield _sse_event(
+                    "agent_log",
+                    {
+                        "agent": msg.get("agent", "unknown"),
+                        "role": msg.get("role", ""),
+                        "title": msg.get("title", ""),
+                        "prompt_excerpt": msg.get("prompt_excerpt", ""),
+                        "response": msg.get("response", ""),
+                        "ts": msg.get("ts", ""),
+                    },
+                )
 
             elif msg["type"] == "done":
                 yield _sse_event(

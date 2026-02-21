@@ -11234,9 +11234,26 @@ function displayBacktestResults(results) {
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
 
-  // Initialize equity chart if data available
-  if (results.equity_curve && results.equity_curve.length > 0) {
-    setTimeout(() => renderEquityChart(results.equity_curve), 100);
+  // Initialize equity chart if data available.
+  // equity_curve can be either:
+  //   - Array format: [{equity, timestamp, drawdown}, ...]  (legacy/in-memory)
+  //   - Object format: {timestamps: [...], equity: [...], drawdown: [...]}  (DB/API)
+  const ec = results.equity_curve;
+  if (ec) {
+    let chartData = null;
+    if (Array.isArray(ec) && ec.length > 0) {
+      chartData = ec;  // already array format
+    } else if (ec && typeof ec === 'object' && Array.isArray(ec.equity) && ec.equity.length > 0) {
+      // Convert object format to array format for renderEquityChart
+      chartData = ec.equity.map((val, i) => ({
+        equity: val,
+        timestamp: ec.timestamps ? ec.timestamps[i] : null,
+        drawdown: ec.drawdown ? ec.drawdown[i] : 0
+      }));
+    }
+    if (chartData) {
+      setTimeout(() => renderEquityChart(chartData), 100);
+    }
   }
 }
 
@@ -11572,7 +11589,20 @@ function switchResultsTab(tabId) {
 
   // Re-render chart if equity tab
   if (tabId === 'equity' && currentBacktestResults) {
-    setTimeout(() => renderEquityChart(currentBacktestResults.equity_curve), 100);
+    const ec = currentBacktestResults.equity_curve;
+    let chartData = null;
+    if (Array.isArray(ec) && ec.length > 0) {
+      chartData = ec;
+    } else if (ec && typeof ec === 'object' && Array.isArray(ec.equity) && ec.equity.length > 0) {
+      chartData = ec.equity.map((val, i) => ({
+        equity: val,
+        timestamp: ec.timestamps ? ec.timestamps[i] : null,
+        drawdown: ec.drawdown ? ec.drawdown[i] : 0
+      }));
+    }
+    if (chartData) {
+      setTimeout(() => renderEquityChart(chartData), 100);
+    }
   }
 }
 
@@ -11942,6 +11972,7 @@ async function runAiBuild() {
   // Show progress panel
   document.getElementById('aiBuildConfig').classList.add('hidden');
   document.getElementById('aiBuildProgress').classList.remove('hidden');
+  _resetAgentMonitor();
   const stageEl = document.getElementById('aiBuildStage');
   if (stageEl) {
     stageEl.textContent = _aiBuildMode === 'optimize'
@@ -12017,6 +12048,8 @@ async function _runAiBuildWithSSE(payload) {
 
         if (eventType === 'stage' && stageEl) {
           stageEl.textContent = msg.label || msg.stage || '…';
+        } else if (eventType === 'agent_log') {
+          _appendAgentLog(msg);
         } else if (eventType === 'result') {
           await showAiBuildResults(msg);
           return;
@@ -12032,15 +12065,135 @@ async function _runAiBuildWithSSE(payload) {
   }
 }
 
+// ============================================
+// AGENT ACTIVITY MONITOR
+// ============================================
+
+/** Counts for each agent column badge */
+const _agentMsgCount = { deepseek: 0, qwen: 0, perplexity: 0 };
+
+/**
+ * Show the agent monitor panel and widen the modal when the first
+ * agent_log event arrives.
+ */
+function _ensureAgentMonitorVisible() {
+  const monitor = document.getElementById('agentMonitor');
+  const modal = document.querySelector('.ai-build-modal-content');
+  if (monitor && monitor.classList.contains('hidden')) {
+    monitor.classList.remove('hidden');
+    if (modal) modal.classList.add('has-agents');
+  }
+}
+
+/**
+ * Append a message card to the correct agent column.
+ * @param {Object} log - agent_log SSE payload
+ */
+function _appendAgentLog(log) {
+  const agent = (log.agent || 'deepseek').toLowerCase();
+  const role = (log.role || 'unknown').toLowerCase();
+  // Use server-provided title (human-readable) or fall back to role label
+  const title = log.title || '';
+  const promptExcerpt = log.prompt_excerpt || '';
+  const response = log.response || '';
+  const ts = log.ts ? new Date(log.ts).toLocaleTimeString() : '';
+
+  // Map agent names to known columns (a2a or unknown → deepseek column)
+  const col = ['deepseek', 'qwen', 'perplexity'].includes(agent) ? agent : 'deepseek';
+
+  _ensureAgentMonitorVisible();
+
+  const feed = document.getElementById(`agentFeed-${col}`);
+  const badge = document.getElementById(`agentBadge-${col}`);
+  if (!feed) return;
+
+  _agentMsgCount[col] = (_agentMsgCount[col] || 0) + 1;
+  if (badge) badge.textContent = _agentMsgCount[col];
+
+  const roleClass = `role-${role}`;
+  const roleLabel = {
+    planner: '🔍 Planner',
+    deliberation: '🤝 Deliberation',
+    optimizer: '⚙️ Optimizer'
+  }[role] || role;
+
+  // Format response: render **bold** markdown, preserve newlines
+  const formattedResponse = escapeHtml(response)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+
+  const card = document.createElement('div');
+  card.className = 'agent-message';
+  card.innerHTML = `
+    <div class="agent-msg-role ${escapeHtml(roleClass)}">
+      <span class="agent-msg-role-label">${escapeHtml(roleLabel)}</span>
+      <span class="agent-msg-time">${escapeHtml(ts)}</span>
+    </div>
+    ${title ? `<div class="agent-msg-title">${escapeHtml(title)}</div>` : ''}
+    ${response ? `<div class="agent-msg-response">${formattedResponse}</div>` : ''}
+    ${promptExcerpt ? `<details class="agent-msg-context"><summary>Context</summary><div class="agent-msg-excerpt">${escapeHtml(promptExcerpt)}</div></details>` : ''}
+  `;
+
+  feed.appendChild(card);
+  // Auto-scroll to bottom
+  feed.scrollTop = feed.scrollHeight;
+}
+
+/** Reset agent monitor state for a new run */
+function _resetAgentMonitor() {
+  ['deepseek', 'qwen', 'perplexity'].forEach(col => {
+    _agentMsgCount[col] = 0;
+    const feed = document.getElementById(`agentFeed-${col}`);
+    const badge = document.getElementById(`agentBadge-${col}`);
+    if (feed) feed.innerHTML = '';
+    if (badge) badge.textContent = '0';
+  });
+  const monitor = document.getElementById('agentMonitor');
+  const modal = document.querySelector('.ai-build-modal-content');
+  if (monitor) monitor.classList.add('hidden');
+  if (modal) modal.classList.remove('has-agents');
+}
+
+/** Toggle agent monitor panel collapsed/expanded */
+function toggleAgentMonitor() {
+  const cols = document.getElementById('agentColumns');
+  const btn = document.getElementById('btnToggleAgentMonitor');
+  if (!cols) return;
+  const collapsed = cols.classList.toggle('hidden');
+  if (btn) {
+    btn.innerHTML = collapsed
+      ? '<i class="bi bi-chevron-down"></i>'
+      : '<i class="bi bi-chevron-up"></i>';
+    btn.title = collapsed ? 'Show agent panel' : 'Hide agent panel';
+  }
+}
+window.toggleAgentMonitor = toggleAgentMonitor;
+
 async function showAiBuildResults(data) {
-  document.getElementById('aiBuildProgress').classList.add('hidden');
   document.getElementById('aiBuildResults').classList.remove('hidden');
 
   const w = data.workflow || {};
-  const _m = w.backtest_results?.metrics || {};
+
+  // backtest_results is the raw response from /strategies/{id}/backtest endpoint.
+  // That endpoint returns { backtest_id, strategy_id, status, results: {...}, redirect_url }.
+  // Fallback: some paths may have a "metrics" key directly.
+  const rawBt = w.backtest_results || {};
+  const apiMetrics = rawBt.results || rawBt.metrics || rawBt || {};
+  const backtestId = rawBt.backtest_id || null;
+
+  // iterations[] is the primary source of truth for metrics shown in the summary.
   const iters = w.iterations || [];
   const lastIter = iters[iters.length - 1] || {};
   const ok = data.success;
+
+  // Pick best metric source: lastIter (normalized by workflow) > apiMetrics
+  const sharpe = lastIter.sharpe_ratio ?? apiMetrics.sharpe_ratio ?? 0;
+  const winRate = lastIter.win_rate != null
+    ? lastIter.win_rate  // already fraction (0-1) from workflow
+    : (apiMetrics.win_rate || 0) / 100;
+  const netProfit = lastIter.net_profit ?? apiMetrics.net_profit ?? 0;
+  const maxDd = lastIter.max_drawdown ?? apiMetrics.max_drawdown ?? 0;
+  const totalTrades = lastIter.total_trades ?? apiMetrics.total_trades ?? 0;
 
   const wasOptimize = _aiBuildMode === 'optimize';
   let html = `
@@ -12050,12 +12203,13 @@ async function showAiBuildResults(data) {
     </div>
     <table class="table table-sm table-bordered">
       <tr><td>Strategy ID</td><td><code>${w.strategy_id || '—'}</code></td></tr>
+      <tr><td>Backtest ID</td><td><code>${backtestId || '—'}</code></td></tr>
       <tr><td>Iterations</td><td>${iters.length}</td></tr>
-      <tr><td>Sharpe Ratio</td><td>${(lastIter.sharpe_ratio || 0).toFixed(3)}</td></tr>
-      <tr><td>Win Rate</td><td>${((lastIter.win_rate || 0) * 100).toFixed(1)}%</td></tr>
-      <tr><td>Net Profit</td><td>$${(lastIter.net_profit || 0).toFixed(2)}</td></tr>
-      <tr><td>Max Drawdown</td><td>${(lastIter.max_drawdown || 0).toFixed(2)}%</td></tr>
-      <tr><td>Total Trades</td><td>${lastIter.total_trades || 0}</td></tr>
+      <tr><td>Sharpe Ratio</td><td>${sharpe.toFixed(3)}</td></tr>
+      <tr><td>Win Rate</td><td>${(winRate * 100).toFixed(1)}%</td></tr>
+      <tr><td>Net Profit</td><td>$${netProfit.toFixed(2)}</td></tr>
+      <tr><td>Max Drawdown</td><td>${maxDd.toFixed(2)}%</td></tr>
+      <tr><td>Total Trades</td><td>${totalTrades}</td></tr>
       <tr><td>Blocks Added</td><td>${(w.blocks_added || []).length}</td></tr>
       <tr><td>Connections</td><td>${(w.connections_made || []).length}</td></tr>
     </table>`;
@@ -12075,28 +12229,63 @@ async function showAiBuildResults(data) {
     html += '</ul></div>';
   }
 
+  // Button to open full results modal (only if we have a backtest_id)
+  if (backtestId) {
+    html += `
+      <button class="btn btn-outline-primary btn-sm mt-2"
+              onclick="viewAiBacktestFullResults('${backtestId}')">
+        📊 View Full Results
+      </button>`;
+  }
+
   document.getElementById('aiBuildResultContent').innerHTML = html;
 
-  // Load the built strategy onto the canvas so user sees the blocks
-  console.log('[AI Build] Attempting to load strategy onto canvas:', w.strategy_id);
+  // ── Open the standard backtest results modal (same as regular backtest) ──
+  // This populates the equity chart, trades table and all 166 metrics.
+  if (backtestId && typeof displayBacktestResults === 'function') {
+    try {
+      const resp = await fetch(`/api/v1/backtests/${backtestId}`);
+      if (resp.ok) {
+        const fullResults = await resp.json();
+        fullResults.backtest_id = backtestId;
+        console.log('[AI Build] Opening full backtest results modal for', backtestId);
+        displayBacktestResults(fullResults);
+      } else {
+        console.warn('[AI Build] Could not fetch full backtest results:', resp.status);
+      }
+    } catch (err) {
+      console.warn('[AI Build] Failed to load full backtest results:', err);
+    }
+  }
+
+  // ── Reload strategy onto canvas so user sees optimized block parameters ──
+  console.log('[AI Build] Loading optimized strategy onto canvas:', w.strategy_id);
 
   if (w.strategy_id && typeof loadStrategy === 'function') {
     try {
       await loadStrategy(w.strategy_id);
-      console.log('[AI Build] Strategy loaded onto canvas successfully:', w.strategy_id);
+      console.log('[AI Build] Optimized strategy loaded onto canvas:', w.strategy_id);
 
       // Update URL so page knows which strategy is active
       const newUrl = new URL(window.location);
       newUrl.searchParams.set('id', w.strategy_id);
       window.history.replaceState({}, '', newUrl);
-      console.log('[AI Build] URL updated with strategy ID');
     } catch (err) {
-      console.error('[AI Build] Failed to load strategy onto canvas:', err);
+      console.error('[AI Build] Failed to reload strategy onto canvas:', err);
     }
-  } else {
-    console.error('[AI Build] Cannot load strategy - missing strategy_id or loadStrategy function');
   }
 }
+
+/**
+ * Open the full backtest results page for an AI-optimized backtest.
+ * Called from the "View Full Results" button inside the AI Build results panel.
+ */
+function viewAiBacktestFullResults(backtestId) {
+  if (backtestId) {
+    window.open(`/frontend/backtest-results.html?backtest_id=${backtestId}`, '_blank');
+  }
+}
+window.viewAiBacktestFullResults = viewAiBacktestFullResults;
 
 // ============================================
 // CSP-COMPLIANT EVENT LISTENERS

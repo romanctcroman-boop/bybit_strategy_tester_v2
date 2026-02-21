@@ -29,6 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from functools import lru_cache
 from typing import Any
 
 from loguru import logger
@@ -43,6 +44,39 @@ from backend.agents.mcp.tools.strategy_builder import (
     builder_update_block_params,
     builder_validate_strategy,
 )
+
+# ---------------------------------------------------------------------------
+# Singletons — shared across all BuilderWorkflow instances in one process
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _get_workflow_memory():
+    """Return the process-wide HierarchicalMemory instance (SQLite backend).
+
+    Persists backtest results, best parameter configs, and optimization history
+    so that subsequent workflow runs can learn from past experiments on the
+    same strategy / symbol / timeframe.
+    """
+    from backend.agents.memory.hierarchical_memory import HierarchicalMemory
+
+    persist_path = "agent_memory/builder_workflow"
+    logger.info(f"[BuilderWorkflow] 🧠 HierarchicalMemory initialised at {persist_path!r}")
+    return HierarchicalMemory(persist_path=persist_path)
+
+
+@lru_cache(maxsize=1)
+def _get_a2a_communicator():
+    """Return the process-wide AgentToAgentCommunicator instance.
+
+    Used in _suggest_adjustments to run a 3-agent parallel consensus instead
+    of a single DeepSeek query — DeepSeek, Qwen, and Perplexity each propose
+    parameter changes which are then merged into a unified adjustment list.
+    """
+    from backend.agents.agent_to_agent_communicator import AgentToAgentCommunicator
+
+    logger.info("[BuilderWorkflow] 🤝 AgentToAgentCommunicator initialised")
+    return AgentToAgentCommunicator()
 
 
 class BuilderStage(str, Enum):
@@ -92,6 +126,9 @@ class BuilderWorkflowConfig:
     min_acceptable_sharpe: float = 0.5
     min_acceptable_win_rate: float = 0.4
 
+    # Profit goal: strategy is only accepted when net profit is positive
+    require_positive_profit: bool = True
+
     # AI Deliberation — optional, uses real LLM agents for planning
     enable_deliberation: bool = False
 
@@ -117,6 +154,7 @@ class BuilderWorkflowConfig:
             "max_iterations": self.max_iterations,
             "min_acceptable_sharpe": self.min_acceptable_sharpe,
             "min_acceptable_win_rate": self.min_acceptable_win_rate,
+            "require_positive_profit": self.require_positive_profit,
             "enable_deliberation": self.enable_deliberation,
             "existing_strategy_id": self.existing_strategy_id,
         }
@@ -196,22 +234,71 @@ class BuilderWorkflow:
         result = await workflow.run(config)
     """
 
-    def __init__(self, on_stage_change: Callable[[BuilderStage], None] | None = None) -> None:
+    def __init__(
+        self,
+        on_stage_change: Callable[[BuilderStage], None] | None = None,
+        on_agent_log: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         """Initialize workflow.
 
         Args:
             on_stage_change: Optional callback invoked synchronously whenever
                 ``self._result.status`` changes.  Used by the SSE endpoint to
                 push stage events without patching the dataclass class.
+            on_agent_log: Optional callback invoked with an ``agent_log`` dict
+                whenever an LLM agent is called.  Dict keys:
+                  - agent (str)  — "deepseek" | "qwen" | "perplexity" | "a2a"
+                  - role  (str)  — "planner" | "deliberation" | "optimizer"
+                  - prompt (str) — first 400 chars of the prompt sent
+                  - response (str) — first 600 chars of the response received
+                  - ts    (str)  — ISO-8601 timestamp
         """
         self._result = BuilderWorkflowResult()
         self._on_stage_change = on_stage_change
+        self._on_agent_log = on_agent_log
 
     def _set_stage(self, stage: BuilderStage) -> None:
         """Set ``self._result.status`` and fire the optional callback."""
         self._result.status = stage
         if self._on_stage_change is not None:
             self._on_stage_change(stage)
+
+    def _emit_agent_log(
+        self,
+        agent: str,
+        role: str,
+        prompt: str,
+        response: str,
+        title: str | None = None,
+    ) -> None:
+        """Fire the on_agent_log callback if registered.
+
+        Args:
+            agent:    Agent name ("deepseek", "qwen", "perplexity").
+            role:     Task role ("planner", "deliberation", "optimizer").
+            prompt:   Full prompt sent (stored truncated for context).
+            response: Full response received (displayed in the UI card).
+            title:    Short human-readable label shown instead of raw prompt.
+                      Auto-generated from role if not provided.
+        """
+        if self._on_agent_log is not None:
+            _role_titles = {
+                "planner": "📐 Strategy Planning",
+                "deliberation": "🤝 Agent Deliberation",
+                "optimizer": "⚙️ Parameter Optimization",
+            }
+            auto_title = title or _role_titles.get(role, role.title())
+            self._on_agent_log(
+                {
+                    "agent": agent,
+                    "role": role,
+                    "title": auto_title,
+                    # Keep a short excerpt of the prompt for context tooltip
+                    "prompt_excerpt": prompt[200:400].strip() or prompt[:200].strip(),
+                    "response": response[:800],
+                    "ts": datetime.now(UTC).isoformat(),
+                }
+            )
 
     async def run(self, config: BuilderWorkflowConfig) -> BuilderWorkflowResult:
         """
@@ -322,6 +409,9 @@ class BuilderWorkflow:
             self._result.backtest_results = backtest
 
             # Stage 8: Evaluate + Iterative optimization loop
+            best_sharpe: float = float("-inf")
+            best_iteration_record: dict[str, Any] = {}
+
             for iteration in range(1, config.max_iterations + 1):
                 self._set_stage(BuilderStage.EVALUATING)
                 # Backtest response uses "results" key (from run_backtest_from_builder endpoint)
@@ -343,10 +433,20 @@ class BuilderWorkflow:
                     "net_profit": metrics.get("net_profit", 0),
                     "max_drawdown": metrics.get("max_drawdown", metrics.get("max_drawdown_pct", 0)),
                     "acceptable": (
-                        sharpe >= config.min_acceptable_sharpe and win_rate >= config.min_acceptable_win_rate
+                        sharpe >= config.min_acceptable_sharpe
+                        and win_rate >= config.min_acceptable_win_rate
+                        and (not config.require_positive_profit or metrics.get("net_profit", 0) > 0)
                     ),
                 }
                 self._result.iterations.append(iteration_record)
+
+                # ── Save iteration result to Episodic Memory ──────────────────
+                await self._memory_store_iteration(config, iteration_record, self._result.blocks_added)
+
+                # Track best result for Semantic Memory at the end
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_iteration_record = iteration_record
 
                 if iteration_record["acceptable"]:
                     logger.info(
@@ -358,7 +458,9 @@ class BuilderWorkflow:
                 logger.info(
                     f"[BuilderWorkflow] Iteration {iteration}/{config.max_iterations}: "
                     f"Sharpe={sharpe:.2f} (min {config.min_acceptable_sharpe}), "
-                    f"WinRate={win_rate:.1%} (min {config.min_acceptable_win_rate:.0%}) — iterating"
+                    f"WinRate={win_rate:.1%} (min {config.min_acceptable_win_rate:.0%}), "
+                    f"NetProfit={metrics.get('net_profit', 0):.2f} "
+                    f"{'✅' if metrics.get('net_profit', 0) > 0 else '❌'} — iterating"
                 )
 
                 if iteration >= config.max_iterations:
@@ -412,6 +514,9 @@ class BuilderWorkflow:
                     take_profit=config.take_profit,
                 )
                 self._result.backtest_results = backtest
+
+            # ── Save best config to Semantic Memory (survives restarts) ───────
+            await self._memory_store_best_config(config, best_iteration_record)
 
             # Completed
             self._set_stage(BuilderStage.COMPLETED)
@@ -490,6 +595,23 @@ class BuilderWorkflow:
         description = config.name  # frontend passes user description as name
         logger.info(f"[BuilderWorkflow] 🤖 LLM block planning for: {description!r}")
 
+        # ── Recall past successful configs from memory before asking LLM ──────
+        memory_context = ""
+        try:
+            memory = _get_workflow_memory()
+            past_configs = await memory.recall(
+                query=f"{config.symbol} {config.timeframe} strategy optimization best config",
+                top_k=3,
+                min_importance=0.6,
+            )
+            if past_configs:
+                memory_context = "\n\nPast successful configurations for reference:\n"
+                for item in past_configs:
+                    memory_context += f"- {item.content}\n"
+                logger.info(f"[BuilderWorkflow] 🧠 Recalled {len(past_configs)} relevant memories for planning")
+        except Exception as mem_err:
+            logger.debug(f"[BuilderWorkflow] Memory recall for planning unavailable: {mem_err}")
+
         # Available block types exposed in the system
         available = (
             "Indicators: rsi, ema, sma, macd, bollinger, atr, stochastic, adx, "
@@ -500,13 +622,22 @@ class BuilderWorkflow:
             "Data: price."
         )
 
-        prompt = f"""You are a quantitative trading strategy designer.
+        prompt = f"""You are a quantitative trading strategy designer specializing in PROFITABLE strategies.
 
 User request: "{description}"
 Market: {config.symbol}, timeframe {config.timeframe}min, direction {config.direction}.
-Commission: {config.commission} (0.07%).
-Min acceptable Sharpe: {config.min_acceptable_sharpe}, min win rate: {config.min_acceptable_win_rate:.0%}.
+Commission: {config.commission} (0.07% per trade — avoid over-trading).
+Capital: ${config.initial_capital}, Leverage: {config.leverage}x.
+Goals: Sharpe ≥ {config.min_acceptable_sharpe}, Win Rate ≥ {config.min_acceptable_win_rate:.0%},
+       **Net Profit MUST BE POSITIVE** — strategy must make money after commissions.
 
+Key rules for profitability:
+- Use TREND-FOLLOWING blocks (EMA, MACD, SuperTrend) as primary signals — they outperform mean-reversion in crypto
+- Set Take Profit at LEAST 2x the Stop Loss (e.g. SL=1.5%, TP=3.5%) for positive expectancy
+- Avoid signals that fire too often — trade quality over quantity (max ~5-10 trades/day at 15m)
+- For direction={config.direction}: {"use both buy AND sell blocks" if config.direction == "both" else "use primarily " + ("buy" if config.direction == "long" else "sell") + " blocks"}
+- Always include a static_sltp block with stop_loss_percent ≤ 2.0 and take_profit_percent ≥ 3.5
+{memory_context}
 Available block types:
 {available}
 
@@ -519,20 +650,28 @@ Rules:
 2. id values must be unique slugs (e.g. "rsi_14", "ema_fast").
 3. connections reference blocks by their id.
 4. params must only include keys the block type actually supports.
-5. Always include a static_sltp block with sensible stop_loss_percent and take_profit_percent.
+5. Always include a static_sltp block with stop_loss_percent ≤ 2.0 and take_profit_percent ≥ 3.5.
 6. Return ONLY the JSON object, no explanation.
 
-Example for a simple RSI mean-reversion:
+Recommended approach for positive profit (EMA + RSI combination):
 {{
   "blocks": [
-    {{"type": "rsi", "id": "rsi_14", "params": {{"period": 14, "use_cross_level": true, "cross_long_level": 30, "cross_short_level": 70}}}},
+    {{"type": "ema", "id": "ema_fast", "params": {{"period": 9}}}},
+    {{"type": "ema", "id": "ema_slow", "params": {{"period": 21}}}},
+    {{"type": "rsi", "id": "rsi_filter", "params": {{"period": 14, "use_cross_level": true, "cross_long_level": 40, "cross_short_level": 60}}}},
+    {{"type": "crossover", "id": "cross_up", "params": {{}}}},
+    {{"type": "crossunder", "id": "cross_dn", "params": {{}}}},
     {{"type": "buy", "id": "buy_1", "params": {{}}}},
     {{"type": "sell", "id": "sell_1", "params": {{}}}},
-    {{"type": "static_sltp", "id": "sltp_1", "params": {{"stop_loss_percent": 2.0, "take_profit_percent": 4.0}}}}
+    {{"type": "static_sltp", "id": "sltp_1", "params": {{"stop_loss_percent": 1.5, "take_profit_percent": 3.5}}}}
   ],
   "connections": [
-    {{"source": "rsi_14", "source_port": "long", "target": "buy_1", "target_port": "signal"}},
-    {{"source": "rsi_14", "source_port": "short", "target": "sell_1", "target_port": "signal"}}
+    {{"source": "ema_fast", "source_port": "value", "target": "cross_up", "target_port": "input_a"}},
+    {{"source": "ema_slow", "source_port": "value", "target": "cross_up", "target_port": "input_b"}},
+    {{"source": "ema_fast", "source_port": "value", "target": "cross_dn", "target_port": "input_a"}},
+    {{"source": "ema_slow", "source_port": "value", "target": "cross_dn", "target_port": "input_b"}},
+    {{"source": "cross_up", "source_port": "result", "target": "buy_1", "target_port": "signal"}},
+    {{"source": "cross_dn", "source_port": "result", "target": "sell_1", "target_port": "signal"}}
   ]
 }}"""
 
@@ -550,6 +689,15 @@ Example for a simple RSI mean-reversion:
 
             raw_text: str = result.get("response", "") or ""
             logger.debug(f"[BuilderWorkflow] LLM plan raw response ({len(raw_text)} chars)")
+
+            # Emit agent log so the SSE panel can show what the planner said
+            self._emit_agent_log(
+                agent="deepseek",
+                role="planner",
+                prompt=prompt,
+                response=raw_text,
+                title=f"📐 Strategy Design for {config.symbol} {config.timeframe}m",
+            )
 
             # Extract JSON from response — model may wrap in ```json ... ```
             json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
@@ -583,34 +731,148 @@ Example for a simple RSI mean-reversion:
             )
 
         except Exception as e:
-            logger.warning(f"[BuilderWorkflow] LLM block planning failed ({e}), falling back to RSI preset")
+            logger.warning(f"[BuilderWorkflow] LLM block planning failed ({e}), falling back to EMA+RSI preset")
+            # EMA crossover + RSI filter — trend-following approach with positive expectancy
             config.blocks = [
+                {"type": "ema", "id": "ema_fast", "params": {"period": 9}},
+                {"type": "ema", "id": "ema_slow", "params": {"period": 21}},
                 {
                     "type": "rsi",
-                    "id": "rsi_14",
+                    "id": "rsi_filter",
                     "params": {
                         "period": 14,
                         "use_cross_level": True,
-                        "cross_long_level": 30,
-                        "cross_short_level": 70,
+                        "cross_long_level": 40,
+                        "cross_short_level": 60,
                     },
                 },
+                {"type": "crossover", "id": "cross_up", "params": {}},
+                {"type": "crossunder", "id": "cross_dn", "params": {}},
                 {"type": "buy", "id": "buy_1", "params": {}},
                 {"type": "sell", "id": "sell_1", "params": {}},
                 {
                     "type": "static_sltp",
                     "id": "sltp_1",
                     "params": {
-                        "stop_loss_percent": 2.0,
-                        "take_profit_percent": 4.0,
+                        "stop_loss_percent": 1.5,
+                        "take_profit_percent": 3.5,  # 2.3x risk-reward
                     },
                 },
             ]
             config.connections = [
-                {"source": "rsi_14", "source_port": "long", "target": "buy_1", "target_port": "signal"},
-                {"source": "rsi_14", "source_port": "short", "target": "sell_1", "target_port": "signal"},
+                {"source": "ema_fast", "source_port": "value", "target": "cross_up", "target_port": "input_a"},
+                {"source": "ema_slow", "source_port": "value", "target": "cross_up", "target_port": "input_b"},
+                {"source": "ema_fast", "source_port": "value", "target": "cross_dn", "target_port": "input_a"},
+                {"source": "ema_slow", "source_port": "value", "target": "cross_dn", "target_port": "input_b"},
+                {"source": "cross_up", "source_port": "result", "target": "buy_1", "target_port": "signal"},
+                {"source": "cross_dn", "source_port": "result", "target": "sell_1", "target_port": "signal"},
             ]
-            self._result.errors.append(f"LLM planning failed (fallback to RSI preset): {e}")
+            self._result.errors.append(f"LLM planning failed (fallback to EMA crossover preset): {e}")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Memory helpers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _memory_store_iteration(
+        self,
+        config: BuilderWorkflowConfig,
+        iteration_record: dict[str, Any],
+        blocks_added: list[dict[str, Any]],
+    ) -> None:
+        """Save a single backtest iteration result to Episodic Memory.
+
+        Stores symbol, timeframe, block params, and metrics so that future
+        runs on the same market can recall what was tried and with what result.
+        """
+        try:
+            memory = _get_workflow_memory()
+            from backend.agents.memory.hierarchical_memory import MemoryType
+
+            blocks_summary = [
+                {"type": b.get("type"), "params": b.get("params", {})} for b in blocks_added if b.get("params")
+            ]
+            content = (
+                f"Backtest iteration {iteration_record.get('iteration')}: "
+                f"symbol={config.symbol} tf={config.timeframe} "
+                f"sharpe={iteration_record.get('sharpe_ratio', 0):.3f} "
+                f"win_rate={iteration_record.get('win_rate', 0):.1%} "
+                f"trades={iteration_record.get('total_trades', 0)} "
+                f"profit={iteration_record.get('net_profit', 0):.2f} "
+                f"blocks={json.dumps(blocks_summary)}"
+            )
+            importance = min(1.0, max(0.1, (iteration_record.get("sharpe_ratio", 0) + 1) / 3))
+            await memory.store(
+                content=content,
+                memory_type=MemoryType.EPISODIC,
+                importance=importance,
+                tags=["backtest", config.symbol, f"tf_{config.timeframe}", "iteration"],
+                metadata={
+                    "symbol": config.symbol,
+                    "timeframe": config.timeframe,
+                    "sharpe_ratio": iteration_record.get("sharpe_ratio", 0),
+                    "win_rate": iteration_record.get("win_rate", 0),
+                    "total_trades": iteration_record.get("total_trades", 0),
+                },
+                source="builder_workflow",
+            )
+            logger.debug(
+                f"[BuilderWorkflow] 🧠 Iteration result saved to Episodic Memory (importance={importance:.2f})"
+            )
+        except Exception as e:
+            logger.debug(f"[BuilderWorkflow] Memory store iteration failed (non-fatal): {e}")
+
+    async def _memory_store_best_config(
+        self,
+        config: BuilderWorkflowConfig,
+        best_record: dict[str, Any],
+    ) -> None:
+        """Persist the best block configuration to Semantic Memory.
+
+        High importance — survives process restarts and is recalled during
+        future planning for the same symbol/timeframe combination.
+        """
+        if not best_record:
+            return
+        try:
+            memory = _get_workflow_memory()
+            from backend.agents.memory.hierarchical_memory import MemoryType
+
+            blocks_summary = [
+                {"type": b.get("type"), "params": b.get("params", {})}
+                for b in self._result.blocks_added
+                if b.get("params")
+            ]
+            sharpe = best_record.get("sharpe_ratio", 0)
+            content = (
+                f"Best configuration for {config.symbol} {config.timeframe}min "
+                f"direction={config.direction}: "
+                f"sharpe={sharpe:.3f} "
+                f"win_rate={best_record.get('win_rate', 0):.1%} "
+                f"trades={best_record.get('total_trades', 0)} "
+                f"blocks={json.dumps(blocks_summary)}"
+            )
+            # Only save configs with positive Sharpe to Semantic memory
+            importance = min(1.0, max(0.3, (sharpe + 1) / 2.5)) if sharpe > 0 else 0.3
+            await memory.store(
+                content=content,
+                memory_type=MemoryType.SEMANTIC,
+                importance=importance,
+                tags=["best_config", config.symbol, f"tf_{config.timeframe}", config.direction],
+                metadata={
+                    "symbol": config.symbol,
+                    "timeframe": config.timeframe,
+                    "direction": config.direction,
+                    "sharpe_ratio": sharpe,
+                    "blocks": blocks_summary,
+                },
+                source="builder_workflow",
+            )
+            logger.info(
+                f"[BuilderWorkflow] 🧠 Best config saved to Semantic Memory "
+                f"(Sharpe={sharpe:.3f}, importance={importance:.2f})"
+            )
+        except Exception as e:
+            logger.debug(f"[BuilderWorkflow] Memory store best config failed (non-fatal): {e}")
 
     async def _run_build_stages(self, config: BuilderWorkflowConfig) -> None:
         """Execute Stages 2-4: create strategy, add blocks, connect blocks.
@@ -999,11 +1261,16 @@ Example for a simple RSI mean-reversion:
         iteration: int,
         metrics: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """Ask DeepSeek to suggest parameter adjustments based on backtest metrics.
+        """Use a 3-agent parallel consensus to suggest parameter adjustments.
 
-        Sends the current blocks + metrics to the LLM and asks for a JSON array
-        of ``{"block_id": ..., "params": {...}}`` adjustments.  Falls back to a
-        rule-based heuristic if the LLM call fails.
+        Sends current blocks + metrics to DeepSeek, Qwen, and Perplexity in
+        parallel via AgentToAgentCommunicator.parallel_consensus().  Each agent
+        proposes adjustments from its own perspective (quant, technical,
+        macro/sentiment), then their responses are merged: adjustments that
+        appear in 2+ responses take priority.
+
+        Falls back to a single DeepSeek call if A2A is unavailable, and to
+        the rule-based heuristic if all LLM calls fail.
 
         Args:
             block_defs: Original block definitions from config.
@@ -1014,37 +1281,115 @@ Example for a simple RSI mean-reversion:
         Returns:
             List of ``{"block_id": ..., "params": {...}}`` adjustments.
         """
-        try:
-            from backend.agents.unified_agent_interface import get_agent_interface
+        blocks_summary = [
+            {"id": b.get("id"), "type": b.get("type"), "params": b.get("params", {})}
+            for b in blocks_added
+            if b.get("params")
+        ]
 
-            blocks_summary = [
-                {"id": b.get("id"), "type": b.get("type"), "params": b.get("params", {})}
-                for b in blocks_added
-                if b.get("params")
-            ]
+        win_rate = metrics.get("win_rate", 0)
+        # Normalise — API returns percentage (52.11) not fraction (0.52)
+        if win_rate > 1:
+            win_rate = win_rate / 100.0
 
-            win_rate = metrics.get("win_rate", 0)
-            # Normalise — API returns percentage (52.11) not fraction (0.52)
-            if win_rate > 1:
-                win_rate = win_rate / 100.0
-
-            prompt = f"""You are a quant strategy optimizer.
+        prompt = f"""You are a quant strategy optimizer. PRIMARY GOAL: make Net Profit POSITIVE.
 
 Current backtest results (iteration {iteration}):
 - Sharpe Ratio: {metrics.get("sharpe_ratio", 0):.3f}
 - Win Rate: {win_rate:.1%}
 - Max Drawdown: {abs(metrics.get("max_drawdown_pct", 0)):.1f}%
-- Net Profit: {metrics.get("net_profit", 0):.2f}
-- Total Trades: {metrics.get("total_trades", 0)}
+- Net Profit: {metrics.get("net_profit", 0):.2f} {"✅" if metrics.get("net_profit", 0) > 0 else "❌ MUST FIX"}
+- Total Trades: {metrics.get("total_trades", 0)} {"(too many — reduce frequency)" if metrics.get("total_trades", 0) > 300 else ""}
 
 Current blocks and parameters:
 {json.dumps(blocks_summary, indent=2)}
 
-Suggest parameter adjustments to improve Sharpe ratio and win rate.
+Profitability rules:
+1. If Net Profit < 0: the strategy loses money — MUST change parameters significantly
+2. static_sltp: take_profit_percent MUST be ≥ 2x stop_loss_percent (positive risk/reward)
+3. If too many trades (>200): widen RSI thresholds, increase EMA periods to reduce noise
+4. If win rate < 40%: tighten entry conditions (RSI overbought lower, oversold higher)
+5. If max drawdown > 30%: reduce stop_loss_percent or add tighter exit conditions
+
+Suggest parameter adjustments to make Net Profit positive and improve Sharpe ratio.
 Return ONLY a JSON array of adjustments. Each item: {{"block_id": "...", "params": {{"key": value}}}}.
 Only include blocks that need changes. Only include changed parameters.
-Return [] if no adjustments are needed.
+Return [] if strategy is already profitable and Sharpe > 1.0.
 Do not include explanations, only the JSON array."""
+
+        # ── Try multi-agent consensus first (A2A parallel) ────────────────────
+        try:
+            import os
+
+            from backend.agents.models import AgentType
+
+            a2a = _get_a2a_communicator()
+
+            # Only use agents for which we have API keys
+            available_agents = []
+            if os.environ.get("DEEPSEEK_API_KEY"):
+                available_agents.append(AgentType.DEEPSEEK)
+            if os.environ.get("QWEN_API_KEY"):
+                available_agents.append(AgentType.QWEN)
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                available_agents.append(AgentType.PERPLEXITY)
+
+            if len(available_agents) >= 2:
+                logger.info(
+                    f"[BuilderWorkflow] 🤝 A2A parallel consensus: "
+                    f"{[a.value for a in available_agents]} (iteration {iteration})"
+                )
+                consensus_result = await a2a.parallel_consensus(
+                    question=prompt,
+                    agents=available_agents,
+                    context={
+                        "task": "parameter_adjustment",
+                        "iteration": iteration,
+                        "symbol": "",  # don't leak strategy to Perplexity web-search
+                        "require_json_array": True,
+                    },
+                )
+
+                # Merge adjustments from all agents — collect all JSON arrays found
+                # in each individual response and merge by majority vote
+                all_adjustments: list[dict[str, Any]] = []
+                for resp in consensus_result.get("individual_responses", []):
+                    agent_resp_text = resp.get("content", "")
+                    # Emit per-agent log for the SSE panel
+                    agent_name = resp.get("agent", "unknown")
+                    self._emit_agent_log(
+                        agent=agent_name,
+                        role="optimizer",
+                        prompt=prompt,
+                        response=agent_resp_text,
+                        title=f"⚙️ Param Optimization — iteration {iteration}",
+                    )
+                    arr_match = re.search(r"\[.*?\]", agent_resp_text, re.DOTALL)
+                    if arr_match:
+                        try:
+                            agent_adjs = json.loads(arr_match.group())
+                            if isinstance(agent_adjs, list):
+                                all_adjustments.extend(agent_adjs)
+                        except json.JSONDecodeError:
+                            pass
+
+                merged = self._merge_agent_adjustments(all_adjustments)
+                if merged:
+                    logger.info(
+                        f"[BuilderWorkflow] 🤝 A2A consensus produced {len(merged)} adjustments "
+                        f"(confidence={consensus_result.get('confidence_score', 0):.2f})"
+                    )
+                    return merged
+
+                # Fall through if consensus produced nothing useful
+                logger.info("[BuilderWorkflow] A2A consensus returned empty — falling back to single LLM")
+
+        except Exception as a2a_err:
+            logger.warning(f"[BuilderWorkflow] A2A consensus failed ({a2a_err}), falling back to single DeepSeek")
+
+        # ── Single DeepSeek fallback ──────────────────────────────────────────
+        try:
+            from backend.agents.unified_agent_interface import get_agent_interface
 
             agent = get_agent_interface()
             result = await agent.query_deepseek(
@@ -1055,9 +1400,18 @@ Do not include explanations, only the JSON array."""
                 use_cache=False,
             )
 
-            raw_text: str = result.get("response", "") or ""
-            # Extract JSON array from response
-            arr_match = re.search(r"\[.*\]", raw_text, re.DOTALL)
+            raw_text_fallback = result.get("response", "") or ""
+
+            # Emit agent log for the single-DeepSeek fallback
+            self._emit_agent_log(
+                agent="deepseek",
+                role="optimizer",
+                prompt=prompt,
+                response=raw_text_fallback,
+                title=f"⚙️ Param Optimization — iteration {iteration} (fallback)",
+            )
+
+            arr_match = re.search(r"\[.*\]", raw_text_fallback, re.DOTALL)
             if not arr_match:
                 raise ValueError("No JSON array in LLM adjustments response")
 
@@ -1065,14 +1419,67 @@ Do not include explanations, only the JSON array."""
             if not isinstance(adjustments, list):
                 raise ValueError("LLM returned non-list adjustments")
 
-            logger.info(f"[BuilderWorkflow] 🤖 LLM suggested {len(adjustments)} adjustments (iteration {iteration})")
-            for adj in adjustments:
-                logger.debug(f"[BuilderWorkflow] LLM adj: {adj}")
+            logger.info(
+                f"[BuilderWorkflow] 🤖 DeepSeek suggested {len(adjustments)} adjustments (iteration {iteration})"
+            )
             return adjustments
 
         except Exception as e:
-            logger.warning(f"[BuilderWorkflow] LLM adjustment failed ({e}), using heuristic fallback")
+            logger.warning(f"[BuilderWorkflow] All LLM adjustments failed ({e}), using heuristic fallback")
             return self._heuristic_adjustments(blocks_added, iteration, metrics)
+
+    def _merge_agent_adjustments(
+        self,
+        all_adjustments: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge parameter adjustments from multiple agents.
+
+        Strategy: for each block_id, average numeric params that ≥2 agents
+        agreed to change; keep unique params that only one agent suggested.
+
+        Args:
+            all_adjustments: Raw list of adjustments from all agents (may have
+                duplicates for the same block_id).
+
+        Returns:
+            Deduplicated and averaged adjustment list.
+        """
+        # Group by block_id
+        by_block: dict[str, list[dict[str, Any]]] = {}
+        for adj in all_adjustments:
+            bid = adj.get("block_id", "")
+            if not bid:
+                continue
+            by_block.setdefault(bid, []).append(adj.get("params", {}))
+
+        merged: list[dict[str, Any]] = []
+        for block_id, params_list in by_block.items():
+            # Collect all param keys across all agents
+            all_keys: set[str] = set()
+            for p in params_list:
+                all_keys.update(p.keys())
+
+            merged_params: dict[str, Any] = {}
+            for key in all_keys:
+                values = [p[key] for p in params_list if key in p]
+                if not values:
+                    continue
+                # Average numeric values; use first value for non-numeric
+                numeric_vals = [v for v in values if isinstance(v, (int, float))]
+                if numeric_vals:
+                    avg = sum(numeric_vals) / len(numeric_vals)
+                    # Round to int if original values were int
+                    if all(isinstance(v, int) for v in numeric_vals):
+                        merged_params[key] = round(avg)
+                    else:
+                        merged_params[key] = round(avg, 4)
+                else:
+                    merged_params[key] = values[0]
+
+            if merged_params:
+                merged.append({"block_id": block_id, "params": merged_params})
+
+        return merged
 
     def _heuristic_adjustments(
         self,
@@ -1139,11 +1546,23 @@ Do not include explanations, only the JSON array."""
                         new_params["oversold"] = max(10, params["oversold"] - 3 * step)
 
             elif block_type in ("atr", "static_sltp"):
+                current_sl = params.get("stop_loss_percent", params.get("stop_loss", 2.0))
+                current_tp = params.get("take_profit_percent", params.get("take_profit", 4.0))
+                net_profit = metrics.get("net_profit", 0)
                 if max_dd > 20:
-                    if "stop_loss" in params:
+                    if "stop_loss_percent" in params:
+                        new_params["stop_loss_percent"] = max(0.8, current_sl - 0.3 * step)
+                    elif "stop_loss" in params:
                         new_params["stop_loss"] = max(0.5, params["stop_loss"] - 0.3 * step)
-                    if "take_profit" in params:
-                        new_params["take_profit"] = max(0.5, params["take_profit"] + 0.3 * step)
+                # Ensure TP is always at least 2x SL for positive expectancy
+                if current_tp < current_sl * 2:
+                    if "take_profit_percent" in params:
+                        new_params["take_profit_percent"] = round(current_sl * 2.5, 1)
+                    elif "take_profit" in params:
+                        new_params["take_profit"] = round(params.get("stop_loss", 2.0) * 2.5, 1)
+                # If net profit is deeply negative, boost TP aggressively
+                if net_profit < -1000 and "take_profit_percent" in params:
+                    new_params["take_profit_percent"] = max(current_tp, round(current_sl * 3.0, 1))
 
             if new_params:
                 adjustments.append({"block_id": block_id, "params": new_params})
@@ -1154,9 +1573,8 @@ Do not include explanations, only the JSON array."""
     async def _run_deliberation(self, config: BuilderWorkflowConfig) -> None:
         """Run AI deliberation and apply the resulting block plan to ``config``.
 
-        Uses RealLLMDeliberation with DeepSeek + Perplexity agents to
+        Uses RealLLMDeliberation with DeepSeek + Perplexity + Qwen agents to
         analyse the planned blocks and suggest improvements before building.
-        Qwen is excluded due to invalid API key.
 
         If the deliberation response contains a JSON object with ``blocks``
         and ``connections`` arrays those values **replace** ``config.blocks``
@@ -1196,8 +1614,21 @@ Do not include explanations, only the JSON array."""
                 strategy_type="builder",
             )
 
-            # Use only available agents (DeepSeek + Perplexity, skip Qwen)
-            agents = ["deepseek", "perplexity"]
+            # Use all available agents — check env keys at runtime
+            import os
+
+            agents: list[str] = []
+            if os.environ.get("DEEPSEEK_API_KEY"):
+                agents.append("deepseek")
+            if os.environ.get("QWEN_API_KEY"):
+                agents.append("qwen")
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                agents.append("perplexity")
+
+            if not agents:
+                logger.warning("[BuilderWorkflow] No LLM API keys found — skipping deliberation")
+                self._result.deliberation = {"skipped": True, "reason": "no_api_keys"}
+                return
 
             result = await deliberation.deliberate(
                 question=question,
@@ -1207,6 +1638,56 @@ Do not include explanations, only the JSON array."""
             )
 
             decision_text: str = result.decision or ""
+
+            # Build per-agent vote lookup from final_votes (position + reasoning)
+            vote_by_agent: dict[str, str] = {}
+            for vote in getattr(result, "final_votes", []) or []:
+                aid = getattr(vote, "agent_id", "")
+                position = getattr(vote, "position", "")
+                reasoning = getattr(vote, "reasoning", "")
+                confidence = getattr(vote, "confidence", None)
+                parts = []
+                if position:
+                    parts.append(f"**Position:** {position}")
+                if reasoning:
+                    parts.append(f"**Reasoning:** {reasoning}")
+                if confidence is not None:
+                    parts.append(f"**Confidence:** {confidence:.0%}")
+                if aid:
+                    vote_by_agent[aid] = "\n".join(parts) if parts else position or reasoning
+
+            # Also check rounds for individual agent responses
+            for rnd in getattr(result, "rounds", []) or []:
+                for vote in getattr(rnd, "votes", []) or []:
+                    aid = getattr(vote, "agent_id", "")
+                    if aid and aid not in vote_by_agent:
+                        position = getattr(vote, "position", "")
+                        reasoning = getattr(vote, "reasoning", "")
+                        confidence = getattr(vote, "confidence", None)
+                        parts = []
+                        if position:
+                            parts.append(f"**Position:** {position}")
+                        if reasoning:
+                            parts.append(f"**Reasoning:** {reasoning}")
+                        if confidence is not None:
+                            parts.append(f"**Confidence:** {confidence:.0%}")
+                        vote_by_agent[aid] = "\n".join(parts) if parts else position or reasoning
+
+            # Emit per-agent logs so the SSE panel shows each agent's unique position
+            conf_label = f"{result.confidence:.0%}" if result.confidence else ""
+            for agent_name in agents:
+                individual_response = vote_by_agent.get(agent_name, "")
+                if not individual_response:
+                    # Fallback: show consensus decision with agent-role framing
+                    individual_response = f"[Consensus reached] {decision_text[:600]}"
+                self._emit_agent_log(
+                    agent=agent_name,
+                    role="deliberation",
+                    prompt=question,
+                    response=individual_response,
+                    title=f"🤝 Deliberation — consensus {conf_label}",
+                )
+
             self._result.deliberation = {
                 "decision": decision_text,
                 "confidence": result.confidence,
