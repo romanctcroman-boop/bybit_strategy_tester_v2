@@ -38,14 +38,14 @@ def recalculate_tp_portions(
         >>> recalculate_tp_portions((0.40, 0.30, 0.25, 0.05), 1)
         (0.40, 0.30, 0.15, 0.15)  # TP1=40%, TP2=30%, остальные по 15%
     """
-    portions = list(portions)
-    n = len(portions)
+    portions_list: list[float] = list(portions)
+    n = len(portions_list)
 
     if changed_index < 0 or changed_index >= n:
-        return tuple(portions)
+        return tuple(portions_list)
 
     # Считаем сумму уже зафиксированных portions (0..changed_index включительно)
-    fixed_sum = sum(portions[: changed_index + 1])
+    fixed_sum = sum(portions_list[: changed_index + 1])
 
     # Остаток для распределения
     remaining = max(0.0, 1.0 - fixed_sum)
@@ -56,14 +56,14 @@ def recalculate_tp_portions(
     if remaining_count > 0:
         each = remaining / remaining_count
         for i in range(changed_index + 1, n):
-            portions[i] = round(each, 4)
+            portions_list[i] = round(each, 4)
 
     # Корректировка последнего для точной суммы = 1.0
-    current_sum = sum(portions)
+    current_sum = sum(portions_list)
     if abs(current_sum - 1.0) > 0.0001:
-        portions[-1] = round(portions[-1] + (1.0 - current_sum), 4)
+        portions_list[-1] = round(portions_list[-1] + (1.0 - current_sum), 4)
 
-    return tuple(portions)
+    return tuple(portions_list)
 
 
 from dataclasses import dataclass, field
@@ -88,7 +88,7 @@ class TpMode(Enum):
     Режим Take Profit - три взаимоисключающие системы.
 
     FIXED: Фиксированный TP в процентах (take_profit=0.03 = 3%)
-    ATR: Динамический TP на основе ATR (atr_tp_multiplier × ATR)
+    ATR: Динамический TP на основе ATR (atr_tp_multiplier x ATR)
     MULTI: Частичное закрытие на 4 уровнях TP (TP1-TP4)
 
     ⚠️ ВЗАИМНАЯ БЛОКИРОВКА:
@@ -107,7 +107,7 @@ class SlMode(Enum):
     Режим Stop Loss.
 
     FIXED: Фиксированный SL в процентах (stop_loss=0.02 = 2%)
-    ATR: Динамический SL на основе ATR (atr_sl_multiplier × ATR)
+    ATR: Динамический SL на основе ATR (atr_sl_multiplier x ATR)
 
     Примечание: SL режим независим от TP режима.
     Fixed SL может использоваться как MAX-лимит для ATR-SL.
@@ -174,21 +174,17 @@ class BacktestInput:
     candles_1m: pd.DataFrame | None = None  # 1-минутные для Bar Magnifier
 
     # === СИГНАЛЫ ===
-    long_entries: np.ndarray = None  # bool array
-    long_exits: np.ndarray = None  # bool array
-    short_entries: np.ndarray = None  # bool array
-    short_exits: np.ndarray = None  # bool array
+    long_entries: np.ndarray | None = None  # bool array
+    long_exits: np.ndarray | None = None  # bool array
+    short_entries: np.ndarray | None = None  # bool array
+    short_exits: np.ndarray | None = None  # bool array
 
     # === КОНФИГУРАЦИЯ ===
     symbol: str = "BTCUSDT"
     interval: str = "60"
     initial_capital: float = 10000.0
-    position_size: float = (
-        0.10  # 10% от капитала (используется если use_fixed_amount=False)
-    )
-    use_fixed_amount: bool = (
-        False  # True = использовать fixed_amount вместо position_size
-    )
+    position_size: float = 0.10  # 10% от капитала (используется если use_fixed_amount=False)
+    use_fixed_amount: bool = False  # True = использовать fixed_amount вместо position_size
     fixed_amount: float = 0.0  # Фиксированная сумма в USDT (как в TradingView)
     leverage: int = 10
 
@@ -244,8 +240,8 @@ class BacktestInput:
 
     # === ATR ПАРАМЕТРЫ (для tp_mode=ATR или sl_mode=ATR) ===
     atr_period: int = 14  # Период ATR
-    atr_tp_multiplier: float = 2.0  # TP = Entry ± ATR × multiplier
-    atr_sl_multiplier: float = 1.5  # SL = Entry ∓ ATR × multiplier
+    atr_tp_multiplier: float = 2.0  # TP = Entry +/- ATR x multiplier
+    atr_sl_multiplier: float = 1.5  # SL = Entry -/+ ATR x multiplier
 
     # === TRAILING STOP (Трейлинг стоп) ===
     # Работает с любым режимом TP, активируется после входа
@@ -257,9 +253,7 @@ class BacktestInput:
     # После срабатывания TP1 (или первого TP), SL переносится в безубыток
     # Работает только с tp_mode=MULTI
     breakeven_enabled: bool = False  # Включить перенос SL в безубыток
-    breakeven_mode: str = (
-        "average"  # "average" = на среднюю цену входа, "tp" = на предыдущий TP
-    )
+    breakeven_mode: str = "average"  # "average" = на среднюю цену входа, "tp" = на предыдущий TP
     breakeven_offset: float = 0.0  # Отступ от безубытка (0.001 = +0.1% от средней)
 
     # =========================================================================
@@ -406,9 +400,7 @@ class BacktestInput:
     # HTF trend filter - торговать только в направлении HTF тренда
     # Пример: RSI на 5m, но только если цена > SMA200 на 1H
     mtf_enabled: bool = False  # Включить MTF фильтрацию
-    mtf_htf_interval: str = (
-        "60"  # Интервал HTF (старший ТФ): "60"=1H, "240"=4H, "D"=Day
-    )
+    mtf_htf_interval: str = "60"  # Интервал HTF (старший ТФ): "60"=1H, "240"=4H, "D"=Day
     mtf_htf_candles: pd.DataFrame | None = None  # HTF OHLCV данные
     mtf_htf_index_map: np.ndarray | None = None  # Маппинг LTF→HTF (от index_mapper)
     mtf_filter_type: str = "sma"  # Тип HTF фильтра: "sma", "ema"
@@ -425,9 +417,7 @@ class BacktestInput:
 
     # === LEGACY COMPATIBILITY (deprecated, use tp_mode/sl_mode) ===
     multi_tp_enabled: bool = False  # DEPRECATED: use tp_mode=TpMode.MULTI
-    atr_enabled: bool = (
-        False  # DEPRECATED: use sl_mode=SlMode.ATR or tp_mode=TpMode.ATR
-    )
+    atr_enabled: bool = False  # DEPRECATED: use sl_mode=SlMode.ATR or tp_mode=TpMode.ATR
 
     def __post_init__(self):
         """
@@ -483,18 +473,17 @@ class BacktestInput:
                     pass  # Оставим как есть, validate() покажет ошибку
 
             # Если DataFrame но без datetime index
-            elif isinstance(self.candles, pd.DataFrame):
-                if not isinstance(self.candles.index, pd.DatetimeIndex):
-                    df = self.candles.copy()
-                    if "open_time" in df.columns:
-                        df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
-                        df.set_index("open_time", inplace=True)
-                        object.__setattr__(self, "candles", df)
-                        warnings.warn(
-                            "⚠️ candles.index автоматически конвертирован в DatetimeIndex",
-                            UserWarning,
-                            stacklevel=2,
-                        )
+            elif isinstance(self.candles, pd.DataFrame) and not isinstance(self.candles.index, pd.DatetimeIndex):
+                df = self.candles.copy()
+                if "open_time" in df.columns:
+                    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+                    df.set_index("open_time", inplace=True)
+                    object.__setattr__(self, "candles", df)
+                    warnings.warn(
+                        "⚠️ candles.index автоматически конвертирован в DatetimeIndex",
+                        UserWarning,
+                        stacklevel=2,
+                    )
 
         # =====================================================================
         # FIX 4: htf_index_map должен быть np.int32
@@ -521,9 +510,7 @@ class BacktestInput:
         # =====================================================================
         # FIX 5: HTF candles также должен быть DataFrame
         # =====================================================================
-        if self.mtf_htf_candles is not None and not isinstance(
-            self.mtf_htf_candles, pd.DataFrame
-        ):
+        if self.mtf_htf_candles is not None and not isinstance(self.mtf_htf_candles, pd.DataFrame):
             try:
                 df = pd.DataFrame(self.mtf_htf_candles)
                 if "open_time" in df.columns:
@@ -536,9 +523,7 @@ class BacktestInput:
         # =====================================================================
         # FIX 6: BTC candles для MTF фильтра
         # =====================================================================
-        if self.mtf_btc_candles is not None and not isinstance(
-            self.mtf_btc_candles, pd.DataFrame
-        ):
+        if self.mtf_btc_candles is not None and not isinstance(self.mtf_btc_candles, pd.DataFrame):
             try:
                 df = pd.DataFrame(self.mtf_btc_candles)
                 if "open_time" in df.columns:
@@ -566,9 +551,7 @@ class BacktestInput:
             errors.append(f"take_profit должен быть 0-1, получено: {self.take_profit}")
 
         if self.position_size <= 0 or self.position_size > 1:
-            errors.append(
-                f"position_size должен быть 0-1, получено: {self.position_size}"
-            )
+            errors.append(f"position_size должен быть 0-1, получено: {self.position_size}")
 
         # === ВАЛИДАЦИЯ РЕЖИМОВ ВЫХОДА ===
 
@@ -592,14 +575,10 @@ class BacktestInput:
                     f"{len(self.tp_levels)} != {len(self.tp_portions)}"
                 )
             if len(self.tp_levels) != 4:
-                errors.append(
-                    f"Multi-TP требует ровно 4 уровня, получено: {len(self.tp_levels)}"
-                )
+                errors.append(f"Multi-TP требует ровно 4 уровня, получено: {len(self.tp_levels)}")
             portions_sum = sum(self.tp_portions)
             if abs(portions_sum - 1.0) > 0.001:
-                errors.append(
-                    f"Сумма tp_portions должна быть 1.0, получено: {portions_sum:.4f}"
-                )
+                errors.append(f"Сумма tp_portions должна быть 1.0, получено: {portions_sum:.4f}")
             # Проверка что уровни возрастают
             for i in range(1, len(self.tp_levels)):
                 if self.tp_levels[i] <= self.tp_levels[i - 1]:
@@ -610,53 +589,33 @@ class BacktestInput:
         # Валидация ATR параметров (если используется ATR)
         if effective_tp_mode == TpMode.ATR or effective_sl_mode == SlMode.ATR:
             if self.atr_period < 1:
-                errors.append(
-                    f"atr_period должен быть >= 1, получено: {self.atr_period}"
-                )
+                errors.append(f"atr_period должен быть >= 1, получено: {self.atr_period}")
             if effective_tp_mode == TpMode.ATR and self.atr_tp_multiplier <= 0:
-                errors.append(
-                    f"atr_tp_multiplier должен быть > 0, получено: {self.atr_tp_multiplier}"
-                )
+                errors.append(f"atr_tp_multiplier должен быть > 0, получено: {self.atr_tp_multiplier}")
             if effective_sl_mode == SlMode.ATR and self.atr_sl_multiplier <= 0:
-                errors.append(
-                    f"atr_sl_multiplier должен быть > 0, получено: {self.atr_sl_multiplier}"
-                )
+                errors.append(f"atr_sl_multiplier должен быть > 0, получено: {self.atr_sl_multiplier}")
 
         # === ВАЛИДАЦИЯ BREAKEVEN ===
         if self.breakeven_enabled:
             if effective_tp_mode != TpMode.MULTI:
-                errors.append(
-                    "Breakeven SL работает только с tp_mode=MULTI (Multi-level TP)"
-                )
+                errors.append("Breakeven SL работает только с tp_mode=MULTI (Multi-level TP)")
             if self.breakeven_mode not in ("average", "tp"):
-                errors.append(
-                    f"breakeven_mode должен быть 'average' или 'tp', получено: {self.breakeven_mode}"
-                )
+                errors.append(f"breakeven_mode должен быть 'average' или 'tp', получено: {self.breakeven_mode}")
 
         # === ВАЛИДАЦИЯ TRAILING STOP ===
         if self.trailing_stop_enabled:
             if self.trailing_stop_activation <= 0:
-                errors.append(
-                    f"trailing_stop_activation должен быть > 0, получено: {self.trailing_stop_activation}"
-                )
+                errors.append(f"trailing_stop_activation должен быть > 0, получено: {self.trailing_stop_activation}")
             if self.trailing_stop_distance <= 0:
-                errors.append(
-                    f"trailing_stop_distance должен быть > 0, получено: {self.trailing_stop_distance}"
-                )
+                errors.append(f"trailing_stop_distance должен быть > 0, получено: {self.trailing_stop_distance}")
 
         # === ВАЛИДАЦИЯ TIME-BASED EXITS ===
         if self.max_bars_in_trade < 0:
-            errors.append(
-                f"max_bars_in_trade должен быть >= 0, получено: {self.max_bars_in_trade}"
-            )
+            errors.append(f"max_bars_in_trade должен быть >= 0, получено: {self.max_bars_in_trade}")
         if self.session_start_hour < 0 or self.session_start_hour > 23:
-            errors.append(
-                f"session_start_hour должен быть 0-23, получено: {self.session_start_hour}"
-            )
+            errors.append(f"session_start_hour должен быть 0-23, получено: {self.session_start_hour}")
         if self.session_end_hour < 1 or self.session_end_hour > 24:
-            errors.append(
-                f"session_end_hour должен быть 1-24, получено: {self.session_end_hour}"
-            )
+            errors.append(f"session_end_hour должен быть 1-24, получено: {self.session_end_hour}")
         if self.session_start_hour >= self.session_end_hour:
             errors.append("session_start_hour должен быть < session_end_hour")
         for day in self.no_trade_days:
@@ -669,25 +628,14 @@ class BacktestInput:
         # === ВАЛИДАЦИЯ POSITION SIZING ===
         valid_sizing_modes = ("fixed", "risk", "kelly", "volatility")
         if self.position_sizing_mode not in valid_sizing_modes:
-            errors.append(
-                f"position_sizing_mode должен быть одним из {valid_sizing_modes}"
-            )
+            errors.append(f"position_sizing_mode должен быть одним из {valid_sizing_modes}")
         if self.risk_per_trade <= 0 or self.risk_per_trade > 1:
-            errors.append(
-                f"risk_per_trade должен быть 0-1, получено: {self.risk_per_trade}"
-            )
+            errors.append(f"risk_per_trade должен быть 0-1, получено: {self.risk_per_trade}")
         if self.kelly_fraction <= 0 or self.kelly_fraction > 1:
-            errors.append(
-                f"kelly_fraction должен быть 0-1, получено: {self.kelly_fraction}"
-            )
+            errors.append(f"kelly_fraction должен быть 0-1, получено: {self.kelly_fraction}")
         if self.max_position_size <= 0 or self.max_position_size > 1:
-            errors.append(
-                f"max_position_size должен быть 0-1, получено: {self.max_position_size}"
-            )
-        if (
-            self.min_position_size < 0
-            or self.min_position_size > self.max_position_size
-        ):
+            errors.append(f"max_position_size должен быть 0-1, получено: {self.max_position_size}")
+        if self.min_position_size < 0 or self.min_position_size > self.max_position_size:
             errors.append("min_position_size должен быть 0-max_position_size")
 
         # === ВАЛИДАЦИЯ RE-ENTRY RULES ===
@@ -712,26 +660,19 @@ class BacktestInput:
         # === ВАЛИДАЦИЯ SCALE-IN ===
         if self.scale_in_enabled:
             if len(self.scale_in_levels) != len(self.scale_in_portions):
-                errors.append(
-                    "scale_in_levels и scale_in_portions должны иметь одинаковую длину"
-                )
+                errors.append("scale_in_levels и scale_in_portions должны иметь одинаковую длину")
             portions_sum = sum(self.scale_in_portions)
             if abs(portions_sum - 1.0) > 0.001:
-                errors.append(
-                    f"Сумма scale_in_portions должна быть 1.0, получено: {portions_sum}"
-                )
+                errors.append(f"Сумма scale_in_portions должна быть 1.0, получено: {portions_sum}")
 
         # === ВАЛИДАЦИЯ SLIPPAGE MODEL ===
         valid_slippage_models = ("fixed", "volume", "volatility", "combined")
         if self.slippage_model not in valid_slippage_models:
-            errors.append(
-                f"slippage_model должен быть одним из {valid_slippage_models}"
-            )
+            errors.append(f"slippage_model должен быть одним из {valid_slippage_models}")
 
         # === ВАЛИДАЦИЯ FUNDING ===
-        if self.include_funding:
-            if self.funding_interval_hours not in (1, 4, 8):
-                errors.append("funding_interval_hours должен быть 1, 4 или 8")
+        if self.include_funding and self.funding_interval_hours not in (1, 4, 8):
+            errors.append("funding_interval_hours должен быть 1, 4 или 8")
 
         return len(errors) == 0, errors
 
@@ -861,7 +802,7 @@ class BacktestOutput:
     equity_curve: np.ndarray = field(default_factory=lambda: np.array([]))
     timestamps: np.ndarray = field(default_factory=lambda: np.array([]))
 
-    # === МЕТА-ИНФОРМАЦИЯ ===
+    # === META-INFO ===
     engine_name: str = ""
     execution_time: float = 0.0  # секунды
     bars_processed: int = 0
@@ -975,7 +916,7 @@ class EngineComparator:
 
             drift = self._calculate_drift(reference_result.metrics, result.metrics)
 
-            comparison["comparisons"].append(
+            comparison["comparisons"].append(  # type: ignore[union-attr]
                 {
                     "engine": engine.name,
                     "metrics": result.metrics.to_dict(),
@@ -990,9 +931,7 @@ class EngineComparator:
 
         return comparison
 
-    def _calculate_drift(
-        self, ref: BacktestMetrics, test: BacktestMetrics
-    ) -> dict[str, float]:
+    def _calculate_drift(self, ref: BacktestMetrics, test: BacktestMetrics) -> dict[str, float]:
         """Расчёт отклонения от эталона"""
 
         def safe_pct_diff(a, b):
@@ -1020,9 +959,7 @@ class EngineComparator:
 # ============================================================================
 
 
-def get_engine(
-    engine_type: str = "fallback", pyramiding: int = 1
-) -> BaseBacktestEngine:
+def get_engine(engine_type: str = "fallback", pyramiding: int = 1) -> BaseBacktestEngine:
     """
     Фабрика для создания движков.
 
@@ -1051,9 +988,7 @@ def get_engine(
     }
 
     if engine_type not in engines:
-        raise ValueError(
-            f"Unknown engine type: {engine_type}. Available: {list(engines.keys())}"
-        )
+        raise ValueError(f"Unknown engine type: {engine_type}. Available: {list(engines.keys())}")
 
     return engines[engine_type]()
 

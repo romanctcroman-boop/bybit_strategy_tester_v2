@@ -54,10 +54,10 @@ try:
     )
 except ImportError:
     # Fallback if interfaces not available
-    BacktestInput = None
-    BacktestOutput = None
-    BacktestMetrics = None
-    TradeDirection = None
+    BacktestInput = None  # type: ignore[assignment]
+    BacktestOutput = None  # type: ignore[assignment]
+    BacktestMetrics = None  # type: ignore[assignment]
+    TradeDirection = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -235,19 +235,9 @@ class UniversalMathEngine:
 
             # Extract OHLCV
             close = candles["close"].values.astype(np.float64)
-            high = (
-                candles["high"].values.astype(np.float64)
-                if "high" in candles
-                else close
-            )
-            low = (
-                candles["low"].values.astype(np.float64) if "low" in candles else close
-            )
-            open_prices = (
-                candles["open"].values.astype(np.float64)
-                if "open" in candles
-                else close
-            )
+            high = candles["high"].values.astype(np.float64) if "high" in candles else close
+            low = candles["low"].values.astype(np.float64) if "low" in candles else close
+            open_prices = candles["open"].values.astype(np.float64) if "open" in candles else close
 
             # Get timestamps
             if hasattr(candles.index, "to_pydatetime"):
@@ -258,9 +248,7 @@ class UniversalMathEngine:
             # =================================================================
             # STEP 1: Generate signals
             # =================================================================
-            signal_output = self.signal_generator.generate(
-                candles, strategy_type, strategy_params, direction
-            )
+            signal_output = self.signal_generator.generate(candles, strategy_type, strategy_params, direction)
 
             long_entries = signal_output.long_entries
             long_exits = signal_output.long_exits
@@ -273,9 +261,7 @@ class UniversalMathEngine:
             # STEP 2: Apply filters
             # =================================================================
             if filter_config is not None:
-                filter_output = self.filter_engine.apply_filters(
-                    candles, long_entries, short_entries, filter_config
-                )
+                filter_output = self.filter_engine.apply_filters(candles, long_entries, short_entries, filter_config)
                 long_entries = filter_output.long_entries
                 short_entries = filter_output.short_entries
                 output.filter_stats = filter_output.filter_stats
@@ -322,7 +308,7 @@ class UniversalMathEngine:
                 bar_time = timestamps[i] if i < len(timestamps) else datetime.now()
 
                 # Check if can trade
-                can_trade, reason = self.risk_manager.can_trade(i, bar_time)
+                can_trade, _reason = self.risk_manager.can_trade(i, bar_time)
 
                 # Process existing trades
                 closed_trades = self.trade_executor.process_bar(
@@ -360,9 +346,7 @@ class UniversalMathEngine:
                             current_capital,
                             close[i],
                             "long",
-                            self.trade_executor.atr_values[i]
-                            if self.trade_executor.atr_values is not None
-                            else 0,
+                            self.trade_executor.atr_values[i] if self.trade_executor.atr_values is not None else 0,
                         )
                         if size > 0:
                             self.trade_executor.open_trade(
@@ -382,9 +366,7 @@ class UniversalMathEngine:
                             current_capital,
                             close[i],
                             "short",
-                            self.trade_executor.atr_values[i]
-                            if self.trade_executor.atr_values is not None
-                            else 0,
+                            self.trade_executor.atr_values[i] if self.trade_executor.atr_values is not None else 0,
                         )
                         if size > 0:
                             self.trade_executor.open_trade(
@@ -422,9 +404,7 @@ class UniversalMathEngine:
             output.trades = all_trades
             output.equity_curve = equity
             output.timestamps = np.array(timestamps)
-            output.metrics = self._calculate_metrics(
-                all_trades, equity, initial_capital
-            )
+            output.metrics = self._calculate_metrics(all_trades, equity, initial_capital)
 
         except Exception as e:
             logger.error(f"UniversalMathEngine error: {e}")
@@ -453,9 +433,7 @@ class UniversalMathEngine:
             mtf_enabled=getattr(input_data, "mtf_enabled", False),
             mtf_htf_candles=getattr(input_data, "mtf_htf_candles", None),
             mtf_htf_index_map=getattr(input_data, "mtf_htf_index_map", None),
-            volatility_filter_enabled=getattr(
-                input_data, "volatility_filter_enabled", False
-            ),
+            volatility_filter_enabled=getattr(input_data, "volatility_filter_enabled", False),
             volume_filter_enabled=getattr(input_data, "volume_filter_enabled", False),
         )
 
@@ -470,10 +448,7 @@ class UniversalMathEngine:
 
         # Get direction
         direction_val = getattr(input_data, "direction", "both")
-        if hasattr(direction_val, "value"):
-            direction = direction_val.value
-        else:
-            direction = str(direction_val).lower()
+        direction = direction_val.value if hasattr(direction_val, "value") else str(direction_val).lower()
 
         return self.run(
             candles=input_data.candles,
@@ -514,11 +489,7 @@ class UniversalMathEngine:
         metrics.total_trades = len(trades)
         metrics.winning_trades = len(wins)
         metrics.losing_trades = len(losses)
-        metrics.win_rate = (
-            metrics.winning_trades / metrics.total_trades
-            if metrics.total_trades > 0
-            else 0.0
-        )
+        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0.0
 
         metrics.avg_win = float(np.mean(wins)) if len(wins) > 0 else 0.0
         metrics.avg_loss = float(np.mean(losses)) if len(losses) > 0 else 0.0
@@ -535,10 +506,7 @@ class UniversalMathEngine:
             metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss)
 
         # Expectancy
-        metrics.expectancy = (
-            metrics.win_rate * metrics.avg_win
-            + (1 - metrics.win_rate) * metrics.avg_loss
-        )
+        metrics.expectancy = metrics.win_rate * metrics.avg_win + (1 - metrics.win_rate) * metrics.avg_loss
 
         # Drawdown
         peak = np.maximum.accumulate(equity)
@@ -565,16 +533,12 @@ class UniversalMathEngine:
         # Sharpe ratio (annualized, assuming daily data)
         returns = np.diff(equity) / equity[:-1]
         if len(returns) > 1 and np.std(returns) > 0:
-            metrics.sharpe_ratio = float(
-                np.mean(returns) / np.std(returns) * np.sqrt(252)
-            )
+            metrics.sharpe_ratio = float(np.mean(returns) / np.std(returns) * np.sqrt(252))
 
         # Sortino ratio
         negative_returns = returns[returns < 0]
         if len(negative_returns) > 0 and np.std(negative_returns) > 0:
-            metrics.sortino_ratio = float(
-                np.mean(returns) / np.std(negative_returns) * np.sqrt(252)
-            )
+            metrics.sortino_ratio = float(np.mean(returns) / np.std(negative_returns) * np.sqrt(252))
 
         # Calmar ratio
         if metrics.max_drawdown > 0:
@@ -583,9 +547,7 @@ class UniversalMathEngine:
 
         # Recovery factor
         if metrics.max_drawdown > 0:
-            metrics.recovery_factor = metrics.net_profit / (
-                metrics.max_drawdown * initial_capital / 100
-            )
+            metrics.recovery_factor = metrics.net_profit / (metrics.max_drawdown * initial_capital / 100)
 
         # Long/Short breakdown
         long_trades = [t for t in trades if t.direction == "long"]

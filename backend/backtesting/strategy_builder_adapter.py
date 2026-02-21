@@ -162,7 +162,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     # Update existing block with isMain flag
                     self.blocks[main_id]["isMain"] = True
 
-        # Resolve "Chart" timeframe in block params в†’ main_interval from Properties panel
+        # Resolve "Chart" timeframe in block params в†' main_interval from Properties panel
         if self.main_interval:
             self._resolve_chart_timeframes()
 
@@ -314,7 +314,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     resolved_count += 1
         if resolved_count:
             logger.debug(
-                "[ChartTF] Resolved {} 'Chart' timeframe param(s) в†’ '{}' (main interval)",
+                "[ChartTF] Resolved {} 'Chart' timeframe param(s) в†' '{}' (main interval)",
                 resolved_count,
                 self.main_interval,
             )
@@ -383,7 +383,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         return result
 
-    # Block type в†’ category mapping for auto-inference when blocks lack 'category'
+    # Block type в†' category mapping for auto-inference when blocks lack 'category'
     _BLOCK_CATEGORY_MAP: dict[str, str] = {
         # Input blocks
         "price": "input",
@@ -501,7 +501,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         "pinbar": "price_action",
         # Divergence вЂ” unified multi-indicator divergence signal block
         "divergence": "divergence",
-        # Universal filters (new instruments in РўРµС…РЅРёС‡РµСЃРєРёРµ РРЅРґРёРєР°С‚РѕСЂС‹)
+        # Universal filters (new instruments in РўРµС…РЅРёС‡РµСЃРєРёРµ РРЅРґРёРєР°С,РѕСЂС<)
         "atr_volatility": "indicator",
         "volume_filter": "indicator",
         "highest_lowest_bar": "indicator",
@@ -646,15 +646,15 @@ class StrategyBuilderAdapter(BaseStrategy):
                     if source_port in source_outputs:
                         inputs[target_port] = source_outputs[source_port]
                     else:
-                        # Try port aliases (e.g. "output" в†’ "value")
+                        # Try port aliases (e.g. "output" в†' "value")
                         resolved = False
                         for alias in self._PORT_ALIASES.get(source_port, []):
                             if alias in source_outputs:
                                 inputs[target_port] = source_outputs[alias]
                                 resolved = True
                                 logger.warning(
-                                    f"[PortResolver] Port alias fallback: '{source_port}' в†’ '{alias}' "
-                                    f"for block {source_id} в†’ {block_id}. "
+                                    f"[PortResolver] Port alias fallback: '{source_port}' в†' '{alias}' "
+                                    f"for block {source_id} в†' {block_id}. "
                                     f"Available outputs: {list(source_outputs.keys())}"
                                 )
                                 break
@@ -665,7 +665,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                             logger.warning(
                                 f"[PortResolver] Single-output fallback: port '{source_port}' not found "
                                 f"in block '{source_id}' (outputs: {list(source_outputs.keys())}), "
-                                f"using only output '{only_key}' в†’ target '{target_port}' on block '{block_id}'"
+                                f"using only output '{only_key}' в†' target '{target_port}' on block '{block_id}'"
                             )
                         elif not resolved:
                             logger.warning(
@@ -2423,7 +2423,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                         and pivot_highs[i] > pivot_highs[last_pivot_high_idx]
                         and ind_pivot_highs[i] < ind_pivot_highs[last_pivot_high_idx]
                     ):
-                        # Price makes higher high, indicator makes lower high в†’ bearish
+                        # Price makes higher high, indicator makes lower high в†' bearish
                         signal_bar = min(i + pivot_interval, n - 1)
                         bearish_raw[signal_bar] = True
                     last_pivot_high_idx = i
@@ -2435,7 +2435,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                         and pivot_lows[i] < pivot_lows[last_pivot_low_idx]
                         and ind_pivot_lows[i] > ind_pivot_lows[last_pivot_low_idx]
                     ):
-                        # Price makes lower low, indicator makes higher low в†’ bullish
+                        # Price makes lower low, indicator makes higher low в†' bullish
                         signal_bar = min(i + pivot_interval, n - 1)
                         bullish_raw[signal_bar] = True
                     last_pivot_low_idx = i
@@ -2613,7 +2613,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             exit_short = pd.Series([False] * n, index=idx)
 
             if activate_reach:
-                # Reach mode: RSI in zone в†’ exit
+                # Reach mode: RSI in zone в†' exit
                 long_more = float(params.get("rsi_long_more", 70))
                 long_less = float(params.get("rsi_long_less", 100))
                 if long_more > long_less:
@@ -2675,7 +2675,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             exit_short = pd.Series([False] * n, index=idx)
 
             if activate_reach:
-                # Reach mode: Stoch %K in zone в†’ exit
+                # Reach mode: Stoch %K in zone в†' exit
                 long_more = float(params.get("stoch_long_more", 80))
                 long_less = float(params.get("stoch_long_less", 100))
                 if long_more > long_less:
@@ -2731,8 +2731,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # Detect trend change using trend direction from PSAR
             trend_series = pd.Series(psar_trend, index=idx)
-            trend_change_bull = (trend_series == 1) & (trend_series.shift(1) == -1)  # bearishв†’bullish
-            trend_change_bear = (trend_series == -1) & (trend_series.shift(1) == 1)  # bullishв†’bearish
+            trend_change_bull = (trend_series == 1) & (trend_series.shift(1) == -1)  # bearishв†'bullish
+            trend_change_bear = (trend_series == -1) & (trend_series.shift(1) == 1)  # bullishв†'bearish
 
             if nth_bar <= 1:
                 # Close on the bar of trend change
@@ -3155,16 +3155,16 @@ class StrategyBuilderAdapter(BaseStrategy):
                             if source_port in source_outputs:
                                 signal = source_outputs[source_port]
                             else:
-                                # Try port aliases (e.g. "long" в†’ "bullish")
+                                # Try port aliases (e.g. "long" в†' "bullish")
                                 for alias in self._SIGNAL_PORT_ALIASES.get(source_port, []):
                                     if alias in source_outputs:
                                         signal = source_outputs[alias]
                                         logger.debug(
-                                            f"[SignalRouting] Port alias: '{source_port}' в†’ '{alias}' "
+                                            f"[SignalRouting] Port alias: '{source_port}' в†' '{alias}' "
                                             f"for block {source_id}"
                                         )
                                         break
-                                # Last resort: single-output block в†’ use that output
+                                # Last resort: single-output block в†' use that output
                                 if signal is None and len(source_outputs) == 1:
                                     signal = next(iter(source_outputs.values()))
                                     logger.debug(

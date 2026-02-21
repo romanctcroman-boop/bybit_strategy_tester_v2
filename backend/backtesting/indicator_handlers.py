@@ -972,10 +972,7 @@ def _handle_mtf(
 
     except Exception as e:
         logger.warning(f"MTF calculation error: {e}")
-        if indicator == "ema":
-            fallback = src.ewm(span=period, adjust=False).mean()
-        else:
-            fallback = src.rolling(period).mean()
+        fallback = src.ewm(span=period, adjust=False).mean() if indicator == "ema" else src.rolling(period).mean()
         return {"value": fallback}
 
 
@@ -1015,10 +1012,7 @@ def _handle_atr_volatility(
         index=ohlcv.index,
     )
     pct_diff = ((atr1 - atr2).abs() / atr2.replace(0, np.nan)) * 100
-    if "< ATR2" in mode:
-        condition = (atr1 < atr2) & (pct_diff >= diff_pct)
-    else:
-        condition = (atr1 > atr2) & (pct_diff >= diff_pct)
+    condition = (atr1 < atr2) & (pct_diff >= diff_pct) if "< ATR2" in mode else (atr1 > atr2) & (pct_diff >= diff_pct)
     condition = condition.fillna(False)
     logger.debug(
         "ATR Volatility filter | mode={} | diff>={}% | pass={}",
@@ -1065,10 +1059,7 @@ def _handle_volume_filter(
         vol2 = volume.ewm(alpha=1 / length2, adjust=False).mean()
 
     pct_diff = ((vol1 - vol2).abs() / vol2.replace(0, np.nan)) * 100
-    if "< VOL2" in mode:
-        condition = (vol1 < vol2) & (pct_diff >= diff_pct)
-    else:
-        condition = (vol1 > vol2) & (pct_diff >= diff_pct)
+    condition = (vol1 < vol2) & (pct_diff >= diff_pct) if "< VOL2" in mode else (vol1 > vol2) & (pct_diff >= diff_pct)
     condition = condition.fillna(False)
     logger.debug(
         "Volume filter | mode={} | diff>={}% | pass={}",
