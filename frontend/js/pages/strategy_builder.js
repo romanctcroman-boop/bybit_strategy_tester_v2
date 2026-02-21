@@ -11989,10 +11989,11 @@ async function _runAiBuildWithSSE(payload) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let streamDone = false;
 
-  while (true) {
+  while (!streamDone) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) { streamDone = true; break; }
 
     buffer += decoder.decode(value, { stream: true });
     // SSE frames are separated by double newline
