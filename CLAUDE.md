@@ -14,7 +14,7 @@
 -   4. Directory Structure
 -   5. Critical Constants (+ 730-day limit)
 -   6. Strategy Parameters
--   7. Risk & Money Management (+ Key Optimization Metrics)
+-   7. Risk & Money Management (+ Key Optimization Metrics, Cross-cutting Parameters)
 -   8. Domain Knowledge
 -   9. How to Work with Claude Code
 -   10. Conventions
@@ -22,6 +22,7 @@
 -   12. Deprecated Items
 -   13. Test Infrastructure
 -   14. Recent Major Changes
+-   15. Refactor Checklist for AI Agents
 
 ## 1. Overview
 
@@ -499,6 +500,29 @@ The optimizer (`backend/optimization/scoring.py`) supports 20 metrics as objecti
 
 > `rank_by_multi_criteria()` ranks results across multiple criteria simultaneously using average-rank method.
 
+### Cross-cutting parameters (dependency graph)
+
+These parameters from §6–§7 are used in **3+ subsystems**. Changing any of them requires updating every listed location.
+
+| Parameter | Subsystems | Locations (key files) | Default | Risk |
+| --- | --- | --- | --- | --- |
+| `commission_rate` / `commission_value` | Engine, BacktestConfig, Bridges (×2), Optimization, MCP agent, RL env, Agent router, MLflow, MetricsCalculator, Frontend, Live trading | `engine.py`, `models.py:318`, `backtest_bridge.py:50`, `walk_forward_bridge.py:54`, `optimization/models.py:32+189`, `agents/mcp/tools/backtest.py:160`, `ml/rl/trading_env.py:58`, `api/routers/agents.py:902`, `mlflow_tracking.py:188`, `metrics_calculator.py`, `strategy_builder.js:912`, `live_trading.py:263` | 0.0007 | 🔴 **HIGHEST** — 6+ hardcoded sites |
+| `initial_capital` | Engine (30+ refs), MetricsCalculator, Optimization, Frontend tests | `engine.py`, `metrics_calculator.py`, `optimization/models.py:31+188`, `optimization/utils.py:71`, `api.test.js:277` | 10000.0 | 🔴 HIGH — equity, CAGR, drawdown |
+| `position_size` | Engine, API routers (×2), Optimization, Optuna, Live trading | `engine.py:1076+1448+2118`, `strategy_builder.py`, `backtests.py`, `optimization/models.py:191`, `optuna_optimizer.py:461`, `strategy_runner.py:72` | 1.0 | 🔴 HIGH — unit mismatch |
+| `leverage` | Engine, Optimization (×2), Frontend (leverageManager), Live trading (×3) | `engine.py:2115`, `optimization/models.py:30+187`, `optimization/utils.py:75`, `strategy_builder.js:914`, `leverageManager.js`, `strategy_runner.py:74`, `position_manager.py:52`, `order_executor.py:70+842` | 10 (optim/UI) vs 1.0 (live) | 🟡 MODERATE |
+| `pyramiding` | Engine, Engine selector, BacktestConfig, Optimization | `engine.py`, `engine_selector.py`, `models.py`, `optimization/utils.py:84` | 1 | 🟡 MODERATE — hardcoded in optimizer |
+| `direction` | API (default `"long"`), Engine (default `"both"`), Frontend (default `"both"`) | `models.py:1269`, `models.py:~100`, `strategy_builder.js` | varies! | 🟡 MODERATE — default mismatch |
+| `strategy_params` | API → Router → Strategy → Engine (all layers) | `dict[str, Any]` passthrough | n/a | 🟢 LOW — passthrough only |
+
+#### Known inconsistencies (as of 2026-02-21)
+
+1. **commission_rate 0.001 vs 0.0007** — `universal_engine/live_trading.py:263` uses `0.001`, all other files use `0.0007`. Live trading diverges from backtest.
+2. **position_size: fraction vs percent** — Engine/Optimization use fraction `0.0–1.0`; `live_trading/strategy_runner.py:72` uses `position_size_percent` (percent). Unit mismatch.
+3. **leverage default: 10 vs 1.0** — Optimization and Frontend default to `10`; live trading defaults to `1.0`.
+4. **pyramiding silently overridden** — `optimization/utils.py:84` hardcodes `pyramiding=1`, ignoring user's value.
+
+> **Rule for AI agents:** Before changing any parameter from this table, `grep -rn <param_name> backend/ frontend/` and update ALL locations. Run the commission parity check: `grep -rn commission backend/ | grep -v 0.0007 | grep -v .pyc | grep -v __pycache__`
+
 ---
 
 ## 8. Domain Knowledge
@@ -676,6 +700,9 @@ Collected here for clarity — do **not** use in new code:
 - Added: Strategy Builder graph JSON format, SignalResult contract, Engine Selection table
 - Added: direction default caveat (API vs Engine vs Builder), warning codes, market_type docs
 - Added: 730-day backtest limit, key optimization metrics, deprecated items list, test infrastructure
+- Added: Cross-cutting Parameters dependency table (§7) — 7 params mapped across 12+ files
+- Added: Known inconsistencies (commission 0.001 in live_trading, position_size unit mismatch, leverage default mismatch, pyramiding hardcoded)
+- Added: Refactor Checklist for AI Agents (§15) — pre-flight, high-risk params, engine, strategy, API, frontend, post-flight
 
 ### 2026-02-19
 
@@ -687,3 +714,67 @@ Collected here for clarity — do **not** use in new code:
 - Port alias fallback added to Case 2 signal routing in adapter
 - `main.py` Unicode fix for cp1251 Windows terminals
 - 56 divergence tests passing (6 handler + 50 AI agent)
+
+---
+
+## 15. Refactor Checklist for AI Agents
+
+Before refactoring any core subsystem, walk through this checklist **in order**. Skip a step only if it's genuinely irrelevant.
+
+### Pre-flight
+
+- [ ] Read `CLAUDE.md` §5 (Critical Constants) and §7 (Cross-cutting Parameters table)
+- [ ] `grep -rn <symbol_you_are_changing> backend/ frontend/` — count ALL usages
+- [ ] Check if the symbol is in the cross-cutting table above — if yes, plan multi-file update
+- [ ] Read `DECISIONS.md` for any prior ADR about this area
+
+### High-risk parameter changes
+
+If changing `commission_rate`, `initial_capital`, `position_size`, `leverage`, `pyramiding`, or `direction`:
+
+- [ ] Update **BacktestConfig** in `backend/backtesting/models.py`
+- [ ] Update **all bridges** (`backtest_bridge.py`, `walk_forward_bridge.py`)
+- [ ] Update **optimization models** (`optimization/models.py`, `optimization/utils.py`)
+- [ ] Update **engine** (`engine.py`) if default/semantics change
+- [ ] Update **MetricsCalculator** (`metrics_calculator.py`) if it depends on the param
+- [ ] Update **frontend defaults** (`strategy_builder.js`, `leverageManager.js`)
+- [ ] Update **agent tools** (`agents/mcp/tools/backtest.py`, `api/routers/agents.py`)
+- [ ] Run commission parity check: `grep -rn commission backend/ | grep -v 0.0007 | grep -v .pyc`
+- [ ] Run `pytest tests/backend/backtesting/test_engine.py tests/backend/backtesting/test_strategy_builder_parity.py -v`
+
+### Engine changes
+
+- [ ] Confirm engine selector (`engine_selector.py`) still routes correctly
+- [ ] All engines MUST delegate metrics to `MetricsCalculator.calculate_all()` — never reimplement
+- [ ] If adding engine type, update `ENGINE_MAP` in engine_selector.py and `EngineType` enum in models.py
+- [ ] Run: `pytest tests/backend/backtesting/test_engine.py -v`
+
+### Strategy / Adapter changes
+
+- [ ] `generate_signals()` must return DataFrame with `signal` column (1 / -1 / 0)
+- [ ] `SignalResult` contract: `signal`, `strength`, `metadata` fields (see §3)
+- [ ] Indicator periods clamped [1, 500] via `_clamp_period()` in adapter
+- [ ] Port alias fallback works for divergence blocks (`long` ↔ `bullish`, `short` ↔ `bearish`)
+- [ ] Run: `pytest tests/backend/backtesting/ -v -m "not slow"`
+
+### API / Router changes
+
+- [ ] Direction default is `"long"` in `BacktestCreateRequest` vs `"both"` in `BacktestConfig` — be aware
+- [ ] Validate date range ≤ 730 days (`validate_dates()` in models.py)
+- [ ] Async DB operations use `asyncio.to_thread()` for blocking SQLite calls
+- [ ] Check Swagger docs still render: `http://localhost:8000/docs`
+
+### Frontend changes
+
+- [ ] No build step — pure ES modules, test by reloading browser
+- [ ] Commission UI is in **percent** (0.07) → backend converts to decimal (0.0007)
+- [ ] Leverage slider capped at 125 (Bybit max), color-coded for high values
+- [ ] All strategy params flow through Properties panel → `strategy_params` dict
+
+### Post-flight
+
+- [ ] `ruff check . --fix && ruff format .`
+- [ ] `pytest tests/ -v -m "not slow"` — all green
+- [ ] Update `CHANGELOG.md` with what changed
+- [ ] If structural change, update `CLAUDE.md` (this file) and `docs/ARCHITECTURE.md`
+- [ ] Commit with descriptive message
