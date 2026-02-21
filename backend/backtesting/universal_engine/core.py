@@ -54,10 +54,10 @@ try:
     )
 except ImportError:
     # Fallback if interfaces not available
-    BacktestInput = None  # type: ignore[assignment]
-    BacktestOutput = None  # type: ignore[assignment]
-    BacktestMetrics = None  # type: ignore[assignment]
-    TradeDirection = None  # type: ignore[assignment]
+    BacktestInput = None  # type: ignore[assignment, misc]
+    BacktestOutput = None  # type: ignore[assignment, misc]
+    BacktestMetrics = None  # type: ignore[assignment, misc]
+    TradeDirection = None  # type: ignore[assignment, misc]
 
 
 @dataclass
@@ -565,8 +565,8 @@ class UniversalMathEngine:
             metrics.short_win_rate = short_wins / len(short_trades)
 
         # Average trade duration
-        durations = [t.duration_bars for t in trades]
-        metrics.avg_trade_duration = float(np.mean(durations)) if durations else 0.0
+        durations = np.array([t.duration_bars for t in trades], dtype=np.int64)
+        metrics.avg_trade_duration = float(np.mean(durations)) if len(durations) > 0 else 0.0
 
         return metrics
 

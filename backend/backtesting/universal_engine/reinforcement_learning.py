@@ -449,7 +449,7 @@ class PrioritizedReplay(ExperienceReplay):
         self.buffer.append(experience)
         self.priorities.append(self.max_priority)
 
-    def sample(self, batch_size: int) -> tuple[list[Experience], NDArray, NDArray]:
+    def sample(self, batch_size: int) -> tuple[list[Experience], NDArray, NDArray]:  # type: ignore[override]
         """Sample batch with priority-based probabilities."""
         priorities = np.array(self.priorities)
         probs = priorities**self.alpha
@@ -466,7 +466,7 @@ class PrioritizedReplay(ExperienceReplay):
 
     def update_priorities(self, indices: NDArray, td_errors: NDArray) -> None:
         """Update priorities based on TD errors."""
-        for idx, td_error in zip(indices, td_errors):
+        for idx, td_error in zip(indices, td_errors, strict=False):
             priority = abs(td_error) + 1e-6
             self.priorities[idx] = priority
             self.max_priority = max(self.max_priority, priority)
@@ -515,7 +515,7 @@ class Dense(Layer):
         return x @ self.weights + self.bias
 
     def backward(self, grad: NDArray) -> NDArray:
-        self._grad_weights = self._input.T @ grad
+        self._grad_weights = self._input.T @ grad  # type: ignore[union-attr]
         self._grad_bias = np.sum(grad, axis=0)
         return grad @ self.weights.T
 
@@ -523,10 +523,10 @@ class Dense(Layer):
         return [self.weights, self.bias]
 
     def set_params(self, params: list[NDArray]) -> None:
-        self.weights, self.bias = params
+        self.weights, self.bias = params  # type: ignore[assignment]
 
     def get_gradients(self) -> list[NDArray]:
-        return [self._grad_weights, self._grad_bias]
+        return [self._grad_weights, self._grad_bias]  # type: ignore[list-item]
 
 
 class ReLU(Layer):
@@ -560,7 +560,7 @@ class Tanh(Layer):
         return self._output
 
     def backward(self, grad: NDArray) -> NDArray:
-        return grad * (1 - self._output**2)
+        return grad * (1 - self._output**2)  # type: ignore[operator]
 
     def get_params(self) -> list[NDArray]:
         return []
@@ -620,7 +620,7 @@ class NeuralNetwork:
         return [layer.get_params() for layer in self.layers]
 
     def set_params(self, params: list[list[NDArray]]) -> None:
-        for layer, p in zip(self.layers, params):
+        for layer, p in zip(self.layers, params, strict=False):
             if p:
                 layer.set_params(p)
 
@@ -667,7 +667,7 @@ class Adam:
         self.t += 1
         updated = []
 
-        for i, (param, grad) in enumerate(zip(params, grads)):
+        for i, (param, grad) in enumerate(zip(params, grads, strict=False)):
             if grad is None:
                 updated.append(param)
                 continue
@@ -736,7 +736,7 @@ class DQNAgent(BaseAgent):
         self.action_dim = action_dim
 
         # Networks
-        layer_sizes = [state_dim] + config.hidden_layers + [action_dim]
+        layer_sizes = [state_dim, *config.hidden_layers, action_dim]
         self.q_network = NeuralNetwork(layer_sizes, config.activation)
         self.target_network = self.q_network.copy()
 
@@ -814,8 +814,8 @@ class DQNAgent(BaseAgent):
         idx = 0
         for layer in self.q_network.layers:
             if isinstance(layer, Dense):
-                layer.weights = updated_params[idx]
-                layer.bias = updated_params[idx + 1]
+                layer.weights = updated_params[idx]  # type: ignore[assignment]
+                layer.bias = updated_params[idx + 1]  # type: ignore[assignment]
                 idx += 2
 
         # Update target network
@@ -836,7 +836,7 @@ class DQNAgent(BaseAgent):
             "epsilon": self.epsilon,
             "update_count": self.update_count,
         }
-        np.save(path, params, allow_pickle=True)
+        np.save(path, params, allow_pickle=True)  # type: ignore[call-overload]
 
     def load(self, path: str) -> None:
         """Load agent state."""
@@ -867,11 +867,11 @@ class PPOAgent(BaseAgent):
         self.action_dim = action_dim
 
         # Actor network (policy)
-        actor_sizes = [state_dim] + config.hidden_layers + [action_dim]
+        actor_sizes = [state_dim, *config.hidden_layers, action_dim]
         self.actor = NeuralNetwork(actor_sizes, config.activation)
 
         # Critic network (value function)
-        critic_sizes = [state_dim] + config.hidden_layers + [1]
+        critic_sizes = [state_dim, *config.hidden_layers, 1]
         self.critic = NeuralNetwork(critic_sizes, config.activation)
 
         # Optimizers
@@ -891,10 +891,7 @@ class PPOAgent(BaseAgent):
         probs = exp_logits / np.sum(exp_logits)
         probs = probs.flatten()
 
-        if training:
-            action = np.random.choice(self.action_dim, p=probs)
-        else:
-            action = np.argmax(probs)
+        action = np.random.choice(self.action_dim, p=probs) if training else np.argmax(probs)
 
         return int(action)
 
@@ -999,7 +996,7 @@ class PPOAgent(BaseAgent):
     def save(self, path: str) -> None:
         """Save agent state."""
         params = {"actor": self.actor.get_params(), "critic": self.critic.get_params()}
-        np.save(path, params, allow_pickle=True)
+        np.save(path, params, allow_pickle=True)  # type: ignore[call-overload]
 
     def load(self, path: str) -> None:
         """Load agent state."""
@@ -1032,7 +1029,7 @@ class A3CAgent(BaseAgent):
         hidden = config.hidden_layers
 
         # Feature extractor
-        feature_sizes = [state_dim] + hidden
+        feature_sizes = [state_dim, *hidden]
         self.feature_net = NeuralNetwork(feature_sizes, config.activation)
 
         # Policy head
@@ -1061,10 +1058,7 @@ class A3CAgent(BaseAgent):
         probs = exp_logits / np.sum(exp_logits)
         probs = probs.flatten()
 
-        if training:
-            action = np.random.choice(self.action_dim, p=probs)
-        else:
-            action = np.argmax(probs)
+        action = np.random.choice(self.action_dim, p=probs) if training else np.argmax(probs)
 
         return int(action)
 
@@ -1118,7 +1112,7 @@ class A3CAgent(BaseAgent):
             "policy_head": self.policy_head.get_params(),
             "value_head": self.value_head.get_params(),
         }
-        np.save(path, params, allow_pickle=True)
+        np.save(path, params, allow_pickle=True)  # type: ignore[call-overload]
 
     def load(self, path: str) -> None:
         """Load agent state."""
@@ -1148,11 +1142,11 @@ class SACAgent(BaseAgent):
         self.action_dim = action_dim
 
         # Actor network
-        actor_sizes = [state_dim] + config.hidden_layers + [action_dim]
+        actor_sizes = [state_dim, *config.hidden_layers, action_dim]
         self.actor = NeuralNetwork(actor_sizes, config.activation)
 
         # Twin Q-networks
-        q_sizes = [state_dim] + config.hidden_layers + [action_dim]
+        q_sizes = [state_dim, *config.hidden_layers, action_dim]
         self.q1 = NeuralNetwork(q_sizes, config.activation)
         self.q2 = NeuralNetwork(q_sizes, config.activation)
 
@@ -1183,10 +1177,7 @@ class SACAgent(BaseAgent):
         probs = exp_logits / np.sum(exp_logits)
         probs = probs.flatten()
 
-        if training:
-            action = np.random.choice(self.action_dim, p=probs)
-        else:
-            action = np.argmax(probs)
+        action = np.random.choice(self.action_dim, p=probs) if training else np.argmax(probs)
 
         return int(action)
 
@@ -1240,12 +1231,12 @@ class SACAgent(BaseAgent):
         actor_loss = np.mean(np.sum(probs * (self.alpha * np.log(probs + 1e-8) - q_values), axis=1))
 
         # Soft update targets
-        for param, target_param in zip(self.q1.get_params(), self.q1_target.get_params()):
-            for p, tp in zip(param, target_param):
+        for param, target_param in zip(self.q1.get_params(), self.q1_target.get_params(), strict=False):
+            for p, tp in zip(param, target_param, strict=False):
                 tp[:] = self.config.tau * p + (1 - self.config.tau) * tp
 
-        for param, target_param in zip(self.q2.get_params(), self.q2_target.get_params()):
-            for p, tp in zip(param, target_param):
+        for param, target_param in zip(self.q2.get_params(), self.q2_target.get_params(), strict=False):
+            for p, tp in zip(param, target_param, strict=False):
                 tp[:] = self.config.tau * p + (1 - self.config.tau) * tp
 
         return {
@@ -1263,7 +1254,7 @@ class SACAgent(BaseAgent):
             "q1_target": self.q1_target.get_params(),
             "q2_target": self.q2_target.get_params(),
         }
-        np.save(path, params, allow_pickle=True)
+        np.save(path, params, allow_pickle=True)  # type: ignore[call-overload]
 
     def load(self, path: str) -> None:
         """Load agent state."""
@@ -1353,8 +1344,8 @@ class RLTrainer:
 
         return {
             "rewards": self.episode_rewards,
-            "lengths": self.episode_lengths,
-            "metrics": self.metrics_history,
+            "lengths": self.episode_lengths,  # type: ignore[dict-item]
+            "metrics": self.metrics_history,  # type: ignore[dict-item]
         }
 
     def evaluate(self, n_episodes: int = 10) -> dict[str, float]:
@@ -1382,7 +1373,7 @@ class RLTrainer:
             metrics = self.env.get_metrics()
             total_return += metrics.get("total_return", 0)
             total_sharpe += metrics.get("sharpe_ratio", 0)
-            total_trades += metrics.get("n_trades", 0)
+            total_trades += int(metrics.get("n_trades", 0))
 
         return {
             "avg_return": total_return / n_episodes,
@@ -1440,34 +1431,34 @@ class AgentFactory:
 # ============================================================================
 
 __all__ = [
+    "A3CAgent",
     # Enums
     "Action",
-    "RewardType",
-    # Data structures
-    "State",
-    "Experience",
-    "RLConfig",
-    # Environment
-    "TradingEnvironment",
-    # Replay buffers
-    "ExperienceReplay",
-    "PrioritizedReplay",
-    # Neural network components
-    "Layer",
-    "Dense",
-    "ReLU",
-    "Tanh",
-    "Softmax",
-    "NeuralNetwork",
     "Adam",
+    # Factory
+    "AgentFactory",
     # Agents
     "BaseAgent",
     "DQNAgent",
+    "Dense",
+    "Experience",
+    # Replay buffers
+    "ExperienceReplay",
+    # Neural network components
+    "Layer",
+    "NeuralNetwork",
     "PPOAgent",
-    "A3CAgent",
-    "SACAgent",
+    "PrioritizedReplay",
+    "RLConfig",
     # Training
     "RLTrainer",
-    # Factory
-    "AgentFactory",
+    "ReLU",
+    "RewardType",
+    "SACAgent",
+    "Softmax",
+    # Data structures
+    "State",
+    "Tanh",
+    # Environment
+    "TradingEnvironment",
 ]

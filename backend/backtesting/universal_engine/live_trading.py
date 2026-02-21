@@ -349,8 +349,8 @@ class PaperTradingEngine(ExchangeConnection):
 
         # Check for limit order
         if order.order_type == OrderType.LIMIT:
-            if (order.side == OrderSide.BUY and fill_price > order.price) or (
-                order.side == OrderSide.SELL and fill_price < order.price
+            if (order.side == OrderSide.BUY and fill_price > order.price) or (  # type: ignore[operator]
+                order.side == OrderSide.SELL and fill_price < order.price  # type: ignore[operator]
             ):
                 order.status = OrderStatus.OPEN
                 self._orders[order.order_id] = order
@@ -363,7 +363,7 @@ class PaperTradingEngine(ExchangeConnection):
                     execution_time_ms=(time.time() - start_time) * 1000,
                     commission=0,
                 )
-            fill_price = order.price
+            fill_price = order.price or market_price  # price always set for LIMIT orders
 
         # Calculate commission
         commission = order.quantity * fill_price * self.commission_rate
@@ -513,7 +513,7 @@ class PaperTradingEngine(ExchangeConnection):
                 return True
         return False
 
-    async def get_order_status(self, order_id: str) -> Order:
+    async def get_order_status(self, order_id: str) -> Order | None:
         """Get order status."""
         return self._orders.get(order_id)
 
@@ -782,9 +782,8 @@ class OrderManager:
 
         for order_id in orders_to_cancel:
             order = self._open_orders[order_id]
-            if symbol is None or order.symbol == symbol:
-                if await self.cancel_order(order_id):
-                    cancelled += 1
+            if (symbol is None or order.symbol == symbol) and await self.cancel_order(order_id):
+                cancelled += 1
 
         return cancelled
 
@@ -982,7 +981,8 @@ class RiskManager:
 
     def reset_daily(self) -> None:
         """Reset daily counters."""
-        asyncio.create_task(self._reset_daily_async())
+        _task = asyncio.create_task(self._reset_daily_async())
+        _task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
     async def _reset_daily_async(self) -> None:
         """Async reset daily counters."""
@@ -1215,28 +1215,23 @@ class LiveTradingBridge:
 # ============================================================================
 
 __all__ = [
-    # Enums
-    "OrderSide",
-    "OrderType",
-    "OrderStatus",
-    "PositionSide",
-    "TradingMode",
-    # Data structures
-    "Order",
-    "Position",
-    "Trade",
     "AccountBalance",
-    "RiskLimits",
-    "ExecutionReport",
-    # Connections
-    "ExchangeConnection",
-    "PaperTradingEngine",
     "BybitConnection",
-    # Components
-    "OrderManager",
-    "PositionTracker",
-    "RiskManager",
+    "ExchangeConnection",
     "ExecutionAnalytics",
-    # Main bridge
+    "ExecutionReport",
     "LiveTradingBridge",
+    "Order",
+    "OrderManager",
+    "OrderSide",
+    "OrderStatus",
+    "OrderType",
+    "PaperTradingEngine",
+    "Position",
+    "PositionSide",
+    "PositionTracker",
+    "RiskLimits",
+    "RiskManager",
+    "Trade",
+    "TradingMode",
 ]

@@ -389,7 +389,8 @@ class UniversalMathEngineV23:
             if self.v23_config.ml_signals.use_adaptive:
                 adaptive_config = AdaptiveConfig(lookback_window=self.v23_config.ml_signals.adaptive_lookback)
                 self.ml_signal_generator = AdaptiveSignalGenerator(  # type: ignore[call-arg]
-                    self.feature_engine, adaptive_config  # type: ignore[arg-type]
+                    self.feature_engine,
+                    adaptive_config,  # type: ignore[arg-type]
                 )
             else:
                 self.ml_signal_generator = None  # type: ignore[assignment]

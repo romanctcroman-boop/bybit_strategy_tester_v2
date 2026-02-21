@@ -14,12 +14,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-try:
-    import vectorbt as vbt
-except ImportError:
-    vbt = None
-    logger.warning("vectorbt not installed. Some Strategy Builder features may be unavailable.")
-
 from backend.backtesting.strategies import BaseStrategy, SignalResult
 
 # Import our custom indicators for extended coverage
@@ -701,10 +695,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         Handler functions live in ``indicator_handlers.py`` and are keyed by
         ``indicator_type`` in ``INDICATOR_DISPATCH``.
         """
-        if not vbt:
-            raise ImportError("vectorbt is required for indicator execution")
+        from backend.backtesting.indicator_handlers import INDICATOR_DISPATCH, _require_vbt
 
-        from backend.backtesting.indicator_handlers import INDICATOR_DISPATCH
+        _require_vbt()
 
         handler = INDICATOR_DISPATCH.get(indicator_type)
         if handler is not None:

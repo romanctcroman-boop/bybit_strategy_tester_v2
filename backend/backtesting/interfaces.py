@@ -916,7 +916,7 @@ class EngineComparator:
 
             drift = self._calculate_drift(reference_result.metrics, result.metrics)
 
-            comparison["comparisons"].append(  # type: ignore[union-attr, index]
+            comparison["comparisons"].append(  # type: ignore[union-attr, index, attr-defined]
                 {
                     "engine": engine.name,
                     "metrics": result.metrics.to_dict(),

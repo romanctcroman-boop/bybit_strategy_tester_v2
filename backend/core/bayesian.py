@@ -27,8 +27,8 @@ try:
 
     OPTUNA_AVAILABLE = True
 except ImportError:
-    optuna = None
-    TPESampler = None
+    optuna = None  # type: ignore[assignment]
+    TPESampler = None  # type: ignore[assignment, misc]
     OPTUNA_AVAILABLE = False
     logger.warning("Optuna not installed. Install with: pip install optuna")
 
@@ -228,7 +228,7 @@ class BayesianOptimizer:
 
                 try:
                     # Run backtest
-                    result = engine.run_backtest(
+                    result = engine.run_backtest(  # type: ignore[attr-defined]
                         df=self.data.copy(),
                         config=config,
                     )
@@ -284,7 +284,7 @@ class BayesianOptimizer:
             # Get top trials
             top_trials = sorted(
                 [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE],
-                key=lambda t: t.value if direction == "maximize" else -t.value,
+                key=lambda t: float(t.value) if direction == "maximize" else -float(t.value),  # type: ignore[arg-type]
                 reverse=True,
             )[:10]
 
@@ -374,12 +374,12 @@ def generate_param_range(
             step_str = f"{step:.10f}".rstrip("0")
             precision = len(step_str.split(".")[-1]) if "." in step_str else 2
 
-    values = []
+    values: list[int | float] = []
     val = low
 
     while val <= high + step * 0.001:
         if param_type == "int":
-            values.append(int(round(val)))
+            values.append(round(val))
         else:
             values.append(round(val, precision) if precision > 0 else round(val))
         val += step

@@ -20,6 +20,20 @@ try:
 except ImportError:
     vbt = None
 
+
+def _require_vbt() -> None:
+    """Raise ImportError if vectorbt is not installed.
+
+    Call at the top of ``_execute_indicator`` (or any handler that needs vbt)
+    to get a clean error instead of ``AttributeError: 'NoneType' object has no
+    attribute 'MA'``.
+    """
+    if vbt is None:
+        raise ImportError(
+            "vectorbt is required for indicator execution. "
+            "Install it with: pip install vectorbt"
+        )
+
 from backend.backtesting.strategy_builder_adapter import _clamp_period, _param
 from backend.core.indicators import (
     calculate_ad_line,

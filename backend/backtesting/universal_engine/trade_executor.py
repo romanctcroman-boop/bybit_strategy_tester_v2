@@ -402,7 +402,7 @@ def calculate_pnl(
     direction: int, entry_price: float, exit_price: float, size: float, fees: float
 ) -> tuple[float, float]:
     """Calculate PnL and PnL percentage."""
-    if direction == 0:  # Long
+    if direction == 0:  # Long  # noqa: SIM108
         pnl_pct = (exit_price - entry_price) / entry_price
     else:  # Short
         pnl_pct = (entry_price - exit_price) / entry_price
@@ -601,12 +601,12 @@ class UniversalTradeExecutor:
                     trade.trailing_activated,
                 )
 
-                if trade.trailing_activated:
-                    if (trade.direction == "long" and low <= trade.trailing_stop_price) or (
-                        trade.direction == "short" and high >= trade.trailing_stop_price
-                    ):
-                        exit_reason = ExitReason.TRAILING_STOP
-                        exit_price = trade.trailing_stop_price
+                if trade.trailing_activated and (
+                    (trade.direction == "long" and low <= trade.trailing_stop_price)
+                    or (trade.direction == "short" and high >= trade.trailing_stop_price)
+                ):
+                    exit_reason = ExitReason.TRAILING_STOP
+                    exit_price = trade.trailing_stop_price
 
             # 2. Check stop loss (if not trailing triggered)
             if exit_reason is None:
@@ -620,7 +620,7 @@ class UniversalTradeExecutor:
             if exit_reason is None:
                 if cfg.tp_mode == TpMode.MULTI and trade.tp_prices:
                     # Multi-level TP
-                    for i, (tp_price, tp_portion) in enumerate(zip(trade.tp_prices, trade.tp_portions)):
+                    for i, (tp_price, tp_portion) in enumerate(zip(trade.tp_prices, trade.tp_portions, strict=False)):
                         if i in trade.tp_levels_hit:
                             continue
                         if check_tp_hit(dir_int, tp_price, low, high):
@@ -658,10 +658,11 @@ class UniversalTradeExecutor:
                         exit_price = trade.tp_price
 
             # 4. Check signal exit
-            if exit_reason is None:
-                if (trade.direction == "long" and long_exit) or (trade.direction == "short" and short_exit):
-                    exit_reason = ExitReason.SIGNAL
-                    exit_price = close
+            if exit_reason is None and (
+                (trade.direction == "long" and long_exit) or (trade.direction == "short" and short_exit)
+            ):
+                exit_reason = ExitReason.SIGNAL
+                exit_price = close
 
             # 5. Check time-based exits
             if exit_reason is None:
@@ -673,17 +674,23 @@ class UniversalTradeExecutor:
                         exit_price = close
 
                 # Session close
-                if cfg.exit_on_session_close and hasattr(bar_time, "hour"):
-                    if bar_time.hour >= cfg.session_end_hour - 1:
-                        exit_reason = ExitReason.SESSION_CLOSE
-                        exit_price = close
+                if (
+                    cfg.exit_on_session_close
+                    and hasattr(bar_time, "hour")
+                    and bar_time.hour >= cfg.session_end_hour - 1
+                ):
+                    exit_reason = ExitReason.SESSION_CLOSE
+                    exit_price = close
 
                 # Weekend close
-                if cfg.exit_end_of_week and hasattr(bar_time, "weekday"):
-                    if bar_time.weekday() == 4:  # Friday
-                        if bar_time.hour >= 24 - cfg.exit_before_weekend:
-                            exit_reason = ExitReason.WEEKEND_CLOSE
-                            exit_price = close
+                if (
+                    cfg.exit_end_of_week
+                    and hasattr(bar_time, "weekday")
+                    and bar_time.weekday() == 4
+                    and bar_time.hour >= 24 - cfg.exit_before_weekend
+                ):  # Friday
+                    exit_reason = ExitReason.WEEKEND_CLOSE
+                    exit_price = close
 
             # Close trade if exit triggered
             if exit_reason is not None:
