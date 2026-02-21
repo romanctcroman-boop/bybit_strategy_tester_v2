@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Strategy Builder Canvas — 7 Coordinate & Performance Bug Fixes (2026-02-21):**
+    - **BUG#1 🔴 (Drag at zoom!=1):** `startDragBlock()` now computes `dragOffset` in **logical** coordinates: `(clientX - containerRect.left) / zoom - blockData.x`. `onMouseMove` converts mouse position to logical via `/ zoom` before writing `blockData.x/y` and `block.style.left/top`. Fixes block drifting/jumping at any zoom level other than 1.
+    - **BUG#2 🔴 (Marquee selection at zoom!=1):** `startMarqueeSelection()` converts `marqueeStart` to logical space (`/ zoom`). `onMouseMove` converts `currentX/Y` the same way. Marquee rect and block bounds are now both in logical space — intersection test is correct.
+    - **BUG#3 🔴 (Drop position at zoom!=1):** `onCanvasDrop()` divides drop offset by `zoom` before passing to `addBlockToCanvas()`. Dropped blocks now land under the cursor at all zoom levels.
+    - **BUG#4 🟡 (Double renderConnections):** Removed the standalone `renderConnections()` call from `deleteConnection()` (called just before `renderBlocks()` which already calls it internally). Same redundant call removed from `restoreStateSnapshot()`.
+    - **BUG#5 🟡 (pushUndo on bare click):** Moved `pushUndo()` from `mousedown` to first real movement inside `onMouseMove` (guarded by `Math.hypot(dx, dy) > 3`). Clicks without dragging no longer pollute the undo stack.
+    - **BUG#6 🟡 (console.log in render hot path):** Removed `console.log` from `renderBlocks()` (called ~60fps during drag via RAF) and stripped 5 verbose logs from `addBlockToCanvas()`. The one user-facing drop log is kept.
+    - **BUG#7 🟢 (ID collision on fast generation):** All `block_${Date.now()}` and `conn_${Date.now()}` ID sites (4 block sites, 2 conn sites) now append a 5-char random suffix: `_${Math.random().toString(36).slice(2,7)}`. Prevents ID collisions during AI bulk-generation or rapid duplication.
+
+- **Strategy Builder — 6 Bug Fixes (2026-02-21):**
+    - **Bug #2 (use_fallback silent zero-signal):** `strategy_builder_adapter.py` now sets `use_fallback=True` with a diagnostic `logger.warning` when connections exist to the main node but all signal series are empty — prevents silently returning 0 trades when a node is wired but produces no signals.
+    - **Bug #3 (Breakeven not passed from static_sltp):** `extractSlTpFromBlocks()` in `strategy_builder.js` already correctly extracts and forwards `breakeven_enabled`, `breakeven_activation_pct`, `breakeven_offset`, `close_only_in_profit`, `sl_type` from `static_sltp` blocks. Backend router reads these fields directly from saved `db_strategy.builder_blocks` — confirmed working end-to-end.
+    - **Bug #4 (Direction filter change not saved):** Added `autoSaveStrategy()` call after `connections.splice()` in the direction-change handler so DB is updated when connections to hidden ports are pruned.
+    - **Bug #5 (Mismatch highlighting misses bullish/bearish):** Mismatch detection now recognises `bullish` as alias for `long` and `bearish` as alias for `short` in source port checking, fixing highlight for divergence blocks.
+    - **Bug #6 (Default port "value" causes signal loss):** `_parse_source_port()` and `_parse_target_port()` in `strategy_builder_adapter.py` now default to `""` instead of `"value"`, preventing phantom "value" port IDs that silently broke signal routing on malformed/unconnected nodes.
+
+- **leverageManager.js — Encoding fix (2026-02-21):** All 12 Russian strings were corrupted with UTF-8 mojibake (box-drawing chars). Restored correct Cyrillic text for 8 risk level labels, 3 warning messages, and `indicator.title`. Version bumped to 1.1.1.
+
+- **Close by Time node — Parameter labels (2026-02-21):** Added `close_by_time` block schema to `blockParamDefs` in `strategy_builder.js` with correct labels ("Use Close By Time Since Order?", "Close order after XX bars:", "Close only with Profit?", "Min Profit percent for Close. %%"). Fixed `min_profit_percent` default from `0` to `0.5`.
+
 ### Added
 
 - **Optional Improvement: Canary Deployment Infrastructure — 2026-02-20:**

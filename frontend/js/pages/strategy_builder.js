@@ -553,6 +553,7 @@ const undoStack = [];
 const redoStack = [];
 const MAX_UNDO_HISTORY = 50;
 let lastAutoSavePayload = null;
+let _eventListenersInitialized = false; // Must be declared before initializeStrategyBuilder() call
 const AUTOSAVE_INTERVAL_MS = 30000;
 const STORAGE_KEY_PREFIX = 'strategy_builder_draft_';
 let skipNextAutoSave = false; // Flag to skip autosave after reset
@@ -846,9 +847,8 @@ function clearAllAndReset() {
     // Update undo/redo buttons
     updateUndoRedoButtons();
 
-    // Re-render
+    // Re-render (renderBlocks calls renderConnections internally)
     renderBlocks();
-    renderConnections();
 
     // Show notification
     showNotification('Всё очищено. Начните заново!', 'success');
@@ -918,11 +918,12 @@ function resetFormToDefaults() {
   if (leverageRangeEl) leverageRangeEl.value = '10';
   updateBacktestLeverageDisplay(10);
 
-  // Start/End dates
+  // Start/End dates — defaults for new (unsaved) strategies
   const startDateEl = document.getElementById('backtestStartDate');
   if (startDateEl) startDateEl.value = '2025-01-01';
   const endDateEl = document.getElementById('backtestEndDate');
   if (endDateEl) {
+    // Bug #3 fix: default to today, not a far-future date like 2030-01-01
     const today = new Date();
     endDateEl.value = today.toISOString().split('T')[0];
   }
@@ -1047,7 +1048,16 @@ function initializeStrategyBuilder() {
     console.log('[Strategy Builder] Initialization complete!');
   } catch (error) {
     console.error('[Strategy Builder] Initialization error:', error);
-    alert('Ошибка инициализации Strategy Builder. Проверьте консоль браузера (F12) для деталей.');
+    // Show the actual error message as a non-blocking banner (not alert) so the page stays usable
+    const msg = error && error.message ? error.message : String(error);
+    const stack = error && error.stack ? error.stack.split('\n').slice(1, 4).join(' | ') : '';
+    // Use the existing banner function if available, otherwise create one
+    const bannerMsg = `Init error: ${msg}${stack ? ' — ' + stack : ''}`;
+    if (typeof showBackendConnectionBanner === 'function') {
+      showBackendConnectionBanner('⚠ ' + bannerMsg);
+    } else {
+      console.error('[Strategy Builder] Full error:', error);
+    }
   }
 }
 
@@ -1199,7 +1209,17 @@ function renderBlockLibrary() {
     });
   });
 
-  // Subcategory click handling is done via event delegation in setupDragAndDrop()
+  // All subcategories start collapsed. CSS handles display:none via
+  // .block-category.collapsed .block-list { display: none !important }
+  // Just ensure the collapsed class + correct chevron icon is in place.
+  container.querySelectorAll('.block-category').forEach((cat) => {
+    cat.classList.add('collapsed');
+    const icon = cat.querySelector('.category-header i');
+    if (icon) {
+      icon.classList.remove('bi-chevron-down');
+      icon.classList.add('bi-chevron-right');
+    }
+  });
 
   console.log('[Strategy Builder] Block library rendered with groups. Groups in DOM:',
     document.querySelectorAll('.block-category-group').length);
@@ -2309,11 +2329,10 @@ async function updateBacktestLeverageRisk() {
     positionSizeTypeEl: document.getElementById('backtestPositionSizeType'),
     positionSizeEl: document.getElementById('backtestPositionSize'),
     leverageVal: parseInt(document.getElementById('backtestLeverageRange')?.value || document.getElementById('backtestLeverage')?.value, 10) || 10,
-    riskIndicatorEl: document.getElementById('backtestLeverageRiskIndicator')
+    riskIndicatorEl: document.getElementById('backtestLeverageRiskIndicator'),
+    rangeEl: document.getElementById('backtestLeverageRange') // Bug #2 fix: pass slider so max can be updated from exchange
   });
 }
-
-let _eventListenersInitialized = false;
 
 function setupEventListeners() {
   // Guard: prevent duplicate listener registration if called more than once
@@ -2371,6 +2390,8 @@ function setupEventListeners() {
             `Удалено ${before - connections.length} соединений к скрытым портам`,
             'info'
           );
+          // Bug #4 fix: sync graph to DB so backend reads updated connections
+          autoSaveStrategy().catch((err) => console.warn('[Strategy Builder] Autosave error:', err));
         }
       }
       // Re-render blocks to update Strategy node ports based on direction
@@ -2548,13 +2569,26 @@ function setupEventListeners() {
           e.stopPropagation();
           const category = categoryHeader.closest('.block-category');
           if (category) {
+            // CSS already controls visibility via .collapsed class + !important rules
+            // (.block-category.collapsed .block-list { display: none !important })
+            // (.block-category:not(.collapsed) .block-list { display: flex !important })
+            // Just toggle the class — no inline style manipulation needed.
             category.classList.toggle('collapsed');
-            console.log('[Strategy Builder] Subcategory toggled:', category.classList.contains('collapsed'));
+            // Sync chevron icon direction
+            const icon = categoryHeader.querySelector('i');
+            if (icon) {
+              if (category.classList.contains('collapsed')) {
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-right');
+              } else {
+                icon.classList.remove('bi-chevron-right');
+                icon.classList.add('bi-chevron-down');
+              }
+            }
           }
           return;
         }
         // Otherwise let sidebar-toggle.js handle category toggle
-        console.log('[Strategy Builder] Category header clicked - letting sidebar-toggle handle');
         return;
       }
 
@@ -2908,16 +2942,16 @@ function setupEventListeners() {
   // Validate button - shows validation panel with auto-close
   const btnValidate = document.getElementById('btnValidate');
   if (btnValidate) {
-    btnValidate.addEventListener('click', function (e) {
+    btnValidate.addEventListener('click', async function (e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('[Strategy Builder] Validate button clicked');
       try {
-        validateStrategy();
+        await validateStrategy();
         showValidationPanel();
       } catch (err) {
         console.error('[Strategy Builder] Validate error:', err);
-        alert(`Validate error: ${err.message}`);
+        showNotification(`Ошибка валидации: ${err.message}`, 'error');
       }
     });
     console.log('[Strategy Builder] Validate button listener attached');
@@ -2928,15 +2962,15 @@ function setupEventListeners() {
   // Generate Code button
   const btnGenerateCode = document.getElementById('btnGenerateCode');
   if (btnGenerateCode) {
-    btnGenerateCode.addEventListener('click', function (e) {
+    btnGenerateCode.addEventListener('click', async function (e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('[Strategy Builder] Generate Code button clicked');
       try {
-        generateCode();
+        await generateCode();
       } catch (err) {
         console.error('[Strategy Builder] Generate Code error:', err);
-        alert(`Generate Code error: ${err.message}`);
+        showNotification(`Ошибка генерации кода: ${err.message}`, 'error');
       }
     });
     console.log('[Strategy Builder] Generate Code button listener attached');
@@ -2955,7 +2989,7 @@ function setupEventListeners() {
         await saveStrategy();
       } catch (err) {
         console.error('[Strategy Builder] Save error:', err);
-        alert(`Save error: ${err.message}`);
+        showNotification(`Ошибка сохранения: ${err.message}`, 'error');
       }
     });
     console.log('[Strategy Builder] Save button listener attached');
@@ -2966,15 +3000,15 @@ function setupEventListeners() {
   // Backtest button
   const btnBacktest = document.getElementById('btnBacktest');
   if (btnBacktest) {
-    btnBacktest.addEventListener('click', function (e) {
+    btnBacktest.addEventListener('click', async function (e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('[Strategy Builder] Backtest button clicked');
       try {
-        runBacktest();
+        await runBacktest();
       } catch (err) {
         console.error('[Strategy Builder] Backtest error:', err);
-        alert(`Backtest error: ${err.message}`);
+        showNotification(`Ошибка запуска бэктеста: ${err.message}`, 'error');
       }
     });
     console.log('[Strategy Builder] Backtest button listener attached');
@@ -3286,9 +3320,10 @@ function onCanvasDrop(event) {
 
   if (blockId && blockType) {
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    console.log(`[Strategy Builder] Drop position: x=${x}, y=${y}`);
+    // BUG#3 FIX: convert screen drop position to logical space by dividing by zoom
+    const x = (event.clientX - rect.left) / zoom;
+    const y = (event.clientY - rect.top) / zoom;
+    console.log(`[Strategy Builder] Drop position (logical): x=${x}, y=${y}`);
     addBlockToCanvas(blockId, blockType, x, y);
   } else {
     console.warn('[Strategy Builder] Drop data missing');
@@ -3296,7 +3331,7 @@ function onCanvasDrop(event) {
 }
 
 function addBlockToCanvas(blockId, blockType, x = null, y = null) {
-  console.log(`[Strategy Builder] addBlockToCanvas called: blockId=${blockId}, blockType=${blockType}`);
+  // BUG#6 FIX: removed verbose console.log calls from this hot path
 
   // Find block definition
   let blockDef = null;
@@ -3311,11 +3346,9 @@ function addBlockToCanvas(blockId, blockType, x = null, y = null) {
     return;
   }
 
-  console.log('[Strategy Builder] Block definition found:', blockDef);
-
   // Create block
   const block = {
-    id: `block_${Date.now()}`,
+    id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     type: blockId,
     category: blockType,
     name: blockDef.name,
@@ -3326,10 +3359,8 @@ function addBlockToCanvas(blockId, blockType, x = null, y = null) {
     optimizationParams: {} // For optimization ranges
   };
 
-  console.log('[Strategy Builder] Created block:', block);
   pushUndo();
   strategyBlocks.push(block);
-  console.log(`[Strategy Builder] Total blocks: ${strategyBlocks.length}`);
 
   renderBlocks();
   selectBlock(block.id);
@@ -3337,7 +3368,6 @@ function addBlockToCanvas(blockId, blockType, x = null, y = null) {
   // Notify optimization panels about block changes
   dispatchBlocksChanged();
 
-  console.log('[Strategy Builder] Block added to canvas successfully');
   showNotification(`Блок "${blockDef.name}" добавлен`, 'success');
 }
 
@@ -3649,7 +3679,7 @@ function getDefaultParams(blockType) {
       enabled: false,
       bars_since_entry: 10,
       profit_only: false,
-      min_profit_percent: 0
+      min_profit_percent: 0.5
     },
     close_channel: {
       enabled: false,
@@ -4347,6 +4377,15 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
     // =============================================
     // CLOSE CONDITIONS (EXIT RULES)
     // =============================================
+    close_by_time: {
+      title: '=== CLOSE COND - CLOSE BY TIME SINCE ORDER ===',
+      fields: [
+        { key: 'enabled', label: 'Use Close By Time Since Order ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close position after N bars since entry' },
+        { key: 'bars_since_entry', label: 'Close order after XX bars:', type: 'number', min: 1, max: 1000, step: 1, optimizable: true, hasTooltip: true, tooltip: 'Number of bars after entry to force close' },
+        { key: 'profit_only', label: 'Close only with Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Only close by time if position is in profit' },
+        { key: 'min_profit_percent', label: 'Min Profit percent for Close. %%', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Minimum profit % required before closing by time' }
+      ]
+    },
     static_sltp: {
       title: 'STATIC SL/TP',
       fields: [
@@ -5238,7 +5277,7 @@ function renderMainStrategyNode(block, _ports) {
 }
 
 function renderBlocks() {
-  console.log(`[Strategy Builder] renderBlocks called, blocks count: ${strategyBlocks.length}`);
+  // BUG#6 FIX: removed console.log — this is called ~60fps during drag via RAF
   const container = document.getElementById('blocksContainer');
   if (!container) {
     console.error('[Strategy Builder] Blocks container not found!');
@@ -6128,8 +6167,8 @@ function insertPreset(presetId, x = 200, y = 200) {
     }
   });
 
+  // BUG#4 FIX: renderBlocks() calls renderConnections() internally — no double render
   renderBlocks();
-  renderConnections();
 
   showNotification(`Пресет "${preset.name}" вставлен`, 'success');
 }
@@ -6261,14 +6300,11 @@ function resetBlockToDefaults(blockId) {
 
   if (Object.keys(defaultParams).length > 0) {
     block.params = { ...defaultParams };
+    // renderBlocks calls renderConnections internally — re-checks direction mismatch
     renderBlocks();
-    renderConnections(); // Re-check direction mismatch after param reset
     // Refresh popup if open
     closeBlockParamsPopup();
     showBlockParamsPopup(blockId);
-    console.log('[Strategy Builder] Reset to defaults:', block.type, defaultParams);
-  } else {
-    console.log('[Strategy Builder] No default params for:', block.type);
   }
 }
 
@@ -6278,7 +6314,7 @@ function duplicateBlock(blockId) {
 
   const newBlock = {
     ...block,
-    id: `block_${Date.now()}`,
+    id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     x: block.x + 30,
     y: block.y + 30,
     params: { ...block.params }
@@ -6910,13 +6946,17 @@ function startDragBlock(event, blockId) {
   // Close popup when starting to drag
   closeBlockParamsPopup();
 
-  pushUndo();
+  // pushUndo is deferred to the first real movement (BUG#5 fix)
   isDragging = true;
+  let undoPushed = false;
   const block = document.getElementById(blockId);
-  const rect = block.getBoundingClientRect();
+  const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
+
+  // BUG#1 FIX: compute dragOffset in LOGICAL space (divide screen offset by zoom)
+  const blockData = strategyBlocks.find((b) => b.id === blockId);
   dragOffset = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    x: (event.clientX - containerRect.left) / zoom - (blockData ? blockData.x : 0),
+    y: (event.clientY - containerRect.top) / zoom - (blockData ? blockData.y : 0)
   };
 
   let rafPending = false;
@@ -6927,15 +6967,26 @@ function startDragBlock(event, blockId) {
     const container = document
       .getElementById('canvasContainer')
       .getBoundingClientRect();
-    const x = e.clientX - container.left - dragOffset.x;
-    const y = e.clientY - container.top - dragOffset.y;
+
+    // BUG#1 FIX: convert screen coords to logical by dividing by zoom
+    const x = (e.clientX - container.left) / zoom - dragOffset.x;
+    const y = (e.clientY - container.top) / zoom - dragOffset.y;
+
+    // BUG#5 FIX: push undo only on first real movement (> 3px)
+    if (!undoPushed && blockData) {
+      const dx = x - blockData.x;
+      const dy = y - blockData.y;
+      if (Math.hypot(dx, dy) > 3) {
+        pushUndo();
+        undoPushed = true;
+      }
+    }
 
     // Update DOM position immediately for responsiveness
     block.style.left = `${Math.max(0, x)}px`;
     block.style.top = `${Math.max(0, y)}px`;
 
     // Update state
-    const blockData = strategyBlocks.find((b) => b.id === blockId);
     if (blockData) {
       blockData.x = Math.max(0, x);
       blockData.y = Math.max(0, y);
@@ -6986,8 +7037,9 @@ function startMarqueeSelection(event) {
   const rect = container.getBoundingClientRect();
 
   marqueeStart = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    // BUG#2 FIX: convert screen offset to logical space by dividing by zoom
+    x: (event.clientX - rect.left) / zoom,
+    y: (event.clientY - rect.top) / zoom
   };
 
   // Create marquee element in blocksContainer (same coordinate system as blocks)
@@ -7006,8 +7058,9 @@ function startMarqueeSelection(event) {
   const onMouseMove = (e) => {
     if (!isMarqueeSelecting) return;
 
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    // BUG#2 FIX: convert screen coords to logical space by dividing by zoom
+    const currentX = (e.clientX - rect.left) / zoom;
+    const currentY = (e.clientY - rect.top) / zoom;
 
     const left = Math.min(marqueeStart.x, currentX);
     const top = Math.min(marqueeStart.y, currentY);
@@ -7563,7 +7616,7 @@ function tryAutoSnapConnection(droppedBlockId) {
     if (!exists) {
       pushUndo();
       connections.push({
-        id: `conn_${Date.now()}`,
+        id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         source: { blockId: source.blockId, portId: source.portId },
         target: { blockId: target.blockId, portId: target.portId },
         type: bestMatch.type
@@ -7666,7 +7719,7 @@ function completeConnection(endPortElement) {
   if (!exists) {
     pushUndo();
     connections.push({
-      id: `conn_${Date.now()}`,
+      id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       source,
       target,
       type: startType
@@ -7838,10 +7891,12 @@ function renderConnections() {
     }
 
     // Case 2: Source signal direction conflicts with target port
-    // e.g., divergence "long" output → entry_short (cross-wired)
-    if (sourcePortId === 'long' && isShortTarget) {
+    // e.g., divergence "long"/"bullish" output → entry_short (cross-wired)
+    const isLongSource = sourcePortId === 'long' || sourcePortId === 'bullish';
+    const isShortSource = sourcePortId === 'short' || sourcePortId === 'bearish';
+    if (isLongSource && isShortTarget) {
       isMismatch = true;
-    } else if (sourcePortId === 'short' && isLongTarget) {
+    } else if (isShortSource && isLongTarget) {
       isMismatch = true;
     }
 
@@ -7888,8 +7943,8 @@ function deleteConnection(connectionId) {
   if (index !== -1) {
     pushUndo();
     connections.splice(index, 1);
-    renderConnections();
-    renderBlocks(); // Update port states
+    // BUG#4 FIX: renderBlocks() already calls renderConnections() internally — no double render
+    renderBlocks(); // Update port states + connections
   }
 }
 
@@ -9188,24 +9243,19 @@ function loadTemplateData(templateId) {
     );
     if (!hasConfigConn) {
       connections.push({
-        id: `conn_sltp_${Date.now()}`,
+        id: `conn_sltp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         source: { blockId: exitBlock.id, portId: 'config' },
         target: { blockId: mainBlock.id, portId: 'sl_tp' },
         type: 'config'
       });
-      console.log(`[Strategy Builder] Auto-injected SL/TP connection: ${exitBlock.id} -> ${mainBlock.id}`);
     }
   }
 
-  console.log(`[Strategy Builder] Total connections: ${connections.length}`);
-
-  // Re-render
+  // Re-render — BUG#4 FIX: renderBlocks() calls renderConnections() internally
   renderBlocks();
-  renderConnections();
   selectedBlockId = null;
   renderBlockProperties();
 
-  console.log(`[Strategy Builder] Template "${templateId}" loaded successfully`);
   showNotification(`Шаблон "${templateId}" загружен`, 'success');
 }
 
@@ -9284,8 +9334,8 @@ function importTemplateFromFile(file) {
           }
         }
       });
+      // renderBlocks calls renderConnections internally
       renderBlocks();
-      renderConnections();
       dispatchBlocksChanged();
       closeTemplatesModal();
       showNotification(`Импортировано: ${blocks.length} блоков`, 'success');
@@ -9315,14 +9365,13 @@ function restoreStateSnapshot(snapshot) {
   }
   // Reset autosave payload so the restored state gets saved to localStorage
   lastAutoSavePayload = null;
-  renderBlocks();
-  renderConnections();
+  renderBlocks(); // renderBlocks calls renderConnections() internally — BUG#4 FIX: no extra call
   renderBlockProperties();
   dispatchBlocksChanged();
   // Re-validate if the validation panel is currently visible (BUG#11)
   const vp = document.querySelector('.validation-panel');
   if (vp && vp.classList.contains('visible')) {
-    validateStrategy();
+    validateStrategy().catch((err) => console.warn('[Strategy Builder] Re-validate error:', err));
   }
 }
 
@@ -9412,7 +9461,7 @@ function duplicateSelected() {
       pushUndo();
       const newBlock = {
         ...block,
-        id: `block_${Date.now()}`,
+        id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         x: block.x + 30,
         y: block.y + 30,
         isMain: false,
@@ -10020,7 +10069,7 @@ async function saveStrategy() {
   // Offline guard: fall back to localStorage draft instead of failing silently
   if (!navigator.onLine) {
     showNotification('Нет подключения к сети. Стратегия сохранена в черновик (localStorage).', 'warning');
-    autoSaveStrategy();
+    autoSaveStrategy().catch((err) => console.warn('[Strategy Builder] Offline autosave error:', err));
     return;
   }
 
@@ -10201,7 +10250,11 @@ function buildStrategyPayload() {
       _position_size_type: positionSizeType,
       _order_amount: positionSizeType === 'fixed_amount' ? positionSizeVal : undefined,
       _no_trade_days: noTradeDays.length ? noTradeDays : undefined,
-      _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100
+      _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100,
+      _slippage: parseFloat(document.getElementById('backtestSlippage')?.value || '0.05') / 100,
+      _pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value || '1', 10) || 1,
+      _start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
+      _end_date: document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10)
     },
     blocks: strategyBlocks.map(b => ({
       id: b.id,
@@ -10395,7 +10448,7 @@ async function loadStrategy(strategyId) {
     const backtestLeverage = document.getElementById('backtestLeverage');
     if (backtestSymbol) backtestSymbol.value = strategy.symbol || 'BTCUSDT';
     if (backtestCapital) backtestCapital.value = strategy.initial_capital || 10000;
-    const maxLeverage = 50;
+    const maxLeverage = 100; // Bug #2 fix: use 100 as default; actual max is loaded dynamically from exchange
     const lev = Math.min(maxLeverage, Math.max(1, strategy.leverage != null ? strategy.leverage : 10));
     const backtestLeverageRange = document.getElementById('backtestLeverageRange');
     if (backtestLeverage) backtestLeverage.value = lev;
@@ -10423,6 +10476,28 @@ async function loadStrategy(strategyId) {
     const backtestCommission = document.getElementById('backtestCommission');
     if (backtestCommission && strategy.parameters?._commission != null) {
       backtestCommission.value = (strategy.parameters._commission * 100).toFixed(2);
+    }
+    const backtestSlippage = document.getElementById('backtestSlippage');
+    if (backtestSlippage && strategy.parameters?._slippage != null) {
+      backtestSlippage.value = (strategy.parameters._slippage * 100).toFixed(2);
+    }
+    const backtestPyramiding = document.getElementById('backtestPyramiding');
+    if (backtestPyramiding && strategy.parameters?._pyramiding != null) {
+      backtestPyramiding.value = strategy.parameters._pyramiding;
+    }
+
+    // Bug #3 fix: restore saved dates; don't auto-overwrite with today on load
+    const backtestStartDateEl = document.getElementById('backtestStartDate');
+    const backtestEndDateEl = document.getElementById('backtestEndDate');
+    if (backtestStartDateEl) {
+      const savedStart = strategy.parameters?._start_date || strategy.start_date || '2025-01-01';
+      backtestStartDateEl.value = savedStart;
+    }
+    if (backtestEndDateEl) {
+      const today = new Date().toISOString().slice(0, 10);
+      const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
+      // If saved date is in the future, show today; otherwise use saved value
+      backtestEndDateEl.value = savedEnd > today ? today : savedEnd;
     }
 
     // Восстановить блоки и соединения
@@ -10499,9 +10574,8 @@ async function loadStrategy(strategyId) {
       tgt: `${c.target.blockId}:${c.target.portId}`
     })));
 
-    // Перерисовать canvas
+    // Перерисовать canvas (renderBlocks calls renderConnections internally)
     renderBlocks();
-    renderConnections();
 
     updateLastSaved(strategy.updated_at);
     showNotification('Стратегия успешно загружена!', 'success');
@@ -10800,6 +10874,22 @@ function extractSlTpFromBlocks() {
       if (params.take_profit_percent != null && result.take_profit == null) {
         result.take_profit = params.take_profit_percent / 100;
       }
+      // Breakeven — backend reads from DB blocks, but send explicitly for self-contained requests
+      if (params.activate_breakeven) {
+        result.breakeven_enabled = true;
+        const beActivation = params.breakeven_activation_percent ?? 0.5;
+        const beNewSl = params.new_breakeven_sl_percent ?? 0.1;
+        result.breakeven_activation_pct = beActivation / 100;
+        result.breakeven_offset = beNewSl / 100;
+      }
+      // Close only in profit
+      if (params.close_only_in_profit) {
+        result.close_only_in_profit = true;
+      }
+      // SL type (average_price or last_order)
+      if (params.sl_type) {
+        result.sl_type = params.sl_type;
+      }
     } else if (type === 'sl_percent' && result.stop_loss == null) {
       const sl = params.stop_loss_percent ?? params.percent;
       if (sl != null) result.stop_loss = sl / 100;
@@ -10822,9 +10912,15 @@ function buildBacktestRequest() {
     interval: interval,
     start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
     end_date: (() => {
-      const endVal = document.getElementById('backtestEndDate')?.value || '2030-01-01';
+      const endVal = document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10);
       const today = new Date().toISOString().slice(0, 10);
-      return endVal > today ? today : endVal;
+      if (endVal > today) {
+        // Bug #3 fix: warn user instead of silently clamping future date
+        showNotification(`End Date ${endVal} в будущем — бэктест запускается по сегодняшнюю дату (${today})`, 'info');
+        console.info(`[Backtest] End date ${endVal} is in the future, clamped to ${today}`);
+        return today;
+      }
+      return endVal;
     })(),
 
     // Market type: spot (TradingView parity) or linear (perpetual futures)
@@ -10837,20 +10933,30 @@ function buildBacktestRequest() {
     pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value) || 1,
 
     // Commission: read from UI as percentage (e.g. 0.07 = 0.07%), convert to decimal (0.0007)
+    // Bug #1 fix: allow 0% commission (useful for testing without fees)
     commission: (() => {
-      const rawVal = parseFloat(document.getElementById('backtestCommission')?.value || '0.07');
-      // Validate commission range: UI shows percentage (0.01–1.0%), convert to decimal
+      const rawVal = parseFloat(document.getElementById('backtestCommission')?.value ?? '0.07');
+      if (isNaN(rawVal) || rawVal < 0) {
+        console.warn(`[Backtest] Commission invalid value "${rawVal}". Using default 0.07%.`);
+        return 0.0007;
+      }
       if (rawVal > 1.0) {
         console.warn(`[Backtest] Commission ${rawVal}% is unusually high (max 1%). Clamping to 1%.`);
         return 0.01;
       }
-      if (rawVal < 0.001) {
-        console.warn(`[Backtest] Commission ${rawVal}% is suspiciously low. Did you enter decimal instead of %? Using 0.07%.`);
-        return 0.0007;
-      }
+      // 0% is a valid value — useful for zero-fee testing (e.g. spot or custom scenarios)
       return rawVal / 100;
     })(),
-    slippage: 0.0005,
+
+    // Slippage: read from UI as percentage, convert to decimal (0.05% → 0.0005)
+    // Bug #6 fix: expose slippage in Properties panel instead of hardcoding 0.0005
+    slippage: (() => {
+      const el = document.getElementById('backtestSlippage');
+      const rawSlip = el != null ? parseFloat(el.value) : 0.05;
+      if (isNaN(rawSlip) || rawSlip < 0) return 0.0005;
+      if (rawSlip > 5.0) return 0.05; // cap at 5%
+      return rawSlip / 100;
+    })(),
 
     // Position sizing from Properties (position_size as fraction 0–1 for percent mode)
     position_size_type: document.getElementById('backtestPositionSizeType')?.value || 'percent',
@@ -10985,6 +11091,29 @@ async function runBacktest() {
     showNotification('Выберите тикер в поле Symbol', 'warning');
     return;
   }
+
+  // Bug #4 fix: validate date range on frontend before sending — avoids cryptic HTTP 422
+  const DATA_START_DATE = '2025-01-01'; // Must match backend/config/database_policy.py
+  const startDateVal = document.getElementById('backtestStartDate')?.value || DATA_START_DATE;
+  const endDateVal = document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10);
+  if (startDateVal < DATA_START_DATE) {
+    showNotification(`Start Date не может быть раньше ${DATA_START_DATE} — данные в БД начинаются с этой даты.`, 'error');
+    return;
+  }
+  const msPerDay = 86400000;
+  const durationDays = (new Date(endDateVal) - new Date(startDateVal)) / msPerDay;
+  if (durationDays > 730) {
+    showNotification(`Диапазон дат ${Math.round(durationDays)} дней превышает максимум 730 дней (2 года). Сократите период.`, 'error');
+    return;
+  }
+  if (durationDays <= 0) {
+    showNotification('End Date должна быть позже Start Date.', 'error');
+    return;
+  }
+
+  // Bug #5 fix: sync graph to DB before backtest so backend reads up-to-date
+  // state (e.g. direction change that pruned connections, param edits not yet saved)
+  await autoSaveStrategy();
 
   // Собрать параметры бэктеста используя маппинг блоков
   const backtestParams = buildBacktestRequest();
@@ -11962,7 +12091,12 @@ function initCspCompliantListeners() {
 
   // My Strategies Modal buttons
   const myStrategiesBtn = document.getElementById('btnMyStrategies');
-  if (myStrategiesBtn) myStrategiesBtn.addEventListener('click', openMyStrategiesModal);
+  if (myStrategiesBtn) myStrategiesBtn.addEventListener('click', () => {
+    openMyStrategiesModal().catch((err) => {
+      console.error('[Strategy Builder] openMyStrategiesModal error:', err);
+      showNotification(`Ошибка открытия стратегий: ${err.message}`, 'error');
+    });
+  });
 
   const closeMyStrategiesBtn = document.getElementById('btnCloseMyStrategies');
   if (closeMyStrategiesBtn) closeMyStrategiesBtn.addEventListener('click', closeMyStrategiesModal);
@@ -12118,53 +12252,58 @@ function renderStrategiesList(strategies) {
  * Handle click events on strategy cards (open / clone / delete / checkbox)
  */
 async function handleStrategyCardAction(e) {
-  // Handle checkbox clicks
-  const checkbox = e.target.closest('[data-select-strategy]');
-  if (checkbox) {
-    e.stopPropagation();
-    const strategyId = checkbox.dataset.selectStrategy;
-    if (checkbox.checked) {
-      _selectedStrategyIds.add(strategyId);
-    } else {
-      _selectedStrategyIds.delete(strategyId);
-    }
-    // Toggle selected class on card
-    const card = checkbox.closest('.strategy-card');
-    if (card) card.classList.toggle('selected', checkbox.checked);
-    updateBatchDeleteUI();
-    return;
-  }
-
-  // Handle checkbox container clicks (prevent card open)
-  if (e.target.closest('.strategy-card-checkbox')) {
-    return;
-  }
-
-  const actionBtn = e.target.closest('[data-action]');
-  if (!actionBtn) {
-    // Click on the card itself — open
-    const card = e.target.closest('.strategy-card');
-    if (card) {
-      const id = card.dataset.strategyId;
-      if (id) {
-        closeMyStrategiesModal();
-        loadStrategy(id);
+  try {
+    // Handle checkbox clicks
+    const checkbox = e.target.closest('[data-select-strategy]');
+    if (checkbox) {
+      e.stopPropagation();
+      const strategyId = checkbox.dataset.selectStrategy;
+      if (checkbox.checked) {
+        _selectedStrategyIds.add(strategyId);
+      } else {
+        _selectedStrategyIds.delete(strategyId);
       }
+      // Toggle selected class on card
+      const card = checkbox.closest('.strategy-card');
+      if (card) card.classList.toggle('selected', checkbox.checked);
+      updateBatchDeleteUI();
+      return;
     }
-    return;
-  }
 
-  const action = actionBtn.dataset.action;
-  const id = actionBtn.dataset.id;
-  const name = actionBtn.dataset.name || 'Untitled';
+    // Handle checkbox container clicks (prevent card open)
+    if (e.target.closest('.strategy-card-checkbox')) {
+      return;
+    }
 
-  if (action === 'open') {
-    closeMyStrategiesModal();
-    loadStrategy(id);
-  } else if (action === 'clone') {
-    await cloneStrategy(id, name);
-  } else if (action === 'delete') {
-    await deleteStrategyById(id, name);
+    const actionBtn = e.target.closest('[data-action]');
+    if (!actionBtn) {
+      // Click on the card itself — open
+      const card = e.target.closest('.strategy-card');
+      if (card) {
+        const id = card.dataset.strategyId;
+        if (id) {
+          closeMyStrategiesModal();
+          await loadStrategy(id);
+        }
+      }
+      return;
+    }
+
+    const action = actionBtn.dataset.action;
+    const id = actionBtn.dataset.id;
+    const name = actionBtn.dataset.name || 'Untitled';
+
+    if (action === 'open') {
+      closeMyStrategiesModal();
+      await loadStrategy(id);
+    } else if (action === 'clone') {
+      await cloneStrategy(id, name);
+    } else if (action === 'delete') {
+      await deleteStrategyById(id, name);
+    }
+  } catch (err) {
+    console.error('[Strategy Builder] handleStrategyCardAction error:', err);
+    showNotification(`Ошибка: ${err.message}`, 'error');
   }
 }
 
