@@ -137,6 +137,10 @@ class BuilderWorkflowResult:
     generated_code: str = ""
     backtest_results: dict[str, Any] = field(default_factory=dict)
     iterations: list[dict[str, Any]] = field(default_factory=list)
+    # Shared audit dict populated by both _plan_blocks and _run_deliberation.
+    # Keys are additive — both can be present simultaneously:
+    #   "llm_plan"  → set by _plan_blocks  (blocks/connections counts, token usage)
+    #   "decision"  → set by _run_deliberation (agent consensus text + applied flag)
     deliberation: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
