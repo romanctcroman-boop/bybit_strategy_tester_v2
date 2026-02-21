@@ -1,6 +1,6 @@
 # Bybit Strategy Tester v2 - Copilot Instructions
 
-> **Last updated:** 2026-02-04  
+> **Last updated:** 2026-02-21  
 > **Stack:** Python 3.11-3.14, FastAPI, SQLAlchemy, SQLite, Pandas, NumPy, Bybit API v5  
 > **Purpose:** Backtesting system for Bybit trading strategies with TradingView metric parity
 
@@ -219,3 +219,40 @@ For maximum autonomy, add to VS Code `settings.json`:
 ```
 
 See `AGENTS.MD` section "VS Code Agent Mode Configuration" for full details.
+
+---
+
+## 🔒 CLAUDE.md — Mandatory Context for Risky Changes
+
+> **Full project map:** `CLAUDE.md` in repository root (15 sections, 780+ lines).
+> Copilot MUST read relevant sections before modifying core subsystems.
+
+### Before ANY change to these areas, read `CLAUDE.md` sections:
+
+| Area | Sections to read |
+| --- | --- |
+| `BacktestConfig`, engine, `MetricsCalculator` | §5 (Critical Constants), §7 (Cross-cutting Parameters), §15 (Refactor Checklist) |
+| Strategy Builder adapter, strategies | §3 (Architecture), §6 (Strategy Parameters), §15 |
+| Optimization, scoring | §7 (Key Optimization Metrics, Cross-cutting Parameters), §15 |
+| Risk management, position sizing | §7 (Global Parameters, MM Dependencies), §15 |
+| Frontend (strategy_builder.js, leverageManager.js) | §3 (Direction Defaults), §7 (Cross-cutting Parameters), §15 |
+
+### High-risk parameters — NEVER change without explicit plan
+
+These parameters are used in **3+ subsystems** (see `CLAUDE.md` §7 "Cross-cutting parameters" table):
+
+- `commission_value` / `commission_rate` (0.0007) — 12+ files, TradingView parity
+- `initial_capital` — engine, metrics, optimization, frontend
+- `position_size` — engine, routers, optimization, live trading (⚠️ unit mismatch: fraction vs percent)
+- `leverage` — engine, optimization, frontend, live trading (⚠️ default mismatch: 10 vs 1.0)
+- `pyramiding` — engine, engine_selector, optimization (⚠️ hardcoded to 1 in optimizer)
+- `direction` — API, engine, frontend (⚠️ default mismatch: "long" vs "both")
+- `strategy_params` — passes through all layers
+
+**Rule:** Before changing any parameter above → `grep -rn <param> backend/ frontend/` and update ALL locations.
+
+### Commission parity check (run before any commit touching commission)
+
+```bash
+grep -rn commission backend/ | grep -v 0.0007 | grep -v .pyc | grep -v __pycache__
+```
