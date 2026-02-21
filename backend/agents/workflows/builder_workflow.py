@@ -25,6 +25,7 @@ import json
 import re
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -191,9 +192,22 @@ class BuilderWorkflow:
         result = await workflow.run(config)
     """
 
-    def __init__(self) -> None:
-        """Initialize workflow."""
+    def __init__(self, on_stage_change: Callable[[BuilderStage], None] | None = None) -> None:
+        """Initialize workflow.
+
+        Args:
+            on_stage_change: Optional callback invoked synchronously whenever
+                ``self._result.status`` changes.  Used by the SSE endpoint to
+                push stage events without patching the dataclass class.
+        """
         self._result = BuilderWorkflowResult()
+        self._on_stage_change = on_stage_change
+
+    def _set_stage(self, stage: BuilderStage) -> None:
+        """Set ``self._result.status`` and fire the optional callback."""
+        self._result.status = stage
+        if self._on_stage_change is not None:
+            self._on_stage_change(stage)
 
     async def run(self, config: BuilderWorkflowConfig) -> BuilderWorkflowResult:
         """
@@ -214,7 +228,7 @@ class BuilderWorkflow:
 
         try:
             # Stage 1: Get block library for validation
-            self._result.status = BuilderStage.PLANNING
+            self._set_stage(BuilderStage.PLANNING)
             logger.info(f"[BuilderWorkflow] Planning: {config.name}")
             library = await builder_get_block_library()
             if isinstance(library, dict) and "error" in library:
@@ -223,13 +237,14 @@ class BuilderWorkflow:
             else:
                 self._result.block_library = library
 
-            # Optional AI Deliberation for planning phase
-            if config.enable_deliberation:
-                await self._run_deliberation(config)
-
+            # P3 fix: plan blocks BEFORE deliberation so deliberation sees the plan
             # LLM block planning: if no blocks provided, ask DeepSeek to design them
             if not config.existing_strategy_id and not config.blocks:
                 await self._plan_blocks(config)
+
+            # Optional AI Deliberation for planning phase
+            if config.enable_deliberation:
+                await self._run_deliberation(config)
 
             # Check mode: existing strategy (optimize) vs new strategy (build)
             if config.existing_strategy_id:
@@ -238,7 +253,7 @@ class BuilderWorkflow:
                 logger.info(f"[BuilderWorkflow] Optimize mode — using existing strategy: {config.existing_strategy_id}")
 
                 # Fetch existing strategy state for iteration context
-                self._result.status = BuilderStage.CREATING
+                self._set_stage(BuilderStage.CREATING)
                 try:
                     from backend.agents.mcp.tools.strategy_builder import (
                         builder_get_strategy,
@@ -267,7 +282,7 @@ class BuilderWorkflow:
                 await self._run_build_stages(config)
 
             # Stage 5: Validate
-            self._result.status = BuilderStage.VALIDATING
+            self._set_stage(BuilderStage.VALIDATING)
             logger.info("[BuilderWorkflow] Validating strategy...")
             validation = await builder_validate_strategy(self._result.strategy_id)
             self._result.validation = validation
@@ -278,14 +293,14 @@ class BuilderWorkflow:
                 # Continue anyway — validation may be advisory
 
             # Stage 6: Generate code
-            self._result.status = BuilderStage.GENERATING_CODE
+            self._set_stage(BuilderStage.GENERATING_CODE)
             logger.info("[BuilderWorkflow] Generating code...")
             code_result = await builder_generate_code(self._result.strategy_id)
             if isinstance(code_result, dict) and "error" not in code_result:
                 self._result.generated_code = code_result.get("code", "")
 
             # Stage 7: Backtest
-            self._result.status = BuilderStage.BACKTESTING
+            self._set_stage(BuilderStage.BACKTESTING)
             logger.info("[BuilderWorkflow] Running backtest...")
             backtest = await builder_run_backtest(
                 strategy_id=self._result.strategy_id,
@@ -304,7 +319,7 @@ class BuilderWorkflow:
 
             # Stage 8: Evaluate + Iterative optimization loop
             for iteration in range(1, config.max_iterations + 1):
-                self._result.status = BuilderStage.EVALUATING
+                self._set_stage(BuilderStage.EVALUATING)
                 # Backtest response uses "results" key (from run_backtest_from_builder endpoint)
                 # but also support "metrics" key for compatibility
                 metrics = {}
@@ -347,7 +362,7 @@ class BuilderWorkflow:
                     break
 
                 # --- Iterative parameter adjustment ---
-                self._result.status = BuilderStage.ITERATING
+                self._set_stage(BuilderStage.ITERATING)
                 adjustments = await self._suggest_adjustments(
                     config.blocks, self._result.blocks_added, iteration, metrics
                 )
@@ -371,13 +386,13 @@ class BuilderWorkflow:
                         )
 
                 # Re-generate code after adjustments
-                self._result.status = BuilderStage.GENERATING_CODE
+                self._set_stage(BuilderStage.GENERATING_CODE)
                 code_result = await builder_generate_code(self._result.strategy_id)
                 if isinstance(code_result, dict) and "error" not in code_result:
                     self._result.generated_code = code_result.get("code", "")
 
                 # Re-run backtest with adjusted parameters
-                self._result.status = BuilderStage.BACKTESTING
+                self._set_stage(BuilderStage.BACKTESTING)
                 logger.info(f"[BuilderWorkflow] Re-running backtest (iteration {iteration + 1})...")
                 backtest = await builder_run_backtest(
                     strategy_id=self._result.strategy_id,
@@ -395,10 +410,10 @@ class BuilderWorkflow:
                 self._result.backtest_results = backtest
 
             # Completed
-            self._result.status = BuilderStage.COMPLETED
+            self._set_stage(BuilderStage.COMPLETED)
 
         except Exception as e:
-            self._result.status = BuilderStage.FAILED
+            self._set_stage(BuilderStage.FAILED)
             self._result.errors.append(str(e))
             logger.error(f"[BuilderWorkflow] Failed: {e}")
 
@@ -600,7 +615,7 @@ Example for a simple RSI mean-reversion:
         when ``config.existing_strategy_id`` is set.
         """
         # Stage 2: Create strategy
-        self._result.status = BuilderStage.CREATING
+        self._set_stage(BuilderStage.CREATING)
         logger.info(f"[BuilderWorkflow] Creating strategy: {config.name}")
         strategy = await builder_create_strategy(
             name=config.name,
@@ -617,7 +632,7 @@ Example for a simple RSI mean-reversion:
         logger.info(f"[BuilderWorkflow] Strategy created: {self._result.strategy_id}")
 
         # Stage 3: Add blocks
-        self._result.status = BuilderStage.ADDING_BLOCKS
+        self._set_stage(BuilderStage.ADDING_BLOCKS)
         block_id_map: dict[str, str] = {}
 
         # Layout blocks in a grid: indicators left, conditions center, actions right
@@ -766,7 +781,7 @@ Example for a simple RSI mean-reversion:
         logger.info(f"[BuilderWorkflow] Added {len(self._result.blocks_added)} blocks (incl. price + main_strategy)")
 
         # Stage 4: Connect blocks
-        self._result.status = BuilderStage.CONNECTING
+        self._set_stage(BuilderStage.CONNECTING)
 
         # First, apply user-defined connections
         for conn_def in config.connections:

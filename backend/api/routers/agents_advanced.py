@@ -10,6 +10,7 @@ Extended endpoints for the AI Agent System:
 """
 
 import asyncio
+import contextlib
 import functools
 import json
 import logging
@@ -1013,6 +1014,7 @@ async def run_builder_task(request: BuilderTaskRequest):
 # SSE helper
 # ---------------------------------------------------------------------------
 
+
 def _sse_event(event: str, data: Any) -> str:
     """Format a single Server-Sent Events frame."""
     payload = json.dumps(data, ensure_ascii=False)
@@ -1071,17 +1073,12 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
 
     # Queue for inter-task communication
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-    workflow = BuilderWorkflow()
 
-    # Intercept status changes via property monkey-patch on the result object
-    _orig_setattr = workflow._result.__class__.__setattr__
+    # P1 fix: callback on the instance — no class-level monkey-patch, safe for concurrent requests
+    def _stage_cb(stage: BuilderStage) -> None:
+        queue.put_nowait({"type": "stage", "stage": stage.value, "label": _stage_labels.get(stage, stage.value)})
 
-    def _intercept(obj: Any, name: str, value: Any) -> None:
-        _orig_setattr(obj, name, value)
-        if name == "status" and isinstance(value, BuilderStage):
-            queue.put_nowait({"type": "stage", "stage": value.value, "label": _stage_labels.get(value, value.value)})
-
-    workflow._result.__class__.__setattr__ = _intercept  # type: ignore[method-assign]
+    workflow = BuilderWorkflow(on_stage_change=_stage_cb)
 
     # Run workflow in background task
     async def _run() -> None:
@@ -1108,10 +1105,13 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
                 yield _sse_event("stage", {"stage": msg["stage"], "label": msg["label"]})
 
             elif msg["type"] == "done":
-                yield _sse_event("result", {
-                    "success": msg["result"].get("status") == "completed",
-                    "workflow": msg["result"],
-                })
+                yield _sse_event(
+                    "result",
+                    {
+                        "success": msg["result"].get("status") == "completed",
+                        "workflow": msg["result"],
+                    },
+                )
                 break
 
             elif msg["type"] == "error":
@@ -1119,9 +1119,10 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
                 break
 
     finally:
-        # Restore original __setattr__ and cancel task if still running
-        workflow._result.__class__.__setattr__ = _orig_setattr  # type: ignore[method-assign]
+        # P2 fix: await task cancellation instead of fire-and-forget
         task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.shield(asyncio.gather(task, return_exceptions=True))
 
 
 @router.post("/builder/task/stream")
