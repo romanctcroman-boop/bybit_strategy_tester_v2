@@ -150,9 +150,7 @@ class MLSignalConfig:
 class V23IntegrationConfig:
     """Combined configuration for all v2.3 integrations."""
 
-    order_book: OrderBookIntegrationConfig = field(
-        default_factory=OrderBookIntegrationConfig
-    )
+    order_book: OrderBookIntegrationConfig = field(default_factory=OrderBookIntegrationConfig)
     gpu: GPUIntegrationConfig = field(default_factory=GPUIntegrationConfig)
     ml_signals: MLSignalConfig = field(default_factory=MLSignalConfig)
 
@@ -358,10 +356,10 @@ class UniversalMathEngineV23:
             self.depth_analyzer = MarketDepthAnalyzer()
             logger.info("Order Book integration enabled")
         else:
-            self.order_book_sim = None
-            self.market_impact_calc = None
-            self.order_flow_analyzer = None
-            self.depth_analyzer = None
+            self.order_book_sim = None  # type: ignore[assignment]
+            self.market_impact_calc = None  # type: ignore[assignment]
+            self.order_flow_analyzer = None  # type: ignore[assignment]
+            self.depth_analyzer = None  # type: ignore[assignment]
 
         # GPU Acceleration
         if self.v23_config.gpu.enabled:
@@ -374,8 +372,8 @@ class UniversalMathEngineV23:
             self.vectorized_indicators = VectorizedIndicators(self.gpu_backend)
             logger.info(f"GPU acceleration enabled: {self.gpu_backend.backend_type}")
         else:
-            self.gpu_backend = None
-            self.vectorized_indicators = None
+            self.gpu_backend = None  # type: ignore[assignment]
+            self.vectorized_indicators = None  # type: ignore[assignment]
 
         # ML Signals
         if self.v23_config.ml_signals.enabled:
@@ -389,17 +387,17 @@ class UniversalMathEngineV23:
             self.feature_engine = FeatureEngine(feature_config)
 
             if self.v23_config.ml_signals.use_adaptive:
-                adaptive_config = AdaptiveConfig(
-                    lookback=self.v23_config.ml_signals.adaptive_lookback
+                adaptive_config = AdaptiveConfig(lookback_window=self.v23_config.ml_signals.adaptive_lookback)
+                self.ml_signal_generator = AdaptiveSignalGenerator(  # type: ignore[call-arg]
+                    self.feature_engine, adaptive_config  # type: ignore[arg-type]
                 )
-                self.ml_signal_generator = AdaptiveSignalGenerator(adaptive_config)
             else:
-                self.ml_signal_generator = None
+                self.ml_signal_generator = None  # type: ignore[assignment]
 
             logger.info("ML Signal integration enabled")
         else:
-            self.feature_engine = None
-            self.ml_signal_generator = None
+            self.feature_engine = None  # type: ignore[assignment]
+            self.ml_signal_generator = None  # type: ignore[assignment]
 
     def run(
         self,
@@ -459,24 +457,10 @@ class UniversalMathEngineV23:
 
             # Extract OHLCV
             close = candles["close"].values.astype(np.float64)
-            high = (
-                candles["high"].values.astype(np.float64)
-                if "high" in candles
-                else close
-            )
-            low = (
-                candles["low"].values.astype(np.float64) if "low" in candles else close
-            )
-            open_prices = (
-                candles["open"].values.astype(np.float64)
-                if "open" in candles
-                else close
-            )
-            volume = (
-                candles["volume"].values.astype(np.float64)
-                if "volume" in candles
-                else np.ones(n_bars)
-            )
+            high = candles["high"].values.astype(np.float64) if "high" in candles else close
+            low = candles["low"].values.astype(np.float64) if "low" in candles else close
+            open_prices = candles["open"].values.astype(np.float64) if "open" in candles else close
+            volume = candles["volume"].values.astype(np.float64) if "volume" in candles else np.ones(n_bars)
 
             # Get timestamps
             if hasattr(candles.index, "to_pydatetime"):
@@ -496,9 +480,7 @@ class UniversalMathEngineV23:
                 )
             else:
                 # Standard signal generation
-                signal_output = self.signal_generator.generate(
-                    candles, strategy_type, strategy_params, direction
-                )
+                signal_output = self.signal_generator.generate(candles, strategy_type, strategy_params, direction)
 
             long_entries = signal_output.long_entries
             long_exits = signal_output.long_exits
@@ -513,9 +495,7 @@ class UniversalMathEngineV23:
             # =================================================================
             if self.v23_config.ml_signals.enabled:
                 t_ml_start = time.time()
-                ml_result = self._enhance_signals_ml(
-                    candles, long_entries, short_entries, direction
-                )
+                ml_result = self._enhance_signals_ml(candles, long_entries, short_entries, direction)
                 if ml_result is not None:
                     long_entries, short_entries, ml_features, ml_predictions = ml_result
                     output.ml_features = ml_features
@@ -527,9 +507,7 @@ class UniversalMathEngineV23:
             # =================================================================
             if filter_config is not None:
                 t_filter_start = time.time()
-                filter_output = self.filter_engine.apply_filters(
-                    candles, long_entries, short_entries, filter_config
-                )
+                filter_output = self.filter_engine.apply_filters(candles, long_entries, short_entries, filter_config)
                 long_entries = filter_output.long_entries
                 short_entries = filter_output.short_entries
                 output.filter_stats = filter_output.filter_stats
@@ -591,13 +569,11 @@ class UniversalMathEngineV23:
                     self.order_book_sim.update(
                         new_mid_price=close[i],
                         timestamp=i,
-                        volatility=np.std(close[max(0, i - 20) : i + 1]) / close[i]
-                        if i > 20
-                        else 0.01,
+                        volatility=np.std(close[max(0, i - 20) : i + 1]) / close[i] if i > 20 else 0.01,
                     )
 
                 # Check if can trade
-                can_trade, reason = self.risk_manager.can_trade(i, bar_time)
+                can_trade, _reason = self.risk_manager.can_trade(i, bar_time)
 
                 # Process existing trades
                 closed_trades = self.trade_executor.process_bar(
@@ -633,44 +609,28 @@ class UniversalMathEngineV23:
                     market_impact_result = None
 
                     # Calculate order book slippage and market impact
-                    if (
-                        self.v23_config.order_book.enabled
-                        and self.order_book_sim is not None
-                    ):
+                    if self.v23_config.order_book.enabled and self.order_book_sim is not None:
                         # Estimate order size for slippage calculation
-                        estimated_size = (
-                            current_capital * position_size / close[i] * leverage
-                        )
+                        estimated_size = current_capital * position_size / close[i] * leverage
 
                         # Get order book slippage
                         if self.v23_config.order_book.use_orderbook_slippage:
                             snapshot = self.order_book_sim.get_snapshot()
                             if snapshot:
-                                ob_slippage = self._calculate_orderbook_slippage(
-                                    snapshot, estimated_size, close[i]
-                                )
+                                ob_slippage = self._calculate_orderbook_slippage(snapshot, estimated_size, close[i])
                                 entry_slippage = max(slippage, ob_slippage)
                                 orderbook_slippage_history.append(ob_slippage)
 
                         # Calculate market impact
-                        if (
-                            self.v23_config.order_book.apply_market_impact
-                            and self.market_impact_calc
-                        ):
+                        if self.v23_config.order_book.apply_market_impact and self.market_impact_calc:
                             avg_volume = np.mean(volume[max(0, i - 20) : i + 1])
-                            volatility = (
-                                np.std(close[max(0, i - 20) : i + 1]) / close[i]
-                                if i > 20
-                                else 0.01
-                            )
-                            market_impact_result = (
-                                self.market_impact_calc.calculate_impact(
-                                    order_size=estimated_size,
-                                    average_volume=avg_volume,
-                                    current_price=close[i],
-                                    volatility=volatility,
-                                    is_buy=long_entries[i],
-                                )
+                            volatility = np.std(close[max(0, i - 20) : i + 1]) / close[i] if i > 20 else 0.01
+                            market_impact_result = self.market_impact_calc.calculate_impact(
+                                order_size=estimated_size,
+                                average_volume=float(avg_volume),
+                                current_price=close[i],
+                                volatility=volatility,
+                                is_buy=long_entries[i],
                             )
                             total_market_impact += market_impact_result.total_impact
                             market_impact_history.append(market_impact_result)
@@ -681,18 +641,14 @@ class UniversalMathEngineV23:
                             current_capital,
                             close[i],
                             "long",
-                            self.trade_executor.atr_values[i]
-                            if self.trade_executor.atr_values is not None
-                            else 0,
+                            self.trade_executor.atr_values[i] if self.trade_executor.atr_values is not None else 0,
                         )
                         if size > 0:
                             # Apply market impact to entry price
                             entry_price = close[i] * (1 + entry_slippage)
                             if market_impact_result:
                                 entry_price *= 1 + market_impact_result.total_impact
-                                total_slippage_cost += (
-                                    (entry_price - close[i]) * size * leverage
-                                )
+                                total_slippage_cost += (entry_price - close[i]) * size * leverage
 
                             self.trade_executor.open_trade(
                                 bar_index=i,
@@ -711,18 +667,14 @@ class UniversalMathEngineV23:
                             current_capital,
                             close[i],
                             "short",
-                            self.trade_executor.atr_values[i]
-                            if self.trade_executor.atr_values is not None
-                            else 0,
+                            self.trade_executor.atr_values[i] if self.trade_executor.atr_values is not None else 0,
                         )
                         if size > 0:
                             # Apply market impact to entry price
                             entry_price = close[i] * (1 - entry_slippage)
                             if market_impact_result:
                                 entry_price *= 1 - market_impact_result.total_impact
-                                total_slippage_cost += (
-                                    (close[i] - entry_price) * size * leverage
-                                )
+                                total_slippage_cost += (close[i] - entry_price) * size * leverage
 
                             self.trade_executor.open_trade(
                                 bar_index=i,
@@ -818,10 +770,7 @@ class UniversalMathEngineV23:
 
         # Convert input to GPU array if needed
         xp = self.gpu_backend.xp  # NumPy or CuPy
-        if xp.__name__ == "cupy":
-            close_gpu = xp.asarray(close)
-        else:
-            close_gpu = close
+        close_gpu = xp.asarray(close) if xp.__name__ == "cupy" else close  # noqa: cSpell
 
         if strategy_type == "rsi":
             period = strategy_params.get("period", 14)
@@ -851,13 +800,9 @@ class UniversalMathEngineV23:
 
             # Entry signals
             if direction in ["long", "both"]:
-                long_entries[1:] = (macd_line[:-1] <= signal_line[:-1]) & (
-                    macd_line[1:] > signal_line[1:]
-                )
+                long_entries[1:] = (macd_line[:-1] <= signal_line[:-1]) & (macd_line[1:] > signal_line[1:])
             if direction in ["short", "both"]:
-                short_entries[1:] = (macd_line[:-1] >= signal_line[:-1]) & (
-                    macd_line[1:] < signal_line[1:]
-                )
+                short_entries[1:] = (macd_line[:-1] >= signal_line[:-1]) & (macd_line[1:] < signal_line[1:])
 
             # Exit signals
             long_exits[1:] = macd_line[1:] < signal_line[1:]
@@ -884,18 +829,12 @@ class UniversalMathEngineV23:
 
         else:
             # Fallback to standard signal generator
-            logger.warning(
-                f"Strategy {strategy_type} not GPU-optimized, using standard"
-            )
+            logger.warning(f"Strategy {strategy_type} not GPU-optimized, using standard")
             # Create dummy DataFrame for standard generator
             import pandas as pd
 
-            df = pd.DataFrame(
-                {"close": close, "high": high, "low": low, "volume": volume}
-            )
-            return self.signal_generator.generate(
-                df, strategy_type, strategy_params, direction
-            )
+            df = pd.DataFrame({"close": close, "high": high, "low": low, "volume": volume})
+            return self.signal_generator.generate(df, strategy_type, strategy_params, direction)
 
         return SignalOutput(
             long_entries=long_entries,
@@ -923,9 +862,7 @@ class UniversalMathEngineV23:
                 "high": candles["high"].values,
                 "low": candles["low"].values,
                 "close": candles["close"].values,
-                "volume": candles["volume"].values
-                if "volume" in candles
-                else np.ones(len(candles)),
+                "volume": candles["volume"].values if "volume" in candles else np.ones(len(candles)),
             }
             features = self.feature_engine.generate_features(ohlcv)
 
@@ -937,7 +874,7 @@ class UniversalMathEngineV23:
             if "rsi_14" in features:
                 rsi = features["rsi_14"]
                 # High confidence for extreme RSI
-                momentum_conf = np.abs(rsi - 50) / 50
+                momentum_conf = np.abs(rsi - 50) / 50  # type: ignore[assignment]
 
             # Filter signals by confidence threshold
             confidence_threshold = 0.3
@@ -950,9 +887,7 @@ class UniversalMathEngineV23:
             logger.warning(f"ML signal enhancement failed: {e}")
             return None
 
-    def _calculate_orderbook_slippage(
-        self, snapshot, size: float, current_price: float
-    ) -> float:
+    def _calculate_orderbook_slippage(self, snapshot, size: float, current_price: float) -> float:
         """Calculate slippage from order book depth."""
         if not snapshot.asks:
             return 0.0
@@ -968,11 +903,7 @@ class UniversalMathEngineV23:
             remaining_size -= fill_size
 
         if size > 0:
-            avg_price = (
-                total_cost / (size - remaining_size)
-                if remaining_size < size
-                else current_price
-            )
+            avg_price = total_cost / (size - remaining_size) if remaining_size < size else current_price
             slippage = (avg_price - current_price) / current_price
             return max(0, slippage)
         return 0.0
@@ -1007,11 +938,7 @@ class UniversalMathEngineV23:
         metrics.total_trades = len(trades)
         metrics.winning_trades = len(wins)
         metrics.losing_trades = len(losses)
-        metrics.win_rate = (
-            metrics.winning_trades / metrics.total_trades
-            if metrics.total_trades > 0
-            else 0.0
-        )
+        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0.0
 
         metrics.avg_win = float(np.mean(wins)) if len(wins) > 0 else 0.0
         metrics.avg_loss = float(np.mean(losses)) if len(losses) > 0 else 0.0
@@ -1024,10 +951,7 @@ class UniversalMathEngineV23:
             metrics.profit_factor = float("inf") if metrics.gross_profit > 0 else 0.0
 
         # Expectancy
-        metrics.expectancy = (
-            metrics.win_rate * metrics.avg_win
-            + (1 - metrics.win_rate) * metrics.avg_loss
-        )
+        metrics.expectancy = metrics.win_rate * metrics.avg_win + (1 - metrics.win_rate) * metrics.avg_loss
 
         # Drawdown
         peak = np.maximum.accumulate(equity)
@@ -1037,16 +961,12 @@ class UniversalMathEngineV23:
         # Sharpe ratio
         returns = np.diff(equity) / equity[:-1]
         if len(returns) > 1 and np.std(returns) > 0:
-            metrics.sharpe_ratio = float(
-                np.mean(returns) / np.std(returns) * np.sqrt(252)
-            )
+            metrics.sharpe_ratio = float(np.mean(returns) / np.std(returns) * np.sqrt(252))
 
         # Sortino ratio
         negative_returns = returns[returns < 0]
         if len(negative_returns) > 0 and np.std(negative_returns) > 0:
-            metrics.sortino_ratio = float(
-                np.mean(returns) / np.std(negative_returns) * np.sqrt(252)
-            )
+            metrics.sortino_ratio = float(np.mean(returns) / np.std(negative_returns) * np.sqrt(252))
 
         # Calmar ratio
         if metrics.max_drawdown > 0:
@@ -1076,9 +996,7 @@ class UniversalMathEngineV23:
         metrics.total_slippage_cost = total_slippage_cost
 
         if orderbook_slippage_history:
-            metrics.avg_slippage_from_orderbook = float(
-                np.mean(orderbook_slippage_history)
-            )
+            metrics.avg_slippage_from_orderbook = float(np.mean(orderbook_slippage_history))
 
         return metrics
 
@@ -1115,7 +1033,7 @@ class BatchBacktesterV23:
         if CUPY_AVAILABLE or OPENCL_AVAILABLE:
             self.gpu_backend = GPUBackend(self.gpu_config)
         else:
-            self.gpu_backend = None
+            self.gpu_backend = None  # type: ignore[assignment]
             logger.warning("No GPU backend available, using CPU parallelization")
 
     def run_batch(
@@ -1156,14 +1074,14 @@ class BatchBacktesterV23:
 
 # Try importing CuPy
 try:
-    import cupy as cp
+    import cupy as cp  # noqa: F401
 
     CUPY_AVAILABLE = True
 except ImportError:
     CUPY_AVAILABLE = False
 
 try:
-    import pyopencl as cl
+    import pyopencl as cl  # noqa: F401
 
     OPENCL_AVAILABLE = True
 except ImportError:

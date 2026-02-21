@@ -916,7 +916,7 @@ class EngineComparator:
 
             drift = self._calculate_drift(reference_result.metrics, result.metrics)
 
-            comparison["comparisons"].append(  # type: ignore[union-attr]
+            comparison["comparisons"].append(  # type: ignore[union-attr, index]
                 {
                     "engine": engine.name,
                     "metrics": result.metrics.to_dict(),
@@ -990,7 +990,7 @@ def get_engine(engine_type: str = "fallback", pyramiding: int = 1) -> BaseBackte
     if engine_type not in engines:
         raise ValueError(f"Unknown engine type: {engine_type}. Available: {list(engines.keys())}")
 
-    return engines[engine_type]()
+    return engines[engine_type]()  # type: ignore[abstract]
 
 
 def get_engine_for_config(config: BacktestInput) -> BaseBacktestEngine:
