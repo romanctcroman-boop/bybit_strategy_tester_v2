@@ -2066,9 +2066,9 @@ Rules:
 
         Fetches the current strategy graph and OHLCV data, builds the
         ``custom_ranges`` list expected by ``generate_builder_param_combinations``,
-        then runs either a grid search (≤ 500 combos) or Optuna Bayesian search
-        (> 500 combos) via the existing ``run_builder_grid_search`` /
-        ``run_builder_optuna_search`` helpers.
+        then runs either a grid search (≤ 200 combos) or Optuna Bayesian search
+        (> 200 combos, capped at 50 trials, 2-minute timeout) via the existing
+        ``run_builder_grid_search`` / ``run_builder_optuna_search`` helpers.
 
         Args:
             config: Current workflow config (symbol, timeframe, dates, capital…).
@@ -2138,7 +2138,29 @@ Rules:
 
         # ── Extract all optimizable params (needed by _merge_ranges) ─────────
         all_params = extract_optimizable_params(strategy_graph)
-        active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+        # If extract found nothing (e.g. non-standard block types), build
+        # minimal param specs directly from the agent-supplied custom_ranges so
+        # the sweep can still run.
+        if all_params:
+            active_specs = _merge_ranges(all_params, custom_ranges)
+        else:
+            logger.info("[BuilderWorkflow] extract_optimizable_params returned empty — building specs from agent ranges directly")
+            active_specs = [
+                {
+                    "block_id": cr["param_path"].split(".")[0],
+                    "block_type": "",
+                    "block_name": cr["param_path"].split(".")[0],
+                    "param_key": cr["param_path"].split(".", 1)[1] if "." in cr["param_path"] else cr["param_path"],
+                    "param_path": cr["param_path"],
+                    "type": cr.get("type", "int"),
+                    "low": cr["low"],
+                    "high": cr["high"],
+                    "step": cr.get("step", 1),
+                    "default": cr["low"],
+                    "current_value": cr["low"],
+                }
+                for cr in custom_ranges
+            ]
 
         if not active_specs:
             logger.warning("[BuilderWorkflow] No active param specs after merge — skipping optimizer sweep")
@@ -2183,25 +2205,34 @@ Rules:
             "optimize_metric": "sharpe_ratio",
         }
 
-        # ── Choose method ─────────────────────────────────────────────────────
-        if total_combos > 500:
+        # ── Choose method based on realistic trial count ─────────────────────
+        # Hard-cap trials to keep each sweep within a few minutes.
+        MAX_GRID_COMBOS = 200   # above this → Bayesian is more efficient
+        MAX_BAYESIAN_TRIALS = 50  # fast enough for mid-workflow use
+        MAX_SWEEP_SECONDS = 120   # 2-minute timeout per sweep
+
+        if total_combos > MAX_GRID_COMBOS:
             method = "bayesian"
-            n_trials = min(200, total_combos)
-            logger.info(f"[BuilderWorkflow] {total_combos} combos → Bayesian sweep (n={n_trials})")
+            n_trials = MAX_BAYESIAN_TRIALS
+            logger.info(
+                f"[BuilderWorkflow] {total_combos} theoretical combos → "
+                f"Bayesian sweep (n_trials={n_trials}, timeout={MAX_SWEEP_SECONDS}s)"
+            )
         else:
             method = "grid"
             n_trials = total_combos
-            logger.info(f"[BuilderWorkflow] Grid sweep: {total_combos} combinations")
+            logger.info(f"[BuilderWorkflow] Grid sweep: {total_combos} combinations, timeout={MAX_SWEEP_SECONDS}s")
 
         param_list_str = ", ".join(
             f"{cr['param_path']}: [{cr['low']}..{cr['high']} step {cr['step']}]" for cr in custom_ranges
         )
+        actual_label = f"{n_trials} trials" if method == "bayesian" else f"{total_combos} combos"
         self._emit_agent_log(
             agent="system",
             role="optimizer",
-            prompt=f"Optimizer sweep: {method}, {total_combos} combinations",
+            prompt=f"Optimizer sweep: {method}, {actual_label}",
             response=f"Parameters: {param_list_str}",
-            title=f"🎯 Optimizer sweep — {method} ({total_combos} combos)",
+            title=f"🎯 Optimizer sweep — {method} ({actual_label})",
         )
 
         # ── Run the optimizer ─────────────────────────────────────────────────
@@ -2216,7 +2247,7 @@ Rules:
                     optimize_metric="sharpe_ratio",
                     n_trials=n_trials,
                     top_n=5,
-                    timeout_seconds=300,
+                    timeout_seconds=MAX_SWEEP_SECONDS,
                 )
             else:
                 param_combinations, _ = generate_builder_param_combinations(
@@ -2233,7 +2264,7 @@ Rules:
                     config_params=config_params,
                     optimize_metric="sharpe_ratio",
                     max_results=5,
-                    timeout_seconds=300,
+                    timeout_seconds=MAX_SWEEP_SECONDS,
                 )
 
             if result and result.get("best_params"):
