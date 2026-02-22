@@ -9,7 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Audit round 2 — remaining 8 ❌ + 4 ⚠️ items fixed (2026-02-22, commit `3134e2b45`):**
+- **Chart Audit — 6 chart bugs fixed + 2 follow-up fixes (2026-02-22, commits `5f39bfce6`, `HEAD`):**
+
+    **`frontend/js/pages/backtest_results.js` + `frontend/backtest-results.html`:**
+
+    - **Benchmarking chart (CRITICAL):** `buy_hold_return` is a USD absolute value, but the chart Y-axis treated it as `%` → showed e.g. `−2770%` instead of `−27%`. Fixed: convert via `(buy_hold_return / initialCapital) * 100`; rewrote chart init with correct `%` axis title `'Доходность (%)'`, floating-bar tooltip callbacks, and a clean 2-dataset structure (`Диапазон` + `Текущ. значение`).
+    - **Equity badge:** Was showing `±$abs(netPnL)` (loss magnitude, e.g. `−$5545`). Fixed: now shows final account balance `$initialCapital + PnL` (e.g. `$4,455`); hover `title` attribute displays the P&L delta.
+    - **Waterfall chart datalabels:** Bar values were invisible because global `ChartDataLabels.display = false` was not overridden. Fixed: added per-chart `datalabels` block (skips `_base` connector bars; K-suffix for values ≥ 1000); added Y-axis title `'USD'`.
+    - **P&L distribution chart:** No datalabels, no axis titles, avg-line annotations had `label.display: false`. Fixed: enabled count labels above bars; added X-axis `'Доходность за сделку (%)'` and Y-axis `'Количество сделок'`; enabled annotation labels `Ср. убыток X%` / `Ср. приб. X%` with coloured badge backgrounds.
+    - **ERR badge false-positives:** `window.onerror` set `resultsCount` badge to `'ERR'` on every harmless `ResizeObserver loop completed...` browser warning. Fixed: filter out `ResizeObserver`, `Script error`, and `Non-Error promise rejection` messages before setting the badge.
+    - **Donut breakeven row:** `Безубыточность: 0 сделок (0.00%)` legend row always visible. Fixed: added `id="legend-breakeven-row"` to the HTML `<div>`, and JS hides the row with `display: none` when `breakeven === 0`.
+    - **OHLC info row stays stale:** Price chart `subscribeCrosshairMove` callback only updated `btChartOHLC` when `candleData` was truthy; when crosshair moved between candles the row kept the last value. Fixed: added `else` branch that resets to `O: -- H: -- L: -- C: --`; replaced `?.toFixed(2)` chains with a null-safe `fmt()` helper.
+    - **Equity chart DPR blur:** `equityChart` was created without an explicit `devicePixelRatio` option, causing canvas to render at 1×pixels on Retina / 125%-scaled displays. Fixed: added `devicePixelRatio: window.devicePixelRatio || 1` to Chart init options; `ResizeObserver` now also refreshes this option on resize.
+
+
     - **`models.py` — EngineType enum expanded:**
       Added `FALLBACK_V4 = "fallback_v4"`, `DCA = "dca"`, `DCA_GRID = "dca_grid"` aliases;
       `validate_engine_type` now accepts `"fallback_v4"` and normalizes it to `"fallback"`;

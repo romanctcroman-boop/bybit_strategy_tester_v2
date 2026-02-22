@@ -458,7 +458,10 @@ function setupChartResize() {
   if (chartContainer && equityChart) {
     const resizeObserver = new ResizeObserver(() => {
       if (equityChart) {
+        // Pass explicit DPR so canvas stays crisp at non-100% display scaling
         equityChart.resize();
+        equityChart.options.devicePixelRatio = window.devicePixelRatio || 1;
+        equityChart.update('none');
       }
     });
     resizeObserver.observe(chartContainer);
@@ -593,6 +596,7 @@ function initCharts() {
         ...chartOptions,
         responsive: true,
         maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 1,
         onClick: handleEquityChartClick,
         interaction: {
           mode: 'index',
@@ -5404,7 +5408,11 @@ async function updatePriceChart(backtest) {
       }
       const candleData = param.seriesData.get(btCandleSeries);
       if (candleData) {
-        ohlcEl.textContent = `O: ${candleData.open?.toFixed(2)} H: ${candleData.high?.toFixed(2)} L: ${candleData.low?.toFixed(2)} C: ${candleData.close?.toFixed(2)}`;
+        const fmt = (v) => (v != null ? Number(v).toFixed(2) : '--');
+        ohlcEl.textContent = `O: ${fmt(candleData.open)}  H: ${fmt(candleData.high)}  L: ${fmt(candleData.low)}  C: ${fmt(candleData.close)}`;
+      } else {
+        // Crosshair is between candles or outside data range — reset to placeholder
+        ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
       }
     });
 
