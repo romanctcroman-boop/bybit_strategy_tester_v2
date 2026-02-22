@@ -9,10 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **AI optimizer agents no longer destroy the existing strategy graph during optimization (2026-02-22, commit `b8e26690c`):**
+
+    **`backend/agents/workflows/builder_workflow.py`:**
+    - **Root cause:** `_suggest_adjustments` sent agents only a bare list of block types and params, with zero context about the visual node-graph system, the signal-flow topology, or the constraint that structural changes were forbidden. Agents had no way to distinguish between an RSI block, an AND logic gate, or a STRATEGY aggregator — so they proposed reconstructing the strategy from scratch, replacing complex multi-indicator graphs (CCI + MFI + RSI + MACD + Supertrend → AND gates) with simplified structures.
+    - **Added `_describe_graph_for_agents()` static helper:** formats the full visual graph for agent prompts — every block with its type, role description (e.g. *"logic gate (output True only when ALL inputs are True)"*), and current parameter values; every connection as a port-level signal-flow line (`rsi_14:long_signal → and_1:input_a`); an explanation of the Indicator → Condition → Logic → Action → STRATEGY signal-flow model; and a hard constraint header *"do NOT add/remove/reconnect blocks"*.
+    - **Rewrote `_suggest_adjustments` prompt:** injects the full graph description at the top; explains all four block categories; provides a separate *tunable blocks* list alongside the complete topology; uses `❌/✅` constraint markers so LLMs reliably respect structural boundaries.
+    - **Fixed `blocks_summary` filter bug:** was `if b.get("params")` — silently dropped every logic gate, buy/sell action, price block, and strategy node from the agent's view. Now all blocks are included in the summary (no filter).
+    - **Improved optimize-mode blocks loading:** if the REST API's top-level `blocks` list has no `params` (can happen for older saved strategies), workflow now falls back to `builder_graph.blocks`; same fallback for connections; logs count of blocks-with-params for observability.
+    - **Passes `connections` to `_suggest_adjustments`:** the call site now forwards `connections=self._result.connections_made` so the graph topology is always available to the prompt builder.
+
 - **Chart Audit — 6 chart bugs fixed + 2 follow-up fixes (2026-02-22, commits `5f39bfce6`, `HEAD`):**
 
     **`frontend/js/pages/backtest_results.js` + `frontend/backtest-results.html`:**
-
     - **Benchmarking chart (CRITICAL):** `buy_hold_return` is a USD absolute value, but the chart Y-axis treated it as `%` → showed e.g. `−2770%` instead of `−27%`. Fixed: convert via `(buy_hold_return / initialCapital) * 100`; rewrote chart init with correct `%` axis title `'Доходность (%)'`, floating-bar tooltip callbacks, and a clean 2-dataset structure (`Диапазон` + `Текущ. значение`).
     - **Equity badge:** Was showing `±$abs(netPnL)` (loss magnitude, e.g. `−$5545`). Fixed: now shows final account balance `$initialCapital + PnL` (e.g. `$4,455`); hover `title` attribute displays the P&L delta.
     - **Waterfall chart datalabels:** Bar values were invisible because global `ChartDataLabels.display = false` was not overridden. Fixed: added per-chart `datalabels` block (skips `_base` connector bars; K-suffix for values ≥ 1000); added Y-axis title `'USD'`.
@@ -21,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Donut breakeven row:** `Безубыточность: 0 сделок (0.00%)` legend row always visible. Fixed: added `id="legend-breakeven-row"` to the HTML `<div>`, and JS hides the row with `display: none` when `breakeven === 0`.
     - **OHLC info row stays stale:** Price chart `subscribeCrosshairMove` callback only updated `btChartOHLC` when `candleData` was truthy; when crosshair moved between candles the row kept the last value. Fixed: added `else` branch that resets to `O: -- H: -- L: -- C: --`; replaced `?.toFixed(2)` chains with a null-safe `fmt()` helper.
     - **Equity chart DPR blur:** `equityChart` was created without an explicit `devicePixelRatio` option, causing canvas to render at 1×pixels on Retina / 125%-scaled displays. Fixed: added `devicePixelRatio: window.devicePixelRatio || 1` to Chart init options; `ResizeObserver` now also refreshes this option on resize.
-
 
     - **`models.py` — EngineType enum expanded:**
       Added `FALLBACK_V4 = "fallback_v4"`, `DCA = "dca"`, `DCA_GRID = "dca_grid"` aliases;
