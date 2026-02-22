@@ -1306,6 +1306,17 @@ class BacktestEngine:
         trailing_peak_price = 0.0  # Highest (long) / lowest (short) since activation
         trailing_stop_price: float | None = None  # Current trailing stop level
 
+        # ========== PER-SIGNAL PROFIT_ONLY EXITS (Фича 1) ==========
+        # close_cond blocks can have profit_only=True and min_profit=N (percent).
+        # The adapter collects those flags into extra_data so the engine can
+        # enforce a minimum PnL requirement per exit signal.
+        _po_exit_series = extra_data.get("profit_only_exits")  # pd.Series[bool] | None
+        _po_sexit_series = extra_data.get("profit_only_short_exits")
+        min_profit_exit_pct = float(extra_data.get("min_profit_exits", 0.0))  # decimal
+        min_profit_sexit_pct = float(extra_data.get("min_profit_short_exits", 0.0))
+        po_exit_arr = _po_exit_series.values if _po_exit_series is not None else None
+        po_sexit_arr = _po_sexit_series.values if _po_sexit_series is not None else None
+
         # ========== UNIVERSAL BAR MAGNIFIER INITIALIZATION ==========
         # If enabled, load 1m data for precise intrabar order execution
         # Uses new architecture: IntrabarEngine + configurable OHLC path
@@ -1777,17 +1788,37 @@ class BacktestEngine:
                         exit_price = max(current_low, min(current_high, exit_price))
 
                 # Check signal exit (uses close price)
-                # close_only_in_profit: skip signal exit if trade is currently at a loss
+                # Per-signal profit_only (Фича 1): if the exit bar is marked
+                # profit_only by the adapter, only close when PnL >= min_profit.
+                # close_only_in_profit (global config) acts as a fallback that
+                # also requires a profitable exit (no min_profit threshold).
                 if not should_exit:
                     signal_exit_triggered = False
                     if (is_long and long_exits[i]) or (not is_long and short_exits is not None and short_exits[i]):
                         signal_exit_triggered = True
 
                     if signal_exit_triggered:
-                        if close_only_in_profit:
-                            # Only exit if current price is profitable vs entry
-                            is_profitable = price > entry_price if is_long else price < entry_price
-                            if is_profitable:
+                        # Determine whether a profit gate applies to this bar
+                        apply_profit_only = False
+                        required_min_profit = 0.0
+
+                        if is_long and po_exit_arr is not None and po_exit_arr[i]:
+                            apply_profit_only = True
+                            required_min_profit = min_profit_exit_pct
+                        elif not is_long and po_sexit_arr is not None and po_sexit_arr[i]:
+                            apply_profit_only = True
+                            required_min_profit = min_profit_sexit_pct
+
+                        # Global close_only_in_profit acts as per-trade profit gate (min 0)
+                        if not apply_profit_only and close_only_in_profit:
+                            apply_profit_only = True
+                            required_min_profit = 0.0
+
+                        if apply_profit_only:
+                            pnl_pct = (
+                                (price - entry_price) / entry_price if is_long else (entry_price - price) / entry_price
+                            )
+                            if pnl_pct >= required_min_profit:
                                 should_exit = True
                                 exit_reason = "signal"
                                 exit_price = price

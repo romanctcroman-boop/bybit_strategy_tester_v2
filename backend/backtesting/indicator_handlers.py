@@ -29,10 +29,8 @@ def _require_vbt() -> None:
     attribute 'MA'``.
     """
     if vbt is None:
-        raise ImportError(
-            "vectorbt is required for indicator execution. "
-            "Install it with: pip install vectorbt"
-        )
+        raise ImportError("vectorbt is required for indicator execution. Install it with: pip install vectorbt")
+
 
 from backend.backtesting.strategy_builder_adapter import _clamp_period, _param
 from backend.core.indicators import (
@@ -169,6 +167,12 @@ def _handle_rsi(
     long_signal = long_range_condition & long_cross_condition
     short_signal = short_range_condition & short_cross_condition
 
+    # Apply memory in range-only mode (cross_level branch handles its own memory above)
+    if params.get("use_cross_memory", False) and not use_cross_level:
+        memory_bars = int(params.get("cross_memory_bars", 5))
+        long_signal = adapter._apply_signal_memory(long_signal, memory_bars)
+        short_signal = adapter._apply_signal_memory(short_signal, memory_bars)
+
     logger.debug(
         "RSI node | long_signals={}, short_signals={}",
         long_signal.sum(),
@@ -193,9 +197,11 @@ def _handle_macd(
     signal_line = macd_result.signal
     histogram = macd_result.hist
 
-    use_cross = params.get("use_macd_cross", False)
+    # Support both old keys (use_macd_cross / use_zero_cross) and new frontend keys
+    # (use_macd_cross_signal / use_macd_cross_zero).
+    use_cross = params.get("use_macd_cross_signal", params.get("use_macd_cross", False))
     use_histogram = params.get("use_histogram", False)
-    use_zero_cross = params.get("use_zero_cross", False)
+    use_zero_cross = params.get("use_macd_cross_zero", params.get("use_zero_cross", False))
 
     long_signal = pd.Series(True, index=ohlcv.index)
     short_signal = pd.Series(True, index=ohlcv.index)
@@ -206,11 +212,14 @@ def _handle_macd(
         cross_long = (macd_prev <= signal_prev) & (macd_line > signal_line)
         cross_short = (macd_prev >= signal_prev) & (macd_line < signal_line)
 
-        if params.get("opposite_signal", False):
+        if params.get("opposite_macd_cross_signal", params.get("opposite_signal", False)):
             cross_long, cross_short = cross_short, cross_long
 
-        if params.get("use_cross_memory", False):
-            memory_bars = int(params.get("cross_memory_bars", 5))
+        # Memory: frontend sends disable_signal_memory (default False = ON) + signal_memory_bars.
+        # Legacy path: use_cross_memory + cross_memory_bars.
+        disable_memory = params.get("disable_signal_memory", True)
+        if not disable_memory or params.get("use_cross_memory", False):
+            memory_bars = int(params.get("signal_memory_bars", params.get("cross_memory_bars", 5)))
             cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
             cross_short = adapter._apply_signal_memory(cross_short, memory_bars)
 
@@ -227,8 +236,12 @@ def _handle_macd(
         zero_cross_long = (macd_prev <= 0) & (macd_line > 0)
         zero_cross_short = (macd_prev >= 0) & (macd_line < 0)
 
-        if params.get("use_zero_cross_memory", False):
-            memory_bars = int(params.get("zero_cross_memory_bars", 5))
+        if params.get("opposite_macd_cross_zero", params.get("opposite_signal", False)):
+            zero_cross_long, zero_cross_short = zero_cross_short, zero_cross_long
+
+        disable_memory = params.get("disable_signal_memory", True)
+        if not disable_memory or params.get("use_zero_cross_memory", False):
+            memory_bars = int(params.get("signal_memory_bars", params.get("zero_cross_memory_bars", 5)))
             zero_cross_long = adapter._apply_signal_memory(zero_cross_long, memory_bars)
             zero_cross_short = adapter._apply_signal_memory(zero_cross_short, memory_bars)
 
@@ -912,8 +925,83 @@ def _handle_pivot_points(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Multi-Timeframe
+# Multi-Timeframe utilities
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Maps Bybit API numeric TF strings ("1", "15", "60", "240", "D") and
+# UI string aliases ("1m", "1h", "4h", "1d") to pandas resample rules.
+_TF_RESAMPLE_MAP: dict[str, str] = {
+    # Bybit API numeric format
+    "1": "1min",
+    "3": "3min",
+    "5": "5min",
+    "15": "15min",
+    "30": "30min",
+    "60": "1h",
+    "120": "2h",
+    "240": "4h",
+    "D": "1D",
+    "W": "1W",
+    "M": "1ME",
+    # UI string aliases
+    "1m": "1min",
+    "3m": "3min",
+    "5m": "5min",
+    "15m": "15min",
+    "30m": "30min",
+    "1h": "1h",
+    "2h": "2h",
+    "4h": "4h",
+    "1d": "1D",
+    "1w": "1W",
+}
+
+
+def _resample_ohlcv(ohlcv: pd.DataFrame, timeframe: str) -> pd.DataFrame | None:
+    """Resample OHLCV to a higher timeframe and re-align to the original index.
+
+    Returns a DataFrame with the same index as *ohlcv* (ffill applied), or
+    ``None`` if the timeframe is unknown, produces fewer than 2 bars, or the
+    resample fails for any reason.
+
+    Supports both ``pd.DatetimeIndex`` (timezone-aware) and numeric
+    (timestamp-in-milliseconds) indices transparently.
+    """
+    rule = _TF_RESAMPLE_MAP.get(str(timeframe))
+    if rule is None:
+        logger.warning("MTF _resample_ohlcv: unknown timeframe '{}', skipping", timeframe)
+        return None
+
+    # If the index is numeric (timestamp ms), temporarily convert to DatetimeIndex
+    # so pandas resample works correctly, then restore afterwards.
+    numeric_index = not isinstance(ohlcv.index, pd.DatetimeIndex)
+    working = ohlcv
+    if numeric_index:
+        working = ohlcv.copy()
+        working.index = pd.to_datetime(working.index, unit="ms", utc=True)
+
+    try:
+        htf = (
+            working.resample(rule)
+            .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+            .dropna()
+        )
+        if len(htf) < 2:
+            logger.warning(
+                "MTF _resample_ohlcv: timeframe '{}' produced only {} HTF bar(s), falling back to main OHLCV",
+                timeframe,
+                len(htf),
+            )
+            return None
+        # Re-align to original index: forward-fill each HTF bar value into the
+        # LTF bars that belong to it.
+        result = htf.reindex(working.index).ffill()
+        if numeric_index:
+            result.index = ohlcv.index  # restore original numeric index
+        return result
+    except Exception as exc:
+        logger.warning("MTF _resample_ohlcv: resample error for tf='{}': {}", timeframe, exc)
+        return None
 
 
 def _handle_mtf(
@@ -1396,15 +1484,49 @@ def _handle_mfi_filter(
     adapter: StrategyBuilderAdapter,
 ) -> dict[str, pd.Series]:
     mfi_len = int(params.get("mfi_length", 14))
+    mfi_tf = params.get("mfi_timeframe", "Chart")
+
+    # Determine working OHLCV: main, HTF-resampled, or BTCUSDT proxy
+    working_ohlcv = ohlcv
+    main_tf = str(adapter.main_interval)
+    resolved_tf = main_tf if str(mfi_tf).lower() == "chart" else str(mfi_tf)
+
+    # Feature 3: use BTCUSDT as MFI source (market dominance proxy)
+    use_btc = params.get("use_btcusdt_mfi", False)
+    if use_btc:
+        btcusdt_ohlcv = getattr(adapter, "_btcusdt_ohlcv", None)
+        if btcusdt_ohlcv is not None:
+            # Align BTCUSDT index to current OHLCV index
+            working_ohlcv = btcusdt_ohlcv.reindex(ohlcv.index).ffill()
+            logger.debug("MFI filter: using BTCUSDT OHLCV as MFI source")
+        else:
+            logger.warning(
+                "MFI filter: use_btcusdt_mfi=True but BTCUSDT data not available "
+                "(symbol may already be BTCUSDT, or router did not preload); "
+                "falling back to current symbol."
+            )
+    elif resolved_tf != main_tf:
+        # Feature 2: resample to higher timeframe
+        htf_ohlcv = _resample_ohlcv(ohlcv, resolved_tf)
+        if htf_ohlcv is not None:
+            working_ohlcv = htf_ohlcv
+            logger.debug("MFI filter: using HTF OHLCV tf='{}'", resolved_tf)
+        else:
+            logger.warning(
+                "MFI filter: resample to '{}' failed, falling back to main tf='{}'",
+                resolved_tf,
+                main_tf,
+            )
+
     mfi_vals = pd.Series(
         calculate_mfi(
-            ohlcv["high"].values,
-            ohlcv["low"].values,
-            close.values,
-            ohlcv["volume"].values.astype(float),
+            working_ohlcv["high"].values,
+            working_ohlcv["low"].values,
+            working_ohlcv["close"].values,
+            working_ohlcv["volume"].values.astype(float),
             period=mfi_len,
         ),
-        index=ohlcv.index,
+        index=ohlcv.index,  # always align to the original index
     )
 
     long_signal = pd.Series(True, index=ohlcv.index)
@@ -1439,14 +1561,33 @@ def _handle_cci_filter(
     adapter: StrategyBuilderAdapter,
 ) -> dict[str, pd.Series]:
     cci_len = int(params.get("cci_length", 14))
+    cci_tf = params.get("cci_timeframe", "Chart")
+
+    # Determine working OHLCV: main or HTF-resampled
+    working_ohlcv = ohlcv
+    main_tf = str(adapter.main_interval)
+    resolved_tf = main_tf if str(cci_tf).lower() == "chart" else str(cci_tf)
+
+    if resolved_tf != main_tf:
+        htf_ohlcv = _resample_ohlcv(ohlcv, resolved_tf)
+        if htf_ohlcv is not None:
+            working_ohlcv = htf_ohlcv
+            logger.debug("CCI filter: using HTF OHLCV tf='{}'", resolved_tf)
+        else:
+            logger.warning(
+                "CCI filter: resample to '{}' failed, falling back to main tf='{}'",
+                resolved_tf,
+                main_tf,
+            )
+
     cci_vals = pd.Series(
         calculate_cci(
-            ohlcv["high"].values,
-            ohlcv["low"].values,
-            close.values,
+            working_ohlcv["high"].values,
+            working_ohlcv["low"].values,
+            working_ohlcv["close"].values,
             period=cci_len,
         ),
-        index=ohlcv.index,
+        index=ohlcv.index,  # always align to the original index
     )
 
     long_signal = pd.Series(True, index=ohlcv.index)
@@ -1511,61 +1652,272 @@ def _handle_momentum_filter(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Dispatch table
+# Block Registry
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Each entry has three fields:
+#   handler       – callable that computes the indicator
+#   outputs       – exhaustive list of keys the handler guarantees to return
+#   param_aliases – {old_frontend_key: canonical_backend_key} applied before
+#                   the handler is called so both old and new param names work
+#
+# Rules for maintaining this table:
+#  1. When a handler's return dict changes, update `outputs` here.
+#  2. When the frontend renames a param, add the old name as an alias here
+#     (do NOT rename inside the handler — that breaks saved strategies).
+#  3. `_execute_indicator` applies aliases and validates outputs against this
+#     table so mismatches surface immediately as warnings instead of silent
+#     bugs weeks later.
 # ═══════════════════════════════════════════════════════════════════════════
 
-INDICATOR_DISPATCH: dict[str, Any] = {
-    # Momentum / Oscillators
-    "rsi": _handle_rsi,
-    "macd": _handle_macd,
-    "stochastic": _handle_stochastic,
-    "qqe": _handle_qqe,
-    "stoch_rsi": _handle_stoch_rsi,
-    "williams_r": _handle_williams_r,
-    "roc": _handle_roc,
-    "mfi": _handle_mfi,
-    "cmo": _handle_cmo,
-    "cci": _handle_cci,
-    # Trend (MA family)
-    "ema": _handle_ema,
-    "sma": _handle_sma,
-    "wma": _handle_wma,
-    "dema": _handle_dema,
-    "tema": _handle_tema,
-    "hull_ma": _handle_hull_ma,
-    # Band / Channel
-    "bollinger": _handle_bollinger,
-    "keltner": _handle_keltner,
-    "donchian": _handle_donchian,
-    # Volatility
-    "atr": _handle_atr,
-    "atrp": _handle_atrp,
-    "stddev": _handle_stddev,
-    # Trend (non-MA)
-    "adx": _handle_adx,
-    "supertrend": _handle_supertrend,
-    "ichimoku": _handle_ichimoku,
-    "parabolic_sar": _handle_parabolic_sar,
-    "aroon": _handle_aroon,
-    # Volume
-    "obv": _handle_obv,
-    "vwap": _handle_vwap,
-    "cmf": _handle_cmf,
-    "ad_line": _handle_ad_line,
-    "pvt": _handle_pvt,
-    # Support / Resistance
-    "pivot_points": _handle_pivot_points,
-    # Multi-timeframe
-    "mtf": _handle_mtf,
-    # Universal filters
-    "atr_volatility": _handle_atr_volatility,
-    "volume_filter": _handle_volume_filter,
-    "highest_lowest_bar": _handle_highest_lowest_bar,
-    "two_mas": _handle_two_mas,
-    "accumulation_areas": _handle_accumulation_areas,
-    "keltner_bollinger": _handle_keltner_bollinger,
-    "rvi_filter": _handle_rvi_filter,
-    "mfi_filter": _handle_mfi_filter,
-    "cci_filter": _handle_cci_filter,
-    "momentum_filter": _handle_momentum_filter,
+BLOCK_REGISTRY: dict[str, dict[str, Any]] = {
+    # ── Momentum / Oscillators ───────────────────────────────────────────
+    "rsi": {
+        "handler": _handle_rsi,
+        "outputs": ["value", "long", "short"],
+        "param_aliases": {},
+    },
+    "macd": {
+        "handler": _handle_macd,
+        "outputs": ["macd", "signal", "histogram", "long", "short"],
+        "param_aliases": {
+            # Frontend has used multiple names for these bool switches
+            "use_macd_cross": "use_macd_cross_signal",
+            "use_zero_cross": "use_macd_cross_zero",
+            "cross_memory_bars": "signal_memory_bars",
+            "opposite_signal": "opposite_macd_cross_signal",
+        },
+    },
+    "stochastic": {
+        "handler": _handle_stochastic,
+        "outputs": ["k", "d", "long", "short"],
+        "param_aliases": {},
+    },
+    "qqe": {
+        "handler": _handle_qqe,
+        "outputs": ["qqe_line", "rsi_ma", "upper_band", "lower_band", "histogram", "trend", "long", "short"],
+        "param_aliases": {},
+    },
+    "stoch_rsi": {
+        "handler": _handle_stoch_rsi,
+        # NOTE: stoch_rsi does NOT return long/short — wire to a condition block first
+        "outputs": ["k", "d"],
+        "param_aliases": {},
+    },
+    "williams_r": {
+        "handler": _handle_williams_r,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "roc": {
+        "handler": _handle_roc,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "mfi": {
+        "handler": _handle_mfi,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "cmo": {
+        "handler": _handle_cmo,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "cci": {
+        "handler": _handle_cci,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    # ── Trend — MA family ────────────────────────────────────────────────
+    "ema": {
+        "handler": _handle_ema,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "sma": {
+        "handler": _handle_sma,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "wma": {
+        "handler": _handle_wma,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "dema": {
+        "handler": _handle_dema,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "tema": {
+        "handler": _handle_tema,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "hull_ma": {
+        "handler": _handle_hull_ma,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    # ── Band / Channel ───────────────────────────────────────────────────
+    "bollinger": {
+        "handler": _handle_bollinger,
+        "outputs": ["upper", "middle", "lower"],
+        "param_aliases": {},
+    },
+    "keltner": {
+        "handler": _handle_keltner,
+        "outputs": ["upper", "middle", "lower"],
+        "param_aliases": {},
+    },
+    "donchian": {
+        "handler": _handle_donchian,
+        "outputs": ["upper", "middle", "lower"],
+        "param_aliases": {},
+    },
+    # ── Volatility ───────────────────────────────────────────────────────
+    "atr": {
+        "handler": _handle_atr,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "atrp": {
+        "handler": _handle_atrp,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "stddev": {
+        "handler": _handle_stddev,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    # ── Trend — non-MA ───────────────────────────────────────────────────
+    "adx": {
+        "handler": _handle_adx,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "supertrend": {
+        "handler": _handle_supertrend,
+        "outputs": ["supertrend", "direction", "upper", "lower", "long", "short"],
+        "param_aliases": {},
+    },
+    "ichimoku": {
+        "handler": _handle_ichimoku,
+        # NOTE: ichimoku does NOT return long/short — use cloud cross as condition
+        "outputs": ["tenkan_sen", "kijun_sen", "senkou_span_a", "senkou_span_b", "chikou_span"],
+        "param_aliases": {},
+    },
+    "parabolic_sar": {
+        "handler": _handle_parabolic_sar,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "aroon": {
+        "handler": _handle_aroon,
+        "outputs": ["up", "down", "oscillator"],
+        "param_aliases": {},
+    },
+    # ── Volume ───────────────────────────────────────────────────────────
+    "obv": {
+        "handler": _handle_obv,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "vwap": {
+        "handler": _handle_vwap,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "cmf": {
+        "handler": _handle_cmf,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "ad_line": {
+        "handler": _handle_ad_line,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    "pvt": {
+        "handler": _handle_pvt,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    # ── Support / Resistance ─────────────────────────────────────────────
+    "pivot_points": {
+        "handler": _handle_pivot_points,
+        "outputs": ["pp", "r1", "r2", "r3", "s1", "s2", "s3"],
+        "param_aliases": {},
+    },
+    # ── Multi-timeframe ──────────────────────────────────────────────────
+    "mtf": {
+        "handler": _handle_mtf,
+        "outputs": ["value"],
+        "param_aliases": {},
+    },
+    # ── Universal filters ────────────────────────────────────────────────
+    "atr_volatility": {
+        "handler": _handle_atr_volatility,
+        "outputs": ["long", "short"],
+        "param_aliases": {},
+    },
+    "volume_filter": {
+        "handler": _handle_volume_filter,
+        "outputs": ["long", "short"],
+        "param_aliases": {},
+    },
+    "highest_lowest_bar": {
+        "handler": _handle_highest_lowest_bar,
+        "outputs": ["long", "short"],
+        "param_aliases": {},
+    },
+    "two_mas": {
+        "handler": _handle_two_mas,
+        "outputs": ["long", "short", "ma1", "ma2"],
+        "param_aliases": {},
+    },
+    "accumulation_areas": {
+        "handler": _handle_accumulation_areas,
+        "outputs": ["long", "short"],
+        "param_aliases": {},
+    },
+    "keltner_bollinger": {
+        "handler": _handle_keltner_bollinger,
+        "outputs": ["long", "short"],
+        "param_aliases": {},
+    },
+    "rvi_filter": {
+        "handler": _handle_rvi_filter,
+        "outputs": ["long", "short", "rvi"],
+        "param_aliases": {},
+    },
+    "mfi_filter": {
+        "handler": _handle_mfi_filter,
+        "outputs": ["long", "short", "mfi"],
+        "param_aliases": {},
+    },
+    "cci_filter": {
+        "handler": _handle_cci_filter,
+        "outputs": ["long", "short", "cci"],
+        "param_aliases": {},
+    },
+    "momentum_filter": {
+        "handler": _handle_momentum_filter,
+        "outputs": ["long", "short", "momentum"],
+        "param_aliases": {},
+    },
+    # Alias for legacy saved strategies that used block type "momentum" instead of
+    # "momentum_filter".  Frontend now always sends "momentum_filter".
+    "momentum": {
+        "handler": _handle_momentum_filter,
+        "outputs": ["long", "short", "momentum"],
+        "param_aliases": {},
+    },
 }
+
+# Backward-compatible dispatch table — generated automatically from the registry.
+# New code should import BLOCK_REGISTRY directly; INDICATOR_DISPATCH is kept
+# so that any external callers (tests, scripts) do not break.
+INDICATOR_DISPATCH: dict[str, Any] = {k: v["handler"] for k, v in BLOCK_REGISTRY.items()}

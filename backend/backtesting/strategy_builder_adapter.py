@@ -94,7 +94,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         signals = adapter.generate_signals(ohlcv)
     """
 
-    # Port alias maps вЂ” class-level constants (avoid re-creation on every call)
+    # Port alias maps — class-level constants (avoid re-creation on every call)
     _PORT_ALIASES: dict[str, list[str]] = {
         "output": ["value", "close"],
         "value": ["output", "close"],
@@ -117,7 +117,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         "config": ["exit_long", "exit_short", "exit", "signal"],
     }
 
-    def __init__(self, strategy_graph: dict[str, Any]):
+    def __init__(self, strategy_graph: dict[str, Any], btcusdt_ohlcv: pd.DataFrame | None = None):
         """
         Initialize adapter from strategy graph.
 
@@ -130,6 +130,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                 - main_strategy: (optional) The main strategy node with isMain: True
                 - interval: (optional) Main chart timeframe from Properties panel
                   Used to resolve "Chart" timeframe in block params.
+            btcusdt_ohlcv: Pre-loaded BTCUSDT OHLCV DataFrame for mfi_filter
+                use_btcusdt_mfi=True. Must be loaded by the caller (e.g. async
+                router) before constructing the adapter — do NOT use asyncio.run()
+                inside generate_signals. Pass None to disable the feature.
         """
         self.graph = strategy_graph
         self.name = strategy_graph.get("name", "Builder Strategy")
@@ -171,10 +175,14 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Cache for computed values
         self._value_cache: dict[str, pd.Series] = {}
 
+        # BTCUSDT OHLCV for use_btcusdt_mfi feature (Фича 3)
+        # Pre-loaded by the router; None means feature is disabled / data unavailable.
+        self._btcusdt_ohlcv: pd.DataFrame | None = btcusdt_ohlcv
+
         # Validate
         self._validate_params()
 
-    # в”Ђв”Ђ Connection normalization в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # в"Ђв"Ђ Connection normalization в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
     # The frontend, AI Builder, and tests send connections in 5+ different
     # key schemas.  _normalize_connections() runs once in __init__ and
     # converts every connection to a flat canonical dict:
@@ -278,7 +286,22 @@ class StrategyBuilderAdapter(BaseStrategy):
         if not main_node:
             logger.warning("No main strategy node found. Entry/exit signals may not be connected.")
 
-    # в”Ђв”Ђ "Chart" timeframe resolution в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    def _requires_btcusdt_data(self) -> bool:
+        """Return True if any mfi_filter block has use_btcusdt_mfi=True.
+
+        Called by the router BEFORE constructing the adapter so it can pre-load
+        BTCUSDT OHLCV and pass it as the btcusdt_ohlcv kwarg.  Can also be
+        called as a static helper by passing a raw strategy_graph dict:
+
+            needs_btc = StrategyBuilderAdapter(graph)._requires_btcusdt_data()
+        """
+        for block in self.blocks.values():
+            if block.get("type") == "mfi_filter":
+                if block.get("params", {}).get("use_btcusdt_mfi", False):
+                    return True
+        return False
+
+    # в"Ђв"Ђ "Chart" timeframe resolution в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ
     # All param keys ending in "timeframe" that hold "Chart"/"chart"
     # are replaced with the main chart interval from the Properties panel.
     _TIMEFRAME_PARAM_KEYS = frozenset(
@@ -364,7 +387,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                         if in_degree[target_id] == 0:
                             queue.append(target_id)
 
-        # Add any remaining blocks вЂ” distinguish disconnected from cyclic
+        # Add any remaining blocks — distinguish disconnected from cyclic
         remaining = [bid for bid in self.blocks if bid not in result]
         if remaining:
             # Blocks with in_degree > 0 after Kahn's are part of a cycle
@@ -374,7 +397,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             cyclic = [bid for bid in remaining if bid in connected_block_ids and in_degree.get(bid, 0) > 0]
             if cyclic:
                 logger.warning(
-                    "Cycle detected in strategy graph вЂ” blocks {} have "
+                    "Cycle detected in strategy graph -- blocks {} have "
                     "unsatisfied dependencies and may produce incorrect signals. "
                     "Break the cycle by removing a connection.",
                     cyclic,
@@ -425,7 +448,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         "stddev": "indicator",
         "atrp": "indicator",
         "qqe": "indicator",
-        # (qqe_cross removed вЂ” consolidated into universal QQE indicator block)
+        # (qqe_cross removed — consolidated into universal QQE indicator block)
+        "mtf": "indicator",
         "momentum": "indicator",
         # Condition blocks
         "crossover": "condition",
@@ -463,10 +487,10 @@ class StrategyBuilderAdapter(BaseStrategy):
         "multi_tp": "action",
         "atr_stop": "action",
         "chandelier_stop": "action",
-        "static_sltp": "action",
+        "static_sltp": "exit",  # was "action": _execute_exit has the handler; _execute_action did not
         # Filter blocks
         "rsi_filter": "filter",
-        # (supertrend_filter removed вЂ” consolidated into universal supertrend indicator)
+        # (supertrend_filter removed — consolidated into universal supertrend indicator)
         "two_ma_filter": "filter",
         "time_filter": "filter",
         "volatility_filter": "filter",
@@ -487,9 +511,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         "short_exit": "signal",
         "buy_signal": "signal",
         "sell_signal": "signal",
-        # (smart_rsi, smart_macd, smart_bollinger removed вЂ” Smart Signals category deprecated)
-        # (smart_stochastic removed вЂ” consolidated into universal stochastic indicator)
-        # (smart_supertrend removed вЂ” consolidated into universal supertrend indicator)
+        # (smart_rsi, smart_macd, smart_bollinger removed — Smart Signals category deprecated)
+        # (smart_stochastic removed — consolidated into universal stochastic indicator)
+        # (smart_supertrend removed — consolidated into universal supertrend indicator)
         # Strategy aggregator
         "strategy": "strategy",
         # DCA/Grid
@@ -500,8 +524,16 @@ class StrategyBuilderAdapter(BaseStrategy):
         "hammer": "price_action",
         "doji": "price_action",
         "pinbar": "price_action",
-        # Divergence вЂ” unified multi-indicator divergence signal block
+        # Divergence — unified multi-indicator divergence signal block
         "divergence": "divergence",
+        # Close condition blocks (Bug fix: were missing from map; _infer_category
+        # fell back to "indicator" so _execute_close_condition was never called)
+        "close_by_time": "close_conditions",
+        "close_channel": "close_conditions",
+        "close_ma_cross": "close_conditions",
+        "close_rsi": "close_conditions",
+        "close_stochastic": "close_conditions",
+        "close_psar": "close_conditions",
         # Universal filters (new instruments in РўРµС…РЅРёС‡РµСЃРєРёРµ РРЅРґРёРєР°С,РѕСЂС<)
         "atr_volatility": "indicator",
         "volume_filter": "indicator",
@@ -615,7 +647,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif category == "visualization":
             # Visualization blocks - config-only, no signals
             return {}
-        # (smart_signals category removed вЂ” entire Smart Signals category deprecated)
+        # (smart_signals category removed — entire Smart Signals category deprecated)
         elif category == "signal":
             # Signal blocks (long_entry, short_entry, long_exit, short_exit)
             # These pass through condition input to output
@@ -627,7 +659,7 @@ class StrategyBuilderAdapter(BaseStrategy):
     def _get_block_inputs(self, block_id: str) -> dict[str, pd.Series]:
         """Get input values for a block from connections.
 
-        Supports port name aliases: "output" в†” "value", "result" в†” "signal".
+        Supports port name aliases: "output" в†" "value", "result" в†" "signal".
         This allows connections to use either canonical or alias port names.
         """
         inputs = {}
@@ -694,21 +726,66 @@ class StrategyBuilderAdapter(BaseStrategy):
     def _execute_indicator(
         self, indicator_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
-        """Execute an indicator block via dispatch table.
+        """Execute an indicator block via the unified BLOCK_REGISTRY.
 
-        Handler functions live in ``indicator_handlers.py`` and are keyed by
-        ``indicator_type`` in ``INDICATOR_DISPATCH``.
+        Steps:
+          1. Look up the registry entry for ``indicator_type``.
+          2. Apply ``param_aliases`` — translate any old frontend param names to
+             the canonical backend names expected by the handler. This lets saved
+             strategies that used old param names continue to work without
+             touching the handler itself.
+          3. Call the handler.
+          4. Validate that every key listed in ``outputs`` is present in the
+             returned dict. Missing keys mean the handler changed its contract
+             without updating the registry — surface this immediately as a
+             warning instead of a silent downstream bug (e.g. a port resolving
+             to None because the expected key disappeared).
         """
-        from backend.backtesting.indicator_handlers import INDICATOR_DISPATCH, _require_vbt
+        from backend.backtesting.indicator_handlers import BLOCK_REGISTRY, _require_vbt
 
         _require_vbt()
 
-        handler = INDICATOR_DISPATCH.get(indicator_type)
-        if handler is not None:
-            return handler(params, ohlcv, ohlcv["close"], inputs, self)
+        entry = BLOCK_REGISTRY.get(indicator_type)
+        if entry is None:
+            logger.warning(
+                "Unknown indicator type '{}' — not found in BLOCK_REGISTRY. "
+                "Register the handler and its output schema there.",
+                indicator_type,
+            )
+            return {}
 
-        logger.warning(f"Unknown indicator type: {indicator_type}")
-        return {}
+        # ── Step 2: apply param aliases ─────────────────────────────────────
+        aliases: dict[str, str] = entry.get("param_aliases") or {}
+        if aliases:
+            normalised: dict[str, Any] = {}
+            for key, val in params.items():
+                canonical = aliases.get(key, key)
+                if canonical != key and canonical not in params:
+                    # Only rename if the canonical key is not already present
+                    # (the user might supply both old and new names)
+                    normalised[canonical] = val
+                    logger.debug(
+                        "[ParamAlias] {}: '{}' -> '{}'", indicator_type, key, canonical
+                    )
+                else:
+                    normalised[key] = val
+            params = normalised
+
+        # ── Step 3: call handler ─────────────────────────────────────────────
+        result: dict[str, Any] = entry["handler"](params, ohlcv, ohlcv["close"], inputs, self)
+
+        # ── Step 4: validate output keys ─────────────────────────────────────
+        expected: list[str] = entry.get("outputs") or []
+        missing = [k for k in expected if k not in result]
+        if missing:
+            logger.warning(
+                "[RegistryMismatch] Handler for '{}' is missing expected output "
+                "key(s): {}. Update BLOCK_REGISTRY outputs or fix the handler.",
+                indicator_type,
+                missing,
+            )
+
+        return result
 
     def _execute_condition(
         self, condition_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
@@ -976,9 +1053,9 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "value": pd.Series(rsi, index=ohlcv.index),
             }
 
-        # (QQE Filter removed вЂ” consolidated into universal QQE indicator block)
+        # (QQE Filter removed — consolidated into universal QQE indicator block)
 
-        # (SuperTrend Filter removed вЂ” consolidated into universal SuperTrend indicator block)
+        # (SuperTrend Filter removed — consolidated into universal SuperTrend indicator block)
 
         # ========== Two MA Filter ==========
         elif filter_type == "two_ma_filter":
@@ -1007,7 +1084,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "slow": pd.Series(slow, index=ohlcv.index),
             }
 
-        # (Stochastic Filter removed вЂ” consolidated into universal Stochastic indicator block)
+        # (Stochastic Filter removed — consolidated into universal Stochastic indicator block)
 
         # ========== MACD Filter ==========
         elif filter_type == "macd_filter":
@@ -1323,7 +1400,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "lower": lower,
             }
 
-        # (divergence_filter removed вЂ” old divergence blocks cleared)
+        # (divergence_filter removed — old divergence blocks cleared)
 
         # ========== Balance of Power Filter ==========
         elif filter_type == "bop_filter":
@@ -1564,7 +1641,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         return result
 
-    # (Smart Signals section removed вЂ” entire category deprecated in favor of universal indicator blocks)
+    # (Smart Signals section removed — entire category deprecated in favor of universal indicator blocks)
 
     def _execute_action(
         self, action_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
@@ -1751,7 +1828,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         result: dict[str, pd.Series] = {}
 
         if exit_type == "static_sltp":
-            # Unified static SL/TP вЂ” config-only block, engine handles execution
+            # Unified static SL/TP — config-only block, engine handles execution
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
             # Pass SL/TP values for engine config extraction
             result["stop_loss_percent"] = params.get("stop_loss_percent", 1.5)
@@ -1762,11 +1839,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             result["new_breakeven_sl_percent"] = params.get("new_breakeven_sl_percent", 0.1)
 
         elif exit_type in ("tp_percent", "sl_percent"):
-            # Legacy blocks вЂ” kept for backward compatibility
+            # Legacy blocks — kept for backward compatibility
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
 
         elif exit_type == "trailing_stop_exit":
-            # Trailing stop is config-only вЂ” engine handles bar-by-bar execution.
+            # Trailing stop is config-only — engine handles bar-by-bar execution.
             # Pass params so generate_signals can relay them via extra_data.
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
             result["trailing_activation_percent"] = params.get("activation_percent", 1.0)
@@ -1921,7 +1998,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Warn if TP levels are not in ascending order
             if tp1 >= tp2 or tp2 >= tp3:
                 logger.warning(
-                    "Multi-TP levels not ascending: TP1={}% TP2={}% TP3={}% вЂ” execution order may be incorrect",
+                    "Multi-TP levels not ascending: TP1={}% TP2={}% TP3={}% — execution order may be incorrect",
                     tp1,
                     tp2,
                     tp3,
@@ -2372,7 +2449,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             mfi_length = int(_param(params, 14, "mfi_length"))
             indicator_series.append(calculate_mfi(high, low, close, volume, mfi_length))
 
-        # If no indicator enabled вЂ” return empty signals
+        # If no indicator enabled — return empty signals
         if not indicator_series:
             return {
                 "signal": pd.Series([False] * n, index=idx),
@@ -2497,7 +2574,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         if close_type == "close_by_time":
             # Close after N bars since entry - needs position tracking
-            bars = params.get("bars", 10)
+            # Bug fix: frontend stores key as "bars_since_entry", not "bars"
+            bars = int(params.get("bars_since_entry", params.get("bars", 10)))
             # Return config, actual implementation in engine
             result["exit"] = pd.Series([False] * n, index=idx)
             result["max_bars"] = pd.Series([bars] * n, index=idx)
@@ -2615,7 +2693,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_less = float(params.get("rsi_long_less", 100))
                 if long_more > long_less:
                     logger.warning(
-                        "Close RSI range inversion: long_more={} > long_less={} вЂ” swapping to prevent always-False exit",
+                        "Close RSI range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
                         long_more,
                         long_less,
                     )
@@ -2624,7 +2702,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 short_more = float(params.get("rsi_short_more", 1))
                 if short_more > short_less:
                     logger.warning(
-                        "Close RSI range inversion: short_more={} > short_less={} вЂ” swapping to prevent always-False exit",
+                        "Close RSI range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
                         short_more,
                         short_less,
                     )
@@ -2677,7 +2755,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_less = float(params.get("stoch_long_less", 100))
                 if long_more > long_less:
                     logger.warning(
-                        "Close Stochastic range inversion: long_more={} > long_less={} вЂ” swapping to prevent always-False exit",
+                        "Close Stochastic range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
                         long_more,
                         long_less,
                     )
@@ -2686,7 +2764,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 short_more = float(params.get("stoch_short_more", 1))
                 if short_more > short_less:
                     logger.warning(
-                        "Close Stochastic range inversion: short_more={} > short_less={} вЂ” swapping to prevent always-False exit",
+                        "Close Stochastic range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
                         short_more,
                         short_less,
                     )
@@ -2920,11 +2998,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
             if block_type in ("rsi_close", "stoch_close", "psar_close"):
-                pass  # Legacy block types вЂ” removed
+                pass  # Legacy block types — removed
             elif block_type == "channel_close":
-                pass  # Legacy block type вЂ” use close_channel instead
+                pass  # Legacy block type — use close_channel instead
             elif block_type == "ma_close":
-                pass  # Legacy block type вЂ” use close_ma_cross instead
+                pass  # Legacy block type — use close_ma_cross instead
             elif block_type == "close_channel":
                 close_conditions["channel_close_enable"] = True
                 close_conditions["channel_close_timeframe"] = params.get("channel_close_timeframe", "Chart")
@@ -3024,6 +3102,70 @@ class StrategyBuilderAdapter(BaseStrategy):
                     return True
         return False
 
+    @classmethod
+    def _check_registry_consistency(cls) -> list[str]:
+        """Cross-check BLOCK_REGISTRY against _BLOCK_CATEGORY_MAP.
+
+        Returns a list of human-readable problem descriptions so callers can
+        decide how to surface them (log, raise, print).  An empty list means
+        everything is consistent.
+
+        Checks performed:
+          A. Every "indicator" entry in _BLOCK_CATEGORY_MAP must appear in
+             BLOCK_REGISTRY — otherwise the adapter will call a handler that
+             does not exist and return {}.
+          B. Every key in BLOCK_REGISTRY must appear in _BLOCK_CATEGORY_MAP
+             (category == "indicator") — otherwise a registered handler is
+             unreachable from the graph execution path.
+          C. Every entry in BLOCK_REGISTRY must declare at least one output key.
+          D. Every param_alias value must differ from its key (a self-alias is
+             always a no-op and usually a copy-paste mistake).
+        """
+        from backend.backtesting.indicator_handlers import BLOCK_REGISTRY
+
+        problems: list[str] = []
+
+        # Collect all "indicator" block types from the category map
+        indicator_types_in_map = {k for k, v in cls._BLOCK_CATEGORY_MAP.items() if v == "indicator"}
+
+        # A: in map but missing from registry
+        for btype in indicator_types_in_map:
+            if btype not in BLOCK_REGISTRY:
+                problems.append(
+                    f"[A] '{btype}' is 'indicator' in _BLOCK_CATEGORY_MAP but "
+                    f"has no entry in BLOCK_REGISTRY — _execute_indicator will "
+                    f"return {{}} for this block."
+                )
+
+        # B: in registry but missing from map (or wrong category)
+        for btype in BLOCK_REGISTRY:
+            cat = cls._BLOCK_CATEGORY_MAP.get(btype)
+            if cat != "indicator":
+                problems.append(
+                    f"[B] '{btype}' is in BLOCK_REGISTRY but _BLOCK_CATEGORY_MAP "
+                    f"has category={cat!r} (expected 'indicator') — handler is "
+                    f"unreachable from the graph execution path."
+                )
+
+        # C: empty outputs declaration
+        for btype, entry in BLOCK_REGISTRY.items():
+            if not entry.get("outputs"):
+                problems.append(
+                    f"[C] '{btype}' BLOCK_REGISTRY entry has no 'outputs' list — "
+                    f"add the keys returned by its handler so mismatches are detected."
+                )
+
+        # D: self-alias (no-op)
+        for btype, entry in BLOCK_REGISTRY.items():
+            for old, new in (entry.get("param_aliases") or {}).items():
+                if old == new:
+                    problems.append(
+                        f"[D] '{btype}' param_aliases has self-alias '{old}' -> '{new}' "
+                        f"(no-op — remove it or fix the alias target)."
+                    )
+
+        return problems
+
     def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
         """
         Generate trading signals from OHLCV data by executing the strategy graph.
@@ -3079,6 +3221,12 @@ class StrategyBuilderAdapter(BaseStrategy):
         short_entries = pd.Series([False] * n, index=ohlcv.index)
         short_exits = pd.Series([False] * n, index=ohlcv.index)
 
+        # Per-signal profit_only tracking (Feature 1 — close_cond blocks)
+        profit_only_exits = pd.Series(False, index=ohlcv.index)
+        profit_only_short_exits = pd.Series(False, index=ohlcv.index)
+        min_profit_for_exits: float = 0.0
+        min_profit_for_short_exits: float = 0.0
+
         # Track whether main node received signals via connections
         has_connections_to_main = False
 
@@ -3129,7 +3277,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                         f"had cached outputs, skipping connection scan"
                     )
 
-            # Case 2: Main node is a pure strategy aggregator вЂ” collect from
+            # Case 2: Main node is a pure strategy aggregator — collect from
             # connections ONLY when Case 1 didn't produce signals (avoid
             # double-counting if main node is both cached and wired to).
             # Port alias map is defined at class level: self._SIGNAL_PORT_ALIASES
@@ -3146,6 +3294,51 @@ class StrategyBuilderAdapter(BaseStrategy):
 
                         if source_id in self._value_cache:
                             source_outputs = self._value_cache[source_id]
+
+                            # ── Special case: close_cond port ──────────────────────
+                            # Close-condition blocks output their signals under
+                            # "exit_long" / "exit_short" keys, NOT as a single aliased
+                            # signal. Their frontend output port is named "config" which
+                            # does NOT appear in _execute_close_condition output — so
+                            # standard signal resolution yields signal=None and skips the
+                            # connection. Handle close_cond BEFORE signal resolution to
+                            # prevent the dead-code bug (RSI/channel/MA-cross exits were
+                            # silently dropped).
+                            if target_port == "close_cond":
+                                raw = source_outputs
+                                # Collect profit_only flags from this close_cond block
+                                has_po = raw.get("profit_only")    # pd.Series[bool] or None
+                                min_pv = raw.get("min_profit")     # pd.Series[float] or None
+                                # min_profit in params is in percent (1.0 = 1%);
+                                # convert to decimal fraction for the engine.
+                                mp_decimal = float(min_pv.iloc[0]) / 100.0 if min_pv is not None else 0.0
+
+                                if "exit_long" in raw:
+                                    exits = exits | raw["exit_long"]
+                                    if has_po is not None:
+                                        profit_only_exits = profit_only_exits | raw["exit_long"]
+                                        min_profit_for_exits = max(min_profit_for_exits, mp_decimal)
+                                if "exit_short" in raw:
+                                    short_exits = short_exits | raw["exit_short"]
+                                    if has_po is not None:
+                                        profit_only_short_exits = profit_only_short_exits | raw["exit_short"]
+                                        min_profit_for_short_exits = max(min_profit_for_short_exits, mp_decimal)
+                                if "exit" in raw and "exit_long" not in raw and "exit_short" not in raw:
+                                    exits = exits | raw["exit"]
+                                    short_exits = short_exits | raw["exit"]
+                                logger.debug(
+                                    f"[SignalRouting] close_cond port: block '{source_id}' "
+                                    f"-> exits updated from {list(raw.keys())}"
+                                )
+                                continue
+
+                            # ── Config ports: router handles, no signal routing ─────
+                            if target_port in ("sl_tp", "sltp", "dca", "dca_grid"):
+                                logger.debug(
+                                    f"[SignalRouting] Config port '{target_port}': block "
+                                    f"'{source_id}' -> params handled by router, no signal extracted."
+                                )
+                                continue
 
                             # Resolve source port: direct match, then aliases, then single-output fallback
                             signal = None
@@ -3196,24 +3389,11 @@ class StrategyBuilderAdapter(BaseStrategy):
                                 # Universal exit - applies to both long and short
                                 exits = exits | signal
                                 short_exits = short_exits | signal
-                            elif target_port == "close_cond":
-                                # Close-condition blocks (close_by_time, close_channel, close_rsi,
-                                # close_ma_cross, close_stochastic, close_psar) — their "config"
-                                # output port carries both exit_long and exit_short signals.
-                                # Extract each independently from the raw cache so both directions
-                                # are honoured instead of collapsing to a single alias match.
-                                raw = source_outputs
-                                if "exit_long" in raw:
-                                    exits = exits | raw["exit_long"]
-                                if "exit_short" in raw:
-                                    short_exits = short_exits | raw["exit_short"]
-                                if "exit" in raw and "exit_long" not in raw and "exit_short" not in raw:
-                                    # Fallback: universal exit key — apply to both sides
-                                    exits = exits | raw["exit"]
-                                    short_exits = short_exits | raw["exit"]
-                                logger.debug(
-                                    f"[SignalRouting] close_cond port: block '{source_id}' "
-                                    f"→ exits updated from {list(raw.keys())}"
+                            else:
+                                logger.warning(
+                                    f"[SignalRouting] Unrecognised target port '{target_port}' "
+                                    f"on strategy node from block '{source_id}' "
+                                    f"(outputs: {list(source_outputs.keys())}). Signal dropped."
                                 )
 
         # Fallback: Look for signal blocks by category ONLY when:
@@ -3323,6 +3503,23 @@ class StrategyBuilderAdapter(BaseStrategy):
                     extra_data["trailing_percent"] = float(trail_dist)
                     extra_data["trail_type"] = cached.get("trail_type", "percent")
                 break  # Only one trailing_stop_exit block expected
+
+        # ========== Collect profit_only exit data for engine (Feature 1) ==========
+        # Only write to extra_data when at least one close_cond block activated
+        # profit_only — avoids unnecessary numpy work in the engine hot loop.
+        if profit_only_exits.any() or profit_only_short_exits.any():
+            extra_data["profit_only_exits"] = profit_only_exits             # pd.Series[bool]
+            extra_data["profit_only_short_exits"] = profit_only_short_exits
+            extra_data["min_profit_exits"] = min_profit_for_exits           # float, decimal fraction
+            extra_data["min_profit_short_exits"] = min_profit_for_short_exits
+            logger.debug(
+                "[SignalRouting] profit_only_exits: long_bars={} min={:.4f}, "
+                "short_bars={} min={:.4f}",
+                int(profit_only_exits.sum()),
+                min_profit_for_exits,
+                int(profit_only_short_exits.sum()),
+                min_profit_for_short_exits,
+            )
 
         logger.info(
             f"[SignalSummary] Strategy '{self.name}': "

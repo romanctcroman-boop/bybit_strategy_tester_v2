@@ -2626,6 +2626,34 @@ async def run_backtest_from_builder(
 
         adapter = StrategyBuilderAdapter(strategy_graph)
 
+        # ── Фича 3: pre-load BTCUSDT OHLCV if any mfi_filter block requires it ──
+        # We construct the adapter once without btcusdt_ohlcv to use the
+        # _requires_btcusdt_data() probe, then reconstruct with the data when needed.
+        if adapter._requires_btcusdt_data():
+            try:
+                from backend.backtesting.service import BacktestService as _BSvc
+
+                _svc = _BSvc()
+                _btc_ohlcv = await _svc._fetch_historical_data(
+                    symbol="BTCUSDT",
+                    interval=request.interval,
+                    start_date=request.start_date,
+                    end_date=request.end_date,
+                    market_type=market_type,
+                )
+                if _btc_ohlcv is not None and len(_btc_ohlcv) > 0:
+                    adapter = StrategyBuilderAdapter(strategy_graph, btcusdt_ohlcv=_btc_ohlcv)
+                    logger.info(
+                        "[Фича3] BTCUSDT OHLCV loaded: {} bars → passed to adapter",
+                        len(_btc_ohlcv),
+                    )
+                else:
+                    logger.warning(
+                        "[Фича3] BTCUSDT OHLCV fetch returned empty — use_btcusdt_mfi will fall back to main symbol"
+                    )
+            except Exception as _btc_err:
+                logger.warning("[Фича3] Failed to pre-load BTCUSDT OHLCV: {} — continuing without it", _btc_err)
+
         # Extract DCA config from blocks (if any)
         block_dca_config = adapter.extract_dca_config()
         has_dca_blocks = adapter.has_dca_blocks()
@@ -2713,11 +2741,17 @@ async def run_backtest_from_builder(
         # Trailing stop params from trailing_stop_exit block
         block_trailing_activation: float | None = None
         block_trailing_offset: float | None = None
+        # close_by_time block → max_bars_in_trade (0 = disabled)
+        block_max_bars_in_trade: int = 0
 
         for block in db_strategy.builder_blocks or []:  # type: ignore[union-attr]
             block_type = block.get("type", "")
             block_params = block.get("params") or block.get("config") or {}
-            if block_type == "static_sltp":
+            if block_type == "close_by_time":
+                # Bug fix: frontend stores key as "bars_since_entry", not "bars"
+                bars_val = block_params.get("bars_since_entry", block_params.get("bars", 0))
+                block_max_bars_in_trade = int(bars_val) if bars_val else 0
+            elif block_type == "static_sltp":
                 if block_stop_loss is None:
                     sl_val = block_params.get("stop_loss_percent", 1.5)
                     # UI always sends percent values (1.5 = 1.5%, 0.5 = 0.5%)
@@ -2782,6 +2816,8 @@ async def run_backtest_from_builder(
             # Trailing stop from trailing_stop_exit block
             trailing_stop_activation=block_trailing_activation,
             trailing_stop_offset=block_trailing_offset,
+            # close_by_time block → max bars per trade (0 = disabled)
+            max_bars_in_trade=block_max_bars_in_trade,
             # DCA Grid settings (from merged config)
             dca_enabled=final_dca_config["dca_enabled"],
             dca_direction=final_dca_config["dca_direction"],
@@ -3004,8 +3040,13 @@ async def run_backtest_from_builder(
                 "_commission": request.commission,
                 "_slippage": request.slippage,
                 "_pyramiding": request.pyramiding,
-                "_start_date": request.start_date,
-                "_end_date": request.end_date,
+                # Serialize datetime → ISO string so JSON column doesn't crash
+                "_start_date": request.start_date.isoformat()
+                if hasattr(request.start_date, "isoformat")
+                else str(request.start_date),
+                "_end_date": request.end_date.isoformat()
+                if hasattr(request.end_date, "isoformat")
+                else str(request.end_date),
                 "_market_type": market_type,
                 "breakeven_enabled": block_breakeven_enabled,
                 "breakeven_activation_pct": block_breakeven_activation_pct,
