@@ -1138,8 +1138,8 @@ def _handle_volume_filter(
             "long": pd.Series(True, index=ohlcv.index),
             "short": pd.Series(True, index=ohlcv.index),
         }
-    length1 = int(params.get("vol_length1", 20))
-    length2 = int(params.get("vol_length2", 100))
+    length1 = _clamp_period(int(params.get("vol_length1", 20)))
+    length2 = _clamp_period(int(params.get("vol_length2", 100)))
     smoothing_method = str(params.get("vol_smoothing", "WMA")).upper()
     diff_pct = float(params.get("vol_diff_percent", 10))
     mode = params.get("vol1_to_vol2", "VOL1 < VOL2")
@@ -1183,10 +1183,10 @@ def _handle_highest_lowest_bar(
     short_signal = pd.Series(True, index=ohlcv.index)
 
     if params.get("use_highest_lowest", False):
-        lookback = int(params.get("hl_lookback_bars", 10))
+        lookback = _clamp_period(int(params.get("hl_lookback_bars", 10)))
         price_pct = float(params.get("hl_price_percent", 0))
         atr_pct = float(params.get("hl_atr_percent", 0))
-        atr_len = int(params.get("atr_hl_length", 50))
+        atr_len = _clamp_period(int(params.get("atr_hl_length", 50)))
 
         high_arr = ohlcv["high"]
         low_arr = ohlcv["low"]
@@ -1314,8 +1314,8 @@ def _handle_accumulation_areas(
             "long": pd.Series(True, index=ohlcv.index),
             "short": pd.Series(True, index=ohlcv.index),
         }
-    interval = int(params.get("backtracking_interval", 30))
-    min_bars = int(params.get("min_bars_to_execute", 5))
+    interval = _clamp_period(int(params.get("backtracking_interval", 30)))
+    min_bars = _clamp_period(int(params.get("min_bars_to_execute", 5)))
     signal_breakout = params.get("signal_on_breakout", False)
     signal_opposite = params.get("signal_on_opposite_breakout", False)
 

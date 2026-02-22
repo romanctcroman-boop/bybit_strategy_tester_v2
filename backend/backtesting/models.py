@@ -24,6 +24,8 @@ class StrategyType(str, Enum):
     MARTINGALE = "martingale"
     # Custom
     CUSTOM = "custom"
+    # NOTE: ADVANCED has no dedicated strategy handler — it delegates to the
+    # strategy_builder_adapter graph runner. Kept for API compatibility.
     ADVANCED = "advanced"
     BUILDER = "builder"
 
@@ -50,15 +52,21 @@ class EngineType(str, Enum):
 
     All engines produce 100% identical results (bit-level parity).
     - AUTO: Automatically select best available (GPU > Numba > Fallback)
-    - FALLBACK: FallbackEngineV2 - Pure Python, reference implementation
+    - FALLBACK: FallbackEngineV4 - Pure Python, reference implementation
+    - FALLBACK_V4: Alias for FALLBACK (explicit V4)
     - NUMBA: NumbaEngineV2 - JIT-compiled, faster
     - GPU: GPUEngineV2 - CUDA-accelerated, fastest on NVIDIA GPUs
+    - DCA: DCA/Martingale engine
+    - DCA_GRID: DCA Grid engine
     """
 
     AUTO = "auto"
     FALLBACK = "fallback"
+    FALLBACK_V4 = "fallback_v4"  # Alias — same engine as FALLBACK
     NUMBA = "numba"
     GPU = "gpu"
+    DCA = "dca"
+    DCA_GRID = "dca_grid"
 
 
 class BacktestConfig(BaseModel):
@@ -649,10 +657,11 @@ class BacktestConfig(BaseModel):
     @classmethod
     def validate_engine_type(cls, v: str) -> str:
         """Validate backtest engine type"""
-        allowed = ["auto", "fallback", "numba", "gpu", "dca", "dca_grid"]
+        allowed = ["auto", "fallback", "fallback_v4", "numba", "gpu", "dca", "dca_grid"]
         if v.lower() not in allowed:
             raise ValueError(f"Engine type must be one of: {allowed}")
-        return v.lower()
+        # Normalize fallback_v4 alias to canonical "fallback"
+        return "fallback" if v.lower() == "fallback_v4" else v.lower()
 
     @field_validator("dca_direction")
     @classmethod

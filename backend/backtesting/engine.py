@@ -1207,7 +1207,6 @@ class BacktestEngine:
         Supports TP/SL, bidirectional trading, and MFE/MAE calculation.
         """
         close = ohlcv["close"].values
-        open_price = ohlcv["open"].values if "open" in ohlcv.columns else close  # noqa: F841
         high = ohlcv["high"].values if "high" in ohlcv.columns else close
         low = ohlcv["low"].values if "low" in ohlcv.columns else close
         entries = np.asarray(signals.entries.values, dtype=bool).copy()
@@ -1502,9 +1501,10 @@ class BacktestEngine:
                     is_long = False
                     entry_time = timestamps[i]
                     entry_idx = i  # kept for diagnostics/traceability
-                    # For short: favorable = lowest, adverse = highest
-                    max_favorable_price = current_low  # Best low so far
-                    max_adverse_price = current_high  # Worst high so far
+                    # For short: favorable = lowest price (price going down), adverse = highest (going up)
+                    # Initialize from entry_price so first-bar intrabar moves are captured correctly
+                    max_favorable_price = entry_price  # best price = entry (will track lower)
+                    max_adverse_price = entry_price  # worst price = entry (will track higher)
 
                     # Calculate ATR-based SL/TP prices at entry bar (short)
                     if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
@@ -1851,7 +1851,11 @@ class BacktestEngine:
                     cash += margin_used + pnl
 
                     # Calculate P&L percentage (relative to margin, not position)
-                    pnl_pct = pnl / margin_used if margin_used > 0 else 0
+                    if margin_used > 0:
+                        pnl_pct = pnl / margin_used
+                        pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
+                    else:
+                        pnl_pct = 0.0
 
                     # Calculate MFE/MAE in % and absolute values (TradingView style)
                     # Note: MFE/MAE % = raw price move %, not leveraged return.
@@ -1971,7 +1975,11 @@ class BacktestEngine:
             cash += margin_used + pnl
 
             # Calculate P&L percentage
-            pnl_pct = pnl / margin_used if margin_used > 0 else 0
+            if margin_used > 0:
+                pnl_pct = pnl / margin_used
+                pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
+            else:
+                pnl_pct = 0.0
 
             # Calculate MFE/MAE in % = raw price excursion (not leveraged return)
             if is_long:

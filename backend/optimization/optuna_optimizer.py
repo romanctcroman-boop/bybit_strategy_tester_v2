@@ -36,9 +36,7 @@ class OptunaOptimizationResult:
 
     # Detailed results
     all_trials: list[dict[str, Any]] = field(default_factory=list)
-    pareto_front: list[dict[str, Any]] = field(
-        default_factory=list
-    )  # For multi-objective
+    pareto_front: list[dict[str, Any]] = field(default_factory=list)  # For multi-objective
 
     # Convergence info
     value_history: list[float] = field(default_factory=list)
@@ -90,9 +88,7 @@ class OptunaOptimizer:
             n_warmup_steps: Steps before pruning can occur
         """
         if not OPTUNA_AVAILABLE:
-            raise ImportError(
-                "Optuna is not installed. Install with: pip install optuna"
-            )
+            raise ImportError("Optuna is not installed. Install with: pip install optuna")
 
         self.sampler_type = sampler_type
         self.pruner_type = pruner_type
@@ -211,9 +207,7 @@ class OptunaOptimizer:
                     "number": trial.number,
                     "params": trial.params,
                     "value": trial.value,
-                    "datetime": trial.datetime_complete.isoformat()
-                    if trial.datetime_complete
-                    else None,
+                    "datetime": trial.datetime_complete.isoformat() if trial.datetime_complete else None,
                 }
                 all_trials.append(trial_info)
                 value_history.append(trial.value)
@@ -224,9 +218,7 @@ class OptunaOptimizer:
                     running_best = min(running_best, trial.value)
                 best_value_history.append(running_best)
 
-        logger.info(
-            f"Optimization complete: {n_trials} trials in {optimization_time:.1f}s"
-        )
+        logger.info(f"Optimization complete: {n_trials} trials in {optimization_time:.1f}s")
         logger.info(f"Best value: {best_trial.value:.6f}")
         logger.info(f"Best params: {best_trial.params}")
 
@@ -273,9 +265,7 @@ class OptunaOptimizer:
             study_name = f"multi_obj_{start_time.strftime('%Y%m%d_%H%M%S')}"
 
         # Create multi-objective study
-        study = optuna.create_study(
-            study_name=study_name, directions=directions, sampler=self._create_sampler()
-        )
+        study = optuna.create_study(study_name=study_name, directions=directions, sampler=self._create_sampler())
 
         def objective(trial: "optuna.Trial") -> tuple:
             params = self._sample_params(trial, param_space)
@@ -284,10 +274,7 @@ class OptunaOptimizer:
                 return values
             except Exception as e:
                 logger.warning(f"Trial {trial.number} failed: {e}")
-                worst_values = tuple(
-                    float("-inf") if d == "maximize" else float("inf")
-                    for d in directions
-                )
+                worst_values = tuple(float("-inf") if d == "maximize" else float("inf") for d in directions)
                 return worst_values
 
         study.optimize(
@@ -329,33 +316,36 @@ class OptunaOptimizer:
             pareto_front=pareto_front,
         )
 
-    def _sample_params(
-        self, trial: "optuna.Trial", param_space: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _sample_params(self, trial: "optuna.Trial", param_space: dict[str, Any]) -> dict[str, Any]:
         """Sample parameters from the search space"""
         params = {}
 
         for name, spec in param_space.items():
             param_type = spec.get("type", "float")
 
+            if param_type == "categorical":
+                params[name] = trial.suggest_categorical(name, spec["choices"])
+                continue
+
+            # Guard: skip specs where low >= high — Optuna would raise ValueError
+            low = spec.get("low", 0)
+            high = spec.get("high", 1)
+            if low >= high:
+                logger.warning(f"_sample_params: skipping param '{name}' — low={low} >= high={high}")
+                continue
+
             if param_type == "float":
                 params[name] = trial.suggest_float(
                     name,
-                    spec["low"],
-                    spec["high"],
+                    low,
+                    high,
                     step=spec.get("step"),
                     log=spec.get("log", False),
                 )
             elif param_type == "int":
-                params[name] = trial.suggest_int(
-                    name, spec["low"], spec["high"], step=spec.get("step", 1)
-                )
-            elif param_type == "categorical":
-                params[name] = trial.suggest_categorical(name, spec["choices"])
+                params[name] = trial.suggest_int(name, int(low), int(high), step=spec.get("step", 1))
             elif param_type == "loguniform":
-                params[name] = trial.suggest_float(
-                    name, spec["low"], spec["high"], log=True
-                )
+                params[name] = trial.suggest_float(name, low, high, log=True)
 
         return params
 
@@ -367,9 +357,7 @@ class TradingStrategyOptimizer:
     Combines Optuna with backtesting engine for easy strategy optimization.
     """
 
-    def __init__(
-        self, backtest_engine, metric: str = "sharpe_ratio", sampler_type: str = "tpe"
-    ):
+    def __init__(self, backtest_engine, metric: str = "sharpe_ratio", sampler_type: str = "tpe"):
         """
         Initialize trading strategy optimizer.
 
@@ -442,7 +430,7 @@ def create_rsi_param_space() -> dict[str, Any]:
 def create_sltp_param_space() -> dict[str, Any]:
     """Create parameter space for SL/TP optimization"""
     return {
-        "stop_loss": {"type": "float", "low": 0.01, "high": 0.10, "step": 0.005},
+        "stop_loss": {"type": "float", "low": 0.001, "high": 0.10, "step": 0.005},
         "take_profit": {"type": "float", "low": 0.02, "high": 0.20, "step": 0.01},
     }
 
@@ -455,7 +443,7 @@ def create_full_strategy_param_space() -> dict[str, Any]:
         "rsi_overbought": {"type": "int", "low": 65, "high": 85},
         "rsi_oversold": {"type": "int", "low": 15, "high": 35},
         # Risk params
-        "stop_loss": {"type": "float", "low": 0.01, "high": 0.10, "step": 0.005},
+        "stop_loss": {"type": "float", "low": 0.001, "high": 0.10, "step": 0.005},
         "take_profit": {"type": "float", "low": 0.02, "high": 0.20, "step": 0.01},
         # Position sizing
         "position_size": {"type": "float", "low": 0.1, "high": 1.0, "step": 0.1},

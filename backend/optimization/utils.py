@@ -232,8 +232,13 @@ def split_candles(candles: pd.DataFrame, train_split: float) -> tuple[pd.DataFra
     if train_split >= 1.0 or train_split <= 0.0:
         return candles, None
 
-    # Clamp to valid range
-    train_split = max(0.5, min(0.95, train_split))
+    # Clamp to valid range and warn if the caller passed an out-of-bounds value
+    clamped = max(0.5, min(0.95, train_split))
+    if clamped != train_split:
+        logger.warning(
+            f"📊 train_split={train_split:.3f} out of valid range [0.5, 0.95] — clamped to {clamped:.3f}"
+        )
+    train_split = clamped
 
     split_idx = int(len(candles) * train_split)
     # Ensure at least 50 candles in each set

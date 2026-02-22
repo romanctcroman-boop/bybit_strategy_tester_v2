@@ -889,6 +889,17 @@ def run_builder_optuna_search(
                 val = trial.suggest_float(path, float(spec["low"]), float(spec["high"]), step=float(spec["step"]))
                 overrides[path] = val
 
+        # Enforce fast_period < slow_period for MACD blocks (cross-param constraint).
+        # param_path format is "{block_id}.{param_key}", so both share the same block prefix.
+        for path in list(overrides.keys()):
+            if path.endswith("fast_period"):
+                slow_path = path[: -len("fast_period")] + "slow_period"
+                if slow_path in overrides:
+                    fast_val = int(overrides[path])
+                    slow_val = int(overrides[slow_path])
+                    if slow_val <= fast_val:
+                        overrides[slow_path] = fast_val + 1
+
         # Clone graph and run backtest
         modified_graph = clone_graph_with_params(base_graph, overrides)
         result = run_builder_backtest(modified_graph, ohlcv, config_params)

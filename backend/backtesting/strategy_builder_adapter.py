@@ -2924,9 +2924,18 @@ class StrategyBuilderAdapter(BaseStrategy):
                     dca_config["dca_enabled"] = True
                     dca_config["custom_orders"] = custom_orders
                     dca_config["dca_order_count"] = len(custom_orders)
-                    # Calculate total grid size from max offset
-                    max_offset = max(order.get("offset", 0) for order in custom_orders)
-                    dca_config["dca_grid_size_percent"] = max_offset
+                    # Calculate grid step size as median of inter-order gaps (not total range)
+                    sorted_offsets = sorted(
+                        o for o in (order.get("offset", 0) for order in custom_orders) if o > 0
+                    )
+                    if len(sorted_offsets) >= 2:
+                        steps = [sorted_offsets[i + 1] - sorted_offsets[i] for i in range(len(sorted_offsets) - 1)]
+                        grid_step = float(sorted(steps)[len(steps) // 2])  # median step
+                    elif sorted_offsets:
+                        grid_step = float(sorted_offsets[0])
+                    else:
+                        grid_step = 1.0
+                    dca_config["dca_grid_size_percent"] = grid_step
                 # Grid trailing
                 grid_trailing = params.get("grid_trailing", 0)
                 if grid_trailing > 0:
