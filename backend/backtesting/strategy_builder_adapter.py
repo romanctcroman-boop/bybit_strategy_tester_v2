@@ -296,9 +296,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             needs_btc = StrategyBuilderAdapter(graph)._requires_btcusdt_data()
         """
         for block in self.blocks.values():
-            if block.get("type") == "mfi_filter":
-                if block.get("params", {}).get("use_btcusdt_mfi", False):
-                    return True
+            if block.get("type") == "mfi_filter" and block.get("params", {}).get("use_btcusdt_mfi", False):
+                return True
         return False
 
     # в"Ђв"Ђ "Chart" timeframe resolution в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ

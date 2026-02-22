@@ -1656,9 +1656,9 @@ def _handle_momentum_filter(
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # Each entry has three fields:
-#   handler       – callable that computes the indicator
-#   outputs       – exhaustive list of keys the handler guarantees to return
-#   param_aliases – {old_frontend_key: canonical_backend_key} applied before
+#   handler       - callable that computes the indicator
+#   outputs       - exhaustive list of keys the handler guarantees to return
+#   param_aliases - {old_frontend_key: canonical_backend_key} applied before
 #                   the handler is called so both old and new param names work
 #
 # Rules for maintaining this table:
