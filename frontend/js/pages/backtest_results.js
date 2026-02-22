@@ -933,12 +933,29 @@ function initCharts() {
             bodyColor: '#c9d1d9',
             borderColor: '#30363d',
             borderWidth: 1
+          },
+          datalabels: {
+            display: (ctx) => {
+              const val = ctx.dataset.data[ctx.dataIndex];
+              return typeof val === 'number' && val > 0;
+            },
+            anchor: 'end',
+            align: 'top',
+            color: '#c9d1d9',
+            font: { size: 11 },
+            formatter: (val) => (val > 0 ? val : '')
           }
         },
         scales: {
           x: {
             stacked: true,
             grid: { display: false },
+            title: {
+              display: true,
+              text: 'Доходность за сделку (%)',
+              color: '#8b949e',
+              font: { size: 11 }
+            },
             ticks: {
               color: '#e6edf3',
               font: { size: 11 },
@@ -949,6 +966,12 @@ function initCharts() {
           y: {
             position: 'right',
             grid: { color: '#30363d' },
+            title: {
+              display: true,
+              text: 'Количество сделок',
+              color: '#8b949e',
+              font: { size: 11 }
+            },
             ticks: { color: '#e6edf3', font: { size: 11 } },
             beginAtZero: true
           }
@@ -1052,8 +1075,29 @@ function initCharts() {
               label: function (context) {
                 const val = context.raw;
                 if (!val || val === 0) return null;
-                return `${context.dataset.label}: ${val.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
+                return `${context.dataset.label}: ${val.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
               }
+            }
+          },
+          datalabels: {
+            display: (ctx) => {
+              if (ctx.dataset.label === '_base') return false;
+              const val = ctx.dataset.data[ctx.dataIndex];
+              if (!Array.isArray(val)) return false;
+              const height = Math.abs(val[1] - val[0]);
+              return height > 1; // only show if bar has visible height
+            },
+            anchor: 'center',
+            align: 'center',
+            color: '#ffffff',
+            font: { size: 11, weight: 'bold' },
+            formatter: (val) => {
+              if (!Array.isArray(val)) return '';
+              const amount = Math.abs(val[1] - val[0]);
+              if (amount < 0.01) return '';
+              return amount >= 1000
+                ? `${(amount / 1000).toFixed(1)}K`
+                : amount.toFixed(0);
             }
           }
         },
@@ -1066,6 +1110,12 @@ function initCharts() {
           y: {
             stacked: true,
             position: 'right',
+            title: {
+              display: true,
+              text: 'USD',
+              color: '#8b949e',
+              font: { size: 11 }
+            },
             grid: { color: '#30363d' },
             ticks: {
               color: '#e6edf3',
@@ -1084,7 +1134,7 @@ function initCharts() {
     benchmarkingChart = new Chart(benchmarkingCanvas, {
       type: 'bar',
       data: {
-        labels: ['Прибыль при покупке и удержании', 'Прибыльность стратегии'],
+        labels: ['Покупка и удержание', 'Прибыльность стратегии'],
         datasets: []
       },
       options: {
@@ -1109,17 +1159,28 @@ function initCharts() {
             bodyColor: '#c9d1d9',
             callbacks: {
               label: function (context) {
-                return `${context.dataset.label}: ${context.raw.toFixed(2)}%`;
+                const [lo, hi] = context.raw;
+                if (context.dataset.label === 'Текущ. значение') {
+                  return `${context.dataset.label}: ${((lo + hi) / 2).toFixed(2)}%`;
+                }
+                return `${context.dataset.label}: от ${lo.toFixed(2)}% до ${hi.toFixed(2)}%`;
               }
             }
-          }
+          },
+          datalabels: { display: false }
         },
         scales: {
           x: {
+            title: {
+              display: true,
+              text: 'Доходность (%)',
+              color: '#8b949e',
+              font: { size: 11 }
+            },
             grid: { color: '#30363d' },
             ticks: {
               color: '#e6edf3',
-              callback: (v) => v + '%'
+              callback: (v) => v.toFixed(0) + '%'
             }
           },
           y: {
@@ -3846,13 +3907,14 @@ function updateCharts(backtest) {
           clearRegimeOverlay();
         }
 
-        // Update current value badge in header
+        // Update current value badge in header — show final account balance, not just P&L delta
         const lastPnL = pnlValues[pnlValues.length - 1] || 0;
+        const finalBalance = (backtest.config?.initial_capital || 10000) + lastPnL;
         const valueBadge = document.getElementById('tvEquityCurrentValue');
         if (valueBadge) {
-          const sign = lastPnL >= 0 ? '+' : '';
-          valueBadge.textContent = `${sign}$${Math.abs(lastPnL).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          valueBadge.classList.toggle('negative', lastPnL < 0);
+          valueBadge.textContent = `$${finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valueBadge.title = `Изменение: ${lastPnL >= 0 ? '+' : ''}$${lastPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valueBadge.classList.toggle('negative', finalBalance < (backtest.config?.initial_capital || 10000));
         }
       }
 
@@ -4011,7 +4073,13 @@ function updateCharts(backtest) {
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
-              display: false
+              display: true,
+              content: `Ср. убыток ${avgLoss.toFixed(1)}%`,
+              position: 'end',
+              backgroundColor: 'rgba(239, 83, 80, 0.8)',
+              color: '#ffffff',
+              font: { size: 10 },
+              padding: { x: 4, y: 2 }
             }
           },
           avgProfitLine: {
@@ -4022,7 +4090,13 @@ function updateCharts(backtest) {
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
-              display: false
+              display: true,
+              content: `Ср. приб. ${avgProfit.toFixed(1)}%`,
+              position: 'end',
+              backgroundColor: 'rgba(38, 166, 154, 0.8)',
+              color: '#ffffff',
+              font: { size: 10 },
+              padding: { x: 4, y: 2 }
             }
           }
         }
@@ -4127,6 +4201,10 @@ function updateCharts(backtest) {
       if (legendBreakeven)
         legendBreakeven.textContent = `${breakeven} ${getUnit(breakeven)}`;
       if (legendBreakevenPct) legendBreakevenPct.textContent = `${bePct}%`;
+
+      // Hide the breakeven row entirely when there are zero breakeven trades
+      const breakevenRow = document.getElementById('legend-breakeven-row');
+      if (breakevenRow) breakevenRow.style.display = breakeven === 0 ? 'none' : '';
 
       winLossDonutChart.update('none');
     } catch (e) {
@@ -4396,54 +4474,68 @@ function updateCharts(backtest) {
       const m = backtest.metrics;
       const initialCapital = backtest.config?.initial_capital || 10000;
 
-      const bhReturn = m.buy_hold_return || 0;
-      const bhMin = m.buy_hold_min_pct || bhReturn * 0.7;
-      const bhMax = m.buy_hold_max_pct || bhReturn * 1.3;
-
-      const strategyReturn =
+      // Strategy return — always in % (from backend net_profit_pct / total_return)
+      const strategyReturnPct =
         m.net_profit_pct ||
         m.total_return ||
         ((m.net_profit || 0) / initialCapital) * 100;
-      let stratMin = strategyReturn * 0.7;
-      let stratMax = strategyReturn * 1.3;
 
+      // Buy & Hold return — convert USD → % if backend sends absolute value
+      // buy_hold_return_pct takes priority; fall back to USD / initialCapital * 100
+      const bhReturnPct =
+        m.buy_hold_return_pct != null && m.buy_hold_return_pct !== 0
+          ? m.buy_hold_return_pct
+          : ((m.buy_hold_return || 0) / initialCapital) * 100;
+
+      // Strategy range from equity curve (in %)
+      let stratMinPct = strategyReturnPct * 1.3;  // fallback: slightly worse
+      let stratMaxPct = strategyReturnPct * 0.7;  // fallback: slightly better
+      if (strategyReturnPct < 0) {
+        // For losses, min is more negative, max is less negative
+        stratMinPct = strategyReturnPct * 1.3;
+        stratMaxPct = strategyReturnPct * 0.7;
+      } else {
+        stratMinPct = strategyReturnPct * 0.7;
+        stratMaxPct = strategyReturnPct * 1.3;
+      }
       if (backtest.equity_curve && backtest.equity_curve.length > 0) {
         const equityValues = backtest.equity_curve.map(
           (e) => e.equity || e.value || e
         );
         const minEquity = Math.min(...equityValues);
         const maxEquity = Math.max(...equityValues);
-        stratMin = ((minEquity - initialCapital) / initialCapital) * 100;
-        stratMax = ((maxEquity - initialCapital) / initialCapital) * 100;
+        stratMinPct = ((minEquity - initialCapital) / initialCapital) * 100;
+        stratMaxPct = ((maxEquity - initialCapital) / initialCapital) * 100;
       }
+      // Ensure current value is always within [min, max]
+      const stratRangeLow = Math.min(stratMinPct, strategyReturnPct);
+      const stratRangeHigh = Math.max(stratMaxPct, strategyReturnPct);
+
+      // BH range (% from equity extremes or ±30%)
+      const bhRangeLow = Math.min(bhReturnPct * (bhReturnPct < 0 ? 1.3 : 0.7), bhReturnPct);
+      const bhRangeHigh = Math.max(bhReturnPct * (bhReturnPct < 0 ? 0.7 : 1.3), bhReturnPct);
 
       benchmarkingChart.data.datasets = [
         {
-          label: 'Min',
-          data: [
-            [0, bhMin < 0 ? bhMin : 0],
-            [0, stratMin < 0 ? stratMin : 0]
-          ],
-          backgroundColor: 'rgba(239, 83, 80, 0.6)',
-          barPercentage: 0.5
-        },
-        {
           label: 'Диапазон',
           data: [
-            [Math.min(bhMin, 0), Math.max(bhMax, 0)],
-            [Math.min(stratMin, 0), Math.max(stratMax, 0)]
+            [bhRangeLow, bhRangeHigh],
+            [stratRangeLow, stratRangeHigh]
           ],
-          backgroundColor: ['#ff9800', '#42a5f5'],
+          backgroundColor: ['rgba(255, 152, 0, 0.4)', 'rgba(66, 165, 245, 0.4)'],
+          borderColor: ['#ff9800', '#42a5f5'],
+          borderWidth: 1,
           barPercentage: 0.5
         },
         {
-          label: 'Текущ. цена',
+          label: 'Текущ. значение',
+          // Thin bar (width = 1% of range) centred on current value
           data: [
-            [bhReturn - 0.5, bhReturn + 0.5],
-            [strategyReturn - 0.5, strategyReturn + 0.5]
+            [bhReturnPct - 0.3, bhReturnPct + 0.3],
+            [strategyReturnPct - 0.3, strategyReturnPct + 0.3]
           ],
           backgroundColor: ['#8d6e63', '#26a69a'],
-          barPercentage: 0.3
+          barPercentage: 0.15
         }
       ];
 

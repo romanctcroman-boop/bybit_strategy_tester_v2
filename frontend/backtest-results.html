@@ -248,7 +248,12 @@
                                     <i class="bi bi-columns-gap"></i>
                                     <span>Compare</span>
                                 </button>
-                                <button class="tv-action-btn" id="btnExportReport" onclick="exportResults()" title="Export">
+                                <button
+                                    class="tv-action-btn"
+                                    id="btnExportReport"
+                                    onclick="exportResults()"
+                                    title="Export"
+                                >
                                     <i class="bi bi-download"></i>
                                     <span>Export</span>
                                 </button>
@@ -696,7 +701,7 @@
                                                     <span class="tv-legend-value" id="legend-losses">0 сделок</span>
                                                     <span class="tv-legend-pct" id="legend-losses-pct">0.00%</span>
                                                 </div>
-                                                <div class="tv-legend-row">
+                                                <div class="tv-legend-row" id="legend-breakeven-row">
                                                     <span class="tv-legend-marker breakeven"></span>
                                                     <span class="tv-legend-label">Безубыточность</span>
                                                     <span class="tv-legend-value" id="legend-breakeven">0 сделок</span>
@@ -820,14 +825,49 @@
                                         <tr>
                                             <th>№ Сделки</th>
                                             <th>Тип</th>
-                                            <th data-sort="date" onclick="sortTradesBy('date')" style="cursor:pointer" title="Сортировать по дате">Дата и время<span class="sort-icon"> ⇅</span></th>
+                                            <th
+                                                data-sort="date"
+                                                onclick="sortTradesBy('date')"
+                                                style="cursor: pointer"
+                                                title="Сортировать по дате"
+                                            >
+                                                Дата и время<span class="sort-icon"> ⇅</span>
+                                            </th>
                                             <th>Сигнал</th>
                                             <th>Цена</th>
                                             <th>Размер позиции</th>
-                                            <th data-sort="pnl" onclick="sortTradesBy('pnl')" style="cursor:pointer" title="Сортировать по прибыли/убытку">Чистая прибыль / убыток<span class="sort-icon"> ⇅</span></th>
-                                            <th data-sort="mfe" onclick="sortTradesBy('mfe')" style="cursor:pointer" title="Сортировать по MFE">MFE<span class="sort-icon"> ⇅</span></th>
-                                            <th data-sort="mae" onclick="sortTradesBy('mae')" style="cursor:pointer" title="Сортировать по MAE">MAE<span class="sort-icon"> ⇅</span></th>
-                                            <th data-sort="cumPnl" onclick="sortTradesBy('cumPnl')" style="cursor:pointer" title="Сортировать по совокупному ПР/УБ">Совокупные ПР/УБ<span class="sort-icon"> ⇅</span></th>
+                                            <th
+                                                data-sort="pnl"
+                                                onclick="sortTradesBy('pnl')"
+                                                style="cursor: pointer"
+                                                title="Сортировать по прибыли/убытку"
+                                            >
+                                                Чистая прибыль / убыток<span class="sort-icon"> ⇅</span>
+                                            </th>
+                                            <th
+                                                data-sort="mfe"
+                                                onclick="sortTradesBy('mfe')"
+                                                style="cursor: pointer"
+                                                title="Сортировать по MFE"
+                                            >
+                                                MFE<span class="sort-icon"> ⇅</span>
+                                            </th>
+                                            <th
+                                                data-sort="mae"
+                                                onclick="sortTradesBy('mae')"
+                                                style="cursor: pointer"
+                                                title="Сортировать по MAE"
+                                            >
+                                                MAE<span class="sort-icon"> ⇅</span>
+                                            </th>
+                                            <th
+                                                data-sort="cumPnl"
+                                                onclick="sortTradesBy('cumPnl')"
+                                                style="cursor: pointer"
+                                                title="Сортировать по совокупному ПР/УБ"
+                                            >
+                                                Совокупные ПР/УБ<span class="sort-icon"> ⇅</span>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody id="tvTradesListBody">
@@ -1399,6 +1439,15 @@
         <!-- Debug: Test API before module loads -->
         <script>
             window.onerror = function (msg, url, line) {
+                // Suppress harmless browser noise that is not a real JS error
+                if (
+                    typeof msg === 'string' &&
+                    (msg.includes('ResizeObserver') ||
+                        msg.includes('Script error') ||
+                        msg.includes('Non-Error promise rejection'))
+                ) {
+                    return false; // suppress without marking ERR
+                }
                 console.error('Global error:', msg, url, line);
                 document.getElementById('resultsCount').textContent = 'ERR';
             };
