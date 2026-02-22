@@ -1606,3 +1606,9 @@ body {
 .small-alert {
     font-size: 0.85rem;
 }
+
+/* Sortable table header columns */
+.sortable-th {
+    cursor: pointer;
+}
+

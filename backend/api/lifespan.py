@@ -22,9 +22,9 @@ logger = logging.getLogger("uvicorn.error")
 _background_tasks: set[asyncio.Task] = set()
 
 
-def _fire_and_forget(coro) -> asyncio.Task:
+def _fire_and_forget(coroutine) -> asyncio.Task:
     """Schedule a coroutine as a background task and keep a strong reference."""
-    task = asyncio.create_task(coro)
+    task = asyncio.create_task(coroutine)
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
@@ -202,7 +202,7 @@ async def _init_mcp_bridge():
 
 
 async def _start_kline_db_service(app: "FastAPI"):
-    """Start KlineDBService for candle upserts."""
+    """Start KlineDBService for candle upserts (bulk insert-or-update)."""
     try:
         from backend.services.kline_db_service import KlineDBService
 

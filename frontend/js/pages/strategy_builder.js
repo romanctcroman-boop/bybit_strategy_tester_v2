@@ -684,7 +684,7 @@ function tryLoadFromLocalStorage(strategyId) {
       connections: connections.length
     });
 
-    // Clear any stale multi-selection state that may have been serialised in localStorage
+    // Clear any stale multi-selection state that may have been serialized in localStorage
     clearMultiSelection();
 
     // Show notification

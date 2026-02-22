@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-def _fire_and_forget(coro) -> asyncio.Task:
-    task = asyncio.create_task(coro)
+def _fire_and_forget(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
