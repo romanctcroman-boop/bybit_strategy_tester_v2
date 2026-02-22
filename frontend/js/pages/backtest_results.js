@@ -38,6 +38,13 @@ let allResults = [];
 let selectedForCompare = [];
 let compareMode = false;
 
+// Trades table pagination state
+let tradesCurrentPage = 0;       // 0-based page index
+const TRADES_PAGE_SIZE = 25;     // rows per page
+let tradesCachedRows = [];       // pre-built HTML rows (reversed, newest-first)
+let tradesSortKey = null;        // active sort column key
+let tradesSortAsc = true;        // sort direction
+
 // Track recently deleted IDs to filter them from API responses
 // This prevents "ghost" items from reappearing due to backend sync delay
 const recentlyDeletedIds = new Set();
@@ -1396,11 +1403,17 @@ function updateChartDisplayMode() {
 // Format TradingView style currency value with percentage
 function formatTVCurrency(value, pct, showSign = true) {
   if (value === null || value === undefined) return '--';
-  const sign = showSign && value >= 0 ? '+' : '';
-  const dollarVal = `${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  // Use strict > 0 to avoid '+-0,00' when a negative value rounds to zero
+  const formatted = value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Strip the locale-generated minus sign if value rounds to '0,00'
+  const cleanFormatted = formatted === '-0,00' ? '0,00' : formatted;
+  const sign = showSign && value > 0 ? '+' : '';
+  const dollarVal = `${sign}${cleanFormatted} USD`;
   if (pct !== undefined && pct !== null) {
-    const pctSign = showSign && pct >= 0 ? '+' : '';
-    return `<div class="tv-dual-value"><span class="tv-main-value">${dollarVal}</span><span class="tv-pct-value">${pctSign}${pct.toFixed(2)}%</span></div>`;
+    const pctFormatted = pct.toFixed(2);
+    const cleanPct = pctFormatted === '-0.00' ? '0.00' : pctFormatted;
+    const pctSign = showSign && pct > 0 ? '+' : '';
+    return `<div class="tv-dual-value"><span class="tv-main-value">${dollarVal}</span><span class="tv-pct-value">${pctSign}${cleanPct}%</span></div>`;
   }
   return dollarVal;
 }
@@ -1408,8 +1421,10 @@ function formatTVCurrency(value, pct, showSign = true) {
 // Format percentage value
 function formatTVPercent(value, showSign = true) {
   if (value === null || value === undefined) return '--';
-  const sign = showSign && value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
+  const formatted = value.toFixed(2);
+  const cleanFormatted = formatted === '-0.00' ? '0.00' : formatted;
+  const sign = showSign && value > 0 ? '+' : '';
+  return `${sign}${cleanFormatted}%`;
 }
 
 // Update TradingView Summary Cards (Tab 1)
@@ -1421,12 +1436,16 @@ function updateTVSummaryCards(metrics) {
   const netProfitPct = document.getElementById('tvNetProfitPct');
   if (netProfit) {
     const val = metrics.net_profit || 0;
-    netProfit.textContent = `${val >= 0 ? '+' : ''}${val.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
+    const valFormatted = val.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cleanVal = valFormatted === '-0,00' ? '0,00' : valFormatted;
+    netProfit.textContent = `${val > 0 ? '+' : ''}${cleanVal} USD`;
     netProfit.className = `tv-summary-card-value ${val >= 0 ? 'tv-value-positive' : 'tv-value-negative'}`;
   }
   if (netProfitPct) {
     const pct = metrics.net_profit_pct ?? 0;
-    netProfitPct.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    const pctFormatted = pct.toFixed(2);
+    const cleanPct = pctFormatted === '-0.00' ? '0.00' : pctFormatted;
+    netProfitPct.textContent = `${pct > 0 ? '+' : ''}${cleanPct}%`;
   }
 
   // Max Drawdown
@@ -1434,7 +1453,7 @@ function updateTVSummaryCards(metrics) {
   const maxDDPct = document.getElementById('tvMaxDrawdownPct');
   if (maxDD) {
     const val = metrics.max_drawdown_value || 0;
-    maxDD.textContent = `${Math.abs(val).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
+    maxDD.textContent = `${Math.abs(val).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
   }
   if (maxDDPct) {
     const pct = metrics.max_drawdown || 0;
@@ -2247,7 +2266,7 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
   setIntValue('rr-max-consec-losses-short', metrics.short_max_consec_losses);
 }
 
-// Update Trades List Tab (Tab 5) - TradingView Style
+// Update Trades List Tab (Tab 5) - TradingView Style with pagination and sorting
 function updateTVTradesListTab(trades, config) {
   const tbody = document.getElementById('tvTradesListBody');
   const countEl = document.getElementById('tvTradesCount');
@@ -2258,6 +2277,7 @@ function updateTVTradesListTab(trades, config) {
     tbody.innerHTML =
       '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:2rem;">Нет сделок для отображения</td></tr>';
     if (countEl) countEl.textContent = '0';
+    removeTradePagination();
     return;
   }
 
@@ -2295,7 +2315,7 @@ function updateTVTradesListTab(trades, config) {
       .replace(',', '');
   };
 
-  // Calculate cumulative P&L in reverse order first
+  // Calculate cumulative P&L chronologically
   let runningPnL = 0;
   const cumulativePnLs = [];
   for (let i = 0; i < trades.length; i++) {
@@ -2303,11 +2323,8 @@ function updateTVTradesListTab(trades, config) {
     cumulativePnLs.push(runningPnL);
   }
 
-  // Build rows - TradingView shows newest trades at top, with Entry below Exit
-  // Each trade has 2 rows: Exit row (with all metrics) and Entry row (just entry info)
-  const rows = [];
-
-  // Reverse to show newest first
+  // Build full rows array with sort metadata — newest first by default
+  const allRows = [];
   for (let i = trades.length - 1; i >= 0; i--) {
     const trade = trades[i];
     const tradeNum = i + 1;
@@ -2320,28 +2337,35 @@ function updateTVTradesListTab(trades, config) {
     const typeText = isLong ? 'Long' : 'Short';
     const typeClass = isLong ? 'tv-trade-long' : 'tv-trade-short';
 
-    // Signal text
     const exitSignal =
       trade.exit_reason ||
       trade.exit_signal ||
       (isLong ? 'Long SL/TP' : 'Short SL/TP');
     const entrySignal = isLong ? 'Long' : 'Short';
 
-    // Position size
     const positionValue = (trade.size || 0) * (trade.entry_price || 0);
     const positionDisplay =
       positionValue >= 1000
         ? `${(positionValue / 1000).toFixed(2)}K USD`
         : `${positionValue.toFixed(2)} USD`;
 
-    // MFE/MAE
-    const mfe = trade.mfe || trade.mfe_value || 0;
-    const mfePct = trade.mfe_pct || 0;
-    const mae = trade.mae || trade.mae_value || 0;
-    const maePct = trade.mae_pct || 0;
+    // MFE/MAE — always show as absolute values (backend may send negative MFE/MAE)
+    const mfe = Math.abs(trade.mfe ?? trade.mfe_value ?? 0);
+    const mfePct = Math.abs(trade.mfe_pct ?? 0);
+    const mae = Math.abs(trade.mae ?? trade.mae_value ?? 0);
+    const maePct = Math.abs(trade.mae_pct ?? 0);
 
-    // Exit row (main row with all metrics)
-    rows.push(`
+    const exitDate = trade.exit_time ? new Date(trade.exit_time).getTime() : 0;
+
+    allRows.push({
+      // Sort keys
+      _date: exitDate,
+      _pnl: pnl,
+      _mfe: mfe,
+      _mae: mae,
+      _cumPnl: cumulativePnL,
+      // Rendered HTML pair
+      html: `
             <tr class="tv-trade-exit-row">
                 <td rowspan="2" class="tv-trade-num-cell">
                     <span class="tv-trade-number">${tradeNum}</span>
@@ -2356,19 +2380,19 @@ function updateTVTradesListTab(trades, config) {
                     <div class="tv-trade-secondary">${positionDisplay}</div>
                 </td>
                 <td class="${pnl >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
-                    <div>${pnl >= 0 ? '+' : ''}${pnl.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                    <div>${pnl >= 0 ? '+' : ''}${pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</div>
                 </td>
                 <td class="tv-value-neutral">
-                    <div>${mfe.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                    <div>${mfe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${mfePct.toFixed(2)}%</div>
                 </td>
-                <td class="${mae < 0 ? 'tv-value-negative' : 'tv-value-neutral'}">
-                    <div>${mae.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                <td class="${mae > 0 ? 'tv-value-negative' : 'tv-value-neutral'}">
+                    <div>${mae.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${maePct.toFixed(2)}%</div>
                 </td>
                 <td class="${cumulativePnL >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
-                    <div>${cumulativePnL.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                    <div>${cumulativePnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${cumulativePnLPct.toFixed(2)}%</div>
                 </td>
             </tr>
@@ -2378,11 +2402,144 @@ function updateTVTradesListTab(trades, config) {
                 <td>${entrySignal}</td>
                 <td>${(trade.entry_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
                 <td colspan="5"></td>
-            </tr>
-        `);
+            </tr>`
+    });
   }
 
-  tbody.innerHTML = rows.join('');
+  // Apply active sort
+  if (tradesSortKey) {
+    allRows.sort((a, b) => {
+      const aVal = a[tradesSortKey];
+      const bVal = b[tradesSortKey];
+      return tradesSortAsc ? aVal - bVal : bVal - aVal;
+    });
+  }
+
+  // Cache rows and render first page
+  tradesCachedRows = allRows;
+  tradesCurrentPage = 0;
+  renderTradesPage(tbody);
+  renderTradePagination(trades.length);
+}
+
+/** Renders the current page of cached trade rows into tbody */
+function renderTradesPage(tbody) {
+  const tgt = tbody || document.getElementById('tvTradesListBody');
+  if (!tgt) return;
+  const start = tradesCurrentPage * TRADES_PAGE_SIZE;
+  const pageRows = tradesCachedRows.slice(start, start + TRADES_PAGE_SIZE);
+  tgt.innerHTML = pageRows.map((r) => r.html).join('');
+  updateTradePaginationControls();
+}
+
+/** Renders or updates the pagination controls below the trades table */
+function renderTradePagination(totalTrades) {
+  const container = document.getElementById('tvTradesContainer') ||
+    document.querySelector('.tv-trades-container');
+  if (!container) return;
+
+  const totalPages = Math.ceil(totalTrades / TRADES_PAGE_SIZE);
+  if (totalPages <= 1) {
+    removeTradePagination();
+    return;
+  }
+
+  let paginationEl = document.getElementById('tradesPagination');
+  if (!paginationEl) {
+    paginationEl = document.createElement('div');
+    paginationEl.id = 'tradesPagination';
+    paginationEl.className = 'trades-pagination';
+    container.after(paginationEl);
+  }
+
+  paginationEl.innerHTML = `
+    <div class="d-flex align-items-center justify-content-center gap-2 py-2">
+      <button class="btn btn-sm btn-outline-secondary" id="tradesPrevBtn"
+              onclick="tradesPrevPage()" ${tradesCurrentPage === 0 ? 'disabled' : ''}>
+        <i class="bi bi-chevron-left"></i>
+      </button>
+      <span class="text-secondary" id="tradesPageInfo">
+        Стр. ${tradesCurrentPage + 1} / ${totalPages}
+        <small class="ms-1">(сделки ${tradesCurrentPage * TRADES_PAGE_SIZE + 1}–${Math.min((tradesCurrentPage + 1) * TRADES_PAGE_SIZE, totalTrades)} из ${totalTrades})</small>
+      </span>
+      <button class="btn btn-sm btn-outline-secondary" id="tradesNextBtn"
+              onclick="tradesNextPage()" ${tradesCurrentPage >= totalPages - 1 ? 'disabled' : ''}>
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>`;
+}
+
+/** Updates only the pagination control state (prev/next buttons and info text) */
+function updateTradePaginationControls() {
+  const paginationEl = document.getElementById('tradesPagination');
+  if (!paginationEl) return;
+  const totalPages = Math.ceil(tradesCachedRows.length / TRADES_PAGE_SIZE);
+  const infoEl = document.getElementById('tradesPageInfo');
+  if (infoEl) {
+    infoEl.innerHTML = `Стр. ${tradesCurrentPage + 1} / ${totalPages}
+      <small class="ms-1">(сделки ${tradesCurrentPage * TRADES_PAGE_SIZE + 1}–${Math.min((tradesCurrentPage + 1) * TRADES_PAGE_SIZE, tradesCachedRows.length)} из ${tradesCachedRows.length})</small>`;
+  }
+  const prev = document.getElementById('tradesPrevBtn');
+  const next = document.getElementById('tradesNextBtn');
+  if (prev) prev.disabled = tradesCurrentPage === 0;
+  if (next) next.disabled = tradesCurrentPage >= totalPages - 1;
+}
+
+function removeTradePagination() {
+  const el = document.getElementById('tradesPagination');
+  if (el) el.remove();
+}
+
+// eslint-disable-next-line no-unused-vars
+function tradesPrevPage() {
+  if (tradesCurrentPage > 0) {
+    tradesCurrentPage--;
+    renderTradesPage();
+  }
+}
+
+// eslint-disable-next-line no-unused-vars
+function tradesNextPage() {
+  const totalPages = Math.ceil(tradesCachedRows.length / TRADES_PAGE_SIZE);
+  if (tradesCurrentPage < totalPages - 1) {
+    tradesCurrentPage++;
+    renderTradesPage();
+  }
+}
+
+/** Sort trades table by column key. Called from table header click handlers. */
+// eslint-disable-next-line no-unused-vars
+function sortTradesBy(key) {
+  if (tradesSortKey === key) {
+    tradesSortAsc = !tradesSortAsc;
+  } else {
+    tradesSortKey = key;
+    tradesSortAsc = true;
+  }
+  tradesCachedRows.sort((a, b) => {
+    const aVal = a[`_${key}`];
+    const bVal = b[`_${key}`];
+    return tradesSortAsc ? aVal - bVal : bVal - aVal;
+  });
+  tradesCurrentPage = 0;
+  renderTradesPage();
+  updateTradeSortIndicators(key);
+}
+
+/** Updates the sort indicator arrows in table headers */
+function updateTradeSortIndicators(activeKey) {
+  document.querySelectorAll('#tvTradesListTable th[data-sort]').forEach((th) => {
+    const key = th.dataset.sort;
+    const icon = th.querySelector('.sort-icon');
+    if (!icon) return;
+    if (key === activeKey) {
+      icon.textContent = tradesSortAsc ? ' ▲' : ' ▼';
+      th.classList.add('sort-active');
+    } else {
+      icon.textContent = ' ⇅';
+      th.classList.remove('sort-active');
+    }
+  });
 }
 
 // Update Report Header
@@ -3125,6 +3282,11 @@ function renderResultsList(results) {
                                 </span>
                                 ${directionBadge}
                                 <span class="result-trades">${r.metrics?.total_trades || 0} trades</span>
+                            </div>
+                            <div class="result-strategy">
+                                <span class="text-secondary" style="font-size:0.75rem;font-weight:600;">
+                                    ${r.config?.strategy_type || r.strategy_type || '—'}
+                                </span>
                             </div>
                             <div class="result-meta">
                                 ${r.symbol} • ${r.interval}
@@ -4455,10 +4617,18 @@ function toggleCompareSelect(event, backtestId) {
     selectedForCompare.push(backtestId);
   }
 
-  document.getElementById('btnCompare').disabled =
-    selectedForCompare.length < 2;
-  document.getElementById('btnAICompare').disabled =
-    selectedForCompare.length < 2;
+  const enoughSelected = selectedForCompare.length >= 2;
+  const tooltipText = enoughSelected
+    ? `Сравнить ${selectedForCompare.length} выбранных бэктеста`
+    : `Выберите 2–3 бэктеста для сравнения (выбрано: ${selectedForCompare.length})`;
+
+  const compareBtn = document.getElementById('btnCompare');
+  compareBtn.disabled = !enoughSelected;
+  compareBtn.title = tooltipText;
+
+  const aiCompareBtn = document.getElementById('btnAICompare');
+  aiCompareBtn.disabled = !enoughSelected;
+  aiCompareBtn.title = tooltipText;
 }
 
 function showNewBacktestModal() {

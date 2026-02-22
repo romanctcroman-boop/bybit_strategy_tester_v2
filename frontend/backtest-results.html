@@ -198,10 +198,10 @@
 
                                 <div class="empty-state d-none" id="emptyState">
                                     <i class="bi bi-inbox"></i>
-                                    <h5>No Backtest Results</h5>
-                                    <p>Run a backtest from the Strategies page to see results here.</p>
+                                    <h5>Нет результатов бэктеста</h5>
+                                    <p>Запустите бэктест на странице «Стратегии», чтобы увидеть результаты здесь.</p>
                                     <a href="strategy-builder.html" class="btn btn-primary btn-sm">
-                                        <i class="bi bi-plus-lg me-1"></i>Create Strategy
+                                        <i class="bi bi-plus-lg me-1"></i>Создать стратегию
                                     </a>
                                 </div>
                             </div>
@@ -248,7 +248,7 @@
                                     <i class="bi bi-columns-gap"></i>
                                     <span>Compare</span>
                                 </button>
-                                <button class="tv-action-btn" onclick="exportResults()" title="Export">
+                                <button class="tv-action-btn" id="btnExportReport" onclick="exportResults()" title="Export">
                                     <i class="bi bi-download"></i>
                                     <span>Export</span>
                                 </button>
@@ -820,14 +820,14 @@
                                         <tr>
                                             <th>№ Сделки</th>
                                             <th>Тип</th>
-                                            <th>Дата и время</th>
+                                            <th data-sort="date" onclick="sortTradesBy('date')" style="cursor:pointer" title="Сортировать по дате">Дата и время<span class="sort-icon"> ⇅</span></th>
                                             <th>Сигнал</th>
                                             <th>Цена</th>
                                             <th>Размер позиции</th>
-                                            <th>Чистая прибыль / убыток</th>
-                                            <th>MFE</th>
-                                            <th>MAE</th>
-                                            <th>Совокупные ПР/УБ</th>
+                                            <th data-sort="pnl" onclick="sortTradesBy('pnl')" style="cursor:pointer" title="Сортировать по прибыли/убытку">Чистая прибыль / убыток<span class="sort-icon"> ⇅</span></th>
+                                            <th data-sort="mfe" onclick="sortTradesBy('mfe')" style="cursor:pointer" title="Сортировать по MFE">MFE<span class="sort-icon"> ⇅</span></th>
+                                            <th data-sort="mae" onclick="sortTradesBy('mae')" style="cursor:pointer" title="Сортировать по MAE">MAE<span class="sort-icon"> ⇅</span></th>
+                                            <th data-sort="cumPnl" onclick="sortTradesBy('cumPnl')" style="cursor:pointer" title="Сортировать по совокупному ПР/УБ">Совокупные ПР/УБ<span class="sort-icon"> ⇅</span></th>
                                         </tr>
                                     </thead>
                                     <tbody id="tvTradesListBody">
