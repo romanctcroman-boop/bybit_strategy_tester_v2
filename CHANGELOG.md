@@ -10,35 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Audit round 2 — remaining 8 ❌ + 4 ⚠️ items fixed (2026-02-22, commit `3134e2b45`):**
-
     - **`models.py` — EngineType enum expanded:**
-        Added `FALLBACK_V4 = "fallback_v4"`, `DCA = "dca"`, `DCA_GRID = "dca_grid"` aliases;
-        `validate_engine_type` now accepts `"fallback_v4"` and normalises it to `"fallback"`;
-        `ADVANCED` docstring notes it delegates to `strategy_builder_adapter` (no dedicated handler).
+      Added `FALLBACK_V4 = "fallback_v4"`, `DCA = "dca"`, `DCA_GRID = "dca_grid"` aliases;
+      `validate_engine_type` now accepts `"fallback_v4"` and normalizes it to `"fallback"`;
+      `ADVANCED` docstring notes it delegates to `strategy_builder_adapter` (no dedicated handler).
 
     - **`engine.py` — three dead-code / correctness fixes:**
-        Removed dead `open_price` variable (was `# noqa: F841`);
-        Fixed MFE/MAE short-position initialisation — both excursion trackers now start from `entry_price` instead of the current bar's `low`/`high`;
-        Added NaN/Inf guard on both `pnl_pct` calculation sites: `pnl_pct = pnl / margin_used if margin_used > 0 else 0` → checks `margin_used > 0`, then rejects NaN/±Inf result with fallback `0.0`.
+      Removed dead `open_price` variable;
+      Fixed MFE/MAE short-position initialization — both excursion trackers now start from `entry_price` instead of the current bar's `low`/`high`;
+      Added NaN/Inf guard on both `pnl_pct` calculation sites: checks `margin_used > 0`, then rejects NaN/Inf result with fallback `0.0`.
 
     - **`builder_optimizer.py` — MACD fast < slow cross-param constraint:**
-        After sampling all trial parameters, scans `overrides` for `*.fast_period` / `*.slow_period` pairs (same block prefix) and clamps `slow_period = max(slow_period, fast_period + 1)` before graph cloning.
+      After sampling all trial parameters, scans `overrides` for `*.fast_period` / `*.slow_period` pairs (same block prefix) and clamps `slow_period = max(slow_period, fast_period + 1)` before graph cloning.
 
     - **`optuna_optimizer.py` — `_sample_params` low ≥ high guard + stop_loss range:**
-        `_sample_params()` now skips any spec where `low >= high` with a `WARNING` log instead of letting Optuna raise `ValueError`;
-        `stop_loss` minimum in both `create_sltp_param_space()` and `create_full_strategy_param_space()` changed `0.01 → 0.001`.
+      `_sample_params()` now skips any spec where `low >= high` with a `WARNING` log instead of letting Optuna raise `ValueError`;
+      `stop_loss` minimum in both `create_sltp_param_space()` and `create_full_strategy_param_space()` changed `0.01 → 0.001`.
 
     - **`strategy_builder_adapter.py` — DCA `grid_size_percent` median-step fix:**
-        Replaced `max(offsets)` (full range, not step size) with the **median inter-order gap** of sorted positive offsets; falls back to the single offset value, then `1.0` for degenerate cases.
+      Replaced `max(offsets)` (full range, not step size) with the **median inter-order gap** of sorted positive offsets; falls back to the single offset value, then `1.0` for degenerate cases.
 
     - **`indicator_handlers.py` — `_clamp_period()` coverage gaps:**
-        Added `_clamp_period()` wrapping to six previously-unguarded period reads:
-        `vol_length1`, `vol_length2` in `_handle_volume_filter`;
-        `hl_lookback_bars`, `atr_hl_length` in `_handle_highest_lowest_bar`;
-        `backtracking_interval`, `min_bars_to_execute` in `_handle_accumulation_areas`.
+      Added `_clamp_period()` wrapping to six previously-unguarded period reads:
+      `vol_length1`, `vol_length2` in `_handle_volume_filter`;
+      `hl_lookback_bars`, `atr_hl_length` in `_handle_highest_lowest_bar`;
+      `backtracking_interval`, `min_bars_to_execute` in `_handle_accumulation_areas`.
 
     - **`optimization/utils.py` — walk-forward split clamp warning level:**
-        `split_candles()` now captures the pre-clamp value and emits `logger.warning(...)` when `train_split` was actually changed by the `max(0.5, min(0.95, …))` clamp; the always-fires `logger.info` log for the final split is retained.
+      `split_candles()` now captures the pre-clamp value and emits `logger.warning(...)` when `train_split` was actually changed by the `max(0.5, min(0.95, …))` clamp; the always-fires `logger.info` log for the final split is retained.
 
 ### Added
 
@@ -51,8 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `_handle_mfi_filter` and `_handle_cci_filter` patched: when `mfi_timeframe` / `cci_timeframe` ≠ chart interval the handler now resamples the OHLCV before computing the indicator. Removed stale `BUG-WARN` comments from both handlers.
 
 - **Фича 3 — `use_btcusdt_mfi`: BTCUSDT OHLCV as MFI data source (2026-02-22):**
-    - `strategy_builder_adapter.py`: `__init__` accepts new `btcusdt_ohlcv: pd.DataFrame | None = None` kwarg; stored as `self._btcusdt_ohlcv`. Added `_requires_btcusdt_data()` helper that scans blocks for `mfi_filter` with `use_btcusdt_mfi=True`.
-    - `api/routers/strategy_builder.py`: after adapter construction, if `_requires_btcusdt_data()` is true, pre-fetches BTCUSDT OHLCV via `BacktestService._fetch_historical_data()` for the same date range/interval and recreates the adapter with the kwarg.
+    - `strategy_builder_adapter.py`: `__init__` accepts new `btcusdt_ohlcv: pd.DataFrame | None = None` keyword argument; stored as `self._btcusdt_ohlcv`. Added `_requires_btcusdt_data()` helper that scans blocks for `mfi_filter` with `use_btcusdt_mfi=True`.
+    - `api/routers/strategy_builder.py`: after adapter construction, if `_requires_btcusdt_data()` is true, pre-fetches BTCUSDT OHLCV via `BacktestService._fetch_historical_data()` for the same date range/interval and recreates the adapter with the new argument.
     - `indicator_handlers.py` `_handle_mfi_filter`: checks `adapter._btcusdt_ohlcv`; if set and `use_btcusdt_mfi=True`, uses that DataFrame instead of the chart symbol's OHLCV; falls back to chart OHLCV silently if not available.
 
 - **Unit tests — 20 new tests for Фичи 1-3 (2026-02-22):**

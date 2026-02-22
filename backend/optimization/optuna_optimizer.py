@@ -18,7 +18,7 @@ try:
     OPTUNA_AVAILABLE = True
 except ImportError:
     OPTUNA_AVAILABLE = False
-    optuna = None
+    optuna = None  # type: ignore[assignment]
 
 from loguru import logger
 
@@ -197,8 +197,8 @@ class OptunaOptimizer:
 
         # Collect all trial info
         all_trials = []
-        value_history = []
-        best_value_history = []
+        value_history: list[float] = []
+        best_value_history: list[float] = []
         running_best = float("-inf") if direction == "maximize" else float("inf")
 
         for trial in study.trials:
@@ -210,21 +210,21 @@ class OptunaOptimizer:
                     "datetime": trial.datetime_complete.isoformat() if trial.datetime_complete else None,
                 }
                 all_trials.append(trial_info)
-                value_history.append(trial.value)
+                trial_val: float = trial.value if trial.value is not None else 0.0
+                value_history.append(trial_val)
 
-                if direction == "maximize":
-                    running_best = max(running_best, trial.value)
-                else:
-                    running_best = min(running_best, trial.value)
+                running_best = max(running_best, trial_val) if direction == "maximize" else min(running_best, trial_val)
                 best_value_history.append(running_best)
 
         logger.info(f"Optimization complete: {n_trials} trials in {optimization_time:.1f}s")
         logger.info(f"Best value: {best_trial.value:.6f}")
         logger.info(f"Best params: {best_trial.params}")
 
+        best_value: float = best_trial.value if best_trial.value is not None else 0.0
+
         return OptunaOptimizationResult(
             best_params=best_trial.params,
-            best_value=best_trial.value,
+            best_value=best_value,
             best_trial_number=best_trial.number,
             n_trials=len(all_trials),
             optimization_time_seconds=optimization_time,
@@ -240,8 +240,8 @@ class OptunaOptimizer:
         param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        directions: list[str] = ["maximize", "maximize"],
-        metric_names: list[str] = ["sharpe", "return"],
+        directions: list[str] | None = None,
+        metric_names: list[str] | None = None,
         study_name: str | None = None,
     ) -> OptunaOptimizationResult:
         """
@@ -259,6 +259,10 @@ class OptunaOptimizer:
         Returns:
             OptunaOptimizationResult with Pareto-optimal solutions
         """
+        if directions is None:
+            directions = ["maximize", "maximize"]
+        if metric_names is None:
+            metric_names = ["sharpe", "return"]
         start_time = datetime.now()
 
         if study_name is None:
@@ -296,7 +300,7 @@ class OptunaOptimizer:
             pareto_solution = {
                 "number": trial.number,
                 "params": trial.params,
-                "values": {name: val for name, val in zip(metric_names, trial.values)},
+                "values": dict(zip(metric_names, trial.values, strict=False)),
             }
             pareto_front.append(pareto_solution)
 
