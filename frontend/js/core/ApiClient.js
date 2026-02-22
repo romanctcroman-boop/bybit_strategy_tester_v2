@@ -289,14 +289,29 @@ export class ApiClient {
    * @returns {AbortSignal}
    */
   _createAbortSignal(timeout = null) {
-    const controller = new AbortController();
     const effectiveTimeout = timeout || this.timeout;
 
     if (effectiveTimeout > 0) {
-      setTimeout(() => controller.abort(), effectiveTimeout);
+      // Prefer AbortSignal.timeout() — automatically clears itself when the
+      // request settles (available in all modern browsers / Node ≥ 17.3).
+      if (typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(effectiveTimeout);
+      }
+
+      // Fallback for older environments: store the timer ID and cancel it
+      // when the signal is aborted externally so the timer never leaks.
+      const controller = new AbortController();
+      const timerId = setTimeout(
+        () => controller.abort(new DOMException('Request timeout', 'TimeoutError')),
+        effectiveTimeout
+      );
+      // Clear the pending timer once the signal fires (for any reason)
+      controller.signal.addEventListener('abort', () => clearTimeout(timerId), { once: true });
+      return controller.signal;
     }
 
-    return controller.signal;
+    // No timeout configured — return a plain signal that can never time out
+    return new AbortController().signal;
   }
 
   /**

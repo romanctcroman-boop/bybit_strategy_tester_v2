@@ -14,6 +14,22 @@
 import { formatDate as _formatDate } from '../utils.js';
 
 // ============================
+// Security utilities
+// ============================
+/**
+ * Escape HTML special characters to prevent XSS injection.
+ * Used whenever server-derived strings are inserted into innerHTML.
+ * @param {*} text - Value to escape (coerced to string)
+ * @returns {string} HTML-escaped string
+ */
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
+
+// ============================
 // Configuration
 // ============================
 const API_BASE = '/api/v1';
@@ -2494,7 +2510,8 @@ async function loadBacktestResults() {
 
   // PRIORITY: Check URL for specific backtest ID first (from optimization/backtest redirect)
   const urlParams = new URLSearchParams(window.location.search);
-  const targetId = urlParams.get('id');
+  // Accept both ?id= (legacy) and ?backtest_id= (sent by strategy_builder)
+  const targetId = urlParams.get('backtest_id') || urlParams.get('id');
 
   if (targetId) {
     console.log('[loadBacktestResults] URL contains targetId:', targetId);
@@ -4549,6 +4566,9 @@ async function requestAIAnalysis() {
       body: JSON.stringify([currentBacktest])
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
     const analysis = await response.json();
 
     // Build rich HTML from AI analysis
@@ -4570,45 +4590,45 @@ async function requestAIAnalysis() {
     // Grade & confidence badge row
     if (grade || confidence) {
       html += '<div class="d-flex gap-2 mb-2 flex-wrap">';
-      if (grade) html += `<span class="badge bg-primary fs-6">Оценка: ${grade}</span>`;
-      if (confidence) html += `<span class="badge bg-info fs-6">Уверенность: ${confidence}%</span>`;
-      if (overfitRisk) html += `<span class="badge bg-${overfitClass} fs-6">Переобучение: ${overfitRisk}</span>`;
-      if (regime) html += `<span class="badge bg-secondary fs-6">Режим: ${regime}</span>`;
+      if (grade) html += `<span class="badge bg-primary fs-6">Оценка: ${escapeHtml(grade)}</span>`;
+      if (confidence) html += `<span class="badge bg-info fs-6">Уверенность: ${escapeHtml(confidence)}%</span>`;
+      if (overfitRisk) html += `<span class="badge bg-${overfitClass} fs-6">Переобучение: ${escapeHtml(overfitRisk)}</span>`;
+      if (regime) html += `<span class="badge bg-secondary fs-6">Режим: ${escapeHtml(regime)}</span>`;
       html += '</div>';
     }
 
     // Summary
-    html += `<div class="mb-2"><strong>📊 Резюме:</strong><br>${summary}</div>`;
+    html += `<div class="mb-2"><strong>📊 Резюме:</strong><br>${escapeHtml(summary)}</div>`;
 
     // Risk assessment
     if (risk) {
-      html += `<div class="mb-2"><strong>⚠️ Оценка рисков:</strong><br>${risk}</div>`;
+      html += `<div class="mb-2"><strong>⚠️ Оценка рисков:</strong><br>${escapeHtml(risk)}</div>`;
     }
 
     // Strengths
     if (strengths.length > 0) {
       html += '<div class="mb-2"><strong>✅ Сильные стороны:</strong><ul>';
-      strengths.forEach(s => { html += `<li>${s}</li>`; });
+      strengths.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
       html += '</ul></div>';
     }
 
     // Weaknesses
     if (weaknesses.length > 0) {
       html += '<div class="mb-2"><strong>❌ Слабые стороны:</strong><ul>';
-      weaknesses.forEach(w => { html += `<li>${w}</li>`; });
+      weaknesses.forEach(w => { html += `<li>${escapeHtml(w)}</li>`; });
       html += '</ul></div>';
     }
 
     // Recommendations
     if (recs.length > 0) {
       html += '<div class="mb-2"><strong>💡 Рекомендации:</strong><ol>';
-      recs.forEach(r => { html += `<li>${r}</li>`; });
+      recs.forEach(r => { html += `<li>${escapeHtml(r)}</li>`; });
       html += '</ol></div>';
     }
 
     // Agents footer
     if (agents.length > 0) {
-      html += `<div class="text-muted small mt-2">🤖 Агенты: ${agents.join(', ')}</div>`;
+      html += `<div class="text-muted small mt-2">🤖 Агенты: ${escapeHtml(agents.join(', '))}</div>`;
     }
 
     html += '</div>';
@@ -4648,11 +4668,14 @@ async function compareWithAI() {
       body: JSON.stringify(results)
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
     const analysis = await response.json();
 
     document.getElementById('aiAnalysisContent').innerHTML = `
                     <strong>Comparison Result:</strong><br>
-                    ${analysis.recommendation || analysis.comparison || 'Comparison complete.'}
+                    ${escapeHtml(analysis.recommendation || analysis.comparison || 'Comparison complete.')}
                 `;
 
     showToast('AI comparison complete', 'success');
@@ -4987,9 +5010,13 @@ async function updatePriceChart(backtest) {
   const symbol = backtest.config.symbol || 'BTCUSDT';
   const interval = backtest.config.interval || '60';
 
-  // Update title
+  // Update title — use DOM manipulation to avoid XSS (symbol comes from server data)
   if (titleEl) {
-    titleEl.innerHTML = `<i class="bi bi-graph-up-arrow me-1"></i>${symbol} — ${formatInterval(interval)}`;
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-graph-up-arrow me-1';
+    titleEl.textContent = '';
+    titleEl.appendChild(icon);
+    titleEl.appendChild(document.createTextNode(`${symbol} — ${formatInterval(interval)}`));
   }
 
   try {

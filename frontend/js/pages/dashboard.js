@@ -1516,7 +1516,7 @@ function renderMarketOverview() {
     if (!container) return;
 
     container.innerHTML = marketData.map(m => `
-                <div class="market-card" onclick="window.location.href='market-chart.html?symbol=${m.symbol}'">
+                <div class="market-card" data-symbol="${escapeHtml(m.symbol)}">
                     <div class="market-icon" style="background: ${m.color}22; color: ${m.color}">
                         ${m.icon}
                     </div>
@@ -1536,6 +1536,16 @@ function renderMarketOverview() {
 
 function initMarketOverview() {
     renderMarketOverview();
+    // Safe click handler using event delegation — avoids inline onclick XSS (symbol in onclick attribute)
+    const container = document.getElementById('marketOverview');
+    if (container) {
+        container.addEventListener('click', (e) => {
+            const card = e.target.closest('.market-card[data-symbol]');
+            if (card) {
+                window.location.href = `market-chart.html?symbol=${encodeURIComponent(card.dataset.symbol)}`;
+            }
+        });
+    }
     // Fetch real data immediately
     fetchMarketData();
     // NOTE: Interval now managed by IntervalManager in DOMContentLoaded
