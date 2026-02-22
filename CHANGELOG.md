@@ -9,12 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **AI optimizer — 3 optimize-mode pipeline bugs fixed (2026-02-22, commit `e2ecd1dab`):**
+
+    **`frontend/js/pages/strategy_builder.js` — Fix #1: empty blocks sent in optimize mode:**
+    - Was: `payload.blocks = []; payload.connections = []` — agents received an empty graph with nothing to analyze.
+    - Now: serializes the live canvas state (`strategyBlocks` + `connections`) into the payload so the backend gets the real graph without an extra API round-trip. Each block maps to `{id, type, name, params}`; each connection normalizes `sourceBlockId`/`source_block_id`/`source` key aliases for cross-version compat.
+
+    **`backend/agents/workflows/builder_workflow.py` — Fix #1b: deliberation ran before strategy was loaded:**
+    - Was: `_plan_blocks → deliberation → load existing strategy` (deliberation always saw empty `config.blocks`).
+    - Now: `load existing strategy → _plan_blocks (new only) → deliberation` — deliberation always sees populated `config.blocks`. The block loader also prefers the canvas payload blocks (fast path) and falls back to `builder_graph.blocks` if the top-level API blocks list lacks params.
+
+    **`backend/agents/mcp/tools/strategy_builder.py` — Fix #2a: new `builder_clone_strategy()` MCP tool:**
+    - Wraps the already-existing `POST /strategies/{id}/clone` REST endpoint.
+    - Returns `{id, name, block_count, connection_count, timeframe, symbol, created_at}`.
+
+    **`backend/agents/workflows/builder_workflow.py` — Fix #2b: version snapshots saved to DB per iteration:**
+    - After each successful block-param update, clones the strategy as `{base_name}_v{iteration}` so parameter history survives page reload.
+    - Stores `version_name` and `version_strategy_id` in `iteration_record` for UI display.
+
+    **`backend/agents/workflows/builder_workflow.py` — Fix #3: silent no-op iterations halted:**
+    - Was: if `builder_update_block_params()` failed, the loop continued and ran another identical backtest.
+    - Now: tracks `failed_blocks` list; if **all** updates in an iteration failed, logs a warning and `continue`s — skipping the backtest for that iteration.
+    - On each successful update: syncs `b["params"]` in `self._result.blocks_added` so `_describe_graph_for_agents()` shows the new values in the next iteration's prompt.
+
 - **AI optimizer agents no longer destroy the existing strategy graph during optimization (2026-02-22, commit `b8e26690c`):**
 
     **`backend/agents/workflows/builder_workflow.py`:**
     - **Root cause:** `_suggest_adjustments` sent agents only a bare list of block types and params, with zero context about the visual node-graph system, the signal-flow topology, or the constraint that structural changes were forbidden. Agents had no way to distinguish between an RSI block, an AND logic gate, or a STRATEGY aggregator — so they proposed reconstructing the strategy from scratch, replacing complex multi-indicator graphs (CCI + MFI + RSI + MACD + Supertrend → AND gates) with simplified structures.
-    - **Added `_describe_graph_for_agents()` static helper:** formats the full visual graph for agent prompts — every block with its type, role description (e.g. *"logic gate (output True only when ALL inputs are True)"*), and current parameter values; every connection as a port-level signal-flow line (`rsi_14:long_signal → and_1:input_a`); an explanation of the Indicator → Condition → Logic → Action → STRATEGY signal-flow model; and a hard constraint header *"do NOT add/remove/reconnect blocks"*.
-    - **Rewrote `_suggest_adjustments` prompt:** injects the full graph description at the top; explains all four block categories; provides a separate *tunable blocks* list alongside the complete topology; uses `❌/✅` constraint markers so LLMs reliably respect structural boundaries.
+    - **Added `_describe_graph_for_agents()` static helper:** formats the full visual graph for agent prompts — every block with its type, role description (e.g. _"logic gate (output True only when ALL inputs are True)"_), and current parameter values; every connection as a port-level signal-flow line (`rsi_14:long_signal → and_1:input_a`); an explanation of the Indicator → Condition → Logic → Action → STRATEGY signal-flow model; and a hard constraint header _"do NOT add/remove/reconnect blocks"_.
+    - **Rewrote `_suggest_adjustments` prompt:** injects the full graph description at the top; explains all four block categories; provides a separate _tunable blocks_ list alongside the complete topology; uses `❌/✅` constraint markers so LLMs reliably respect structural boundaries.
     - **Fixed `blocks_summary` filter bug:** was `if b.get("params")` — silently dropped every logic gate, buy/sell action, price block, and strategy node from the agent's view. Now all blocks are included in the summary (no filter).
     - **Improved optimize-mode blocks loading:** if the REST API's top-level `blocks` list has no `params` (can happen for older saved strategies), workflow now falls back to `builder_graph.blocks`; same fallback for connections; logs count of blocks-with-params for observability.
     - **Passes `connections` to `_suggest_adjustments`:** the call site now forwards `connections=self._result.connections_made` so the graph topology is always available to the prompt builder.
