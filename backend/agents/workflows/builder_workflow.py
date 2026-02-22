@@ -343,7 +343,13 @@ class BuilderWorkflow:
                 self._result.strategy_id = config.existing_strategy_id
                 logger.info(f"[BuilderWorkflow] Optimize mode — using existing strategy: {config.existing_strategy_id}")
 
-                # Fetch existing strategy state for iteration context
+                # Fetch existing strategy state for iteration context.
+                # We need both blocks (with params) and connections (graph topology)
+                # so that _suggest_adjustments can describe the full visual graph
+                # to the agents.  The REST API returns:
+                #   top-level "blocks"      → builder_blocks (full block dicts with params)
+                #   top-level "connections" → builder_connections
+                #   "builder_graph"         → raw saved graph (alternative source)
                 self._set_stage(BuilderStage.CREATING)
                 try:
                     from backend.agents.mcp.tools.strategy_builder import (
@@ -352,11 +358,31 @@ class BuilderWorkflow:
 
                     existing = await builder_get_strategy(config.existing_strategy_id)
                     if isinstance(existing, dict) and "error" not in existing:
-                        self._result.blocks_added = existing.get("blocks", [])
-                        self._result.connections_made = existing.get("connections", [])
+                        raw_blocks = existing.get("blocks", [])
+                        raw_connections = existing.get("connections", [])
+
+                        # Fallback: if top-level blocks list is sparse (no params),
+                        # try to pull richer block data from builder_graph.blocks
+                        if raw_blocks and not any(b.get("params") for b in raw_blocks):
+                            graph = existing.get("builder_graph") or {}
+                            graph_blocks = graph.get("blocks", [])
+                            if graph_blocks and any(b.get("params") for b in graph_blocks):
+                                logger.info(
+                                    "[BuilderWorkflow] Using builder_graph.blocks (richer params)"
+                                )
+                                raw_blocks = graph_blocks
+
+                        # Same fallback for connections
+                        if not raw_connections:
+                            graph = existing.get("builder_graph") or {}
+                            raw_connections = graph.get("connections", [])
+
+                        self._result.blocks_added = raw_blocks
+                        self._result.connections_made = raw_connections
                         logger.info(
                             f"[BuilderWorkflow] Loaded existing strategy: "
-                            f"{len(self._result.blocks_added)} blocks, "
+                            f"{len(self._result.blocks_added)} blocks "
+                            f"({sum(1 for b in self._result.blocks_added if b.get('params'))} with params), "
                             f"{len(self._result.connections_made)} connections"
                         )
                     else:
@@ -470,7 +496,11 @@ class BuilderWorkflow:
                 # --- Iterative parameter adjustment ---
                 self._set_stage(BuilderStage.ITERATING)
                 adjustments = await self._suggest_adjustments(
-                    config.blocks, self._result.blocks_added, iteration, metrics
+                    config.blocks,
+                    self._result.blocks_added,
+                    iteration,
+                    metrics,
+                    connections=self._result.connections_made,
                 )
 
                 if not adjustments:
@@ -1263,19 +1293,180 @@ Recommended approach for positive profit (EMA + RSI combination):
         logger.info(f"[BuilderWorkflow] Auto-wired {len(auto_connections)} connections")
         return auto_connections
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Graph description helper — formats visual block graph for agent prompts
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _describe_graph_for_agents(
+        blocks: list[dict[str, Any]],
+        connections: list[dict[str, Any]],
+    ) -> str:
+        """Format the visual node graph as human-readable text for agent prompts.
+
+        Produces a compact but complete description of the block graph:
+        block IDs, types, roles, current parameters, and the signal-flow
+        connections between them.  This is injected into every agent prompt so
+        that agents understand the existing graph structure before suggesting
+        any parameter changes.
+
+        Args:
+            blocks: List of block dicts with at least ``id``, ``type``, and
+                optional ``name``/``params`` keys.
+            connections: List of connection dicts with ``source_block_id``,
+                ``source_port``, ``target_block_id``, ``target_port`` keys.
+                The REST API also emits ``source``/``target`` aliases.
+
+        Returns:
+            Multi-line human-readable string describing the graph.
+        """
+        _BLOCK_ROLE = {
+            # Indicators — compute numeric values from price data
+            "rsi": "indicator (RSI momentum oscillator, output: long_signal/short_signal)",
+            "ema": "indicator (Exponential Moving Average, output: value)",
+            "sma": "indicator (Simple Moving Average, output: value)",
+            "macd": "indicator (MACD momentum, output: macd/signal/histogram/long_signal/short_signal)",
+            "bollinger": "indicator (Bollinger Bands, output: upper/middle/lower/long_signal/short_signal)",
+            "bbands": "indicator (Bollinger Bands, output: upper/middle/lower/long_signal/short_signal)",
+            "atr": "indicator (Average True Range volatility, output: value)",
+            "stochastic": "indicator (Stochastic oscillator, output: k/d/long_signal/short_signal)",
+            "stoch": "indicator (Stochastic oscillator, output: k/d/long_signal/short_signal)",
+            "adx": "indicator (Average Directional Index trend strength, output: adx/plus_di/minus_di)",
+            "supertrend": "indicator (SuperTrend trend-follower, output: direction/long_signal/short_signal)",
+            "vwap": "indicator (Volume Weighted Average Price, output: value)",
+            "cci": "indicator (Commodity Channel Index, output: value/long_signal/short_signal)",
+            "williams_r": "indicator (Williams %R oscillator, output: value/long_signal/short_signal)",
+            "mfi": "indicator (Money Flow Index volume-oscillator, output: value/long_signal/short_signal)",
+            "roc": "indicator (Rate of Change momentum, output: value)",
+            "momentum": "indicator (Momentum oscillator, output: value)",
+            "obv": "indicator (On-Balance Volume, output: value)",
+            # Conditions — evaluate a boolean True/False signal
+            "crossover": "condition (True when input_a crosses ABOVE input_b, output: result)",
+            "crossunder": "condition (True when input_a crosses BELOW input_b, output: result)",
+            "greater_than": "condition (True when input_a > input_b, output: result)",
+            "less_than": "condition (True when input_a < input_b, output: result)",
+            "between": "condition (True when value is between lower/upper bounds, output: result)",
+            "equals": "condition (True when input_a == input_b, output: result)",
+            # Logic gates — combine boolean signals
+            "and": "logic gate (output True only when ALL inputs are True, output: result)",
+            "or": "logic gate (output True when ANY input is True, output: result)",
+            "not": "logic gate (inverts boolean input, output: result)",
+            # Data sources
+            "price": "data source (emits OHLCV price data, output: close/open/high/low/volume)",
+            # Actions — trigger trade entries/exits
+            "buy": "action (triggers LONG entry when signal=True)",
+            "buy_market": "action (triggers LONG market entry when signal=True)",
+            "sell": "action (triggers SHORT entry when signal=True)",
+            "sell_market": "action (triggers SHORT market entry when signal=True)",
+            "close_long": "action (closes LONG position when signal=True)",
+            "close_short": "action (closes SHORT position when signal=True)",
+            "close_all": "action (closes ALL positions when signal=True)",
+            # Risk management
+            "static_sltp": "risk management (fixed Stop-Loss/Take-Profit percentages)",
+            "atr_sltp": "risk management (ATR-based dynamic Stop-Loss/Take-Profit)",
+            "trailing_stop_exit": "risk management (trailing stop exit)",
+            # Strategy aggregator
+            "strategy": "strategy node (MAIN NODE — aggregates all action signals into the backtest engine)",
+        }
+
+        lines: list[str] = []
+
+        lines.append("STRATEGY GRAPH (visual node editor):")
+        lines.append(
+            "Each block is a node. Connections carry signals between ports. "
+            "The STRATEGY node is the final aggregator — all trade signals must reach it."
+        )
+        lines.append("")
+        lines.append("BLOCKS (do NOT add, remove, or rename any block):")
+
+        # Identify which block IDs are tunable (have actual params to adjust)
+        _TUNABLE_TYPES = {
+            "rsi",
+            "ema",
+            "sma",
+            "macd",
+            "bollinger",
+            "bbands",
+            "atr",
+            "stochastic",
+            "stoch",
+            "adx",
+            "supertrend",
+            "vwap",
+            "cci",
+            "williams_r",
+            "mfi",
+            "roc",
+            "momentum",
+            "obv",
+            "static_sltp",
+            "atr_sltp",
+            "crossover",
+            "crossunder",
+            "greater_than",
+            "less_than",
+            "between",
+        }
+
+        for b in blocks:
+            bid = b.get("id") or b.get("block_id", "?")
+            btype = (b.get("type") or b.get("block_type", "unknown")).lower()
+            bname = b.get("name") or btype.upper()
+            params = b.get("params") or {}
+            role = _BLOCK_ROLE.get(btype, f"block (type={btype})")
+            tunable = "✏️ tunable" if (btype in _TUNABLE_TYPES and params) else "🔒 no params"
+
+            if params:
+                params_str = ", ".join(f"{k}={v}" for k, v in params.items())
+                lines.append(f"  • [{bid}] {bname} ({role}) — params: {{{params_str}}} [{tunable}]")
+            else:
+                lines.append(f"  • [{bid}] {bname} ({role}) [{tunable}]")
+
+        lines.append("")
+        lines.append("SIGNAL FLOW (connections — do NOT change any connection):")
+
+        # Normalise connection keys — REST API uses both source_block_id and source
+        def _src_id(c: dict[str, Any]) -> str:
+            return c.get("source_block_id") or c.get("source") or "?"
+
+        def _tgt_id(c: dict[str, Any]) -> str:
+            return c.get("target_block_id") or c.get("target") or "?"
+
+        def _src_port(c: dict[str, Any]) -> str:
+            return c.get("source_port") or "out"
+
+        def _tgt_port(c: dict[str, Any]) -> str:
+            return c.get("target_port") or "in"
+
+        if connections:
+            for conn in connections:
+                lines.append(f"  {_src_id(conn)}:{_src_port(conn)}  →  {_tgt_id(conn)}:{_tgt_port(conn)}")
+        else:
+            lines.append("  (no connections stored — infer from block roles)")
+
+        lines.append("")
+        lines.append(
+            "⚠️  CONSTRAINT: You may ONLY suggest changes to parameter VALUES of existing blocks. "
+            "Do NOT add new blocks, remove blocks, or change any connections."
+        )
+
+        return "\n".join(lines)
+
     async def _suggest_adjustments(
         self,
         block_defs: list[dict[str, Any]],
         blocks_added: list[dict[str, Any]],
         iteration: int,
         metrics: dict[str, Any],
+        connections: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Use a 3-agent parallel consensus to suggest parameter adjustments.
 
-        Sends current blocks + metrics to DeepSeek, Qwen, and Perplexity in
+        Sends the complete visual block graph (blocks + connections + topology)
+        along with backtest metrics to DeepSeek, Qwen, and Perplexity in
         parallel via AgentToAgentCommunicator.parallel_consensus().  Each agent
-        proposes adjustments from its own perspective (quant, technical,
-        macro/sentiment), then their responses are merged: adjustments that
+        proposes parameter-only adjustments; structural changes are explicitly
+        forbidden in the prompt.  Their responses are merged: adjustments that
         appear in 2+ responses take priority.
 
         Falls back to a single DeepSeek call if A2A is unavailable, and to
@@ -1286,45 +1477,100 @@ Recommended approach for positive profit (EMA + RSI combination):
             blocks_added: Actual blocks added (with IDs and current params).
             iteration: Current iteration number (1-based).
             metrics: Backtest metrics from the last run.
+            connections: Current connections list (for graph topology context).
 
         Returns:
             List of ``{"block_id": ..., "params": {...}}`` adjustments.
         """
+        # Include ALL blocks in the summary — never filter by params presence,
+        # because logic gates / buy / sell blocks without params are still
+        # important for the agent to understand the graph structure.
         blocks_summary = [
-            {"id": b.get("id"), "type": b.get("type"), "params": b.get("params", {})}
-            for b in blocks_added
-            if b.get("params")
+            {"id": b.get("id"), "type": b.get("type"), "params": b.get("params") or {}} for b in blocks_added
         ]
+
+        # Build a human-readable graph description for the agent prompt
+        graph_description = self._describe_graph_for_agents(
+            blocks=blocks_added,
+            connections=connections or self._result.connections_made or [],
+        )
 
         win_rate = metrics.get("win_rate", 0)
         # Normalise — API returns percentage (52.11) not fraction (0.52)
         if win_rate > 1:
             win_rate = win_rate / 100.0
 
-        prompt = f"""You are a quant strategy optimizer. PRIMARY GOAL: make Net Profit POSITIVE.
+        # List only the tunable blocks (those with non-empty params) for the
+        # adjustment section — purely to help agents focus their output.
+        tunable_blocks = [b for b in blocks_summary if b.get("params")]
+        tunable_json = json.dumps(tunable_blocks, indent=2)
 
-Current backtest results (iteration {iteration}):
-- Sharpe Ratio: {metrics.get("sharpe_ratio", 0):.3f}
-- Win Rate: {win_rate:.1%}
-- Max Drawdown: {abs(metrics.get("max_drawdown_pct", 0)):.1f}%
-- Net Profit: {metrics.get("net_profit", 0):.2f} {"✅" if metrics.get("net_profit", 0) > 0 else "❌ MUST FIX"}
-- Total Trades: {metrics.get("total_trades", 0)} {"(too many — reduce frequency)" if metrics.get("total_trades", 0) > 300 else ""}
+        prompt = f"""You are a quantitative strategy parameter optimizer.
 
-Current blocks and parameters:
-{json.dumps(blocks_summary, indent=2)}
+══════════════════════════════════════════════════════════════
+HOW THE VISUAL STRATEGY BUILDER WORKS
+══════════════════════════════════════════════════════════════
+The strategy is a VISUAL NODE GRAPH — a set of typed blocks connected
+by ports.  Signal flows left-to-right:
 
-Profitability rules:
-1. If Net Profit < 0: the strategy loses money — MUST change parameters significantly
-2. static_sltp: take_profit_percent MUST be ≥ 2x stop_loss_percent (positive risk/reward)
-3. If too many trades (>200): widen RSI thresholds, increase EMA periods to reduce noise
-4. If win rate < 40%: tighten entry conditions (RSI overbought lower, oversold higher)
-5. If max drawdown > 30%: reduce stop_loss_percent or add tighter exit conditions
+  PRICE → INDICATOR(s) → CONDITION(s) / LOGIC GATE(s) → ACTION(s) → STRATEGY
 
-Suggest parameter adjustments to make Net Profit positive and improve Sharpe ratio.
-Return ONLY a JSON array of adjustments. Each item: {{"block_id": "...", "params": {{"key": value}}}}.
-Only include blocks that need changes. Only include changed parameters.
-Return [] if strategy is already profitable and Sharpe > 1.0.
-Do not include explanations, only the JSON array."""
+• Indicator blocks (rsi, ema, macd, cci, mfi, supertrend, …) read price
+  data and output numeric values or boolean long_signal/short_signal.
+• Condition blocks (crossover, greater_than, …) compare inputs and output
+  True/False.
+• Logic gate blocks (and, or, not) combine boolean signals — they do NOT
+  generate new signals, they only filter/combine existing ones.
+• Action blocks (buy, sell, close_long, …) trigger trade entries/exits.
+• The STRATEGY node is the final aggregator — receives entry_long,
+  entry_short, exit_long, exit_short signals and drives the backtester.
+• Risk blocks (static_sltp, atr_sltp) set Stop-Loss and Take-Profit.
+
+══════════════════════════════════════════════════════════════
+CURRENT STRATEGY GRAPH (existing — DO NOT CHANGE STRUCTURE)
+══════════════════════════════════════════════════════════════
+{graph_description}
+
+══════════════════════════════════════════════════════════════
+LAST BACKTEST RESULTS (iteration {iteration})
+══════════════════════════════════════════════════════════════
+• Sharpe Ratio  : {metrics.get("sharpe_ratio", 0):.3f}
+• Win Rate      : {win_rate:.1%}
+• Max Drawdown  : {abs(metrics.get("max_drawdown_pct", 0)):.1f}%
+• Net Profit    : {metrics.get("net_profit", 0):.2f} {"✅ profitable" if metrics.get("net_profit", 0) > 0 else "❌ LOSING MONEY — must fix"}
+• Total Trades  : {metrics.get("total_trades", 0)}{"  ← too many, reduce signal frequency" if metrics.get("total_trades", 0) > 300 else ""}
+
+══════════════════════════════════════════════════════════════
+TUNABLE BLOCKS (only these have adjustable parameters)
+══════════════════════════════════════════════════════════════
+{tunable_json}
+
+══════════════════════════════════════════════════════════════
+YOUR TASK
+══════════════════════════════════════════════════════════════
+Suggest PARAMETER VALUE changes to improve Net Profit and Sharpe Ratio.
+
+ABSOLUTE CONSTRAINTS — violating these will break the strategy:
+1. ❌ Do NOT add any new blocks.
+2. ❌ Do NOT remove any blocks.
+3. ❌ Do NOT change any connections between blocks.
+4. ❌ Do NOT suggest changes to buy/sell/logic/strategy/price blocks (they have no params).
+5. ✅ Only change numeric parameter values of indicator and risk-management blocks.
+
+PROFITABILITY RULES:
+• Net Profit < 0 → change parameters SIGNIFICANTLY (strategy is losing money).
+• static_sltp: take_profit_percent MUST be >= 2x stop_loss_percent.
+• Total Trades > 200 → widen indicator thresholds or increase periods to reduce noise.
+• Win Rate < 40% → tighten entry conditions (RSI: raise overbought, lower oversold).
+• Max Drawdown > 30% → tighten stop_loss_percent.
+• If already profitable and Sharpe ≥ 1.0 → return empty array [].
+
+OUTPUT FORMAT — return ONLY a JSON array, no explanation:
+[{{"block_id": "exact_block_id_here", "params": {{"param_name": new_value}}}}]
+
+Use the exact block IDs from the TUNABLE BLOCKS list above.
+Only include blocks that need changes.
+Only include the specific parameters that should change."""
 
         # ── Try multi-agent consensus first (A2A parallel) ────────────────────
         try:
