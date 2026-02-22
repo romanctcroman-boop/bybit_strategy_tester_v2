@@ -703,6 +703,28 @@ class BacktestConfig(BaseModel):
 
         return self
 
+    @model_validator(mode="after")
+    def validate_strategy_params(self):
+        """Validate cross-field constraints in strategy_params (fast < slow period)."""
+        params = self.strategy_params or {}
+        strategy = str(self.strategy_type)
+
+        # SMA/EMA crossover: fast_period must be < slow_period
+        if strategy in ("sma_crossover", "ema_crossover"):
+            fast = params.get("fast_period") or params.get("fast_ma_period")
+            slow = params.get("slow_period") or params.get("slow_ma_period")
+            if fast is not None and slow is not None and int(fast) >= int(slow):
+                raise ValueError(f"strategy_params: fast_period ({fast}) must be less than slow_period ({slow})")
+
+        # MACD: fast_period < slow_period
+        if strategy == "macd":
+            fast = params.get("fast_period") or params.get("macd_fast")
+            slow = params.get("slow_period") or params.get("macd_slow")
+            if fast is not None and slow is not None and int(fast) >= int(slow):
+                raise ValueError(f"strategy_params: MACD fast_period ({fast}) must be less than slow_period ({slow})")
+
+        return self
+
 
 class TradeRecord(BaseModel):
     """Single trade record with TradingView-compatible metrics"""

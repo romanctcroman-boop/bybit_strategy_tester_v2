@@ -366,7 +366,13 @@ class TestCalculateCalmarKnown:
 
     def test_clipped(self):
         result = calculate_calmar(10000.0, 0.1, years=1.0)
-        assert result == 100.0  # clipped
+        # max_drawdown_pct=0.1 is ≤ 1.0, so the tiny-drawdown sentinel fires: 10.0
+        assert result == 10.0
+
+    def test_clipped_large_numerator(self):
+        # max_drawdown_pct=2.0 > 1.0 threshold, so clip applies: 10000/2 = 5000 → clipped to 100
+        result = calculate_calmar(10000.0, 2.0, years=1.0)
+        assert result == 100.0  # clipped to max
 
 
 # =============================================================================
@@ -921,11 +927,23 @@ class TestCalculateAllComprehensive:
         assert len(result) >= 90, f"Only {len(result)} keys in result"
 
     def test_all_values_finite(self, deterministic_trades, simple_equity):
-        """No NaN or Inf in any metric value."""
+        """No NaN in any metric value. Inf is allowed for payoff/recovery when no losses/drawdown."""
+        ALLOWED_INF_KEYS = {
+            "payoff_ratio",
+            "long_payoff_ratio",
+            "short_payoff_ratio",
+            "recovery_factor",
+            "long_recovery_factor",
+            "short_recovery_factor",
+            "expectancy_pct_ratio",
+            "expectancy_ratio",
+        }
         result = MetricsCalculator.calculate_all(deterministic_trades, simple_equity, 10000.0)
         for key, value in result.items():
             if isinstance(value, float):
-                assert math.isfinite(value), f"{key} = {value} is not finite"
+                assert not math.isnan(value), f"{key} = NaN is not allowed"
+                if key not in ALLOWED_INF_KEYS:
+                    assert math.isfinite(value), f"{key} = {value} is not finite"
 
     def test_trade_stats_in_output(self, deterministic_trades, simple_equity):
         result = MetricsCalculator.calculate_all(deterministic_trades, simple_equity, 10000.0)

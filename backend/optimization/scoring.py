@@ -36,6 +36,7 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     max_drawdown = max_drawdown_pct / 100.0
     win_rate_pct = result.get("win_rate", 0) or 0
     profit_factor = result.get("profit_factor", 0) or 0  # 0 for losers, not 1
+    profit_factor = min(profit_factor, 999.0)  # cap to avoid runaway scores from tiny loss baselines
 
     # Simple metrics (higher = better)
     if metric == "net_profit":
@@ -55,7 +56,8 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     elif metric == "expectancy":
         return result.get("expectancy", 0) or 0
     elif metric == "recovery_factor":
-        return result.get("recovery_factor", 0) or 0
+        rf = result.get("recovery_factor", 0) or 0
+        return min(rf, 999.0) if rf != float("inf") else 999.0
     elif metric == "avg_win":
         return result.get("avg_win", 0) or 0
     elif metric == "payoff_ratio":
@@ -85,7 +87,7 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
 
     # Computed composite metrics
     elif metric == "calmar_ratio":
-        if max_drawdown_pct > 0.01:
+        if max_drawdown_pct > 1.0:
             return total_return / max_drawdown_pct
         return total_return * 10 if total_return > 0 else total_return
     elif metric == "risk_adjusted_return":

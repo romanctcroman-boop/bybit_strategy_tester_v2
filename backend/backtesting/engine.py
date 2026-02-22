@@ -1362,9 +1362,9 @@ class BacktestEngine:
                 end_ts = int(ohlcv.index[-1].timestamp() * 1000) + 3600000  # +1h buffer
 
                 db_path = Path(__file__).parent.parent.parent / "data.sqlite3"
-                conn = sqlite3.connect(str(db_path))
-                m1_df = pd.read_sql(
-                    """
+                with sqlite3.connect(str(db_path)) as conn:
+                    m1_df = pd.read_sql(
+                        """
                     SELECT open_time, open_price as open, high_price as high,
                            low_price as low, close_price as close, volume
                     FROM bybit_kline_audit
@@ -1373,10 +1373,9 @@ class BacktestEngine:
                     ORDER BY open_time ASC
                     LIMIT ?
                     """,
-                    conn,
-                    params=[config.symbol.upper(), start_ts, end_ts, max_bars],
-                )
-                conn.close()
+                        conn,
+                        params=[config.symbol.upper(), start_ts, end_ts, max_bars],
+                    )
 
                 if len(m1_df) > 0:
                     intrabar_engine.load_m1_data(m1_df)

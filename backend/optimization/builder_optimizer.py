@@ -894,10 +894,10 @@ def run_builder_optuna_search(
         result = run_builder_backtest(modified_graph, ohlcv, config_params)
 
         if result is None:
-            return float("-inf")
+            raise optuna.TrialPruned()
 
         if not passes_filters(result, config_params):
-            return float("-inf")
+            raise optuna.TrialPruned()
 
         return calculate_composite_score(result, optimize_metric, weights)
 

@@ -431,7 +431,7 @@ def calculate_calmar(
     Uses compound annual growth rate (CAGR) for multi-year periods.
     For single year (years <= 1), total_return_pct is used directly as CAGR.
     """
-    if abs(max_drawdown_pct) <= 0.01:
+    if abs(max_drawdown_pct) <= 1.0:
         return 10.0 if total_return_pct > 0 else 0.0
 
     # Use compound CAGR for multi-year periods
@@ -881,6 +881,8 @@ class MetricsCalculator:
         # Payoff ratio
         if metrics.avg_loss != 0:
             metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss)
+        else:
+            metrics.payoff_ratio = float("inf") if metrics.avg_win > 0 else 0.0
 
         # Bars
         metrics.avg_bars_held = np.mean(bars_list) if bars_list else 0.0
@@ -1009,6 +1011,9 @@ class MetricsCalculator:
         if metrics.max_drawdown_value > 0:
             net_profit = final_capital - initial_capital
             metrics.recovery_factor = net_profit / metrics.max_drawdown_value
+        else:
+            net_profit = final_capital - initial_capital
+            metrics.recovery_factor = float("inf") if net_profit > 0 else 0.0
 
         # Margin Efficiency
         if margin_used > 0:
@@ -1272,6 +1277,10 @@ class MetricsCalculator:
         if trade_m.total_trades > 0:
             win_frac = trade_m.winning_trades / trade_m.total_trades
             expectancy, expectancy_ratio = calculate_expectancy(win_frac, trade_m.avg_win, trade_m.avg_loss)
+            # expectancy_pct: uses percent avg_win/avg_loss for a normalised "R" representation
+            expectancy_pct, expectancy_pct_ratio = calculate_expectancy(
+                win_frac, trade_m.avg_win_pct, trade_m.avg_loss_pct
+            )
 
             # SQN (System Quality Number) calculation
             # Extract PnLs from trades again to compute StdDev
@@ -1306,6 +1315,7 @@ class MetricsCalculator:
 
         else:
             expectancy, expectancy_ratio = 0.0, 0.0
+            expectancy_pct, expectancy_pct_ratio = 0.0, 0.0
 
         # Combine into dictionary
         result = {
@@ -1363,6 +1373,8 @@ class MetricsCalculator:
             "open_trades": 0,  # All trades are closed in backtests
             "expectancy": expectancy,
             "expectancy_ratio": expectancy_ratio,
+            "expectancy_pct": expectancy_pct,
+            "expectancy_pct_ratio": expectancy_pct_ratio,
             "cagr": risk_m.cagr,
             "volatility": risk_m.volatility,
             # Long/Short metrics
