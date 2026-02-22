@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Audit round 2 — remaining 8 ❌ + 4 ⚠️ items fixed (2026-02-22, commit `3134e2b45`):**
+
+    - **`models.py` — EngineType enum expanded:**
+        Added `FALLBACK_V4 = "fallback_v4"`, `DCA = "dca"`, `DCA_GRID = "dca_grid"` aliases;
+        `validate_engine_type` now accepts `"fallback_v4"` and normalises it to `"fallback"`;
+        `ADVANCED` docstring notes it delegates to `strategy_builder_adapter` (no dedicated handler).
+
+    - **`engine.py` — three dead-code / correctness fixes:**
+        Removed dead `open_price` variable (was `# noqa: F841`);
+        Fixed MFE/MAE short-position initialisation — both excursion trackers now start from `entry_price` instead of the current bar's `low`/`high`;
+        Added NaN/Inf guard on both `pnl_pct` calculation sites: `pnl_pct = pnl / margin_used if margin_used > 0 else 0` → checks `margin_used > 0`, then rejects NaN/±Inf result with fallback `0.0`.
+
+    - **`builder_optimizer.py` — MACD fast < slow cross-param constraint:**
+        After sampling all trial parameters, scans `overrides` for `*.fast_period` / `*.slow_period` pairs (same block prefix) and clamps `slow_period = max(slow_period, fast_period + 1)` before graph cloning.
+
+    - **`optuna_optimizer.py` — `_sample_params` low ≥ high guard + stop_loss range:**
+        `_sample_params()` now skips any spec where `low >= high` with a `WARNING` log instead of letting Optuna raise `ValueError`;
+        `stop_loss` minimum in both `create_sltp_param_space()` and `create_full_strategy_param_space()` changed `0.01 → 0.001`.
+
+    - **`strategy_builder_adapter.py` — DCA `grid_size_percent` median-step fix:**
+        Replaced `max(offsets)` (full range, not step size) with the **median inter-order gap** of sorted positive offsets; falls back to the single offset value, then `1.0` for degenerate cases.
+
+    - **`indicator_handlers.py` — `_clamp_period()` coverage gaps:**
+        Added `_clamp_period()` wrapping to six previously-unguarded period reads:
+        `vol_length1`, `vol_length2` in `_handle_volume_filter`;
+        `hl_lookback_bars`, `atr_hl_length` in `_handle_highest_lowest_bar`;
+        `backtracking_interval`, `min_bars_to_execute` in `_handle_accumulation_areas`.
+
+    - **`optimization/utils.py` — walk-forward split clamp warning level:**
+        `split_candles()` now captures the pre-clamp value and emits `logger.warning(...)` when `train_split` was actually changed by the `max(0.5, min(0.95, …))` clamp; the always-fires `logger.info` log for the final split is retained.
+
 ### Added
 
 - **Фича 1 — `profit_only` / `min_profit` gate on `close_cond` exits (2026-02-22):**
