@@ -495,20 +495,21 @@
 
       </div>
 
-      <!-- Right Sidebar - Validation -->
-      <div class="sidebar-right" id="sidebarRight">
-        <div class="validation-panel">
-          <div class="validation-header">
-            <span class="validation-title">Validation</span>
-            <span class="validation-status valid" id="validationStatus">
-              <i class="bi bi-check-circle-fill"></i> Valid
-            </span>
-          </div>
-          <div class="validation-list" id="validationList">
-            <div class="validation-item info">
-              <i class="bi bi-info-circle"></i>
-              <span>Add blocks to start building your strategy</span>
-            </div>
+      <!-- Right Sidebar - Validation (hidden: validation panel is position:fixed, this container is unused) -->
+      <!-- Right Sidebar - removed: validation panel is position:fixed and rendered independently -->
+
+      <!-- Validation Popup Panel (position:fixed, opened by Validate button) -->
+      <div class="validation-panel">
+        <div class="validation-header">
+          <span class="validation-title">Validation</span>
+          <span class="validation-status valid" id="validationStatus">
+            <i class="bi bi-check-circle-fill"></i> Valid
+          </span>
+        </div>
+        <div class="validation-list" id="validationList">
+          <div class="validation-item info">
+            <i class="bi bi-info-circle"></i>
+            <span>Add blocks to start building your strategy</span>
           </div>
         </div>
       </div>

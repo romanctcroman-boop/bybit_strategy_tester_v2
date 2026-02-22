@@ -3272,13 +3272,8 @@ body {
     transform: rotate(180deg);
 }
 
-.sidebar-right .validation-panel {
-    opacity: 1;
-    visibility: visible;
-    transition:
-        opacity 0.3s ease,
-        visibility 0.3s ease;
-}
+/* .sidebar-right .validation-panel rule removed - validation panel is now
+   rendered outside .sidebar-right as a standalone position:fixed popup */
 
 .sidebar-right.collapsed .sidebar-header {
     justify-content: center;
