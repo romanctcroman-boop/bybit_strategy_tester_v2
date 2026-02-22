@@ -34,6 +34,17 @@ from backend.config.database_policy import (
 
 logger = logging.getLogger(__name__)
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 # Timeframe relationships for adjacent loading
 TIMEFRAME_ADJACENCY = {
     "1": ["1", "3", "5"],  # 1m → 1m, 3m, 5m
@@ -501,7 +512,7 @@ class SmartKlineService:
                     # Need to load more
                     result["intervals_loading"].append(interval)
                     # Start background task
-                    asyncio.create_task(
+                    _fire_and_forget(
                         self._load_historical_background(
                             symbol, interval, target_candles
                         )
@@ -516,7 +527,7 @@ class SmartKlineService:
         if quality_service:
             quality_service.start_monitoring(symbol, primary_interval)
             # Start background monitoring if not already running
-            asyncio.create_task(quality_service.start_background_monitoring())
+            _fire_and_forget(quality_service.start_background_monitoring())
             logger.info(f"Started quality monitoring for {symbol}:{primary_interval}")
 
         return result
@@ -576,7 +587,7 @@ class SmartKlineService:
                 )
 
                 # Auto-repair gaps after loading
-                asyncio.create_task(self._auto_repair_gaps(symbol, interval))
+                _fire_and_forget(self._auto_repair_gaps(symbol, interval))
             else:
                 progress.status = "failed"
                 progress.error = "No candles returned"
@@ -679,7 +690,7 @@ class SmartKlineService:
                             )
 
                             # Run repair in background
-                            asyncio.create_task(
+                            _fire_and_forget(
                                 self._auto_repair_gaps(symbol, interval, max_gaps=10)
                             )
                     except Exception as e:

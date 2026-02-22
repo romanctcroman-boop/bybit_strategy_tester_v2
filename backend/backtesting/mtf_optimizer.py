@@ -210,14 +210,14 @@ class MTFOptimizer:
         htf_candles: pd.DataFrame,
         htf_index_map: np.ndarray,
         # Strategy params
-        rsi_period_range: list[int] = [14],
-        rsi_overbought_range: list[int] = [70],
-        rsi_oversold_range: list[int] = [30],
-        stop_loss_range: list[float] = [0.02],
-        take_profit_range: list[float] = [0.03],
+        rsi_period_range: list[int] | None = None,
+        rsi_overbought_range: list[int] | None = None,
+        rsi_oversold_range: list[int] | None = None,
+        stop_loss_range: list[float] | None = None,
+        take_profit_range: list[float] | None = None,
         # MTF params
-        htf_filter_types: list[str] = ["sma"],
-        htf_filter_periods: list[int] = [200],
+        htf_filter_types: list[str] | None = None,
+        htf_filter_periods: list[int] | None = None,
         # Trading params
         initial_capital: float = 10000.0,
         leverage: int = 10,
@@ -234,13 +234,13 @@ class MTFOptimizer:
             ltf_candles: Lower timeframe OHLCV data
             htf_candles: Higher timeframe OHLCV data
             htf_index_map: LTF → HTF index mapping
-            rsi_period_range: RSI periods to test
-            rsi_overbought_range: Overbought levels to test
-            rsi_oversold_range: Oversold levels to test
-            stop_loss_range: Stop loss percentages to test
-            take_profit_range: Take profit percentages to test
-            htf_filter_types: HTF filter types to test
-            htf_filter_periods: HTF filter periods to test
+            rsi_period_range: RSI periods to test (default: [14])
+            rsi_overbought_range: Overbought levels to test (default: [70])
+            rsi_oversold_range: Oversold levels to test (default: [30])
+            stop_loss_range: Stop loss percentages to test (default: [0.02])
+            take_profit_range: Take profit percentages to test (default: [0.03])
+            htf_filter_types: HTF filter types to test (default: ["sma"])
+            htf_filter_periods: HTF filter periods to test (default: [200])
             initial_capital: Starting capital
             leverage: Trading leverage
             commission: Commission rate
@@ -251,6 +251,22 @@ class MTFOptimizer:
         Returns:
             MTFOptimizationResult
         """
+        # Initialise mutable defaults here to avoid B006
+        if rsi_period_range is None:
+            rsi_period_range = [14]
+        if rsi_overbought_range is None:
+            rsi_overbought_range = [70]
+        if rsi_oversold_range is None:
+            rsi_oversold_range = [30]
+        if stop_loss_range is None:
+            stop_loss_range = [0.02]
+        if take_profit_range is None:
+            take_profit_range = [0.03]
+        if htf_filter_types is None:
+            htf_filter_types = ["sma"]
+        if htf_filter_periods is None:
+            htf_filter_periods = [200]
+
         start_time = time.perf_counter()
 
         # Calculate total combinations

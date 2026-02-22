@@ -771,7 +771,7 @@ class UniversalMathEngineV23:
 
         # Convert input to GPU array if needed
         xp = self.gpu_backend.xp  # NumPy or CuPy
-        close_gpu = xp.asarray(close) if xp.__name__ == "cupy" else close  # noqa: cSpell
+        close_gpu = xp.asarray(close) if xp.__name__ == "cupy" else close  # type: ignore[attr-defined]  # cupy/numpy duck-typing
 
         if strategy_type == "rsi":
             period = strategy_params.get("period", 14)

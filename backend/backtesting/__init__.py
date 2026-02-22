@@ -65,9 +65,9 @@ def __getattr__(name: str):
     # Optimizer imports (heavy - loads GPU/Numba)
     if name in ("OptimizationResult", "UniversalOptimizer", "optimize"):
         from backend.backtesting.optimizer import (
-            OptimizationResult,
-            UniversalOptimizer,
-            optimize,
+            OptimizationResult,  # noqa: F401
+            UniversalOptimizer,  # noqa: F401
+            optimize,  # noqa: F401
         )
 
         return locals()[name]
@@ -75,10 +75,10 @@ def __getattr__(name: str):
     # Position sizing imports (moderate)
     if name in ("IndicatorCache", "KellyCalculator", "MonteCarloAnalyzer", "TradeResult"):
         from backend.backtesting.position_sizing import (
-            IndicatorCache,
-            KellyCalculator,
-            MonteCarloAnalyzer,
-            TradeResult,
+            IndicatorCache,  # noqa: F401
+            KellyCalculator,  # noqa: F401
+            MonteCarloAnalyzer,  # noqa: F401
+            TradeResult,  # noqa: F401
         )
 
         return locals()[name]
@@ -86,9 +86,9 @@ def __getattr__(name: str):
     # Walk-forward imports (moderate)
     if name in ("WalkForwardOptimizer", "WalkForwardResult", "WalkForwardWindow"):
         from backend.backtesting.walk_forward import (
-            WalkForwardOptimizer,
-            WalkForwardResult,
-            WalkForwardWindow,
+            WalkForwardOptimizer,  # noqa: F401
+            WalkForwardResult,  # noqa: F401
+            WalkForwardWindow,  # noqa: F401
         )
 
         return locals()[name]

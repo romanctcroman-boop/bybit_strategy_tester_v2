@@ -39,6 +39,9 @@ from backend.core.metrics import get_metrics
 
 logger = logging.getLogger(__name__)
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
 
 @dataclass
 class Trade:
@@ -364,7 +367,9 @@ async def main():
     loop = asyncio.get_running_loop()
 
     def shutdown():
-        asyncio.create_task(broadcaster.stop())
+        task = asyncio.create_task(broadcaster.stop())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
     # Note: signal handling differs on Windows
     try:

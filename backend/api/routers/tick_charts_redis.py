@@ -24,6 +24,17 @@ from backend.services.tick_service import Trade, get_tick_service
 
 logger = logging.getLogger(__name__)
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 router = APIRouter(prefix="/ticks", tags=["Tick Charts"])
 
 # =============================================================================
@@ -60,9 +71,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
             )
 
         now = time.time()
-        connection_ips[client_ip] = [
-            ts for ts in connection_ips[client_ip] if now - ts < 60
-        ]
+        connection_ips[client_ip] = [ts for ts in connection_ips[client_ip] if now - ts < 60]
 
         if len(connection_ips[client_ip]) >= MAX_CONNECTIONS_PER_IP:
             return False, f"Too many connections from IP ({MAX_CONNECTIONS_PER_IP} max)"
@@ -156,9 +165,7 @@ async def get_status():
             return {
                 "mode": "redis",
                 "redis_connected": True,
-                "total_commands_processed": info.get(
-                    "total_commands_processed", "unknown"
-                ),
+                "total_commands_processed": info.get("total_commands_processed", "unknown"),
             }
         except Exception as e:
             return {"mode": "redis", "redis_connected": False, "error": str(e)}
@@ -173,16 +180,14 @@ async def get_status():
 # =============================================================================
 
 
-async def handle_legacy_websocket(
-    websocket: WebSocket, symbol: str, ticks: int, client_ip: str
-):
+async def handle_legacy_websocket(websocket: WebSocket, symbol: str, ticks: int, client_ip: str):
     """Handle WebSocket in legacy mode (TickService singleton)."""
     logger.info(f"Legacy WS: {symbol}, {ticks} ticks (IP: {client_ip})")
 
     service = get_tick_service()
 
     if not service.is_running():
-        asyncio.create_task(service.start([symbol]))
+        _fire_and_forget(service.start([symbol]))
 
     service.get_aggregator(symbol, ticks)
 
@@ -244,9 +249,7 @@ async def handle_legacy_websocket(
 # =============================================================================
 
 
-async def handle_redis_websocket(
-    websocket: WebSocket, symbol: str, ticks: int, client_ip: str
-):
+async def handle_redis_websocket(websocket: WebSocket, symbol: str, ticks: int, client_ip: str):
     """
     Handle WebSocket in Redis mode.
 
@@ -302,9 +305,7 @@ async def handle_redis_websocket(
                     if channel == candle_channel:
                         # Completed candle from aggregator
                         candle_dict = data.get("candle", data)
-                        await websocket.send_json(
-                            {"type": "candle", "data": candle_dict}
-                        )
+                        await websocket.send_json({"type": "candle", "data": candle_dict})
 
                         # Update current candle state
                         current_candle_state = data.get("current_candle")
@@ -321,20 +322,14 @@ async def handle_redis_websocket(
             except TimeoutError:
                 # No message within 50ms - send current candle state
                 if current_candle_state:
-                    current_candle_state["server_time"] = int(
-                        datetime.now(UTC).timestamp() * 1000
-                    )
-                    await websocket.send_json(
-                        {"type": "current", "data": current_candle_state}
-                    )
+                    current_candle_state["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
+                    await websocket.send_json({"type": "current", "data": current_candle_state})
 
                 # Send pending trades
                 if pending_trades:
                     trades_to_send = pending_trades.copy()
                     pending_trades.clear()
-                    await websocket.send_json(
-                        {"type": "trades", "data": trades_to_send}
-                    )
+                    await websocket.send_json({"type": "trades", "data": trades_to_send})
 
     except Exception as e:
         logger.error(f"Redis WS error: {e}")
@@ -401,7 +396,4 @@ async def tick_websocket(
         logger.error(f"Tick WebSocket error: {e}")
     finally:
         await release_connection(client_ip)
-        logger.info(
-            f"Tick WebSocket closed: {symbol} (IP: {client_ip}, "
-            f"Remaining: {active_connections})"
-        )
+        logger.info(f"Tick WebSocket closed: {symbol} (IP: {client_ip}, Remaining: {active_connections})")

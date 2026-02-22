@@ -13,10 +13,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
+
+if TYPE_CHECKING:
+    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
 # =============================================================================
 # Events
@@ -414,12 +417,8 @@ def create_on_bar_from_adapter(
     result = adapter.generate_signals(df)
     entries = result.entries if hasattr(result.entries, "values") else pd.Series()
     exits = result.exits if hasattr(result.exits, "values") else pd.Series()
-    short_entries = (
-        result.short_entries if hasattr(result.short_entries, "values") else pd.Series()
-    )
-    short_exits = (
-        result.short_exits if hasattr(result.short_exits, "values") else pd.Series()
-    )
+    short_entries = result.short_entries if hasattr(result.short_entries, "values") else pd.Series()
+    short_exits = result.short_exits if hasattr(result.short_exits, "values") else pd.Series()
 
     position = 0  # -1 short, 0 flat, 1 long
 
@@ -497,9 +496,7 @@ def run_event_driven_with_adapter(
     """
 
     on_bar = create_on_bar_from_adapter(adapter, df, symbol=symbol)
-    handler = (
-        SimulationExecutionHandler(execution_config) if execution_config else None
-    )
+    handler = SimulationExecutionHandler(execution_config) if execution_config else None
     engine = EventDrivenEngine(
         initial_capital=initial_capital,
         on_bar=on_bar,

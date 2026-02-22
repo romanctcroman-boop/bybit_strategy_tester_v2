@@ -18,6 +18,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("uvicorn.error")
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro) -> asyncio.Task:
+    """Schedule a coroutine as a background task and keep a strong reference."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 async def capture_tool_registry():
     """Capture MCP tool registry after bridge initialization."""
@@ -185,7 +196,7 @@ async def _init_mcp_bridge():
         await ensure_mcp_bridge_initialized()
         logger.info("MCP Bridge initialized")
 
-        asyncio.create_task(capture_tool_registry())
+        _fire_and_forget(capture_tool_registry())
     except Exception as e:
         logger.debug("MCP Bridge initialization skipped: %s", e)
 
@@ -498,7 +509,7 @@ async def lifespan(app: "FastAPI"):
     # This avoids duplicate functionality and unnecessary API calls on boot.
 
     # Preload Bybit tickers list for Properties Symbol dropdown (linear + spot)
-    asyncio.create_task(_preload_symbols_list(app))
+    _fire_and_forget(_preload_symbols_list(app))
 
     # Start WebSocket manager
     await _start_websocket_manager(app, CONFIG)

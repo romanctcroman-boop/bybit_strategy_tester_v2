@@ -26,6 +26,9 @@ from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
 T = TypeVar("T")
 
 
@@ -214,7 +217,9 @@ class GracefulShutdownManager:
         # Schedule async shutdown in event loop if running
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self.shutdown())
+            task = loop.create_task(self.shutdown())
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         except RuntimeError:
             # No running loop, will be handled by atexit
             pass

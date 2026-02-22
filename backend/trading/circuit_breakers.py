@@ -10,6 +10,7 @@ Features:
 - Emergency halt mechanism (полная остановка торговли)
 """
 
+import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,6 +18,9 @@ from datetime import datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
 
 
 class CircuitBreakerState(str, Enum):
@@ -226,11 +230,11 @@ class TradingCircuitBreaker:
             )
 
             # Fire and forget async alert
-            import asyncio
-
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(alert_service.send_alert(alert))
+                task = loop.create_task(alert_service.send_alert(alert))
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
             except RuntimeError:
                 # No event loop - log only
                 logger.info(f"Alert would be sent: {alert.title} - {alert.message}")

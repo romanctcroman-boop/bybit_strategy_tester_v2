@@ -18,6 +18,17 @@ from backend.api.websocket_auth import get_ws_authenticator
 from backend.core.metrics import get_metrics
 from backend.services.tick_service import Trade, get_tick_service
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ticks", tags=["Tick Charts"])
@@ -60,9 +71,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
         # Check per-IP limit (prevent abuse)
         now = time.time()
         # Clean old entries (older than TTL)
-        connection_ips[client_ip] = [
-            ts for ts in connection_ips[client_ip] if now - ts < CONNECTION_HISTORY_TTL
-        ]
+        connection_ips[client_ip] = [ts for ts in connection_ips[client_ip] if now - ts < CONNECTION_HISTORY_TTL]
 
         if len(connection_ips[client_ip]) >= MAX_CONNECTIONS_PER_IP:
             return False, f"Too many connections from IP ({MAX_CONNECTIONS_PER_IP} max)"
@@ -285,7 +294,7 @@ async def start_tick_service(
         service.get_aggregator(symbol, ticks)
 
     # Start in background
-    asyncio.create_task(service.start(symbols))
+    _fire_and_forget(service.start(symbols))
 
     return {"status": "starting", "symbols": symbols, "ticks_per_bar": ticks}
 
@@ -338,9 +347,7 @@ async def tick_websocket(
     auth_result = await authenticator.authenticate(websocket, token)
 
     if not auth_result.authenticated:
-        await websocket.close(
-            code=4001, reason=auth_result.error or "Authentication failed"
-        )
+        await websocket.close(code=4001, reason=auth_result.error or "Authentication failed")
         logger.warning(f"WebSocket auth failed from {client_ip}: {auth_result.error}")
         return
 
@@ -362,7 +369,7 @@ async def tick_websocket(
 
         # Ensure service is running
         if not service.is_running():
-            asyncio.create_task(service.start([symbol]))
+            _fire_and_forget(service.start([symbol]))
 
         # Ensure aggregator exists
         service.get_aggregator(symbol, ticks)
@@ -424,9 +431,7 @@ async def tick_websocket(
             # Priority 1: Send completed candle immediately
             if pending_candle is not None:
                 try:
-                    await websocket.send_json(
-                        {"type": "candle", "data": pending_candle}
-                    )
+                    await websocket.send_json({"type": "candle", "data": pending_candle})
                     pending_candle = None
                 except Exception:
                     break
@@ -441,9 +446,7 @@ async def tick_websocket(
             if current:
                 try:
                     # Add server timestamp for latency monitoring
-                    current["server_time"] = int(
-                        datetime.now(UTC).timestamp() * 1000
-                    )
+                    current["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
                     await websocket.send_json({"type": "current", "data": current})
                 except Exception:
                     break
@@ -455,9 +458,7 @@ async def tick_websocket(
 
                 # Send in a single message to reduce per-message overhead.
                 try:
-                    await websocket.send_json(
-                        {"type": "trades", "data": trades_to_send}
-                    )
+                    await websocket.send_json({"type": "trades", "data": trades_to_send})
                 except Exception:
                     break
 
@@ -477,7 +478,4 @@ async def tick_websocket(
 
         # Release connection slot
         await release_connection(client_ip)
-        logger.info(
-            f"Tick WS closed: {symbol} (IP: {client_ip}, "
-            f"Remaining: {active_connections})"
-        )
+        logger.info(f"Tick WS closed: {symbol} (IP: {client_ip}, Remaining: {active_connections})")

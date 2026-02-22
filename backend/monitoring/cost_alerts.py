@@ -13,6 +13,9 @@ from enum import Enum
 import httpx
 from loguru import logger
 
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
 
 class AlertLevel(Enum):
     """Alert severity levels"""
@@ -70,9 +73,7 @@ class TelegramNotifier:
         self.enabled = bool(self.bot_token and self.chat_id)
 
         if not self.enabled:
-            logger.info(
-                "📱 Telegram notifications disabled (no TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)"
-            )
+            logger.info("📱 Telegram notifications disabled (no TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)")
 
     async def send_alert(self, alert: CostAlert) -> bool:
         """Send alert via Telegram"""
@@ -108,8 +109,10 @@ class TelegramNotifier:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # Schedule in existing loop
-                asyncio.create_task(self.send_alert(alert))
+                # Store reference to prevent GC before task completes (RUF006)
+                task = asyncio.create_task(self.send_alert(alert))
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
                 return True
             else:
                 return loop.run_until_complete(self.send_alert(alert))
@@ -146,9 +149,7 @@ class EmailNotifier:
             msg = MIMEMultipart()
             msg["From"] = self.smtp_user
             msg["To"] = self.recipient
-            msg["Subject"] = (
-                f"[Cost Alert] {alert.alert_type.upper()} - ${alert.current_cost:.2f}"
-            )
+            msg["Subject"] = f"[Cost Alert] {alert.alert_type.upper()} - ${alert.current_cost:.2f}"
 
             # HTML body
             html = f"""
@@ -263,9 +264,7 @@ class CostAlertManager:
 
         if sent:
             self._sent_alerts[alert_key] = now
-            logger.info(
-                f"🔔 Cost alert sent: {alert_type} ${current_cost:.2f} > ${threshold:.2f}"
-            )
+            logger.info(f"🔔 Cost alert sent: {alert_type} ${current_cost:.2f} > ${threshold:.2f}")
 
         return sent
 
