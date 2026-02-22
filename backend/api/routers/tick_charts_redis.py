@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-def _fire_and_forget(coro) -> asyncio.Task:
-    task = asyncio.create_task(coro)
+def _fire_and_forget(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
@@ -54,7 +54,7 @@ MAX_CONNECTIONS_PER_WORKER = 800
 MAX_CONNECTIONS_PER_IP = 50
 MAX_CONNECTIONS_GLOBAL = 5000
 
-connection_ips = defaultdict(list)
+connection_ips: dict[str, list[float]] = defaultdict(list)
 active_connections = 0
 active_connections_lock = asyncio.Lock()
 
@@ -289,13 +289,13 @@ async def handle_redis_websocket(websocket: WebSocket, symbol: str, ticks: int, 
         trade_sample_counter = 0
         TRADE_SAMPLE_RATE = 3
 
-        # Listen for Redis messages
-        listen_task = asyncio.create_task(pubsub.listen())
+        # Listen for Redis messages — pubsub.listen() is an async generator
+        listen_gen = pubsub.listen()
 
         while True:
             try:
                 # Get next message from Redis (with timeout)
-                message = await asyncio.wait_for(listen_task.__anext__(), timeout=0.05)
+                message = await asyncio.wait_for(listen_gen.__anext__(), timeout=0.05)
 
                 # Parse Redis message
                 if message["type"] == "message":

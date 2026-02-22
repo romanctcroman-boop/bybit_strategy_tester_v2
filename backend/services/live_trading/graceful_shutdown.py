@@ -172,7 +172,7 @@ class GracefulShutdownManager:
     def install_signal_handlers(self) -> None:
         """Install signal handlers for graceful shutdown."""
         # Handle SIGINT (Ctrl+C) and SIGTERM (kill)
-        signals_to_handle = [signal.SIGINT, signal.SIGTERM]
+        signals_to_handle: list[signal.Signals] = [signal.SIGINT, signal.SIGTERM]
 
         # On Windows, SIGBREAK is also useful
         if sys.platform == "win32":
@@ -181,7 +181,7 @@ class GracefulShutdownManager:
         for sig in signals_to_handle:
             try:
                 # Store original handler
-                self._original_handlers[sig] = signal.getsignal(sig)
+                self._original_handlers[sig] = signal.getsignal(sig)  # type: ignore[assignment]
 
                 # Install our handler
                 signal.signal(sig, self._signal_handler)
@@ -305,6 +305,7 @@ class GracefulShutdownManager:
 
         try:
             async with asyncio.timeout(self.timeout / 3):
+                assert self._position_closer is not None
                 if asyncio.iscoroutinefunction(self._position_closer):
                     result = await self._position_closer()
                 else:

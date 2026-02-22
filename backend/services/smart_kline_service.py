@@ -17,6 +17,7 @@ Architecture:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -123,9 +124,7 @@ class SymbolState:
 
     symbol: str
     loaded_intervals: set[str] = field(default_factory=set)
-    db_coverage: dict[str, tuple] = field(
-        default_factory=dict
-    )  # interval -> (oldest, newest)
+    db_coverage: dict[str, tuple] = field(default_factory=dict)  # interval -> (oldest, newest)
     last_update: datetime | None = None
     is_primary: bool = False  # If this is the main selected symbol
 
@@ -216,9 +215,7 @@ class SmartKlineService:
                     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
                     "data.sqlite3",
                 )
-                self._repository_adapter = get_repository_adapter(
-                    f"sqlite:///{db_path}"
-                )
+                self._repository_adapter = get_repository_adapter(f"sqlite:///{db_path}")
                 logger.debug("RepositoryAdapter connected")
             except Exception as e:
                 logger.debug(f"RepositoryAdapter not available: {e}")
@@ -348,9 +345,7 @@ class SmartKlineService:
             elif len(candles) >= limit:
                 logger.info(f"RAM cache stale: {key}, last candle too old")
             else:
-                logger.info(
-                    f"RAM cache partial: {key} ({len(candles)}/{limit} candles)"
-                )
+                logger.info(f"RAM cache partial: {key} ({len(candles)}/{limit} candles)")
 
         # Check DB
         try:
@@ -373,9 +368,7 @@ class SmartKlineService:
             self._persist_to_db(symbol, interval, candles)
         return candles
 
-    def get_historical_candles(
-        self, symbol: str, interval: str, end_time: int, limit: int = 200
-    ) -> list[dict]:
+    def get_historical_candles(self, symbol: str, interval: str, end_time: int, limit: int = 200) -> list[dict]:
         """
         Get historical candles before a specific time.
         Used for infinite scroll.
@@ -397,13 +390,9 @@ class SmartKlineService:
 
         # First check DB with overlap
         try:
-            db_candles = self._load_from_db_before(
-                symbol, interval, effective_end_time, limit + overlap_candles
-            )
+            db_candles = self._load_from_db_before(symbol, interval, effective_end_time, limit + overlap_candles)
             if db_candles and len(db_candles) >= limit // 2:
-                logger.info(
-                    f"DB historical hit: {symbol}:{interval} before {end_time} (with overlap)"
-                )
+                logger.info(f"DB historical hit: {symbol}:{interval} before {end_time} (with overlap)")
                 return db_candles
         except Exception as e:
             logger.warning(f"DB historical load failed: {e}")
@@ -449,7 +438,7 @@ class SmartKlineService:
         state = self._symbol_states[symbol]
         state.is_primary = True
 
-        result = {
+        result: dict[str, Any] = {
             "symbol": symbol,
             "primary_interval": primary_interval,
             "status": "initialized",
@@ -467,18 +456,14 @@ class SmartKlineService:
         # This is required for accurate leverage risk assessment
         if "D" not in intervals_to_load:
             intervals_to_load.append("D")
-            logger.info(
-                f"[VOLATILITY] Adding daily (D) timeframe for {symbol} risk calculations"
-            )
+            logger.info(f"[VOLATILITY] Adding daily (D) timeframe for {symbol} risk calculations")
 
         # ALWAYS include 1m and 1h for strategy creation/validation
         # These are required for multi-timeframe analysis
         for required_interval in STRATEGY_REQUIRED_INTERVALS:
             if required_interval not in intervals_to_load:
                 intervals_to_load.append(required_interval)
-                logger.info(
-                    f"[STRATEGY] Adding {required_interval}m timeframe for {symbol} strategy support"
-                )
+                logger.info(f"[STRATEGY] Adding {required_interval}m timeframe for {symbol} strategy support")
 
         # Add market_types to result
         result["market_types"] = MARKET_TYPES
@@ -487,11 +472,10 @@ class SmartKlineService:
         # Check what we already have in DB
         for interval in intervals_to_load:
             coverage = self._get_db_coverage(symbol, interval)
-            state.db_coverage[interval] = coverage
+            if coverage is not None:
+                state.db_coverage[interval] = coverage
             result["db_coverage"][interval] = (
-                {"oldest": coverage[0], "newest": coverage[1], "count": coverage[2]}
-                if coverage
-                else None
+                {"oldest": coverage[0], "newest": coverage[1], "count": coverage[2]} if coverage else None
             )
 
         # Load data
@@ -505,18 +489,12 @@ class SmartKlineService:
                     # We have enough data
                     state.loaded_intervals.add(interval)
                     result["intervals_loaded"].append(interval)
-                    logger.info(
-                        f"[OK] {symbol}:{interval} already has {coverage[2]} candles in DB"
-                    )
+                    logger.info(f"[OK] {symbol}:{interval} already has {coverage[2]} candles in DB")
                 else:
                     # Need to load more
                     result["intervals_loading"].append(interval)
                     # Start background task
-                    _fire_and_forget(
-                        self._load_historical_background(
-                            symbol, interval, target_candles
-                        )
-                    )
+                    _fire_and_forget(self._load_historical_background(symbol, interval, target_candles))
 
         # Load initial data into RAM for primary interval
         candles = self.get_candles(symbol, primary_interval, self.RAM_LIMIT)
@@ -532,9 +510,7 @@ class SmartKlineService:
 
         return result
 
-    async def _load_historical_background(
-        self, symbol: str, interval: str, target_candles: int
-    ):
+    async def _load_historical_background(self, symbol: str, interval: str, target_candles: int):
         """Load historical data in background."""
         key = self._cache_key(symbol, interval)
 
@@ -548,9 +524,7 @@ class SmartKlineService:
         self._loading_progress[key] = progress
 
         try:
-            logger.info(
-                f"[LOADING] Background loading: {key}, target: {target_candles}"
-            )
+            logger.info(f"[LOADING] Background loading: {key}, target: {target_candles}")
 
             # Get current newest time in DB to start from there
             coverage = self._get_db_coverage(symbol, interval)
@@ -582,9 +556,7 @@ class SmartKlineService:
                 if symbol in self._symbol_states:
                     self._symbol_states[symbol].loaded_intervals.add(interval)
 
-                logger.info(
-                    f"[OK] Background loading complete: {key}, loaded: {len(candles)}"
-                )
+                logger.info(f"[OK] Background loading complete: {key}, loaded: {len(candles)}")
 
                 # Auto-repair gaps after loading
                 _fire_and_forget(self._auto_repair_gaps(symbol, interval))
@@ -599,9 +571,7 @@ class SmartKlineService:
         finally:
             progress.end_time = datetime.now(UTC)
 
-    async def _auto_repair_gaps(
-        self, symbol: str, interval: str, max_gaps: int = 20
-    ) -> None:
+    async def _auto_repair_gaps(self, symbol: str, interval: str, max_gaps: int = 20) -> None:
         """
         Automatically detect and repair data gaps after loading.
 
@@ -623,9 +593,7 @@ class SmartKlineService:
                 return
 
             data_gaps = summary.get("data_gaps", 0)
-            logger.info(
-                f"[REPAIR] Found {data_gaps} gaps in {symbol}:{interval}, repairing..."
-            )
+            logger.info(f"[REPAIR] Found {data_gaps} gaps in {symbol}:{interval}, repairing...")
 
             # Run repair (limit to max_gaps to avoid long operations)
             loop = asyncio.get_event_loop()
@@ -646,9 +614,7 @@ class SmartKlineService:
                     f"inserted {result.get('total_candles_inserted', 0)} candles"
                 )
             else:
-                logger.warning(
-                    f"[WARN] Auto-repair for {symbol}:{interval}: {result.get('status')}"
-                )
+                logger.warning(f"[WARN] Auto-repair for {symbol}:{interval}: {result.get('status')}")
 
         except ImportError:
             logger.debug("DataGapRepairService not available, skipping auto-repair")
@@ -685,14 +651,10 @@ class SmartKlineService:
 
                         if summary.get("needs_repair"):
                             data_gaps = summary.get("data_gaps", 0)
-                            logger.info(
-                                f"[REPAIR] Found {data_gaps} gaps in {symbol}:{interval}"
-                            )
+                            logger.info(f"[REPAIR] Found {data_gaps} gaps in {symbol}:{interval}")
 
                             # Run repair in background
-                            _fire_and_forget(
-                                self._auto_repair_gaps(symbol, interval, max_gaps=10)
-                            )
+                            _fire_and_forget(self._auto_repair_gaps(symbol, interval, max_gaps=10))
                     except Exception as e:
                         logger.warning(f"Gap check failed for {symbol}:{interval}: {e}")
 
@@ -722,9 +684,7 @@ class SmartKlineService:
             if days_since_last < RETENTION_CHECK_DAYS:
                 return  # Not time yet
 
-        logger.info(
-            f"🧹 Starting retention policy check (max {RETENTION_YEARS} years per pair)..."
-        )
+        logger.info(f"🧹 Starting retention policy check (max {RETENTION_YEARS} years per pair)...")
         self._last_retention_check = now
 
         try:
@@ -747,18 +707,14 @@ class SmartKlineService:
                     .scalar()
                 )
                 if old_count and old_count > 0:
-                    session.query(BybitKlineAudit).filter(
-                        BybitKlineAudit.open_time < min_allowed_ts
-                    ).delete(synchronize_session=False)
+                    session.query(BybitKlineAudit).filter(BybitKlineAudit.open_time < min_allowed_ts).delete(
+                        synchronize_session=False
+                    )
                     session.commit()
                     logger.info(f"🗑️ Deleted {old_count:,} candles before 2025-01-01")
 
                 # Step 2: Get all unique symbol/interval pairs
-                pairs = (
-                    session.query(BybitKlineAudit.symbol, BybitKlineAudit.interval)
-                    .distinct()
-                    .all()
-                )
+                pairs = session.query(BybitKlineAudit.symbol, BybitKlineAudit.interval).distinct().all()
 
                 total_deleted = 0
                 for symbol, interval in pairs:
@@ -779,12 +735,8 @@ class SmartKlineService:
                         continue
 
                     min_ts, max_ts = result
-                    min_date = datetime.utcfromtimestamp(min_ts / 1000).replace(
-                        tzinfo=UTC
-                    )
-                    max_date = datetime.utcfromtimestamp(max_ts / 1000).replace(
-                        tzinfo=UTC
-                    )
+                    min_date = datetime.utcfromtimestamp(min_ts / 1000).replace(tzinfo=UTC)
+                    max_date = datetime.utcfromtimestamp(max_ts / 1000).replace(tzinfo=UTC)
                     period_days = (max_date - min_date).days
 
                     # If period exceeds 2 years, trim oldest month
@@ -812,9 +764,7 @@ class SmartKlineService:
                             )
 
                 if total_deleted > 0:
-                    logger.info(
-                        f"[OK] Retention cleanup complete: deleted {total_deleted:,} old candles"
-                    )
+                    logger.info(f"[OK] Retention cleanup complete: deleted {total_deleted:,} old candles")
                 else:
                     logger.info("[OK] All pairs within 2-year limit, no cleanup needed")
 
@@ -875,9 +825,7 @@ class SmartKlineService:
             if missing_candles <= 1:
                 return  # Data is fresh
 
-            logger.info(
-                f"📥 {symbol}:{interval} needs {missing_candles} recent candles"
-            )
+            logger.info(f"📥 {symbol}:{interval} needs {missing_candles} recent candles")
 
             # Fetch missing candles
             adapter = self._get_adapter()
@@ -892,9 +840,7 @@ class SmartKlineService:
                 new_candles = [c for c in candles if c["open_time"] > newest_in_db]
                 if new_candles:
                     self._persist_to_db(symbol, interval, new_candles)
-                    logger.info(
-                        f"[OK] Loaded {len(new_candles)} new candles for {symbol}:{interval}"
-                    )
+                    logger.info(f"[OK] Loaded {len(new_candles)} new candles for {symbol}:{interval}")
 
         except Exception as e:
             logger.error(f"Freshness check failed for {symbol}:{interval}: {e}")
@@ -968,9 +914,7 @@ class SmartKlineService:
             logger.error(f"DB load error: {e}")
             return []
 
-    def _load_from_db_before(
-        self, symbol: str, interval: str, end_time: int, limit: int = 200
-    ) -> list[dict]:
+    def _load_from_db_before(self, symbol: str, interval: str, end_time: int, limit: int = 200) -> list[dict]:
         """
         Load historical candles from database before a specific time.
 
@@ -980,9 +924,7 @@ class SmartKlineService:
         repo_adapter = self._get_repository_adapter()
         if repo_adapter:
             try:
-                return repo_adapter.get_klines(
-                    symbol, interval, limit=limit, end_time=end_time
-                )
+                return repo_adapter.get_klines(symbol, interval, limit=limit, end_time=end_time)
             except Exception as e:
                 logger.debug(f"RepositoryAdapter failed, using fallback: {e}")
 
@@ -1077,9 +1019,7 @@ class SmartKlineService:
                 logger.info(f"Queued {queued} candles for {symbol}:{interval}")
                 return
             except Exception as e:
-                logger.warning(
-                    f"KlineDBService queue failed, falling back to direct: {e}"
-                )
+                logger.warning(f"KlineDBService queue failed, falling back to direct: {e}")
 
         # Fallback to direct database insert
         try:
@@ -1113,21 +1053,17 @@ class SmartKlineService:
                             return obj.isoformat()
                         return str(obj)
 
-                    raw_json = (
-                        json.dumps(candle, default=json_serializer) if candle else "{}"
-                    )
+                    raw_json = json.dumps(candle, default=json_serializer) if candle else "{}"
 
                     if exists:
                         # Update existing candle with fresh data
-                        exists.open_price = float(candle.get("open", exists.open_price))
-                        exists.high_price = float(candle.get("high", exists.high_price))
-                        exists.low_price = float(candle.get("low", exists.low_price))
-                        exists.close_price = float(
-                            candle.get("close", exists.close_price)
-                        )
-                        exists.volume = float(candle.get("volume", exists.volume))
-                        exists.turnover = float(candle.get("turnover", exists.turnover))
-                        exists.raw = raw_json
+                        exists.open_price = float(candle.get("open", exists.open_price))  # type: ignore[assignment]
+                        exists.high_price = float(candle.get("high", exists.high_price))  # type: ignore[assignment]
+                        exists.low_price = float(candle.get("low", exists.low_price))  # type: ignore[assignment]
+                        exists.close_price = float(candle.get("close", exists.close_price))  # type: ignore[assignment]
+                        exists.volume = float(candle.get("volume", exists.volume))  # type: ignore[assignment]
+                        exists.turnover = float(candle.get("turnover", exists.turnover))  # type: ignore[assignment]
+                        exists.raw = raw_json  # type: ignore[assignment]
                         inserted += 1
                         continue
 
@@ -1135,9 +1071,7 @@ class SmartKlineService:
                         symbol=symbol,
                         interval=interval,
                         open_time=open_time,
-                        open_time_dt=datetime.fromtimestamp(
-                            open_time / 1000, tz=UTC
-                        ),
+                        open_time_dt=datetime.fromtimestamp(open_time / 1000, tz=UTC),
                         open_price=float(candle.get("open", 0)),
                         high_price=float(candle.get("high", 0)),
                         low_price=float(candle.get("low", 0)),
@@ -1155,9 +1089,7 @@ class SmartKlineService:
         except Exception as e:
             logger.error(f"DB persist error: {e}")
 
-    def _fetch_from_api(
-        self, symbol: str, interval: str, limit: int = 500
-    ) -> list[dict]:
+    def _fetch_from_api(self, symbol: str, interval: str, limit: int = 500) -> list[dict]:
         """Fetch candles from Bybit API."""
         try:
             adapter = self._get_adapter()
@@ -1192,9 +1124,7 @@ class SmartKlineService:
             adapter = self._get_adapter()
 
             # Use new parallel fetch method
-            results = adapter.get_klines_both_markets(
-                symbol=symbol, interval=interval, limit=limit
-            )
+            results = adapter.get_klines_both_markets(symbol=symbol, interval=interval, limit=limit)
 
             # Persist to DB with market_type
             if persist:
@@ -1207,13 +1137,9 @@ class SmartKlineService:
                                 market_type=market_type,
                                 normalized_rows=candles,
                             )
-                            logger.debug(
-                                f"Persisted {inserted} {market_type.upper()} candles for {symbol}/{interval}"
-                            )
+                            logger.debug(f"Persisted {inserted} {market_type.upper()} candles for {symbol}/{interval}")
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to persist {market_type} klines: {e}"
-                            )
+                            logger.warning(f"Failed to persist {market_type} klines: {e}")
 
             return results
 
@@ -1231,22 +1157,16 @@ class SmartKlineService:
             return
 
         self._running = True
-        self._update_task = asyncio.create_task(
-            self._update_loop(update_interval_seconds)
-        )
-        logger.info(
-            f"Started background update service (interval: {update_interval_seconds}s)"
-        )
+        self._update_task = asyncio.create_task(self._update_loop(update_interval_seconds))
+        logger.info(f"Started background update service (interval: {update_interval_seconds}s)")
 
     async def stop_update_service(self):
         """Stop background update service."""
         self._running = False
         if self._update_task:
             self._update_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._update_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Stopped background update service")
 
     async def _update_loop(self, interval_seconds: int):
@@ -1308,9 +1228,7 @@ class SmartKlineService:
             "symbol_states": {
                 symbol: {
                     "intervals": list(state.loaded_intervals),
-                    "last_update": state.last_update.isoformat()
-                    if state.last_update
-                    else None,
+                    "last_update": state.last_update.isoformat() if state.last_update else None,
                     "is_primary": state.is_primary,
                 }
                 for symbol, state in self._symbol_states.items()

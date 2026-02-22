@@ -87,7 +87,7 @@ class MTFOptimizer:
         """
         self.parallel_workers = parallel_workers
         self.verbose = verbose
-        self._precomputed_indicators = {}
+        self._precomputed_indicators: dict[str, Any] = {}
 
     def _precompute_htf_indicators(
         self,
@@ -106,12 +106,10 @@ class MTFOptimizer:
         Returns:
             Dict mapping filter_type -> period -> indicator_values
         """
-        indicators = {}
+        indicators: dict[str, Any] = {}
 
         close = htf_candles["close"].values.astype(float)
-        high = (
-            htf_candles["high"].values.astype(float) if "high" in htf_candles else close
-        )
+        high = htf_candles["high"].values.astype(float) if "high" in htf_candles else close
         low = htf_candles["low"].values.astype(float) if "low" in htf_candles else close
 
         for filter_type in htf_filter_types:
@@ -124,22 +122,16 @@ class MTFOptimizer:
                     indicators[filter_type][period] = calculate_ema(close, period)
                 elif filter_type == "supertrend":
                     multiplier = 3.0  # Default multiplier
-                    st_values, st_trend = calculate_supertrend(
-                        high, low, close, period, multiplier
-                    )
+                    st_values, st_trend = calculate_supertrend(high, low, close, period, multiplier)
                     indicators[filter_type][period] = (st_values, st_trend)
                 elif filter_type == "ichimoku":
-                    ich = calculate_ichimoku(
-                        high, low, tenkan_period=9, kijun_period=period
-                    )
+                    ich = calculate_ichimoku(high, low, tenkan_period=9, kijun_period=period)
                     indicators[filter_type][period] = ich
                 elif filter_type == "macd":
                     # Use period as slow period, fast = period // 2
                     fast = max(period // 2, 5)
                     signal = max(period // 3, 3)
-                    macd_line, signal_line, histogram = calculate_macd(
-                        close, fast, period, signal
-                    )
+                    macd_line, signal_line, histogram = calculate_macd(close, fast, period, signal)
                     indicators[filter_type][period] = (
                         macd_line,
                         signal_line,
@@ -196,11 +188,9 @@ class MTFOptimizer:
             return filter_obj.check(close_val, 0, senkou_a=sa, senkou_b=sb)
 
         elif filter_type == "macd":
-            macd_line, signal_line, histogram = precomputed[filter_type][period]
+            macd_line, signal_line, _ = precomputed[filter_type][period]
             filter_obj = MACDFilter()
-            return filter_obj.check(
-                0, 0, macd=macd_line[htf_idx], signal=signal_line[htf_idx]
-            )
+            return filter_obj.check(0, 0, macd=macd_line[htf_idx], signal=signal_line[htf_idx])
 
         return True, True
 
@@ -307,9 +297,7 @@ class MTFOptimizer:
         )
 
         for params in param_grid:
-            rsi_period, overbought, oversold, sl, tp, filter_type, filter_period = (
-                params
-            )
+            rsi_period, overbought, oversold, sl, tp, filter_type, filter_period = params
 
             # Skip invalid RSI params
             if overbought <= oversold:
@@ -318,23 +306,21 @@ class MTFOptimizer:
             tested += 1
 
             # Generate signals with MTF filter
-            long_signals, long_exits, short_signals, short_exits = (
-                generate_mtf_rsi_signals(
-                    ltf_candles=ltf_candles,
-                    htf_candles=htf_candles,
-                    htf_index_map=htf_index_map,
-                    htf_filter_type=filter_type,
-                    htf_filter_period=filter_period,
-                    direction=direction,
-                    rsi_period=rsi_period,
-                    overbought=overbought,
-                    oversold=oversold,
-                )
+            long_signals, long_exits, short_signals, short_exits = generate_mtf_rsi_signals(
+                ltf_candles=ltf_candles,
+                htf_candles=htf_candles,
+                htf_index_map=htf_index_map,
+                htf_filter_type=filter_type,
+                htf_filter_period=filter_period,
+                direction=direction,
+                rsi_period=rsi_period,
+                overbought=overbought,
+                oversold=oversold,
             )
 
             # Run backtest
             try:
-                from backend.backtesting.interfaces import BacktestInput
+                from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
                 bt_input = BacktestInput(
                     candles=ltf_candles,
@@ -346,18 +332,14 @@ class MTFOptimizer:
                     leverage=leverage,
                     stop_loss=sl,
                     take_profit=tp,
-                    direction=direction,
+                    direction=TradeDirection(direction),
                 )
 
                 engine = FallbackEngineV4()
                 result = engine.run(bt_input)
 
                 # Convert metrics to dict for easy access
-                metrics_dict = (
-                    result.metrics.to_dict()
-                    if hasattr(result.metrics, "to_dict")
-                    else {}
-                )
+                metrics_dict = result.metrics.to_dict() if hasattr(result.metrics, "to_dict") else {}
 
                 # Extract score (using getattr for dataclass)
                 if optimize_metric == "sharpe_ratio":
@@ -400,26 +382,18 @@ class MTFOptimizer:
             if self.verbose and tested % 100 == 0:
                 elapsed = time.perf_counter() - start_time
                 speed = tested / elapsed if elapsed > 0 else 0
-                logger.info(
-                    f"  Progress: {tested}/{total_combinations} ({speed:.1f} comb/s)"
-                )
+                logger.info(f"  Progress: {tested}/{total_combinations} ({speed:.1f} comb/s)")
 
         # Sort by score
-        all_results.sort(key=lambda x: x["score"], reverse=True)
+        all_results.sort(key=lambda x: float(x["score"]), reverse=True)
         top_results = all_results[:top_k]
 
         elapsed = time.perf_counter() - start_time
 
-        best = (
-            top_results[0]
-            if top_results
-            else {"params": {}, "score": -999, "metrics": {}}
-        )
+        best = top_results[0] if top_results else {"params": {}, "score": -999, "metrics": {}}
 
         if self.verbose:
-            logger.info(
-                f"✅ MTF Optimization complete: {tested} tested in {elapsed:.2f}s"
-            )
+            logger.info(f"✅ MTF Optimization complete: {tested} tested in {elapsed:.2f}s")
             logger.info(f"   Best score ({optimize_metric}): {best['score']:.4f}")
             logger.info(f"   Best params: {best['params']}")
 
@@ -428,9 +402,9 @@ class MTFOptimizer:
             total_combinations=total_combinations,
             tested_combinations=tested,
             execution_time_seconds=elapsed,
-            best_params=best["params"],
-            best_score=best["score"],
-            best_metrics=best["metrics"],
+            best_params=dict(best["params"]),
+            best_score=float(best["score"]),
+            best_metrics=dict(best["metrics"]),
             top_results=top_results,
             performance_stats={
                 "combinations_per_second": tested / elapsed if elapsed > 0 else 0,

@@ -47,7 +47,7 @@ class CostAlert:
     def _generate_message(self) -> str:
         """Generate alert message"""
         level_emoji = {
-            AlertLevel.INFO: "ℹ️",
+            AlertLevel.INFO: "\u2139\ufe0f",
             AlertLevel.WARNING: "⚠️",
             AlertLevel.CRITICAL: "🚨",
         }
@@ -147,8 +147,8 @@ class EmailNotifier:
             from email.mime.text import MIMEText
 
             msg = MIMEMultipart()
-            msg["From"] = self.smtp_user
-            msg["To"] = self.recipient
+            msg["From"] = self.smtp_user or ""
+            msg["To"] = self.recipient or ""
             msg["Subject"] = f"[Cost Alert] {alert.alert_type.upper()} - ${alert.current_cost:.2f}"
 
             # HTML body
@@ -174,7 +174,7 @@ class EmailNotifier:
             def send_email():
                 with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                     server.starttls()
-                    server.login(self.smtp_user, self.smtp_password)
+                    server.login(self.smtp_user or "", self.smtp_password or "")
                     server.send_message(msg)
 
             loop = asyncio.get_event_loop()

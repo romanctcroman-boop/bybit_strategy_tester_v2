@@ -430,7 +430,6 @@ def create_on_bar_from_adapter(
             return orders
 
         close = float(event.close)
-        n = len(df)
         capital_per_trade = 10000.0 * position_pct
         qty = capital_per_trade / close if close > 0 else 0.0
 
@@ -449,10 +448,12 @@ def create_on_bar_from_adapter(
             )
 
         try:
-            long_entry = bool(entries.iloc[idx]) if idx < len(entries) else False
-            long_exit = bool(exits.iloc[idx]) if idx < len(exits) else False
-            short_entry = bool(short_entries.iloc[idx]) if idx < len(short_entries) else False
-            short_exit = bool(short_exits.iloc[idx]) if idx < len(short_exits) else False
+            long_entry = bool(entries.iloc[idx]) if entries is not None and idx < len(entries) else False
+            long_exit = bool(exits.iloc[idx]) if exits is not None and idx < len(exits) else False
+            short_entry = (
+                bool(short_entries.iloc[idx]) if short_entries is not None and idx < len(short_entries) else False
+            )
+            short_exit = bool(short_exits.iloc[idx]) if short_exits is not None and idx < len(short_exits) else False
         except (IndexError, KeyError):
             return orders
 
@@ -463,14 +464,12 @@ def create_on_bar_from_adapter(
             elif short_entry:
                 add_order("sell")
                 position = -1
-        elif position == 1:
-            if long_exit or short_entry:
-                add_order("sell")
-                position = 0
-        elif position == -1:
-            if short_exit or long_entry:
-                add_order("buy")
-                position = 0
+        elif position == 1 and (long_exit or short_entry):
+            add_order("sell")
+            position = 0
+        elif position == -1 and (short_exit or long_entry):
+            add_order("buy")
+            position = 0
 
         return orders
 

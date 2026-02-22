@@ -52,6 +52,7 @@
         "psubscribe",
         "unliked",
         "savez",
+        "signum",
         "venv",
         "Venv",
         "uvicorn",

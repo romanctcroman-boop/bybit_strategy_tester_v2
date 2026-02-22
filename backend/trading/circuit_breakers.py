@@ -78,7 +78,7 @@ class TradingCircuitBreaker:
     Monitors trading activity and halts operations if limits exceeded
     """
 
-    def __init__(self, config: CircuitBreakerConfig = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         """Initialize circuit breaker"""
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitBreakerState.CLOSED
@@ -89,9 +89,7 @@ class TradingCircuitBreaker:
 
     def _calculate_loss_percent(self) -> float:
         """Calculate current loss percentage"""
-        current_value = (
-            self.metrics.initial_portfolio_value + self.metrics.total_profit_loss
-        )
+        current_value = self.metrics.initial_portfolio_value + self.metrics.total_profit_loss
         loss = self.metrics.initial_portfolio_value - current_value
         return (loss / self.metrics.initial_portfolio_value) * 100
 
@@ -152,10 +150,12 @@ class TradingCircuitBreaker:
         """
         if self.state == CircuitBreakerState.OPEN:
             if not self._check_cooldown():
-                remaining = (
-                    self.config.cooldown_seconds
-                    - (datetime.now() - self.metrics.circuit_opened_at).total_seconds()
+                elapsed = (
+                    (datetime.now() - self.metrics.circuit_opened_at).total_seconds()
+                    if self.metrics.circuit_opened_at is not None
+                    else 0.0
                 )
+                remaining = self.config.cooldown_seconds - elapsed
                 return (
                     False,
                     f"Circuit breaker OPEN - cooldown {remaining:.0f}s remaining",
@@ -171,9 +171,7 @@ class TradingCircuitBreaker:
                 self.state = CircuitBreakerState.CLOSED
                 logger.info("Circuit breaker CLOSED - recovery successful")
             else:
-                logger.info(
-                    f"Recovery test: {self.recovery_test_count}/{self.config.recovery_test_trades}"
-                )
+                logger.info(f"Recovery test: {self.recovery_test_count}/{self.config.recovery_test_trades}")
 
         # Check limits
         loss_ok, loss_reason = self._check_loss_limits()
@@ -203,29 +201,27 @@ class TradingCircuitBreaker:
         try:
             from backend.services.alerting import (
                 Alert,
-                AlertSeverity,
-                get_alert_service,
+                AlertLevel,
+                get_alerting_service,
             )
 
-            alert_service = get_alert_service()
+            alert_service = get_alerting_service()
             severity_map = {
-                "info": AlertSeverity.INFO,
-                "warning": AlertSeverity.WARNING,
-                "critical": AlertSeverity.CRITICAL,
+                "info": AlertLevel.INFO,
+                "warning": AlertLevel.WARNING,
+                "critical": AlertLevel.CRITICAL,
             }
 
             alert = Alert(
                 title=f"Trading Circuit Breaker {severity.upper()}",
                 message=reason,
-                severity=severity_map.get(severity, AlertSeverity.WARNING),
+                level=severity_map.get(severity, AlertLevel.WARNING),
                 source="trading_circuit_breaker",
                 metadata={
                     "state": self.state.value,
                     "total_trades": self.metrics.total_trades,
                     "total_profit_loss": self.metrics.total_profit_loss,
-                    "opened_at": self.metrics.circuit_opened_at.isoformat()
-                    if self.metrics.circuit_opened_at
-                    else None,
+                    "opened_at": self.metrics.circuit_opened_at.isoformat() if self.metrics.circuit_opened_at else None,
                 },
             )
 
@@ -277,8 +273,7 @@ class TradingCircuitBreaker:
         self.metrics.volume_last_hour += abs(volume)
 
         logger.info(
-            f"Trade recorded: success={success}, P/L=${profit_loss:.2f}, "
-            f"volume=${volume:.2f}, state={self.state}",
+            f"Trade recorded: success={success}, P/L=${profit_loss:.2f}, volume=${volume:.2f}, state={self.state}",
             extra={"correlation_id": correlation_id or "N/A"},
         )
 
