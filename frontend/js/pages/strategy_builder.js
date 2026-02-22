@@ -684,6 +684,9 @@ function tryLoadFromLocalStorage(strategyId) {
       connections: connections.length
     });
 
+    // Clear any stale multi-selection state that may have been serialised in localStorage
+    clearMultiSelection();
+
     // Show notification
     showRestoreNotification();
 
@@ -905,7 +908,7 @@ function resetFormToDefaults() {
   const positionSizeTypeEl = document.getElementById('backtestPositionSizeType');
   if (positionSizeTypeEl) positionSizeTypeEl.value = 'percent';
   const positionSizeEl = document.getElementById('backtestPositionSize');
-  if (positionSizeEl) positionSizeEl.value = '100';
+  if (positionSizeEl) positionSizeEl.value = '10';
 
   // Commission
   const commissionEl = document.getElementById('backtestCommission');
@@ -1044,6 +1047,9 @@ function initializeStrategyBuilder() {
 
     // Initialize undo/redo button states
     updateUndoRedoButtons();
+
+    // Set initial state of action buttons (disabled until symbol is selected)
+    updateRunButtonsState();
 
     console.log('[Strategy Builder] Initialization complete!');
   } catch (error) {
@@ -1721,6 +1727,8 @@ function initSymbolPicker() {
     input.blur();
     console.log(`[SymbolPicker] Selected: ${sym}`);
     document.dispatchEvent(new CustomEvent('properties-symbol-selected'));
+    // Update action-button state now that a symbol is set
+    updateRunButtonsState();
     // Отменить отложенный вызов от change/debounce, чтобы не прерывать только что запущенный sync
     if (typeof checkSymbolDataForProperties === 'function' && checkSymbolDataForProperties.cancel) {
       checkSymbolDataForProperties.cancel();
@@ -2359,7 +2367,11 @@ function setupEventListeners() {
   const backtestSymbolEl = document.getElementById('backtestSymbol');
   const strategyTimeframeEl = document.getElementById('strategyTimeframe');
   const builderMarketTypeEl = document.getElementById('builderMarketType');
-  if (backtestSymbolEl) backtestSymbolEl.addEventListener('change', checkSymbolDataForProperties);
+  if (backtestSymbolEl) {
+    backtestSymbolEl.addEventListener('change', checkSymbolDataForProperties);
+    backtestSymbolEl.addEventListener('input', updateRunButtonsState);
+    backtestSymbolEl.addEventListener('change', updateRunButtonsState);
+  }
   if (strategyTimeframeEl) strategyTimeframeEl.addEventListener('change', () => {
     checkSymbolDataForProperties();
     // Restart auto-refresh with new TF interval
@@ -7146,6 +7158,26 @@ function clearMultiSelection() {
   selectedBlockIds = [];
 }
 
+/**
+ * Enable/disable the primary action buttons based on whether a symbol is selected.
+ * Called on init and whenever the symbol input changes.
+ */
+function updateRunButtonsState() {
+  const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+  const canRun = Boolean(symbol);
+  const tooltip = canRun ? '' : 'Сначала выберите Symbol';
+  ['btnBacktest', 'btnGenerateCode', 'btnStartOptimization'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = !canRun;
+    btn.title = canRun ? btn.dataset.originalTitle || '' : tooltip;
+    if (!btn.dataset.originalTitle && canRun) {
+      // Store original title once it has a value, so we can restore it later
+      btn.dataset.originalTitle = btn.title;
+    }
+  });
+}
+
 // ============================================
 // GROUP DRAG
 // ============================================
@@ -9843,6 +9875,14 @@ function updateValidationPanel(result) {
 
 async function generateCode() {
   console.log('[Strategy Builder] generateCode called');
+
+  // Guard: symbol must be selected before generating code
+  const symbolForCode = document.getElementById('backtestSymbol')?.value?.trim();
+  if (!symbolForCode) {
+    showNotification('Выберите тикер в поле Symbol перед генерацией кода', 'warning');
+    return;
+  }
+
   const strategyId = getStrategyIdFromURL();
   console.log('[Strategy Builder] Strategy ID from URL:', strategyId);
 
@@ -10189,8 +10229,6 @@ async function saveStrategy() {
 }
 
 function buildStrategyPayload() {
-  console.log('[Strategy Builder] buildStrategyPayload called');
-
   const nameEl = document.getElementById('strategyName');
   const timeframeEl = document.getElementById('strategyTimeframe');
   const marketTypeEl = document.getElementById('builderMarketType');
@@ -11077,7 +11115,13 @@ async function runBacktest() {
   // Bug #4 fix: validate date range on frontend before sending — avoids cryptic HTTP 422
   const DATA_START_DATE = '2025-01-01'; // Must match backend/config/database_policy.py
   const startDateVal = document.getElementById('backtestStartDate')?.value || DATA_START_DATE;
-  const endDateVal = document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const endDateRaw = document.getElementById('backtestEndDate')?.value;
+  if (!endDateRaw) {
+    showNotification('Укажите End Date перед запуском бэктеста', 'warning');
+    document.getElementById('backtestEndDate')?.focus();
+    return;
+  }
+  const endDateVal = endDateRaw;
   if (startDateVal < DATA_START_DATE) {
     showNotification(`Start Date не может быть раньше ${DATA_START_DATE} — данные в БД начинаются с этой даты.`, 'error');
     return;
