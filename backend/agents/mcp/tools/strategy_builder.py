@@ -25,6 +25,8 @@ registry = get_tool_registry()
 # Base URL for internal API calls (same server)
 _API_BASE = "http://localhost:8000/api/v1/strategy-builder"
 _TIMEOUT = 30.0
+# Backtest can take several minutes for long date ranges (6+ months of 15m data)
+_BACKTEST_TIMEOUT = 300.0
 
 
 async def _api_get(path: str, params: dict | None = None) -> dict[str, Any]:
@@ -96,6 +98,7 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "williams_r": "indicator",
     "roc": "indicator",
     "supertrend": "indicator",
+    "bbands": "indicator",  # alias for bollinger bands
     "ichimoku": "indicator",
     "keltner": "indicator",
     "donchian": "indicator",
@@ -1211,7 +1214,7 @@ async def builder_run_backtest(
     start_date: str = "2025-01-01",
     end_date: str = "2025-06-01",
     initial_capital: float = 10000.0,
-    leverage: int = 10,
+    leverage: float = 10.0,
     direction: str = "both",
     commission: float = 0.0007,
     stop_loss: float | None = None,
@@ -1252,10 +1255,24 @@ async def builder_run_backtest(
         if take_profit is not None:
             payload["take_profit"] = take_profit
 
-        return await _api_post(f"/strategies/{strategy_id}/backtest", json_data=payload)
+        # Use extended timeout for backtest — 6 months of 15m data can take 2-3 minutes
+        async with httpx.AsyncClient(timeout=_BACKTEST_TIMEOUT) as client:
+            resp = await client.post(
+                f"{_API_BASE}/strategies/{strategy_id}/backtest",
+                json=payload,
+            )
+            resp.raise_for_status()
+            result: dict[str, Any] = resp.json()
+            return result
     except httpx.HTTPStatusError as e:
         logger.error(f"builder_run_backtest HTTP error: {e.response.status_code} - {e.response.text}")
         return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+    except httpx.ReadTimeout:
+        logger.error(
+            f"builder_run_backtest timed out after {_BACKTEST_TIMEOUT}s for strategy {strategy_id}. "
+            "Consider reducing the date range or using a faster engine."
+        )
+        return {"error": f"Backtest timed out after {_BACKTEST_TIMEOUT}s. Try a shorter date range."}
     except Exception as e:
         logger.error(f"builder_run_backtest error: {e}")
         return {"error": str(e)}

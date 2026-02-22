@@ -400,7 +400,7 @@ class BuilderWorkflow:
                 start_date=config.start_date,
                 end_date=config.end_date,
                 initial_capital=config.initial_capital,
-                leverage=int(config.leverage),
+                leverage=round(config.leverage),
                 direction=config.direction,
                 commission=config.commission,
                 stop_loss=config.stop_loss,
@@ -507,7 +507,7 @@ class BuilderWorkflow:
                     start_date=config.start_date,
                     end_date=config.end_date,
                     initial_capital=config.initial_capital,
-                    leverage=int(config.leverage),
+                    leverage=round(config.leverage),
                     direction=config.direction,
                     commission=config.commission,
                     stop_loss=config.stop_loss,
@@ -542,9 +542,9 @@ class BuilderWorkflow:
         "less_than",
         "between",
         "equals",
-        "and",
-        "or",
-        "not",
+        # NOTE: "and", "or", "not" are LOGIC blocks (category="logic"), NOT conditions.
+        # Logic blocks combine signals but are not entry conditions themselves
+        # — they should NOT be auto-wired to action blocks.
     }
     _INDICATOR_TYPES = {
         "rsi",
@@ -614,9 +614,10 @@ class BuilderWorkflow:
 
         # Available block types exposed in the system
         available = (
-            "Indicators: rsi, ema, sma, macd, bollinger, atr, stochastic, adx, "
+            "Indicators: rsi, ema, sma, macd, bollinger, bbands, atr, stochastic, adx, "
             "supertrend, vwap, cci, williams_r, mfi, roc, momentum, obv. "
-            "Conditions: crossover, crossunder, greater_than, less_than, between, and, or, not. "
+            "Conditions: crossover, crossunder, greater_than, less_than, between, equals. "
+            "Logic (signal combinators, NOT entry conditions): and, or, not. "
             "Actions: buy, sell, close_long, close_short, close_all. "
             "Risk: static_sltp, atr_sltp. "
             "Data: price."
@@ -1133,11 +1134,16 @@ Recommended approach for positive profit (EMA + RSI combination):
             return auto_connections
 
         # Build set of explicit connection targets (source→target pairs)
-        explicit_targets: set[str] = set()
+        # Map both raw names and resolved IDs so has_downstream works correctly
+        explicit_sources: set[str] = set()
         for conn in explicit_connections:
             src = conn.get("source", "")
-            tgt = conn.get("target", "")
-            explicit_targets.add(f"{src}→{tgt}")
+            if src:
+                explicit_sources.add(src)
+                # Also add the resolved actual block ID so we don't double-wire
+                resolved_src = block_id_map.get(src, "")
+                if resolved_src:
+                    explicit_sources.add(resolved_src)
 
         # Categorize blocks by role
         condition_blocks: list[dict[str, Any]] = []
@@ -1161,7 +1167,10 @@ Recommended approach for positive profit (EMA + RSI combination):
                 continue
 
             # Check if condition already has downstream connections
-            has_downstream = any(conn.get("source", "") in (cond["id"], cond["type"]) for conn in explicit_connections)
+            # Check both the raw plan name and the resolved actual block ID
+            has_downstream = (
+                cond["id"] in explicit_sources or cond["type"] in explicit_sources or cond_id in explicit_sources
+            )
 
             if not has_downstream:
                 # Smart wiring: crossover → buy, crossunder → sell
