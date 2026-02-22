@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AI builder — Optimizer Sweep Mode (2026-02-22, commit `e7fc03f9b`):**
+
+    New `use_optimizer_mode` flag connects the AI builder workflow to the existing `BuilderOptimizer` infrastructure so each iteration can search a full parameter space rather than guessing a single value.
+
+    **`backend/agents/workflows/builder_workflow.py`:**
+    - `BuilderWorkflowConfig.use_optimizer_mode: bool = False` — opt-in per request; serialized in `to_dict()`.
+    - `_suggest_param_ranges()`: A2A parallel consensus (DeepSeek + Qwen + Perplexity) — agents are shown the full graph description + `DEFAULT_PARAM_RANGES` hints and asked to propose narrow `{min, max, step}` ranges for 2-4 parameters. Falls back to single DeepSeek on A2A failure.
+    - `_merge_agent_ranges()`: merges per-agent range suggestions using tightest common window: `max(mins)`, `min(maxs)`, `min(steps)`. Falls back to first agent's range if the intersection is empty.
+    - `_run_optimizer_for_ranges()`: converts agent ranges → `custom_ranges` format, fetches strategy graph via `builder_get_strategy()` MCP tool, fetches OHLCV via `BacktestService`, auto-selects grid search (≤ 500 combos) or Bayesian/Optuna (> 500 combos, capped at 200 trials), returns `{best_params, best_score, best_metrics, tested_combinations}`.
+    - Iteration loop now branches: `if config.use_optimizer_mode` → ranges+sweep path; `else` → existing single-value `_suggest_adjustments` path (backward-compatible).
+    - Added `import asyncio` at module top.
+
+    **`backend/api/routers/agents_advanced.py`:**
+    - `BuilderTaskRequest.use_optimizer_mode: bool = False` Pydantic field (with description).
+    - Passed to `BuilderWorkflowConfig` in both `run_builder_task()` and `_builder_sse_stream()`.
+
+    **`frontend/strategy-builder.html`:**
+    - New `#aiUseOptimizer` checkbox added to AI Build modal under the Deliberation checkbox.
+
+    **`frontend/js/pages/strategy_builder.js`:**
+    - `payload.use_optimizer_mode` reads `#aiUseOptimizer` checkbox value.
+
 ### Fixed
 
 - **AI optimizer — 3 optimize-mode pipeline bugs fixed (2026-02-22, commit `e2ecd1dab`):**
