@@ -763,9 +763,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     # Only rename if the canonical key is not already present
                     # (the user might supply both old and new names)
                     normalised[canonical] = val
-                    logger.debug(
-                        "[ParamAlias] {}: '{}' -> '{}'", indicator_type, key, canonical
-                    )
+                    logger.debug("[ParamAlias] {}: '{}' -> '{}'", indicator_type, key, canonical)
                 else:
                     normalised[key] = val
             params = normalised
@@ -3306,8 +3304,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                             if target_port == "close_cond":
                                 raw = source_outputs
                                 # Collect profit_only flags from this close_cond block
-                                has_po = raw.get("profit_only")    # pd.Series[bool] or None
-                                min_pv = raw.get("min_profit")     # pd.Series[float] or None
+                                has_po = raw.get("profit_only")  # pd.Series[bool] or None
+                                min_pv = raw.get("min_profit")  # pd.Series[float] or None
                                 # min_profit in params is in percent (1.0 = 1%);
                                 # convert to decimal fraction for the engine.
                                 mp_decimal = float(min_pv.iloc[0]) / 100.0 if min_pv is not None else 0.0
@@ -3405,7 +3403,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         )
 
         if has_connections_to_main and not use_fallback and entries.sum() == 0 and short_entries.sum() == 0:
-            _conn_count = sum(1 for conn in self.connections if conn.get("target", {}).get("nodeId") == main_node_id)
+            _conn_count = sum(1 for conn in self.connections if conn.get("target_id") == main_node_id)
             logger.warning(
                 "[SignalRouting] Strategy '%s': %d connection(s) to main node but "
                 "ALL signal series are empty (0 long, 0 short entries). "
@@ -3507,13 +3505,12 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Only write to extra_data when at least one close_cond block activated
         # profit_only — avoids unnecessary numpy work in the engine hot loop.
         if profit_only_exits.any() or profit_only_short_exits.any():
-            extra_data["profit_only_exits"] = profit_only_exits             # pd.Series[bool]
+            extra_data["profit_only_exits"] = profit_only_exits  # pd.Series[bool]
             extra_data["profit_only_short_exits"] = profit_only_short_exits
-            extra_data["min_profit_exits"] = min_profit_for_exits           # float, decimal fraction
+            extra_data["min_profit_exits"] = min_profit_for_exits  # float, decimal fraction
             extra_data["min_profit_short_exits"] = min_profit_for_short_exits
             logger.debug(
-                "[SignalRouting] profit_only_exits: long_bars={} min={:.4f}, "
-                "short_bars={} min={:.4f}",
+                "[SignalRouting] profit_only_exits: long_bars={} min={:.4f}, short_bars={} min={:.4f}",
                 int(profit_only_exits.sum()),
                 min_profit_for_exits,
                 int(profit_only_short_exits.sum()),
