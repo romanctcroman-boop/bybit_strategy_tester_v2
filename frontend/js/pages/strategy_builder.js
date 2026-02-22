@@ -3108,26 +3108,8 @@ function setupEventListeners() {
   }
   // ===== End Toolbar buttons =====
 
-  document.querySelectorAll('[onclick*="fitToScreen"]').forEach((btn) => {
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', fitToScreen);
-  });
-
-  // Zoom buttons
-  document.querySelectorAll('[onclick*="zoomIn"]').forEach((btn) => {
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', zoomIn);
-  });
-
-  document.querySelectorAll('[onclick*="zoomOut"]').forEach((btn) => {
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', zoomOut);
-  });
-
-  document.querySelectorAll('[onclick*="resetZoom"]').forEach((btn) => {
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', resetZoom);
-  });
+  // NOTE: fitToScreen and zoom buttons have no onclick attributes in HTML.
+  // They are wired in initCspCompliantListeners() via title/class selectors.
 
   // Modal buttons by ID
   const btnCloseModal = document.getElementById('btnCloseModal');
@@ -11253,6 +11235,7 @@ function displayBacktestResults(results) {
     }
     if (chartData) {
       setTimeout(() => renderEquityChart(chartData), 100);
+      setTimeout(() => renderDrawdownChart(chartData), 100);
     }
   }
 }
@@ -11508,8 +11491,9 @@ function renderEquityChart(equityCurve) {
   // Simple canvas rendering (no external chart library needed)
   const ctx = canvas.getContext('2d');
   const container = canvas.parentElement;
-  canvas.width = container.clientWidth;
-  canvas.height = container.clientHeight;
+  canvas.width = container.clientWidth || 600;
+  // Fallback height when tab is hidden (clientHeight === 0)
+  canvas.height = container.clientHeight || 300;
 
   const padding = 40;
   const width = canvas.width - padding * 2;
@@ -11536,7 +11520,7 @@ function renderEquityChart(equityCurve) {
     ctx.stroke();
   }
 
-  // Draw equity line
+  // Draw equity line (stroke only)
   ctx.strokeStyle = '#58a6ff';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -11558,7 +11542,22 @@ function renderEquityChart(equityCurve) {
 
   ctx.stroke();
 
-  // Fill area under curve
+  // Fill area under curve — separate path to avoid stroke/fill path conflict
+  ctx.beginPath();
+  values.forEach((val, idx) => {
+    const x = values.length <= 1
+      ? padding + width / 2
+      : padding + (idx / (values.length - 1)) * width;
+    const y = range > 0
+      ? padding + height - ((val - minVal) / range) * height
+      : padding + height / 2;
+
+    if (idx === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
   ctx.lineTo(padding + width, padding + height);
   ctx.lineTo(padding, padding + height);
   ctx.closePath();
@@ -11571,6 +11570,93 @@ function renderEquityChart(equityCurve) {
   ctx.textAlign = 'right';
   ctx.fillText(formatCurrency(maxVal), padding - 5, padding + 5);
   ctx.fillText(formatCurrency(minVal), padding - 5, padding + height);
+}
+
+/**
+ * Render drawdown chart on the #drawdownChart canvas.
+ * Drawdown values are expected as percentages (e.g. -15.3 means -15.3%).
+ * @param {Array} equityCurve - Same array passed to renderEquityChart
+ */
+function renderDrawdownChart(equityCurve) {
+  const canvas = document.getElementById('drawdownChart');
+  if (!canvas || !equityCurve || equityCurve.length === 0) return;
+
+  const ctx = canvas.getContext('2d');
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth || 600;
+  canvas.height = container.clientHeight || 300;
+
+  const padding = 40;
+  const width = canvas.width - padding * 2;
+  const height = canvas.height - padding * 2;
+
+  // Extract drawdown values (already negative or zero)
+  const values = equityCurve.map(p => {
+    const dd = p.drawdown !== undefined ? p.drawdown : 0;
+    return Math.min(dd, 0); // Ensure non-positive
+  });
+  const minVal = Math.min(...values, -0.001); // At least slightly below 0
+  const maxVal = 0;
+  const range = maxVal - minVal || 1;
+
+  // Clear canvas
+  ctx.fillStyle = '#161b22';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw grid lines
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding + (height * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(canvas.width - padding, y);
+    ctx.stroke();
+    // Label each grid line with the drawdown %
+    const pct = (maxVal - (range * i) / 4) * 100;
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(pct.toFixed(1) + '%', padding - 5, y + 4);
+  }
+
+  // Draw zero baseline
+  ctx.strokeStyle = '#484f58';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(canvas.width - padding, padding);
+  ctx.stroke();
+
+  // Draw drawdown line (stroke)
+  ctx.strokeStyle = '#f85149';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  values.forEach((val, idx) => {
+    const x = values.length <= 1
+      ? padding + width / 2
+      : padding + (idx / (values.length - 1)) * width;
+    const y = padding + ((maxVal - val) / range) * height;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill area below the drawdown line — separate path
+  ctx.beginPath();
+  values.forEach((val, idx) => {
+    const x = values.length <= 1
+      ? padding + width / 2
+      : padding + (idx / (values.length - 1)) * width;
+    const y = padding + ((maxVal - val) / range) * height;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(padding + width, padding); // back to baseline right
+  ctx.lineTo(padding, padding);          // back to baseline left
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(248, 81, 73, 0.15)';
+  ctx.fill();
 }
 
 /**
@@ -11602,6 +11688,7 @@ function switchResultsTab(tabId) {
     }
     if (chartData) {
       setTimeout(() => renderEquityChart(chartData), 100);
+      setTimeout(() => renderDrawdownChart(chartData), 100);
     }
   }
 }
@@ -11645,7 +11732,7 @@ function exportBacktestResults() {
  */
 function viewFullResults() {
   if (currentBacktestResults && currentBacktestResults.backtest_id) {
-    window.location.href = `/frontend/backtest-results.html?backtest_id=${currentBacktestResults.backtest_id}`;
+    window.location.href = `backtest-results.html?backtest_id=${currentBacktestResults.backtest_id}`;
   } else {
     showNotification('No backtest ID available', 'warning');
   }
@@ -11943,10 +12030,10 @@ async function runAiBuild() {
     end_date: endDate,
     initial_capital: capital,
     leverage: leverage,
-    max_iterations: parseInt(document.getElementById('aiMaxIter').value),
-    min_sharpe: parseFloat(document.getElementById('aiMinSharpe').value),
+    max_iterations: parseInt(document.getElementById('aiMaxIter')?.value || '3', 10),
+    min_sharpe: parseFloat(document.getElementById('aiMinSharpe')?.value || '0.5'),
     min_win_rate: 0.4,
-    enable_deliberation: document.getElementById('aiDeliberation').checked
+    enable_deliberation: document.getElementById('aiDeliberation')?.checked ?? false
   };
 
   if (_aiBuildMode === 'optimize' && _aiBuildExistingStrategyId) {
@@ -12063,6 +12150,9 @@ async function _runAiBuildWithSSE(payload) {
       }
     }
   }
+  // Stream ended without a 'result' or 'error' event — surface as an error
+  // so the caller can hide the progress panel and show a message.
+  throw new Error('AI agent stream closed without returning a result. The task may have timed out or the server restarted.');
 }
 
 // ============================================

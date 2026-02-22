@@ -153,24 +153,36 @@ class ApiClient {
     }
 
     /**
-     * Fetch with timeout
+     * Fetch with timeout using AbortController.
+     * Cancels the request after this.config.timeout milliseconds.
      * @private
      */
     async _fetchWithTimeout(url, options) {
-        const timeoutId = setTimeout(() => {
-            if (options.signal) {
-                // Can't abort externally, will use Promise.race instead
-            }
-        }, this.config.timeout);
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(
+            () => timeoutController.abort(new Error('Request timeout')),
+            this.config.timeout
+        );
+
+        // Merge the timeout signal with any existing signal from the caller.
+        // If either fires, the request is aborted.
+        const signals = [timeoutController.signal];
+        if (options.signal) signals.push(options.signal);
+
+        const combinedSignal = signals.length === 1
+            ? signals[0]
+            : AbortSignal.any
+                ? AbortSignal.any(signals)          // modern browsers
+                : signals[0];                        // fallback: timeout wins
 
         try {
-            const response = await Promise.race([
-                fetch(url, options),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Request timeout')), this.config.timeout)
-                )
-            ]);
+            const response = await fetch(url, { ...options, signal: combinedSignal });
             return response;
+        } catch (err) {
+            if (timeoutController.signal.aborted) {
+                throw new Error('Request timeout');
+            }
+            throw err;
         } finally {
             clearTimeout(timeoutId);
         }
