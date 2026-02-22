@@ -7715,13 +7715,14 @@ body.floating-window-open .zoom-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 32px 0;
+    gap: 8px;
+    padding: 12px 0 10px;
 }
 
 .ai-build-spinner p {
     color: var(--text-secondary, #a1a1aa);
     font-size: 13px;
+    margin: 0;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -7768,7 +7769,7 @@ body.floating-window-open .zoom-controls {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0;
-    max-height: 420px;
+    max-height: 560px;
 }
 
 .agent-col {
@@ -7824,7 +7825,7 @@ body.floating-window-open .zoom-controls {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 380px;
+    max-height: 520px;
     scrollbar-width: thin;
     scrollbar-color: #3d3d5c transparent;
 }
@@ -7955,8 +7956,8 @@ body.floating-window-open .zoom-controls {
     margin-left: 6px;
 }
 
-/* When agent monitor is visible, widen the AI modal */
+/* When agent monitor is visible, widen the AI modal to full comfortable width */
 .ai-build-modal-content.has-agents {
-    width: min(96vw, 900px);
-    max-height: 92vh;
+    width: min(98vw, 1100px);
+    max-height: 95vh;
 }

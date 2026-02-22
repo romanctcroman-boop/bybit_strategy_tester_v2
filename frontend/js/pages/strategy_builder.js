@@ -12100,9 +12100,11 @@ async function runAiBuild() {
     }
   }
 
-  // Show progress panel
+  // Show progress panel — expand modal immediately to agent-monitor width
   document.getElementById('aiBuildConfig').classList.add('hidden');
   document.getElementById('aiBuildProgress').classList.remove('hidden');
+  const _progressModal = document.querySelector('.ai-build-modal-content');
+  if (_progressModal) _progressModal.classList.add('has-agents');
   _resetAgentMonitor();
   const stageEl = document.getElementById('aiBuildStage');
   if (stageEl) {
