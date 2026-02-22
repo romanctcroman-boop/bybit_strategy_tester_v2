@@ -12081,10 +12081,24 @@ async function runAiBuild() {
   };
 
   if (_aiBuildMode === 'optimize' && _aiBuildExistingStrategyId) {
-    // Optimize mode: use existing strategy, skip creation/blocks/connections
+    // Optimize mode: reuse existing strategy — send current canvas state so
+    // the backend can describe the graph to agents without an extra API call.
+    // backend also does builder_get_strategy() as a fallback, but sending
+    // the live canvas data is faster and always up-to-date.
     payload.existing_strategy_id = _aiBuildExistingStrategyId;
-    payload.blocks = [];
-    payload.connections = [];
+    payload.blocks = strategyBlocks.map(b => ({
+      id: b.id,
+      type: b.type,
+      name: b.name || b.type,
+      params: b.params || {}
+    }));
+    payload.connections = connections.map(c => ({
+      id: c.id,
+      source_block_id: c.sourceBlockId || c.source_block_id || c.source,
+      source_port: c.sourcePort || c.source_port || 'output',
+      target_block_id: c.targetBlockId || c.target_block_id || c.target,
+      target_port: c.targetPort || c.target_port || 'input'
+    }));
   } else {
     const presetSelect = document.getElementById('aiPreset');
     const presetKey = presetSelect?.value || 'custom';

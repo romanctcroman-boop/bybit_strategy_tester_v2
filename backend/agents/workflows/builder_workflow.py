@@ -328,28 +328,15 @@ class BuilderWorkflow:
             else:
                 self._result.block_library = library
 
-            # P3 fix: plan blocks BEFORE deliberation so deliberation sees the plan
-            # LLM block planning: if no blocks provided, ask DeepSeek to design them
-            if not config.existing_strategy_id and not config.blocks:
-                await self._plan_blocks(config)
-
-            # Optional AI Deliberation for planning phase
-            if config.enable_deliberation:
-                await self._run_deliberation(config)
-
-            # Check mode: existing strategy (optimize) vs new strategy (build)
+            # ── Optimize mode: load existing strategy FIRST so deliberation
+            # and _plan_blocks have access to real blocks/connections.
             if config.existing_strategy_id:
-                # ── Optimize mode: skip Stages 2-4, reuse existing strategy ──
                 self._result.strategy_id = config.existing_strategy_id
                 logger.info(f"[BuilderWorkflow] Optimize mode — using existing strategy: {config.existing_strategy_id}")
 
-                # Fetch existing strategy state for iteration context.
-                # We need both blocks (with params) and connections (graph topology)
-                # so that _suggest_adjustments can describe the full visual graph
-                # to the agents.  The REST API returns:
-                #   top-level "blocks"      → builder_blocks (full block dicts with params)
-                #   top-level "connections" → builder_connections
-                #   "builder_graph"         → raw saved graph (alternative source)
+                # Fetch existing strategy state.  We need blocks (with params) and
+                # connections (graph topology) for both deliberation context and
+                # _suggest_adjustments prompt building.
                 self._set_stage(BuilderStage.CREATING)
                 try:
                     from backend.agents.mcp.tools.strategy_builder import (
@@ -362,14 +349,13 @@ class BuilderWorkflow:
                         raw_connections = existing.get("connections", [])
 
                         # Fallback: if top-level blocks list is sparse (no params),
-                        # try to pull richer block data from builder_graph.blocks
-                        if raw_blocks and not any(b.get("params") for b in raw_blocks):
+                        # try to pull richer block data from builder_graph.blocks.
+                        # This also covers the case where the frontend sent empty arrays.
+                        if not raw_blocks or not any(b.get("params") for b in raw_blocks):
                             graph = existing.get("builder_graph") or {}
                             graph_blocks = graph.get("blocks", [])
                             if graph_blocks and any(b.get("params") for b in graph_blocks):
-                                logger.info(
-                                    "[BuilderWorkflow] Using builder_graph.blocks (richer params)"
-                                )
+                                logger.info("[BuilderWorkflow] Using builder_graph.blocks (richer params)")
                                 raw_blocks = graph_blocks
 
                         # Same fallback for connections
@@ -377,10 +363,26 @@ class BuilderWorkflow:
                             graph = existing.get("builder_graph") or {}
                             raw_connections = graph.get("connections", [])
 
-                        self._result.blocks_added = raw_blocks
-                        self._result.connections_made = raw_connections
+                        # If the frontend provided blocks in the payload, prefer
+                        # those (they are the live canvas state, always current)
+                        # but fall back to DB data when the frontend sent nothing.
+                        if config.blocks:
+                            logger.info(
+                                f"[BuilderWorkflow] Using canvas blocks from payload "
+                                f"({len(config.blocks)} blocks, {len(config.connections)} connections)"
+                            )
+                        else:
+                            config.blocks = raw_blocks
+                            config.connections = raw_connections
+                            logger.info(
+                                f"[BuilderWorkflow] Loaded blocks from DB: "
+                                f"{len(raw_blocks)} blocks, {len(raw_connections)} connections"
+                            )
+
+                        self._result.blocks_added = config.blocks
+                        self._result.connections_made = config.connections
                         logger.info(
-                            f"[BuilderWorkflow] Loaded existing strategy: "
+                            f"[BuilderWorkflow] Strategy context ready: "
                             f"{len(self._result.blocks_added)} blocks "
                             f"({sum(1 for b in self._result.blocks_added if b.get('params'))} with params), "
                             f"{len(self._result.connections_made)} connections"
@@ -394,8 +396,17 @@ class BuilderWorkflow:
                     logger.warning(
                         f"[BuilderWorkflow] Failed to fetch existing strategy: {e}. Continuing with optimize anyway."
                     )
-            else:
-                # ── Build mode: Stages 2-4 — create strategy, add blocks, connect ──
+
+            # LLM block planning: only for new strategies when no blocks provided
+            if not config.existing_strategy_id and not config.blocks:
+                await self._plan_blocks(config)
+
+            # Optional AI Deliberation — now always has populated config.blocks
+            if config.enable_deliberation:
+                await self._run_deliberation(config)
+
+            # Build mode: Stages 2-4 — create strategy, add blocks, connect
+            if not config.existing_strategy_id:
                 await self._run_build_stages(config)
 
             # Stage 5: Validate
@@ -507,19 +518,60 @@ class BuilderWorkflow:
                     logger.info("[BuilderWorkflow] No adjustments possible, stopping iteration")
                     break
 
+                # Apply each adjustment; track failures so we can skip the
+                # backtest if every single update failed (no-op iteration).
+                failed_blocks: list[str] = []
                 for adj in adjustments:
                     block_id = adj["block_id"]
                     new_params = adj["params"]
                     logger.info(f"[BuilderWorkflow] Adjusting block {block_id}: {new_params}")
-                    result = await builder_update_block_params(
+                    update_result = await builder_update_block_params(
                         strategy_id=self._result.strategy_id,
                         block_id=block_id,
                         params=new_params,
                     )
-                    if isinstance(result, dict) and "error" in result:
-                        self._result.errors.append(
-                            f"Iteration {iteration}: Failed to adjust {block_id}: {result['error']}"
+                    if isinstance(update_result, dict) and "error" in update_result:
+                        err_msg = f"Iteration {iteration}: Failed to adjust {block_id}: {update_result['error']}"
+                        self._result.errors.append(err_msg)
+                        logger.warning(f"[BuilderWorkflow] {err_msg}")
+                        failed_blocks.append(block_id)
+                    else:
+                        # Update local blocks_added so _suggest_adjustments sees
+                        # the new params in the next iteration's graph description.
+                        for b in self._result.blocks_added:
+                            if b.get("id") == block_id:
+                                b.setdefault("params", {}).update(new_params)
+                                break
+
+                if len(failed_blocks) == len(adjustments):
+                    logger.warning(
+                        f"[BuilderWorkflow] All {len(adjustments)} block update(s) failed "
+                        f"({failed_blocks}) — skipping backtest for iteration {iteration + 1}"
+                    )
+                    continue
+
+                # Save a version snapshot to DB after each successful adjustment
+                try:
+                    from backend.agents.mcp.tools.strategy_builder import (
+                        builder_clone_strategy,
+                    )
+
+                    base_name = config.name.split("_v")[0]
+                    version_name = f"{base_name}_v{iteration}"
+                    clone = await builder_clone_strategy(
+                        strategy_id=self._result.strategy_id,
+                        new_name=version_name,
+                    )
+                    if isinstance(clone, dict) and "error" not in clone:
+                        logger.info(
+                            f"[BuilderWorkflow] 💾 Version snapshot saved: {version_name} (id={clone.get('id', '?')})"
                         )
+                        iteration_record["version_name"] = version_name
+                        iteration_record["version_strategy_id"] = clone.get("id", "")
+                    else:
+                        logger.warning(f"[BuilderWorkflow] Version snapshot failed (non-fatal): {clone}")
+                except Exception as snap_err:
+                    logger.warning(f"[BuilderWorkflow] Version snapshot error (non-fatal): {snap_err}")
 
                 # Re-generate code after adjustments
                 self._set_stage(BuilderStage.GENERATING_CODE)

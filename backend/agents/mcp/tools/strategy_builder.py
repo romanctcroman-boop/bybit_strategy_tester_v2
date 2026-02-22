@@ -465,6 +465,43 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         return {"error": str(e)}
 
 
+@registry.register(
+    name="builder_clone_strategy",
+    description=(
+        "Clone (snapshot) an existing strategy under a new name. "
+        "Used to save a version checkpoint after each optimization iteration "
+        "so that parameter history is preserved in the database."
+    ),
+    category="strategy_builder",
+)
+async def builder_clone_strategy(
+    strategy_id: str,
+    new_name: str,
+) -> dict[str, Any]:
+    """Clone a strategy, creating a named version snapshot in the database.
+
+    Uses the REST ``POST /strategies/{strategy_id}/clone`` endpoint which does
+    a full deep-copy of blocks, connections, and ``builder_graph``.
+
+    Args:
+        strategy_id: UUID of the strategy to clone.
+        new_name:    Name for the cloned copy (e.g. ``"My Strategy_v2"``).
+
+    Returns:
+        Dict with ``id``, ``name``, ``block_count``, ``connection_count``,
+        ``timeframe``, ``symbol``, ``created_at``, ``updated_at`` on success,
+        or ``{"error": "..."}`` on failure.
+    """
+    try:
+        return await _api_post(
+            f"/strategies/{strategy_id}/clone",
+            json_data={"new_name": new_name},
+        )
+    except Exception as e:
+        logger.error(f"builder_clone_strategy error: {e}")
+        return {"error": str(e)}
+
+
 # =============================================================================
 # BLOCK OPERATIONS — Add, update, remove blocks on the canvas
 # =============================================================================
