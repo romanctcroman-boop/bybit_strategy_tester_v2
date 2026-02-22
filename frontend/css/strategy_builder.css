@@ -393,9 +393,9 @@ body {
     display: flex;
     flex-direction: column;
     scroll-behavior: smooth;
-    /* Hide scrollbar but keep functionality */
-    scrollbar-width: none; /* Firefox */
+    /* Hide scrollbar but keep functionality (all browsers) */
     -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none; /* Firefox */
 }
 
 /* Hide scrollbar for Chrome/Safari/Opera */
@@ -7832,6 +7832,20 @@ body.floating-window-open .zoom-controls {
     max-height: 232px;
     scrollbar-width: thin;
     scrollbar-color: #3d3d5c transparent;
+}
+
+/* Webkit fallback for .agent-feed scrollbar styling */
+.agent-feed::-webkit-scrollbar {
+    width: 4px;
+}
+
+.agent-feed::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.agent-feed::-webkit-scrollbar-thumb {
+    background-color: #3d3d5c;
+    border-radius: 2px;
 }
 
 .agent-message {

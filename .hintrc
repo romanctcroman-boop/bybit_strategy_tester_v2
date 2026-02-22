@@ -1,0 +1,14 @@
+{
+    "extends": ["development"],
+    "hints": {
+        "compat-api/css": [
+            "warning",
+            {
+                "ignore": [
+                    "scrollbar-width",
+                    "scrollbar-color"
+                ]
+            }
+        ]
+    }
+}
