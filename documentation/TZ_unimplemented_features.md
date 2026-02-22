@@ -30,13 +30,13 @@ BUG 1 (критический, **уже исправлен**): `close_cond` ве
 
 Пять блоков закрытия позиции поддерживают опцию «закрывать только в прибыль»:
 
-| Блок | Параметры в params |
-|---|---|
-| `close_ma_cross` | `profit_only: bool`, `min_profit_percent: float` |
-| `close_rsi` | `rsi_close_profit_only: bool`, `rsi_close_min_profit: float` |
-| `close_stochastic` | `stoch_close_profit_only: bool`, `stoch_close_min_profit: float` |
-| `close_psar` | `psar_close_profit_only: bool`, `psar_close_min_profit: float` |
-| `close_channel` | `channel_close_profit_only: bool`, `channel_close_min_profit: float` |
+| Блок               | Параметры в params                                                   |
+| ------------------ | -------------------------------------------------------------------- |
+| `close_ma_cross`   | `profit_only: bool`, `min_profit_percent: float`                     |
+| `close_rsi`        | `rsi_close_profit_only: bool`, `rsi_close_min_profit: float`         |
+| `close_stochastic` | `stoch_close_profit_only: bool`, `stoch_close_min_profit: float`     |
+| `close_psar`       | `psar_close_profit_only: bool`, `psar_close_min_profit: float`       |
+| `close_channel`    | `channel_close_profit_only: bool`, `channel_close_min_profit: float` |
 
 `_execute_close_condition` корректно читает эти параметры и кладёт в result-dict
 Series-константы `profit_only=True` и `min_profit=<float>`. Но дальше они
@@ -51,13 +51,13 @@ Series-константы `profit_only=True` и `min_profit=<float>`. Но да�
 
 Каждый из 5 close-блоков читает свои флаги под разными именами параметров:
 
-| Блок | Чтение profit_only | Чтение min_profit | Запись в result |
-|---|---|---|---|
-| `close_ma_cross` | `params.get("profit_only", False)` | `params.get("min_profit_percent", 1.0)` | `result["profit_only"]`, `result["min_profit"]` |
-| `close_rsi` | `params.get("rsi_close_profit_only", False)` | `params.get("rsi_close_min_profit", 1.0)` | `result["profit_only"]`, `result["min_profit"]` |
-| `close_stochastic` | `params.get("stoch_close_profit_only", False)` | `params.get("stoch_close_min_profit", 1.0)` | `result["profit_only"]`, `result["min_profit"]` |
-| `close_psar` | *(нужно проверить)* | *(нужно проверить)* | `result["profit_only"]`, `result["min_profit"]` |
-| `close_channel` | `params.get("channel_close_profit_only", False)` | `params.get("channel_close_min_profit", 1.0)` | `result["profit_only"]`, `result["min_profit"]` |
+| Блок               | Чтение profit_only                               | Чтение min_profit                             | Запись в result                                 |
+| ------------------ | ------------------------------------------------ | --------------------------------------------- | ----------------------------------------------- |
+| `close_ma_cross`   | `params.get("profit_only", False)`               | `params.get("min_profit_percent", 1.0)`       | `result["profit_only"]`, `result["min_profit"]` |
+| `close_rsi`        | `params.get("rsi_close_profit_only", False)`     | `params.get("rsi_close_min_profit", 1.0)`     | `result["profit_only"]`, `result["min_profit"]` |
+| `close_stochastic` | `params.get("stoch_close_profit_only", False)`   | `params.get("stoch_close_min_profit", 1.0)`   | `result["profit_only"]`, `result["min_profit"]` |
+| `close_psar`       | _(нужно проверить)_                              | _(нужно проверить)_                           | `result["profit_only"]`, `result["min_profit"]` |
+| `close_channel`    | `params.get("channel_close_profit_only", False)` | `params.get("channel_close_min_profit", 1.0)` | `result["profit_only"]`, `result["min_profit"]` |
 
 > **ВАЖНО:** `min_profit` читается из params уже в **процентах** (`1.0 = 1%`).
 > При записи в `extra_data` для движка — конвертировать: `/ 100.0`.
@@ -68,6 +68,7 @@ Series-константы `profit_only=True` и `min_profit=<float>`. Но да�
 флаги `profit_only`/`min_profit` молча теряются.
 
 **`engine.py` `_run_fallback_v4`** (строки 1265, 1277, 1780–1797):
+
 ```python
 close_only_in_profit = getattr(config, "close_only_in_profit", False)
 extra_data = getattr(signals, "extra_data", None) or {}
@@ -93,11 +94,13 @@ if not should_exit:
 ```
 
 Движок умеет `close_only_in_profit`, но:
+
 - только через глобальный `BacktestConfig.close_only_in_profit` (не per-signal)
 - только `price > entry_price` без `min_profit_percent`
 - `extra_data` уже читается в этой функции — паттерн добавления новых ключей хорошо известен
 
 **`numba_engine.py` `NumbaEngineV2`** (строки 192–196):
+
 ```python
 # Check signal exit
 if not should_exit and ((is_long and long_exits[i]) or (not is_long and short_exits[i])):
@@ -117,6 +120,7 @@ numpy arrays как дополнительные аргументы функци
 **Файл:** `backend/backtesting/strategy_builder_adapter.py`
 
 Перед главным циклом по connections (до строки ~3200) инициализировать:
+
 ```python
 profit_only_exits = pd.Series(False, index=ohlcv.index)
 profit_only_short_exits = pd.Series(False, index=ohlcv.index)
@@ -126,6 +130,7 @@ min_profit_for_short_exits: float = 0.0
 
 В существующей ветке `if target_port == "close_cond":` (строки ~3270–3291)
 расширить после `exits = exits | raw["exit_long"]`:
+
 ```python
 if target_port == "close_cond":
     raw = source_outputs
@@ -156,6 +161,7 @@ if target_port == "close_cond":
 ```
 
 В существующем блоке сбора `extra_data` (строки ~3432–3462) добавить после ATR/trailing:
+
 ```python
 # ========== Collect profit_only exit data ==========
 any_profit_only = profit_only_exits.any() or profit_only_short_exits.any()
@@ -171,6 +177,7 @@ if any_profit_only:
 **Файл:** `backend/backtesting/engine.py`, метод `_run_fallback_v4`
 
 После блока чтения ATR данных (строка ~1285), добавить:
+
 ```python
 # ========== PER-SIGNAL PROFIT_ONLY EXITS ==========
 profit_only_exit_mask  = extra_data.get("profit_only_exits")   # pd.Series или None
@@ -182,6 +189,7 @@ po_sexit_arr = profit_only_sexit_mask.values if profit_only_sexit_mask is not No
 ```
 
 Заменить существующий signal-exit блок (строки ~1780–1797):
+
 ```python
 if signal_exit_triggered:
     # Определить, нужна ли profit_only проверка для этого бара
@@ -221,6 +229,7 @@ if signal_exit_triggered:
 NumbaEngine — JIT-функция, не принимает `extra_data`. Нужно добавить аргументы:
 
 В Python-обёртке над Numba-функцией (не в самой `@njit` функции) — передать массивы:
+
 ```python
 # В методе/функции, вызывающей Numba-ядро:
 po_exit_arr = extra_data["profit_only_exits"].values if "profit_only_exits" in extra_data \
@@ -232,6 +241,7 @@ min_profit_sexit = float(extra_data.get("min_profit_short_exits", 0.0))
 ```
 
 В сигнатуре Numba-функции добавить параметры:
+
 ```python
 # po_exit_arr: np.ndarray[bool], po_sexit_arr: np.ndarray[bool]
 # min_profit_exit: float, min_profit_sexit: float
@@ -284,6 +294,7 @@ def test_profit_only_exit_fires_above_min():
 MTF через `resample()` + `ffill()`. Именно эта механика нужна для MFI/CCI.
 
 `_handle_mtf` имеет локальный `tf_map` (строки ~970–977):
+
 ```python
 tf_map = {
     "5m": "5min", "15m": "15min", "30m": "30min",
@@ -304,6 +315,7 @@ tf_map = {
 #### 2.1 — Вынести MTF-ресамплинг в утилитарную функцию
 
 Создать приватную функцию (до блока хэндлеров, можно рядом с `_handle_mtf`):
+
 ```python
 # Покрывает числовые таймфреймы Bybit API ("1", "5", "15", "60", "240", "D")
 # и строковые алиасы из UI ("1m", "1h", "4h", "1d")
@@ -360,6 +372,7 @@ def _resample_ohlcv(ohlcv: pd.DataFrame, timeframe: str) -> pd.DataFrame | None:
 #### 2.2 — Патч `_handle_mfi_filter`
 
 Заменить текущий блок (строки ~1413–1436):
+
 ```python
 def _handle_mfi_filter(params, ohlcv, close, inputs, adapter):
     mfi_len = int(params.get("mfi_length", 14))
@@ -398,6 +411,7 @@ def _handle_mfi_filter(params, ohlcv, close, inputs, adapter):
 #### 2.3 — Патч `_handle_cci_filter`
 
 Аналогично п. 2.2, используя:
+
 - `cci_timeframe` вместо `mfi_timeframe`
 - `calculate_cci(working_ohlcv["high"], working_ohlcv["low"], working_ohlcv["close"], period)` вместо `calculate_mfi`
 
@@ -405,12 +419,12 @@ def _handle_mfi_filter(params, ohlcv, close, inputs, adapter):
 
 ### Граничные условия
 
-| Ситуация | Ожидаемое поведение |
-|---|---|
-| `mfi_timeframe = "Chart"` | работает на основном OHLCV, как сейчас |
-| `mfi_timeframe` = младший таймфрейм (5m при main=15m) | warning + fallback на main |
-| Индекс OHLCV — целочисленный (timestamp ms) | конвертировать в DatetimeIndex перед resample |
-| HTF даёт < 2 баров (слишком мало данных) | warning + fallback на main |
+| Ситуация                                              | Ожидаемое поведение                           |
+| ----------------------------------------------------- | --------------------------------------------- |
+| `mfi_timeframe = "Chart"`                             | работает на основном OHLCV, как сейчас        |
+| `mfi_timeframe` = младший таймфрейм (5m при main=15m) | warning + fallback на main                    |
+| Индекс OHLCV — целочисленный (timestamp ms)           | конвертировать в DatetimeIndex перед resample |
+| HTF даёт < 2 баров (слишком мало данных)              | warning + fallback на main                    |
 
 ### Тест
 
@@ -474,6 +488,7 @@ adapter = StrategyBuilderAdapter(
 **Файл:** `backend/backtesting/strategy_builder_adapter.py`
 
 В `__init__` добавить параметр:
+
 ```python
 def __init__(self, ..., btcusdt_ohlcv: pd.DataFrame | None = None):
     ...
@@ -481,6 +496,7 @@ def __init__(self, ..., btcusdt_ohlcv: pd.DataFrame | None = None):
 ```
 
 Вспомогательный метод для проверки графа:
+
 ```python
 def _requires_btcusdt_data(self) -> bool:
     """Возвращает True если любой блок mfi_filter имеет use_btcusdt_mfi=True."""
@@ -494,6 +510,7 @@ def _requires_btcusdt_data(self) -> bool:
 #### Шаг 3 — Хэндлер: использовать `adapter._btcusdt_ohlcv`
 
 В `_handle_mfi_filter` (совмещается с Фичей 2):
+
 ```python
 use_btc = params.get("use_btcusdt_mfi", False)
 if use_btc:
@@ -512,12 +529,12 @@ if use_btc:
 
 ### Граничные условия
 
-| Ситуация | Ожидаемое поведение |
-|---|---|
-| `use_btcusdt_mfi=True`, символ уже BTCUSDT | `_requires_btcusdt_data()` возвращает True, но роутер передаёт `btcusdt_ohlcv=None`; хэндлер логирует и использует текущий OHLCV |
-| BTCUSDT OHLCV имеет другой DatetimeIndex | Выровнять через `reindex(ohlcv.index).ffill()` |
-| DataService недоступен или вернул пустой DataFrame | warning + fallback на текущий символ |
-| `use_btcusdt_mfi=False` (дефолт) | без изменений, BTCUSDT не загружается |
+| Ситуация                                           | Ожидаемое поведение                                                                                                              |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `use_btcusdt_mfi=True`, символ уже BTCUSDT         | `_requires_btcusdt_data()` возвращает True, но роутер передаёт `btcusdt_ohlcv=None`; хэндлер логирует и использует текущий OHLCV |
+| BTCUSDT OHLCV имеет другой DatetimeIndex           | Выровнять через `reindex(ohlcv.index).ffill()`                                                                                   |
+| DataService недоступен или вернул пустой DataFrame | warning + fallback на текущий символ                                                                                             |
+| `use_btcusdt_mfi=False` (дефолт)                   | без изменений, BTCUSDT не загружается                                                                                            |
 
 > **Архитектурное правило:** `generate_signals` остаётся синхронным.
 > Вся async-логика загрузки данных — в роутере перед созданием адаптера.
@@ -563,11 +580,11 @@ pytest tests/ -v -m "not slow" -q
 
 ## Файлы для изменения
 
-| Файл | Фича | Тип изменения |
-|---|---|---|
-| `backend/backtesting/indicator_handlers.py` | 2, 3 | Добавить `_TF_RESAMPLE_MAP` + `_resample_ohlcv()`; патч `_handle_mfi_filter`, `_handle_cci_filter`; удалить BUG-WARN комментарии |
-| `backend/backtesting/strategy_builder_adapter.py` | 1, 3 | Расширить `if target_port == "close_cond":` (строки ~3270–3291); добавить сбор в `extra_data`; добавить `btcusdt_ohlcv` kwarg в `__init__`; добавить `_requires_btcusdt_data()` |
-| `backend/backtesting/engine.py` | 1 | После строки ~1285: читать `profit_only_*` из `extra_data`; заменить signal-exit блок (строки ~1780–1797) |
-| `backend/backtesting/numba_engine.py` | 1 | Передать `po_exit_arr`/`po_sexit_arr`/`min_profit_*` как numpy arrays в Numba-ядро; расширить signal-exit блок (строки ~192–196) |
-| `backend/api/routers/backtesting.py` *(или аналог)* | 3 | Async предзагрузка BTCUSDT OHLCV перед созданием адаптера |
-| `tests/backend/backtesting/` | 1, 2, 3 | Новые unit-тесты (см. блоки "Тест" выше) |
+| Файл                                                | Фича    | Тип изменения                                                                                                                                                                   |
+| --------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/backtesting/indicator_handlers.py`         | 2, 3    | Добавить `_TF_RESAMPLE_MAP` + `_resample_ohlcv()`; патч `_handle_mfi_filter`, `_handle_cci_filter`; удалить BUG-WARN комментарии                                                |
+| `backend/backtesting/strategy_builder_adapter.py`   | 1, 3    | Расширить `if target_port == "close_cond":` (строки ~3270–3291); добавить сбор в `extra_data`; добавить `btcusdt_ohlcv` kwarg в `__init__`; добавить `_requires_btcusdt_data()` |
+| `backend/backtesting/engine.py`                     | 1       | После строки ~1285: читать `profit_only_*` из `extra_data`; заменить signal-exit блок (строки ~1780–1797)                                                                       |
+| `backend/backtesting/numba_engine.py`               | 1       | Передать `po_exit_arr`/`po_sexit_arr`/`min_profit_*` как numpy arrays в Numba-ядро; расширить signal-exit блок (строки ~192–196)                                                |
+| `backend/api/routers/backtesting.py` _(или аналог)_ | 3       | Async предзагрузка BTCUSDT OHLCV перед созданием адаптера                                                                                                                       |
+| `tests/backend/backtesting/`                        | 1, 2, 3 | Новые unit-тесты (см. блоки "Тест" выше)                                                                                                                                        |

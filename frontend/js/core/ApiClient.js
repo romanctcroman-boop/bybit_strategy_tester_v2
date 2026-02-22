@@ -21,7 +21,7 @@
 export class ApiError extends Error {
   constructor(status, message, data = null) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.status = status;
     this.data = data;
     this.timestamp = new Date().toISOString();
@@ -56,9 +56,9 @@ export class ApiError extends Error {
  * Network Error (no response)
  */
 export class NetworkError extends Error {
-  constructor(message = "Network error occurred") {
+  constructor(message = 'Network error occurred') {
     super(message);
-    this.name = "NetworkError";
+    this.name = 'NetworkError';
     this.timestamp = new Date().toISOString();
   }
 }
@@ -87,7 +87,7 @@ export class ApiClient {
    * @param {string} baseUrl - Base URL for all requests
    * @param {Object} options - Configuration options
    */
-  constructor(baseUrl = "/api", options = {}) {
+  constructor(baseUrl = '/api', options = {}) {
     this.baseUrl = baseUrl;
     this.timeout = options.timeout || 30000;
     this.retries = options.retries || 3;
@@ -95,8 +95,8 @@ export class ApiClient {
 
     // CSRF token management
     this.csrfToken = null;
-    this.csrfHeaderName = options.csrfHeaderName || "X-CSRF-Token";
-    this.csrfCookieName = options.csrfCookieName || "csrf_token";
+    this.csrfHeaderName = options.csrfHeaderName || 'X-CSRF-Token';
+    this.csrfCookieName = options.csrfCookieName || 'csrf_token';
 
     // Request/response interceptors
     this._requestInterceptors = [];
@@ -119,7 +119,7 @@ export class ApiClient {
     // Try meta tag first
     const metaTag = document.querySelector('meta[name="csrf-token"]');
     if (metaTag) {
-      this.csrfToken = metaTag.getAttribute("content");
+      this.csrfToken = metaTag.getAttribute('content');
       return;
     }
 
@@ -131,7 +131,7 @@ export class ApiClient {
     }
 
     // Will be fetched on first request if needed
-    console.debug("[ApiClient] No CSRF token found, will fetch on demand");
+    console.debug('[ApiClient] No CSRF token found, will fetch on demand');
   }
 
   /**
@@ -142,7 +142,7 @@ export class ApiClient {
    */
   _getCookie(name) {
     const match = document.cookie.match(
-      new RegExp("(^| )" + name + "=([^;]+)"),
+      new RegExp('(^| )' + name + '=([^;]+)')
     );
     return match ? decodeURIComponent(match[2]) : null;
   }
@@ -154,8 +154,8 @@ export class ApiClient {
   async fetchCsrfToken() {
     try {
       const response = await fetch(`${this.baseUrl}/csrf-token`, {
-        method: "GET",
-        credentials: "same-origin",
+        method: 'GET',
+        credentials: 'same-origin'
       });
 
       if (response.ok) {
@@ -164,7 +164,7 @@ export class ApiClient {
         return this.csrfToken;
       }
     } catch (error) {
-      console.warn("[ApiClient] Failed to fetch CSRF token:", error);
+      console.warn('[ApiClient] Failed to fetch CSRF token:', error);
     }
     return null;
   }
@@ -230,23 +230,23 @@ export class ApiClient {
     let config = {
       method: method.toUpperCase(),
       headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...options.headers,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...options.headers
       },
-      credentials: "same-origin",
-      signal: this._createAbortSignal(options.timeout),
+      credentials: 'same-origin',
+      signal: this._createAbortSignal(options.timeout)
     };
 
     // Add CSRF token for mutating requests
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(config.method)) {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method)) {
       if (this.csrfToken) {
         config.headers[this.csrfHeaderName] = this.csrfToken;
       }
     }
 
     // Add body for requests with data
-    if (data !== null && !["GET", "HEAD"].includes(config.method)) {
+    if (data !== null && !['GET', 'HEAD'].includes(config.method)) {
       config.body = JSON.stringify(data);
     }
 
@@ -330,8 +330,8 @@ export class ApiClient {
         lastError = error;
 
         // Don't retry on abort
-        if (error.name === "AbortError") {
-          throw new NetworkError("Request timeout");
+        if (error.name === 'AbortError') {
+          throw new NetworkError('Request timeout');
         }
 
         // Don't retry on client errors
@@ -343,7 +343,7 @@ export class ApiClient {
         if (attempt < maxRetries) {
           const delay = this.retryDelay * Math.pow(2, attempt);
           console.warn(
-            `[ApiClient] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`,
+            `[ApiClient] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`
           );
           await this._sleep(delay);
         }
@@ -363,8 +363,8 @@ export class ApiClient {
     let data = null;
 
     // Parse response body
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
       try {
         data = await response.json();
       } catch (e) {
@@ -409,21 +409,21 @@ export class ApiClient {
       try {
         handler(error);
       } catch (e) {
-        console.error("[ApiClient] Error handler threw:", e);
+        console.error('[ApiClient] Error handler threw:', e);
       }
     }
 
     // Dispatch global event for UI components
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       window.dispatchEvent(
-        new CustomEvent("api-error", {
+        new CustomEvent('api-error', {
           detail: {
             error,
             status: error.status,
             message: error.message,
-            timestamp: new Date().toISOString(),
-          },
-        }),
+            timestamp: new Date().toISOString()
+          }
+        })
       );
     }
   }
@@ -439,7 +439,7 @@ export class ApiClient {
    * @returns {Promise<any>}
    */
   get(endpoint, options = {}) {
-    return this.request("GET", endpoint, null, options);
+    return this.request('GET', endpoint, null, options);
   }
 
   /**
@@ -450,7 +450,7 @@ export class ApiClient {
    * @returns {Promise<any>}
    */
   post(endpoint, data, options = {}) {
-    return this.request("POST", endpoint, data, options);
+    return this.request('POST', endpoint, data, options);
   }
 
   /**
@@ -461,7 +461,7 @@ export class ApiClient {
    * @returns {Promise<any>}
    */
   put(endpoint, data, options = {}) {
-    return this.request("PUT", endpoint, data, options);
+    return this.request('PUT', endpoint, data, options);
   }
 
   /**
@@ -472,7 +472,7 @@ export class ApiClient {
    * @returns {Promise<any>}
    */
   patch(endpoint, data, options = {}) {
-    return this.request("PATCH", endpoint, data, options);
+    return this.request('PATCH', endpoint, data, options);
   }
 
   /**
@@ -482,7 +482,7 @@ export class ApiClient {
    * @returns {Promise<any>}
    */
   delete(endpoint, options = {}) {
-    return this.request("DELETE", endpoint, null, options);
+    return this.request('DELETE', endpoint, null, options);
   }
 
   // ============================================
@@ -500,10 +500,10 @@ export class ApiClient {
     const url = this._buildUrl(endpoint);
 
     const config = {
-      method: "POST",
+      method: 'POST',
       headers: {},
       body: formData,
-      credentials: "same-origin",
+      credentials: 'same-origin'
     };
 
     // Add CSRF token
@@ -512,7 +512,7 @@ export class ApiClient {
     }
 
     // Handle progress
-    if (options.onProgress && typeof XMLHttpRequest !== "undefined") {
+    if (options.onProgress && typeof XMLHttpRequest !== 'undefined') {
       return this._uploadWithProgress(url, config, options);
     }
 
@@ -528,17 +528,17 @@ export class ApiClient {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
-      xhr.upload.addEventListener("progress", (e) => {
+      xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable && options.onProgress) {
           options.onProgress({
             loaded: e.loaded,
             total: e.total,
-            percent: Math.round((e.loaded / e.total) * 100),
+            percent: Math.round((e.loaded / e.total) * 100)
           });
         }
       });
 
-      xhr.addEventListener("load", () => {
+      xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             resolve(JSON.parse(xhr.responseText));
@@ -550,8 +550,8 @@ export class ApiClient {
         }
       });
 
-      xhr.addEventListener("error", () => {
-        reject(new NetworkError("Upload failed"));
+      xhr.addEventListener('error', () => {
+        reject(new NetworkError('Upload failed'));
       });
 
       xhr.open(config.method, url);
@@ -573,14 +573,14 @@ export class ApiClient {
    * @param {Object} options
    */
   async download(endpoint, filename, options = {}) {
-    const response = await this.request("GET", endpoint, null, {
+    const response = await this.request('GET', endpoint, null, {
       ...options,
-      rawResponse: true,
+      rawResponse: true
     });
 
     const blob = await response.response.blob();
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -595,17 +595,17 @@ export class ApiClient {
 // ============================================
 
 // Create default API client instance
-const api = new ApiClient("/api/v1");
+const api = new ApiClient('/api/v1');
 
 // Add global error handler for notifications
 api.addErrorHandler((error) => {
   // Log errors in development (check hostname instead of process.env)
   const isDev =
-    typeof window !== "undefined" &&
-    (window.location?.hostname === "localhost" ||
-      window.location?.hostname === "127.0.0.1");
+    typeof window !== 'undefined' &&
+    (window.location?.hostname === 'localhost' ||
+      window.location?.hostname === '127.0.0.1');
   if (isDev) {
-    console.error("[API Error]", error.message, error);
+    console.error('[API Error]', error.message, error);
   }
 });
 
@@ -614,7 +614,7 @@ export { api };
 export default ApiClient;
 
 // Attach to window for non-module scripts
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.ApiClient = ApiClient;
   window.api = api;
   window.ApiError = ApiError;

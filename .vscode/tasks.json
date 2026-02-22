@@ -1,149 +1,290 @@
-﻿{
-"version": "2.0.0",
-"tasks": [
 {
-"label": "Start Kline DB Service",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_kline_db_service.ps1",
-"args": ["start"],
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false }
-},
-{
-"label": "Start AI Agent Service",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_agent_service.ps1",
-"args": [],
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false },
-"group": { "kind": "build", "isDefault": true }
-},
-{
-"label": "Start Uvicorn Server",
-"type": "shell",
-"command": "powershell.exe",
-"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'", "start", "-AppModule", "backend.api.app:app", "-BindHost", "0.0.0.0", "-Port", "8000", "-Workers", "4"],
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false }
-},
-{
-"label": "Start MCP Server",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_mcp_server.ps1",
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false }
-},
-{
-"label": "Stop Uvicorn Server",
-"type": "shell",
-"command": "powershell.exe",
-"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'", "stop"],
-"problemMatcher": []
-},
-{
-"label": "Uvicorn Status",
-"type": "shell",
-"command": "powershell.exe",
-"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'", "status"],
-"problemMatcher": []
-},
-{
-"label": "Tail Uvicorn Logs",
-"type": "shell",
-"command": "powershell.exe",
-"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'", "tail"],
-"isBackground": true,
-"problemMatcher": []
-},
-{
-"label": "Run Database Migrations",
-"type": "shell",
-"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-"args": ["${workspaceFolder}\\main.py", "migrate"],
-"problemMatcher": []
-},
-{
-"label": "System Health Check",
-"type": "shell",
-"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-"args": ["${workspaceFolder}\\main.py", "health"],
-"problemMatcher": []
-},
-{
-"label": "Clear Python Cache",
-"type": "shell",
-"command": "powershell.exe",
-"args": ["-NoProfile", "-Command", "Get-ChildItem -Path '${workspaceFolder}' -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host '[OK] Python cache cleared'"],
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "shared" }
-},
-{
-"label": "Start Redis Server",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_redis.ps1",
-"args": ["start"],
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false }
-},
-{
-"label": "Start DB Maintenance Server",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-"args": ["start"],
-"isBackground": true,
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "silent", "focus": false, "panel": "dedicated", "showReuseMessage": false, "clear": false }
-},
-{
-"label": "Stop DB Maintenance Server",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-"args": ["stop"],
-"problemMatcher": []
-},
-{
-"label": "DB Maintenance Status",
-"type": "shell",
-"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-"args": ["status"],
-"problemMatcher": []
-},
-{
-"label": "Recreate Backend Container",
-"type": "shell",
-"command": "${workspaceFolder}\\deployment\\recreate_backend.ps1",
-"group": "build",
-"problemMatcher": []
-},
-{
-"label": "Check Port 8000",
-"type": "shell",
-"command": "netstat -ano | findstr :8000",
-"problemMatcher": []
-},
-{
-"label": "Start All Services",
-"dependsOrder": "sequence",
-"dependsOn": ["Clear Python Cache", "Start Redis Server", "Start Kline DB Service", "Start DB Maintenance Server", "Start Uvicorn Server", "Start MCP Server", "Start AI Agent Service"],
-"problemMatcher": []
-},
-{
-"label": "Stop All Services",
-"type": "shell",
-"command": "${workspaceFolder}\\stop_all.ps1",
-"problemMatcher": [],
-"presentation": { "echo": true, "reveal": "always", "focus": false, "panel": "shared" }
-},
-{
-"label": "Restart All Services",
-"dependsOrder": "sequence",
-"dependsOn": ["Stop All Services", "Start All Services"],
-"problemMatcher": []
-}
-]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Kline DB Service",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_kline_db_service.ps1",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			}
+		},
+		{
+			"label": "Start AI Agent Service",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_agent_service.ps1",
+			"args": [],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Start Uvicorn Server",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
+				"start",
+				"-AppModule",
+				"backend.api.app:app",
+				"-BindHost",
+				"0.0.0.0",
+				"-Port",
+				"8000",
+				"-Workers",
+				"4"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			}
+		},
+		{
+			"label": "Start MCP Server",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_mcp_server.ps1",
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			}
+		},
+		{
+			"label": "Stop Uvicorn Server",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
+				"stop"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Uvicorn Status",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
+				"status"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Tail Uvicorn Logs",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
+				"tail"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run Database Migrations",
+			"type": "shell",
+			"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+			"args": [
+				"${workspaceFolder}\\main.py",
+				"migrate"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "System Health Check",
+			"type": "shell",
+			"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+			"args": [
+				"${workspaceFolder}\\main.py",
+				"health"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Clear Python Cache",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Get-ChildItem -Path '${workspaceFolder}' -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host '[OK] Python cache cleared'"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Start Redis Server",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_redis.ps1",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			}
+		},
+		{
+			"label": "Start DB Maintenance Server",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			}
+		},
+		{
+			"label": "Stop DB Maintenance Server",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+			"args": [
+				"stop"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "DB Maintenance Status",
+			"type": "shell",
+			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+			"args": [
+				"status"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Recreate Backend Container",
+			"type": "shell",
+			"command": "${workspaceFolder}\\deployment\\recreate_backend.ps1",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Check Port 8000",
+			"type": "shell",
+			"command": "netstat -ano | findstr :8000",
+			"problemMatcher": []
+		},
+		{
+			"label": "Start All Services",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Clear Python Cache",
+				"Start Redis Server",
+				"Start Kline DB Service",
+				"Start DB Maintenance Server",
+				"Start Uvicorn Server",
+				"Start MCP Server",
+				"Start AI Agent Service"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Stop All Services",
+			"type": "shell",
+			"command": "${workspaceFolder}\\stop_all.ps1",
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Restart All Services",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Stop All Services",
+				"Start All Services"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Test Signal Pipeline",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\scripts\\test_generate_signals.py"
+			]
+		},
+		{
+			"label": "Test Signal Pipeline Output",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\scripts\\test_generate_signals.py",
+				">",
+				"d:\\bybit_strategy_tester_v2\\scripts\\test_output.txt",
+				"2>&1"
+			]
+		}
+	]
 }

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /d/bybit_strategy_tester_v2 log --oneline -10 frontend/)"
+    ]
+  }
+}

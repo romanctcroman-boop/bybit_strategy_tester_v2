@@ -7,7 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Фича 1 — `profit_only` / `min_profit` gate on `close_cond` exits (2026-02-22):**
+    - `strategy_builder_adapter.py`: `close_cond` routing now collects `profit_only` and `min_profit` flags per signal bar into four extra-data Series: `profit_only_exits`, `profit_only_short_exits`, `min_profit_exits`, `min_profit_short_exits`, passed to the engine via `SignalResult.extra_data`.
+    - `engine.py` (`FallbackEngineV4`): new per-signal profit-gate block reads `po_exit_arr` / `po_sexit_arr` from `extra_data`. A signal-triggered exit is only executed when the current PnL% ≥ `min_profit` threshold; if the gate is not active the original unconditional exit fires as before.
+
+- **Фича 2 — HTF timeframe resampling for `mfi_filter` / `cci_filter` (2026-02-22):**
+    - `indicator_handlers.py`: added `_TF_RESAMPLE_MAP` (all 9 Bybit TFs + common aliases) and `_resample_ohlcv()` helper that converts a 1-min / 15-min OHLCV DataFrame to any higher timeframe and reindexes it back to the original length via forward-fill.
+    - `_handle_mfi_filter` and `_handle_cci_filter` patched: when `mfi_timeframe` / `cci_timeframe` ≠ chart interval the handler now resamples the OHLCV before computing the indicator. Removed stale `BUG-WARN` comments from both handlers.
+
+- **Фича 3 — `use_btcusdt_mfi`: BTCUSDT OHLCV as MFI data source (2026-02-22):**
+    - `strategy_builder_adapter.py`: `__init__` accepts new `btcusdt_ohlcv: pd.DataFrame | None = None` kwarg; stored as `self._btcusdt_ohlcv`. Added `_requires_btcusdt_data()` helper that scans blocks for `mfi_filter` with `use_btcusdt_mfi=True`.
+    - `api/routers/strategy_builder.py`: after adapter construction, if `_requires_btcusdt_data()` is true, pre-fetches BTCUSDT OHLCV via `BacktestService._fetch_historical_data()` for the same date range/interval and recreates the adapter with the kwarg.
+    - `indicator_handlers.py` `_handle_mfi_filter`: checks `adapter._btcusdt_ohlcv`; if set and `use_btcusdt_mfi=True`, uses that DataFrame instead of the chart symbol's OHLCV; falls back to chart OHLCV silently if not available.
+
+- **Unit tests — 20 new tests for Фичи 1-3 (2026-02-22):**
+    - `tests/backend/backtesting/test_unimplemented_features.py` (520 lines, 20 tests):
+        - `TestResampleOhlcv` (6): DatetimeIndex resample, numeric-ms-index resample, unknown TF → `None`, <2 HTF bars → `None`, daily from 1h, `_TF_RESAMPLE_MAP` completeness.
+        - `TestMfiFilterHtf` (4): chart-TF path, HTF resample path, BTCUSDT override, BTCUSDT fallback-to-None.
+        - `TestCciFilterHtf` (2): chart-TF and HTF resample paths.
+        - `TestProfitOnlyExitsEngine` (4): loss-suppressed exit, profit-above-threshold fires, unconditional exit fires, below-min_profit suppressed.
+        - `TestAdapterProfitOnlyExtraData` (4): `_requires_btcusdt_data()` false by default, true when block present, `_btcusdt_ohlcv` stored on adapter, `None` by default.
+
 ### Fixed
+
+- **`strategy_builder_adapter.py` — pre-existing encoding corruption (2026-02-22):**
+    - 117 curly-quote characters (U+201C / U+201D) replaced with ASCII straight quotes.
+    - 26 Windows-1252 mojibake em-dash sequences (`\xd0\xb2\xd0\x82"`) replaced with proper `—` (U+2014), resolving `SyntaxError: unterminated string literal` at line 2001.
+
+- **`strategy_builder_adapter.py` line 3406 — stale raw connection format (2026-02-22):**
+    - `conn.get("target", {}).get("nodeId")` used the pre-normalization nested format on `self.connections` which has already been normalized to flat `dict[str, str]` by `_normalize_connections()`. Replaced with `conn.get("target_id")`. Fixes 3 Mypy errors (`misc`, `union-attr`, `call-overload`).
+
+- **`indicator_handlers.py` — ambiguous en-dash in comments (2026-02-22):**
+    - Replaced `–` (U+2013 en-dash) with `-` (hyphen) in block-registry comment lines 1659–1661 (Ruff RUF003).
+
+- **`strategy_builder_adapter.py` — collapsible nested `if` in `_requires_btcusdt_data()` (2026-02-22):**
+    - Merged `if block.get("type") == "mfi_filter": if block.get("params"...) ...` into a single `and` condition (Ruff SIM102).
+
+### Fixed
+
+- **Strategy Builder Adapter — `close_conditions` blocks never executed (2026-02-21):**
+    - **Root cause:** `close_by_time`, `close_channel`, `close_ma_cross`, `close_rsi`, `close_stochastic`, `close_psar` were all missing from `_BLOCK_CATEGORY_MAP` in `strategy_builder_adapter.py`. When `_execute_block()` called `_infer_category()` and the type wasn't found in the map, it fell through to the heuristic fallback which returned `"indicator"`. This caused `_execute_indicator()` to be called instead of `_execute_close_condition()`, returning `{}` for all these block types.
+    - **Effect:** `exits=0` in `[SignalSummary]` even when `close_by_time` / `close_channel` blocks were wired to `main_strategy:close_cond`. The `close_cond` routing code at line 3198 was never reached because the block never produced outputs.
+    - **Fix:** Added all 6 close-condition block types to `_BLOCK_CATEGORY_MAP` with `"close_conditions"` category (`backend/backtesting/strategy_builder_adapter.py`).
+
+- **Strategy Builder Adapter — `close_by_time` wrong parameter key `bars` vs `bars_since_entry` (2026-02-21):**
+    - `_execute_close_condition()` read `params.get("bars", 10)` but the frontend saves the value under key `"bars_since_entry"`.
+    - **Fix:** Changed to `params.get("bars_since_entry", params.get("bars", 10))` to support both keys with backward compatibility.
+
+- **Strategy Builder Router — `close_by_time` not wired to `BacktestConfig.max_bars_in_trade` (2026-02-21):**
+    - `close_by_time` block params were not extracted from `db_strategy.builder_blocks` in `run_backtest_from_builder()`, so `BacktestConfig.max_bars_in_trade` was always `0` (disabled) even when the block was present.
+    - **Fix:** Added `block_max_bars_in_trade` extraction in the block-scan loop in `strategy_builder.py` and passed it as `max_bars_in_trade=block_max_bars_in_trade` to `BacktestConfig`. Also fixed the key lookup (`bars_since_entry` with `bars` fallback).
+
+- **Strategy Builder Backtest — `datetime` JSON serialization crash (2026-02-21):**
+    - `BacktestRequest.start_date` / `end_date` are Pydantic `datetime` fields. They were stored as-is inside the `parameters` dict passed to SQLAlchemy's `JSON` column, which calls `json.dumps()` and throws `TypeError: Object of type datetime is not JSON serializable`.
+    - Fixed in `backend/api/routers/strategy_builder.py` `run_backtest_from_builder()`: `request.start_date` and `request.end_date` are now serialized to ISO strings via `.isoformat()` before being stored in `parameters`.
+    - **Impact:** `POST /strategy-builder/strategies/{id}/backtest` was returning HTTP 500 for all Strategy Builder strategies. The backtest engine itself ran correctly (95+ trades with real metrics), but the DB write failed causing the entire endpoint to crash and AI Strategy Optimizer to see 0 trades / 0% win rate.
 
 - **Strategy Builder Canvas — 7 Coordinate & Performance Bug Fixes (2026-02-21):**
     - **BUG#1 🔴 (Drag at zoom!=1):** `startDragBlock()` now computes `dragOffset` in **logical** coordinates: `(clientX - containerRect.left) / zoom - blockData.x`. `onMouseMove` converts mouse position to logical via `/ zoom` before writing `blockData.x/y` and `block.style.left/top`. Fixes block drifting/jumping at any zoom level other than 1.

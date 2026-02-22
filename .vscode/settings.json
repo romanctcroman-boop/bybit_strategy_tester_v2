@@ -201,5 +201,6 @@
     "css": true,
     "json": true,
     "yaml": true
-  }
+  },
+  "claudeCode.useTerminal": true
 }

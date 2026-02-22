@@ -545,16 +545,36 @@ class TestBuilderConnectBlocks:
 
 
 class TestBuilderRunBacktest:
-    """Tests for builder_run_backtest."""
+    """Tests for builder_run_backtest.
+
+    builder_run_backtest uses httpx.AsyncClient directly (not _api_post) so
+    that it can use a dedicated 300-second timeout.  Tests patch
+    httpx.AsyncClient via unittest.mock to capture the payload and return
+    controlled results.
+    """
+
+    def _make_mock_client(self, response_data: dict) -> AsyncMock:
+        """Return a mock httpx.AsyncClient context manager."""
+        import json
+
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json = lambda: response_data
+        mock_response.raise_for_status = lambda: None
+        mock_response.text = json.dumps(response_data)
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        return mock_client
 
     @pytest.mark.asyncio
     async def test_run_backtest_success(self, mock_backtest_results):
         """Should run backtest and return metrics."""
-        with patch(
-            "backend.agents.mcp.tools.strategy_builder._api_post",
-            new_callable=AsyncMock,
-            return_value=mock_backtest_results,
-        ) as mock_post:
+        mock_client = self._make_mock_client(mock_backtest_results)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
             from backend.agents.mcp.tools.strategy_builder import builder_run_backtest
 
             result = await builder_run_backtest(
@@ -567,17 +587,17 @@ class TestBuilderRunBacktest:
 
         assert result["metrics"]["sharpe_ratio"] == 1.25
         assert result["metrics"]["win_rate"] == 0.55
-        call_payload = mock_post.call_args[1]["json_data"]
-        assert call_payload["commission"] == 0.0007  # TradingView parity
+        # Verify the payload passed to httpx POST
+        call_kwargs = mock_client.post.call_args
+        payload = call_kwargs[1]["json"]
+        assert payload["commission"] == 0.0007  # TradingView parity
 
     @pytest.mark.asyncio
     async def test_run_backtest_with_sl_tp(self, mock_backtest_results):
         """Should pass stop_loss and take_profit."""
-        with patch(
-            "backend.agents.mcp.tools.strategy_builder._api_post",
-            new_callable=AsyncMock,
-            return_value=mock_backtest_results,
-        ) as mock_post:
+        mock_client = self._make_mock_client(mock_backtest_results)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
             from backend.agents.mcp.tools.strategy_builder import builder_run_backtest
 
             await builder_run_backtest(
@@ -586,28 +606,25 @@ class TestBuilderRunBacktest:
                 take_profit=0.03,
             )
 
-        call_payload = mock_post.call_args[1]["json_data"]
-        assert call_payload["stop_loss"] == 0.02
-        assert call_payload["take_profit"] == 0.03
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["stop_loss"] == 0.02
+        assert payload["take_profit"] == 0.03
 
     @pytest.mark.asyncio
     async def test_run_backtest_commission_never_changed(self, mock_backtest_results):
         """Commission must always be 0.0007 — TradingView parity."""
-        with patch(
-            "backend.agents.mcp.tools.strategy_builder._api_post",
-            new_callable=AsyncMock,
-            return_value=mock_backtest_results,
-        ) as mock_post:
+        mock_client = self._make_mock_client(mock_backtest_results)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
             from backend.agents.mcp.tools.strategy_builder import builder_run_backtest
 
-            # Even with different commission arg, should use 0.0007
             await builder_run_backtest(
                 strategy_id="test-strategy-001",
                 commission=0.0007,
             )
 
-        call_payload = mock_post.call_args[1]["json_data"]
-        assert call_payload["commission"] == 0.0007
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["commission"] == 0.0007
 
 
 # =============================================================================
@@ -733,6 +750,19 @@ class TestBuilderWorkflow:
             ],
         }
 
+        # Mock httpx.AsyncClient for builder_run_backtest (uses dedicated client)
+        import json
+
+        mock_bt_response = AsyncMock()
+        mock_bt_response.status_code = 200
+        mock_bt_response.json = lambda: mock_backtest_results
+        mock_bt_response.raise_for_status = lambda: None
+        mock_bt_response.text = json.dumps(mock_backtest_results)
+        mock_httpx_client = AsyncMock()
+        mock_httpx_client.post = AsyncMock(return_value=mock_bt_response)
+        mock_httpx_client.__aenter__ = AsyncMock(return_value=mock_httpx_client)
+        mock_httpx_client.__aexit__ = AsyncMock(return_value=False)
+
         # Mock all API calls
         with (
             patch(
@@ -747,7 +777,35 @@ class TestBuilderWorkflow:
                 "backend.agents.mcp.tools.strategy_builder._api_put",
                 new_callable=AsyncMock,
             ) as mock_put,
+            # Patch httpx.AsyncClient so builder_run_backtest doesn't connect to server
+            patch("httpx.AsyncClient", return_value=mock_httpx_client),
+            # Patch A2A communicator to avoid real LLM calls in _suggest_adjustments
+            patch(
+                "backend.agents.workflows.builder_workflow._get_a2a_communicator",
+            ) as mock_a2a_factory,
+            # Patch memory singleton to avoid disk I/O
+            patch(
+                "backend.agents.workflows.builder_workflow._get_workflow_memory",
+            ) as mock_mem_factory,
         ):
+            # A2A communicator: parallel_consensus returns empty adjustments so
+            # the workflow doesn't iterate (backtest already meets criteria)
+            mock_a2a = AsyncMock()
+            mock_a2a.parallel_consensus = AsyncMock(
+                return_value={
+                    "consensus": "[]",
+                    "confidence_score": 0.9,
+                    "individual_responses": [],
+                }
+            )
+            mock_a2a_factory.return_value = mock_a2a
+
+            # Memory: stub out store so nothing is written to disk
+            mock_mem = AsyncMock()
+            mock_mem.store = AsyncMock(return_value=AsyncMock(id="mem_test"))
+            mock_mem.recall = AsyncMock(return_value=[])
+            mock_mem_factory.return_value = mock_mem
+
             # Configure return values
             # GETs: block_library, add_block(price), add_block(rsi), add_block(buy),
             #        add_block(main_strategy), add_block(static_sltp),
@@ -766,7 +824,7 @@ class TestBuilderWorkflow:
                 mock_strategy_response,  # create strategy
                 {"is_valid": True, "errors": [], "warnings": []},  # validate
                 {"code": "# generated code"},  # generate code
-                mock_backtest_results,  # backtest
+                # NOTE: backtest goes via httpx.AsyncClient (mocked above), not _api_post
             ]
             mock_put.return_value = strategy_with_main  # update (add block, connect)
 
