@@ -22,11 +22,11 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
                   length: int = 10, ma_type: str = "WMA", ma_length: int = 14) -> np.ndarray:
     """
     Calculate Relative Volatility Index (RVI).
-    
+
     RVI measures the direction of volatility on a scale of 0 to 100.
     - Above 50: Volatility is increasing in upward direction
     - Below 50: Volatility is increasing in downward direction
-    
+
     Args:
         close: Close prices
         high: High prices
@@ -34,7 +34,7 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
         length: Lookback period for standard deviation
         ma_type: Moving average type (WMA, RMA, SMA, EMA)
         ma_length: MA smoothing period
-    
+
     Returns:
         RVI values (0-100)
     """
@@ -87,12 +87,12 @@ def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
                                          deviation: float = 2.0) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculate Linear Regression Channel.
-    
+
     Args:
         close: Close prices
         length: Regression period
         deviation: Channel width multiplier
-    
+
     Returns:
         Tuple of (middle_line, upper_channel, lower_channel, slope)
     """
@@ -139,11 +139,11 @@ def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
 def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply Linear Regression Channel filter.
-    
+
     Args:
         close: Close prices
         config: Configuration with linreg settings
-    
+
     Returns:
         Tuple of (long_signals, short_signals) boolean arrays
     """
@@ -199,13 +199,13 @@ def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
                        pivot_bars: int = 10) -> tuple[np.ndarray, np.ndarray]:
     """
     Find pivot highs and lows.
-    
+
     Args:
         high: High prices
         low: Low prices
         close: Close prices
         pivot_bars: Bars left and right to confirm pivot
-    
+
     Returns:
         Tuple of (pivot_highs, pivot_lows) with prices (0 where no pivot)
     """
@@ -241,11 +241,11 @@ def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
                         config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply Levels Break filter for S/R breakouts.
-    
+
     Args:
         high, low, close: Price arrays
         config: Configuration with levels settings
-    
+
     Returns:
         Tuple of (long_signals, short_signals) boolean arrays
     """
@@ -304,15 +304,15 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
                              config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Find accumulation/distribution areas.
-    
+
     Accumulation areas are periods of consolidation with high volume,
     typically preceding breakouts.
-    
+
     Args:
         close: Close prices
         volume: Volume data
         config: Configuration with accumulation settings
-    
+
     Returns:
         Tuple of (long_signals, short_signals) on breakout from accumulation
     """

@@ -9,7 +9,7 @@ for entry/exit signals, plus ATR-based stop-loss and take-profit levels.
 Signal Logic:
 - Long Entry: RSI < 30 AND fast EMA crosses above slow EMA
 - Short Entry: RSI > 70 AND fast EMA crosses below slow EMA
-- Long Exit: RSI > 70 OR fast EMA crosses below slow EMA  
+- Long Exit: RSI > 70 OR fast EMA crosses below slow EMA
 - Short Exit: RSI < 30 OR fast EMA crosses above slow EMA
 """
 
@@ -32,7 +32,7 @@ def momentum_strategy(
 ) -> dict[str, np.ndarray]:
     """
     Momentum-based trading strategy using RSI and EMA crossovers with ATR-based risk management.
-    
+
     Parameters:
     -----------
     close : np.ndarray
@@ -57,7 +57,7 @@ def momentum_strategy(
         RSI level for oversold condition
     rsi_overbought : float, default=70.0
         RSI level for overbought condition
-    
+
     Returns:
     --------
     dict

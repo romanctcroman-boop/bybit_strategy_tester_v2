@@ -15,11 +15,11 @@ import pandas as pd
 def resample_ohlcv(df: pd.DataFrame, target_tf: str) -> pd.DataFrame:
     """
     Resample OHLCV data to a higher timeframe.
-    
+
     Args:
         df: DataFrame with OHLCV columns and datetime index or 'timestamp' column
         target_tf: Target timeframe (e.g., '1h', '4h', '1D')
-    
+
     Returns:
         Resampled DataFrame with OHLCV data
     """
@@ -60,15 +60,15 @@ def map_higher_tf_to_base(base_df: pd.DataFrame, higher_tf_df: pd.DataFrame,
                           values: np.ndarray) -> np.ndarray:
     """
     Map values from higher timeframe back to base timeframe.
-    
+
     Each bar in base timeframe gets the value from the corresponding
     (or most recent) higher timeframe bar.
-    
+
     Args:
         base_df: Base timeframe DataFrame with datetime index
         higher_tf_df: Higher timeframe DataFrame with datetime index
         values: Values calculated on higher timeframe
-    
+
     Returns:
         Values mapped to base timeframe length
     """
@@ -93,7 +93,7 @@ def calculate_supertrend_mtf(high: np.ndarray, low: np.ndarray, close: np.ndarra
                               period: int = 10, multiplier: float = 3.0) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculate SuperTrend indicator.
-    
+
     Returns:
         Tuple of (supertrend_values, direction) where direction is 1 for uptrend, -1 for downtrend
     """
@@ -178,12 +178,12 @@ def calculate_rsi_mtf(close: np.ndarray, period: int = 14) -> np.ndarray:
 class MTFIndicatorCalculator:
     """
     Calculator for multi-timeframe indicators.
-    
+
     Usage:
         calc = MTFIndicatorCalculator(base_df)
         calc.add_timeframe('1h')
         calc.add_timeframe('4h')
-        
+
         st_1h = calc.supertrend('1h', period=10, multiplier=3.0)
         rsi_4h = calc.rsi('4h', period=14)
     """
@@ -203,13 +203,13 @@ class MTFIndicatorCalculator:
                    return_direction: bool = False) -> np.ndarray:
         """
         Calculate SuperTrend on specified timeframe, mapped to base TF.
-        
+
         Args:
             tf: Timeframe to calculate on
             period: ATR period
             multiplier: ATR multiplier
             return_direction: If True, return direction instead of ST value
-        
+
         Returns:
             SuperTrend values or direction mapped to base timeframe
         """
@@ -261,11 +261,11 @@ class MTFIndicatorCalculator:
 def apply_mtf_filters(base_df: pd.DataFrame, config: dict) -> np.ndarray:
     """
     Apply MTF filters based on configuration.
-    
+
     Args:
         base_df: Base timeframe OHLCV data
         config: Configuration dictionary with MTF settings
-    
+
     Returns:
         Boolean array where True means all MTF filters pass
     """

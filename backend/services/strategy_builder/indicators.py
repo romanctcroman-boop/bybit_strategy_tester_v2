@@ -949,7 +949,7 @@ class IndicatorLibrary:
 
         # Execute custom code
         try:
-            exec(indicator.code, namespace)  # noqa: S102
+            exec(indicator.code, namespace)
             if "calculate" in namespace:
                 result = namespace["calculate"](data, **params)
                 return result

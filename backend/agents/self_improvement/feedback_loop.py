@@ -480,7 +480,7 @@ class FeedbackLoop:
                     ),
                     timeout=300.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f"Iteration {iteration}: backtest timed out (300s)")
                 metrics = self._create_failed_metrics()
             except Exception as e:

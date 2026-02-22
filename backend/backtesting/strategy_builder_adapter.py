@@ -2925,9 +2925,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     dca_config["custom_orders"] = custom_orders
                     dca_config["dca_order_count"] = len(custom_orders)
                     # Calculate grid step size as median of inter-order gaps (not total range)
-                    sorted_offsets = sorted(
-                        o for o in (order.get("offset", 0) for order in custom_orders) if o > 0
-                    )
+                    sorted_offsets = sorted(o for o in (order.get("offset", 0) for order in custom_orders) if o > 0)
                     if len(sorted_offsets) >= 2:
                         steps = [sorted_offsets[i + 1] - sorted_offsets[i] for i in range(len(sorted_offsets) - 1)]
                         grid_step = float(sorted(steps)[len(steps) // 2])  # median step

@@ -70,13 +70,13 @@ class RedisRateLimiter:
     local limit = tonumber(ARGV[1])
     local window = tonumber(ARGV[2])
     local now = tonumber(ARGV[3])
-    
+
     -- Clean old entries
     redis.call('ZREMRANGEBYSCORE', key, 0, now - window * 1000)
-    
+
     -- Count current requests
     local count = redis.call('ZCARD', key)
-    
+
     if count < limit then
         -- Add new request with timestamp as score
         redis.call('ZADD', key, now, now .. '-' .. math.random(1000000))

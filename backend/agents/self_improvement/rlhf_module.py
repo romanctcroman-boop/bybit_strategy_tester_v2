@@ -551,7 +551,7 @@ class RLHFModule:
                             evaluator_fn(prompt, response_a, response_b),
                             timeout=60.0,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.error(f"AI evaluation timed out for pair ({i}, {j})")
                         continue
                     except Exception as e:
