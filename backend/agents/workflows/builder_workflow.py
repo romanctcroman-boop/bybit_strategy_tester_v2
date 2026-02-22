@@ -138,7 +138,7 @@ class BuilderWorkflowConfig:
 
     # Optimizer sweep mode — agents suggest parameter RANGES, optimizer finds best values
     # True  → each iteration: agents propose {min, max, step} → grid/bayesian sweep
-    # False → each iteration: agents propose single values (original behaviour)
+    # False → each iteration: agents propose single values (original behavior)
     use_optimizer_mode: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -560,7 +560,7 @@ class BuilderWorkflow:
                 # backtest if every single update failed (no-op iteration).
                 failed_blocks: list[str] = []
                 for adj in adjustments:
-                    block_id = adj["block_id"]
+                    block_id: str = str(adj["block_id"])
                     new_params = adj["params"]
                     logger.info(f"[BuilderWorkflow] Adjusting block {block_id}: {new_params}")
                     update_result = await builder_update_block_params(
@@ -1501,16 +1501,16 @@ Recommended approach for positive profit (EMA + RSI combination):
         for b in blocks:
             bid = b.get("id") or b.get("block_id", "?")
             btype = (b.get("type") or b.get("block_type", "unknown")).lower()
-            bname = b.get("name") or btype.upper()
+            block_name = b.get("name") or btype.upper()
             params = b.get("params") or {}
             role = _BLOCK_ROLE.get(btype, f"block (type={btype})")
             tunable = "✏️ tunable" if (btype in _TUNABLE_TYPES and params) else "🔒 no params"
 
             if params:
                 params_str = ", ".join(f"{k}={v}" for k, v in params.items())
-                lines.append(f"  • [{bid}] {bname} ({role}) — params: {{{params_str}}} [{tunable}]")
+                lines.append(f"  • [{bid}] {block_name} ({role}) — params: {{{params_str}}} [{tunable}]")
             else:
-                lines.append(f"  • [{bid}] {bname} ({role}) [{tunable}]")
+                lines.append(f"  • [{bid}] {block_name} ({role}) [{tunable}]")
 
         lines.append("")
         lines.append("SIGNAL FLOW (connections — do NOT change any connection):")
@@ -1993,7 +1993,7 @@ Rules:
         """Merge range suggestions from multiple agents.
 
         For each block+param: use the tightest common window
-        (max of mins, min of maxs, min of steps) so the sweep stays
+        (max of mins, min of maxima, min of steps) so the sweep stays
         focused even when agents disagree slightly.
 
         Args:

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     **`backend/agents/workflows/builder_workflow.py`:**
     - `BuilderWorkflowConfig.use_optimizer_mode: bool = False` — opt-in per request; serialized in `to_dict()`.
     - `_suggest_param_ranges()`: A2A parallel consensus (DeepSeek + Qwen + Perplexity) — agents are shown the full graph description + `DEFAULT_PARAM_RANGES` hints and asked to propose narrow `{min, max, step}` ranges for 2-4 parameters. Falls back to single DeepSeek on A2A failure.
-    - `_merge_agent_ranges()`: merges per-agent range suggestions using tightest common window: `max(mins)`, `min(maxs)`, `min(steps)`. Falls back to first agent's range if the intersection is empty.
+    - `_merge_agent_ranges()`: merges per-agent range suggestions using tightest common window: `max(mins)`, `min(maxima)`, `min(steps)`. Falls back to first agent's range if the intersection is empty.
     - `_run_optimizer_for_ranges()`: converts agent ranges → `custom_ranges` format, fetches strategy graph via `builder_get_strategy()` MCP tool, fetches OHLCV via `BacktestService`, auto-selects grid search (≤ 500 combos) or Bayesian/Optuna (> 500 combos, capped at 200 trials), returns `{best_params, best_score, best_metrics, tested_combinations}`.
     - Iteration loop now branches: `if config.use_optimizer_mode` → ranges+sweep path; `else` → existing single-value `_suggest_adjustments` path (backward-compatible).
     - Added `import asyncio` at module top.
