@@ -256,6 +256,7 @@ class RedisTickSubscriber:
             decode_responses=True,
         )
 
+        assert self.redis_client is not None
         self.pubsub = self.redis_client.pubsub()
 
         # Subscribe to channels
@@ -288,6 +289,8 @@ class RedisTickSubscriber:
 
     async def _listen_loop(self):
         """Listen to Redis and invoke callbacks."""
+        if self.pubsub is None:
+            return
         with contextlib.suppress(asyncio.CancelledError):
             async for message in self.pubsub.listen():
                 if message["type"] == "message":

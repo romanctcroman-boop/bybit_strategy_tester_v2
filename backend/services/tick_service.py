@@ -234,7 +234,7 @@ class TickService:
         self._seen_trades = ExpiringSet(ttl_seconds=60.0, max_size=100000)
 
         # Stats
-        self._stats = {
+        self._stats: dict[str, Any] = {
             "trades_received": 0,
             "trades_duplicates": 0,
             "candles_created": 0,
@@ -434,7 +434,7 @@ class TickService:
 
             # Listen for messages
             async for message in ws:
-                await self._handle_message(message)
+                await self._handle_message(message if isinstance(message, str) else message.decode())
 
     async def _handle_message(self, message: str):
         """Handle incoming WebSocket message."""
@@ -503,9 +503,9 @@ class TickService:
                     # Record candle creation metric
                     metrics.tick_candle_created(symbol, f"{ticks_per_bar}T")
                     # Notify candle callbacks
-                    for callback in self._candle_callbacks:
+                    for candle_callback in self._candle_callbacks:
                         with contextlib.suppress(Exception):
-                            callback(symbol, ticks_per_bar, candle)
+                            candle_callback(symbol, ticks_per_bar, candle)
 
         # Log slow processing (over 5ms is suspicious for a single trade)
         dt = time.perf_counter() - t0
@@ -618,7 +618,7 @@ def get_tick_service(use_redis: bool | None = None, redis_url: str | None = None
         import os
 
         _use_redis = use_redis if use_redis is not None else os.environ.get("TICK_USE_REDIS", "").lower() == "true"
-        _redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
+        _redis_url = redis_url or os.environ.get("REDIS_URL") or "redis://localhost:6379"
 
         _tick_service = TickService(use_redis=_use_redis, redis_url=_redis_url)
 

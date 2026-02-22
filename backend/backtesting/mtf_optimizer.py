@@ -171,26 +171,22 @@ class MTFOptimizer:
             ind_val = indicator[htf_idx]
             if np.isnan(ind_val):
                 return True, True
-            filter_obj = HTFTrendFilter(period=period, filter_type=filter_type)
-            return filter_obj.check(close_val, ind_val)
+            return HTFTrendFilter(period=period, filter_type=filter_type).check(close_val, ind_val)
 
         elif filter_type == "supertrend":
             st_values, st_trend = precomputed[filter_type][period]
             trend = st_trend[htf_idx]
-            filter_obj = SuperTrendFilter(period=period)
-            return filter_obj.check(close_val, st_values[htf_idx], trend=trend)
+            return SuperTrendFilter(period=period).check(close_val, st_values[htf_idx], trend=trend)
 
         elif filter_type == "ichimoku":
             ich = precomputed[filter_type][period]
             sa = ich["senkou_a"][htf_idx]
             sb = ich["senkou_b"][htf_idx]
-            filter_obj = IchimokuFilter()
-            return filter_obj.check(close_val, 0, senkou_a=sa, senkou_b=sb)
+            return IchimokuFilter().check(close_val, 0, senkou_a=sa, senkou_b=sb)
 
         elif filter_type == "macd":
             macd_line, signal_line, _ = precomputed[filter_type][period]
-            filter_obj = MACDFilter()
-            return filter_obj.check(0, 0, macd=macd_line[htf_idx], signal=signal_line[htf_idx])
+            return MACDFilter().check(0, 0, macd=macd_line[htf_idx], signal=signal_line[htf_idx])
 
         return True, True
 
@@ -282,7 +278,7 @@ class MTFOptimizer:
         htf_close = htf_candles["close"].values.astype(float)  # noqa: F841
 
         # Results storage
-        all_results = []
+        all_results: list[dict[str, Any]] = []
         tested = 0
 
         # Generate parameter grid
@@ -390,7 +386,7 @@ class MTFOptimizer:
 
         elapsed = time.perf_counter() - start_time
 
-        best = top_results[0] if top_results else {"params": {}, "score": -999, "metrics": {}}
+        best: dict[str, Any] = top_results[0] if top_results else {"params": {}, "score": -999.0, "metrics": {}}
 
         if self.verbose:
             logger.info(f"✅ MTF Optimization complete: {tested} tested in {elapsed:.2f}s")

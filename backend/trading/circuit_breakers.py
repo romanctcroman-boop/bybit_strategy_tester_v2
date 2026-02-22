@@ -228,7 +228,15 @@ class TradingCircuitBreaker:
             # Fire and forget async alert
             try:
                 loop = asyncio.get_running_loop()
-                task = loop.create_task(alert_service.send_alert(alert))
+                task = loop.create_task(
+                    alert_service.send_alert(
+                        level=alert.level,
+                        title=alert.title,
+                        message=alert.message,
+                        source=alert.source,
+                        metadata=alert.metadata,
+                    )
+                )
                 _background_tasks.add(task)
                 task.add_done_callback(_background_tasks.discard)
             except RuntimeError:
