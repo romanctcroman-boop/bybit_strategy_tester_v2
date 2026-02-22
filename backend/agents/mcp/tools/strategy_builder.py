@@ -25,8 +25,11 @@ registry = get_tool_registry()
 # Base URL for internal API calls (same server)
 _API_BASE = "http://localhost:8000/api/v1/strategy-builder"
 _TIMEOUT = 30.0
-# Backtest can take several minutes for long date ranges (6+ months of 15m data)
-_BACKTEST_TIMEOUT = 300.0
+# Backtest timeout: 2 minutes is enough for 6 months of 15m data with numba engine.
+# (Old value was 300s = 5 min, which caused the AI Build workflow to hang for
+#  744+ seconds when 3 iterations x 2 backtests each = up to 30 min waiting.)
+_BACKTEST_TIMEOUT = 120.0
+_BACKTEST_TIMEOUT = 120.0
 
 
 async def _api_get(path: str, params: dict | None = None) -> dict[str, Any]:
@@ -1256,6 +1259,7 @@ async def builder_run_backtest(
     commission: float = 0.0007,
     stop_loss: float | None = None,
     take_profit: float | None = None,
+    timeout: float | None = None,
 ) -> dict[str, Any]:
     """
     Run backtest on a Strategy Builder strategy.
@@ -1272,10 +1276,13 @@ async def builder_run_backtest(
         commission: Commission rate (0.0007 = 0.07%)
         stop_loss: Stop loss fraction (e.g. 0.02 = 2%)
         take_profit: Take profit fraction (e.g. 0.03 = 3%)
+        timeout: Override HTTP timeout in seconds (default: _BACKTEST_TIMEOUT=120s).
+                 Pass a smaller value (e.g. 60) for quick iteration re-runs.
 
     Returns:
         Backtest results with metrics and trade list
     """
+    effective_timeout = timeout if timeout is not None else _BACKTEST_TIMEOUT
     try:
         payload = {
             "symbol": symbol,
@@ -1292,8 +1299,8 @@ async def builder_run_backtest(
         if take_profit is not None:
             payload["take_profit"] = take_profit
 
-        # Use extended timeout for backtest — 6 months of 15m data can take 2-3 minutes
-        async with httpx.AsyncClient(timeout=_BACKTEST_TIMEOUT) as client:
+        # Configurable timeout — default 120s (2 min), enough for 6 months of 15m data.
+        async with httpx.AsyncClient(timeout=effective_timeout) as client:
             resp = await client.post(
                 f"{_API_BASE}/strategies/{strategy_id}/backtest",
                 json=payload,
@@ -1306,10 +1313,10 @@ async def builder_run_backtest(
         return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
     except httpx.ReadTimeout:
         logger.error(
-            f"builder_run_backtest timed out after {_BACKTEST_TIMEOUT}s for strategy {strategy_id}. "
+            f"builder_run_backtest timed out after {effective_timeout}s for strategy {strategy_id}. "
             "Consider reducing the date range or using a faster engine."
         )
-        return {"error": f"Backtest timed out after {_BACKTEST_TIMEOUT}s. Try a shorter date range."}
+        return {"error": f"Backtest timed out after {effective_timeout}s. Try a shorter date range."}
     except Exception as e:
         logger.error(f"builder_run_backtest error: {e}")
         return {"error": str(e)}

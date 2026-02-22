@@ -1214,11 +1214,32 @@ class TestIterativeOptimization:
         )
 
         # Mock all API calls
+        mock_backtest_result = {
+            "status": "completed",
+            "results": {
+                "sharpe_ratio": 0.3,
+                "win_rate": 30.0,
+                "total_trades": 10,
+                "net_profit": 100,
+                "max_drawdown": -5,
+                "max_drawdown_pct": -5.0,
+            },
+        }
         with (
             patch("backend.agents.mcp.tools.strategy_builder._api_get") as mock_get,
             patch("backend.agents.mcp.tools.strategy_builder._api_post") as mock_post,
             patch("backend.agents.mcp.tools.strategy_builder._api_put") as mock_put,
+            patch(
+                "backend.agents.mcp.tools.strategy_builder.builder_run_backtest",
+                new_callable=AsyncMock,
+            ) as mock_bt,
+            patch(
+                "backend.agents.workflows.builder_workflow.builder_run_backtest",
+                new_callable=AsyncMock,
+            ) as mock_bt_wf,
         ):
+            mock_bt.return_value = mock_backtest_result
+            mock_bt_wf.return_value = mock_backtest_result
             mock_get.return_value = {
                 "id": "iter-strat-001",
                 "name": "Test",

@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 from backend.api.app import app
 from backend.backtesting.models import (
     BacktestConfig,
-    BacktestCreateRequest,
     BacktestResult,
     BacktestStatus,
     EquityCurve,

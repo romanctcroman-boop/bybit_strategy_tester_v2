@@ -191,6 +191,8 @@ class BuilderWorkflowResult:
     duration_seconds: float = 0.0
     started_at: str = ""
     completed_at: str = ""
+    # True when the run used optimizer sweep mode (for UI display)
+    used_optimizer_mode: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize result to dict."""
@@ -210,6 +212,7 @@ class BuilderWorkflowResult:
             "duration_seconds": self.duration_seconds,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
+            "used_optimizer_mode": self.used_optimizer_mode,
         }
 
 
@@ -321,6 +324,7 @@ class BuilderWorkflow:
             workflow_id=f"bw_{uuid.uuid4().hex[:12]}",
             config=config.to_dict(),
             started_at=datetime.now(UTC).isoformat(),
+            used_optimizer_mode=config.use_optimizer_mode,
         )
         start_time = time.monotonic()
 
@@ -452,6 +456,43 @@ class BuilderWorkflow:
             )
             self._result.backtest_results = backtest
 
+            # ── Detect backtest errors / zero-trade warnings ───────────────────
+            if isinstance(backtest, dict):
+                if "error" in backtest:
+                    err_msg = f"Initial backtest failed: {backtest['error']}"
+                    logger.warning(f"[BuilderWorkflow] {err_msg}")
+                    self._result.errors.append(err_msg)
+                    self._emit_agent_log(
+                        agent="system",
+                        role="backtest",
+                        prompt="Running initial backtest",
+                        response=err_msg,
+                        title="⚠️ Backtest error — strategy may have missing connections",
+                    )
+                elif backtest.get("warnings"):
+                    for w in backtest["warnings"]:
+                        logger.warning(f"[BuilderWorkflow] Backtest warning: {w}")
+                        self._emit_agent_log(
+                            agent="system",
+                            role="backtest",
+                            prompt="Backtest signal check",
+                            response=w,
+                            title="⚠️ Backtest warning",
+                        )
+                _init_trades = (backtest.get("results") or {}).get("total_trades", 0)
+                if _init_trades == 0 and "error" not in backtest:
+                    logger.warning(
+                        "[BuilderWorkflow] Initial backtest produced 0 trades — "
+                        "strategy may have missing entry/exit connections"
+                    )
+                    self._emit_agent_log(
+                        agent="system",
+                        role="backtest",
+                        prompt="Initial backtest result",
+                        response="0 trades generated. Optimizer sweep will be skipped until trades are detected.",
+                        title="⚠️ 0 trades — checking connections",
+                    )
+
             # Stage 8: Evaluate + Iterative optimization loop
             best_sharpe: float = float("-inf")
             best_iteration_record: dict[str, Any] = {}
@@ -461,7 +502,7 @@ class BuilderWorkflow:
                 # Backtest response uses "results" key (from run_backtest_from_builder endpoint)
                 # but also support "metrics" key for compatibility
                 metrics = {}
-                if isinstance(backtest, dict):
+                if isinstance(backtest, dict) and "error" not in backtest:
                     metrics = backtest.get("results", backtest.get("metrics", {}))
                 sharpe = metrics.get("sharpe_ratio", 0)
                 # win_rate from the API is already a percentage (e.g. 52.11 for 52.11%)
@@ -516,15 +557,34 @@ class BuilderWorkflow:
 
                 if config.use_optimizer_mode:
                     # ── Optimizer mode: agents suggest ranges → sweep ──────────
-                    agent_ranges = await self._suggest_param_ranges(
-                        blocks_added=self._result.blocks_added,
-                        iteration=iteration,
-                        metrics=metrics,
-                        connections=self._result.connections_made,
-                    )
-                    if agent_ranges:
-                        opt_result = await self._run_optimizer_for_ranges(config, agent_ranges)
-                        if opt_result:
+                    # Skip optimizer sweep if no trades were detected — sweep can't
+                    # improve a strategy that generates no entries.  Fall back to
+                    # structural (single-value) suggestions instead.
+                    _current_trades = metrics.get("total_trades", 0)
+                    if _current_trades == 0:
+                        logger.info(
+                            f"[BuilderWorkflow] Optimizer mode skipped (0 trades, iteration {iteration}) "
+                            "— using structural adjustments instead"
+                        )
+                        adjustments = await self._suggest_adjustments(
+                            config.blocks,
+                            self._result.blocks_added,
+                            iteration,
+                            metrics,
+                            connections=self._result.connections_made,
+                        )
+                    else:
+                        agent_ranges = await self._suggest_param_ranges(
+                            blocks_added=self._result.blocks_added,
+                            iteration=iteration,
+                            metrics=metrics,
+                            connections=self._result.connections_made,
+                        )
+                        opt_result: dict[str, Any] | None = None
+                        if agent_ranges:
+                            opt_result = await self._run_optimizer_for_ranges(config, agent_ranges)
+
+                        if opt_result and opt_result.get("best_params"):
                             # best_params format: {"block_id.param": value}
                             # Group by block_id and apply via builder_update_block_params
                             by_block: dict[str, dict[str, Any]] = {}
@@ -539,9 +599,19 @@ class BuilderWorkflow:
                                 f"(score={opt_result['best_score']:.3f})"
                             )
                         else:
-                            adjustments = []
-                    else:
-                        adjustments = []
+                            # Optimizer found nothing (all trials pruned) → fall
+                            # back to single-value structural suggestions
+                            logger.info(
+                                f"[BuilderWorkflow] Optimizer sweep produced no results "
+                                f"(iteration {iteration}) — falling back to structural adjustments"
+                            )
+                            adjustments = await self._suggest_adjustments(
+                                config.blocks,
+                                self._result.blocks_added,
+                                iteration,
+                                metrics,
+                                connections=self._result.connections_made,
+                            )
                 else:
                     # ── Direct mode: agents suggest single values (original) ──
                     adjustments = await self._suggest_adjustments(
@@ -634,6 +704,26 @@ class BuilderWorkflow:
                     take_profit=config.take_profit,
                 )
                 self._result.backtest_results = backtest
+
+                # Detect and surface iteration backtest errors/warnings
+                if isinstance(backtest, dict):
+                    if "error" in backtest:
+                        iter_err = f"Iteration {iteration + 1} backtest error: {backtest['error']}"
+                        logger.warning(f"[BuilderWorkflow] {iter_err}")
+                        self._result.errors.append(iter_err)
+                        self._emit_agent_log(
+                            agent="system",
+                            role="backtest",
+                            prompt=f"Re-running backtest (iteration {iteration + 1})",
+                            response=iter_err,
+                            title=f"⚠️ Backtest error — iteration {iteration + 1}",
+                        )
+                    elif backtest.get("warnings"):
+                        for _w in backtest["warnings"]:
+                            logger.warning(f"[BuilderWorkflow] Iteration backtest warning: {_w}")
+                    _iter_trades = (backtest.get("results") or {}).get("total_trades", 0)
+                    if _iter_trades == 0 and "error" not in backtest:
+                        logger.warning(f"[BuilderWorkflow] Iteration {iteration + 1} backtest: 0 trades")
 
             # ── Save best config to Semantic Memory (survives restarts) ───────
             await self._memory_store_best_config(config, best_iteration_record)
@@ -2144,7 +2234,9 @@ Rules:
         if all_params:
             active_specs = _merge_ranges(all_params, custom_ranges)
         else:
-            logger.info("[BuilderWorkflow] extract_optimizable_params returned empty — building specs from agent ranges directly")
+            logger.info(
+                "[BuilderWorkflow] extract_optimizable_params returned empty — building specs from agent ranges directly"
+            )
             active_specs = [
                 {
                     "block_id": cr["param_path"].split(".")[0],
@@ -2207,9 +2299,9 @@ Rules:
 
         # ── Choose method based on realistic trial count ─────────────────────
         # Hard-cap trials to keep each sweep within a few minutes.
-        MAX_GRID_COMBOS = 200   # above this → Bayesian is more efficient
+        MAX_GRID_COMBOS = 200  # above this → Bayesian is more efficient
         MAX_BAYESIAN_TRIALS = 50  # fast enough for mid-workflow use
-        MAX_SWEEP_SECONDS = 120   # 2-minute timeout per sweep
+        MAX_SWEEP_SECONDS = 120  # 2-minute timeout per sweep
 
         if total_combos > MAX_GRID_COMBOS:
             method = "bayesian"

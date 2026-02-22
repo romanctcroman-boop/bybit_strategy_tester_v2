@@ -504,9 +504,9 @@ async def list_mcp_resources():
 async def get_agent_metrics():
     """Get AI agent monitoring metrics"""
     try:
-        from backend.agents.monitoring.metrics_collector import MetricsCollector
+        from backend.agents.monitoring.metrics_collector import get_metrics_collector
 
-        collector = MetricsCollector()
+        collector = get_metrics_collector()
 
         return {
             "stats": collector.get_stats(),

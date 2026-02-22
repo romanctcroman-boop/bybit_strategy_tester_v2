@@ -12337,6 +12337,16 @@ async function showAiBuildResults(data) {
   const lastIter = iters[iters.length - 1] || {};
   const ok = data.success;
 
+  // Find best iteration by sharpe
+  let bestIterIdx = 0;
+  let bestSharpe = -Infinity;
+  iters.forEach(function (it, idx) {
+    if ((it.sharpe_ratio || 0) > bestSharpe) {
+      bestSharpe = it.sharpe_ratio || 0;
+      bestIterIdx = idx;
+    }
+  });
+
   // Pick best metric source: lastIter (normalized by workflow) > apiMetrics
   const sharpe = lastIter.sharpe_ratio ?? apiMetrics.sharpe_ratio ?? 0;
   const winRate = lastIter.win_rate != null
@@ -12347,37 +12357,146 @@ async function showAiBuildResults(data) {
   const totalTrades = lastIter.total_trades ?? apiMetrics.total_trades ?? 0;
 
   const wasOptimize = _aiBuildMode === 'optimize';
-  let html = `
-    <div class="alert ${ok ? 'alert-success' : 'alert-warning'}">
-      <strong>${ok ? (wasOptimize ? '✅ Strategy Optimized!' : '✅ Strategy Built!') : '⚠️ Below Target'}</strong>
-      — ${w.status || 'unknown'} in ${(w.duration_seconds || 0).toFixed(1)}s
-    </div>
-    <table class="table table-sm table-bordered">
-      <tr><td>Strategy ID</td><td><code>${w.strategy_id || '—'}</code></td></tr>
-      <tr><td>Backtest ID</td><td><code>${backtestId || '—'}</code></td></tr>
-      <tr><td>Iterations</td><td>${iters.length}</td></tr>
-      <tr><td>Sharpe Ratio</td><td>${sharpe.toFixed(3)}</td></tr>
-      <tr><td>Win Rate</td><td>${(winRate * 100).toFixed(1)}%</td></tr>
-      <tr><td>Net Profit</td><td>$${netProfit.toFixed(2)}</td></tr>
-      <tr><td>Max Drawdown</td><td>${maxDd.toFixed(2)}%</td></tr>
-      <tr><td>Total Trades</td><td>${totalTrades}</td></tr>
-      <tr><td>Blocks Added</td><td>${(w.blocks_added || []).length}</td></tr>
-      <tr><td>Connections</td><td>${(w.connections_made || []).length}</td></tr>
-    </table>`;
+  const usedOptimizer = w.used_optimizer_mode || false;
 
-  if (w.deliberation && w.deliberation.decision) {
-    html += `
-      <div class="alert alert-info mt-2">
-        <strong>🤖 AI Deliberation</strong>
-        (confidence: ${(w.deliberation.confidence * 100).toFixed(0)}%)<br>
-        <small>${w.deliberation.decision.substring(0, 300)}...</small>
-      </div>`;
+  // ── Helper: color class for metric values ──────────────────────────────
+  function metricColor(val, thresholds) {
+    // thresholds: [good, ok] — >= good => green, >= ok => yellow, else red
+    if (val >= thresholds[0]) return 'text-success fw-bold';
+    if (val >= thresholds[1]) return 'text-warning fw-bold';
+    return 'text-danger fw-bold';
   }
 
+  // ── Summary metric cards ────────────────────────────────────────────────
+  const sharpeClass = metricColor(sharpe, [1.0, 0.3]);
+  const winRateClass = metricColor(winRate * 100, [50, 35]);
+  const profitClass = netProfit > 0 ? 'text-success fw-bold' : (netProfit === 0 ? 'text-secondary' : 'text-danger fw-bold');
+  const ddClass = maxDd < 10 ? 'text-success' : (maxDd < 25 ? 'text-warning' : 'text-danger');
+  const tradesClass = totalTrades >= 10 ? 'text-success' : (totalTrades > 0 ? 'text-warning' : 'text-danger fw-bold');
+  const zeroTradesWarning = totalTrades === 0
+    ? `<div class="alert alert-danger mt-2 py-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>0 Trades Detected!</strong>
+        Check that indicator blocks are connected to <em>Entry Long / Entry Short</em> ports on the Strategy node.
+        Review errors below.
+       </div>`
+    : '';
+
+  let html = `
+    <div class="alert ${ok ? 'alert-success' : 'alert-warning'} py-2 mb-2">
+      <strong>${ok ? (wasOptimize ? '✅ Strategy Optimized!' : '✅ Strategy Built!') : '⚠️ Below Target'}</strong>
+      — ${w.status || 'unknown'} in ${(w.duration_seconds || 0).toFixed(1)}s
+      ${usedOptimizer ? '<span class="badge bg-primary ms-1">🎯 Optimizer</span>' : ''}
+    </div>
+    ${zeroTradesWarning}
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Sharpe Ratio</div>
+          <div class="fs-5 ${sharpeClass}">${sharpe.toFixed(3)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Win Rate</div>
+          <div class="fs-5 ${winRateClass}">${(winRate * 100).toFixed(1)}%</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Net Profit</div>
+          <div class="fs-5 ${profitClass}">$${netProfit.toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Max Drawdown</div>
+          <div class="fs-5 ${ddClass}">${maxDd.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Total Trades</div>
+          <div class="fs-5 ${tradesClass}">${totalTrades}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="card card-body p-2 text-center">
+          <div class="small text-muted">Blocks / Connections</div>
+          <div class="fs-5">${(w.blocks_added || []).length} / ${(w.connections_made || []).length}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-2 flex-wrap">
+      <span class="badge bg-secondary">ID: ${(w.strategy_id || '—').substring(0, 8)}…</span>
+      <span class="badge bg-secondary">Backtest: ${(backtestId || '—').substring(0, 8)}…</span>
+      <span class="badge bg-info text-dark">${iters.length} iteration${iters.length !== 1 ? 's' : ''}</span>
+    </div>`;
+
+  // ── Per-iteration table ────────────────────────────────────────────────
+  if (iters.length > 0) {
+    html += `
+    <details open class="mb-3">
+      <summary class="fw-semibold mb-1" style="cursor:pointer">📊 Iterations</summary>
+      <div class="table-responsive">
+      <table class="table table-sm table-hover table-bordered mb-0" style="font-size:0.82rem">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th><th>Sharpe</th><th>Win Rate</th>
+            <th>Net Profit</th><th>Trades</th><th>Max DD</th><th>OK?</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    iters.forEach(function (it, idx) {
+      const isBest = idx === bestIterIdx && iters.length > 1;
+      const itSharpe = (it.sharpe_ratio || 0).toFixed(3);
+      const itWR = ((it.win_rate || 0) * 100).toFixed(1);
+      const itProfit = (it.net_profit || 0).toFixed(2);
+      const itDD = (it.max_drawdown || 0).toFixed(2);
+      const itTrades = it.total_trades || 0;
+      const itOk = it.acceptable;
+      const rowClass = isBest ? 'table-success' : (itOk ? 'table-info' : '');
+      html += `<tr class="${rowClass}">
+        <td>${it.iteration}${isBest ? ' ⭐' : ''}</td>
+        <td>${itSharpe}</td>
+        <td>${itWR}%</td>
+        <td class="${parseFloat(itProfit) > 0 ? 'text-success' : (parseFloat(itProfit) < 0 ? 'text-danger' : '')}">
+          $${itProfit}
+        </td>
+        <td class="${itTrades === 0 ? 'text-danger fw-bold' : ''}">${itTrades}</td>
+        <td>${itDD}%</td>
+        <td>${itOk ? '✅' : '❌'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div></details>';
+  }
+
+  // ── Deliberation section ────────────────────────────────────────────────
+  if (w.deliberation && w.deliberation.decision) {
+    html += `
+      <details class="mb-2">
+        <summary class="fw-semibold" style="cursor:pointer">🤖 AI Deliberation
+          (${(w.deliberation.confidence * 100).toFixed(0)}% confidence)
+        </summary>
+        <div class="alert alert-info mt-1 mb-0 py-2">
+          <small>${escapeHtml(w.deliberation.decision.substring(0, 500))}${w.deliberation.decision.length > 500 ? '…' : ''}</small>
+        </div>
+      </details>`;
+  }
+
+  // ── Errors section ──────────────────────────────────────────────────────
   if (w.errors && w.errors.length > 0) {
-    html += '<div class="alert alert-danger mt-2"><strong>Errors:</strong><ul>';
-    w.errors.forEach(function (e) { html += `<li>${e}</li>`; });
-    html += '</ul></div>';
+    html += `
+    <details open class="mb-2">
+      <summary class="fw-semibold text-danger" style="cursor:pointer">
+        ❌ Errors (${w.errors.length})
+      </summary>
+      <ul class="list-unstyled mb-0 mt-1">`;
+    w.errors.forEach(function (e) {
+      html += `<li class="small text-danger border-start border-danger ps-2 mb-1">${escapeHtml(e)}</li>`;
+    });
+    html += '</ul></details>';
   }
 
   // Button to open full results modal (only if we have a backtest_id)
