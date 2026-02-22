@@ -21,6 +21,7 @@ Added 2026-02-14 — Agent x Strategy Builder Integration.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -135,6 +136,11 @@ class BuilderWorkflowConfig:
     # Existing strategy — when set, skip create/blocks/connect stages (optimize mode)
     existing_strategy_id: str | None = None
 
+    # Optimizer sweep mode — agents suggest parameter RANGES, optimizer finds best values
+    # True  → each iteration: agents propose {min, max, step} → grid/bayesian sweep
+    # False → each iteration: agents propose single values (original behaviour)
+    use_optimizer_mode: bool = False
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize config to dict."""
         return {
@@ -157,6 +163,7 @@ class BuilderWorkflowConfig:
             "require_positive_profit": self.require_positive_profit,
             "enable_deliberation": self.enable_deliberation,
             "existing_strategy_id": self.existing_strategy_id,
+            "use_optimizer_mode": self.use_optimizer_mode,
         }
 
 
@@ -506,13 +513,44 @@ class BuilderWorkflow:
 
                 # --- Iterative parameter adjustment ---
                 self._set_stage(BuilderStage.ITERATING)
-                adjustments = await self._suggest_adjustments(
-                    config.blocks,
-                    self._result.blocks_added,
-                    iteration,
-                    metrics,
-                    connections=self._result.connections_made,
-                )
+
+                if config.use_optimizer_mode:
+                    # ── Optimizer mode: agents suggest ranges → sweep ──────────
+                    agent_ranges = await self._suggest_param_ranges(
+                        blocks_added=self._result.blocks_added,
+                        iteration=iteration,
+                        metrics=metrics,
+                        connections=self._result.connections_made,
+                    )
+                    if agent_ranges:
+                        opt_result = await self._run_optimizer_for_ranges(config, agent_ranges)
+                        if opt_result:
+                            # best_params format: {"block_id.param": value}
+                            # Group by block_id and apply via builder_update_block_params
+                            by_block: dict[str, dict[str, Any]] = {}
+                            for path, value in opt_result["best_params"].items():
+                                bid, _, param = path.partition(".")
+                                by_block.setdefault(bid, {})[param] = value
+
+                            adjustments = [{"block_id": bid, "params": params} for bid, params in by_block.items()]
+                            logger.info(
+                                f"[BuilderWorkflow] 🎯 Optimizer gave best params for "
+                                f"{len(adjustments)} block(s) "
+                                f"(score={opt_result['best_score']:.3f})"
+                            )
+                        else:
+                            adjustments = []
+                    else:
+                        adjustments = []
+                else:
+                    # ── Direct mode: agents suggest single values (original) ──
+                    adjustments = await self._suggest_adjustments(
+                        config.blocks,
+                        self._result.blocks_added,
+                        iteration,
+                        metrics,
+                        connections=self._result.connections_made,
+                    )
 
                 if not adjustments:
                     logger.info("[BuilderWorkflow] No adjustments possible, stopping iteration")
@@ -1787,6 +1825,433 @@ Only include the specific parameters that should change."""
                 merged.append({"block_id": block_id, "params": merged_params})
 
         return merged
+
+    async def _suggest_param_ranges(
+        self,
+        blocks_added: list[dict[str, Any]],
+        iteration: int,
+        metrics: dict[str, Any],
+        connections: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Use agents to suggest parameter RANGES (min/max/step) for optimizer sweep.
+
+        Instead of suggesting a single value, each agent proposes a narrow sweep
+        range for the most impactful parameters.  The ranges from all agents are
+        merged (intersection) by ``_merge_agent_ranges()``.
+
+        Returns:
+            List of ``{"block_id": ..., "ranges": {"param": {"min", "max", "step", "type"}}}``
+        """
+        from backend.optimization.builder_optimizer import DEFAULT_PARAM_RANGES
+
+        graph_description = self._describe_graph_for_agents(
+            blocks=blocks_added,
+            connections=connections or self._result.connections_made or [],
+        )
+
+        # Build per-block available-ranges hint for the prompt
+        available_ranges: dict[str, Any] = {}
+        for block in blocks_added:
+            bt = block.get("type", "").lower()
+            if bt in DEFAULT_PARAM_RANGES:
+                available_ranges[block.get("id", bt)] = {
+                    "type": bt,
+                    "optimizable": DEFAULT_PARAM_RANGES[bt],
+                }
+
+        win_rate = metrics.get("win_rate", 0)
+        if win_rate > 1:
+            win_rate /= 100.0
+        sharpe = metrics.get("sharpe_ratio", 0)
+        net_profit = metrics.get("net_profit", 0)
+        max_dd = metrics.get("max_drawdown_pct", metrics.get("max_drawdown", 0))
+
+        prompt = f"""You are optimizing a trading strategy. Current backtest results:
+- Sharpe Ratio: {sharpe:.3f}
+- Win Rate: {win_rate * 100:.1f}%
+- Net Profit: ${net_profit:.2f}
+- Max Drawdown: {max_dd:.2f}%
+- Iteration: {iteration}
+
+Strategy graph:
+{graph_description}
+
+Available optimizable parameters per block:
+{json.dumps(available_ranges, indent=2)}
+
+Analyze the current performance and suggest PARAMETER RANGES to sweep for optimization.
+Focus on 2-4 parameters that are most likely to improve Sharpe Ratio and Net Profit.
+Keep ranges narrow (max 15 values per param) to avoid combinatorial explosion.
+
+IMPORTANT: Respond with ONLY a JSON array. No markdown, no explanation:
+[
+  {{
+    "block_id": "the_block_id",
+    "ranges": {{
+      "param_name": {{"min": 10, "max": 25, "step": 1, "type": "int"}},
+      "param_name2": {{"min": 0.5, "max": 3.0, "step": 0.5, "type": "float"}}
+    }}
+  }}
+]
+
+Rules:
+- Only suggest params that exist in the "Available optimizable parameters" list.
+- Keep (max - min) / step <= 15 values per param.
+- Do NOT suggest structural changes — ranges only.
+- If strategy is already good (Sharpe >= 1.5 and Net Profit > 0), return [].
+"""
+
+        # ── Try multi-agent consensus (A2A) ──────────────────────────────────
+        try:
+            import os
+
+            from backend.agents.models import AgentType
+
+            a2a = _get_a2a_communicator()
+            available_agents = []
+            if os.environ.get("DEEPSEEK_API_KEY"):
+                available_agents.append(AgentType.DEEPSEEK)
+            if os.environ.get("QWEN_API_KEY"):
+                available_agents.append(AgentType.QWEN)
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                available_agents.append(AgentType.PERPLEXITY)
+
+            if len(available_agents) >= 2:
+                logger.info(
+                    f"[BuilderWorkflow] 🤝 A2A range consensus: "
+                    f"{[a.value for a in available_agents]} (iteration {iteration})"
+                )
+                consensus_result = await a2a.parallel_consensus(
+                    question=prompt,
+                    agents=available_agents,
+                    context={
+                        "task": "param_ranges",
+                        "iteration": iteration,
+                        "require_json_array": True,
+                    },
+                )
+                # Collect all per-agent JSON arrays
+                all_responses: list[dict[str, Any]] = []
+                for resp in consensus_result.get("individual_responses", []):
+                    agent_name = resp.get("agent", "unknown")
+                    agent_text = resp.get("content", "")
+                    self._emit_agent_log(
+                        agent=agent_name,
+                        role="optimizer",
+                        prompt=prompt,
+                        response=agent_text,
+                        title=f"🎯 Param Ranges — iteration {iteration}",
+                    )
+                    all_responses.append({"agent": agent_name, "response": agent_text})
+
+                merged = self._merge_agent_ranges(all_responses)
+                if merged:
+                    logger.info(f"[BuilderWorkflow] 🤝 A2A range consensus: {len(merged)} block(s)")
+                    return merged
+                logger.info("[BuilderWorkflow] A2A range consensus empty — falling back to single LLM")
+
+        except Exception as a2a_err:
+            logger.warning(f"[BuilderWorkflow] A2A range consensus failed ({a2a_err}), falling back")
+
+        # ── Single DeepSeek fallback ──────────────────────────────────────────
+        try:
+            from backend.agents.unified_agent_interface import get_agent_interface
+
+            agent = get_agent_interface()
+            result = await agent.query_deepseek(
+                prompt,
+                model="deepseek-chat",
+                temperature=0.2,
+                max_tokens=1000,
+                use_cache=False,
+            )
+            raw_text = result.get("response", "") or ""
+            self._emit_agent_log(
+                agent="deepseek",
+                role="optimizer",
+                prompt=prompt,
+                response=raw_text,
+                title=f"🎯 Param Ranges — iteration {iteration} (fallback)",
+            )
+            arr_match = re.search(r"\[.*?\]", raw_text, re.DOTALL)
+            if arr_match:
+                try:
+                    parsed = json.loads(arr_match.group())
+                    return parsed if isinstance(parsed, list) else []
+                except json.JSONDecodeError:
+                    pass
+            return []
+
+        except Exception as e:
+            logger.warning(f"[BuilderWorkflow] All range suggestions failed: {e}")
+            return []
+
+    def _merge_agent_ranges(
+        self,
+        responses: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge range suggestions from multiple agents.
+
+        For each block+param: use the tightest common window
+        (max of mins, min of maxs, min of steps) so the sweep stays
+        focused even when agents disagree slightly.
+
+        Args:
+            responses: List of ``{"agent": ..., "response": "<json text>"}`` dicts.
+
+        Returns:
+            Merged list of ``{"block_id": ..., "ranges": {...}}`` items.
+        """
+        all_suggestions: list[list[dict[str, Any]]] = []
+        for r in responses:
+            text = r.get("response", "") if isinstance(r, dict) else str(r)
+            arr_m = re.search(r"\[.*?\]", text, re.DOTALL)
+            if arr_m:
+                try:
+                    parsed = json.loads(arr_m.group())
+                    if isinstance(parsed, list) and parsed:
+                        all_suggestions.append(parsed)
+                except json.JSONDecodeError:
+                    pass
+
+        if not all_suggestions:
+            return []
+        if len(all_suggestions) == 1:
+            return all_suggestions[0]
+
+        # Index: {block_id: {param: [range_dict, ...]}}
+        index: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for suggestion_list in all_suggestions:
+            for item in suggestion_list:
+                bid = item.get("block_id")
+                ranges = item.get("ranges", {})
+                if not bid or not ranges:
+                    continue
+                index.setdefault(bid, {})
+                for param, rng in ranges.items():
+                    if isinstance(rng, dict):
+                        index[bid].setdefault(param, []).append(rng)
+
+        # Merge: tightest window per param
+        merged: list[dict[str, Any]] = []
+        for bid, params in index.items():
+            block_ranges: dict[str, Any] = {}
+            for param, agent_ranges in params.items():
+                if len(agent_ranges) == 1:
+                    block_ranges[param] = agent_ranges[0]
+                    continue
+                lo = max(r.get("min", 1) for r in agent_ranges)
+                hi = min(r.get("max", 100) for r in agent_ranges)
+                st = min(r.get("step", 1) for r in agent_ranges)
+                if lo >= hi:
+                    # Agents disagreed strongly — use widest window from first agent
+                    block_ranges[param] = agent_ranges[0]
+                else:
+                    block_ranges[param] = {
+                        "min": lo,
+                        "max": hi,
+                        "step": st,
+                        "type": agent_ranges[0].get("type", "int"),
+                    }
+            if block_ranges:
+                merged.append({"block_id": bid, "ranges": block_ranges})
+        return merged
+
+    async def _run_optimizer_for_ranges(
+        self,
+        config: BuilderWorkflowConfig,
+        agent_ranges: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Convert agent-suggested ranges to optimizer format and run sweep.
+
+        Fetches the current strategy graph and OHLCV data, builds the
+        ``custom_ranges`` list expected by ``generate_builder_param_combinations``,
+        then runs either a grid search (≤ 500 combos) or Optuna Bayesian search
+        (> 500 combos) via the existing ``run_builder_grid_search`` /
+        ``run_builder_optuna_search`` helpers.
+
+        Args:
+            config: Current workflow config (symbol, timeframe, dates, capital…).
+            agent_ranges: Output of ``_suggest_param_ranges()``.
+                          Each item: ``{"block_id": ..., "ranges": {"param": {min,max,step,type}}}``
+
+        Returns:
+            Dict with ``best_params``, ``best_score``, ``best_metrics``,
+            ``tested_combinations`` on success; ``None`` on failure.
+        """
+        from backend.backtesting.service import BacktestService
+        from backend.optimization.builder_optimizer import (
+            _merge_ranges,
+            extract_optimizable_params,
+            generate_builder_param_combinations,
+            run_builder_grid_search,
+            run_builder_optuna_search,
+        )
+
+        # ── Convert agent ranges → custom_ranges format ──────────────────────
+        # custom_ranges format: [{param_path, low, high, step, type, enabled}]
+        custom_ranges: list[dict[str, Any]] = []
+        for item in agent_ranges:
+            block_id = item.get("block_id", "")
+            for param, rng in item.get("ranges", {}).items():
+                lo = rng.get("min", 1)
+                hi = rng.get("max", 100)
+                st = rng.get("step", 1)
+                ptype = rng.get("type", "int")
+                if lo >= hi:
+                    logger.debug(
+                        f"[BuilderWorkflow] Skipping invalid range for {block_id}.{param}: min={lo} >= max={hi}"
+                    )
+                    continue
+                custom_ranges.append(
+                    {
+                        "param_path": f"{block_id}.{param}",
+                        "low": lo,
+                        "high": hi,
+                        "step": st,
+                        "type": ptype,
+                        "enabled": True,
+                    }
+                )
+
+        if not custom_ranges:
+            logger.warning("[BuilderWorkflow] No valid ranges from agents — skipping optimizer sweep")
+            return None
+
+        # ── Fetch strategy graph from API ────────────────────────────────────
+        from backend.agents.mcp.tools.strategy_builder import builder_get_strategy
+
+        graph_resp = await builder_get_strategy(self._result.strategy_id)
+        if not graph_resp or "error" in graph_resp:
+            logger.warning(f"[BuilderWorkflow] Could not fetch strategy graph: {graph_resp}")
+            return None
+
+        blocks = graph_resp.get("blocks") or graph_resp.get("builder_blocks") or []
+        connections = graph_resp.get("connections") or graph_resp.get("builder_connections") or []
+        strategy_graph: dict[str, Any] = {
+            "name": config.name,
+            "blocks": blocks,
+            "connections": connections,
+            "direction": config.direction,
+            "interval": config.timeframe,
+        }
+
+        # ── Extract all optimizable params (needed by _merge_ranges) ─────────
+        all_params = extract_optimizable_params(strategy_graph)
+        active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+        if not active_specs:
+            logger.warning("[BuilderWorkflow] No active param specs after merge — skipping optimizer sweep")
+            return None
+
+        # ── Estimate combination count ────────────────────────────────────────
+        total_combos = 1
+        for cr in custom_ranges:
+            n = max(1, int((cr["high"] - cr["low"]) / cr["step"]) + 1)
+            total_combos *= n
+
+        # ── Fetch OHLCV data ─────────────────────────────────────────────────
+        from datetime import datetime
+
+        service = BacktestService()
+        try:
+            ohlcv = await service._fetch_historical_data(
+                symbol=config.symbol,
+                interval=config.timeframe,
+                start_date=datetime.fromisoformat(config.start_date),
+                end_date=datetime.fromisoformat(config.end_date),
+                market_type="linear",
+            )
+        except Exception as fetch_err:
+            logger.error(f"[BuilderWorkflow] Could not fetch OHLCV for optimizer: {fetch_err}")
+            return None
+
+        if ohlcv is None or len(ohlcv) == 0:
+            logger.warning("[BuilderWorkflow] No OHLCV data available — skipping optimizer sweep")
+            return None
+
+        config_params: dict[str, Any] = {
+            "symbol": config.symbol,
+            "interval": config.timeframe,
+            "initial_capital": config.initial_capital,
+            "leverage": config.leverage,
+            "commission": config.commission,
+            "direction": config.direction,
+            "use_fixed_amount": False,
+            "fixed_amount": 0.0,
+            "engine_type": "numba",
+            "optimize_metric": "sharpe_ratio",
+        }
+
+        # ── Choose method ─────────────────────────────────────────────────────
+        if total_combos > 500:
+            method = "bayesian"
+            n_trials = min(200, total_combos)
+            logger.info(f"[BuilderWorkflow] {total_combos} combos → Bayesian sweep (n={n_trials})")
+        else:
+            method = "grid"
+            n_trials = total_combos
+            logger.info(f"[BuilderWorkflow] Grid sweep: {total_combos} combinations")
+
+        param_list_str = ", ".join(
+            f"{cr['param_path']}: [{cr['low']}..{cr['high']} step {cr['step']}]" for cr in custom_ranges
+        )
+        self._emit_agent_log(
+            agent="system",
+            role="optimizer",
+            prompt=f"Optimizer sweep: {method}, {total_combos} combinations",
+            response=f"Parameters: {param_list_str}",
+            title=f"🎯 Optimizer sweep — {method} ({total_combos} combos)",
+        )
+
+        # ── Run the optimizer ─────────────────────────────────────────────────
+        try:
+            if method == "bayesian":
+                result = await asyncio.to_thread(
+                    run_builder_optuna_search,
+                    base_graph=strategy_graph,
+                    ohlcv=ohlcv,
+                    param_specs=active_specs,
+                    config_params=config_params,
+                    optimize_metric="sharpe_ratio",
+                    n_trials=n_trials,
+                    top_n=5,
+                    timeout_seconds=300,
+                )
+            else:
+                param_combinations, _ = generate_builder_param_combinations(
+                    param_specs=active_specs,
+                    custom_ranges=custom_ranges,
+                    search_method="grid",
+                    max_iterations=0,
+                )
+                result = await asyncio.to_thread(
+                    run_builder_grid_search,
+                    base_graph=strategy_graph,
+                    ohlcv=ohlcv,
+                    param_combinations=param_combinations,
+                    config_params=config_params,
+                    optimize_metric="sharpe_ratio",
+                    max_results=5,
+                    timeout_seconds=300,
+                )
+
+            if result and result.get("best_params"):
+                best = result["best_params"]
+                logger.info(
+                    f"[BuilderWorkflow] ✅ Optimizer best: score={result.get('best_score', 0):.3f} params={best}"
+                )
+                return {
+                    "best_params": best,
+                    "best_score": result.get("best_score", 0),
+                    "best_metrics": result.get("best_metrics", {}),
+                    "tested_combinations": result.get("tested_combinations", 0),
+                }
+
+        except Exception as opt_err:
+            logger.error(f"[BuilderWorkflow] Optimizer sweep failed: {opt_err}", exc_info=True)
+
+        return None
 
     def _heuristic_adjustments(
         self,

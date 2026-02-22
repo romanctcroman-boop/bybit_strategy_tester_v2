@@ -959,6 +959,12 @@ class BuilderTaskRequest(BaseModel):
         default=None,
         description="Existing strategy ID to optimize (skip create/blocks/connect stages)",
     )
+    use_optimizer_mode: bool = Field(
+        default=False,
+        description=(
+            "Optimizer sweep mode: agents suggest param ranges, optimizer finds best values (slower but more thorough)"
+        ),
+    )
 
 
 @router.post("/builder/task")
@@ -995,6 +1001,7 @@ async def run_builder_task(request: BuilderTaskRequest):
             min_acceptable_win_rate=request.min_win_rate,
             enable_deliberation=request.enable_deliberation,
             existing_strategy_id=request.existing_strategy_id,
+            use_optimizer_mode=request.use_optimizer_mode,
         )
 
         workflow = BuilderWorkflow()
@@ -1055,6 +1062,7 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
         min_acceptable_win_rate=request.min_win_rate,
         enable_deliberation=request.enable_deliberation,
         existing_strategy_id=request.existing_strategy_id,
+        use_optimizer_mode=request.use_optimizer_mode,
     )
 
     _stage_labels: dict[str, str] = {

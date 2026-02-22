@@ -12077,7 +12077,8 @@ async function runAiBuild() {
     max_iterations: parseInt(document.getElementById('aiMaxIter')?.value || '3', 10),
     min_sharpe: parseFloat(document.getElementById('aiMinSharpe')?.value || '0.5'),
     min_win_rate: 0.4,
-    enable_deliberation: document.getElementById('aiDeliberation')?.checked ?? false
+    enable_deliberation: document.getElementById('aiDeliberation')?.checked ?? false,
+    use_optimizer_mode: document.getElementById('aiUseOptimizer')?.checked ?? false
   };
 
   if (_aiBuildMode === 'optimize' && _aiBuildExistingStrategyId) {

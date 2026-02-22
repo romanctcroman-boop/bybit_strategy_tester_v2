@@ -755,6 +755,12 @@
                 AI Deliberation (DeepSeek + Qwen + Perplexity consensus — uses API credits)
               </label>
             </div>
+            <div class="ai-build-row">
+              <label class="form-check-label">
+                <input type="checkbox" id="aiUseOptimizer" class="form-check-input">
+                Optimizer Sweep <small class="text-muted">(agents propose ranges → grid/bayesian sweep per iteration — slower but finds better params)</small>
+              </label>
+            </div>
 
             <h5 class="ai-build-preset-heading">Preset Blocks <small class="text-muted ai-preset-hint">(ignored when description is filled)</small></h5>
             <select id="aiPreset" class="form-select form-select-sm" title="Select preset strategy blocks">
