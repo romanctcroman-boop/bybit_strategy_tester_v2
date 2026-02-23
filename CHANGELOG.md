@@ -48,22 +48,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Results**: 103 our trades vs 104 TV — all divergences fully explained.
 
-    | Metric          | TV      | Ours    | Status                     |
-    | --------------- | ------- | ------- | -------------------------- |
-    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓  |
-    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓   |
-    | gross_loss      | 924.34  | 924.40  | ✅ OK                      |
-    | commission_paid | 145.35  | 144.00  | ✅ OK (1 fewer trade)      |
-    | total_trades    | 104     | 103     | −1 (explained below)       |
-    | win_rate        | 90.38%  | 90.29%  | ✅ OK                      |
-    | largest_win     | 40.42   | 13.61   | DIFF — TV#27 bar-close exit|
-    | avg_loss        | -92.43  | -92.44  | ✅ OK                      |
-    | long_trades     | 20      | 20      | ✅ OK                      |
-    | short_trades    | 84      | 83      | −1 (explained below)       |
-    | long_profit     | 59.95   | 59.94   | ✅ OK                      |
+    | Metric          | TV      | Ours    | Status                      |
+    | --------------- | ------- | ------- | --------------------------- |
+    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓    |
+    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓     |
+    | gross_loss      | 924.34  | 924.40  | ✅ OK                       |
+    | commission_paid | 145.35  | 144.00  | ✅ OK (1 fewer trade)       |
+    | total_trades    | 104     | 103     | −1 (explained below)        |
+    | win_rate        | 90.38%  | 90.29%  | ✅ OK                       |
+    | largest_win     | 40.42   | 13.61   | DIFF — TV#27 bar-close exit |
+    | avg_loss        | -92.43  | -92.44  | ✅ OK                       |
+    | long_trades     | 20      | 20      | ✅ OK                       |
+    | short_trades    | 84      | 83      | −1 (explained below)        |
+    | long_profit     | 59.95   | 59.94   | ✅ OK                       |
 
     **Root causes of divergence** (arithmetic: 13.61 + 26.81 = 40.42 = 381.47 − 341.00 ✓):
-
     1. **TV#2 missing trade (+13.61 USDT for TV)**: TV#1 SL exit at bar `2025-01-07 00:30 UTC`,
        TV#2 entry at `01:00 UTC`. Our engine exits T1 at `01:00 UTC` (1-bar lag), so when T2
        signal fires at `00:30 UTC`, T1 is still open → pyramiding=1 blocks T2 entry.
@@ -82,6 +81,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     **No engine fixes recommended** — divergences are explained, not bugs:
     - 1-bar exit lag is by design (exits on close of SL bar = open of next bar is equivalent)
     - Bar-close vs TP-level exit on same-bar entry+exit is an edge-case TV-specific behavior
+
+- **TV Parity analysis: Strategy_RSI_L/S_6 (2026-02-27):**
+
+    Full investigation via `scripts/_rerun_rsi6.py` (q1-q5.csv TV export, 104 trades).
+    Strategy_RSI_L/S_6 (ID: `5c03fd86-a821-4a62-a783-4d617bf25bc7`) has **identical** RSI/SL/TP
+    params to RSI_5 but DB stores `_slippage=0.0005`. TV export uses `Проскальзывание=0 тики`.
+    Script overrides to `slippage=0` to match TV.
+
+    **Key improvement over RSI_5**: 47/47 listed TV signals matched (RSI_5 had 6/47 due to
+    stale OHLCV data). RSI_6 uses refreshed OHLCV data that aligns with current TV feed.
+
+    **Results**: 103 our trades vs 104 TV — same two divergences as RSI_5:
+
+    | Metric          | TV      | Ours    | Status                      |
+    | --------------- | ------- | ------- | --------------------------- |
+    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓   |
+    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓    |
+    | gross_loss      | 924.34  | 924.40  | ✅ OK                       |
+    | commission_paid | 145.35  | 144.00  | ✅ OK (1 fewer trade)       |
+    | total_trades    | 104     | 103     | −1 (TV#2 missing)           |
+    | win_rate        | 90.38%  | 90.29%  | ✅ OK                       |
+    | largest_win     | 40.42   | 13.61   | DIFF — TV#27 bar-close exit |
+    | avg_loss        | −92.43  | −92.44  | ✅ OK                       |
+    | long_trades     | 20      | 20      | ✅ OK                       |
+    | short_trades    | 84      | 83      | −1 (TV#2 missing)           |
+    | long_profit     | 59.95   | 59.94   | ✅ OK                       |
+
+    **Root causes** (same as RSI_5, arithmetic: 13.61 + 26.81 = 40.42 = 381.47 − 341.00 ✓):
+
+    1. **TV#2 missing (+13.61)**: Signal fires at bar `2025-01-07 00:30 UTC` while T1 still open
+       (pyramiding=1 blocks entry). T1 exits at bar `01:00 UTC`, but TV#2's signal was at bar
+       `i-1` — engine only checks `short_entries[i]` on the current bar, misses carry-forward.
+       Fix required: "carry-forward missed entry signal one bar after position closes."
+
+    2. **TV#27 bar-close exit (+26.81)**: TP triggered on entry bar itself (same-bar entry+exit).
+       TV exits at bar CLOSE (`89270.3`) → pnl=`40.42`. Our engine exits at TP price (`91766.4`).
+       Fix required: "when TP hit on entry bar, use close_price instead of tp_price as exit."
+
+    **No engine fixes in this session** — parity gap is fully documented and accounted for.
 
 - **TV Parity analysis: Strategy_RSI_L/S_4 (2026-02-26):**
 
