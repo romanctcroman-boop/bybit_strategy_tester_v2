@@ -290,8 +290,10 @@ def _build_performance_metrics(
         years = 1.0
 
     # Use centralized calculator for all metrics
+    # TV parity: exclude open positions (end_of_backtest) from closed-trade metrics
+    closed_trades_for_metrics = [t for t in trades if not getattr(t, "is_open", False)]
     calc_metrics = MetricsCalculator.calculate_all(
-        trades=trades,
+        trades=closed_trades_for_metrics,
         equity=equity_arr,
         initial_capital=initial_capital,
         years=years,
@@ -317,21 +319,21 @@ def _build_performance_metrics(
     total_return = (equity[-1] - initial_capital) / initial_capital if initial_capital > 0 else 0.0
     annual_return = total_return * (365 / max(1, (timestamps[-1] - timestamps[0]).days)) if len(timestamps) > 1 else 0.0
 
-    # Exposure time calculation
-    winning_trades_list = [t for t in trades if t.pnl > 0]
-    losing_trades_list = [t for t in trades if t.pnl <= 0]
+    # Exposure time calculation (use closed trades only for TV parity)
+    winning_trades_list = [t for t in closed_trades_for_metrics if t.pnl > 0]
+    losing_trades_list = [t for t in closed_trades_for_metrics if t.pnl <= 0]
 
     # Calculate exposure time (% of total time in position)
-    if trades and len(timestamps) > 1:
+    if closed_trades_for_metrics and len(timestamps) > 1:
         total_bars = len(timestamps)
-        bars_in_trades = sum(getattr(t, "bars_in_trade", 0) or 0 for t in trades)
+        bars_in_trades = sum(getattr(t, "bars_in_trade", 0) or 0 for t in closed_trades_for_metrics)
         exposure_time = (bars_in_trades / total_bars * 100) if total_bars > 0 else 0.0
     else:
         exposure_time = 0.0
 
     # Calculate average bars in trade
-    if trades:
-        all_bars = [getattr(t, "bars_in_trade", 0) or 0 for t in trades]
+    if closed_trades_for_metrics:
+        all_bars = [getattr(t, "bars_in_trade", 0) or 0 for t in closed_trades_for_metrics]
         win_bars = [getattr(t, "bars_in_trade", 0) or 0 for t in winning_trades_list]
         loss_bars = [getattr(t, "bars_in_trade", 0) or 0 for t in losing_trades_list]
         avg_bars_in_trade = np.mean(all_bars) if all_bars else 0.0
@@ -382,13 +384,13 @@ def _build_performance_metrics(
     max_drawdown_intrabar_value = 0.0
     max_runup_intrabar_value = 0.0
 
-    if trades:
+    if closed_trades_for_metrics:
         # MAE represents the maximum adverse move (drawdown) during each trade
         # This is already calculated from intrabar High/Low in fallback engine
-        mae_values = [getattr(t, "mae", 0) or 0 for t in trades]
-        mae_pct_values = [getattr(t, "mae_pct", 0) or 0 for t in trades]
-        mfe_values = [getattr(t, "mfe", 0) or 0 for t in trades]
-        mfe_pct_values = [getattr(t, "mfe_pct", 0) or 0 for t in trades]
+        mae_values = [getattr(t, "mae", 0) or 0 for t in closed_trades_for_metrics]
+        mae_pct_values = [getattr(t, "mae_pct", 0) or 0 for t in closed_trades_for_metrics]
+        mfe_values = [getattr(t, "mfe", 0) or 0 for t in closed_trades_for_metrics]
+        mfe_pct_values = [getattr(t, "mfe_pct", 0) or 0 for t in closed_trades_for_metrics]
 
         if mae_values:
             max_drawdown_intrabar_value = max(mae_values)  # Largest adverse excursion
@@ -416,15 +418,15 @@ def _build_performance_metrics(
     # Formula: sum(entry_price * size * slippage_pct) for each trade
     slippage_pct = getattr(config, "slippage", 0.0)
     total_slippage = 0.0
-    if trades and slippage_pct > 0:
-        for t in trades:
+    if closed_trades_for_metrics and slippage_pct > 0:
+        for t in closed_trades_for_metrics:
             entry_price = getattr(t, "entry_price", 0)
             size = getattr(t, "size", 0)
             # Slippage on entry and exit
             total_slippage += entry_price * size * slippage_pct * 2  # Entry + Exit
 
     # max_contracts_held = maximum position size across all trades
-    max_contracts_held = max((getattr(t, "size", 0) for t in trades), default=0.0) if trades else 0.0
+    max_contracts_held = max((getattr(t, "size", 0) for t in closed_trades_for_metrics), default=0.0) if closed_trades_for_metrics else 0.0
 
     # Margin metrics (for leveraged trading)
     leverage = getattr(config, "leverage", 1.0)
@@ -1209,6 +1211,7 @@ class BacktestEngine:
         close = ohlcv["close"].values
         high = ohlcv["high"].values if "high" in ohlcv.columns else close
         low = ohlcv["low"].values if "low" in ohlcv.columns else close
+        open_prices = ohlcv["open"].values if "open" in ohlcv.columns else close
         entries = np.asarray(signals.entries.values, dtype=bool).copy()
         exits = signals.exits.values
 
@@ -1405,6 +1408,7 @@ class BacktestEngine:
         entry_time = None
         entry_size = 0.0
         entry_idx = 0
+        tp_sl_active_from = 1  # bar index from which TP/SL are active (entry_idx + 1 for TV parity)
         margin_allocated = 0.0  # Track exact margin for correct cash return
         entry_fees_paid = 0.0  # Track entry fees for accurate trade recording
         max_favorable_price = 0.0
@@ -1453,24 +1457,25 @@ class BacktestEngine:
                     # Using signal_price for TP/SL trigger levels matches TV parity.
                     signal_price = price  # close without slippage
 
-                    # Bybit formula: Position Value = Margin * Leverage
-                    # allocated_capital = margin (what we risk from our cash)
-                    # position_value = notional value of the position
-                    # entry_size = quantity in base currency (e.g., BTC)
+                    # TradingView "% of equity" sizing with recalculate=OFF:
+                    # notional = initial_capital * position_size (FIXED, not current equity)
+                    # margin   = notional / leverage
+                    # This matches TV "Объём заявки = 10% от капитала", recalculate=OFF.
+                    position_value = config.initial_capital * config.position_size  # fixed notional
+                    margin_allocated = position_value / leverage  # margin locked from cash
+                    entry_size = position_value / entry_price  # quantity in base currency
 
-                    allocated_capital = cash * config.position_size  # margin
-                    position_value = allocated_capital * leverage  # notional with leverage
-                    entry_size = position_value / (entry_price * (1 + config.taker_fee))
+                    fees = position_value * config.commission_value  # use commission_value (0.07%)
 
-                    fees = position_value * config.taker_fee
-
-                    cash -= allocated_capital + fees  # Only deduct margin, not full position
-                    margin_allocated = allocated_capital  # Save exact margin for exit
+                    cash -= margin_allocated + fees  # deduct only margin + entry fee
                     entry_fees_paid = fees  # Save entry fees for accurate recording
                     position = entry_size
                     is_long = True
                     entry_time = timestamps[i]
                     entry_idx = i  # kept for diagnostics/traceability
+                    # TradingView: entry fills at close of bar i, TP/SL orders activate on bar i+1.
+                    # If bar i+1 gaps through TP, fill at bar i+1 open.
+                    tp_sl_active_from = i + 1
                     # Initialize MFE/MAE with current bar's high/low
                     max_favorable_price = current_high  # Best high so far
                     max_adverse_price = current_low  # Worst low so far
@@ -1492,21 +1497,20 @@ class BacktestEngine:
                     # TradingView anchors TP/SL to the SIGNAL price (close), not the fill price.
                     signal_price = price  # close without slippage
 
-                    # Bybit formula: Position Value = Margin * Leverage
+                    # TradingView "% of equity" sizing with recalculate=OFF (fixed notional).
+                    position_value = config.initial_capital * config.position_size  # fixed notional
+                    margin_allocated = position_value / leverage  # margin locked from cash
+                    entry_size = position_value / entry_price  # quantity in base currency
 
-                    allocated_capital = cash * config.position_size  # margin
-                    position_value = allocated_capital * leverage  # notional with leverage
-                    entry_size = position_value / (entry_price * (1 + config.taker_fee))
+                    fees = position_value * config.commission_value  # use commission_value (0.07%)
 
-                    fees = position_value * config.taker_fee
-
-                    cash -= allocated_capital + fees  # Only deduct margin, not full position
-                    margin_allocated = allocated_capital  # Save exact margin for exit
+                    cash -= margin_allocated + fees  # deduct only margin + entry fee
                     entry_fees_paid = fees  # Save entry fees for accurate recording
                     position = entry_size
                     is_long = False
                     entry_time = timestamps[i]
                     entry_idx = i  # kept for diagnostics/traceability
+                    tp_sl_active_from = i + 1  # TV: TP/SL orders activate on bar after signal bar
                     # For short: favorable = lowest price (price going down), adverse = highest (going up)
                     # Initialize from entry_price so first-bar intrabar moves are captured correctly
                     max_favorable_price = entry_price  # best price = entry (will track lower)
@@ -1591,7 +1595,9 @@ class BacktestEngine:
 
                 # ========== UNIVERSAL BAR MAGNIFIER SL/TP CHECK ==========
                 # If IntrabarEngine is enabled, use 1m intrabar ticks for precise detection
-                if intrabar_engine is not None and (stop_loss or take_profit):
+                # TV parity: TP/SL orders only activate starting bar (tp_sl_active_from + 1),
+                # i.e. 2 bars after entry signal. Skip intrabar check on earlier bars.
+                if intrabar_engine is not None and (stop_loss or take_profit) and i >= tp_sl_active_from + 1:
                     try:
                         # Get bar time range
                         bar_start_ms = int(timestamps[i].timestamp() * 1000)
@@ -1645,7 +1651,14 @@ class BacktestEngine:
                             elif tp_triggered_at[0] < sl_triggered_at[0]:
                                 should_exit = True
                                 exit_reason = "take_profit"
-                                exit_price = tp_triggered_at[1]
+                                # Gap-through: if bar open already past TP, fill at open (TV parity)
+                                _bar_open = open_prices[i]
+                                if is_long and _bar_open >= tp_triggered_at[1]:
+                                    exit_price = _bar_open
+                                elif not is_long and _bar_open <= tp_triggered_at[1]:
+                                    exit_price = _bar_open
+                                else:
+                                    exit_price = tp_triggered_at[1]
                                 apply_slippage = False
                             else:
                                 # Same tick - use sl_priority
@@ -1657,7 +1670,14 @@ class BacktestEngine:
                                 else:
                                     should_exit = True
                                     exit_reason = "take_profit"
-                                    exit_price = tp_triggered_at[1]
+                                    # Gap-through: if bar open already past TP, fill at open (TV parity)
+                                    _bar_open = open_prices[i]
+                                    if is_long and _bar_open >= tp_triggered_at[1]:
+                                        exit_price = _bar_open
+                                    elif not is_long and _bar_open <= tp_triggered_at[1]:
+                                        exit_price = _bar_open
+                                    else:
+                                        exit_price = tp_triggered_at[1]
                                     apply_slippage = False
                         elif sl_triggered_at:
                             should_exit = True
@@ -1667,7 +1687,14 @@ class BacktestEngine:
                         elif tp_triggered_at:
                             should_exit = True
                             exit_reason = "take_profit"
-                            exit_price = tp_triggered_at[1]
+                            # Gap-through: if bar open already past TP, fill at open (TV parity)
+                            _bar_open = open_prices[i]
+                            if is_long and _bar_open >= tp_triggered_at[1]:
+                                exit_price = _bar_open
+                            elif not is_long and _bar_open <= tp_triggered_at[1]:
+                                exit_price = _bar_open
+                            else:
+                                exit_price = tp_triggered_at[1]
                             apply_slippage = False
 
                     except Exception as e:
@@ -1774,7 +1801,9 @@ class BacktestEngine:
 
                     # Check Stop Loss using worst price within bar (TradingView style)
                     # SL/TP = % price movement, matches FallbackEngineV4
-                    if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss:
+                    # TradingView: limit/stop orders (TP/SL) do NOT fill on the entry bar or
+                    # the bar immediately after entry. They activate on bar entry_idx+2 onward.
+                    if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss and i >= tp_sl_active_from + 1:
                         should_exit = True
                         exit_reason = "stop_loss"
                         # Calculate exact SL price using sl_ref_price (average or last order)
@@ -1784,12 +1813,23 @@ class BacktestEngine:
                         apply_slippage = True  # SL is market order
 
                     # Check Take Profit using best price within bar (TradingView style)
-                    if not should_exit and take_profit and best_pnl_pct >= take_profit:
+                    # TradingView: signal bar = N (entry fills at close[N]).
+                    # TP order activates starting bar N+2 (tp_sl_active_from + 1).
+                    # On gap-through bars (open past TP), TV fills at open price (not TP price).
+                    if not should_exit and take_profit and best_pnl_pct >= take_profit and i >= tp_sl_active_from + 1:
                         should_exit = True
                         exit_reason = "take_profit"
                         apply_slippage = False  # TP is limit order -> no slippage
                         # Calculate exact TP price anchored to signal_price (TV parity: no slippage in anchor)
-                        exit_price = signal_price * (1 + take_profit) if is_long else signal_price * (1 - take_profit)
+                        tp_target = signal_price * (1 + take_profit) if is_long else signal_price * (1 - take_profit)
+                        # TradingView gap-through behavior: if open already past TP, fill at open
+                        bar_open = open_prices[i]
+                        if is_long and bar_open >= tp_target:
+                            exit_price = bar_open  # gap-up through TP → fill at open
+                        elif not is_long and bar_open <= tp_target:
+                            exit_price = bar_open  # gap-down through TP → fill at open
+                        else:
+                            exit_price = tp_target  # normal fill at TP price
                         # Ensure exit price is within bar range
                         exit_price = max(current_low, min(current_high, exit_price))
 
@@ -1842,24 +1882,34 @@ class BacktestEngine:
                     # position (entry_size) already includes leverage effect on quantity
                     # position_value = notional value of the leveraged position
                     position_value = position * exit_price
-                    fees = position_value * config.taker_fee
+                    fees = position_value * config.commission_value  # use commission_value (0.07%)
 
                     # Calculate PnL (entry_size already reflects leveraged quantity)
-                    # PnL = price_diff * qty - fees
+                    # total_trade_fees = entry_fees (paid at open) + exit_fees (paid at close)
+                    total_trade_fees = entry_fees_paid + fees
+                    # gross_price_pnl = raw price move * quantity (before fees)
                     if is_long:
-                        pnl = (exit_price - entry_price) * entry_size - fees
+                        gross_price_pnl = (exit_price - entry_price) * entry_size
                     else:
-                        pnl = (entry_price - exit_price) * entry_size - fees
+                        gross_price_pnl = (entry_price - exit_price) * entry_size
+                    # Net PnL as reported (includes both entry+exit fees -- matches TradingView)
+                    pnl = gross_price_pnl - total_trade_fees
 
                     # Use exact margin saved at entry (no reconstruction error)
                     margin_used = margin_allocated
 
-                    # Return margin + PnL (this is what trader gets back)
-                    cash += margin_used + pnl
+                    # Return margin + net PnL + entry fees back to cash.
+                    # At open: cash -= margin + entry_fee
+                    # At close: cash += margin + net_pnl + entry_fee
+                    #   (because net_pnl = gross - entry_fee - exit_fee,
+                    #    so gross - exit_fee = net_pnl + entry_fee)
+                    cash += margin_used + pnl + entry_fees_paid
 
-                    # Calculate P&L percentage (relative to margin, not position)
-                    if margin_used > 0:
-                        pnl_pct = pnl / margin_used
+                    # Calculate P&L percentage relative to position notional (TV style)
+                    # TV shows pnl_pct = pnl / position_value (e.g. $13.61/$1000 = 1.36%)
+                    position_value_at_entry = entry_size * entry_price  # notional
+                    if position_value_at_entry > 0:
+                        pnl_pct = pnl / position_value_at_entry
                         pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
                     else:
                         pnl_pct = 0.0
@@ -1887,8 +1937,7 @@ class BacktestEngine:
                         f"MFE={mfe_pct:.2f}% (${mfe_value:.2f}), MAE={mae_pct:.2f}% (${mae_value:.2f})"
                     )
 
-                    # Record trade - use exact entry + exit fees (not approximation)
-                    total_trade_fees = entry_fees_paid + fees
+                    # Record trade - total_trade_fees already computed above (entry + exit)
 
                     # Map exit_reason to exit_comment format
                     exit_comment_map = {
@@ -1950,19 +1999,16 @@ class BacktestEngine:
                     # Only applies to TP/SL exits (not signal exits, which use close price).
                     if exit_reason in ("take_profit", "stop_loss") and cash > 0:
                         _can_long = direction in ("long", "both") and long_entries[i]
-                        _can_short = (
-                            direction in ("short", "both")
-                            and short_entries is not None
-                            and short_entries[i]
-                        )
+                        _can_short = direction in ("short", "both") and short_entries is not None and short_entries[i]
                         if _can_long or _can_short:
                             # Use close price for the new entry (TV: next bar open = this bar close)
                             _ep = price * (1 + slippage) if _can_long else price * (1 - slippage)
                             _sp = price  # signal_price anchor (no slippage)
-                            _alloc = cash * config.position_size
-                            _pv = _alloc * leverage
-                            _es = _pv / (_ep * (1 + config.taker_fee))
-                            _fees = _pv * config.taker_fee
+                            # TV "% of equity" sizing with recalculate=OFF (fixed notional)
+                            _pv = config.initial_capital * config.position_size  # fixed notional
+                            _alloc = _pv / leverage  # margin locked
+                            _es = _pv / _ep
+                            _fees = _pv * config.commission_value  # use commission_value (0.07%)
                             if cash >= _alloc + _fees:
                                 cash -= _alloc + _fees
                                 margin_allocated = _alloc
@@ -1975,14 +2021,23 @@ class BacktestEngine:
                                 is_long = _can_long
                                 entry_time = timestamps[i]
                                 entry_idx = i
+                                tp_sl_active_from = i + 1  # TV: TP/SL activate on bar after signal bar
                                 max_favorable_price = _ep
                                 max_adverse_price = _ep
                                 if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
-                                    atr_sl_price = _ep + atr_sl_values[i] * atr_sl_mult if not is_long else _ep - atr_sl_values[i] * atr_sl_mult
+                                    atr_sl_price = (
+                                        _ep + atr_sl_values[i] * atr_sl_mult
+                                        if not is_long
+                                        else _ep - atr_sl_values[i] * atr_sl_mult
+                                    )
                                 else:
                                     atr_sl_price = None
                                 if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
-                                    atr_tp_price = _ep - atr_tp_values[i] * atr_tp_mult if not is_long else _ep + atr_tp_values[i] * atr_tp_mult
+                                    atr_tp_price = (
+                                        _ep - atr_tp_values[i] * atr_tp_mult
+                                        if not is_long
+                                        else _ep + atr_tp_values[i] * atr_tp_mult
+                                    )
                                 else:
                                     atr_tp_price = None
 
@@ -2011,23 +2066,26 @@ class BacktestEngine:
 
             # Calculate position value and fees
             position_value = position * exit_price
-            fees = position_value * config.taker_fee
-
-            # Calculate PnL
+            fees = position_value * config.commission_value  # use commission_value (0.07%)
+            # Calculate PnL (entry + exit fees both included)
+            total_trade_fees = entry_fees_paid + fees  # Exact entry + exit fees
             if is_long:
-                pnl = (exit_price - entry_price) * entry_size - fees
+                gross_price_pnl = (exit_price - entry_price) * entry_size
             else:
-                pnl = (entry_price - exit_price) * entry_size - fees
+                gross_price_pnl = (entry_price - exit_price) * entry_size
+            pnl = gross_price_pnl - total_trade_fees
 
             # Use exact margin saved at entry (no reconstruction error)
             margin_used = margin_allocated
 
-            # Return margin + PnL
-            cash += margin_used + pnl
+            # Return margin + net PnL + entry fees back to cash
+            # (entry_fee was deducted at open; add it back so cash is correct)
+            cash += margin_used + pnl + entry_fees_paid
 
-            # Calculate P&L percentage
-            if margin_used > 0:
-                pnl_pct = pnl / margin_used
+            # Calculate P&L percentage relative to position notional (TV style)
+            position_value_at_entry = entry_size * entry_price  # notional
+            if position_value_at_entry > 0:
+                pnl_pct = pnl / position_value_at_entry
                 pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
             else:
                 pnl_pct = 0.0
@@ -2044,7 +2102,7 @@ class BacktestEngine:
                 mfe_value = (entry_price - max_favorable_price) * entry_size
                 mae_value = (max_adverse_price - entry_price) * entry_size
 
-            total_trade_fees = entry_fees_paid + fees  # Exact entry + exit fees
+            # total_trade_fees already computed above (entry + exit fees)
 
             logger.debug(
                 f"Position closed at end of backtest: is_long={is_long}, entry={entry_price:.2f}, "
@@ -2072,6 +2130,7 @@ class BacktestEngine:
                     mfe_pct=mfe_pct,
                     mae_pct=mae_pct,
                     exit_comment="end_of_backtest",
+                    is_open=True,  # TV parity: position still open at end of backtest
                 )
             )
 

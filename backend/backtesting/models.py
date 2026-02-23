@@ -842,6 +842,12 @@ class TradeRecord(BaseModel):
     # ===== NEW: Profit/Loss percentage (TradingView compatible) =====
     profit_percent: float = Field(default=0.0, description="Profit/loss as percentage of entry price")
 
+    # ===== TV parity: open position at end of backtest =====
+    is_open: bool = Field(
+        default=False,
+        description="True if position was still open at end of backtest (TV: counted separately, not in closed trades)",
+    )
+
 
 class PerformanceMetrics(BaseModel):
     """
