@@ -1338,6 +1338,12 @@ class FallbackEngineV4(BaseBacktestEngine):
                     short_accumulated_mae = max(short_accumulated_mae, current_mae)
 
             # === ВЫПОЛНЕНИЕ ОТЛОЖЕННЫХ ВЫХОДОВ ===
+            # TV convention: exit_time = bar where TP/SL triggered (i-1), not bar where it executes (i)
+            prev_bar_time = (
+                pd.Timestamp(timestamps[i - 1]).to_pydatetime()
+                if hasattr(timestamps[i - 1], "to_pydatetime")
+                else timestamps[i - 1]
+            )
             if pending_long_exit and pyramid_mgr.has_position("long"):
                 exit_price = pending_long_exit_price
                 # Ensure exit_reason is not None
@@ -1346,7 +1352,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     direction="long",
                     exit_price=exit_price,
                     exit_bar_idx=i,
-                    exit_time=current_time,
+                    exit_time=prev_bar_time,
                     exit_reason=effective_exit_reason.value
                     if hasattr(effective_exit_reason, "value")
                     else str(effective_exit_reason),
@@ -1403,7 +1409,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     direction="short",
                     exit_price=exit_price,
                     exit_bar_idx=i,
-                    exit_time=current_time,
+                    exit_time=prev_bar_time,
                     exit_reason=effective_short_exit_reason.value
                     if hasattr(effective_short_exit_reason, "value")
                     else str(effective_short_exit_reason),
