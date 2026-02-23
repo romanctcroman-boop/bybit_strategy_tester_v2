@@ -373,7 +373,8 @@
         "mneg",
         "dneg",
         "bstd",
-        "urpnl"
+        "urpnl",
+        "negs"
     ],
     "ignorePaths": [
         ".gitignore",

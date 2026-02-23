@@ -221,7 +221,7 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
-exclude = ["venv", ".venv", "tests", "scripts", "node_modules"]
+exclude = ["venv", ".venv", "tests", "scripts", "node_modules", "^scripts/"]
 
 [[tool.mypy.overrides]]
 module = "backend.*"
@@ -260,6 +260,69 @@ disable_error_code = [
     "operator",
     "index",
     "dict-item",
+    "call-arg",
+    "no-redef",
+]
+ignore_errors = true
+
+# Also catch scripts accessed as top-level modules (no __init__.py in scripts/)
+# mypy names them by stem: _compare_trades, _debug_sharpe, etc.
+[[tool.mypy.overrides]]
+module = [
+    "_compare_trades",
+    "_debug_avg_margin",
+    "_debug_avg_margin2",
+    "_debug_sharpe",
+    "_debug_sharpe2",
+    "_debug_sharpe3",
+    "_debug_sharpe4",
+    "_debug_sortino",
+    "_debug_sortino2",
+    "_debug_trade127",
+    "_debug_trade127b",
+    "_deep_analysis",
+    "_diagnose_intrabar3",
+    "_diagnose_ratios",
+    "_diagnose_ratios2",
+    "_diagnose_ratios3",
+    "_diagnose_ratios4",
+    "_diagnose_runup",
+    "_diagnose_runup2",
+    "_dump_metrics",
+    "_inspect_ec",
+    "_inspect_trade129",
+    "_verify_all_metrics",
+    "_check_rsi_missing",
+    "_check_tv_entry",
+    "_check_tv_ohlcv",
+    "_check_tv_csv",
+    "_check_market_types",
+    "_check_strategy_config",
+    "_check_tv_raw",
+    "_check_data_range",
+    "_check_summary_stats",
+    "_debug_t126_tp",
+    "_compare_tv_v2",
+    "_compare_tv_v3",
+    "_compare_tv_v4",
+    "_compare_tv_v5",
+    "_debug_trade2",
+    "_debug_trade100",
+    "_debug_trade100b",
+    "_debug_engine_entry",
+    "_debug_rsi_signals",
+    "_debug_rsi_compare",
+    "_debug_signals9313",
+    "_debug_t100_reason",
+    "_diagnose_intrabar2",
+    "_diagnose_ratios3",
+    "_inspect_trade129",
+    "_rsi_signal_analysis",
+    "_verify_rsi_fix",
+    "_find_missing_signals",
+    "_timezone_analysis",
+    "_debug_sortino",
+    "_debug_sortino2",
 ]
 ignore_errors = true
 
