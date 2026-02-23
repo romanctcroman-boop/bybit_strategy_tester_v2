@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TV Parity Complete — tp_sl_active_from, Intrabar Guard, Gap-Through, is_open (2026-02-24):**
+
+    **Root cause 1 (tp_sl_active_from)**: TP/SL were checked starting from bar `entry_idx + 1` (one bar after entry). TradingView only activates TP/SL orders starting from `entry_idx + 2` (the bar after the entry bar's next bar). This caused trade #100 to exit one bar too early via the intrabar engine.
+
+    **Root cause 2 (IntrabarEngine bypassing guard)**: The `IntrabarEngine` (1m tick data) was loaded and active but did NOT respect the `tp_sl_active_from` constraint — it checked TP/SL on `entry_idx + 1` unconditionally, pre-empting the standard bar-level check.
+
+    **Root cause 3 (Intrabar TP gap-through)**: The intrabar engine filled TP exits at the TP target price even when the bar's open price had already gapped past the TP target. TradingView fills at the bar open in this case.
+
+    **Root cause 4 (is_open for end-of-backtest)**: Positions still open at the end of the backtest were being closed and counted as regular closed trades. TradingView tracks them separately as "Open PL" and excludes them from closed-trade metrics.
+
+    **Impact**:
+    - Trade #100: incorrect exit price (62254.11 TP vs TV 62923.80 bar open = gap-through)
+    - Losing trades: 28 vs TV 27 (extra short loss from final open position)
+    - Short losses: 15 vs TV 14
+    - Net profit: -$19 difference eliminated
+
+    **Fix**:
+    - Added `tp_sl_active_from = i + 1` at all 3 entry points (long, short, same-bar re-entry)
+    - Standard SL/TP: changed `i > entry_idx` → `i >= tp_sl_active_from + 1`
+    - Standard TP: added gap-through logic (fill at bar open if open > TP target)
+    - Intrabar block: added `and i >= tp_sl_active_from + 1` guard
+    - Intrabar TP (all 3 paths): added gap-through via `_bar_open = open_prices[i]`
+    - Added `is_open: bool = False` to `TradeRecord` model
+    - End-of-backtest trade marked `is_open=True`
+    - `MetricsCalculator` called with `closed_trades_for_metrics` (excludes `is_open=True`)
+
+    **Result**: 128/128 closed trades match TV. All metrics OK:
+    - Net profit: $482.83 vs TV $482.16 (+0.1%, rounding only)
+    - Gross profit: $1384.65 vs TV $1384.65 (exact match)
+    - Largest win: $24.50 vs TV $24.50 (exact match, trade #100)
+    - 101 wins / 27 losses / 78.91% win rate — all match
+
+    **Files changed**: `backend/backtesting/engine.py`, `backend/backtesting/models.py`
+
 - **RSI Indicator — TradingView Parity Fix (2026-02-23):**
 
     **Root cause**: `_handle_rsi()` in `backend/backtesting/indicator_handlers.py` was using `vbt.RSI.run(close, window=period).rsi` (VectorBT's RSI, pure EWM smoothing) instead of the correct Wilder's RSI formula used by TradingView (SMA seed + Wilder's smoothing = `(prev * (n-1) + current) / n`).
