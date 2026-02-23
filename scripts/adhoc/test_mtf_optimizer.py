@@ -22,7 +22,7 @@ def load_test_data():
 
     # Load LTF data (15m)
     ltf_query = """
-        SELECT open_time, open_price as open, high_price as high, 
+        SELECT open_time, open_price as open, high_price as high,
                low_price as low, close_price as close, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '15'
@@ -171,7 +171,7 @@ def test_mtf_optimizer_all_filters():
         print(f"  {ft:12s}: score={best['score']:.4f}, period={best['params']['htf_filter_period']}")
 
     # Verify all filter types were tested
-    tested_types = set(r["params"]["htf_filter_type"] for r in result.top_results)
+    tested_types = {r["params"]["htf_filter_type"] for r in result.top_results}
     print(f"\n  Filter types tested: {tested_types}")
 
     print("\n✅ PASSED: All filter types work")

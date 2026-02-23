@@ -24,7 +24,7 @@ print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -35,7 +35,7 @@ df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
 df_1h.set_index('open_time', inplace=True)
 
 df_1m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'
@@ -264,7 +264,7 @@ trades_identical = all_mismatches == 0
 
 print(f"""
    🔬 INTRABAR СРАВНЕНИЕ: FallbackEngineV2 vs NumbaEngineV2
-   
+
    ┌─────────────────────────────────────────────────────────────────────────┐
    │ КРИТЕРИЙ                               │ РЕЗУЛЬТАТ                     │
    ├─────────────────────────────────────────────────────────────────────────┤

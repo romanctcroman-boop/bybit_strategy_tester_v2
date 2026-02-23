@@ -163,7 +163,7 @@ class OptimizationCache:
         self.stats["disk_misses"] += 1
         return False, None
 
-    def set_disk(self, key: str, value: Any, expires_days: int = None):
+    def set_disk(self, key: str, value: Any, expires_days: int | None = None):
         """Set in disk cache."""
         if not self.enabled:
             return

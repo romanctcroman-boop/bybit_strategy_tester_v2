@@ -532,7 +532,7 @@ class AutoMLPipeline:
         estimator.fit(X, y)
 
         # Get importances
-        importance = dict(zip(feature_names, estimator.feature_importances_))
+        importance = dict(zip(feature_names, estimator.feature_importances_, strict=False))
 
         # Select features
         selector = SelectFromModel(
@@ -545,7 +545,7 @@ class AutoMLPipeline:
 
         # Get selected feature names
         mask = selector.get_support()
-        selected_features = [name for name, m in zip(feature_names, mask) if m]
+        selected_features = [name for name, m in zip(feature_names, mask, strict=False) if m]
 
         logger.info(f"Selected {len(selected_features)}/{len(feature_names)} features")
 

@@ -414,18 +414,17 @@ class StrategyValidator:
                 (i for i in target_block.inputs if i.name == conn.target_input), None
             )
 
-            if output and input_port:
-                if not self._types_compatible(output.data_type, input_port.data_type):
-                    errors.append(
-                        ValidationError(
-                            code="TYPE_MISMATCH",
-                            message=f"Type mismatch: '{output.data_type}' → '{input_port.data_type}'",
-                            severity=ValidationSeverity.WARNING,
-                            block_id=conn.target_block_id,
-                            block_name=target_block.name,
-                            suggestion="Ensure data types are compatible",
-                        )
+            if output and input_port and not self._types_compatible(output.data_type, input_port.data_type):
+                errors.append(
+                    ValidationError(
+                        code="TYPE_MISMATCH",
+                        message=f"Type mismatch: '{output.data_type}' → '{input_port.data_type}'",
+                        severity=ValidationSeverity.WARNING,
+                        block_id=conn.target_block_id,
+                        block_name=target_block.name,
+                        suggestion="Ensure data types are compatible",
                     )
+                )
 
         # Check required inputs
         for block_id, block in graph.blocks.items():

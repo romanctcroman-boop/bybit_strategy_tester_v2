@@ -204,7 +204,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)
@@ -307,8 +307,8 @@ def main():
     print("🔍 UNMATCHED TRADES ANALYSIS")
     print("="*80)
 
-    our_prices = set(round(t['entry_price'], 0) for t in our_trades)
-    tv_prices = set(round(p, 0) for p in tv_trades['price'])
+    our_prices = {round(t['entry_price'], 0) for t in our_trades}
+    tv_prices = {round(p, 0) for p in tv_trades['price']}
 
     extra_ours = our_prices - tv_prices
     missing_tv = tv_prices - our_prices

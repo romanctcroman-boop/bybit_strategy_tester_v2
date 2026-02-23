@@ -125,7 +125,7 @@ def grid_search_task(
         for idx, params in enumerate(combinations, 1):
             # Обновить конфигурацию стратегии
             test_config = strategy_config.copy()
-            for param_name, param_value in zip(param_names, params):
+            for param_name, param_value in zip(param_names, params, strict=False):
                 test_config[param_name] = param_value
 
             # Запустить бэктест
@@ -135,7 +135,7 @@ def grid_search_task(
 
                 results.append(
                     {
-                        "params": dict(zip(param_names, params)),
+                        "params": dict(zip(param_names, params, strict=False)),
                         "score": score,
                         "metrics": {
                             "total_return": result.get("total_return"),
@@ -150,7 +150,7 @@ def grid_search_task(
                 # Обновить лучший результат
                 if score > best_score:
                     best_score = score
-                    best_params = dict(zip(param_names, params))
+                    best_params = dict(zip(param_names, params, strict=False))
                     best_result = result
 
                 # Обновить прогресс

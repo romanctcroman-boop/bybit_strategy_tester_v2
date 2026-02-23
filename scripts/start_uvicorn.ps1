@@ -9,7 +9,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("start", "stop", "status")]
+    [ValidateSet("start", "stop", "status", "tail")]
     [string]$Action = "start"
 )
 
@@ -19,6 +19,7 @@ $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $RunDir = Join-Path $ProjectRoot ".run"
 $PidFile = Join-Path $RunDir "uvicorn.pid"
 $LogFile = Join-Path $RunDir "uvicorn.log"
+$LogFileErr = Join-Path $RunDir "uvicorn_err.log"
 
 # Ensure .run directory exists
 if (-not (Test-Path $RunDir)) {
@@ -78,17 +79,22 @@ function Start-UvicornServer {
         }
     }
 
-    # Start Uvicorn in a new window
-    $startInfo = @{
-        FilePath         = $VenvPython
-        ArgumentList     = "-m", "uvicorn", "backend.api.app:app", "--host", "0.0.0.0", "--port", "8000"
-        WorkingDirectory = $ProjectRoot
-        PassThru         = $true
-        WindowStyle      = "Minimized"
-    }
+    # Start Uvicorn with output redirected to log files via bat wrapper
+    # (bat file handles >> redirection reliably on Windows)
+    $stdoutLog = $LogFile
+    $stderrLog = $LogFileErr
+    $batFile = Join-Path $PSScriptRoot "run_uvicorn.bat"
+
+    # Clear old logs
+    Set-Content $stdoutLog -Value "" -Force -ErrorAction SilentlyContinue
+    Set-Content $stderrLog -Value "" -Force -ErrorAction SilentlyContinue
 
     try {
-        $process = Start-Process @startInfo
+        $process = Start-Process -FilePath $batFile `
+            -ArgumentList "`"$VenvPython`"", "`"$ProjectRoot`"", "`"$stdoutLog`"", "`"$stderrLog`"" `
+            -WorkingDirectory $ProjectRoot `
+            -PassThru `
+            -WindowStyle Hidden
         
         # Wait a moment for process to start
         Start-Sleep -Seconds 2
@@ -143,11 +149,13 @@ function Get-UvicornStatus {
     $proc = Get-UvicornProcess
     if ($proc) {
         Write-Host "[OK] Uvicorn is running (PID: $($proc.Id))" -ForegroundColor Green
-        
+        Write-Host "     stdout log: $LogFile" -ForegroundColor Gray
+        Write-Host "     stderr log: $LogFileErr" -ForegroundColor Gray
+
         # Check if responding
         try {
-            $response = Invoke-RestMethod -Uri "http://localhost:8000/healthz" -TimeoutSec 5 -ErrorAction Stop
-            Write-Host "[OK] Server responding: $($response.status)" -ForegroundColor Green
+            $null = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/health" -TimeoutSec 5 -ErrorAction Stop
+            Write-Host "[OK] Server responding" -ForegroundColor Green
         }
         catch {
             Write-Host "[WARN] Server not responding to health check" -ForegroundColor Yellow
@@ -158,9 +166,18 @@ function Get-UvicornStatus {
     }
 }
 
+function Get-UvicornLogs {
+    param([int]$Lines = 100)
+    Write-Host "=== STDOUT ($LogFile) ===" -ForegroundColor Cyan
+    if (Test-Path $LogFile) { Get-Content $LogFile -Tail $Lines } else { Write-Host "(no file)" -ForegroundColor Gray }
+    Write-Host "=== STDERR ($LogFileErr) ===" -ForegroundColor Yellow
+    if (Test-Path $LogFileErr) { Get-Content $LogFileErr -Tail $Lines } else { Write-Host "(no file)" -ForegroundColor Gray }
+}
+
 # Execute action
 switch ($Action) {
     "start" { Start-UvicornServer }
     "stop" { Stop-UvicornServer }
     "status" { Get-UvicornStatus }
+    "tail" { Get-UvicornLogs -Lines 200 }
 }

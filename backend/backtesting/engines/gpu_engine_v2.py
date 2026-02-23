@@ -399,10 +399,7 @@ class GPUEngineV2(BaseBacktestEngine):
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
                 # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 if allocated >= 1.0:  # Minimum $1.00 to open
                     notional = allocated * leverage
@@ -436,10 +433,7 @@ class GPUEngineV2(BaseBacktestEngine):
                 # TV parity: No slippage on entry, entry at exact open price
                 entry_price = open_prices[i + 1]
                 # FIXED: Handle fixed amount vs percentage modes (TV parity)
-                if use_fixed_amount:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount else cash * position_size
 
                 if allocated >= 1.0:  # Minimum $1.00 to open
                     notional = allocated * leverage
@@ -586,7 +580,7 @@ class GPUEngineV2(BaseBacktestEngine):
             m1_highs = candles_1m["high"].values[start_idx:end_idx]
             m1_lows = candles_1m["low"].values[start_idx:end_idx]
 
-            for m1_high, m1_low in zip(m1_highs, m1_lows):
+            for m1_high, m1_low in zip(m1_highs, m1_lows, strict=False):
                 if is_long:
                     # Long: check SL (low) first, then TP (high)
                     # TV parity: SL/TP exit at exact level, no slippage
@@ -699,10 +693,7 @@ class GPUEngineV2(BaseBacktestEngine):
     ) -> tuple[float, float, float]:
         """Calculate PnL, PnL%, and fees - TV style (entry + exit fees)."""
 
-        if is_long:
-            pnl = (exit_price - entry_price) * size
-        else:
-            pnl = (entry_price - exit_price) * size
+        pnl = (exit_price - entry_price) * size if is_long else (entry_price - exit_price) * size
 
         # TV: Calculate both entry and exit fees
         exit_value = exit_price * size
@@ -805,10 +796,7 @@ class GPUEngineV2(BaseBacktestEngine):
         downside_returns = returns[returns < 0]
         if len(downside_returns) > 1:
             downside_std = np.std(downside_returns)
-            if downside_std > 0:
-                sortino_ratio = np.mean(returns) / downside_std * np.sqrt(252 * 24)
-            else:
-                sortino_ratio = 0.0
+            sortino_ratio = np.mean(returns) / downside_std * np.sqrt(252 * 24) if downside_std > 0 else 0.0
         else:
             sortino_ratio = 0.0
 
@@ -851,10 +839,7 @@ class GPUEngineV2(BaseBacktestEngine):
         avg_losing_duration = np.mean(losing_durations) if losing_durations else 0
 
         # Recovery factor
-        if max_drawdown > 0:
-            recovery_factor = net_profit / (initial_capital * max_drawdown / 100)
-        else:
-            recovery_factor = 0.0
+        recovery_factor = net_profit / (initial_capital * max_drawdown / 100) if max_drawdown > 0 else 0.0
 
         return BacktestMetrics(
             net_profit=net_profit,
@@ -912,7 +897,7 @@ class GPUEngineV2(BaseBacktestEngine):
         combinations = list(itertools.product(*param_values))
 
         for combo in combinations:
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=False))
 
             # Create modified input
             modified_input = BacktestInput(
@@ -939,7 +924,7 @@ class GPUEngineV2(BaseBacktestEngine):
 
         # Sort by metric
         def get_metric_value(item):
-            params, output = item
+            _params, output = item
             return getattr(output.metrics, metric, 0)
 
         results.sort(key=get_metric_value, reverse=True)

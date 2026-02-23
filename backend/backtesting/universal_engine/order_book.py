@@ -713,7 +713,7 @@ class MarketImpactCalculator:
         results = []
         cumulative_permanent = 0.0
 
-        for i in range(n_slices):
+        for _i in range(n_slices):
             result = self.calculate_impact(
                 order_size=slice_size,
                 average_volume=average_volume,
@@ -1106,10 +1106,7 @@ class OrderFlowAnalyzer:
         total_volume = buy_volume + sell_volume
         net_volume = buy_volume - sell_volume
 
-        if total_volume > 0:
-            volume_imbalance = net_volume / total_volume
-        else:
-            volume_imbalance = 0.0
+        volume_imbalance = net_volume / total_volume if total_volume > 0 else 0.0
 
         # Average trade size
         n_trades = n_buy_trades + n_sell_trades
@@ -1123,10 +1120,7 @@ class OrderFlowAnalyzer:
             window_buy = sum(self._buy_volumes)
             window_sell = sum(self._sell_volumes)
             window_total = window_buy + window_sell
-            if window_total > 0:
-                vpin = abs(window_buy - window_sell) / window_total
-            else:
-                vpin = 0.0
+            vpin = abs(window_buy - window_sell) / window_total if window_total > 0 else 0.0
         else:
             vpin = abs(volume_imbalance)
 
@@ -1178,25 +1172,25 @@ class OrderFlowAnalyzer:
 # =============================================================================
 
 __all__ = [
-    # Order Book
-    "OrderBookSide",
-    "OrderBookLevel",
-    "OrderBookSnapshot",
-    "OrderBookConfig",
-    "OrderBookSimulator",
+    "CascadeConfig",
+    "CascadeResult",
     # Market Depth
     "DepthMetrics",
+    "LiquidationCascadeSimulator",
+    # Liquidation Cascade
+    "LiquidationLevel",
     "MarketDepthAnalyzer",
+    "MarketImpactCalculator",
     # Market Impact
     "MarketImpactConfig",
     "MarketImpactResult",
-    "MarketImpactCalculator",
-    # Liquidation Cascade
-    "LiquidationLevel",
-    "CascadeConfig",
-    "CascadeResult",
-    "LiquidationCascadeSimulator",
+    "OrderBookConfig",
+    "OrderBookLevel",
+    # Order Book
+    "OrderBookSide",
+    "OrderBookSimulator",
+    "OrderBookSnapshot",
+    "OrderFlowAnalyzer",
     # Order Flow
     "OrderFlowMetrics",
-    "OrderFlowAnalyzer",
 ]

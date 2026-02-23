@@ -350,10 +350,7 @@ class FallbackEngineV3(BaseBacktestEngine):
             if can_enter_long:
                 entry_price = open_prices[i + 1]
 
-                if use_fixed_amount and fixed_amount > 0:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount and fixed_amount > 0 else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -398,10 +395,7 @@ class FallbackEngineV3(BaseBacktestEngine):
             if can_enter_short:
                 entry_price = open_prices[i + 1]
 
-                if use_fixed_amount and fixed_amount > 0:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount and fixed_amount > 0 else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -447,7 +441,7 @@ class FallbackEngineV3(BaseBacktestEngine):
 
                     # Проверяем каждый SO уровень
                     base_price = dca_state["base_price"]
-                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes)):
+                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes, strict=False)):
                         if dca_state["filled"][so_idx]:
                             continue  # Уже заполнен
 
@@ -498,7 +492,7 @@ class FallbackEngineV3(BaseBacktestEngine):
 
                     # Проверяем каждый SO уровень
                     base_price = dca_state["base_price"]
-                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes)):
+                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes, strict=False)):
                         if dca_state["filled"][so_idx]:
                             continue  # Уже заполнен
 

@@ -711,22 +711,22 @@ def resilient_call(
 # =============================================================================
 
 __all__ = [
-    # Enums
-    "CircuitState",
-    # Exceptions
-    "CircuitBreakerError",
-    "RetryableError",
-    "RateLimitError",
-    "TransientError",
+    "AdaptiveMetrics",
     # Classes
     "CircuitBreaker",
     "CircuitBreakerConfig",
+    # Exceptions
+    "CircuitBreakerError",
     "CircuitBreakerRegistry",
-    "AdaptiveMetrics",
-    # Functions
-    "get_circuit_registry",
+    # Enums
+    "CircuitState",
+    "RateLimitError",
+    "RetryableError",
+    "TransientError",
     # Decorators
     "circuit_breaker",
-    "with_retry",
+    # Functions
+    "get_circuit_registry",
     "resilient_call",
+    "with_retry",
 ]

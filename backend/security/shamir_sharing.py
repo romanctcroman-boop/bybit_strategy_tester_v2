@@ -324,7 +324,7 @@ class ShamirSecretSharing:
 
         # Reconstruct with the share and check consistency
         try:
-            test_shares = [share] + other_shares[: share.threshold - 1]
+            test_shares = [share, *other_shares[:share.threshold - 1]]
             secret1 = self.combine(test_shares)
 
             # Reconstruct without this share

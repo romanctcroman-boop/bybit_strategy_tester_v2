@@ -57,7 +57,7 @@ def example_order_management():
     )
 
     # OCO order
-    tp_order, sl_order = manager.create_oco_order(
+    _tp_order, _sl_order = manager.create_oco_order(
         side=OrderSide.SELL,
         size=0.1,
         config=OCOConfig(take_profit_price=55000.0, stop_loss_price=47000.0),
@@ -393,7 +393,7 @@ def example_bar_simulation():
     test_stops = [49800, 49700, 49600]
 
     for stop in test_stops:
-        triggered, tick_idx, exec_price = simulator.check_stop_triggered(
+        triggered, tick_idx, _exec_price = simulator.check_stop_triggered(
             path=path, stop_price=stop, is_long=True
         )
         if triggered:
@@ -427,10 +427,10 @@ def example_liquidation():
 
     print("\n1. Liquidation prices at different leverages...")
     for leverage in [5, 10, 20, 50, 100]:
-        liq_long, bank_long = engine.calculate_liquidation_price(
+        liq_long, _bank_long = engine.calculate_liquidation_price(
             entry_price=50000, leverage=leverage, is_long=True
         )
-        liq_short, bank_short = engine.calculate_liquidation_price(
+        liq_short, _bank_short = engine.calculate_liquidation_price(
             entry_price=50000, leverage=leverage, is_long=False
         )
         print(

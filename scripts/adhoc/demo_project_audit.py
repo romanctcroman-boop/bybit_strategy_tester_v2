@@ -315,10 +315,7 @@ def execute_tool(name: str, args: dict) -> str:
         ),
     }
     handler = handlers.get(name)
-    if handler:
-        result = handler()
-    else:
-        result = {"success": False, "error": f"Unknown tool: {name}"}
+    result = handler() if handler else {"success": False, "error": f"Unknown tool: {name}"}
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 

@@ -698,7 +698,7 @@ class MegaDCATestV2:
             sharpe = calculator.calculate_sharpe(returns)
             sortino = calculator.calculate_sortino(returns)
             calmar = calculator.calculate_calmar(equity_curve)
-            max_dd_value, max_dd_pct = calculator.calculate_max_drawdown(equity_curve)
+            _max_dd_value, max_dd_pct = calculator.calculate_max_drawdown(equity_curve)
 
             return TestResult(
                 name="Extended Metrics Calculator",
@@ -867,7 +867,7 @@ class MegaDCATestV2:
 
         # Load data
         logger.info("\n📥 Loading market data...")
-        ltf_candles, htf_candles = self.load_data()
+        ltf_candles, _htf_candles = self.load_data()
 
         if len(ltf_candles) < 100:
             logger.error("Not enough data!")

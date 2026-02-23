@@ -25,9 +25,9 @@ def load_real_data(symbol: str = "BTCUSDT", interval_1h: str = "60", limit: int 
 
     # Load 1H data from bybit_kline_audit
     query_1h = """
-        SELECT open_time as timestamp, open_price as open, high_price as high, 
-               low_price as low, close_price as close, volume 
-        FROM bybit_kline_audit 
+        SELECT open_time as timestamp, open_price as open, high_price as high,
+               low_price as low, close_price as close, volume
+        FROM bybit_kline_audit
         WHERE symbol = ? AND interval = ?
         ORDER BY open_time DESC
         LIMIT ?
@@ -49,9 +49,9 @@ def load_real_data(symbol: str = "BTCUSDT", interval_1h: str = "60", limit: int 
 
     # Load 1M data for the same period
     query_1m = """
-        SELECT open_time as timestamp, open_price as open, high_price as high, 
-               low_price as low, close_price as close, volume 
-        FROM bybit_kline_audit 
+        SELECT open_time as timestamp, open_price as open, high_price as high,
+               low_price as low, close_price as close, volume
+        FROM bybit_kline_audit
         WHERE symbol = ? AND interval = '1'
         AND open_time >= ? AND open_time <= ?
         ORDER BY open_time

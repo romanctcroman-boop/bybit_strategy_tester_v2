@@ -109,10 +109,7 @@ class ExecutionSimulator:
         slippage_bps = self._rng.uniform(0, self.slippage_bps)
         slippage_pct = slippage_bps / 10000.0
 
-        if side.lower() == "buy":
-            fill_price = order_price * (1.0 + slippage_pct)
-        else:
-            fill_price = order_price * (1.0 - slippage_pct)
+        fill_price = order_price * (1.0 + slippage_pct) if side.lower() == "buy" else order_price * (1.0 - slippage_pct)
 
         # Fill amount
         rejected_reason = None

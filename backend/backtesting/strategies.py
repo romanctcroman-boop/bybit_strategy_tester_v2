@@ -623,7 +623,7 @@ class DCAStrategy(BaseStrategy):
         cumulative = 0.0
         current_deviation = self.price_deviation
 
-        for i in range(self.max_safety_orders):
+        for _i in range(self.max_safety_orders):
             cumulative += current_deviation
             self.so_levels.append(cumulative)
             current_deviation *= self.step_scale
@@ -631,7 +631,7 @@ class DCAStrategy(BaseStrategy):
         # Also pre-calculate volume for each SO (martingale)
         self.so_volumes = []
         current_size = self.safety_order_size
-        for i in range(self.max_safety_orders):
+        for _i in range(self.max_safety_orders):
             self.so_volumes.append(current_size)
             current_size *= self.safety_order_volume_scale
 

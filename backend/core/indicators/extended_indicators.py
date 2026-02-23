@@ -152,7 +152,7 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarra
     breakout_rebound = config.get('linreg_breakout_rebound', 'Breakout')
     slope_direction = config.get('linreg_slope_direction', 'Allow_Any')
 
-    middle, upper, lower, slope = calculate_linear_regression_channel(close, length, deviation)
+    _middle, upper, lower, slope = calculate_linear_regression_channel(close, length, deviation)
 
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
@@ -163,9 +163,8 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarra
         if slope_direction == 'Follow':
             if slope[i] <= 0:
                 continue  # Skip if slope not positive for longs
-        elif slope_direction == 'Opposite':
-            if slope[i] >= 0:
-                continue
+        elif slope_direction == 'Opposite' and slope[i] >= 0:
+            continue
 
         # Breakout or Rebound
         if breakout_rebound == 'Breakout':

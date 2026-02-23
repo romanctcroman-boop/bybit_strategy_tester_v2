@@ -190,7 +190,7 @@ class MetricsCalculator:
         total_return = (final_equity - initial_capital) / initial_capital
 
         # Returns
-        returns = np.diff(equity_curve) / equity_curve[:-1]
+        np.diff(equity_curve) / equity_curve[:-1]
 
         # Win/Loss
         n_trades = len(trades)
@@ -374,10 +374,7 @@ class MetricsCalculator:
         risk_reward = avg_win / avg_loss if avg_loss > 0 else float("inf")
 
         # Kelly Criterion
-        if avg_loss > 0:
-            kelly = win_rate - (1 - win_rate) / (avg_win / avg_loss)
-        else:
-            kelly = win_rate
+        kelly = win_rate - (1 - win_rate) / (avg_win / avg_loss) if avg_loss > 0 else win_rate
         kelly = max(0, min(1, kelly))
 
         # Largest trades

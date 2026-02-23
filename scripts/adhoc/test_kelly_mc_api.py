@@ -52,7 +52,7 @@ def test_kelly_with_trades():
     import random
 
     random.seed(42)
-    for i in range(100):
+    for _i in range(100):
         if random.random() < 0.55:  # 55% win rate
             pnl = random.uniform(100, 200)
         else:
@@ -108,11 +108,8 @@ def test_enhanced_monte_carlo():
     import random
 
     random.seed(42)
-    for i in range(50):
-        if random.random() < 0.55:
-            pnl = random.uniform(100, 200)
-        else:
-            pnl = random.uniform(-150, -50)
+    for _i in range(50):
+        pnl = random.uniform(100, 200) if random.random() < 0.55 else random.uniform(-150, -50)
 
         trades.append(
             {

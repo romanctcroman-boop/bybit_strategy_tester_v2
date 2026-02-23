@@ -335,10 +335,7 @@ class RiskEngine:
         recommended_stop = stop_loss
         if not recommended_stop:
             if atr:
-                if side.lower() == "buy":
-                    recommended_stop = entry_price - (2 * atr)
-                else:
-                    recommended_stop = entry_price + (2 * atr)
+                recommended_stop = entry_price - 2 * atr if side.lower() == "buy" else entry_price + 2 * atr
             else:
                 stop_pct = self.config.default_stop_pct / 100
                 if side.lower() == "buy":
@@ -352,10 +349,7 @@ class RiskEngine:
         if not recommended_tp and recommended_stop:
             risk = abs(entry_price - recommended_stop)
             rr_target = max(self.config.min_risk_reward, 2.0)  # Target 2:1 RR
-            if side.lower() == "buy":
-                recommended_tp = entry_price + (risk * rr_target)
-            else:
-                recommended_tp = entry_price - (risk * rr_target)
+            recommended_tp = entry_price + risk * rr_target if side.lower() == "buy" else entry_price - risk * rr_target
         details["recommended_take_profit"] = recommended_tp
 
         # Create trade request for validation
@@ -586,13 +580,7 @@ class RiskEngine:
             return False
 
         # Check exposure limits
-        if (
-            self.exposure_controller.current_drawdown_pct
-            >= self.config.max_drawdown_pct
-        ):
-            return False
-
-        return True
+        return not self.exposure_controller.current_drawdown_pct >= self.config.max_drawdown_pct
 
     def reset_daily(self):
         """Reset daily tracking (call at start of trading day)."""

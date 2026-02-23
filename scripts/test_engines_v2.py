@@ -26,7 +26,7 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 
 # Основные данные (1h)
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -38,7 +38,7 @@ df_1h.set_index('open_time', inplace=True)
 
 # 1-минутные данные для Bar Magnifier
 df_1m = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'

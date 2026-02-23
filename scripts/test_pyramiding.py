@@ -24,10 +24,10 @@ def test_pyramiding_manager():
     # Тест 1: pyramiding = 1 (отключено)
     print("\n1. Pyramiding = 1 (disabled)")
     mgr = PyramidingManager(pyramiding=1)
-    assert mgr.can_add_entry("long") == True, "Should allow first entry"
+    assert mgr.can_add_entry("long"), "Should allow first entry"
 
     mgr.add_entry("long", 50000, 0.1, 1000, 0, datetime.now())
-    assert mgr.can_add_entry("long") == False, "Should not allow second entry"
+    assert not mgr.can_add_entry("long"), "Should not allow second entry"
     assert mgr.get_avg_entry_price("long") == 50000, "Avg price should be entry price"
     print("   ✓ Passed")
 
@@ -36,13 +36,13 @@ def test_pyramiding_manager():
     mgr = PyramidingManager(pyramiding=3)
 
     mgr.add_entry("long", 50000, 0.1, 1000, 0, datetime.now())
-    assert mgr.can_add_entry("long") == True, "Should allow 2nd entry"
+    assert mgr.can_add_entry("long"), "Should allow 2nd entry"
 
     mgr.add_entry("long", 51000, 0.1, 1000, 1, datetime.now())
-    assert mgr.can_add_entry("long") == True, "Should allow 3rd entry"
+    assert mgr.can_add_entry("long"), "Should allow 3rd entry"
 
     mgr.add_entry("long", 52000, 0.1, 1000, 2, datetime.now())
-    assert mgr.can_add_entry("long") == False, "Should not allow 4th entry"
+    assert not mgr.can_add_entry("long"), "Should not allow 4th entry"
 
     print(f"   Entry count: {mgr.get_entry_count('long')}")
     print(f"   Total size: {mgr.get_total_size('long')}")

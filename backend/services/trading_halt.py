@@ -329,9 +329,8 @@ class TradingHaltService:
 
     def can_close_position(self) -> tuple[bool, str]:
         """Check if positions can be closed."""
-        if self._state.status == TradingStatus.HALTED:
-            if self._state.halt_level == HaltLevel.EMERGENCY:
-                return False, "Emergency halt - all trading blocked"
+        if self._state.status == TradingStatus.HALTED and self._state.halt_level == HaltLevel.EMERGENCY:
+            return False, "Emergency halt - all trading blocked"
         return True, "OK"
 
     def validate_trade(

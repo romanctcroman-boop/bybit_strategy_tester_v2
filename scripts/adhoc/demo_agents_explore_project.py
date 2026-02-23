@@ -243,7 +243,7 @@ async def call_llm_with_tools(
     """
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
-    conversation = [{"role": "system", "content": system}] + messages
+    conversation = [{"role": "system", "content": system}, *messages]
     total_calls = 0
 
     for round_num in range(max_tool_rounds + 1):

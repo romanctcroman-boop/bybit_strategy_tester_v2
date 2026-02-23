@@ -71,7 +71,7 @@ start_ts = int(pd.Timestamp(BASE_CONFIG['start_date']).timestamp() * 1000)
 end_ts = int(pd.Timestamp(BASE_CONFIG['end_date']).timestamp() * 1000)
 
 df = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = '{BASE_CONFIG['symbol']}' AND interval = '{BASE_CONFIG['interval']}'

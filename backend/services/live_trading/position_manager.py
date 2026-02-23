@@ -12,6 +12,7 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -244,10 +245,8 @@ class PositionManager:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         await self._ws_client.disconnect()
         await self._executor.close()

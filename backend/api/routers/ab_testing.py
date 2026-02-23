@@ -7,6 +7,7 @@ Provides REST endpoints for managing A/B experiments:
 - Get results and dashboards
 """
 
+import contextlib
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -226,10 +227,8 @@ async def list_experiments(
 
     exp_status = None
     if status_filter:
-        try:
+        with contextlib.suppress(ValueError):
             exp_status = ExperimentStatus(status_filter.lower())
-        except ValueError:
-            pass
 
     experiments = manager.list_experiments(status=exp_status)
 

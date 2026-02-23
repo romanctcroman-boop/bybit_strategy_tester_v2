@@ -1,4 +1,5 @@
 """Update strategy slippage to 0.0 to match TradingView settings."""
+
 import json
 import sqlite3
 

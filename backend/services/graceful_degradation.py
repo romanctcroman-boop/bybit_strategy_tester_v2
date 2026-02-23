@@ -333,15 +333,13 @@ class GracefulDegradationManager:
             # Fall through to static
             fallback_type = FallbackType.STATIC
 
-        if fallback_type == FallbackType.STATIC:
-            if key in self.static_fallbacks:
-                logger.info(f"Using static fallback for '{key}'")
-                return self.static_fallbacks[key]
+        if fallback_type == FallbackType.STATIC and key in self.static_fallbacks:
+            logger.info(f"Using static fallback for '{key}'")
+            return self.static_fallbacks[key]
 
-        if fallback_type == FallbackType.COMPUTED:
-            if key in self.fallback_handlers:
-                logger.info(f"Using computed fallback for '{key}'")
-                return self.fallback_handlers[key](*args, **kwargs)
+        if fallback_type == FallbackType.COMPUTED and key in self.fallback_handlers:
+            logger.info(f"Using computed fallback for '{key}'")
+            return self.fallback_handlers[key](*args, **kwargs)
 
         return None
 

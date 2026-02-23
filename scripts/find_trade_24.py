@@ -37,7 +37,7 @@ def calculate_rsi_wilder(prices: pd.Series, period: int = 14) -> pd.Series:
 conn = sqlite3.connect(DB_PATH)
 query = """
 SELECT open_time, open_price, high_price, low_price, close_price, volume
-FROM bybit_kline_audit 
+FROM bybit_kline_audit
 WHERE symbol = 'BTCUSDT' AND interval = '15' AND market_type = 'spot'
 ORDER BY open_time ASC
 """
@@ -117,10 +117,10 @@ TradingView Trade #24:
   Entry: 2025-10-30 17:15 (likely UTC+3/MSK)
   Price: $108,080.40
   Type:  LONG
-  
+
 Our System:
   Check if we have a LONG signal at that exact time/price
-  
+
 Possible issues:
   1. Timezone difference (UTC vs MSK)
   2. RSI rounding at boundary

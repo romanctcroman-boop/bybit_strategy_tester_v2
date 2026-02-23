@@ -486,10 +486,7 @@ def simulate_partial_close_trade(
             tp_prices[j] = entry_price * (1 - tp_levels[j])
 
     # SL price
-    if direction == 1:
-        sl_price = entry_price * (1 - stop_loss)
-    else:
-        sl_price = entry_price * (1 + stop_loss)
+    sl_price = entry_price * (1 - stop_loss) if direction == 1 else entry_price * (1 + stop_loss)
 
     level_hit = np.zeros(n_levels, dtype=np.bool_)
 
@@ -546,10 +543,7 @@ def simulate_partial_close_trade(
 
     # Exit remaining at last bar
     exit_price = close[n - 1]
-    if direction == 1:
-        pnl = (exit_price - entry_price) * remaining_size
-    else:
-        pnl = (entry_price - exit_price) * remaining_size
+    pnl = (exit_price - entry_price) * remaining_size if direction == 1 else (entry_price - exit_price) * remaining_size
     total_pnl += pnl
 
     return n - 1, exit_price, total_pnl, partial_closes

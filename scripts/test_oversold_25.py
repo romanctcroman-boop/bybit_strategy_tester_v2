@@ -26,7 +26,7 @@ def calculate_rsi_wilder(close, period=14):
 # Load data
 conn = sqlite3.connect(DB_PATH)
 df = pd.read_sql_query("""
-    SELECT open_time, close_price FROM bybit_kline_audit 
+    SELECT open_time, close_price FROM bybit_kline_audit
     WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
     ORDER BY open_time ASC
 """, conn)
@@ -43,7 +43,7 @@ print("="*60)
 mask = (df['datetime'] >= '2025-10-05 09:00') & (df['datetime'] <= '2025-10-05 12:00')
 region = df[mask]
 
-for i, row in region.iterrows():
+for _i, row in region.iterrows():
     rsi = row['rsi']
 
     # Check thresholds

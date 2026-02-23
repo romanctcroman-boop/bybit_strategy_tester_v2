@@ -34,7 +34,7 @@ if len(merged) > 0:
 
     if len(mismatches) > 0:
         print('\nFirst 10 mismatches:')
-        for i, row in mismatches.head(10).iterrows():
+        for _i, row in mismatches.head(10).iterrows():
             print(f"  {row['time_utc']}: TV={row['open_tv']:.2f} vs Our={row['open_our']:.2f} (diff={row['open_diff']:.2f})")
     else:
         print('\nAll open prices match!')

@@ -288,9 +288,8 @@ class TradingEnv(gym.Env if GYM_AVAILABLE else object):
                 # Open short
                 self._open_position(current_price, is_long=False)
 
-        elif action == TradingAction.CLOSE:
-            if self.state.position != 0:
-                self._close_position(current_price)
+        elif action == TradingAction.CLOSE and self.state.position != 0:
+            self._close_position(current_price)
 
     def _open_position(self, price: float, is_long: bool) -> None:
         """Open a new position."""
@@ -416,20 +415,14 @@ class TradingEnv(gym.Env if GYM_AVAILABLE else object):
 
         elif self.reward_function == "log_return":
             # Log return
-            if prev_equity > 0:
-                reward = np.log(current_equity / prev_equity)
-            else:
-                reward = -1.0
+            reward = np.log(current_equity / prev_equity) if prev_equity > 0 else -1.0
 
         elif self.reward_function == "sharpe":
             # Approximate Sharpe ratio
             if len(self._rewards_history) > 1:
                 returns = np.array(self._rewards_history[-100:])
                 std = np.std(returns)
-                if std > 0:
-                    reward = np.mean(returns) / std
-                else:
-                    reward = 0.0
+                reward = np.mean(returns) / std if std > 0 else 0.0
             else:
                 reward = (current_equity - prev_equity) / self.config.initial_balance
 
@@ -440,10 +433,7 @@ class TradingEnv(gym.Env if GYM_AVAILABLE else object):
                 downside = returns[returns < 0]
                 if len(downside) > 0:
                     downside_std = np.std(downside)
-                    if downside_std > 0:
-                        reward = np.mean(returns) / downside_std
-                    else:
-                        reward = np.mean(returns)
+                    reward = np.mean(returns) / downside_std if downside_std > 0 else np.mean(returns)
                 else:
                     reward = np.mean(returns)
             else:

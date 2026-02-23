@@ -26,9 +26,9 @@ def load_candles():
     cursor = conn.cursor()
     cursor.execute('''
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '15'
-        AND open_time >= ? AND open_time <= ? 
+        AND open_time >= ? AND open_time <= ?
         ORDER BY open_time
     ''', (start_ts, end_ts))
 
@@ -117,7 +117,7 @@ def test_engine_parity(direction: str):
     all_match = True
     mismatches = []
 
-    for i, (fb, vbt) in enumerate(zip(fallback_trades, vbt_trades)):
+    for i, (fb, vbt) in enumerate(zip(fallback_trades, vbt_trades, strict=False)):
         fb_size = round(fb.size, 6)
         vbt_size = round(vbt.size, 6)
         fb_pnl = round(fb.pnl, 2)
@@ -180,7 +180,7 @@ def test_metrics_coverage():
     )
 
     strategy = get_strategy(config.strategy_type, config.strategy_params)
-    signals = strategy.generate_signals(df)
+    strategy.generate_signals(df)
     engine = BacktestEngine()
 
     result = engine.run(config, df)
@@ -194,7 +194,7 @@ def test_metrics_coverage():
     empty = []
     zero_ok = []  # Fields where 0 is acceptable
 
-    for field_name, field_info in schema.items():
+    for field_name, _field_info in schema.items():
         value = getattr(metrics, field_name, None)
 
         # Check if filled

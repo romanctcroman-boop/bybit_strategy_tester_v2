@@ -111,7 +111,7 @@ class ExtendedMetricsCalculator:
 
         # Basic metrics
         sharpe = self.calculate_sharpe(returns)
-        max_dd, max_dd_pct = self.calculate_max_drawdown(equity_curve)
+        _max_dd, max_dd_pct = self.calculate_max_drawdown(equity_curve)
         total_return = (equity_curve[-1] - equity_curve[0]) / equity_curve[0]
 
         # Extended metrics

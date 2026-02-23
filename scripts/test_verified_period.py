@@ -63,7 +63,7 @@ print(f"Trades: {len(r3.trades)}, Net Profit: {r3.metrics.net_profit:.2f}")
 # Compare
 if len(r2.trades) == len(r3.trades):
     all_match = True
-    for i, (t2, t3) in enumerate(zip(r2.trades, r3.trades)):
+    for i, (t2, t3) in enumerate(zip(r2.trades, r3.trades, strict=False)):
         if abs(t2.entry_price - t3.entry_price) > 0.01 or abs(t2.pnl - t3.pnl) > 0.01:
             print(f"\nTrade {i+1} mismatch:")
             print(f"  V2: entry={t2.entry_price:.2f}, pnl={t2.pnl:.2f}")

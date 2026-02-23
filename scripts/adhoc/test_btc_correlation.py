@@ -425,7 +425,7 @@ def main():
     passed = sum(1 for _, r, _ in results if r)
     total = len(results)
 
-    for name, result, error in results:
+    for name, result, _error in results:
         status = "✅ PASSED" if result else "❌ FAILED"
         print(f"{status}: {name}")
 

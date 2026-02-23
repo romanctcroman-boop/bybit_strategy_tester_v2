@@ -41,7 +41,7 @@ def main():
     # Count existing records
     cursor.execute(
         """
-        SELECT COUNT(*) FROM bybit_kline_audit 
+        SELECT COUNT(*) FROM bybit_kline_audit
         WHERE symbol = ? AND interval = ?
     """,
         (SYMBOL, INTERVAL),
@@ -79,8 +79,8 @@ def main():
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO bybit_kline_audit
-                    (symbol, interval, open_time, open_time_dt, 
-                     open_price, high_price, low_price, close_price, 
+                    (symbol, interval, open_time, open_time_dt,
+                     open_price, high_price, low_price, close_price,
                      volume, turnover, raw, market_type, inserted_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """,
@@ -111,7 +111,7 @@ def main():
     # Count after import
     cursor.execute(
         """
-        SELECT COUNT(*) FROM bybit_kline_audit 
+        SELECT COUNT(*) FROM bybit_kline_audit
         WHERE symbol = ? AND interval = ?
     """,
         (SYMBOL, INTERVAL),
@@ -122,7 +122,7 @@ def main():
     cursor.execute(
         """
         SELECT MIN(open_time_dt), MAX(open_time_dt)
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol = ? AND interval = ?
     """,
         (SYMBOL, INTERVAL),

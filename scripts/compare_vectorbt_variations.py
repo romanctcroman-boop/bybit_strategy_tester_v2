@@ -104,19 +104,19 @@ def main():
 
     ohlcv = to_dataframe(data)
 
-    base_cfg = dict(
-        symbol=symbol,
-        interval=interval,
-        start_date=start_date,
-        end_date=end_date,
-        strategy_type="rsi",
-        strategy_params={"period": 21, "oversold": 30, "overbought": 70},
+    base_cfg = {
+        "symbol": symbol,
+        "interval": interval,
+        "start_date": start_date,
+        "end_date": end_date,
+        "strategy_type": "rsi",
+        "strategy_params": {"period": 21, "oversold": 30, "overbought": 70},
         # Use long-only signals for vectorbt parity checks
-        direction="long",
-        initial_capital=10000.0,
-        leverage=10.0,
-        position_size=1.0,
-    )
+        "direction": "long",
+        "initial_capital": 10000.0,
+        "leverage": 10.0,
+        "position_size": 1.0,
+    }
 
     variations = {
         "baseline": {**base_cfg},

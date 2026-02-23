@@ -1,0 +1,20 @@
+﻿{
+    "backtest_id":  "61b5c718-be09-4c6a-b175-2e4a8159508b",
+    "strategy_id":  "5a1741ac-ad9e-4285-a9d6-58067c56407a",
+    "status":  "completed",
+    "results":  {
+                    "total_return":  -0.02632825193145636,
+                    "sharpe_ratio":  -0.08193203492552945,
+                    "win_rate":  69.67213114754098,
+                    "total_trades":  122,
+                    "max_drawdown":  19.767104956056762,
+                    "net_profit":  -263.28251931456407,
+                    "max_drawdown_pct":  19.767104956056762,
+                    "profit_factor":  1.121482994249957
+                },
+    "redirect_url":  "/frontend/backtest-results.html?backtest_id=61b5c718-be09-4c6a-b175-2e4a8159508b",
+    "warnings":  [
+                     "No long exit signals found. Trades will only close via SL/TP. Consider adding exit conditions.",
+                     "No short exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
+                 ]
+}

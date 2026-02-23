@@ -92,36 +92,36 @@ from backend.security.shamir_sharing import (
 )
 
 __all__ = [
+    "CRYPTO_AVAILABLE",
+    "MLOCK_AVAILABLE",
+    "APIKeyRotationManager",
     # Crypto
     "CryptoManager",
-    "SecureBytes",
-    "create_crypto_manager",
-    "CRYPTO_AVAILABLE",
-    # Memory
-    "SecureString",
-    "MemoryGuard",
-    "secure_operation",
-    "secure_compare",
-    "secure_random_string",
-    "MLOCK_AVAILABLE",
-    # Key Management
-    "MasterKeyManager",
-    "get_master_key_manager",
-    "KeyManager",
-    "get_key_manager",
-    "get_decrypted_key",
-    "APIKeyRotationManager",
-    "get_rotation_manager",
-    # HSM
-    "HSMProvider",
     "HSMConfig",
     "HSMFactory",
+    # HSM
+    "HSMProvider",
+    "KeyManager",
     "LocalHSM",
-    "get_hsm",
-    "set_hsm",
+    # Key Management
+    "MasterKeyManager",
+    "MemoryGuard",
+    "SecretShare",
+    "SecureBytes",
+    # Memory
+    "SecureString",
     # Shamir
     "ShamirSecretSharing",
-    "SecretShare",
-    "split_key",
     "combine_key",
+    "create_crypto_manager",
+    "get_decrypted_key",
+    "get_hsm",
+    "get_key_manager",
+    "get_master_key_manager",
+    "get_rotation_manager",
+    "secure_compare",
+    "secure_operation",
+    "secure_random_string",
+    "set_hsm",
+    "split_key",
 ]

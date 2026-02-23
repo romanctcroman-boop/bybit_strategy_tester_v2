@@ -136,7 +136,7 @@ class FeatureEngine:
         close: NDArray,
     ) -> dict[str, NDArray]:
         """Generate price-based features."""
-        n = len(close)
+        len(close)
         features = {}
 
         # Returns
@@ -736,7 +736,7 @@ class SimpleMLPClassifier(SignalClassifier):
 
     def _init_weights(self, input_size: int, output_size: int = 5) -> None:
         """Initialize network weights."""
-        layers = [input_size] + self.config.hidden_layers + [output_size]
+        layers = [input_size, *self.config.hidden_layers, output_size]
 
         self._weights = []
         self._biases = []
@@ -758,7 +758,7 @@ class SimpleMLPClassifier(SignalClassifier):
         """Forward pass through the network."""
         current = x
 
-        for i, (w, b) in enumerate(zip(self._weights, self._biases)):
+        for i, (w, b) in enumerate(zip(self._weights, self._biases, strict=False)):
             current = current @ w + b
 
             if i < len(self._weights) - 1:
@@ -953,7 +953,7 @@ class EnsemblePredictor:
 
         training_results = []
 
-        for i in range(self.config.n_models):
+        for _i in range(self.config.n_models):
             # Bootstrap sample
             sample_indices = np.random.choice(n_samples, n_subsample, replace=True)
 
@@ -990,7 +990,7 @@ class EnsemblePredictor:
         all_predictions: list[list[SignalPrediction]] = []
 
         # Get predictions from each model
-        for model, feat_indices in zip(self._models, self._feature_subsets):
+        for model, feat_indices in zip(self._models, self._feature_subsets, strict=False):
             subset_features = features[:, feat_indices]
             preds = model.predict(subset_features)
             all_predictions.append(preds)
@@ -1007,7 +1007,7 @@ class EnsemblePredictor:
             for signal_type in SignalType:
                 weighted_prob = sum(
                     p.probabilities.get(signal_type, 0) * w
-                    for p, w in zip(sample_preds, self._model_weights)
+                    for p, w in zip(sample_preds, self._model_weights, strict=False)
                 )
                 avg_probs[signal_type] = weighted_prob
 
@@ -1189,13 +1189,7 @@ class AdaptiveSignalGenerator:
             return True
 
         # Check performance
-        if (
-            len(self._performance_history) >= self.config.performance_window
-            and self.get_accuracy() < self.config.min_accuracy
-        ):
-            return True
-
-        return False
+        return bool(len(self._performance_history) >= self.config.performance_window and self.get_accuracy() < self.config.min_accuracy)
 
 
 # =============================================================================
@@ -1203,20 +1197,20 @@ class AdaptiveSignalGenerator:
 # =============================================================================
 
 __all__ = [
+    # Adaptive
+    "AdaptiveConfig",
+    "AdaptiveSignalGenerator",
+    "ClassifierConfig",
+    # Ensemble
+    "EnsembleConfig",
+    "EnsemblePredictor",
     # Feature Engineering
     "FeatureCategory",
     "FeatureConfig",
     "FeatureEngine",
+    "SignalClassifier",
+    "SignalPrediction",
     # Signal Classifier
     "SignalType",
-    "SignalPrediction",
-    "ClassifierConfig",
-    "SignalClassifier",
     "SimpleMLPClassifier",
-    # Ensemble
-    "EnsembleConfig",
-    "EnsemblePredictor",
-    # Adaptive
-    "AdaptiveConfig",
-    "AdaptiveSignalGenerator",
 ]

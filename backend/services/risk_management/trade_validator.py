@@ -136,8 +136,8 @@ class ValidationReport:
     def approve(
         cls,
         request: TradeRequest,
-        warnings: list[str] = None,
-        details: dict[str, Any] = None,
+        warnings: list[str] | None = None,
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create approved validation report."""
@@ -158,7 +158,7 @@ class ValidationReport:
         cls,
         request: TradeRequest,
         reasons: list[RejectionReason],
-        details: dict[str, Any] = None,
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create rejected validation report."""
@@ -179,8 +179,8 @@ class ValidationReport:
         cls,
         request: TradeRequest,
         modifications: dict[str, Any],
-        warnings: list[str] = None,
-        details: dict[str, Any] = None,
+        warnings: list[str] | None = None,
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create modified validation report with suggested changes."""

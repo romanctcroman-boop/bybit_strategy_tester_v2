@@ -12,6 +12,7 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -435,17 +436,15 @@ class LiveStrategyRunner:
         self._running = False
 
         # Stop strategies
-        for key, strategy in self._strategies.items():
+        for _key, strategy in self._strategies.items():
             strategy.on_stop()
             strategy.state.is_running = False
 
         # Cancel tasks
         for task in self._tasks:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
         self._tasks.clear()
 
         # Disconnect
@@ -503,7 +502,7 @@ class LiveStrategyRunner:
             }
 
             # Run matching strategies
-            for key, strategy in self._strategies.items():
+            for _key, strategy in self._strategies.items():
                 if (
                     strategy.config.symbol == symbol
                     and strategy.config.timeframe == interval
@@ -536,7 +535,7 @@ class LiveStrategyRunner:
             }
 
             # Run matching strategies
-            for key, strategy in self._strategies.items():
+            for _key, strategy in self._strategies.items():
                 if strategy.config.symbol == symbol:
                     signal = strategy.on_trade(trade)
 

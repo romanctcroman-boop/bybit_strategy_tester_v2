@@ -77,9 +77,9 @@ class WSAuthenticator:
 
     def __init__(
         self,
-        allow_anonymous: bool = None,
-        secret_key: str = None,
-        token_ttl: int = None,
+        allow_anonymous: bool | None = None,
+        secret_key: str | None = None,
+        token_ttl: int | None = None,
     ):
         self.allow_anonymous = allow_anonymous if allow_anonymous is not None else ALLOW_ANONYMOUS_WS
         self.secret_key = secret_key or WS_SECRET_KEY
@@ -166,7 +166,7 @@ class WSAuthenticator:
 
         return False, None, "Invalid API key"
 
-    async def authenticate(self, websocket: WebSocket, token: str = None) -> WSAuthResult:
+    async def authenticate(self, websocket: WebSocket, token: str | None = None) -> WSAuthResult:
         """
         Authenticate WebSocket connection.
 

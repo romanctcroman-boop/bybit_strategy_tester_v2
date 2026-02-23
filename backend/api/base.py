@@ -20,7 +20,7 @@ Usage:
 """
 
 from datetime import UTC, datetime
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 T = TypeVar("T")
 
 
-class APIResponse(BaseModel, Generic[T]):
+class APIResponse[T](BaseModel):
     """
     Standard API response wrapper.
 
@@ -122,7 +122,7 @@ class PaginationMeta(BaseModel):
         )
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """
     Paginated API response.
 

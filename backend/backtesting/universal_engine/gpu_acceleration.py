@@ -315,10 +315,7 @@ class BatchBacktester:
         n_metrics = 6
         metrics_gpu = self.gpu.zeros((n_backtests, n_metrics))
 
-        if self.config.store_equity_curves:
-            equity_curves_gpu = self.gpu.zeros((n_backtests, n_bars))
-        else:
-            equity_curves_gpu = None
+        equity_curves_gpu = self.gpu.zeros((n_backtests, n_bars)) if self.config.store_equity_curves else None
 
         # Process in batches
         batch_size = min(self.config.batch_size, n_backtests)
@@ -393,7 +390,7 @@ class BatchBacktester:
 
         # For simple strategies, can be fully vectorized
         # For complex strategies, may need to loop
-        close = candles[:, 3]  # Close prices
+        candles[:, 3]  # Close prices
 
         for i in range(n_backtests):
             # Extract parameters for this backtest
@@ -1009,23 +1006,23 @@ def gpu_rsi_strategy(candles: Any, params: Any, xp: Any) -> Any:
 # =============================================================================
 
 __all__ = [
-    # Backend
-    "GPUBackendType",
-    "GPUInfo",
-    "GPUConfig",
-    "GPUBackend",
+    # Constants
+    "CUPY_AVAILABLE",
+    "OPENCL_AVAILABLE",
     # Batch Backtester
     "BatchBacktestConfig",
     "BatchBacktestResult",
     "BatchBacktester",
-    # Indicators
-    "VectorizedIndicators",
+    "GPUBackend",
+    # Backend
+    "GPUBackendType",
+    "GPUConfig",
+    "GPUInfo",
+    "GPUOptimizer",
     # Optimizer
     "GPUOptimizerConfig",
-    "GPUOptimizer",
+    # Indicators
+    "VectorizedIndicators",
     # Helpers
     "gpu_rsi_strategy",
-    # Constants
-    "CUPY_AVAILABLE",
-    "OPENCL_AVAILABLE",
 ]

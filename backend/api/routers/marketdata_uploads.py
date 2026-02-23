@@ -5,6 +5,7 @@ Extracted from marketdata.py for better maintainability.
 Handles file upload, listing, deletion and ingestion.
 """
 
+import contextlib
 import csv
 import json
 import logging
@@ -348,10 +349,8 @@ def _insert_to_db(rows: list[dict], symbol: str, interval: str) -> int:
         from backend.database import Base, SessionLocal, engine
         from backend.models.bybit_kline_audit import BybitKlineAudit
 
-        try:
+        with contextlib.suppress(Exception):
             Base.metadata.create_all(bind=engine)
-        except Exception:
-            pass
 
         sess: SASession = SessionLocal()
         try:

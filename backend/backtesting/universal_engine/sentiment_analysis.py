@@ -178,8 +178,7 @@ class LexiconSentimentAnalyzer:
     def _build_lexicon(self):
         """Build sentiment lexicon."""
         # Crypto-specific sentiment words
-        self.positive_words = set(
-            [
+        self.positive_words = {
                 # General positive
                 "good",
                 "great",
@@ -216,11 +215,9 @@ class LexiconSentimentAnalyzer:
                 "new high",
                 "recovery",
                 "bounce",
-            ]
-        )
+            }
 
-        self.negative_words = set(
-            [
+        self.negative_words = {
                 # General negative
                 "bad",
                 "terrible",
@@ -238,7 +235,6 @@ class LexiconSentimentAnalyzer:
                 # Crypto specific
                 "dump",
                 "dumping",
-                "crash",
                 "correction",
                 "sell",
                 "short",
@@ -253,8 +249,7 @@ class LexiconSentimentAnalyzer:
                 "capitulation",
                 "liquidation",
                 "rekt",
-            ]
-        )
+            }
 
         # Intensifiers and negations
         self.intensifiers = {"very", "extremely", "highly", "super", "mega"}
@@ -875,7 +870,7 @@ class SentimentSignalGenerator:
             data_points = [social_data[i]]
 
             # Add simulated fear/greed
-            fg_index, fg_level = self.fear_greed.calculate(
+            fg_index, _fg_level = self.fear_greed.calculate(
                 close[: i + 1],
                 volume[: i + 1] if volume is not None else None,
             )
@@ -946,10 +941,7 @@ class SentimentAnalyzer:
         signals = []
         for i, sentiment in enumerate(sentiments):
             # Calculate price trend
-            if i >= 20:
-                price_trend = (close[i] - close[i - 20]) / close[i - 20]
-            else:
-                price_trend = 0.0
+            price_trend = (close[i] - close[i - 20]) / close[i - 20] if i >= 20 else 0.0
 
             signal = self.signal_generator.generate_signal(sentiment, price_trend)
             signals.append(signal)

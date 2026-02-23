@@ -82,7 +82,7 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 # Проверяем доступные данные
 info = pd.read_sql("""
     SELECT COUNT(*) as cnt, MIN(open_time) as min_t, MAX(open_time) as max_t
-    FROM bybit_kline_audit 
+    FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '30'
 """, conn)
 
@@ -98,7 +98,7 @@ start_ts = int(pd.Timestamp(start_date).timestamp() * 1000)
 end_ts = int(pd.Timestamp(end_date).timestamp() * 1000)
 
 df = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '30'
@@ -118,7 +118,7 @@ if len(df) < 100:
     print("\n⚠️ НЕДОСТАТОЧНО ДАННЫХ! Попробуем загрузить все доступные...")
     conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
     df = pd.read_sql("""
-        SELECT open_time, open_price as open, high_price as high, 
+        SELECT open_time, open_price as open, high_price as high,
                low_price as low, close_price as close, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '30'
@@ -219,7 +219,7 @@ if all_best:
   Max Drawdown:  {winner[2].get('max_drawdown', 0):.2f}%
   Win Rate:      {winner[2].get('win_rate', 0)*100:.1f}%
   Total Trades:  {winner[2].get('total_trades', 0)}
-  
+
   Параметры:
     RSI Period:    {p.get('rsi_period')}
     Overbought:    {p.get('rsi_overbought')}

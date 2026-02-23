@@ -408,7 +408,7 @@ class WalkForwardOptimizer:
         values = list(param_grid.values())
         combinations = list(itertools.product(*values))
 
-        return [dict(zip(keys, combo)) for combo in combinations]
+        return [dict(zip(keys, combo, strict=False)) for combo in combinations]
 
     def _calculate_param_stability(self, all_params: list[dict[str, Any]]) -> float:
         """
@@ -440,7 +440,7 @@ class WalkForwardOptimizer:
                         param_variations.append(cv)
                 except (ValueError, TypeError):
                     # Non-numeric, check if all same
-                    unique = len(set(str(v) for v in values))
+                    unique = len({str(v) for v in values})
                     param_variations.append(0 if unique == 1 else 1)
 
         if not param_variations:
@@ -486,7 +486,7 @@ class WalkForwardOptimizer:
                     "stability_pct": round(stability, 2),
                 }
             except (ValueError, TypeError):
-                unique = len(set(str(v) for v in values))
+                unique = len({str(v) for v in values})
                 report[key] = {
                     "mean": str(values[0]),
                     "std": "N/A",

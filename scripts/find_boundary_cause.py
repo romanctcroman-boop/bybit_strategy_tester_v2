@@ -131,7 +131,6 @@ def simulate_trades_with_tracking(df):
         # Check entry conditions (only if not in position)
         if not in_position:
             # Check for boundary case
-            is_boundary = False
             boundary_distance = None
 
             # LONG signal: RSI crosses above oversold
@@ -147,7 +146,6 @@ def simulate_trades_with_tracking(df):
 
                     # Check if this is a boundary case
                     if abs(curr_rsi - OVERSOLD) < 0.1:
-                        is_boundary = True
                         boundary_distance = curr_rsi - OVERSOLD
                         boundary_triggers.append({
                             'trade_num': len(trades) + 1,
@@ -160,27 +158,25 @@ def simulate_trades_with_tracking(df):
                         })
 
             # SHORT signal: RSI crosses below overbought
-            elif prev_rsi >= OVERBOUGHT and curr_rsi < OVERBOUGHT:
-                if i + 1 < len(df):
-                    next_bar = df.iloc[i + 1]
-                    in_position = True
-                    position_type = 'SHORT'
-                    entry_price = next_bar['open_price']
-                    entry_time = next_bar['datetime']
-                    entry_bar = i + 1
+            elif prev_rsi >= OVERBOUGHT and curr_rsi < OVERBOUGHT and i + 1 < len(df):
+                next_bar = df.iloc[i + 1]
+                in_position = True
+                position_type = 'SHORT'
+                entry_price = next_bar['open_price']
+                entry_time = next_bar['datetime']
+                entry_bar = i + 1
 
-                    if abs(curr_rsi - OVERBOUGHT) < 0.1:
-                        is_boundary = True
-                        boundary_distance = OVERBOUGHT - curr_rsi
-                        boundary_triggers.append({
-                            'trade_num': len(trades) + 1,
-                            'datetime': row['datetime'],
-                            'prev_rsi': prev_rsi,
-                            'curr_rsi': curr_rsi,
-                            'threshold': OVERBOUGHT,
-                            'distance': boundary_distance,
-                            'direction': 'SHORT'
-                        })
+                if abs(curr_rsi - OVERBOUGHT) < 0.1:
+                    boundary_distance = OVERBOUGHT - curr_rsi
+                    boundary_triggers.append({
+                        'trade_num': len(trades) + 1,
+                        'datetime': row['datetime'],
+                        'prev_rsi': prev_rsi,
+                        'curr_rsi': curr_rsi,
+                        'threshold': OVERBOUGHT,
+                        'distance': boundary_distance,
+                        'direction': 'SHORT'
+                    })
 
     return trades, boundary_triggers
 
@@ -194,7 +190,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
     """, conn)
@@ -225,7 +221,7 @@ def main():
     print("📋 TRADE COMPARISON (Finding Trade #24)")
     print("="*80)
 
-    our_df = pd.DataFrame(our_trades)
+    pd.DataFrame(our_trades)
 
     print(f"\n{'Our#':>4} | {'Our Time':>19} | {'Our Dir':>6} | {'Our Price':>10} || {'TV#':>4} | {'TV Time':>19} | {'TV Dir':>6} | {'TV Price':>10} | {'Match'}")
     print("-"*130)
@@ -300,7 +296,7 @@ The EARLIEST boundary case before Trade #24 with smallest distance:
 HYPOTHESIS:
   If TradingView rounds {suspect['curr_rsi']:.4f} to {suspect['threshold']:.1f},
   it would trigger a {suspect['direction']} signal that we MISS.
-  
+
   This would cause a +1 trade offset that propagates to Trade #24!
 """)
     else:

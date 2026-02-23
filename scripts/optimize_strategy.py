@@ -25,7 +25,7 @@ print(f"Время: {datetime.now()}")
 print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -240,7 +240,7 @@ if len(df) > 0:
       EMA Fast:       {int(best['ema_fast'])}
       EMA Slow:       {int(best['ema_slow'])}
       Direction:      {best['direction']}
-   
+
    📊 РЕЗУЛЬТАТЫ:
       Net Profit:     ${best['net_profit']:,.2f}
       Total Return:   {best['total_return']:.2f}%

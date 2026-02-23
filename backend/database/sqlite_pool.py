@@ -20,7 +20,7 @@ Usage:
 import logging
 import sqlite3
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from queue import Empty, Queue
 
@@ -266,10 +266,8 @@ class SQLiteConnectionPool:
         except Exception:
             # Pool full, close connection
             logger.debug("Pool full, closing connection")
-            try:
+            with suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
 
     @contextmanager
     def connection(self):
@@ -370,10 +368,8 @@ class SQLiteConnectionPool:
 
     def __del__(self):
         """Cleanup on garbage collection."""
-        try:
+        with suppress(Exception):
             self.close_all()
-        except Exception:
-            pass
 
 
 # ============================================================================

@@ -240,10 +240,7 @@ class PropertyTestingService:
         """Validate that cumulative fills are monotonically increasing."""
         if len(fill_history) < 2:
             return True
-        for i in range(1, len(fill_history)):
-            if fill_history[i] < fill_history[i - 1]:
-                return False
-        return True
+        return all(fill_history[i] >= fill_history[i - 1] for i in range(1, len(fill_history)))
 
     def _validate_risk_compliance(
         self,
@@ -402,7 +399,7 @@ class PropertyTestingService:
         skipped = 0
         errors = 0
 
-        for prop_name, prop in self._properties.items():
+        for prop_name, _prop in self._properties.items():
             try:
                 # Generate test data
                 if test_data_generator:

@@ -208,7 +208,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)
@@ -262,7 +262,7 @@ def main():
     TV Net Profit:        {tv_total:>10.2f} USDT
     Our Net Profit:       {our_total:>10.2f} USDT
     Difference:           {our_total - tv_total:>+10.2f} USDT ({(our_total - tv_total)/tv_total*100:+.2f}%)
-    
+
     Exact P&L Matches:    {exact_matches} / {min(len(tv_trades), len(our_trades))} ({exact_matches/min(len(tv_trades), len(our_trades))*100:.1f}%)
     Total Abs Diff:       {total_diff:.2f} USDT
     Avg Diff per Trade:   {total_diff/min(len(tv_trades), len(our_trades)):.2f} USDT

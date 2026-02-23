@@ -45,6 +45,7 @@ class PipelineConfig:
 
     Attributes:
         min_sharpe: Minimum Sharpe ratio to pass quality check (triggers re-optimize if below).
+            NOTE: used as fallback when evaluation_config is not set or primary_metric is sharpe_ratio.
         max_drawdown_pct: Maximum drawdown percentage (triggers re-generate if above).
         max_reoptimize_cycles: Maximum number of re-optimization attempts.
         max_regenerate_cycles: Maximum number of re-generation attempts.
@@ -54,6 +55,8 @@ class PipelineConfig:
         commission: Commission rate (0.0007 = 0.07%, TradingView parity).
         direction: Trade direction ("both", "long", "short").
         enable_walk_forward: Whether to run walk-forward validation.
+        evaluation_config: Evaluation panel settings — primary_metric, constraints, etc.
+            ALL scoring and acceptance decisions use this. Set from frontend Evaluation panel.
     """
 
     min_sharpe: float = 1.0
@@ -66,6 +69,46 @@ class PipelineConfig:
     commission: float = 0.0007  # TradingView parity — NEVER change
     direction: str = "both"
     enable_walk_forward: bool = False
+    # Evaluation panel config — single source of truth for scoring
+    evaluation_config: dict = field(
+        default_factory=lambda: {
+            "primary_metric": "sharpe_ratio",
+            "secondary_metrics": [],
+            "constraints": [],
+            "sort_order": [],
+            "use_composite": False,
+            "weights": None,
+        }
+    )
+
+    def get_primary_metric(self) -> str:
+        """Return the primary evaluation metric."""
+        return self.evaluation_config.get("primary_metric", "sharpe_ratio") or "sharpe_ratio"
+
+    def get_primary_score(self, metrics: dict) -> float:
+        """Extract primary metric score from backtest metrics dict."""
+        from backend.optimization.scoring import calculate_composite_score
+
+        primary = self.get_primary_metric()
+        use_composite = self.evaluation_config.get("use_composite", False)
+        weights = self.evaluation_config.get("weights")
+        if use_composite and weights:
+            return float(calculate_composite_score(metrics, primary, weights))
+        return float(metrics.get(primary, 0) or 0)
+
+    def get_min_primary(self) -> float:
+        """Return minimum acceptable value for the primary metric."""
+        primary = self.get_primary_metric()
+        _defaults: dict = {
+            "sharpe_ratio": self.min_sharpe,
+            "sortino_ratio": self.min_sharpe,
+            "calmar_ratio": self.min_sharpe,
+            "profit_factor": 1.0,
+            "win_rate": 40.0,  # stored as % in metrics
+            "total_return": 0.0,
+            "cagr": 0.0,
+        }
+        return _defaults.get(primary, 0.0)
 
 
 # =============================================================================
@@ -283,7 +326,7 @@ class BacktestNode(AgentNode):
             timeframe=timeframe,
             df=df,
             initial_capital=config.initial_capital,
-            leverage=config.leverage,
+            leverage=int(config.leverage),
             direction=config.direction,
         )
 
@@ -291,17 +334,23 @@ class BacktestNode(AgentNode):
 
         sharpe = (metrics or {}).get("sharpe_ratio", 0.0)
         max_dd = abs((metrics or {}).get("max_drawdown", 0.0))
+        primary_score = config.get_primary_score(metrics or {})
 
         state.context["last_sharpe"] = sharpe
         state.context["last_drawdown"] = max_dd
+        state.context["last_primary_score"] = primary_score
         state.context["optimize_attempt"] = state.context.get("optimize_attempt", 0) + 1
 
         state.add_message(
             "system",
-            f"Backtest: Sharpe={sharpe:.2f}, MaxDD={max_dd:.1f}% (attempt #{state.context['optimize_attempt']})",
+            f"Backtest: {config.get_primary_metric()}={primary_score:.3f}, "
+            f"Sharpe={sharpe:.2f}, MaxDD={max_dd:.1f}% (attempt #{state.context['optimize_attempt']})",
             "backtest",
         )
-        logger.info(f"📈 LG Backtest: Sharpe={sharpe:.2f}, MaxDD={max_dd:.1f}%")
+        logger.info(
+            f"📈 LG Backtest: {config.get_primary_metric()}={primary_score:.3f}, "
+            f"Sharpe={sharpe:.2f}, MaxDD={max_dd:.1f}%"
+        )
         return state
 
 
@@ -330,10 +379,19 @@ class QualityCheckNode(AgentNode):
         config: PipelineConfig = state.context.get("pipeline_config", PipelineConfig())
         metrics = state.get_result("backtest_metrics") or {}
 
-        sharpe = state.context.get("last_sharpe", 0.0)
+        # ── Use primary_metric from Evaluation panel (single source of truth) ──
+        primary_metric = config.get_primary_metric()
+        primary_score = config.get_primary_score(metrics)
+        min_primary = config.get_min_primary()
+
+        # Keep max_dd check for safety (always relevant regardless of primary metric)
         max_dd = state.context.get("last_drawdown", 0.0)
         optimize_attempt = state.context.get("optimize_attempt", 0)
         generation_attempt = state.context.get("generation_attempt", 0)
+
+        # Store primary score in context for downstream nodes
+        state.context["last_primary_score"] = primary_score
+        state.context["primary_metric"] = primary_metric
 
         # Evaluate with MetricsAnalyzer
         try:
@@ -342,6 +400,21 @@ class QualityCheckNode(AgentNode):
             state.context["analysis"] = analysis.to_dict()
         except Exception as e:
             logger.warning(f"MetricsAnalyzer failed: {e}")
+
+        # ── Hard constraints from Evaluation panel ─────────────────────────────
+        constraints = config.evaluation_config.get("constraints") or []
+        passes_constraints = True
+        for c in constraints:
+            m = c.get("metric", "")
+            op = c.get("operator", ">=")
+            val = float(c.get("value", 0))
+            mv = float(metrics.get(m) or 0)
+            if op in (">=", ">") and not (mv >= val if op == ">=" else mv > val):
+                passes_constraints = False
+                break
+            if op in ("<=", "<") and not (mv <= val if op == "<=" else mv < val):
+                passes_constraints = False
+                break
 
         # Decision logic
         decision = "report"  # Default: pass
@@ -352,20 +425,25 @@ class QualityCheckNode(AgentNode):
                 f"⚠️ LG MaxDD {max_dd:.1f}% > {config.max_drawdown_pct}% — re-generating "
                 f"(attempt {generation_attempt}/{config.max_regenerate_cycles})"
             )
-        elif sharpe < config.min_sharpe and optimize_attempt <= config.max_reoptimize_cycles:
+        elif (
+            primary_score < min_primary or not passes_constraints
+        ) and optimize_attempt <= config.max_reoptimize_cycles:
             decision = "re_optimize"
             logger.warning(
-                f"⚠️ LG Sharpe {sharpe:.2f} < {config.min_sharpe} — re-optimizing "
+                f"⚠️ LG {primary_metric}={primary_score:.3f} < {min_primary:.3f} — re-optimizing "
                 f"(attempt {optimize_attempt}/{config.max_reoptimize_cycles})"
             )
         else:
-            if sharpe >= config.min_sharpe and max_dd <= config.max_drawdown_pct:
+            if primary_score >= min_primary and passes_constraints and max_dd <= config.max_drawdown_pct:
                 logger.info(
-                    f"✅ LG Quality PASS: Sharpe={sharpe:.2f} ≥ {config.min_sharpe}, "
+                    f"✅ LG Quality PASS: {primary_metric}={primary_score:.3f} ≥ {min_primary:.3f}, "
                     f"MaxDD={max_dd:.1f}% ≤ {config.max_drawdown_pct}%"
                 )
             else:
-                logger.info(f"⚠️ LG Quality marginal but max retries reached: Sharpe={sharpe:.2f}, MaxDD={max_dd:.1f}%")
+                logger.info(
+                    f"⚠️ LG Quality marginal but max retries reached: "
+                    f"{primary_metric}={primary_score:.3f}, MaxDD={max_dd:.1f}%"
+                )
 
         state.context["quality_decision"] = decision
         state.add_message("system", f"Quality check: {decision}", "quality_check")
@@ -376,7 +454,7 @@ class ReOptimizeNode(AgentNode):
     """
     Re-optimization node: runs walk-forward optimization on current strategy.
 
-    Triggered when Sharpe < min_sharpe. Uses WalkForwardBridge to find
+    Triggered when primary_metric < min_primary. Uses WalkForwardBridge to find
     better parameters, then loops back to backtest.
     """
 
@@ -401,6 +479,19 @@ class ReOptimizeNode(AgentNode):
 
         try:
             bridge = WalkForwardBridge(n_splits=3, train_ratio=0.7)
+            # Use primary_metric from Evaluation panel for walk-forward optimization
+            wf_metric = config.get_primary_metric()
+            # WalkForwardBridge accepts short metric names (sharpe, profit_factor, etc.)
+            _wf_metric_map = {
+                "sharpe_ratio": "sharpe",
+                "sortino_ratio": "sortino",
+                "calmar_ratio": "calmar",
+                "profit_factor": "profit_factor",
+                "win_rate": "win_rate",
+                "total_return": "return",
+                "cagr": "cagr",
+            }
+            wf_metric_short = _wf_metric_map.get(wf_metric, "sharpe")
             wf_result = await bridge.run_walk_forward_async(
                 strategy=strategy,
                 df=df,
@@ -408,7 +499,7 @@ class ReOptimizeNode(AgentNode):
                 timeframe=timeframe,
                 initial_capital=config.initial_capital,
                 direction=config.direction,
-                metric="sharpe",
+                metric=wf_metric_short,
             )
 
             # Apply recommended params to strategy

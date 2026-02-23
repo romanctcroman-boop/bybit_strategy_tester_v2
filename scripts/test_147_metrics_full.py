@@ -26,7 +26,7 @@ print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -38,7 +38,7 @@ df_1h.set_index('open_time', inplace=True)
 
 # 1M для Bar Magnifier (ограничено для скорости)
 df_1m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'
@@ -373,9 +373,8 @@ for cfg in CONFIGS:
             elif not is_fee_dep:
                 mismatches.append((metric_name, fb_val, nb_val))
 
-        if fb_val is not None and isinstance(fb_val, (int, float, np.number)):
-            if abs(float(fb_val)) > 1e-10:
-                non_zero += 1
+        if fb_val is not None and isinstance(fb_val, (int, float, np.number)) and abs(float(fb_val)) > 1e-10:
+            non_zero += 1
 
     total_core = core_matches
     total_ext = ext_matches
@@ -389,7 +388,7 @@ for cfg in CONFIGS:
 
     if mismatches and len(mismatches) <= 5:
         print("\n   ⚠️ Неожиданные расхождения:")
-        for name, fb_v, nb_v in mismatches[:5]:
+        for name, _fb_v, _nb_v in mismatches[:5]:
             print(f"      - {name}")
 
     all_results.append({
@@ -435,18 +434,18 @@ for r in all_results:
 if core_pct >= 99:
     print(f"""
 
-    ████████╗███████╗███████╗████████╗    ██████╗  █████╗ ███████╗███████╗███████╗██████╗ 
+    ████████╗███████╗███████╗████████╗    ██████╗  █████╗ ███████╗███████╗███████╗██████╗
     ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝    ██╔══██╗██╔══██╗██╔════╝██╔════╝██╔════╝██╔══██╗
        ██║   █████╗  ███████╗   ██║       ██████╔╝███████║███████╗███████╗█████╗  ██║  ██║
        ██║   ██╔══╝  ╚════██║   ██║       ██╔═══╝ ██╔══██║╚════██║╚════██║██╔══╝  ██║  ██║
        ██║   ███████╗███████║   ██║       ██║     ██║  ██║███████║███████║███████╗██████╔╝
-       ╚═╝   ╚══════╝╚══════╝   ╚═╝       ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═════╝ 
-    
+       ╚═╝   ╚══════╝╚══════╝   ╚═╝       ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═════╝
+
     🎉 ВАЛИДАЦИЯ ПРОЙДЕНА!
     ✅ Core метрики (46): {core_pct:.1f}% совпадение
     ✅ {total_non_zero} метрик с ненулевыми значениями
     ✅ FallbackEngineV2 и NumbaEngineV2 согласованы!
-    
+
     ℹ️ Расхождения в Extended метриках связаны с разным форматом хранения fees/pnl_pct
        в TradeRecord между движками. Это не влияет на корректность бэктеста.
     """)

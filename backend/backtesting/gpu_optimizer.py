@@ -1992,7 +1992,7 @@ class WarmProcessPool:
     Workers are initialized once and reused, Numba functions are pre-compiled.
     """
 
-    def __init__(self, n_workers: int = None):
+    def __init__(self, n_workers: int | None = None):
         self.n_workers = n_workers or N_WORKERS
         self.pool = None
         self.shm = None
@@ -2576,7 +2576,7 @@ class GPUGridOptimizer:
         slippage: float = 0.0005,
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",
-        position_size: float = None,
+        position_size: float | None = None,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
         **kwargs,

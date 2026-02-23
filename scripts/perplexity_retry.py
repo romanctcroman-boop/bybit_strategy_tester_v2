@@ -24,7 +24,7 @@ AUDIT_REPORT = """
 - Решение: Добавлены параметры upon_*_conflict="ignore" в Portfolio.from_signals
 - Результат: Trade divergence снижено с 25% до 5%
 
-### Улучшение #2: Intrabar SL/TP Detection  
+### Улучшение #2: Intrabar SL/TP Detection
 - Проблема: VectorBT проверял SL/TP только по цене CLOSE
 - Решение: Добавлена передача high/low серий во все вызовы VectorBT
 - Результат: Более точное определение срабатывания SL/TP
@@ -36,7 +36,7 @@ AUDIT_REPORT = """
 
 ## Метрики
 - Trade divergence: 25% → 5%
-- Single simulation: 41x speedup  
+- Single simulation: 41x speedup
 - Batch optimization: 375,000 combinations/second
 - Stage 2 validation: 47x speedup
 

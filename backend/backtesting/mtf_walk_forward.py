@@ -96,13 +96,13 @@ class MTFWalkForward:
         n_windows: int = 5,  # Number of walk-forward windows
         overlap_pct: float = 0.5,  # Window overlap (anchored = 0)
         # Optimization params
-        rsi_period_range: list[int] = None,
-        rsi_overbought_range: list[int] = None,
-        rsi_oversold_range: list[int] = None,
-        stop_loss_range: list[float] = None,
-        take_profit_range: list[float] = None,
-        htf_filter_types: list[str] = None,
-        htf_filter_periods: list[int] = None,
+        rsi_period_range: list[int] | None = None,
+        rsi_overbought_range: list[int] | None = None,
+        rsi_oversold_range: list[int] | None = None,
+        stop_loss_range: list[float] | None = None,
+        take_profit_range: list[float] | None = None,
+        htf_filter_types: list[str] | None = None,
+        htf_filter_periods: list[int] | None = None,
         # Trading config
         initial_capital: float = 10000,
         leverage: int = 10,

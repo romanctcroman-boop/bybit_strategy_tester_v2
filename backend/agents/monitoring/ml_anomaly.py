@@ -538,7 +538,7 @@ class MLAnomalyDetector:
         anomalies = []
         baseline = np.mean(values)
 
-        for i, (value, anomalous, score) in enumerate(zip(values, is_anomaly, scores)):
+        for i, (value, anomalous, score) in enumerate(zip(values, is_anomaly, scores, strict=False)):
             if anomalous or return_all:
                 severity = self._classify_severity(score)
 

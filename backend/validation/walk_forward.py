@@ -409,11 +409,11 @@ class WalkForwardValidator:
 
             if isinstance(values[0], (int, float)):
                 weighted_avg = (
-                    sum(v * w for v, w in zip(values, weights)) / total_weight
+                    sum(v * w for v, w in zip(values, weights, strict=False)) / total_weight
                 )
                 # Round to same type as original
                 if isinstance(values[0], int):
-                    recommended[key] = int(round(weighted_avg))
+                    recommended[key] = round(weighted_avg)
                 else:
                     recommended[key] = round(weighted_avg, 4)
             else:

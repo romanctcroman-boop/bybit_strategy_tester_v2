@@ -52,7 +52,7 @@ _circuit_breakers: dict[str, CircuitBreaker] = {
 }
 
 
-def _update_metrics(tool: str, success: bool, duration: float, error_type: str = None):
+def _update_metrics(tool: str, success: bool, duration: float, error_type: str | None = None):
     """Update Prometheus metrics if available."""
     if not _METRICS_AVAILABLE:
         return
@@ -66,7 +66,7 @@ def _update_metrics(tool: str, success: bool, duration: float, error_type: str =
 
 
 async def send_to_deepseek(
-    content: str, conversation_id: str = None, context: dict = None
+    content: str, conversation_id: str | None = None, context: dict | None = None
 ) -> dict:
     """
     Send message to DeepSeek agent via MCP.
@@ -136,7 +136,7 @@ async def send_to_deepseek(
 
 
 async def send_to_perplexity(
-    content: str, conversation_id: str = None, context: dict = None
+    content: str, conversation_id: str | None = None, context: dict | None = None
 ) -> dict:
     """
     Send message to Perplexity agent via MCP.
@@ -205,7 +205,7 @@ async def send_to_perplexity(
         return mcp_error.to_dict()
 
 
-async def get_consensus(question: str, agents: list[str] = None) -> dict:
+async def get_consensus(question: str, agents: list[str] | None = None) -> dict:
     """
     Get consensus from multiple agents.
 
@@ -271,21 +271,21 @@ def register_agent_tools(mcp):
 
     @mcp.tool()
     async def mcp_agent_to_agent_send_to_deepseek(
-        content: str, conversation_id: str = None, context: dict = None
+        content: str, conversation_id: str | None = None, context: dict | None = None
     ) -> dict:
         """Send message to DeepSeek agent via MCP"""
         return await send_to_deepseek(content, conversation_id, context)
 
     @mcp.tool()
     async def mcp_agent_to_agent_send_to_perplexity(
-        content: str, conversation_id: str = None, context: dict = None
+        content: str, conversation_id: str | None = None, context: dict | None = None
     ) -> dict:
         """Send message to Perplexity agent via MCP"""
         return await send_to_perplexity(content, conversation_id, context)
 
     @mcp.tool()
     async def mcp_agent_to_agent_get_consensus(
-        question: str, agents: list = None
+        question: str, agents: list | None = None
     ) -> dict:
         """Get consensus from multiple agents"""
         return await get_consensus(question, agents)

@@ -993,6 +993,8 @@ function initializeStrategyBuilder() {
         if (!mainNode) {
           createMainStrategyNode();
         }
+        // Ensure buttons are enabled after strategy load (symbol is populated)
+        updateRunButtonsState();
         console.log('[Strategy Builder] Strategy loaded');
       }).catch((err) => {
         console.error('[Strategy Builder] Error loading strategy:', err);
@@ -10599,6 +10601,8 @@ async function loadStrategy(strategyId) {
 
     updateLastSaved(strategy.updated_at);
     showNotification('Стратегия успешно загружена!', 'success');
+    // Enable action buttons now that symbol is populated from loaded strategy
+    updateRunButtonsState();
     // Запустить проверку/синхронизацию данных для загруженного символа и TF
     runCheckSymbolDataForProperties();
   } catch (err) {
@@ -12078,7 +12082,17 @@ async function runAiBuild() {
     min_sharpe: parseFloat(document.getElementById('aiMinSharpe')?.value || '0.5'),
     min_win_rate: 0.4,
     enable_deliberation: document.getElementById('aiDeliberation')?.checked ?? false,
-    use_optimizer_mode: document.getElementById('aiUseOptimizer')?.checked ?? false
+    use_optimizer_mode: document.getElementById('aiUseOptimizer')?.checked ?? false,
+    // Evaluation panel config — ALL scoring/sorting uses ONLY this.
+    // Falls back to sharpe_ratio with min_sharpe threshold if panel not available.
+    evaluation_config: (window.evaluationCriteriaPanel?.getCriteria && window.evaluationCriteriaPanel.getCriteria()) || {
+      primary_metric: 'sharpe_ratio',
+      secondary_metrics: [],
+      constraints: [],
+      sort_order: [],
+      use_composite: false,
+      weights: null
+    }
   };
 
   if (_aiBuildMode === 'optimize' && _aiBuildExistingStrategyId) {

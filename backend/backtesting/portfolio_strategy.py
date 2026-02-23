@@ -392,7 +392,7 @@ class StrategyPortfolioBacktester:
         portfolio_equity = []
         for i in range(max_len):
             total = 0.0
-            for symbol, result in self.per_asset_results.items():
+            for _symbol, result in self.per_asset_results.items():
                 if i < len(result.equity_curve):
                     total += result.equity_curve[i]
                 else:
@@ -514,10 +514,7 @@ class StrategyPortfolioBacktester:
                 else:
                     r1 = asset_returns.get(s1, [])
                     r2 = asset_returns.get(s2, [])
-                    if len(r1) > 0 and len(r2) > 0:
-                        corr = float(np.corrcoef(r1, r2)[0, 1])
-                    else:
-                        corr = 0.0
+                    corr = float(np.corrcoef(r1, r2)[0, 1]) if len(r1) > 0 and len(r2) > 0 else 0.0
                 row[s2] = round(corr, 4)
                 if i < j:
                     correlations.append(corr)

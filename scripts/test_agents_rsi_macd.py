@@ -5,7 +5,6 @@ using P5 Memory Integration.
 DeepSeek, Qwen and Perplexity agents analyze RSI/MACD Strategy Builder nodes,
 results are stored in memory and reused across deliberations.
 """
-# ruff: noqa: RUF001
 
 import asyncio
 import sys

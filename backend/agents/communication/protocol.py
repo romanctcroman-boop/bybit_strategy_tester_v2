@@ -11,6 +11,7 @@ Standardized communication between AI agents:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
 from abc import ABC, abstractmethod
@@ -230,10 +231,8 @@ class MessageBroker:
         self._running = False
         if self._processor_task:
             self._processor_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._processor_task
-            except asyncio.CancelledError:
-                pass
         logger.info("📬 MessageBroker stopped")
 
     def register_agent(self, agent_info: AgentInfo) -> None:
@@ -291,7 +290,7 @@ class MessageBroker:
 
     def unsubscribe(self, subscription_id: str) -> bool:
         """Unsubscribe from topic"""
-        for topic, subs in self._subscriptions.items():
+        for _topic, subs in self._subscriptions.items():
             for sub in subs:
                 if sub.id == subscription_id:
                     subs.remove(sub)
@@ -536,10 +535,8 @@ class AgentCommunicator:
         self._running = False
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
         self.broker.unregister_agent(self.agent_id)
         logger.info(f"🛑 Agent {self.agent_id} stopped")
 

@@ -357,7 +357,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)
@@ -452,7 +452,7 @@ def main():
     Exact Matches:            {matched_metrics}
     Close Matches:            {close_metrics}
     Metrics with Differences: {total_metrics - matched_metrics - close_metrics}
-    
+
     Match Rate: {matched_metrics/total_metrics*100:.1f}% exact, {(matched_metrics+close_metrics)/total_metrics*100:.1f}% within tolerance
 """)
 

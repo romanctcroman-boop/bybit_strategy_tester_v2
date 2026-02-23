@@ -312,10 +312,7 @@ def compare_with_tv(our_metrics, tv_metrics):
             tv_str = f"{tv:.{decimals}f}"
 
         # Calculate parity
-        if tv != 0:
-            parity_pct = (1 - abs(diff) / abs(tv)) * 100
-        else:
-            parity_pct = 100 if our == 0 else 0
+        parity_pct = (1 - abs(diff) / abs(tv)) * 100 if tv != 0 else 100 if our == 0 else 0
 
         parity_pct = max(0, min(100, parity_pct))
 
@@ -363,9 +360,9 @@ def sequence_comparison(our_trades, tv_entries):
     our_df = pd.DataFrame(our_trades)
 
     matched = 0
-    for i, our in our_df.iterrows():
+    for _i, our in our_df.iterrows():
         # Find TV trade with matching price
-        for j, tv in tv_entries.iterrows():
+        for _j, tv in tv_entries.iterrows():
             if abs(our['entry_price'] - tv['price']) < 1:
                 if our['direction'] == tv['direction']:
                     matched += 1
@@ -388,7 +385,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
     """, conn)
@@ -427,7 +424,7 @@ def main():
     # Sequence comparison
     tv_entries = load_tv_trades()
     if tv_entries is not None:
-        seq_parity = sequence_comparison(trades, tv_entries)
+        sequence_comparison(trades, tv_entries)
 
     # Final verdict
     print("\n" + "="*80)
@@ -438,7 +435,7 @@ def main():
    💰 Net Profit:     ${our_metrics['net_profit']:.2f} vs ${TV_METRICS['net_profit']:.2f}
    📈 Win Rate:       {our_metrics['win_rate']:.1f}% vs {TV_METRICS['win_rate']:.1f}%
    📉 Max Drawdown:   ${our_metrics['max_drawdown']:.2f} vs ${TV_METRICS['max_drawdown']:.2f}
-   
+
    🎯 Overall Parity: {overall_parity:.1f}%
 """)
 

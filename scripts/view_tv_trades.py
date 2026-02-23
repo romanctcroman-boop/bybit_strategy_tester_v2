@@ -59,11 +59,11 @@ Our Engine Signal #24:
   Datetime:  2025-10-21 06:15:00 UTC
   RSI:       21.45 → 31.62 (clear crossover above 30)
   Close:     $107,985.90
-  
+
 TradingView Trade #24:
   DateTime:  2025-10-11 00:45 (10 days earlier!)
   Price:     $110,971.80
-  
+
 ⚠️ ISSUE: We're comparing different trade sequences!
    - TV trade numbering includes Entry+Exit pairs
    - Our signal might need different counting

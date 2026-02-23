@@ -61,7 +61,7 @@ print("""
 At start of bar 6320 (signal bar):
   - in_long = False
   - long_entries[6319] was True (signal at 6319)
-  
+
 But wait, signal bar is actually 6319 if entry is at bar 6320.
 Let me verify...
 """)

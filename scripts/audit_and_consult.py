@@ -46,10 +46,10 @@ AUDIT_REPORT = """
 - **Проблема**: Python-версия Fallback engine работала медленно (~1.3k симуляций/сек)
 - **Причина**: Интерпретируемый Python код для bar-by-bar симуляции
 - **Решение**: Создан numba_engine.py с JIT-компилируемыми функциями
-- **Файлы**: 
+- **Файлы**:
   - НОВЫЙ: backend/backtesting/numba_engine.py
   - ОБНОВЛЁН: backend/backtesting/two_stage_optimizer.py
-- **Результат**: 
+- **Результат**:
   - Single simulation: 41x speedup (0.77ms → 0.019ms)
   - Batch simulation: 375,000 combinations/second
   - Stage 2 validation: 47x speedup

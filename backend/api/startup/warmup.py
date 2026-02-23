@@ -20,7 +20,7 @@ DEFAULT_WARMUP_PAIRS: list[tuple[str, str]] = [
 
 
 def warmup_cache(
-    pairs: list[tuple[str, str]] = None,
+    pairs: list[tuple[str, str]] | None = None,
     timeout_seconds: int = 10,
     limit: int = 500,
 ) -> bool:

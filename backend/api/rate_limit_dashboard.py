@@ -206,10 +206,7 @@ async def get_rate_limit_events(
         # Access internal rate limit tracking if available
         if hasattr(agent_interface, "_rate_limit_events"):
             all_events = agent_interface._rate_limit_events
-            if agent:
-                events = [e for e in all_events if e.get("agent") == agent]
-            else:
-                events = all_events
+            events = [e for e in all_events if e.get("agent") == agent] if agent else all_events
 
         return {
             "events": events[-limit:],
@@ -334,6 +331,4 @@ def _is_key_usable(key) -> bool:
     """Check if a key is currently usable"""
     if key.disabled:
         return False
-    if key.cooling_until and key.cooling_until > datetime.now().timestamp():
-        return False
-    return True
+    return not (key.cooling_until and key.cooling_until > datetime.now().timestamp())

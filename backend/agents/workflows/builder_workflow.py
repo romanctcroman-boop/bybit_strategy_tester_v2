@@ -141,6 +141,98 @@ class BuilderWorkflowConfig:
     # False → each iteration: agents propose single values (original behavior)
     use_optimizer_mode: bool = False
 
+    # ── Evaluation config (from Evaluation panel) ─────────────────────────────
+    # ALL scoring, sorting, and acceptance decisions use ONLY these settings.
+    # primary_metric  — the single metric that drives optimization and iteration.
+    # secondary_metrics — additional metrics shown in results.
+    # constraints     — hard filters: [{"metric": "max_drawdown", "operator": "<=", "value": 20}]
+    # sort_order      — multi-level result sorting: [{"metric": "...", "direction": "desc"}]
+    # use_composite   — if True, primary score is a weighted composite of all metrics.
+    # weights         — per-metric weights for composite scoring.
+    evaluation_config: dict[str, Any] = field(
+        default_factory=lambda: {
+            "primary_metric": "sharpe_ratio",
+            "secondary_metrics": ["win_rate", "max_drawdown", "profit_factor"],
+            "constraints": [],
+            "sort_order": [],
+            "use_composite": False,
+            "weights": None,
+        }
+    )
+
+    def get_primary_metric(self) -> str:
+        """Return the primary evaluation metric (from Evaluation panel)."""
+        return self.evaluation_config.get("primary_metric", "sharpe_ratio") or "sharpe_ratio"
+
+    def get_min_acceptable_primary(self) -> float:
+        """Return minimum acceptable value for the primary metric.
+
+        For sharpe_ratio this is min_acceptable_sharpe.
+        For win_rate, min_profit_factor, etc. sensible defaults are returned.
+        The caller can override via constraints.
+        """
+        metric = self.get_primary_metric()
+        _defaults: dict[str, float] = {
+            "sharpe_ratio": self.min_acceptable_sharpe,
+            "sortino_ratio": self.min_acceptable_sharpe,
+            "calmar_ratio": self.min_acceptable_sharpe,
+            "profit_factor": 1.0,
+            "win_rate": self.min_acceptable_win_rate * 100,  # stored as %
+            "total_return": 0.0,
+            "cagr": 0.0,
+        }
+        return _defaults.get(metric, 0.0)
+
+    def evaluate_metrics(self, metrics: dict[str, Any]) -> tuple[float, bool]:
+        """Score a backtest result using Evaluation panel settings.
+
+        Returns:
+            (score, is_acceptable): score is the primary metric value (or
+            composite if use_composite=True).  is_acceptable is True when
+            all hard constraints pass AND the primary metric meets its minimum.
+        """
+        from backend.optimization.scoring import calculate_composite_score
+
+        primary = self.get_primary_metric()
+        use_composite = self.evaluation_config.get("use_composite", False)
+        weights = self.evaluation_config.get("weights")
+        constraints = self.evaluation_config.get("constraints") or []
+
+        # ── 1. Score ──────────────────────────────────────────────────────────
+        if use_composite and weights:
+            score = calculate_composite_score(metrics, primary, weights)
+        else:
+            raw = metrics.get(primary, 0) or 0
+            # win_rate is stored as percentage in metrics; keep as-is for threshold comparison
+            score = raw if primary == "win_rate" and raw > 1 else float(raw)
+
+        # ── 2. Hard constraints ───────────────────────────────────────────────
+        passes_constraints = True
+        for c in constraints:
+            m = c.get("metric", "")
+            op = c.get("operator", ">=")
+            val = float(c.get("value", 0))
+            mv = float(metrics.get(m, 0) or 0)
+            if op in (">=", ">") and not (mv >= val if op == ">=" else mv > val):
+                passes_constraints = False
+                break
+            if op in ("<=", "<") and not (mv <= val if op == "<=" else mv < val):
+                passes_constraints = False
+                break
+
+        # ── 3. Minimum primary metric ─────────────────────────────────────────
+        min_primary = self.get_min_acceptable_primary()
+        meets_minimum = score >= min_primary
+
+        is_acceptable = (
+            meets_minimum
+            and passes_constraints
+            and win_rate_ok(metrics, self.min_acceptable_win_rate)
+            and (not self.require_positive_profit or (metrics.get("net_profit", 0) or 0) > 0)
+        )
+
+        return score, is_acceptable
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize config to dict."""
         return {
@@ -164,7 +256,15 @@ class BuilderWorkflowConfig:
             "enable_deliberation": self.enable_deliberation,
             "existing_strategy_id": self.existing_strategy_id,
             "use_optimizer_mode": self.use_optimizer_mode,
+            "evaluation_config": self.evaluation_config,
         }
+
+
+def win_rate_ok(metrics: dict[str, Any], min_win_rate: float) -> bool:
+    """Check win_rate threshold (handles both % and fraction representation)."""
+    raw = metrics.get("win_rate", 0) or 0
+    fraction = raw / 100.0 if raw > 1 else raw
+    return fraction >= min_win_rate
 
 
 @dataclass
@@ -494,7 +594,7 @@ class BuilderWorkflow:
                     )
 
             # Stage 8: Evaluate + Iterative optimization loop
-            best_sharpe: float = float("-inf")
+            best_primary_score: float = float("-inf")
             best_iteration_record: dict[str, Any] = {}
 
             for iteration in range(1, config.max_iterations + 1):
@@ -504,46 +604,48 @@ class BuilderWorkflow:
                 metrics = {}
                 if isinstance(backtest, dict) and "error" not in backtest:
                     metrics = backtest.get("results", backtest.get("metrics", {}))
-                sharpe = metrics.get("sharpe_ratio", 0)
-                # win_rate from the API is already a percentage (e.g. 52.11 for 52.11%)
-                # Normalize to fraction (0-1) for comparison with min_acceptable_win_rate
+
+                # ── Evaluate via Evaluation panel config (single source of truth) ──
+                primary_score, is_acceptable = config.evaluate_metrics(metrics)
+                primary_metric = config.get_primary_metric()
+
+                # Keep sharpe for logging/memory (always useful regardless of primary_metric)
+                sharpe = float(metrics.get("sharpe_ratio", 0) or 0)
                 raw_win_rate = metrics.get("win_rate", 0)
                 win_rate = raw_win_rate / 100.0 if raw_win_rate > 1 else raw_win_rate
 
                 iteration_record = {
                     "iteration": iteration,
+                    "primary_metric": primary_metric,
+                    "primary_score": primary_score,
                     "sharpe_ratio": sharpe,
                     "win_rate": win_rate,
                     "total_trades": metrics.get("total_trades", 0),
                     "net_profit": metrics.get("net_profit", 0),
                     "max_drawdown": metrics.get("max_drawdown", metrics.get("max_drawdown_pct", 0)),
-                    "acceptable": (
-                        sharpe >= config.min_acceptable_sharpe
-                        and win_rate >= config.min_acceptable_win_rate
-                        and (not config.require_positive_profit or metrics.get("net_profit", 0) > 0)
-                    ),
+                    "acceptable": is_acceptable,
                 }
                 self._result.iterations.append(iteration_record)
 
                 # ── Save iteration result to Episodic Memory ──────────────────
                 await self._memory_store_iteration(config, iteration_record, self._result.blocks_added)
 
-                # Track best result for Semantic Memory at the end
-                if sharpe > best_sharpe:
-                    best_sharpe = sharpe
+                # Track best result by primary metric (not hardcoded sharpe)
+                if primary_score > best_primary_score:
+                    best_primary_score = primary_score
                     best_iteration_record = iteration_record
 
                 if iteration_record["acceptable"]:
                     logger.info(
                         f"[BuilderWorkflow] Iteration {iteration}: Strategy meets criteria — "
-                        f"Sharpe={sharpe:.2f}, WinRate={win_rate:.1%}"
+                        f"{primary_metric}={primary_score:.3f}, Sharpe={sharpe:.2f}, WinRate={win_rate:.1%}"
                     )
                     break
 
                 logger.info(
                     f"[BuilderWorkflow] Iteration {iteration}/{config.max_iterations}: "
-                    f"Sharpe={sharpe:.2f} (min {config.min_acceptable_sharpe}), "
-                    f"WinRate={win_rate:.1%} (min {config.min_acceptable_win_rate:.0%}), "
+                    f"{primary_metric}={primary_score:.3f} (min {config.get_min_acceptable_primary():.3f}), "
+                    f"Sharpe={sharpe:.2f}, WinRate={win_rate:.1%} (min {config.min_acceptable_win_rate:.0%}), "
                     f"NetProfit={metrics.get('net_profit', 0):.2f} "
                     f"{'✅' if metrics.get('net_profit', 0) > 0 else '❌'} — iterating"
                 )
@@ -2294,7 +2396,8 @@ Rules:
             "use_fixed_amount": False,
             "fixed_amount": 0.0,
             "engine_type": "numba",
-            "optimize_metric": "sharpe_ratio",
+            # Use primary_metric from Evaluation panel — single source of truth
+            "optimize_metric": config.get_primary_metric(),
         }
 
         # ── Choose method based on realistic trial count ─────────────────────
@@ -2328,6 +2431,7 @@ Rules:
         )
 
         # ── Run the optimizer ─────────────────────────────────────────────────
+        optimize_metric = config.get_primary_metric()
         try:
             if method == "bayesian":
                 result = await asyncio.to_thread(
@@ -2336,7 +2440,7 @@ Rules:
                     ohlcv=ohlcv,
                     param_specs=active_specs,
                     config_params=config_params,
-                    optimize_metric="sharpe_ratio",
+                    optimize_metric=optimize_metric,
                     n_trials=n_trials,
                     top_n=5,
                     timeout_seconds=MAX_SWEEP_SECONDS,
@@ -2354,7 +2458,7 @@ Rules:
                     ohlcv=ohlcv,
                     param_combinations=param_combinations,
                     config_params=config_params,
-                    optimize_metric="sharpe_ratio",
+                    optimize_metric=optimize_metric,
                     max_results=5,
                     timeout_seconds=MAX_SWEEP_SECONDS,
                 )

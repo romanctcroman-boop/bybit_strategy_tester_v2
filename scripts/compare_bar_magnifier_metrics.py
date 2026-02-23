@@ -77,16 +77,14 @@ def generate_rsi_signals(
     # Long entry: RSI crosses above oversold
     long_entries = np.zeros(len(df), dtype=bool)
     for i in range(1, len(df)):
-        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]):
-            if rsi[i-1] < oversold and rsi[i] >= oversold:
-                long_entries[i] = True
+        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]) and rsi[i-1] < oversold and rsi[i] >= oversold:
+            long_entries[i] = True
 
     # Short entry: RSI crosses below overbought
     short_entries = np.zeros(len(df), dtype=bool)
     for i in range(1, len(df)):
-        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]):
-            if rsi[i-1] > overbought and rsi[i] <= overbought:
-                short_entries[i] = True
+        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]) and rsi[i-1] > overbought and rsi[i] <= overbought:
+            short_entries[i] = True
 
     return long_entries, short_entries
 
@@ -251,10 +249,7 @@ def print_comparison_report(results: dict[str, Any]):
             pct_str = f"{pct:+.2f}%"
 
         # Highlight differences
-        if diff != 0:
-            status = "📊" if abs(pct) < 1 else ("🔺" if diff > 0 else "🔻")
-        else:
-            status = "✅"
+        status = ("📊" if abs(pct) < 1 else "🔺" if diff > 0 else "🔻") if diff != 0 else "✅"
 
         print(f"{name:<30} {std_str:>15} {mag_str:>15} {diff_str:>12} {pct_str:>10} {status}")
 
@@ -276,7 +271,7 @@ def print_comparison_report(results: dict[str, Any]):
 
     print(f"{'#':<3} {'MFE Std':>12} {'MFE Mag':>12} {'MAE Std':>12} {'MAE Mag':>12}")
     print("-" * 55)
-    for i, (st, mt) in enumerate(zip(std_trades, mag_trades)):
+    for i, (st, mt) in enumerate(zip(std_trades, mag_trades, strict=False)):
         print(f"{i+1:<3} {st.mfe:>12.2f} {mt.mfe:>12.2f} {st.mae:>12.2f} {mt.mae:>12.2f}")
 
 

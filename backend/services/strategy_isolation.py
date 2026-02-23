@@ -14,7 +14,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -221,10 +221,8 @@ class StrategyIsolationManager:
         self._running = False
         if self._monitoring_task:
             self._monitoring_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._monitoring_task
-            except asyncio.CancelledError:
-                pass
         logger.info("StrategyIsolationManager stopped")
 
     async def register_strategy(

@@ -255,11 +255,11 @@ class VectorbtGridOptimizer:
                 )
 
                 # Extract unique values for this chunk
-                periods = sorted(set(c[0] for c in chunk))
-                overboughts = sorted(set(c[1] for c in chunk))
-                oversolds = sorted(set(c[2] for c in chunk))
-                stop_losses = sorted(set(c[3] for c in chunk))
-                take_profits = sorted(set(c[4] for c in chunk))
+                periods = sorted({c[0] for c in chunk})
+                overboughts = sorted({c[1] for c in chunk})
+                oversolds = sorted({c[2] for c in chunk})
+                stop_losses = sorted({c[3] for c in chunk})
+                take_profits = sorted({c[4] for c in chunk})
 
                 chunk_results = self._run_batch(
                     close_series=close_series,

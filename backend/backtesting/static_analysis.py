@@ -443,38 +443,36 @@ class StrategyAnalyzer:
 
             for node in ast.walk(tree):
                 # Check for iloc with negative index (future access)
-                if isinstance(node, ast.Subscript):
-                    if isinstance(node.slice, ast.UnaryOp):
-                        if isinstance(node.slice.op, ast.USub):
-                            if isinstance(node.slice.operand, ast.Constant):
-                                val = node.slice.operand.value
-                                if isinstance(val, int) and val > 0:
-                                    self.result.warnings.append(
-                                        AnalysisWarning(
-                                            code="AST_001",
-                                            level=WarningLevel.WARNING,
-                                            message=f"Negative index [-{val}] may indicate future data access",
-                                            line_number=node.lineno,
-                                        )
+                if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.UnaryOp):
+                    if isinstance(node.slice.op, ast.USub):
+                        if isinstance(node.slice.operand, ast.Constant):
+                            val = node.slice.operand.value
+                            if isinstance(val, int) and val > 0:
+                                self.result.warnings.append(
+                                    AnalysisWarning(
+                                        code="AST_001",
+                                        level=WarningLevel.WARNING,
+                                        message=f"Negative index [-{val}] may indicate future data access",
+                                        line_number=node.lineno,
                                     )
+                                )
 
                 # Check for DataFrame operations that might leak
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Attribute):
-                        attr_name = node.func.attr
-                        if attr_name in ("pct_change", "diff", "rolling"):
-                            # These are OK if used properly
-                            pass
-                        elif attr_name == "apply":
-                            # Custom apply might have issues
-                            self.result.warnings.append(
-                                AnalysisWarning(
-                                    code="AST_002",
-                                    level=WarningLevel.INFO,
-                                    message="DataFrame.apply() - ensure function doesn't access future data",
-                                    line_number=node.lineno,
-                                )
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                    attr_name = node.func.attr
+                    if attr_name in ("pct_change", "diff", "rolling"):
+                        # These are OK if used properly
+                        pass
+                    elif attr_name == "apply":
+                        # Custom apply might have issues
+                        self.result.warnings.append(
+                            AnalysisWarning(
+                                code="AST_002",
+                                level=WarningLevel.INFO,
+                                message="DataFrame.apply() - ensure function doesn't access future data",
+                                line_number=node.lineno,
                             )
+                        )
 
         except SyntaxError:
             # Not valid Python, skip AST analysis

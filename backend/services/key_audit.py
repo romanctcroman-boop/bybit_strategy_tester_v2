@@ -522,10 +522,10 @@ class KeyUsageAuditService:
                     "successful": successful,
                     "failed": failed,
                     "unique_users": len(
-                        set(e.user_id for e in key_events if e.user_id)
+                        {e.user_id for e in key_events if e.user_id}
                     ),
                     "unique_ips": len(
-                        set(e.ip_address for e in key_events if e.ip_address)
+                        {e.ip_address for e in key_events if e.ip_address}
                     ),
                 }
             )

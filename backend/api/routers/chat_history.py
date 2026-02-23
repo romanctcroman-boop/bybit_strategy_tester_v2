@@ -470,8 +470,8 @@ async def get_history_stats(db: Session = Depends(get_db)) -> dict:
 
     return {
         "total": total,
-        "by_tab": {tab: count for tab, count in by_tab_rows},
-        "by_agent": {agent: count for agent, count in by_agent_rows},
+        "by_tab": dict(by_tab_rows),
+        "by_agent": dict(by_agent_rows),
         "starred": starred or 0,
         "oldest": oldest.isoformat() if oldest else None,
         "newest": newest.isoformat() if newest else None,

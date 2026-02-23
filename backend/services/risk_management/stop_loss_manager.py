@@ -222,28 +222,16 @@ class StopLossManager:
         elif stop_type == StopLossType.ATR_BASED and atr_value:
             mult = atr_multiplier or self.config.atr_multiplier
             distance = atr_value * mult
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
         elif stop_type == StopLossType.TRAILING and trail_distance:
-            if side == "long":
-                stop_price = entry_price - trail_distance
-            else:
-                stop_price = entry_price + trail_distance
+            stop_price = entry_price - trail_distance if side == "long" else entry_price + trail_distance
         elif stop_type == StopLossType.TRAILING_PERCENT and trail_percent:
             distance = entry_price * (trail_percent / 100)
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
         else:
             # Default 2% stop
             distance = entry_price * 0.02
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
 
         # Create stop order
         stop = StopLossOrder(
@@ -304,9 +292,8 @@ class StopLossManager:
         stop.updated_at = datetime.now(UTC)
 
         # Check time-based expiration
-        if stop.stop_type == StopLossType.TIME_BASED:
-            if stop.expire_at and datetime.now(UTC) >= stop.expire_at:
-                return self._trigger_stop(stop, current_price, "time_expired")
+        if stop.stop_type == StopLossType.TIME_BASED and stop.expire_at and datetime.now(UTC) >= stop.expire_at:
+            return self._trigger_stop(stop, current_price, "time_expired")
 
         # Update highest/lowest
         if current_price > stop.highest_price:

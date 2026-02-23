@@ -21,7 +21,7 @@ def load_db_data(market_type):
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(f"""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='{market_type}'
         ORDER BY open_time ASC
     """, conn)
@@ -139,7 +139,7 @@ def compare_ohlc(db_df, tv_df, market_name):
     exact_matches = 0
     close_matches = 0
 
-    for i, (dt, row) in enumerate(merged.head(10).iterrows()):
+    for _i, (dt, row) in enumerate(merged.head(10).iterrows()):
         db_open = row.get(db_open_col, row.get('open_price', 0))
         tv_open = row.get(tv_open_col, row.get('open', 0))
 

@@ -241,7 +241,7 @@ def price_to_ticks(price: float, symbol: str) -> int:
     Returns:
         Number of ticks
     """
-    return int(round(price / get_min_tick(symbol)))
+    return round(price / get_min_tick(symbol))
 
 
 # Update cache with actual rates (would use API in production)

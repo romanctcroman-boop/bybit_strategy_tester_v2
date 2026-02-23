@@ -430,11 +430,10 @@ Please retry when services are restored for personalized risk analysis.
                 return "strategy:mean_reversion"
 
         # Market research patterns
-        if agent_type == "perplexity":
-            if "market" in prompt_lower and (
-                "overview" in prompt_lower or "analysis" in prompt_lower
-            ):
-                return "research:market_overview"
+        if agent_type == "perplexity" and "market" in prompt_lower and (
+            "overview" in prompt_lower or "analysis" in prompt_lower
+        ):
+            return "research:market_overview"
 
         # Risk analysis patterns
         if "risk" in prompt_lower and "portfolio" in prompt_lower:
@@ -567,7 +566,7 @@ def with_fallback(
     return decorator
 
 
-def graceful_degradation(
+def graceful_degradation[T](
     fallback_value: T,
     log_level: str = "warning",
 ):

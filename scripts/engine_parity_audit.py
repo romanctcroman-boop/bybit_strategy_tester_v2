@@ -26,7 +26,7 @@ print("📊 Loading data and running engines...")
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -150,7 +150,7 @@ checks = [
 
 print(f"\n{'Standard':<25} {'Description':<30} {'Status':>10}")
 print("-" * 70)
-for name, desc, compliant, note in checks:
+for name, desc, compliant, _note in checks:
     status = "✅ PASS" if compliant else "❌ FAIL"
     print(f"{name:<25} {desc:<30} {status:>10}")
 

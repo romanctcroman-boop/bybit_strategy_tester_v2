@@ -15,6 +15,7 @@ Part of autonomous multi-agent self-improvement initiative.
 """
 
 import asyncio
+import contextlib
 import subprocess
 import sys
 from collections.abc import Callable
@@ -356,10 +357,8 @@ class HealthMonitor:
         self._is_monitoring = False
         if self._monitoring_task:
             self._monitoring_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._monitoring_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Health monitoring stopped")
 
     def get_component_health(self, component: str) -> HealthCheckResult | None:

@@ -525,10 +525,7 @@ class GitSecretsScanner:
 
     def _should_exclude_file(self, file_path: str) -> bool:
         """Check if file should be excluded."""
-        for pattern in self._exclude_patterns:
-            if re.search(pattern, file_path):
-                return True
-        return False
+        return any(re.search(pattern, file_path) for pattern in self._exclude_patterns)
 
     def _is_false_positive(self, line: str, pattern: SecretPattern) -> bool:
         """Check if a match is likely a false positive."""
@@ -556,11 +553,7 @@ class GitSecretsScanner:
             "settings.",
         ]
 
-        for indicator in fp_indicators:
-            if indicator in line_lower:
-                return True
-
-        return False
+        return any(indicator in line_lower for indicator in fp_indicators)
 
     def _mask_secret(self, line: str, secret_match: str) -> str:
         """Mask the secret in the line."""

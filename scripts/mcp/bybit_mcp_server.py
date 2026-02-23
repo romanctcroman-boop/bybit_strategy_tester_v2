@@ -12,6 +12,7 @@ Protocol:
     Communicates via stdin/stdout using JSON-RPC 2.0 (synchronous for Windows compatibility)
 """
 
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -237,10 +238,8 @@ def main():
             request_id = request.get("id")
             if request_id is None:
                 # This is a notification, process but don't respond
-                try:
+                with contextlib.suppress(Exception):
                     server.handle_request(request)
-                except Exception:
-                    pass
                 continue
 
             response = server.handle_request(request)

@@ -211,7 +211,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 
     def update_priorities(self, indices: list[int], priorities: list[float]) -> None:
         """Update priorities for sampled experiences."""
-        for idx, priority in zip(indices, priorities):
+        for idx, priority in zip(indices, priorities, strict=False):
             if idx < len(self.priorities):
                 self.priorities[idx] = priority + 1e-5  # Small epsilon to avoid zero
 
@@ -383,7 +383,7 @@ class DQNAgent(BaseRLAgent):
         super().__init__(config)
 
         # Build networks
-        layer_dims = [config.state_dim] + config.hidden_dims + [config.action_dim]
+        layer_dims = [config.state_dim, *config.hidden_dims, config.action_dim]
         self.q_network = SimpleNeuralNetwork(layer_dims, config.learning_rate)
         self.target_network = SimpleNeuralNetwork(layer_dims, config.learning_rate)
         self.target_network.copy_from(self.q_network)
@@ -756,7 +756,7 @@ async def train_rl_agent(
         episode_loss = 0.0
         steps = 0
 
-        for step in range(max_steps_per_episode):
+        for _step in range(max_steps_per_episode):
             # Select action
             action = agent.select_action(state, training=True)
 

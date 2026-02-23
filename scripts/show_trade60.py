@@ -8,12 +8,12 @@ import sqlite3
 import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df_1h = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, low_price as low, close_price as close 
+df_1h = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, low_price as low, close_price as close
 FROM bybit_kline_audit WHERE symbol='BTCUSDT' AND interval='60' ORDER BY open_time ASC LIMIT 500""", conn)
 df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
 df_1h.set_index('open_time', inplace=True)
 
-df_1m = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, low_price as low, close_price as close 
+df_1m = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, low_price as low, close_price as close
 FROM bybit_kline_audit WHERE symbol='BTCUSDT' AND interval='1' ORDER BY open_time ASC""", conn)
 df_1m['open_time'] = pd.to_datetime(df_1m['open_time'], unit='ms')
 df_1m.set_index('open_time', inplace=True)

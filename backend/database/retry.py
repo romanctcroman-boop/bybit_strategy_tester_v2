@@ -20,6 +20,7 @@ Usage:
         pass
 """
 
+import contextlib
 import functools
 import logging
 import sqlite3
@@ -334,10 +335,8 @@ class RetryableTransaction:
             self._commit_with_retry()
         else:
             # Error - rollback
-            try:
+            with contextlib.suppress(Exception):
                 self.connection.rollback()
-            except Exception:
-                pass
 
         self._in_transaction = False
         if self.cursor:

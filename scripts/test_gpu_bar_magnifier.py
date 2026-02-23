@@ -1,7 +1,7 @@
 """
 GPU Engine V2 - Bar Magnifier Parity Test
 
-Verifies GPUEngineV2 with Bar Magnifier produces 100% identical results 
+Verifies GPUEngineV2 with Bar Magnifier produces 100% identical results
 to FallbackEngineV2 (reference).
 """
 import sys
@@ -22,7 +22,7 @@ print("\nLoading 60m data...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 df_60m = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -38,7 +38,7 @@ start_ts = int(df_60m.index[0].timestamp() * 1000)
 end_ts = int(df_60m.index[-1].timestamp() * 1000) + 60 * 60 * 1000
 
 df_1m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'

@@ -23,9 +23,9 @@ def load_candles():
     cursor = conn.cursor()
     cursor.execute('''
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '15'
-        AND open_time >= ? AND open_time <= ? 
+        AND open_time >= ? AND open_time <= ?
         ORDER BY open_time
     ''', (start_ts, end_ts))
 
@@ -165,7 +165,7 @@ def main():
     for fields in categories.values():
         all_categorized.update(fields)
 
-    uncategorized = [f for f in schema.keys() if f not in all_categorized]
+    uncategorized = [f for f in schema if f not in all_categorized]
 
     if uncategorized:
         print(f"\n{'='*80}")

@@ -6,7 +6,7 @@ import pandas as pd
 
 DB = Path("data.sqlite3")
 conn = sqlite3.connect(DB)
-df = pd.read_sql_query("""SELECT open_time, close_price FROM bybit_kline_audit 
+df = pd.read_sql_query("""SELECT open_time, close_price FROM bybit_kline_audit
     WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot' ORDER BY open_time""", conn)
 conn.close()
 
@@ -64,15 +64,14 @@ for i in range(1, len(df)):
         continue
 
     # Crossover and very close to 25
-    if prev <= 25 and curr > 25:
-        if abs(curr - 25) < 0.1 or abs(prev - 25) < 0.1:
-            critical.append({
-                'datetime': df.iloc[i]['datetime'],
-                'prev_rsi': prev,
-                'curr_rsi': curr,
-                'delta_curr': curr - 25,
-                'delta_prev': prev - 25
-            })
+    if prev <= 25 and curr > 25 and (abs(curr - 25) < 0.1 or abs(prev - 25) < 0.1):
+        critical.append({
+            'datetime': df.iloc[i]['datetime'],
+            'prev_rsi': prev,
+            'curr_rsi': curr,
+            'delta_curr': curr - 25,
+            'delta_prev': prev - 25
+        })
 
 print(f"\nCrossover cases near threshold: {len(critical)}")
 for c in critical:

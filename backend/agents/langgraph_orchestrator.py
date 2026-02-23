@@ -246,10 +246,7 @@ class LLMAgent(AgentNode):
                 prompt = f"{self.system_prompt}\n\n{prompt}"
 
             # Select agent type
-            if self.agent_type == "perplexity":
-                agent_type = AgentType.PERPLEXITY
-            else:
-                agent_type = AgentType.DEEPSEEK
+            agent_type = AgentType.PERPLEXITY if self.agent_type == "perplexity" else AgentType.DEEPSEEK
 
             # Execute agent call
             response = await communicator.async_send_message(
@@ -297,9 +294,8 @@ class Edge:
         """Check if this edge should be traversed."""
         if self.edge_type == EdgeType.DIRECT:
             return True
-        elif self.edge_type == EdgeType.CONDITIONAL:
-            if self.condition:
-                return self.condition(state)
+        elif self.edge_type == EdgeType.CONDITIONAL and self.condition:
+            return self.condition(state)
         return True
 
 
@@ -539,7 +535,7 @@ class AgentGraph:
         lines = [f"Graph: {self.name}"]
         lines.append("=" * 50)
 
-        for node_name, node in self.nodes.items():
+        for node_name, _node in self.nodes.items():
             prefix = "→ " if node_name == self.entry_point else "  "
             suffix = " [EXIT]" if node_name in self.exit_points else ""
             lines.append(f"{prefix}{node_name}{suffix}")

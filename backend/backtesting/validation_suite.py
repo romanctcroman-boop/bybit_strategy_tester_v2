@@ -99,7 +99,7 @@ class ValidationSuite:
         "max_dd_pct": 0.03,  # 3% tolerance for max drawdown
     }
 
-    def __init__(self, tolerances: dict[str, float] = None):
+    def __init__(self, tolerances: dict[str, float] | None = None):
         """Initialize with optional custom tolerances."""
         self.tolerances = tolerances or self.DEFAULT_TOLERANCES.copy()
         self.reports: list[ValidationReport] = []

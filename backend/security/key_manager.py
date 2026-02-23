@@ -31,7 +31,7 @@ class KeyManager:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(KeyManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -134,7 +134,7 @@ class KeyManager:
         masked = {}
 
         # From encrypted cache (decrypt lazily just for masking)
-        for key_name in self._encrypted_secrets.keys():
+        for key_name in self._encrypted_secrets:
             try:
                 value = self.get_decrypted_key(key_name)
             except ValueError:
@@ -211,9 +211,7 @@ class KeyManager:
         if os.getenv(key_name):
             return True
         if key_name in self._encrypted_secrets:
-            if require_decryptable and not self._crypto:
-                return False
-            return True
+            return not (require_decryptable and not self._crypto)
         return False
 
 

@@ -21,7 +21,7 @@ print("=" * 100)
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -128,8 +128,8 @@ print("🔍 ПОИСК ОТЛИЧИЙ")
 print("=" * 100)
 
 # Создадим set по entry_time для быстрого поиска
-fb_entry_times = set(t[0] for t in fb_trades)
-nb_entry_times = set(t[0] for t in nb_trades)
+fb_entry_times = {t[0] for t in fb_trades}
+nb_entry_times = {t[0] for t in nb_trades}
 
 only_in_fb = fb_entry_times - nb_entry_times
 only_in_nb = nb_entry_times - fb_entry_times

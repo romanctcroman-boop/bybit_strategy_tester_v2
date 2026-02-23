@@ -25,7 +25,7 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 
 # 1H данные
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -37,7 +37,7 @@ df_1h.set_index('open_time', inplace=True)
 
 # 1M данные (для Bar Magnifier - 60 subticks per hour bar)
 df_1m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'
@@ -306,7 +306,7 @@ metrics_pct = matches / total * 100
 
 print(f"""
    🔬 INTRABAR / BAR MAGNIFIER ТЕСТ:
-   
+
    ├─ Режим:                   Precise Intrabar (60 subticks/bar)
    ├─ 1M данных использовано:  {len(df_1m):,} баров
    ├─ Trades совпадают:        {'✅' if trades_match else '❌'} (FB: {len(fb_with_bm.trades)}, NB: {len(nb_with_bm.trades)})

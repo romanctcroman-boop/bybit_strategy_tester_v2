@@ -11,7 +11,7 @@ All database operations should go through repositories to ensure:
 
 import builtins
 import logging
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class BaseRepository(Generic[T]):
+class BaseRepository[T]:
     """
     Base repository with common CRUD operations and exception handling.
 

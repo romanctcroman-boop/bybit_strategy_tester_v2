@@ -403,10 +403,9 @@ class PerformanceEvaluator:
                 test_score = found / len(keywords)
                 test_passed = test_score >= 0.6
 
-            if "min_length" in test:
-                if len(response) < test["min_length"]:
-                    test_passed = False
-                    test_score *= 0.5
+            if "min_length" in test and len(response) < test["min_length"]:
+                test_passed = False
+                test_score *= 0.5
 
             if "expected_behavior" in test and test["expected_behavior"] == "refuse":
                 forbidden = test.get("forbidden_patterns", [])
@@ -693,8 +692,8 @@ class PerformanceEvaluator:
         score = 0.5
 
         # Response addresses the prompt
-        prompt_keywords = set(w.lower() for w in prompt.split() if len(w) > 3)
-        response_keywords = set(w.lower() for w in response.split() if len(w) > 3)
+        prompt_keywords = {w.lower() for w in prompt.split() if len(w) > 3}
+        response_keywords = {w.lower() for w in response.split() if len(w) > 3}
 
         if prompt_keywords:
             relevance = len(prompt_keywords & response_keywords) / len(prompt_keywords)

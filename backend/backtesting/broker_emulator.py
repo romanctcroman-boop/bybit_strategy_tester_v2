@@ -197,7 +197,7 @@ class BrokerEmulator:
             f"leverage={self.config.leverage}x"
         )
 
-    def reset(self, initial_capital: float = None) -> None:
+    def reset(self, initial_capital: float | None = None) -> None:
         """Сбросить состояние брокера."""
         capital = initial_capital or self.state.initial_capital
         self.state = BrokerState(
@@ -643,9 +643,9 @@ class BrokerEmulator:
         side: OrderSide,
         size: float,
         price: float = 0.0,
-        stop_loss: float = None,
-        take_profit: float = None,
-        trailing_stop: float = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop: float | None = None,
         tag: str = "",
     ) -> Order:
         """Отправить ордер."""
@@ -686,9 +686,9 @@ class BrokerEmulator:
     def set_position_sl_tp(
         self,
         position_id: str,
-        stop_loss: float = None,
-        take_profit: float = None,
-        trailing_stop: float = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        trailing_stop: float | None = None,
     ) -> bool:
         """Установить SL/TP для позиции."""
         if position_id not in self.state.positions:

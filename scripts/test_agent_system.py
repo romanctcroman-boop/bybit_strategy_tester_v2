@@ -265,10 +265,10 @@ def calculate_rsi(prices, period=14):
         else:
             gains.append(0)
             losses.append(abs(change))
-    
+
     avg_gain = sum(gains[-period:]) / period
     avg_loss = sum(losses[-period:]) / period
-    
+
     if avg_loss == 0:
         return 100
     rs = avg_gain / avg_loss

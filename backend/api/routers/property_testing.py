@@ -246,7 +246,7 @@ async def run_edge_case_tests(property_name: str):
     edge_cases = service.generate_edge_cases(property_name, num_cases=10)
 
     results = []
-    for i, case in enumerate(edge_cases):
+    for _i, case in enumerate(edge_cases):
         result = service.run_property_test(
             property_name=property_name,
             test_data=case,

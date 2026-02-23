@@ -353,7 +353,7 @@ class EquityCurveChart(PlotlyChart):
                 y=self.equity_data.equity,
                 mode="lines",
                 name="Equity",
-                line=dict(color=self.style.neutral_color, width=self.style.line_width),
+                line={"color": self.style.neutral_color, "width": self.style.line_width},
                 fill="tozeroy",
                 fillcolor="rgba(66, 165, 245, 0.1)",
             ),
@@ -368,7 +368,7 @@ class EquityCurveChart(PlotlyChart):
                 y=self.equity_data.peak_equity,
                 mode="lines",
                 name="Peak Equity",
-                line=dict(color=self.style.positive_color, width=1, dash="dot"),
+                line={"color": self.style.positive_color, "width": 1, "dash": "dot"},
             ),
             row=1,
             col=1,
@@ -382,7 +382,7 @@ class EquityCurveChart(PlotlyChart):
                     y=self.benchmark_equity,
                     mode="lines",
                     name="Benchmark",
-                    line=dict(color="#9E9E9E", width=1, dash="dash"),
+                    line={"color": "#9E9E9E", "width": 1, "dash": "dash"},
                 ),
                 row=1,
                 col=1,
@@ -395,7 +395,7 @@ class EquityCurveChart(PlotlyChart):
                 y=-self.equity_data.drawdown_pct,
                 mode="lines",
                 name="Drawdown %",
-                line=dict(color=self.style.negative_color, width=self.style.line_width),
+                line={"color": self.style.negative_color, "width": self.style.line_width},
                 fill="tozeroy",
                 fillcolor="rgba(239, 83, 80, 0.3)",
             ),
@@ -409,7 +409,7 @@ class EquityCurveChart(PlotlyChart):
             height=self.style.figure_height,
             width=self.style.figure_width,
             showlegend=True,
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            legend={"yanchor": "top", "y": 0.99, "xanchor": "left", "x": 0.01},
             hovermode="x unified",
         )
 
@@ -457,7 +457,7 @@ class TradeScatterChart(PlotlyChart):
                 y=self.prices,
                 mode="lines",
                 name="Price",
-                line=dict(color="#9E9E9E", width=1),
+                line={"color": "#9E9E9E", "width": 1},
             )
         )
 
@@ -476,7 +476,7 @@ class TradeScatterChart(PlotlyChart):
                     x=[trade.entry_time],
                     y=[trade.entry_price],
                     mode="markers",
-                    marker=dict(color=color, size=10, symbol=symbol),
+                    marker={"color": color, "size": 10, "symbol": symbol},
                     name=f"Entry ({trade.direction})",
                     showlegend=False,
                     hovertemplate=(
@@ -496,7 +496,7 @@ class TradeScatterChart(PlotlyChart):
                     x=[trade.exit_time],
                     y=[trade.exit_price],
                     mode="markers",
-                    marker=dict(color=color, size=10, symbol=exit_symbol),
+                    marker={"color": color, "size": 10, "symbol": exit_symbol},
                     name="Exit",
                     showlegend=False,
                     hovertemplate=(
@@ -514,7 +514,7 @@ class TradeScatterChart(PlotlyChart):
                     x=[trade.entry_time, trade.exit_time],
                     y=[trade.entry_price, trade.exit_price],
                     mode="lines",
-                    line=dict(color=color, width=1, dash="dot"),
+                    line={"color": color, "width": 1, "dash": "dot"},
                     showlegend=False,
                     hoverinfo="skip",
                 )
@@ -583,7 +583,7 @@ class PerformanceHeatmap(PlotlyChart):
                 y=self.y_values,
                 z=self.z_values,
                 colorscale="RdYlGn",
-                colorbar=dict(title=self.z_label),
+                colorbar={"title": self.z_label},
                 hovertemplate=(
                     f"{self.x_label}: %{{x}}<br>"
                     f"{self.y_label}: %{{y}}<br>"
@@ -598,12 +598,12 @@ class PerformanceHeatmap(PlotlyChart):
                 x=[best_x],
                 y=[best_y],
                 mode="markers",
-                marker=dict(
-                    color="white",
-                    size=15,
-                    symbol="star",
-                    line=dict(color="black", width=2),
-                ),
+                marker={
+                    "color": "white",
+                    "size": 15,
+                    "symbol": "star",
+                    "line": {"color": "black", "width": 2},
+                },
                 name=f"Best: {best_val:.4f}",
                 hovertemplate=(
                     f"<b>Best Parameters</b><br>"
@@ -674,8 +674,8 @@ class Surface3DChart(PlotlyChart):
                 y=y_mesh,
                 z=self.z_values,
                 colorscale="Viridis",
-                colorbar=dict(title=self.z_label),
-                contours=dict(z=dict(show=True, usecolormap=True, project_z=True)),
+                colorbar={"title": self.z_label},
+                contours={"z": {"show": True, "usecolormap": True, "project_z": True}},
             )
         )
 
@@ -691,19 +691,19 @@ class Surface3DChart(PlotlyChart):
                 y=[best_y],
                 z=[best_z],
                 mode="markers",
-                marker=dict(color="red", size=10, symbol="diamond"),
+                marker={"color": "red", "size": 10, "symbol": "diamond"},
                 name=f"Best: {best_z:.4f}",
             )
         )
 
         self._fig.update_layout(
             title=self._title or "3D Optimization Surface",
-            scene=dict(
-                xaxis_title=self.x_label,
-                yaxis_title=self.y_label,
-                zaxis_title=self.z_label,
-                camera=dict(eye=dict(x=1.5, y=1.5, z=1.2)),
-            ),
+            scene={
+                "xaxis_title": self.x_label,
+                "yaxis_title": self.y_label,
+                "zaxis_title": self.z_label,
+                "camera": {"eye": {"x": 1.5, "y": 1.5, "z": 1.2}},
+            },
             height=self.style.figure_height,
             width=self.style.figure_width,
         )
@@ -748,7 +748,7 @@ class CorrelationMatrixChart(PlotlyChart):
                 z=self.correlation_matrix,
                 colorscale="RdBu",
                 zmid=0,
-                colorbar=dict(title="Correlation"),
+                colorbar={"title": "Correlation"},
                 text=text,
                 texttemplate="%{text}",
                 textfont={"size": 10},
@@ -759,8 +759,8 @@ class CorrelationMatrixChart(PlotlyChart):
             title=self._title or "Correlation Matrix",
             height=max(400, len(self.labels) * 50),
             width=max(400, len(self.labels) * 50),
-            xaxis=dict(tickangle=45),
-            yaxis=dict(autorange="reversed"),
+            xaxis={"tickangle": 45},
+            yaxis={"autorange": "reversed"},
         )
 
 
@@ -840,7 +840,7 @@ class TradeDistributionChart(PlotlyChart):
                 y=normal_pdf,
                 mode="lines",
                 name="Normal Fit",
-                line=dict(color="red", dash="dash"),
+                line={"color": "red", "dash": "dash"},
             ),
             row=1,
             col=1,
@@ -854,7 +854,7 @@ class TradeDistributionChart(PlotlyChart):
                 y=cumulative_pnl,
                 mode="lines",
                 name="Cumulative P&L",
-                line=dict(color=self.style.neutral_color),
+                line={"color": self.style.neutral_color},
             ),
             row=1,
             col=2,
@@ -928,11 +928,8 @@ class MonthlyReturnsHeatmap(PlotlyChart):
         # Convert to monthly returns
         monthly_data: dict[tuple[int, int], float] = {}
 
-        for ret, ts in zip(self.returns, self.timestamps):
-            if isinstance(ts, (int, float)):
-                dt = datetime.fromtimestamp(ts)
-            else:
-                dt = ts
+        for ret, ts in zip(self.returns, self.timestamps, strict=False):
+            dt = datetime.fromtimestamp(ts) if isinstance(ts, (int, float)) else ts
 
             key = (dt.year, dt.month)
             if key not in monthly_data:
@@ -948,7 +945,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
             return
 
         # Get unique years and months
-        years = sorted(set(k[0] for k in monthly_data))
+        years = sorted({k[0] for k in monthly_data})
         months = list(range(1, 13))
         month_names = [
             "Jan",
@@ -983,15 +980,15 @@ class MonthlyReturnsHeatmap(PlotlyChart):
                 value = z_data[i, j]
                 if not np.isnan(value):
                     annotations.append(
-                        dict(
-                            x=month_names[j],
-                            y=str(year),
-                            text=f"{value:.1f}%",
-                            showarrow=False,
-                            font=dict(
-                                color="white" if abs(value) > 5 else "black", size=10
-                            ),
-                        )
+                        {
+                            "x": month_names[j],
+                            "y": str(year),
+                            "text": f"{value:.1f}%",
+                            "showarrow": False,
+                            "font": {
+                                "color": "white" if abs(value) > 5 else "black", "size": 10
+                            },
+                        }
                     )
 
         self._fig = go.Figure()
@@ -1003,7 +1000,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
                 z=z_data,
                 colorscale="RdYlGn",
                 zmid=0,
-                colorbar=dict(title="Return %"),
+                colorbar={"title": "Return %"},
             )
         )
 
@@ -1360,37 +1357,37 @@ def export_charts_to_html(
 # =============================================================================
 
 __all__ = [
+    # Flags
+    "HAS_MATPLOTLIB",
+    "HAS_PLOTLY",
+    # Base classes
+    "BaseChart",
+    # Data classes
+    "ChartStyle",
     # Enums
     "ChartType",
     "ColorScheme",
-    # Data classes
-    "ChartStyle",
-    "TradeVisualization",
-    "EquityData",
+    "CorrelationMatrixChart",
     "DashboardPanel",
-    # Base classes
-    "BaseChart",
-    "PlotlyChart",
-    "MatplotlibChart",
     # Chart classes
     "EquityCurveChart",
-    "TradeScatterChart",
-    "PerformanceHeatmap",
-    "Surface3DChart",
-    "CorrelationMatrixChart",
-    "TradeDistributionChart",
+    "EquityData",
+    "MatplotlibChart",
     "MonthlyReturnsHeatmap",
+    "PerformanceHeatmap",
+    "PlotlyChart",
+    "Surface3DChart",
+    "TradeDistributionChart",
+    "TradeScatterChart",
+    "TradeVisualization",
     # Dashboard
     "TradingDashboard",
+    "create_backtest_report",
+    # Utilities
+    "export_charts_to_html",
+    "plot_correlation_matrix",
     # Quick functions
     "plot_equity_curve",
     "plot_optimization_heatmap",
     "plot_trade_distribution",
-    "plot_correlation_matrix",
-    "create_backtest_report",
-    # Utilities
-    "export_charts_to_html",
-    # Flags
-    "HAS_MATPLOTLIB",
-    "HAS_PLOTLY",
 ]

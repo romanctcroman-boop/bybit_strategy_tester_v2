@@ -156,7 +156,7 @@ class AgentMetricsCollector:
         agent_name: str,
         response_time_ms: float,
         success: bool,
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Записать время отклика"""
         await self.record_metric(
@@ -184,7 +184,7 @@ class AgentMetricsCollector:
         tool_name: str,
         iterations: int,
         success: bool,
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Записать использование tool calling"""
         await self.record_metric(
@@ -206,7 +206,7 @@ class AgentMetricsCollector:
         agent_name: str,
         error_type: str,
         error_message: str,
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Записать ошибку"""
         await self.record_metric(
@@ -399,7 +399,7 @@ async def record_agent_call(
     error: str | None = None,
     tool_calls: int | None = None,
     iterations: int | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
 ):
     """
     Convenience function для записи полного вызова агента

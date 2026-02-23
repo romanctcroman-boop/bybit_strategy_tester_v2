@@ -471,11 +471,10 @@ class PaperTradingEngine:
         leverage = order.metadata.get("leverage", self.default_leverage)
         required_margin = notional / leverage
 
-        if not order.reduce_only:
-            if required_margin > self.account.available_balance:
-                order.status = OrderStatus.REJECTED
-                logger.warning("Order rejected: insufficient margin")
-                return
+        if not order.reduce_only and required_margin > self.account.available_balance:
+            order.status = OrderStatus.REJECTED
+            logger.warning("Order rejected: insufficient margin")
+            return
 
         # Update order
         order.status = OrderStatus.FILLED

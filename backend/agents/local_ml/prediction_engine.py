@@ -459,7 +459,7 @@ class PredictionEngine:
         total_accuracy = sum(m.accuracy for m in self.models.values())
 
         if total_accuracy > 0:
-            for name, model in self.models.items():
+            for _name, model in self.models.items():
                 # Weight proportional to accuracy, with minimum floor
                 model.weight = max(
                     0.2, model.accuracy / total_accuracy * len(self.models)

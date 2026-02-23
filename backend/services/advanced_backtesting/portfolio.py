@@ -472,7 +472,7 @@ class PortfolioBacktester:
                 constraints=constraints,
             )
             if res.success:
-                allocation.weights = dict(zip(assets_list, res.x))
+                allocation.weights = dict(zip(assets_list, res.x, strict=False))
         except Exception:
             weight = 1.0 / n
             allocation.weights = dict.fromkeys(assets_list, weight)
@@ -518,7 +518,7 @@ class PortfolioBacktester:
                 constraints=constraints,
             )
             if res.success:
-                allocation.weights = dict(zip(assets_list, res.x))
+                allocation.weights = dict(zip(assets_list, res.x, strict=False))
             else:
                 weight = 1.0 / n
                 allocation.weights = dict.fromkeys(assets_list, weight)
@@ -568,7 +568,7 @@ class PortfolioBacktester:
                     x = x / np.sum(x)
                     x = np.clip(x, allocation.min_weight, allocation.max_weight)
                     x = x / np.sum(x)
-                    allocation.weights = dict(zip(assets_list, x))
+                    allocation.weights = dict(zip(assets_list, x, strict=False))
                     return allocation
         except ImportError:
             pass
@@ -888,10 +888,7 @@ class PortfolioBacktester:
                 else:
                     r1 = np.array(asset_returns[asset1])
                     r2 = np.array(asset_returns[asset2])
-                    if len(r1) > 0 and len(r2) > 0:
-                        corr = float(np.corrcoef(r1, r2)[0, 1])
-                    else:
-                        corr = 0.0
+                    corr = float(np.corrcoef(r1, r2)[0, 1]) if len(r1) > 0 and len(r2) > 0 else 0.0
                 row[asset2] = round(corr, 4)
 
                 if asset1 != asset2:
@@ -958,7 +955,7 @@ def aggregate_multi_symbol_equity(
     portfolio_equity = []
     for i in range(max_len):
         total = 0.0
-        for symbol, curve in equity_curves.items():
+        for _symbol, curve in equity_curves.items():
             if i < len(curve):
                 total += curve[i]
             else:

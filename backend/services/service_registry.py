@@ -13,6 +13,7 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
 import random
 from dataclasses import dataclass, field
@@ -232,10 +233,8 @@ class InMemoryServiceRegistry:
         self._running = False
         if self._health_check_task:
             self._health_check_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._health_check_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Service registry stopped")
 
     async def register(
@@ -425,7 +424,7 @@ class InMemoryServiceRegistry:
                 "instances": len(service.instances),
                 "healthy": len(service.healthy_instances),
                 "load_balancing": service.load_balancing.value,
-                "versions": list(set(i.version for i in service.instances)),
+                "versions": list({i.version for i in service.instances}),
             }
         return result
 

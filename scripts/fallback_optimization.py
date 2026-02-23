@@ -86,7 +86,7 @@ print("📊 ЗАГРУЗКА ДАННЫХ (1 год, 1h)")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df = pd.read_sql(
     """
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -246,7 +246,7 @@ for direction in ["long", "short", "both"]:
    Total Trades:  {best["total_trades"]}
    Profit Factor: {best["profit_factor"]:.2f}
    Net Profit:    ${best["net_profit"]:,.2f}
-   
+
    Параметры:
      RSI Period:    {best["period"]}
      Overbought:    {best["overbought"]}

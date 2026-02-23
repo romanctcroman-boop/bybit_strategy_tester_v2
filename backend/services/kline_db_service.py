@@ -12,6 +12,7 @@ Features:
 - Auto-reconnect on failures
 """
 
+import contextlib
 import json
 import logging
 import signal
@@ -177,10 +178,8 @@ class KlineDBService:
             pass  # Index may already exist
 
         # Drop old index if exists
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("DROP INDEX IF EXISTS uix_symbol_open_time")
-        except sqlite3.OperationalError:
-            pass
 
         conn.commit()
         logger.info("Database schema verified")

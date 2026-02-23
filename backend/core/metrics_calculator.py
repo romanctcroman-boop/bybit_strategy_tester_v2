@@ -836,8 +836,10 @@ class MetricsCalculator:
 
                 logger.debug(f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}")
 
-            # Gross profit/loss (P&L + fees for consistency)
-            gross_pnl = pnl + fees if include_commission else pnl
+            # Gross profit/loss — TV definition: sum of net trade PnL (fees already deducted in pnl).
+            # Do NOT add fees back: that would inflate gross_profit by double-counting commissions.
+            # TV: gross_profit = sum(t.pnl for winning trades), gross_loss = sum(abs(t.pnl) for losing trades)
+            gross_pnl = pnl
 
             if pnl > 0:
                 metrics.winning_trades += 1

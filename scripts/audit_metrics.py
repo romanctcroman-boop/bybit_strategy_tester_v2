@@ -249,7 +249,7 @@ def run_audit():
         print("""
 METRICS THAT USE TICK/INTRABAR DATA:
 1. max_drawdown_intrabar / max_drawdown_intrabar_value
-2. max_runup_intrabar / max_runup_intrabar_value  
+2. max_runup_intrabar / max_runup_intrabar_value
 3. Per-trade MAE (Maximum Adverse Excursion)
 4. Per-trade MFE (Maximum Favorable Excursion)
 5. Per-trade max_runup / max_drawdown

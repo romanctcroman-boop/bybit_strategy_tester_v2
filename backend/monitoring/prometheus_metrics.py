@@ -344,10 +344,10 @@ class MetricsCollector:
         duration_seconds: float,
         status: str,
         strategy: str = "",
-        win_rate: float = None,
-        profit_factor: float = None,
-        max_drawdown: float = None,
-        sharpe_ratio: float = None,
+        win_rate: float | None = None,
+        profit_factor: float | None = None,
+        max_drawdown: float | None = None,
+        sharpe_ratio: float | None = None,
     ):
         """Record backtest execution"""
         self.metrics.backtest_duration.labels(asset=asset, timeframe=timeframe).observe(

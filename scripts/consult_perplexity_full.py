@@ -30,8 +30,8 @@ STAGE 1: VectorBT (vectorized)
   - Speed: 5,000-80,000 combinations/sec
   - Accuracy: ~85%
   - Uses: vectorbt.Portfolio.from_signals()
-  
-STAGE 2: Fallback (sequential)  
+
+STAGE 2: Fallback (sequential)
   - Validates TOP-50 candidates from Stage 1
   - Speed: ~1 combination/sec
   - Accuracy: 100%

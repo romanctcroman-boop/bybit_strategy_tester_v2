@@ -30,7 +30,7 @@ def load_spot_ohlcv():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
     """, conn)
@@ -240,8 +240,6 @@ def find_rsi_boundary_divergence(df, trades, tv_entries):
     df['rsi'] = rsi
 
     # Find boundary cases
-    OVERSOLD = 30
-    OVERBOUGHT = 70
 
     print("\n🔍 Bars where RSI is VERY close to threshold:")
     print("-"*80)
@@ -309,7 +307,7 @@ def main():
 
     # Load data
     df = load_spot_ohlcv()
-    tv_entries, tv_exits = load_tv_trades()
+    tv_entries, _tv_exits = load_tv_trades()
 
     print("\n📊 Data loaded:")
     print(f"   SPOT bars:  {len(df)}")
@@ -320,7 +318,7 @@ def main():
     output = run_engine_backtest(df)
 
     # Compare trades
-    trades, first_div = compare_trades(output, tv_entries)
+    trades, _first_div = compare_trades(output, tv_entries)
 
     # Find RSI boundary
     find_rsi_boundary_divergence(df, trades, tv_entries)

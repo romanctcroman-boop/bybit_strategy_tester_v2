@@ -78,7 +78,7 @@ def extract_all_metrics(metrics: PerformanceMetrics) -> dict[str, Any]:
     """Extract ALL metrics from PerformanceMetrics as a flat dict."""
     result = {}
 
-    for field_name in PerformanceMetrics.model_fields.keys():
+    for field_name in PerformanceMetrics.model_fields:
         value = getattr(metrics, field_name, None)
         if isinstance(value, (list, dict)):
             continue

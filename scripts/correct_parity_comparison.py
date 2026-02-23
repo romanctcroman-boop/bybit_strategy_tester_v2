@@ -234,7 +234,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     spot_df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
     """, conn)
@@ -248,7 +248,7 @@ def main():
     # Load TV SPOT trades
     tv_spot_csv = Path(r"d:\TV\RSI_Strategy_with_TP_SL_(FIXED)_BYBIT_BTCUSDT_2026-01-21.csv")
     if not tv_spot_csv.exists():
-        tv_spot_csv = list(Path(r"d:\TV").glob("*BTCUSDT_2026*.csv"))[0]
+        tv_spot_csv = next(iter(Path(r"d:\TV").glob("*BTCUSDT_2026*.csv")))
 
     tv_spot_trades = load_tv_trades(tv_spot_csv)
 
@@ -263,7 +263,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     linear_df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)

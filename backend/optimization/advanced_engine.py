@@ -301,7 +301,7 @@ class AdvancedOptimizationEngine:
         param_names = list(param_space.keys())
         param_values = []
 
-        for name, spec in param_space.items():
+        for _name, spec in param_space.items():
             if spec["type"] == "int":
                 values = list(range(spec["low"], spec["high"] + 1, spec.get("step", 1)))
             elif spec["type"] == "float":
@@ -316,7 +316,7 @@ class AdvancedOptimizationEngine:
         # Run backtests
         results = []
         for combo in combinations:
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=False))
             try:
                 result = self._run_backtest(data, strategy_class, params, base_config)
                 value = getattr(result.metrics, metric, 0)

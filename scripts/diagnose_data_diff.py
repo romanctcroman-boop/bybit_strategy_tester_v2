@@ -25,7 +25,7 @@ def load_db():
         SELECT symbol, interval, market_type, COUNT(*) as cnt,
                MIN(datetime(open_time/1000, 'unixepoch')) as min_dt,
                MAX(datetime(open_time/1000, 'unixepoch')) as max_dt
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         GROUP BY symbol, interval, market_type
         ORDER BY symbol, interval, market_type
     """)
@@ -38,7 +38,7 @@ def load_db():
     # Load SPOT and LINEAR samples
     spot_df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
         LIMIT 10
@@ -46,7 +46,7 @@ def load_db():
 
     linear_df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
         LIMIT 10
@@ -131,13 +131,13 @@ def check_data_source():
     # Sample data with all columns
     print("\nSample row (all columns):")
     cur = conn.execute("""
-        SELECT * FROM bybit_kline_audit 
-        WHERE symbol='BTCUSDT' AND interval='15' 
+        SELECT * FROM bybit_kline_audit
+        WHERE symbol='BTCUSDT' AND interval='15'
         LIMIT 1
     """)
     row = cur.fetchone()
     col_names = [desc[0] for desc in cur.description]
-    for name, val in zip(col_names, row):
+    for name, val in zip(col_names, row, strict=False):
         print(f"  {name}: {val}")
 
     conn.close()
@@ -163,14 +163,14 @@ def compare_same_timestamp(db_spot, db_linear, tv_spot, tv_linear):
     conn = sqlite3.connect(DB_PATH)
 
     db_spot_full = pd.read_sql_query("""
-        SELECT open_time, open_price FROM bybit_kline_audit 
+        SELECT open_time, open_price FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         AND open_time BETWEEN 1728993600000 AND 1729000800000
         ORDER BY open_time
     """, conn)
 
-    db_linear_full = pd.read_sql_query("""
-        SELECT open_time, open_price FROM bybit_kline_audit 
+    pd.read_sql_query("""
+        SELECT open_time, open_price FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         AND open_time BETWEEN 1728993600000 AND 1729000800000
         ORDER BY open_time

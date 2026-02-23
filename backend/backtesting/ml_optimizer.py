@@ -369,7 +369,7 @@ class MLOptimizer:
             ]
 
             # Replace population
-            combined = list(zip(population + children, fitness + child_fitness))
+            combined = list(zip(population + children, fitness + child_fitness, strict=False))
             combined.sort(key=lambda x: x[1], reverse=True)
             population = [x[0] for x in combined[:population_size]]
             fitness = [x[1] for x in combined[:population_size]]
@@ -547,8 +547,8 @@ class MLOptimizer:
                 child2[i] = (1 - alpha) * parent1[i] + alpha * parent2[i]
 
                 if space.param_type == "int":
-                    child1[i] = int(round(child1[i]))
-                    child2[i] = int(round(child2[i]))
+                    child1[i] = round(child1[i])
+                    child2[i] = round(child2[i])
 
                 # Clamp to bounds
                 child1[i] = max(space.low, min(space.high, child1[i]))

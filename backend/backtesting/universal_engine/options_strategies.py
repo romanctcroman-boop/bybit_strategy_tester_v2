@@ -452,10 +452,7 @@ class BinomialTree:
             prices[i] = S * (u ** (self.n_steps - i)) * (d**i)
 
         # Calculate option values at expiration
-        if option_type == OptionType.CALL:
-            values = np.maximum(prices - K, 0)
-        else:
-            values = np.maximum(K - prices, 0)
+        values = np.maximum(prices - K, 0) if option_type == OptionType.CALL else np.maximum(K - prices, 0)
 
         # Backward induction
         discount = np.exp(-r * dt)
@@ -466,10 +463,7 @@ class BinomialTree:
                 if style == OptionStyle.AMERICAN:
                     # Check early exercise
                     spot = S * (u ** (step - i)) * (d**i)
-                    if option_type == OptionType.CALL:
-                        exercise_value = max(0, spot - K)
-                    else:
-                        exercise_value = max(0, K - spot)
+                    exercise_value = max(0, spot - K) if option_type == OptionType.CALL else max(0, K - spot)
                     values[i] = max(hold_value, exercise_value)
                 else:
                     values[i] = hold_value
@@ -545,10 +539,7 @@ class MonteCarloPricer:
         paths = self.simulate_paths(S, T, r, sigma, q)
         final_prices = paths[:, -1]
 
-        if option_type == OptionType.CALL:
-            payoffs = np.maximum(final_prices - K, 0)
-        else:
-            payoffs = np.maximum(K - final_prices, 0)
+        payoffs = np.maximum(final_prices - K, 0) if option_type == OptionType.CALL else np.maximum(K - final_prices, 0)
 
         # Discount payoffs
         discount = np.exp(-r * T)
@@ -578,15 +569,9 @@ class MonteCarloPricer:
         """
         paths = self.simulate_paths(S, T, r, sigma, q)
 
-        if averaging == "arithmetic":
-            avg_prices = np.mean(paths, axis=1)
-        else:
-            avg_prices = np.exp(np.mean(np.log(paths), axis=1))
+        avg_prices = np.mean(paths, axis=1) if averaging == "arithmetic" else np.exp(np.mean(np.log(paths), axis=1))
 
-        if option_type == OptionType.CALL:
-            payoffs = np.maximum(avg_prices - K, 0)
-        else:
-            payoffs = np.maximum(K - avg_prices, 0)
+        payoffs = np.maximum(avg_prices - K, 0) if option_type == OptionType.CALL else np.maximum(K - avg_prices, 0)
 
         discount = np.exp(-r * T)
         discounted_payoffs = discount * payoffs
@@ -623,10 +608,7 @@ class MonteCarloPricer:
         else:  # knock-in
             alive = crossed
 
-        if option_type == OptionType.CALL:
-            payoffs = np.maximum(final_prices - K, 0)
-        else:
-            payoffs = np.maximum(K - final_prices, 0)
+        payoffs = np.maximum(final_prices - K, 0) if option_type == OptionType.CALL else np.maximum(K - final_prices, 0)
 
         payoffs = payoffs * alive
 
@@ -1147,27 +1129,27 @@ class OptionsPortfolio:
 # ============================================================================
 
 __all__ = [
-    # Enums
-    "OptionType",
-    "OptionStyle",
-    "StrategyType",
-    # Data structures
-    "Option",
-    "Greeks",
-    "OptionPosition",
-    "StrategyLeg",
-    "StrategyPayoff",
+    "BinomialTree",
     # Pricing models
     "BlackScholes",
+    "Greeks",
     "GreeksCalculator",
-    "BinomialTree",
-    "MonteCarloPricer",
     # Implied volatility
     "ImpliedVolatility",
-    "VolatilitySurface",
+    "MonteCarloPricer",
+    # Data structures
+    "Option",
+    "OptionPosition",
+    "OptionStyle",
+    # Enums
+    "OptionType",
+    # Portfolio
+    "OptionsPortfolio",
     # Strategy
     "OptionsStrategy",
     "StrategyFactory",
-    # Portfolio
-    "OptionsPortfolio",
+    "StrategyLeg",
+    "StrategyPayoff",
+    "StrategyType",
+    "VolatilitySurface",
 ]

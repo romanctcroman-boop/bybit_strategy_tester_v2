@@ -50,15 +50,15 @@ def load_spot_data():
     conn = sqlite3.connect(DB_PATH)
 
     query = """
-    SELECT 
+    SELECT
         open_time,
         open_price,
         high_price,
         low_price,
         close_price,
         volume
-    FROM bybit_kline_audit 
-    WHERE symbol = 'BTCUSDT' 
+    FROM bybit_kline_audit
+    WHERE symbol = 'BTCUSDT'
       AND interval = '15'
       AND market_type = 'spot'
     ORDER BY open_time ASC
@@ -71,15 +71,15 @@ def load_spot_data():
         print("❌ No SPOT data found! Trying without market_type filter...")
         conn = sqlite3.connect(DB_PATH)
         query = """
-        SELECT 
+        SELECT
             open_time,
             open_price,
             high_price,
             low_price,
             close_price,
             volume
-        FROM bybit_kline_audit 
-        WHERE symbol = 'BTCUSDT' 
+        FROM bybit_kline_audit
+        WHERE symbol = 'BTCUSDT'
           AND interval = '15'
         ORDER BY open_time ASC
         """

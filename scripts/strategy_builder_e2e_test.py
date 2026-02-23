@@ -164,7 +164,7 @@ def test_create_strategy():
 
     assert "id" in data, "Ответ должен содержать id стратегии"
     assert data["name"] == strategy_data["name"], "Имя стратегии должно совпадать"
-    assert data["is_builder_strategy"] == True, "is_builder_strategy должен быть True"
+    assert data["is_builder_strategy"], "is_builder_strategy должен быть True"
 
     strategy_id = data["id"]
     print(f"✅ Стратегия создана: ID = {strategy_id}")
@@ -186,7 +186,7 @@ def test_load_strategy(strategy_id: str):
     data = response.json()
 
     assert data["id"] == strategy_id, "ID стратегии должен совпадать"
-    assert data["is_builder_strategy"] == True, "is_builder_strategy должен быть True"
+    assert data["is_builder_strategy"], "is_builder_strategy должен быть True"
     assert "blocks" in data, "Ответ должен содержать blocks"
     assert "connections" in data, "Ответ должен содержать connections"
     assert len(data["blocks"]) == 5, f"Ожидалось 5 блоков, получено {len(data['blocks'])}"
@@ -240,7 +240,7 @@ def test_generate_code(strategy_id: str):
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}: {response.text}"
     data = response.json()
 
-    assert data["success"] == True, f"Генерация кода должна быть успешной: {data.get('errors')}"
+    assert data["success"], f"Генерация кода должна быть успешной: {data.get('errors')}"
     assert "code" in data, "Ответ должен содержать сгенерированный код"
     assert "strategy_name" in data, "Ответ должен содержать имя класса стратегии"
     assert len(data["code"]) > 0, "Код не должен быть пустым"
@@ -345,7 +345,7 @@ def main():
         strategy_id = test_create_strategy()
 
         # Тест 2: Загрузка стратегии
-        strategy_data = test_load_strategy(strategy_id)
+        test_load_strategy(strategy_id)
 
         # Тест 3: Обновление стратегии
         test_update_strategy(strategy_id)

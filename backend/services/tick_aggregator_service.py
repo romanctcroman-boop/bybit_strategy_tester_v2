@@ -9,6 +9,7 @@ Architecture:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections import deque
@@ -215,10 +216,8 @@ class TickAggregatorService:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         if self.pubsub:
             await self.pubsub.unsubscribe()

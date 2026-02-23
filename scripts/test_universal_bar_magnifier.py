@@ -299,10 +299,7 @@ def test_ohlc_path_comparison():
         for tick in ticks[1:]:
             fills = broker.process_tick(tick.price, tick.timestamp_ms)
             if fills:
-                if "stop_loss" in fills[0].order_id:
-                    exit_reason = "SL"
-                else:
-                    exit_reason = "TP"
+                exit_reason = "SL" if "stop_loss" in fills[0].order_id else "TP"
                 break
 
         results[path.value] = exit_reason

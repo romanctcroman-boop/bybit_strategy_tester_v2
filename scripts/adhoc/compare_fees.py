@@ -90,7 +90,7 @@ print(f"Fees Diff: {fb_total_fees - nb_total_fees:.4f}")
 # Find trades with largest differences
 print("\n=== TRADES WITH LARGEST PnL DIFFERENCES ===")
 diffs = []
-for i, (fb_t, nb_t) in enumerate(zip(fb_result.trades, nb_result.trades)):
+for i, (fb_t, nb_t) in enumerate(zip(fb_result.trades, nb_result.trades, strict=False)):
     diff = abs(fb_t.pnl - nb_t.pnl)
     if diff > 0.01:
         diffs.append((i, fb_t, nb_t, diff))

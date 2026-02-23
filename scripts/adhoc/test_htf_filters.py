@@ -215,7 +215,7 @@ def test_filters_with_real_data():
     print(f"🌩️ Ichimoku: {valid_clouds} valid cloud data points")
 
     # 3. MACD
-    macd_line, signal_line, histogram = calculate_macd(close)
+    macd_line, signal_line, _histogram = calculate_macd(close)
     macd_bullish = np.sum(macd_line > signal_line)
     macd_bearish = np.sum(macd_line < signal_line)
     print(f"📊 MACD: {macd_bullish} bullish, {macd_bearish} bearish periods")

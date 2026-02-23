@@ -82,14 +82,12 @@ def generate_rsi_signals(
             continue
 
         # Long entry: crossover(RSI, oversold)
-        if direction in ("long", "both"):
-            if prev_rsi <= oversold and curr_rsi > oversold:
-                long_entries[i + 1] = True
+        if direction in ("long", "both") and prev_rsi <= oversold and curr_rsi > oversold:
+            long_entries[i + 1] = True
 
         # Short entry: crossunder(RSI, overbought)
-        if direction in ("short", "both"):
-            if prev_rsi >= overbought and curr_rsi < overbought:
-                short_entries[i + 1] = True
+        if direction in ("short", "both") and prev_rsi >= overbought and curr_rsi < overbought:
+            short_entries[i + 1] = True
 
     return long_entries, long_exits, short_entries, short_exits
 

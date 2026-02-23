@@ -452,10 +452,7 @@ class CustomMetrics:
             # Rolling Sharpe
             mean_ret = np.mean(window_returns)
             std_ret = np.std(window_returns)
-            if std_ret > 0:
-                sharpe = mean_ret / std_ret * np.sqrt(self.periods_per_year)
-            else:
-                sharpe = 0.0
+            sharpe = mean_ret / std_ret * np.sqrt(self.periods_per_year) if std_ret > 0 else 0.0
             rolling.rolling_sharpe.append(float(sharpe))
 
         # Calculate stability metrics

@@ -290,10 +290,7 @@ async def encrypt_data(request: EncryptRequest):
     service = get_kms_service()
 
     try:
-        if request.is_base64:
-            plaintext = base64.b64decode(request.plaintext)
-        else:
-            plaintext = request.plaintext.encode()
+        plaintext = base64.b64decode(request.plaintext) if request.is_base64 else request.plaintext.encode()
 
         ciphertext = await service.encrypt(plaintext, request.key_id)
 

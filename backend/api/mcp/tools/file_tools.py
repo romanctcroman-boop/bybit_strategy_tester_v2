@@ -42,7 +42,7 @@ BLOCKED_PATTERNS = [
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
-def _update_metrics(tool: str, success: bool, duration: float, error_type: str = None):
+def _update_metrics(tool: str, success: bool, duration: float, error_type: str | None = None):
     """Update Prometheus metrics if available."""
     if not _METRICS_AVAILABLE:
         return
@@ -264,7 +264,7 @@ async def list_project_structure(
         }
 
 
-async def analyze_code_quality(file_path: str, tools: list[str] = None) -> dict:
+async def analyze_code_quality(file_path: str, tools: list[str] | None = None) -> dict:
     """
     Analyze code quality using Ruff, Black, Bandit.
 
@@ -422,7 +422,7 @@ def register_file_tools(mcp):
         return await list_project_structure(directory, max_depth, include_hidden)
 
     @mcp.tool()
-    async def mcp_analyze_code_quality(file_path: str, tools: list = None) -> dict:
+    async def mcp_analyze_code_quality(file_path: str, tools: list | None = None) -> dict:
         """Analyze code quality using Ruff, Black, Bandit"""
         return await analyze_code_quality(file_path, tools)
 

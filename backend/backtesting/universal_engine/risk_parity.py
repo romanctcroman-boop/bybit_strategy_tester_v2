@@ -1131,7 +1131,7 @@ class DynamicRebalancer:
 class PortfolioRiskCalculator:
     """Calculate comprehensive portfolio risk metrics."""
 
-    def __init__(self, confidence_levels: list[float] = None):
+    def __init__(self, confidence_levels: list[float] | None = None):
         if confidence_levels is None:
             self.confidence_levels = [0.95, 0.99]
         else:
@@ -1346,32 +1346,32 @@ def create_max_sharpe_portfolio(
 # ============================================================================
 
 __all__ = [
-    # Enums
-    "OptimizationObjective",
-    "RebalanceFrequency",
-    "ConstraintType",
     # Data structures
     "Asset",
-    "PortfolioConstraints",
-    "PortfolioWeights",
-    "RiskMetrics",
     "BacktestResult",
+    "BlackLittermanModel",
+    "ConstraintType",
     # Covariance estimation
     "CovarianceEstimator",
-    # Optimizers
-    "RiskParityOptimizer",
-    "HierarchicalRiskParity",
-    "MeanVarianceOptimizer",
-    "BlackLittermanModel",
-    "RiskBudgeting",
     # Rebalancing
     "DynamicRebalancer",
-    # Risk
-    "PortfolioRiskCalculator",
+    "HierarchicalRiskParity",
+    "MeanVarianceOptimizer",
+    # Enums
+    "OptimizationObjective",
+    "PortfolioConstraints",
     # Factory
     "PortfolioFactory",
-    # Convenience functions
-    "create_risk_parity_portfolio",
+    # Risk
+    "PortfolioRiskCalculator",
+    "PortfolioWeights",
+    "RebalanceFrequency",
+    "RiskBudgeting",
+    "RiskMetrics",
+    # Optimizers
+    "RiskParityOptimizer",
     "create_hrp_portfolio",
     "create_max_sharpe_portfolio",
+    # Convenience functions
+    "create_risk_parity_portfolio",
 ]

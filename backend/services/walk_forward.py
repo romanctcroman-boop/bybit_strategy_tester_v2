@@ -262,7 +262,7 @@ class WalkForwardOptimizer:
             best_params = {}
 
             for combo in param_combinations:
-                params = dict(zip(param_names, combo))
+                params = dict(zip(param_names, combo, strict=False))
                 try:
                     result = strategy_runner(train_data, params, initial_capital)
                     metric_value = result.get(metric, result.get("return", 0))
@@ -345,12 +345,7 @@ class WalkForwardOptimizer:
         consistency_ratio = positive_windows / n if n > 0 else 0
 
         # Parameter stability: How often same params are selected
-        if all_best_params:
-            param_stability = self._calculate_param_stability(
-                all_best_params, param_names
-            )
-        else:
-            param_stability = 0
+        param_stability = self._calculate_param_stability(all_best_params, param_names) if all_best_params else 0
 
         # Average degradation
         avg_degradation = np.mean([w.return_degradation for w in windows])

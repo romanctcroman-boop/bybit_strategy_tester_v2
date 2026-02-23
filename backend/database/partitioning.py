@@ -338,12 +338,11 @@ class KlineArchiver:
                 if (
                     table_date.year * 12 + table_date.month
                     >= start_dt.year * 12 + start_dt.month
+                ) and (
+                    table_date.year * 12 + table_date.month
+                    <= end_dt.year * 12 + end_dt.month
                 ):
-                    if (
-                        table_date.year * 12 + table_date.month
-                        <= end_dt.year * 12 + end_dt.month
-                    ):
-                        relevant_tables.append(table)
+                    relevant_tables.append(table)
             except ValueError:
                 continue
 

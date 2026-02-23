@@ -949,7 +949,9 @@ class BuilderTaskRequest(BaseModel):
     stop_loss: float | None = Field(default=None, description="Stop loss fraction")
     take_profit: float | None = Field(default=None, description="Take profit fraction")
     max_iterations: int = Field(default=3, description="Max iteration attempts")
-    min_sharpe: float = Field(default=0.5, description="Minimum acceptable Sharpe ratio")
+    min_sharpe: float = Field(
+        default=0.5, description="Minimum acceptable Sharpe ratio (fallback if evaluation_config not set)"
+    )
     min_win_rate: float = Field(default=0.4, description="Minimum acceptable win rate")
     enable_deliberation: bool = Field(
         default=False,
@@ -963,6 +965,14 @@ class BuilderTaskRequest(BaseModel):
         default=False,
         description=(
             "Optimizer sweep mode: agents suggest param ranges, optimizer finds best values (slower but more thorough)"
+        ),
+    )
+    evaluation_config: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Evaluation panel config — ALL scoring and sorting uses this. "
+            "Fields: primary_metric, secondary_metrics, constraints, sort_order, "
+            "use_composite, weights. If not set, falls back to sharpe_ratio with min_sharpe threshold."
         ),
     )
 
@@ -981,6 +991,20 @@ async def run_builder_task(request: BuilderTaskRequest):
             BuilderWorkflow,
             BuilderWorkflowConfig,
         )
+
+        # Build evaluation_config: prefer explicit evaluation_config from request,
+        # fall back to legacy min_sharpe/min_win_rate fields for backwards compat
+        eval_config = request.evaluation_config or {
+            "primary_metric": "sharpe_ratio",
+            "secondary_metrics": [],
+            "constraints": [
+                {"metric": "win_rate", "operator": ">=", "value": request.min_win_rate},
+            ],
+            "sort_order": [],
+            "use_composite": False,
+            "weights": None,
+            "min_primary": request.min_sharpe,
+        }
 
         config = BuilderWorkflowConfig(
             name=request.name,
@@ -1002,6 +1026,7 @@ async def run_builder_task(request: BuilderTaskRequest):
             enable_deliberation=request.enable_deliberation,
             existing_strategy_id=request.existing_strategy_id,
             use_optimizer_mode=request.use_optimizer_mode,
+            evaluation_config=eval_config,
         )
 
         workflow = BuilderWorkflow()
@@ -1043,6 +1068,20 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
         BuilderWorkflowConfig,
     )
 
+    # Build evaluation_config: prefer explicit evaluation_config from request,
+    # fall back to legacy min_sharpe/min_win_rate fields for backwards compat
+    eval_config_sse = request.evaluation_config or {
+        "primary_metric": "sharpe_ratio",
+        "secondary_metrics": [],
+        "constraints": [
+            {"metric": "win_rate", "operator": ">=", "value": request.min_win_rate},
+        ],
+        "sort_order": [],
+        "use_composite": False,
+        "weights": None,
+        "min_primary": request.min_sharpe,
+    }
+
     config = BuilderWorkflowConfig(
         name=request.name,
         symbol=request.symbol,
@@ -1063,6 +1102,7 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
         enable_deliberation=request.enable_deliberation,
         existing_strategy_id=request.existing_strategy_id,
         use_optimizer_mode=request.use_optimizer_mode,
+        evaluation_config=eval_config_sse,
     )
 
     _stage_labels: dict[str, str] = {

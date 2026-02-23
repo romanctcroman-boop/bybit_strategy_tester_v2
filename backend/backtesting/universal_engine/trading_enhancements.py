@@ -331,16 +331,14 @@ class OrderManager:
         """Update trailing stop price based on new high/low."""
         if order.side == OrderSide.SELL:
             # For sell trailing stop, track new highs
-            if order.order_id in self._trailing_highs:
-                if high > self._trailing_highs[order.order_id]:
-                    self._trailing_highs[order.order_id] = high
-                    order.stop_price = high * (1 - order.trailing_delta)
+            if order.order_id in self._trailing_highs and high > self._trailing_highs[order.order_id]:
+                self._trailing_highs[order.order_id] = high
+                order.stop_price = high * (1 - order.trailing_delta)
         else:
             # For buy trailing stop, track new lows
-            if order.order_id in self._trailing_lows:
-                if low < self._trailing_lows[order.order_id]:
-                    self._trailing_lows[order.order_id] = low
-                    order.stop_price = low * (1 + order.trailing_delta)
+            if order.order_id in self._trailing_lows and low < self._trailing_lows[order.order_id]:
+                self._trailing_lows[order.order_id] = low
+                order.stop_price = low * (1 + order.trailing_delta)
 
     def _cancel_oco_pairs(self, filled: list[Order]) -> None:
         """Cancel OCO paired orders when one is filled."""
@@ -956,12 +954,11 @@ class TradingFilters:
                         False,
                         f"Cooldown after loss ({bars_since}/{self.cooldown.cooldown_after_loss} bars)",
                     )
-            elif self.last_trade_result == "win":
-                if bars_since < self.cooldown.cooldown_after_win:
-                    return (
-                        False,
-                        f"Cooldown after win ({bars_since}/{self.cooldown.cooldown_after_win} bars)",
-                    )
+            elif self.last_trade_result == "win" and bars_since < self.cooldown.cooldown_after_win:
+                return (
+                    False,
+                    f"Cooldown after win ({bars_since}/{self.cooldown.cooldown_after_win} bars)",
+                )
 
         return True, "No cooldown active"
 
@@ -1257,31 +1254,31 @@ class PositionTracker:
 # =============================================================================
 
 __all__ = [
-    # Order Types
-    "OrderType",
-    "OrderSide",
-    "OrderStatus",
-    "Order",
-    "TrailingStopConfig",
-    "OCOConfig",
-    "OrderManager",
     # Risk Management
     "AntiLiquidationConfig",
     "BreakEvenConfig",
-    "RiskPerTradeConfig",
+    "CooldownConfig",
     "DrawdownGuardianConfig",
+    "NewsEvent",
+    "NewsFilterConfig",
+    "OCOConfig",
+    "Order",
+    "OrderManager",
+    "OrderSide",
+    "OrderStatus",
+    # Order Types
+    "OrderType",
+    "PositionAgeMetrics",
+    "PositionTracker",
     "RiskAction",
     "RiskManagement",
-    # Trading Filters
-    "TradingSession",
+    "RiskPerTradeConfig",
     "SessionFilterConfig",
-    "NewsFilterConfig",
-    "CooldownConfig",
-    "NewsEvent",
-    "TradingFilters",
     # Market Simulation
     "SpreadConfig",
     "SpreadSimulator",
-    "PositionAgeMetrics",
-    "PositionTracker",
+    "TradingFilters",
+    # Trading Filters
+    "TradingSession",
+    "TrailingStopConfig",
 ]

@@ -175,10 +175,7 @@ def compare_results(
     fb_equity = fb_result.equity_curve[-1] if len(fb_result.equity_curve) > 0 else 10000
     numba_equity = numba_result.equity_curve[-1] if len(numba_result.equity_curve) > 0 else 10000
 
-    if abs(fb_equity) > 0.01:
-        equity_diff_pct = abs(fb_equity - numba_equity) / abs(fb_equity) * 100
-    else:
-        equity_diff_pct = 0.0
+    equity_diff_pct = abs(fb_equity - numba_equity) / abs(fb_equity) * 100 if abs(fb_equity) > 0.01 else 0.0
 
     return {
         "fb_trades": fb_trades,

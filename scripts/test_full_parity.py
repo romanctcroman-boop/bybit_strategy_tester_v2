@@ -69,7 +69,7 @@ def compare_trades(vbt_trades, fb_trades, tolerance_pct: float = 0.001) -> dict:
         "details": []
     }
 
-    for i, (t_vbt, t_fb) in enumerate(zip(vbt_trades, fb_trades)):
+    for i, (t_vbt, t_fb) in enumerate(zip(vbt_trades, fb_trades, strict=False)):
         entry_match = abs(t_vbt.entry_price - t_fb.entry_price) < 1.0
         exit_match = abs(t_vbt.exit_price - t_fb.exit_price) < 1.0
         size_match = abs(t_vbt.size - t_fb.size) < 0.0001

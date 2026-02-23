@@ -306,9 +306,7 @@ class OnlineLearner:
             # Combine batch and adaptive
             if buffer_size >= self.batch_size:
                 return True
-            if buffer_size >= self.batch_size // 2 and self._check_drift():
-                return True
-            return False
+            return bool(buffer_size >= self.batch_size // 2 and self._check_drift())
 
         return buffer_size >= self.batch_size
 

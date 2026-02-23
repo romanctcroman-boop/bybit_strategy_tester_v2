@@ -341,13 +341,12 @@ class MTFDataLoader:
                     logger.warning(f"Missing column: {col}")
 
         # Convert time to datetime if needed
-        if "time" in df.columns:
-            if df["time"].dtype == "int64" or df["time"].dtype == "float64":
-                # Assume milliseconds
-                if df["time"].iloc[0] > 1e12:
-                    df["time"] = pd.to_datetime(df["time"], unit="ms")
-                else:
-                    df["time"] = pd.to_datetime(df["time"], unit="s")
+        if "time" in df.columns and (df["time"].dtype == "int64" or df["time"].dtype == "float64"):
+            # Assume milliseconds
+            if df["time"].iloc[0] > 1e12:
+                df["time"] = pd.to_datetime(df["time"], unit="ms")
+            else:
+                df["time"] = pd.to_datetime(df["time"], unit="s")
 
         return df
 

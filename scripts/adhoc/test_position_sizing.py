@@ -15,7 +15,7 @@ def create_sample_trades(n_trades: int = 100, win_rate: float = 0.55) -> list:
     np.random.seed(42)
     trades = []
 
-    for i in range(n_trades):
+    for _i in range(n_trades):
         is_win = np.random.random() < win_rate
         entry_price = 100.0
 

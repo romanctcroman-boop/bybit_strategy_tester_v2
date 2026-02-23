@@ -653,7 +653,7 @@ def on_config_change(config: Any) -> None:
             new_threshold = getattr(cb_config, "failure_threshold", 5)
             new_timeout = getattr(cb_config, "recovery_timeout", 60)
 
-            for name, breaker in manager._breakers.items():
+            for _name, breaker in manager._breakers.items():
                 breaker.failure_threshold = new_threshold
                 breaker.recovery_time = new_timeout
 

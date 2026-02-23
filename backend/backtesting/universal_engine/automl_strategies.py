@@ -1035,7 +1035,7 @@ class LinearModel(BaseModel):
 
     def fit(self, X: NDArray, y: NDArray) -> "LinearModel":
         """Fit using closed-form solution with regularization."""
-        n_samples, n_features = X.shape
+        _n_samples, n_features = X.shape
 
         # Add regularization
         XtX = X.T @ X + self.regularization * np.eye(n_features)
@@ -1164,10 +1164,7 @@ class EnsembleModel(BaseModel):
             y_boot = y[indices]
 
             # Create and fit model
-            if self.base_model == "tree":
-                model = DecisionTreeModel(max_depth=3)
-            else:
-                model = LinearModel()
+            model = DecisionTreeModel(max_depth=3) if self.base_model == "tree" else LinearModel()
 
             model.fit(X_boot, y_boot)
             self._models.append(model)
@@ -1443,14 +1440,14 @@ class StrategyEvolver:
         for i in range(n):
             # Entry conditions
             entry_signals = []
-            for idx, fname in zip(entry_indices, genome.entry_features):
+            for idx, fname in zip(entry_indices, genome.entry_features, strict=False):
                 val = features[i, idx]
                 thresh = genome.entry_thresholds.get(fname, (-1, 1))
                 entry_signals.append(thresh[0] <= val <= thresh[1])
 
             # Exit conditions
             exit_signals = []
-            for idx, fname in zip(exit_indices, genome.exit_features):
+            for idx, fname in zip(exit_indices, genome.exit_features, strict=False):
                 val = features[i, idx]
                 thresh = genome.exit_thresholds.get(fname, (-1, 1))
                 exit_signals.append(thresh[0] <= val <= thresh[1])
@@ -1605,7 +1602,7 @@ class SignalCombiner:
             return np.array([])
 
         # Get signal length
-        first_signals = list(self._signal_sources.values())[0][0]
+        first_signals = next(iter(self._signal_sources.values()))[0]
         n = len(first_signals)
 
         if self.combination_method == "weighted_average":
@@ -1908,31 +1905,31 @@ class AutoMLPipeline:
 # ============================================================================
 
 __all__ = [
-    # Enums
-    "FeatureType",
-    "ModelType",
-    "CrossoverType",
-    "SelectionType",
-    # Data structures
-    "Feature",
-    "FeatureSet",
-    "StrategyGenome",
     "AutoMLConfig",
-    "ValidationResult",
-    # Feature engineering
-    "FeatureEngineering",
-    # Model selection
-    "BaseModel",
-    "LinearModel",
-    "DecisionTreeModel",
-    "EnsembleModel",
-    "ModelSelector",
-    # Genetic algorithm
-    "StrategyEvolver",
-    # Signal combination
-    "SignalCombiner",
-    # Validation
-    "WalkForwardValidator",
     # Pipeline
     "AutoMLPipeline",
+    # Model selection
+    "BaseModel",
+    "CrossoverType",
+    "DecisionTreeModel",
+    "EnsembleModel",
+    # Data structures
+    "Feature",
+    # Feature engineering
+    "FeatureEngineering",
+    "FeatureSet",
+    # Enums
+    "FeatureType",
+    "LinearModel",
+    "ModelSelector",
+    "ModelType",
+    "SelectionType",
+    # Signal combination
+    "SignalCombiner",
+    # Genetic algorithm
+    "StrategyEvolver",
+    "StrategyGenome",
+    "ValidationResult",
+    # Validation
+    "WalkForwardValidator",
 ]

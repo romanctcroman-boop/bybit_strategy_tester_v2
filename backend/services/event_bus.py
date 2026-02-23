@@ -6,6 +6,7 @@ Supports Redis-based distributed events and local in-memory events.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import uuid
@@ -459,10 +460,8 @@ class RedisEventBus(EventBusBackend):
         self._running = False
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
 
         if self._pubsub:
             await self._pubsub.close()

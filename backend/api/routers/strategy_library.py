@@ -8,6 +8,7 @@ Provides REST API endpoints for:
 - Parameter optimization
 """
 
+import contextlib
 import logging
 from typing import Any
 
@@ -190,10 +191,8 @@ async def list_strategies(
         # Parse category
         category_enum = None
         if category:
-            try:
+            with contextlib.suppress(ValueError):
                 category_enum = StrategyCategory(category)
-            except ValueError:
-                pass
 
         # Search strategies
         tags_list = [tag] if tag else None
@@ -383,10 +382,9 @@ async def validate_parameters(
             if not isinstance(value, (int, float)):
                 errors.append(f"{name}: expected float, got {type(value).__name__}")
                 continue
-        elif spec.param_type.value == "bool":
-            if not isinstance(value, bool):
-                errors.append(f"{name}: expected bool, got {type(value).__name__}")
-                continue
+        elif spec.param_type.value == "bool" and not isinstance(value, bool):
+            errors.append(f"{name}: expected bool, got {type(value).__name__}")
+            continue
 
         # Range validation
         if spec.min_value is not None and value < spec.min_value:
@@ -419,7 +417,7 @@ async def get_all_tags():
     for info in StrategyRegistry.list_all():
         all_tags.update(info.tags)
 
-    return {"tags": sorted(list(all_tags))}
+    return {"tags": sorted(all_tags)}
 
 
 @router.get("/stats/summary")
@@ -489,19 +487,17 @@ async def get_strategy_recommendations(
                 ]:
                     score += 3
                     reasons.append("Good for ranging markets")
-            elif market_condition == "volatile":
-                if info.category == StrategyCategory.BREAKOUT:
-                    score += 2
-                    reasons.append("Can capture volatility breakouts")
+            elif market_condition == "volatile" and info.category == StrategyCategory.BREAKOUT:
+                score += 2
+                reasons.append("Can capture volatility breakouts")
 
         # Experience level
-        if experience_level:
-            if experience_level == "beginner":
-                if "beginner-friendly" in info.tags:
-                    score += 2
-                    reasons.append("Beginner friendly")
-                if info.risk_level == "conservative":
-                    score += 1
+        if experience_level and experience_level == "beginner":
+            if "beginner-friendly" in info.tags:
+                score += 2
+                reasons.append("Beginner friendly")
+            if info.risk_level == "conservative":
+                score += 1
 
         # Timeframe matching
         if preferred_timeframe and preferred_timeframe in info.recommended_timeframes:

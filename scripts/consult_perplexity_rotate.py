@@ -17,7 +17,7 @@ PROMPT = """
 We use VectorBT for fast optimization but found critical issues:
 
 1. **No Intrabar SL/TP**: Only checks stops at bar CLOSE, not High/Low
-2. **No MAE/MFE tracking** 
+2. **No MAE/MFE tracking**
 3. **Fixed Position Sizing**: Uses fixed order_value, not equity-based
 4. **Quick Reversals**: Opens positions on same bar as close (+25% extra trades)
 5. **No Bar Magnifier**: Can't use 1-minute data for intrabar simulation

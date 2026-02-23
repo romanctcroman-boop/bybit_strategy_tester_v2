@@ -175,7 +175,7 @@ async def quick_validation(request: QuickValidationRequest) -> ValidationMetrics
 
         # Average degradation
         degradations = []
-        for train, test in zip(request.train_returns, request.test_returns):
+        for train, test in zip(request.train_returns, request.test_returns, strict=False):
             if train != 0:
                 degradations.append(test / train - 1)
         avg_deg = sum(degradations) / len(degradations) if degradations else 0

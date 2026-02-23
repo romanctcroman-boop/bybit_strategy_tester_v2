@@ -13,6 +13,7 @@ Version: 2.3.0
 """
 
 import asyncio
+import contextlib
 import time
 from abc import ABC, abstractmethod
 from collections import deque
@@ -658,10 +659,8 @@ class CandleAggregator:
 
                 # Notify callbacks
                 for callback in self._callbacks:
-                    try:
+                    with contextlib.suppress(Exception):
                         callback(current)
-                    except Exception:
-                        pass
 
                 current = None
 
@@ -931,24 +930,24 @@ class StreamManager:
 # =============================================================================
 
 __all__ = [
-    # Types
-    "StreamType",
-    "StreamStatus",
-    # Data classes
-    "TickerUpdate",
-    "TradeUpdate",
-    "OrderBookLevel",
-    "OrderBookUpdate",
-    "KlineUpdate",
-    "StreamConfig",
-    # Streams
-    "MarketDataStream",
-    "TickerStream",
-    "OrderBookStream",
-    "TradeStream",
     # Aggregator
     "CandleAggregator",
+    "KlineUpdate",
+    # Streams
+    "MarketDataStream",
+    "OrderBookLevel",
+    "OrderBookStream",
+    "OrderBookUpdate",
+    "StreamConfig",
+    "StreamManager",
     # Manager
     "StreamManagerConfig",
-    "StreamManager",
+    "StreamStatus",
+    # Types
+    "StreamType",
+    "TickerStream",
+    # Data classes
+    "TickerUpdate",
+    "TradeStream",
+    "TradeUpdate",
 ]

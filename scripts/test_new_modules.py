@@ -224,7 +224,7 @@ modules = [
     ("Regime Detection", "backend.ml.regime_detection", True),
 ]
 
-for name, module_path, expected in modules:
+for name, module_path, _expected in modules:
     try:
         __import__(module_path)
         status = "✅ READY"

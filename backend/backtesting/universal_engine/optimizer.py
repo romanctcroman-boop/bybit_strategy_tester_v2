@@ -72,10 +72,7 @@ class OptimizableParameter:
 
         if self.min_value is not None and value < self.min_value:
             return False
-        if self.max_value is not None and value > self.max_value:
-            return False
-
-        return True
+        return not (self.max_value is not None and value > self.max_value)
 
 
 @dataclass
@@ -357,7 +354,7 @@ class UniversalOptimizer:
             params = dict(base_params)
             strategy_params = dict(base_params.get("strategy_params", {}))
 
-            for name, value in zip(param_names, combo):
+            for name, value in zip(param_names, combo, strict=False):
                 if name in ["stop_loss", "take_profit", "position_size"]:
                     params[name] = value
                 else:
@@ -391,7 +388,7 @@ class UniversalOptimizer:
 
                 # Create result
                 opt_result = OptimizationResult(
-                    params=dict(zip(param_names, combo)),
+                    params=dict(zip(param_names, combo, strict=False)),
                     metrics=result.metrics,
                     score=score,
                     execution_time=result.execution_time,
@@ -452,7 +449,7 @@ class UniversalOptimizer:
             params = dict(base_params)
             strategy_params = dict(base_params.get("strategy_params", {}))
 
-            for name, value in zip(param_names, combo):
+            for name, value in zip(param_names, combo, strict=False):
                 if name in ["stop_loss", "take_profit", "position_size"]:
                     params[name] = value
                 else:
@@ -483,7 +480,7 @@ class UniversalOptimizer:
                 score = getattr(result.metrics, optimize_metric, 0.0)
 
                 opt_result = OptimizationResult(
-                    params=dict(zip(param_names, combo)),
+                    params=dict(zip(param_names, combo, strict=False)),
                     metrics=result.metrics,
                     score=score,
                     execution_time=result.execution_time,
@@ -520,10 +517,7 @@ class UniversalOptimizer:
         ):
             return False
 
-        if "min_sharpe" in filters and metrics.sharpe_ratio < filters["min_sharpe"]:
-            return False
-
-        return True
+        return not ("min_sharpe" in filters and metrics.sharpe_ratio < filters["min_sharpe"])
 
     def quick_optimize(
         self,

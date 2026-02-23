@@ -83,7 +83,7 @@ def extract_all_metrics(metrics: PerformanceMetrics) -> dict[str, Any]:
     result = {}
 
     # Get all fields from Pydantic model
-    for field_name, field_info in metrics.model_fields.items():
+    for field_name, _field_info in metrics.model_fields.items():
         value = getattr(metrics, field_name, None)
 
         # Skip complex types (lists, dicts)
@@ -104,7 +104,7 @@ def compare_all_metrics(
 ) -> tuple[list, list, list]:
     """
     Compare all metrics between two runs.
-    
+
     Returns:
         (exact_matches, within_tolerance, mismatches)
     """
@@ -218,10 +218,7 @@ def run_full_comparison(direction: str = "both"):
         for item in mismatches:
             if len(item) == 4:
                 key, val1, val2, diff = item
-                if isinstance(diff, float):
-                    diff_str = f"{diff:.4f}%"
-                else:
-                    diff_str = str(diff)
+                diff_str = f"{diff:.4f}%" if isinstance(diff, float) else str(diff)
 
                 if isinstance(val1, float) and isinstance(val2, float):
                     print(f"{key:<40} {val1:>18.4f} {val2:>18.4f} {diff_str:>15}")
@@ -272,10 +269,7 @@ def run_full_comparison(direction: str = "both"):
             status = "✅ MATCH"
         elif isinstance(val_std, float) and isinstance(val_mag, float):
             diff = abs(val_std - val_mag)
-            if diff < 0.01:
-                status = "🔶 ~MATCH"
-            else:
-                status = f"❌ diff={diff:.2f}"
+            status = "🔶 ~MATCH" if diff < 0.01 else f"❌ diff={diff:.2f}"
         else:
             status = "❌ DIFF"
 

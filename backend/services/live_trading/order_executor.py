@@ -368,8 +368,8 @@ class OrderExecutor:
         side: OrderSide,
         qty: float,
         entry_price: float | None = None,  # None for market entry
-        stop_loss: float = None,
-        take_profit: float = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
     ) -> list[TradeResult]:
         """
         Place a bracket order (entry + SL + TP).

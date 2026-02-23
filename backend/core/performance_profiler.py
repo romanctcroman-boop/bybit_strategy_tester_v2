@@ -148,7 +148,7 @@ class BacktestProfiler:
                 self._profiler.disable()
 
             if self._tracemalloc:
-                current, peak = self._tracemalloc.get_traced_memory()
+                _current, peak = self._tracemalloc.get_traced_memory()
                 self._memory_peak = peak / 1024 / 1024  # MB
                 self._tracemalloc.stop()
 
@@ -309,7 +309,7 @@ def benchmark_backtest_engine(
     except ImportError:
         tracemalloc = None
 
-    for i in range(n_runs):
+    for _i in range(n_runs):
         if tracemalloc:
             tracemalloc.start()
 

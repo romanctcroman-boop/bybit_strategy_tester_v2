@@ -26,9 +26,9 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 
 # Проверим сколько данных есть
 info = pd.read_sql("""
-    SELECT symbol, interval, COUNT(*) as cnt, 
+    SELECT symbol, interval, COUNT(*) as cnt,
            MIN(open_time) as min_time, MAX(open_time) as max_time
-    FROM bybit_kline_audit 
+    FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT'
     GROUP BY symbol, interval
     ORDER BY cnt DESC
@@ -41,7 +41,7 @@ for _, row in info.iterrows():
 
 # Загружаем 1h данные
 df = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'

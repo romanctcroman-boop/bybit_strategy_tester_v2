@@ -168,7 +168,7 @@ class MonteCarloSimulator:
         n_simulations: int = 10000,
         method: SimulationMethod = SimulationMethod.TRADE_SHUFFLE,
         block_size: int = 5,
-        confidence_levels: list[float] = None,
+        confidence_levels: list[float] | None = None,
         seed: int | None = None,
         store_raw: bool = False,
     ) -> MonteCarloResult:

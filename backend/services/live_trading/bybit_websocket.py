@@ -13,6 +13,7 @@ Features:
 """
 
 import asyncio
+import contextlib
 import hashlib
 import hmac
 import json
@@ -226,10 +227,8 @@ class BybitWebSocketClient:
         # Cancel background tasks
         for task in self._tasks:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
         self._tasks.clear()
 
         # Close connections

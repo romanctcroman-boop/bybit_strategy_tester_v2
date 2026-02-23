@@ -53,9 +53,7 @@ def verify_symbol_in_db(symbol: str, market_type: str = "linear") -> bool:
         groups = data.get("groups") or []
         for g in groups:
             if (g.get("symbol") or "").upper() == symbol and (g.get("market_type") or "linear") == market_type:
-                if (g.get("total_rows") or 0) > 0:
-                    return True
-                return False
+                return (g.get("total_rows") or 0) > 0
         return False
     except Exception:
         return False

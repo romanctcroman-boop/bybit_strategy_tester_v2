@@ -69,7 +69,7 @@ class APIKeyRotationManager:
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
 
-    def _add_audit_log(self, action: str, key_id: str, details: dict = None):
+    def _add_audit_log(self, action: str, key_id: str, details: dict | None = None):
         """Add entry to audit log"""
         entry = {
             "timestamp": datetime.now().isoformat(),

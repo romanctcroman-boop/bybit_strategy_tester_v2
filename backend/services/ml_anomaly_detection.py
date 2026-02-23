@@ -239,12 +239,9 @@ class IsolationForest:
         """Fit Isolation Forest to data."""
         import random
 
-        if len(data) < self.sample_size:
-            sample_size = len(data)
-        else:
-            sample_size = self.sample_size
+        sample_size = len(data) if len(data) < self.sample_size else self.sample_size
 
-        height_limit = int(math.ceil(math.log2(sample_size)))
+        height_limit = math.ceil(math.log2(sample_size))
 
         self.trees = []
         for _ in range(self.n_trees):

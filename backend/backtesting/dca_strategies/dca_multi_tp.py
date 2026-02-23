@@ -465,10 +465,7 @@ class DCAMultiTPStrategy:
         if cfg.tp_mode == TPMode.FIXED:
             # Single TP
             tp_pct = cfg.fixed_tp_pct / 100.0
-            if direction == "long":
-                tp_prices = [avg_entry * (1 + tp_pct)]
-            else:
-                tp_prices = [avg_entry * (1 - tp_pct)]
+            tp_prices = [avg_entry * (1 + tp_pct)] if direction == "long" else [avg_entry * (1 - tp_pct)]
 
         elif cfg.tp_mode == TPMode.MULTI:
             # Multi-level TP
@@ -489,10 +486,7 @@ class DCAMultiTPStrategy:
             else:
                 # Fallback to fixed if ATR not available
                 tp_pct = cfg.fixed_tp_pct / 100.0
-                if direction == "long":
-                    tp_prices = [avg_entry * (1 + tp_pct)]
-                else:
-                    tp_prices = [avg_entry * (1 - tp_pct)]
+                tp_prices = [avg_entry * (1 + tp_pct)] if direction == "long" else [avg_entry * (1 - tp_pct)]
 
         return tp_prices
 
@@ -643,10 +637,7 @@ class DCAMultiTPStrategy:
 
                 # Check Stop Loss
                 sl_hit = False
-                if direction == "long":
-                    sl_hit = current_low <= deal.sl_price
-                else:
-                    sl_hit = current_high >= deal.sl_price
+                sl_hit = current_low <= deal.sl_price if direction == "long" else current_high >= deal.sl_price
 
                 if sl_hit and deal.sl_price > 0:
                     exits.iloc[i] = True
@@ -706,10 +697,7 @@ class DCAMultiTPStrategy:
                     for tp_idx, tp_price in enumerate(deal.tp_prices):
                         if tp_idx < len(deal.tp_hit) and not deal.tp_hit[tp_idx]:
                             tp_hit = False
-                            if direction == "long":
-                                tp_hit = current_high >= tp_price
-                            else:
-                                tp_hit = current_low <= tp_price
+                            tp_hit = current_high >= tp_price if direction == "long" else current_low <= tp_price
 
                             if tp_hit:
                                 deal.tp_hit[tp_idx] = True
@@ -757,10 +745,7 @@ class DCAMultiTPStrategy:
                     if len(deal.tp_prices) > 0:
                         tp_price = deal.tp_prices[0]
                         tp_hit = False
-                        if direction == "long":
-                            tp_hit = current_high >= tp_price
-                        else:
-                            tp_hit = current_low <= tp_price
+                        tp_hit = current_high >= tp_price if direction == "long" else current_low <= tp_price
 
                         if tp_hit:
                             exits.iloc[i] = True

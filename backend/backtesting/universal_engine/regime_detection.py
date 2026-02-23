@@ -421,8 +421,8 @@ class RuleBasedRegimeDetector:
                 sideways_score += 0.1
 
             # Volatility signals
-            vol_ratio = features["volatility_ratio"][i]
-            atr_pct = features["atr_percent"][i]
+            features["volatility_ratio"][i]
+            features["atr_percent"][i]
 
             # Calculate volatility percentiles
             vol_window = features["volatility_medium"][max(0, i - 100) : i + 1]
@@ -543,7 +543,7 @@ class ClusteringRegimeDetector:
         self, X: NDArray, k: int, max_iter: int = 100
     ) -> tuple[NDArray, NDArray]:
         """Simple K-Means clustering."""
-        n, d = X.shape
+        n, _d = X.shape
 
         # Initialize centers randomly
         np.random.seed(42)
@@ -733,15 +733,9 @@ class MLRegimeClassifier:
             left_mask = X[:, f] <= threshold
             right_mask = ~left_mask
 
-            if np.sum(left_mask) > 0:
-                left_pred = self._mode(y[left_mask])
-            else:
-                left_pred = self._mode(y)
+            left_pred = self._mode(y[left_mask]) if np.sum(left_mask) > 0 else self._mode(y)
 
-            if np.sum(right_mask) > 0:
-                right_pred = self._mode(y[right_mask])
-            else:
-                right_pred = self._mode(y)
+            right_pred = self._mode(y[right_mask]) if np.sum(right_mask) > 0 else self._mode(y)
 
             best_feature = f
             best_threshold = threshold

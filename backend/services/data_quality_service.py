@@ -11,6 +11,7 @@ Runs as background task and auto-repairs detected issues.
 """
 
 import asyncio
+import contextlib
 import logging
 import sqlite3
 import threading
@@ -365,7 +366,7 @@ class DataQualityService:
 
             # Find anomalies: Z-score threshold OR absolute gap threshold
             issue_count = 0
-            for i, (z, row) in enumerate(zip(z_scores, rows)):
+            for _i, (z, row) in enumerate(zip(z_scores, rows, strict=False)):
                 gap_pct = abs(row["gap_pct"])
 
                 # Detect by Z-score OR absolute gap percentage
@@ -908,10 +909,8 @@ class DataQualityService:
         """Stop the background monitoring task."""
         if self._monitoring_task and not self._monitoring_task.done():
             self._monitoring_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._monitoring_task
-            except asyncio.CancelledError:
-                pass
 
 
 # Singleton instance

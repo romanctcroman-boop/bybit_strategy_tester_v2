@@ -19,7 +19,6 @@ sys.path.insert(0, str(ROOT))
 
 def audit_result(name: str, tv_formula: str, our_impl: str, status: str, notes: str = ""):
     """Print audit result for a metric."""
-    icon = {"✅": "PASS", "❌": "FAIL", "⚠️": "WARN", "ℹ️": "INFO"}
     print(f"\n{status} **{name}**")
     print(f"   TV: {tv_formula}")
     print(f"   US: {our_impl}")

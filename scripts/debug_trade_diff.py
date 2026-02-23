@@ -58,7 +58,7 @@ print("=" * 80)
 print("TRADE-BY-TRADE COMPARISON (LONG)")
 print("=" * 80)
 
-for i, (t_vbt, t_fb) in enumerate(zip(result_vbt.trades, result_fb.trades)):
+for i, (t_vbt, t_fb) in enumerate(zip(result_vbt.trades, result_fb.trades, strict=False)):
     print(f"\nTrade {i+1}:")
     print(f"  VBT: entry={t_vbt.entry_price:.2f}, exit={t_vbt.exit_price:.2f}, size={t_vbt.size:.6f}, pnl={t_vbt.pnl:.2f}, fees={t_vbt.fees:.4f}")
     print(f"  FB:  entry={t_fb.entry_price:.2f}, exit={t_fb.exit_price:.2f}, size={t_fb.size:.6f}, pnl={t_fb.pnl:.2f}, fees={t_fb.fees:.4f}")

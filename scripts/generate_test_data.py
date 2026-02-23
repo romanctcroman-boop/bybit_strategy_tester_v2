@@ -382,7 +382,7 @@ def generate_optimizations(
 
     now = utc_now()
 
-    for i in range(count):
+    for _i in range(count):
         strategy = random.choice(strategies)
 
         # Status distribution

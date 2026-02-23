@@ -495,10 +495,10 @@ class ArbitrageDetector:
             funding = funding_rates[exchange]
 
             # Basis = (perp - spot) / spot
-            basis = (perp.mid_price - spot.mid_price) / spot.mid_price
+            (perp.mid_price - spot.mid_price) / spot.mid_price
 
             # Annualized funding (3 times per day * 365 days)
-            annual_funding = funding * 3 * 365
+            funding * 3 * 365
 
             # If funding positive and basis reasonable, go long spot short perp
             if funding > 0.0001:  # Meaningful positive funding
@@ -840,7 +840,6 @@ class FeeCalculator:
         """Calculate fees for a single trade."""
         fees = self.exchange_fees.get(exchange, ExchangeFees())
 
-        fee_rate = fees.maker_fee if is_maker else fees.taker_fee
 
         return FeeBreakdown(
             maker_fee=size_usd * fees.maker_fee if is_maker else 0,
@@ -1078,26 +1077,26 @@ class LatencySimulator:
 # =============================================================================
 
 __all__ = [
-    # Exchange
-    "ExchangeName",
-    "ExchangeFees",
-    "ExchangeTicker",
-    "ExchangeBalance",
-    "ExchangeConfig",
-    "ExchangeConnector",
-    # Arbitrage
-    "ArbitrageType",
-    "ArbitrageOpportunity",
     "ArbitrageConfig",
     "ArbitrageDetector",
     # Trading
     "ArbitrageExecution",
-    "TraderConfig",
+    "ArbitrageOpportunity",
+    # Arbitrage
+    "ArbitrageType",
     "CrossExchangeTrader",
+    "ExchangeBalance",
+    "ExchangeConfig",
+    "ExchangeConnector",
+    "ExchangeFees",
+    # Exchange
+    "ExchangeName",
+    "ExchangeTicker",
     # Fees
     "FeeBreakdown",
     "FeeCalculator",
     # Latency
     "LatencyProfile",
     "LatencySimulator",
+    "TraderConfig",
 ]

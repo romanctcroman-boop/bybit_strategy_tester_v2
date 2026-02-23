@@ -6,7 +6,7 @@ across all trading directions (long, short, both).
 
 VectorBT is now reserved for optimization only due to architectural differences:
 - Quick reversals (can open on same bar as close)
-- Fixed sizing vs equity-based sizing  
+- Fixed sizing vs equity-based sizing
 - Parallel vs sequential signal processing
 
 Author: AI Assistant
@@ -65,7 +65,7 @@ def load_test_data(symbol: str = "BTCUSDT", interval: str = "60", limit: int = 5
 
 def create_config(direction: str, use_bar_magnifier: bool = False) -> dict:
     """Create base config for testing.
-    
+
     Testing VectorBT from_order_func SL/TP implementation vs Fallback.
     """
     return {
@@ -88,7 +88,7 @@ def extract_all_metrics(metrics: PerformanceMetrics) -> dict[str, Any]:
     """Extract ALL metrics from PerformanceMetrics as a flat dict."""
     result = {}
 
-    for field_name in PerformanceMetrics.model_fields.keys():
+    for field_name in PerformanceMetrics.model_fields:
         value = getattr(metrics, field_name, None)
         if isinstance(value, (list, dict)):
             continue
@@ -230,10 +230,7 @@ def run_engine_comparison(direction: str = "both"):
         for item in mismatches:
             if len(item) == 4:
                 key, val1, val2, diff = item
-                if isinstance(diff, float):
-                    diff_str = f"{diff:.4f}%"
-                else:
-                    diff_str = str(diff)
+                diff_str = f"{diff:.4f}%" if isinstance(diff, float) else str(diff)
 
                 if isinstance(val1, float) and isinstance(val2, float):
                     print(f"{key:<40} {val1:>18.4f} {val2:>18.4f} {diff_str:>15}")

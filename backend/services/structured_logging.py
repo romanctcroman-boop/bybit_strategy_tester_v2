@@ -142,9 +142,8 @@ class StructuredFormatter(logging.Formatter):
                     "exc_text",
                     "message",
                     "taskName",
-                ):
-                    if not key.startswith("_"):
-                        log_entry[key] = value
+                ) and not key.startswith("_"):
+                    log_entry[key] = value
 
         return json.dumps(log_entry, default=str)
 

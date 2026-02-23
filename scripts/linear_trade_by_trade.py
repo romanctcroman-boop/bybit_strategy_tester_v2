@@ -187,7 +187,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)
@@ -201,7 +201,7 @@ def main():
 
     # Simulate our trades
     our_trades = simulate_strategy(df)
-    our_df = pd.DataFrame(our_trades)
+    pd.DataFrame(our_trades)
 
     print(f"📊 Our Trades: {len(our_trades)}")
 
@@ -280,11 +280,11 @@ def main():
     print(f"""
     Our Trades:         {len(our_trades)}
     TV Trades:          {len(tv_trades)}
-    
+
     Exact Matches:      {matches}/{min(len(our_trades), len(tv_trades))} ({matches/min(len(our_trades), len(tv_trades))*100:.1f}%)
     Price Matches:      {price_matches}/{min(len(our_trades), len(tv_trades))} ({price_matches/min(len(our_trades), len(tv_trades))*100:.1f}%)
     Direction Matches:  {direction_matches}/{min(len(our_trades), len(tv_trades))} ({direction_matches/min(len(our_trades), len(tv_trades))*100:.1f}%)
-    
+
     🎯 SEQUENCE PARITY: {matches/min(len(our_trades), len(tv_trades))*100:.1f}%
 """)
 

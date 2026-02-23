@@ -583,7 +583,7 @@ class AdvancedBacktestEngine:
             "equity": self.equity,
         }
 
-        for i, candle in enumerate(data):
+        for _i, candle in enumerate(data):
             # timestamp available in candle for debugging if needed
             open_time = candle.get("open_time")
             interval_minutes = self._infer_interval_minutes(candle, open_time)
@@ -1101,10 +1101,7 @@ class AdvancedBacktestEngine:
             if loss_frac >= self.config.daily_loss_limit:
                 return False
 
-        if len(self.positions) >= self.config.position_limit:
-            return False
-
-        return True
+        return not len(self.positions) >= self.config.position_limit
 
     def _update_equity_tracking(self):
         """Update equity curve and drawdown."""
@@ -1411,14 +1408,8 @@ class AdvancedBacktestEngine:
                 # TradingView Sortino: DD = sqrt(sum(min(0, Xi))^2 / N)
                 downside_sq = np.minimum(0, returns) ** 2
                 downside_dev = np.sqrt(downside_sq.sum() / len(returns))
-                if std < 1e-9:
-                    sharpe = 0
-                else:
-                    sharpe = np.mean(returns) / std * np.sqrt(365 * 24)
-                if downside_dev < 1e-9:
-                    sortino = 0
-                else:
-                    sortino = np.mean(returns) / downside_dev * np.sqrt(365 * 24)
+                sharpe = 0 if std < 1e-09 else np.mean(returns) / std * np.sqrt(365 * 24)
+                sortino = 0 if downside_dev < 1e-09 else np.mean(returns) / downside_dev * np.sqrt(365 * 24)
             else:
                 sharpe = 0
                 sortino = 0

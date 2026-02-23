@@ -185,10 +185,9 @@ class IntrabarEngine:
             # Если нужны промежуточные тики (subticks)
             if self.config.subticks_per_segment > 0 and i < len(path) - 1:
                 next_price = path[i + 1][0]
-                for st in self._generate_subticks(
+                yield from self._generate_subticks(
                     price, next_price, tick_time, ts, bar_index
-                ):
-                    yield st
+                )
 
     def _get_ohlc_path(
         self, o: float, h: float, low_val: float, c: float

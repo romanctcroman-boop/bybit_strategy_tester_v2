@@ -2,7 +2,7 @@
 COMPREHENSIVE 147-METRIC ENGINE PARITY TEST
 ============================================
 
-Tests FallbackEngineV2 vs NumbaEngineV2 vs GPUEngineV2 
+Tests FallbackEngineV2 vs NumbaEngineV2 vs GPUEngineV2
 with ALL strategy parameters and 147 metrics comparison.
 
 Full Parameter Support:
@@ -85,10 +85,10 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 
 # Load main timeframe data
 df_60m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
-    WHERE symbol = '{STRATEGY_CONFIG["trading_pair"]}' 
+    WHERE symbol = '{STRATEGY_CONFIG["trading_pair"]}'
       AND interval = '{STRATEGY_CONFIG["timeframe"]}'
     ORDER BY open_time ASC
     LIMIT 500
@@ -101,10 +101,10 @@ start_ts = int(df_60m.index[0].timestamp() * 1000)
 end_ts = int(df_60m.index[-1].timestamp() * 1000) + 60 * 60 * 1000
 
 df_1m = pd.read_sql(f"""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
-    WHERE symbol = '{STRATEGY_CONFIG["trading_pair"]}' 
+    WHERE symbol = '{STRATEGY_CONFIG["trading_pair"]}'
       AND interval = '1'
       AND open_time >= {start_ts} AND open_time <= {end_ts}
     ORDER BY open_time ASC
@@ -599,7 +599,7 @@ print(f"""
 
    NumbaEngineV2 vs FallbackEngineV2:
       Matching: {numba_matches}/{total_compared} ({numba_pct:.2f}%)
-   
+
    GPUEngineV2 vs FallbackEngineV2:
       Matching: {gpu_matches}/{total_compared} ({gpu_pct:.2f}%)
 """)

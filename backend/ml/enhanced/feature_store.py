@@ -511,7 +511,7 @@ class FeatureStore:
         if len(sig.parameters) == 1:
             # Simple function with just data
             result = fn(
-                input_data.get("close", input_data.get(list(input_data.keys())[0])),
+                input_data.get("close", input_data.get(next(iter(input_data.keys())))),
                 **params,
             )
         else:

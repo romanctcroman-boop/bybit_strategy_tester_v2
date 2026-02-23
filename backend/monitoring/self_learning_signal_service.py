@@ -327,10 +327,7 @@ class SelfLearningSignalPublisher:
         Args:
             severity: Фильтр по severity (optional)
         """
-        if severity:
-            filtered = [a for a in self.alerts if a.severity == severity]
-        else:
-            filtered = self.alerts
+        filtered = [a for a in self.alerts if a.severity == severity] if severity else self.alerts
 
         return [asdict(a) for a in filtered]
 

@@ -23,6 +23,7 @@
 Created: 2026-01-24
 """
 
+import contextlib
 import sys
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -636,10 +637,8 @@ def print_calibration_report(results: list[dict]):
 def main():
     """Главная функция калибровки."""
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
-        try:
+        with contextlib.suppress(Exception):
             sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
     print("TradingView 166-Metrics Calibration Script")
     print("=" * 60)
 

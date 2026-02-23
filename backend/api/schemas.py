@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -74,7 +74,7 @@ class TradeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ApiListResponse(BaseModel, Generic[T]):
+class ApiListResponse[T](BaseModel):
     """Generic list response wrapper for API endpoints."""
 
     items: list[T]

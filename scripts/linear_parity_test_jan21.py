@@ -282,10 +282,7 @@ def compare_with_tv(our_metrics, tv_metrics):
             our_str = f"{our:.{decimals}f}"
             tv_str = f"{tv:.{decimals}f}"
 
-        if tv != 0:
-            parity_pct = (1 - abs(diff) / abs(tv)) * 100
-        else:
-            parity_pct = 100 if our == 0 else 0
+        parity_pct = (1 - abs(diff) / abs(tv)) * 100 if tv != 0 else 100 if our == 0 else 0
 
         parity_pct = max(0, min(100, parity_pct))
 
@@ -319,7 +316,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT open_time, open_price, high_price, low_price, close_price, volume
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
     """, conn)
@@ -332,7 +329,7 @@ def main():
         conn = sqlite3.connect(DB_PATH)
         df = pd.read_sql_query("""
             SELECT open_time, open_price, high_price, low_price, close_price, volume
-            FROM bybit_kline_audit 
+            FROM bybit_kline_audit
             WHERE symbol='BTCUSDT' AND interval='15'
             ORDER BY open_time ASC
         """, conn)
@@ -387,7 +384,7 @@ def main():
    💰 Net Profit:     ${our_metrics['net_profit']:.2f} vs ${TV_METRICS['net_profit']:.2f}
    📈 Win Rate:       {our_metrics['win_rate']:.1f}% vs {TV_METRICS['win_rate']:.1f}%
    📉 Max Drawdown:   ${our_metrics['max_drawdown']:.2f} vs ${TV_METRICS['max_drawdown']:.2f}
-   
+
    🎯 Overall Parity: {overall_parity:.1f}%
 """)
 

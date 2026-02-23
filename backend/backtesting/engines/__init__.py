@@ -89,34 +89,34 @@ except ImportError:
     FillEvent = None  # type: ignore[misc,assignment]
 
 __all__ = [
-    # Interfaces
-    "BaseBacktestEngine",
-    "BacktestInput",
-    "BacktestOutput",
-    "BacktestMetrics",
-    "TradeRecord",
-    "TradeDirection",
-    "ExitReason",
-    "EngineComparator",
-    # Main Engines
-    "FallbackEngine",  # = V4 (основной)
-    "NumbaEngine",  # = NumbaEngineV2 (быстрый)
-    "DCAEngine",  # = DCA/Grid Trading engine
-    # Explicit versions (for parity tests)
-    "FallbackEngineV4",
-    "NumbaEngineV2",
-    # DCA Components
-    "DCAGridConfig",
-    "DCAGridCalculator",
-    # Deprecated (backward compatibility)
-    "FallbackEngineV2",  # deprecated
-    "FallbackEngineV3",  # deprecated
     # Availability flags
     "NUMBA_AVAILABLE",
+    "BacktestInput",
+    "BacktestMetrics",
+    "BacktestOutput",
+    "BarEvent",
+    # Interfaces
+    "BaseBacktestEngine",
+    "DCAEngine",  # = DCA/Grid Trading engine
+    "DCAGridCalculator",
+    # DCA Components
+    "DCAGridConfig",
+    "EngineComparator",
     # Event-driven (skeleton, ROADMAP)
     "EventDrivenEngine",
     "EventQueue",
-    "BarEvent",
-    "OrderEvent",
+    "ExitReason",
+    # Main Engines
+    "FallbackEngine",  # = V4 (основной)
+    # Deprecated (backward compatibility)
+    "FallbackEngineV2",  # deprecated
+    "FallbackEngineV3",  # deprecated
+    # Explicit versions (for parity tests)
+    "FallbackEngineV4",
     "FillEvent",
+    "NumbaEngine",  # = NumbaEngineV2 (быстрый)
+    "NumbaEngineV2",
+    "OrderEvent",
+    "TradeDirection",
+    "TradeRecord",
 ]

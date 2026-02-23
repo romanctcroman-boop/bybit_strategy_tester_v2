@@ -525,7 +525,7 @@ class TestReinforcementLearning:
         state = env.reset()
         assert state is not None
 
-        next_state, reward, done, info = env.step(0)
+        next_state, _reward, _done, _info = env.step(0)
         assert next_state is not None
 
     def test_experience_replay_push_sample(self):
@@ -538,7 +538,7 @@ class TestReinforcementLearning:
         replay = ExperienceReplay(capacity=100)
 
         # Actual API uses push method instead of add
-        for i in range(50):
+        for _i in range(50):
             exp = Experience(
                 state=np.random.randn(10),
                 action=0,

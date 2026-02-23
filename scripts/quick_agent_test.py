@@ -68,7 +68,7 @@ test("Context Manager", test_context_manager)
 # Test 5: LLM Connections
 def test_llm():
     from backend.agents.llm.connections import LLMConfig, LLMMessage, LLMProvider
-    msg = LLMMessage(role="user", content="Hello")
+    LLMMessage(role="user", content="Hello")
     config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
     assert config.temperature == 0.7
 

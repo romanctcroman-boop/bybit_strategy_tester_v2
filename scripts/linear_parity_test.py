@@ -31,7 +31,7 @@ def get_btcusdh2026_candles() -> pd.DataFrame:
     conn = sqlite3.connect(str(db_path))
 
     query = """
-        SELECT 
+        SELECT
             open_time as timestamp,
             open_price as open,
             high_price as high,
@@ -39,7 +39,7 @@ def get_btcusdh2026_candles() -> pd.DataFrame:
             close_price as close,
             volume
         FROM bybit_kline_audit
-        WHERE symbol = 'BTCUSDH2026' 
+        WHERE symbol = 'BTCUSDH2026'
           AND interval = '15'
         ORDER BY open_time ASC
     """
@@ -97,9 +97,8 @@ def generate_rsi_signals(candles: pd.DataFrame, period: int, overbought: int, ov
                 long_entries[i + 1] = True
 
         # Crossunder: RSI crosses BELOW overbought (Short entry)
-        if prev_rsi >= overbought and curr_rsi < overbought:
-            if i + 1 < len(closes):
-                short_entries[i + 1] = True
+        if prev_rsi >= overbought and curr_rsi < overbought and i + 1 < len(closes):
+            short_entries[i + 1] = True
 
     return long_entries, short_entries
 

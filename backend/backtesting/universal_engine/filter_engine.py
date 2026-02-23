@@ -251,14 +251,12 @@ def apply_htf_filter(
         neutral_lower = htf_ma_val * (1 - neutral_zone_pct)
 
         # Filter long: HTF price above MA (or in neutral zone)
-        if long_entries[i]:
-            if htf_price > neutral_lower:
-                filtered_long[i] = True
+        if long_entries[i] and htf_price > neutral_lower:
+            filtered_long[i] = True
 
         # Filter short: HTF price below MA (or in neutral zone)
-        if short_entries[i]:
-            if htf_price < neutral_upper:
-                filtered_short[i] = True
+        if short_entries[i] and htf_price < neutral_upper:
+            filtered_short[i] = True
 
     return filtered_long, filtered_short
 

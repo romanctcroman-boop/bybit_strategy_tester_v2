@@ -216,11 +216,7 @@ class SecureConfigHandler:
             return self._variables[name].is_sensitive
 
         # Check patterns
-        for pattern in SENSITIVE_PATTERNS:
-            if re.match(pattern, name, re.IGNORECASE):
-                return True
-
-        return False
+        return any(re.match(pattern, name, re.IGNORECASE) for pattern in SENSITIVE_PATTERNS)
 
     def mask_value(self, value: str, visible_chars: int = 4) -> str:
         """Mask a sensitive value."""
@@ -323,7 +319,7 @@ class SecureConfigHandler:
 
         try:
             with open(file_path, encoding="utf-8") as f:
-                for line_num, line in enumerate(f, 1):
+                for _line_num, line in enumerate(f, 1):
                     line = line.strip()
 
                     # Skip comments and empty lines

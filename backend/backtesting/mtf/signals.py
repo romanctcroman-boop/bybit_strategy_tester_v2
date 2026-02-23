@@ -46,7 +46,7 @@ def generate_mtf_rsi_signals(
     # Direction
     direction: str = "both",
     # Entry timing
-    warmup_bars: int = None,
+    warmup_bars: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate RSI signals filtered by HTF trend.
@@ -137,16 +137,12 @@ def generate_mtf_rsi_signals(
         curr_rsi = rsi[i]
 
         # LONG signal: RSI crossover oversold + HTF bullish
-        if direction in ("long", "both"):
-            if prev_rsi <= oversold and curr_rsi > oversold:
-                if allow_long:
-                    long_entries[i + 1] = True  # Entry on next bar
+        if direction in ("long", "both") and prev_rsi <= oversold and curr_rsi > oversold and allow_long:
+            long_entries[i + 1] = True  # Entry on next bar
 
         # SHORT signal: RSI crossunder overbought + HTF bearish
-        if direction in ("short", "both"):
-            if prev_rsi >= overbought and curr_rsi < overbought:
-                if allow_short:
-                    short_entries[i + 1] = True  # Entry on next bar
+        if direction in ("short", "both") and prev_rsi >= overbought and curr_rsi < overbought and allow_short:
+            short_entries[i + 1] = True  # Entry on next bar
 
     # Log statistics
     n_long = np.sum(long_entries)
@@ -255,18 +251,16 @@ def generate_mtf_sma_crossover_signals(
 
         # Golden cross: fast crosses above slow + HTF bullish
         if direction in ("long", "both"):
-            if prev_fast <= prev_slow and curr_fast > curr_slow:
-                if allow_long:
-                    long_entries[i] = True
+            if prev_fast <= prev_slow and curr_fast > curr_slow and allow_long:
+                long_entries[i] = True
             # Death cross for exit
             if prev_fast >= prev_slow and curr_fast < curr_slow:
                 long_exits[i] = True
 
         # Death cross: fast crosses below slow + HTF bearish
         if direction in ("short", "both"):
-            if prev_fast >= prev_slow and curr_fast < curr_slow:
-                if allow_short:
-                    short_entries[i] = True
+            if prev_fast >= prev_slow and curr_fast < curr_slow and allow_short:
+                short_entries[i] = True
             # Golden cross for exit
             if prev_fast <= prev_slow and curr_fast > curr_slow:
                 short_exits[i] = True
@@ -287,7 +281,7 @@ def generate_mtf_signals_with_btc(
     btc_index_map: np.ndarray,
     # Strategy parameters
     strategy_type: str = "rsi",
-    strategy_params: dict = None,
+    strategy_params: dict | None = None,
     # HTF filter parameters
     htf_filter_type: str = "sma",
     htf_filter_period: int = 200,

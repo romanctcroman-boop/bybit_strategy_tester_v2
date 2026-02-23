@@ -267,10 +267,7 @@ class DataService:
 
         # Сортировка
         order_field = getattr(Backtest, order_by, Backtest.created_at)
-        if order_dir == "desc":
-            query = query.order_by(desc(order_field))
-        else:
-            query = query.order_by(asc(order_field))
+        query = query.order_by(desc(order_field)) if order_dir == "desc" else query.order_by(asc(order_field))
 
         return query.offset(offset).limit(limit).all()
 
@@ -503,7 +500,7 @@ class DataService:
                     logger.info(
                         "update_backtest_results: extracted metric keys for backtest %s: %s",
                         backtest_id,
-                        ",".join(sorted([k for k in metrics.keys()]))
+                        ",".join(sorted(metrics.keys()))
                         if hasattr(metrics, "keys")
                         else str(type(metrics)),
                     )

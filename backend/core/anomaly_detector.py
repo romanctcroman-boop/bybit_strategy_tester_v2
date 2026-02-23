@@ -277,7 +277,7 @@ class LogAlertNotifier:
 class CompositeAlertNotifier:
     """Combines multiple alert notifiers."""
 
-    def __init__(self, notifiers: list[AlertNotifier] = None):
+    def __init__(self, notifiers: list[AlertNotifier] | None = None):
         self.notifiers: list[AlertNotifier] = notifiers or []
 
     def add_notifier(self, notifier: AlertNotifier) -> None:

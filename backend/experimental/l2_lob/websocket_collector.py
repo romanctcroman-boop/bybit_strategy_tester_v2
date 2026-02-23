@@ -74,7 +74,6 @@ async def run_websocket_collector(
 
     bids: dict[float, float] = {}
     asks: dict[float, float] = {}
-    last_u = 0
     fp = open(output_path, "a", encoding="utf-8") if output_path else None
 
     def _emit(ts: int, u: int | None, seq: int | None) -> None:
@@ -131,7 +130,6 @@ async def run_websocket_collector(
                     for row in raw_a:
                         if len(row) >= 2:
                             asks[float(row[0])] = float(row[1])
-                    last_u = u or 0
                     _emit(ts, u, seq)
                 elif msg_type == "delta":
                     if u == 1:

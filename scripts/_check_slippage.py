@@ -1,6 +1,7 @@
 """Check strategy slippage config and what _compare_all_metrics uses."""
-import sqlite3
+
 import json
+import sqlite3
 
 conn = sqlite3.connect("data.sqlite3")
 row = conn.execute(

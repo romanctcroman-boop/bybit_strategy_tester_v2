@@ -17,6 +17,7 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import Callable
@@ -487,10 +488,8 @@ class CacheWarmingService:
         self._running = False
         if self._warming_task:
             self._warming_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._warming_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Cache warming service stopped")
 
     async def _warming_loop(self):

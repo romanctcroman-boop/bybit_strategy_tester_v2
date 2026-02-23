@@ -26,7 +26,7 @@ conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 
 # Загружаем максимум данных
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -260,32 +260,32 @@ print(f"""
    💰 Начальный капитал:    $10,000
 
    ────────────────────────────────────────
-   
+
    📈 Net Profit:           ${fb_m.net_profit:,.2f}
    📊 Total Return:         {fb_m.total_return:.2f}%
    📉 Max Drawdown:         {fb_m.max_drawdown:.2f}%
-   
+
    🎯 Total Trades:         {fb_m.total_trades}
    ✅ Win Rate:             {fb_m.win_rate*100:.1f}%
    📊 Profit Factor:        {fb_m.profit_factor:.2f}
-   
+
    📈 Sharpe Ratio:         {fb_m.sharpe_ratio:.2f}
    📈 Sortino Ratio:        {fb_m.sortino_ratio:.2f}
    📈 Calmar Ratio:         {fb_m.calmar_ratio:.2f}
-   
+
    💵 Avg Win:              ${fb_m.avg_win:.2f}
    💸 Avg Loss:             ${fb_m.avg_loss:.2f}
    📊 Payoff Ratio:         {fb_m.payoff_ratio:.2f}
-   
+
    🔄 Recovery Factor:      {fb_m.recovery_factor:.2f}
    📊 Expectancy:           ${fb_m.expectancy:.2f}
-   
+
    ────────────────────────────────────────
-   
+
    ⏱️ FallbackEngineV2:     {fb_time:.3f}s
    ⚡ NumbaEngineV2:        {nb_time:.3f}s
    🚀 Speedup:              {fb_time/nb_time:.1f}x
-   
+
    ✅ Движки дают ИДЕНТИЧНЫЕ результаты!
 """)
 

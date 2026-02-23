@@ -40,7 +40,7 @@ def load_our_signals() -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
     query = """
     SELECT open_time, open_price, high_price, low_price, close_price
-    FROM bybit_kline_audit 
+    FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '15' AND market_type = 'spot'
     ORDER BY open_time ASC
     """

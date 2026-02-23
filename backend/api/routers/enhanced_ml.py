@@ -747,10 +747,7 @@ async def create_ensemble(request: EnsembleCreateRequest) -> dict[str, Any]:
         name = parts[0]
         version = parts[1] if len(parts) > 1 else None
 
-        if version:
-            model = registry.get_model(name, version)
-        else:
-            model = registry.get_production_model(name)
+        model = registry.get_model(name, version) if version else registry.get_production_model(name)
 
         if not model:
             raise HTTPException(status_code=404, detail=f"Model {model_ref} not found")
@@ -1100,7 +1097,7 @@ async def get_feature_importance(request: FeatureImportanceRequest) -> dict[str,
     importance_scores = importance_scores / importance_scores.sum()
 
     features_ranked = sorted(
-        zip(feature_names, importance_scores.tolist()), key=lambda x: x[1], reverse=True
+        zip(feature_names, importance_scores.tolist(), strict=False), key=lambda x: x[1], reverse=True
     )
 
     return {
@@ -1141,7 +1138,7 @@ async def compute_shap_values(request: SHAPRequest) -> dict[str, Any]:
         "feature_names": feature_names,
         "mean_abs_shap": {
             name: round(val, 4)
-            for name, val in zip(feature_names, mean_abs_shap.tolist())
+            for name, val in zip(feature_names, mean_abs_shap.tolist(), strict=False)
         },
         "shap_values_sample": shap_values[:5].tolist() if n_samples > 0 else [],
     }
@@ -1164,7 +1161,7 @@ async def compute_lime_explanation(
     weights = np.random.randn(n_features) * 0.2
 
     explanation = sorted(
-        zip(feature_names[:n_features], weights.tolist()),
+        zip(feature_names[:n_features], weights.tolist(), strict=False),
         key=lambda x: abs(x[1]),
         reverse=True,
     )

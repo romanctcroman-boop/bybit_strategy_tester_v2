@@ -281,7 +281,7 @@ class FallbackEngineV2(BaseBacktestEngine):
 
                 # Accumulate for Long position
                 if in_long and long_size > 0:
-                    for m1_high, m1_low in zip(m1_highs, m1_lows):
+                    for m1_high, m1_low in zip(m1_highs, m1_lows, strict=False):
                         # MFE: max favorable excursion (high - entry for long)
                         current_mfe = max(0, (m1_high - long_entry_price) * long_size)
                         long_accumulated_mfe = max(long_accumulated_mfe, current_mfe)
@@ -291,7 +291,7 @@ class FallbackEngineV2(BaseBacktestEngine):
 
                 # Accumulate for Short position
                 if in_short and short_size > 0:
-                    for m1_high, m1_low in zip(m1_highs, m1_lows):
+                    for m1_high, m1_low in zip(m1_highs, m1_lows, strict=False):
                         # MFE: max favorable excursion (entry - low for short)
                         current_mfe = max(0, (short_entry_price - m1_low) * short_size)
                         short_accumulated_mfe = max(short_accumulated_mfe, current_mfe)
@@ -489,10 +489,7 @@ class FallbackEngineV2(BaseBacktestEngine):
                 entry_price = open_prices[i + 1]
 
                 # TradingView-style: fixed USDT amount OR percentage of capital
-                if use_fixed_amount and fixed_amount > 0:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount and fixed_amount > 0 else cash * position_size
 
                 # Skip if allocated is too small (prevents micro-positions)
                 if allocated >= 1.0:
@@ -604,7 +601,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         param_values = list(param_ranges.values())
 
         for combo in product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=False))
 
             # Применяем параметры к input
             modified_input = self._apply_params(input_data, params)
@@ -710,7 +707,7 @@ class FallbackEngineV2(BaseBacktestEngine):
             m1_highs = candles_1m["high"].values[start_idx:end_idx]
             m1_lows = candles_1m["low"].values[start_idx:end_idx]
 
-            for m1_high, m1_low in zip(m1_highs, m1_lows):
+            for m1_high, m1_low in zip(m1_highs, m1_lows, strict=False):
                 if is_long:
                     # Long: сначала проверяем SL (low), потом TP (high)
                     if sl_price > 0 and m1_low <= sl_price:
@@ -783,10 +780,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         taker_fee: float,
     ) -> tuple[float, float, float]:
         """Расчёт PnL, PnL%, и комиссий (entry + exit как в TV)"""
-        if is_long:
-            pnl = (exit_price - entry_price) * size
-        else:
-            pnl = (entry_price - exit_price) * size
+        pnl = (exit_price - entry_price) * size if is_long else (entry_price - exit_price) * size
 
         # TradingView считает комиссию на ОБЕИХ сторонах: entry + exit
         entry_value = entry_price * size

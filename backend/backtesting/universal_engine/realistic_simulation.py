@@ -296,10 +296,7 @@ class RealisticBarSimulator:
             trigger_idx = np.argmax(trigger_mask)
             # Execution price with small slippage
             slippage = abs(path[trigger_idx] - stop_price) * 0.1
-            if is_long:
-                exec_price = stop_price - slippage
-            else:
-                exec_price = stop_price + slippage
+            exec_price = stop_price - slippage if is_long else stop_price + slippage
             return True, int(trigger_idx), exec_price
 
         return False, -1, 0.0
@@ -804,7 +801,7 @@ class PartialFillSimulator:
 
         total_filled = sum(fill_sizes)
         avg_price = (
-            sum(p * s for p, s in zip(fill_prices, fill_sizes)) / total_filled
+            sum(p * s for p, s in zip(fill_prices, fill_sizes, strict=False)) / total_filled
             if total_filled > 0
             else current_price
         )
@@ -878,10 +875,7 @@ class PartialFillSimulator:
         # Calculate fill probability based on how deep into the bar
         bar_range = bar_high - bar_low
         if bar_range > 0:
-            if is_buy:
-                depth = (limit_price - bar_low) / bar_range
-            else:
-                depth = (bar_high - limit_price) / bar_range
+            depth = (limit_price - bar_low) / bar_range if is_buy else (bar_high - limit_price) / bar_range
             fill_prob = min(1.0, depth * 2)  # Higher prob if limit is more aggressive
         else:
             fill_prob = 1.0
@@ -897,10 +891,7 @@ class PartialFillSimulator:
 
         # Determine actual fill price (possible improvement)
         if self.rng.random() < self.config.price_improvement_prob:
-            if is_buy:
-                fill_price = self.rng.uniform(bar_low, limit_price)
-            else:
-                fill_price = self.rng.uniform(limit_price, bar_high)
+            fill_price = self.rng.uniform(bar_low, limit_price) if is_buy else self.rng.uniform(limit_price, bar_high)
         else:
             fill_price = limit_price
 
@@ -1075,10 +1066,7 @@ class LiquidationEngine:
         is_partial = False
         liquidated_size = 0.0
 
-        if is_long:
-            is_liquidated = current_price <= liq_price
-        else:
-            is_liquidated = current_price >= liq_price
+        is_liquidated = current_price <= liq_price if is_long else current_price >= liq_price
 
         # Check for partial liquidation
         if not is_liquidated and self.config.enable_partial_liquidation:
@@ -1489,25 +1477,25 @@ __all__ = [
     # Bar Simulator
     "BarPathType",
     "BarSimulatorConfig",
+    "DynamicFundingConfig",
+    "DynamicFundingManager",
+    "FeatureEngineering",
+    "FillResult",
+    # Dynamic Funding
+    "FundingRateEntry",
+    # Liquidation
+    "LiquidationConfig",
+    "LiquidationEngine",
+    "LiquidationResult",
+    # ML Interface
+    "MLModelProtocol",
+    "MLStrategyConfig",
+    "MLStrategyInterface",
+    # Partial Fills
+    "PartialFillConfig",
+    "PartialFillSimulator",
     "RealisticBarSimulator",
     # Volume Slippage
     "VolumeSlippageConfig",
     "VolumeSlippageModel",
-    # Dynamic Funding
-    "FundingRateEntry",
-    "DynamicFundingConfig",
-    "DynamicFundingManager",
-    # Partial Fills
-    "PartialFillConfig",
-    "FillResult",
-    "PartialFillSimulator",
-    # Liquidation
-    "LiquidationConfig",
-    "LiquidationResult",
-    "LiquidationEngine",
-    # ML Interface
-    "MLModelProtocol",
-    "MLStrategyConfig",
-    "FeatureEngineering",
-    "MLStrategyInterface",
 ]

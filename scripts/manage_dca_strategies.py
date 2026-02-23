@@ -2,6 +2,9 @@
 Manage DCA Strategies - Delete old ones, create Long and Short
 """
 
+import builtins
+import contextlib
+
 import requests
 
 API_BASE = "http://localhost:8000/api/v1"
@@ -100,10 +103,8 @@ def create_dca_strategy(name: str, direction: str):
         return data
     else:
         print(f"  ❌ Failed: {r.status_code}")
-        try:
+        with contextlib.suppress(builtins.BaseException):
             print(f"     Error: {r.text[:300]}")
-        except:
-            pass
         return None
 
 def verify_strategies():

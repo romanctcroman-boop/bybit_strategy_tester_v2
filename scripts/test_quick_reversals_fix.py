@@ -26,7 +26,7 @@ def main():
     import sqlite3
     conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
     df = pd.read_sql("""
-        SELECT open_time, open_price as open, high_price as high, 
+        SELECT open_time, open_price as open, high_price as high,
                low_price as low, close_price as close, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -109,10 +109,7 @@ def main():
     print("=" * 70)
 
     if vbt_trades is not None and fb_trades is not None:
-        if fb_trades > 0:
-            diff_pct = abs(vbt_trades - fb_trades) / fb_trades * 100
-        else:
-            diff_pct = 0 if vbt_trades == 0 else 100
+        diff_pct = abs(vbt_trades - fb_trades) / fb_trades * 100 if fb_trades > 0 else 0 if vbt_trades == 0 else 100
 
         print(f"   VectorBT trades:  {vbt_trades}")
         print(f"   Fallback trades:  {fb_trades}")

@@ -9,10 +9,10 @@ from backend.backtesting.models import BacktestConfig
 # Load data
 conn = sqlite3.connect('data.sqlite3')
 df = pd.read_sql('''
-    SELECT open_time, open_price as open, high_price as high, 
-           low_price as low, close_price as close, volume 
-    FROM bybit_kline_audit 
-    WHERE symbol='BTCUSDT' AND interval='60' 
+    SELECT open_time, open_price as open, high_price as high,
+           low_price as low, close_price as close, volume
+    FROM bybit_kline_audit
+    WHERE symbol='BTCUSDT' AND interval='60'
     ORDER BY open_time DESC LIMIT 100
 ''', conn)
 conn.close()

@@ -1001,7 +1001,7 @@ class MegaDCATest:
             # Calculate SO levels
             so_levels = []
             deviation = config.price_deviation_pct
-            for i in range(config.max_safety_orders):
+            for _i in range(config.max_safety_orders):
                 so_levels.append(deviation)
                 deviation *= config.step_scale
 
@@ -1053,7 +1053,7 @@ class MegaDCATest:
 
             # Calculate order sizes
             order_sizes = [config.safety_order_size_pct]
-            for i in range(1, config.max_safety_orders):
+            for _i in range(1, config.max_safety_orders):
                 order_sizes.append(order_sizes[-1] * config.volume_scale)
 
             total_position = config.base_order_size_pct + sum(order_sizes)

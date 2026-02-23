@@ -27,7 +27,7 @@ print(f"Время: {datetime.now()}")
 print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -181,9 +181,8 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
 
     def get_metric(result, ext_metrics, name):
         # For extended metrics, read from ext_metrics first
-        if name in EXT_METRICS:
-            if hasattr(ext_metrics, name):
-                return getattr(ext_metrics, name)
+        if name in EXT_METRICS and hasattr(ext_metrics, name):
+            return getattr(ext_metrics, name)
         # For basic metrics, read from result.metrics
         if hasattr(result.metrics, name):
             return getattr(result.metrics, name)
@@ -284,10 +283,10 @@ if all_perfect:
     ██╔═══╝ ██╔══╝   ██╔══██╗██╔══╝  ██╔══╝  ██║        ██║   ╚═╝
     ██║     ███████╗ ██║  ██║██║     ███████╗╚██████╗   ██║   ██╗
     ╚═╝     ╚══════╝ ╚═╝  ╚═╝╚═╝     ╚══════╝ ╚═════╝   ╚═╝   ╚═╝
-    
+
     🎉 100% PARITY НА {len(METRICS)} МЕТРИКАХ × {len(combinations)} КОМБИНАЦИЯХ!
     🔬 Всего: {total_comparisons:,} сравнений
-    
+
     FallbackEngineV2 и NumbaEngineV2 математически ИДЕНТИЧНЫ!
     """)
 else:

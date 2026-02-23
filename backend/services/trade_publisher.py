@@ -9,6 +9,7 @@ Architecture:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
@@ -96,10 +97,8 @@ class TradePublisher:
 
         if self._ws_task:
             self._ws_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._ws_task
-            except asyncio.CancelledError:
-                pass
 
         if self.redis_client:
             await self.redis_client.close()

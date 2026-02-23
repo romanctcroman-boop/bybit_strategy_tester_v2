@@ -6,7 +6,7 @@ import pandas as pd
 # Load DB SPOT data (overlapping period only)
 conn = sqlite3.connect('data.sqlite3')
 db = pd.read_sql_query("""
-    SELECT open_time, open_price FROM bybit_kline_audit 
+    SELECT open_time, open_price FROM bybit_kline_audit
     WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
     AND open_time >= 1727740800000
     ORDER BY open_time LIMIT 100
@@ -33,7 +33,7 @@ print('\n' + '='*60)
 print('Looking for EXACT price matches...')
 print('='*60)
 
-for db_idx, db_row in db.head(20).iterrows():
+for _db_idx, db_row in db.head(20).iterrows():
     db_price = db_row['open_price']
     db_time = db_row['datetime']
 

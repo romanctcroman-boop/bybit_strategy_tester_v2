@@ -37,7 +37,7 @@ async def reload_spot_data():
     # Step 1: Check current state
     conn = sqlite3.connect(DB_PATH)
     cur = conn.execute("""
-        SELECT COUNT(*) FROM bybit_kline_audit 
+        SELECT COUNT(*) FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
     """, (symbol, interval, market_type))
     current_count = cur.fetchone()[0]
@@ -49,7 +49,7 @@ async def reload_spot_data():
     print(f"\n🗑️ Deleting existing {market_type} data...")
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
-        DELETE FROM bybit_kline_audit 
+        DELETE FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
     """, (symbol, interval, market_type))
     conn.commit()
@@ -91,7 +91,7 @@ async def reload_spot_data():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.execute("""
         SELECT COUNT(*), MIN(datetime(open_time/1000, 'unixepoch')), MAX(datetime(open_time/1000, 'unixepoch'))
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
     """, (symbol, interval, market_type))
     count, min_dt, max_dt = cur.fetchone()
@@ -99,7 +99,7 @@ async def reload_spot_data():
     # Get sample prices
     cur = conn.execute("""
         SELECT datetime(open_time/1000, 'unixepoch'), open_price
-        FROM bybit_kline_audit 
+        FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
         ORDER BY open_time LIMIT 5
     """, (symbol, interval, market_type))
