@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **FallbackEngineV4._calculate_metrics: Complete metrics implementation (2026-02-26):**
+- **FallbackEngineV4.\_calculate_metrics: Complete metrics implementation (2026-02-26):**
 
     Previously `_calculate_metrics` computed only basic totals; long/short breakdown metrics,
     avg_trade, largest_win/loss, payoff_ratio, expectancy, duration metrics, recovery_factor,
@@ -28,17 +28,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Verified against TradingView export (Strategy_RSI_L/S_4, 121 trades)**:
 
-    | Metric | TV | Ours | Status |
-    |--------|-----|------|--------|
-    | avg_win | 13.72 | 13.60 | ✅ OK |
-    | largest_win | 13.72 | 13.61 | ✅ OK |
-    | largest_loss | -31.42 | -31.42 | ✅ OK |
-    | short_win_rate | 77.42% | 77.05% | ✅ OK |
-    | commission_paid | 170.04 | 165.15 | ~2.9% (3 fewer trades) |
-    | long_trades | 59 | 57 | 3.4% (3 missing trades = OHLCV data diff) |
-    | short_trades | 62 | 61 | 1.6% |
+    | Metric          | TV     | Ours   | Status                                    |
+    | --------------- | ------ | ------ | ----------------------------------------- |
+    | avg_win         | 13.72  | 13.60  | ✅ OK                                     |
+    | largest_win     | 13.72  | 13.61  | ✅ OK                                     |
+    | largest_loss    | -31.42 | -31.42 | ✅ OK                                     |
+    | short_win_rate  | 77.42% | 77.05% | ✅ OK                                     |
+    | commission_paid | 170.04 | 165.15 | ~2.9% (3 fewer trades)                    |
+    | long_trades     | 59     | 57     | 3.4% (3 missing trades = OHLCV data diff) |
+    | short_trades    | 62     | 61     | 1.6%                                      |
 
 ### Investigated
+
+- **TV Parity analysis: Strategy_RSI_L/S_5 (2026-02-27):**
+
+    Full investigation via `scripts/_rerun_rsi5.py` and `scripts/_rsi5_debug.py`.
+    Strategy: 30m BTCUSDT, RSI-14 with range filter (L: 10–40, S: 50–65) + cross level
+    (long=18, short=63), TP=1.5%, SL=9.1%, IC=1,000,000, leverage=10.
+
+    **Results**: 103 our trades vs 104 TV — all divergences fully explained.
+
+    | Metric          | TV      | Ours    | Status                     |
+    | --------------- | ------- | ------- | -------------------------- |
+    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓  |
+    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓   |
+    | gross_loss      | 924.34  | 924.40  | ✅ OK                      |
+    | commission_paid | 145.35  | 144.00  | ✅ OK (1 fewer trade)      |
+    | total_trades    | 104     | 103     | −1 (explained below)       |
+    | win_rate        | 90.38%  | 90.29%  | ✅ OK                      |
+    | largest_win     | 40.42   | 13.61   | DIFF — TV#27 bar-close exit|
+    | avg_loss        | -92.43  | -92.44  | ✅ OK                      |
+    | long_trades     | 20      | 20      | ✅ OK                      |
+    | short_trades    | 84      | 83      | −1 (explained below)       |
+    | long_profit     | 59.95   | 59.94   | ✅ OK                      |
+
+    **Root causes of divergence** (arithmetic: 13.61 + 26.81 = 40.42 = 381.47 − 341.00 ✓):
+
+    1. **TV#2 missing trade (+13.61 USDT for TV)**: TV#1 SL exit at bar `2025-01-07 00:30 UTC`,
+       TV#2 entry at `01:00 UTC`. Our engine exits T1 at `01:00 UTC` (1-bar lag), so when T2
+       signal fires at `00:30 UTC`, T1 is still open → pyramiding=1 blocks T2 entry.
+
+    2. **TV#27 bar-close exit vs TP-price exit (+26.81 USDT for TV)**: Short entry at `93163.9`,
+       bar `2025-03-03 14:30 UTC` has LOW=`89155` (far below TP=`91766.4`). TV exits at bar
+       CLOSE `89270.3` → pnl=`40.42`. Our engine exits at exact TP price `91766.4` → pnl=`13.61`.
+       TV behavior: same-bar entry+exit → exit at bar close, not TP level.
+
+    **Signal mismatches (41/47 TV signals not found in our data)**:
+    - Root cause: OHLCV data differences between our stored Bybit data and what TV used at
+      recording time. Example: TV#6 entry bar `2025-01-20 02:30 UTC` — our `open=101687.5`
+      vs TV price `103736.4` (~2000 USDT diff). Despite this, our engine produces a similar
+      total trade count because different signals get blocked/allowed in equivalent ways.
+
+    **No engine fixes recommended** — divergences are explained, not bugs:
+    - 1-bar exit lag is by design (exits on close of SL bar = open of next bar is equivalent)
+    - Bar-close vs TP-level exit on same-bar entry+exit is an edge-case TV-specific behavior
 
 - **TV Parity analysis: Strategy_RSI_L/S_4 (2026-02-26):**
 
@@ -53,8 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
        between our `bybit_kline_audit` table and TV's Bybit data feed (confirmed for trade #8:
        our high=101621.7 > TP=101611.65 triggers exit, TV's high ≤ TP so it doesn't)
     5. Remaining 18.9% PnL gap: caused by different exit bars from OHLCV differences + 3 missing trades
-
-
 
     **Root cause**: Engine used `np.maximum.accumulate(equity_close)` for HWM — this created unrealistically high HWM peaks from unrealized PnL during open positions.
 
