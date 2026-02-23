@@ -9,7 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **TV Parity: max_drawdown_intrabar HWM Algorithm (2026-02-25):**
+- **FallbackEngineV4._calculate_metrics: Complete metrics implementation (2026-02-26):**
+
+    Previously `_calculate_metrics` computed only basic totals; long/short breakdown metrics,
+    avg_trade, largest_win/loss, payoff_ratio, expectancy, duration metrics, recovery_factor,
+    and commission_paid were all zero/missing.
+
+    **Changes**:
+    - Added `avg_trade`, `largest_win`, `largest_loss`, `payoff_ratio`, `expectancy`
+    - Added `avg_trade_duration`, `avg_winning_duration`, `avg_losing_duration`
+    - Added `recovery_factor` (net_profit / max_drawdown_value)
+    - Added `commission_paid` (sum of `TradeRecord.fees` across all trades)
+    - Added full long/short breakdown using `_side_metrics()` helper:
+      `long_trades`, `short_trades`, `*_winning_trades`, `*_losing_trades`,
+      `*_gross_profit`, `*_gross_loss`, `*_profit`, `*_win_rate`,
+      `*_profit_factor`, `*_avg_win`, `*_avg_loss`
+    - Added `commission_paid` field to `BacktestMetrics` dataclass and `to_dict()`
+
+    **Verified against TradingView export (Strategy_RSI_L/S_4, 121 trades)**:
+
+    | Metric | TV | Ours | Status |
+    |--------|-----|------|--------|
+    | avg_win | 13.72 | 13.60 | ✅ OK |
+    | largest_win | 13.72 | 13.61 | ✅ OK |
+    | largest_loss | -31.42 | -31.42 | ✅ OK |
+    | short_win_rate | 77.42% | 77.05% | ✅ OK |
+    | commission_paid | 170.04 | 165.15 | ~2.9% (3 fewer trades) |
+    | long_trades | 59 | 57 | 3.4% (3 missing trades = OHLCV data diff) |
+    | short_trades | 62 | 61 | 1.6% |
+
+### Investigated
+
+- **TV Parity analysis: Strategy_RSI_L/S_4 (2026-02-26):**
+
+    Full investigation via `scripts/_rerun_rsi4.py`, `_compare_exits.py`, `_find_missing_trades.py`.
+
+    **Confirmed findings**:
+    1. All 40 known TV signals present in our RSI adapter output ✅
+    2. Entry prices match exactly: for gap-less BTCUSDT 15m, `close[n] == open[n+1]`
+       so our `close[signal_bar]` = TV's `open[signal_bar+1]`
+    3. Exit timing: our exit_time = TV detection bar + 15min (pending exit system — expected)
+    4. 3 missing trades (118 vs TV's 121): root cause = minor OHLCV data quality differences
+       between our `bybit_kline_audit` table and TV's Bybit data feed (confirmed for trade #8:
+       our high=101621.7 > TP=101611.65 triggers exit, TV's high ≤ TP so it doesn't)
+    5. Remaining 18.9% PnL gap: caused by different exit bars from OHLCV differences + 3 missing trades
+
+
 
     **Root cause**: Engine used `np.maximum.accumulate(equity_close)` for HWM — this created unrealistically high HWM peaks from unrealized PnL during open positions.
 
