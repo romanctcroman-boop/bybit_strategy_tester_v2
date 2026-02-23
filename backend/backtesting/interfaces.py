@@ -764,6 +764,7 @@ class BacktestMetrics:
     expectancy: float = 0.0  # Математическое ожидание
     recovery_factor: float = 0.0
     payoff_ratio: float = 0.0  # avg_win / abs(avg_loss)
+    commission_paid: float = 0.0  # Суммарные комиссии по всем сделкам
 
     def to_dict(self) -> dict[str, Any]:
         """Конвертация в словарь для сериализации"""
@@ -782,6 +783,7 @@ class BacktestMetrics:
             "long_trades": self.long_trades,
             "short_trades": self.short_trades,
             "expectancy": round(self.expectancy, 2),
+            "commission_paid": round(self.commission_paid, 2),
         }
 
 

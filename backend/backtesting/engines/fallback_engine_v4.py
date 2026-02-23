@@ -2679,12 +2679,33 @@ class FallbackEngineV4(BaseBacktestEngine):
         metrics.net_profit = sum(pnls)
         metrics.total_return = (metrics.net_profit / initial_capital) * 100
 
+        # Commission paid (sum of all fees across all trades)
+        metrics.commission_paid = float(sum(getattr(t, "fees", 0) or 0 for t in trades))
+
         metrics.profit_factor = metrics.gross_profit / metrics.gross_loss if metrics.gross_loss > 0 else float("inf")
 
         winning_pnls = [p for p in pnls if p > 0]
         losing_pnls = [p for p in pnls if p < 0]
         metrics.avg_win = float(np.mean(winning_pnls)) if winning_pnls else 0.0
         metrics.avg_loss = float(np.mean(losing_pnls)) if losing_pnls else 0.0
+        metrics.avg_trade = float(np.mean(pnls)) if pnls else 0.0
+        metrics.largest_win = float(max(winning_pnls)) if winning_pnls else 0.0
+        metrics.largest_loss = float(min(losing_pnls)) if losing_pnls else 0.0
+        metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss) if metrics.avg_loss != 0 else float("inf")
+        metrics.expectancy = (
+            metrics.win_rate * metrics.avg_win + (1 - metrics.win_rate) * metrics.avg_loss
+            if metrics.total_trades > 0
+            else 0.0
+        )
+
+        # Duration metrics
+        durations = [t.duration_bars for t in trades if t.duration_bars is not None]
+        if durations:
+            metrics.avg_trade_duration = float(np.mean(durations))
+            win_durs = [t.duration_bars for t in trades if t.pnl > 0 and t.duration_bars is not None]
+            loss_durs = [t.duration_bars for t in trades if t.pnl < 0 and t.duration_bars is not None]
+            metrics.avg_winning_duration = float(np.mean(win_durs)) if win_durs else 0.0
+            metrics.avg_losing_duration = float(np.mean(loss_durs)) if loss_durs else 0.0
 
         # Drawdown
         equity_arr = np.array(equity_curve)
@@ -2697,6 +2718,62 @@ class FallbackEngineV4(BaseBacktestEngine):
             returns = np.array(pnls) / initial_capital
             if np.std(returns) > 0:
                 metrics.sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252)
+
+        # Recovery factor
+        if metrics.max_drawdown > 0:
+            metrics.recovery_factor = metrics.net_profit / (metrics.max_drawdown / 100 * initial_capital)
+
+        # === LONG/SHORT BREAKDOWN ===
+        long_trades = [t for t in trades if str(getattr(t, "direction", "")).lower() == "long"]
+        short_trades = [t for t in trades if str(getattr(t, "direction", "")).lower() == "short"]
+
+        def _side_metrics(side_trades: list[TradeRecord]) -> None | dict:
+            if not side_trades:
+                return None
+            s_pnls = [t.pnl for t in side_trades]
+            wins = [p for p in s_pnls if p > 0]
+            losses = [p for p in s_pnls if p < 0]
+            n = len(s_pnls)
+            return {
+                "total": n,
+                "winning": len(wins),
+                "losing": len(losses),
+                "gross_profit": sum(wins),
+                "gross_loss": abs(sum(losses)),
+                "net_profit": sum(s_pnls),
+                "win_rate": len(wins) / n if n > 0 else 0.0,
+                "profit_factor": sum(wins) / abs(sum(losses)) if losses else float("inf"),
+                "avg_win": float(np.mean(wins)) if wins else 0.0,
+                "avg_loss": float(np.mean(losses)) if losses else 0.0,
+                "largest_win": float(max(wins)) if wins else 0.0,
+                "largest_loss": float(min(losses)) if losses else 0.0,
+            }
+
+        long_m = _side_metrics(long_trades)
+        if long_m:
+            metrics.long_trades = long_m["total"]
+            metrics.long_winning_trades = long_m["winning"]
+            metrics.long_losing_trades = long_m["losing"]
+            metrics.long_gross_profit = long_m["gross_profit"]
+            metrics.long_gross_loss = long_m["gross_loss"]
+            metrics.long_profit = long_m["net_profit"]
+            metrics.long_win_rate = long_m["win_rate"]
+            metrics.long_profit_factor = long_m["profit_factor"]
+            metrics.long_avg_win = long_m["avg_win"]
+            metrics.long_avg_loss = long_m["avg_loss"]
+
+        short_m = _side_metrics(short_trades)
+        if short_m:
+            metrics.short_trades = short_m["total"]
+            metrics.short_winning_trades = short_m["winning"]
+            metrics.short_losing_trades = short_m["losing"]
+            metrics.short_gross_profit = short_m["gross_profit"]
+            metrics.short_gross_loss = short_m["gross_loss"]
+            metrics.short_profit = short_m["net_profit"]
+            metrics.short_win_rate = short_m["win_rate"]
+            metrics.short_profit_factor = short_m["profit_factor"]
+            metrics.short_avg_win = short_m["avg_win"]
+            metrics.short_avg_loss = short_m["avg_loss"]
 
         return metrics
 
