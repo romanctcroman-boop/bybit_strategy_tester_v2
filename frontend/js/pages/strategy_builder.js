@@ -914,6 +914,10 @@ function resetFormToDefaults() {
   const commissionEl = document.getElementById('backtestCommission');
   if (commissionEl) commissionEl.value = '0.07';
 
+  // Slippage (TV parity: 0% default)
+  const slippageEl = document.getElementById('backtestSlippage');
+  if (slippageEl) slippageEl.value = '0.00';
+
   // Leverage
   const leverageEl = document.getElementById('backtestLeverage');
   if (leverageEl) leverageEl.value = '10';
@@ -10273,7 +10277,7 @@ function buildStrategyPayload() {
       _order_amount: positionSizeType === 'fixed_amount' ? positionSizeVal : undefined,
       _no_trade_days: noTradeDays.length ? noTradeDays : undefined,
       _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100,
-      _slippage: parseFloat(document.getElementById('backtestSlippage')?.value || '0.05') / 100,
+      _slippage: parseFloat(document.getElementById('backtestSlippage')?.value || '0') / 100,
       _pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value || '1', 10) || 1,
       _start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
       _end_date: document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10)
@@ -10972,12 +10976,12 @@ function buildBacktestRequest() {
       return rawVal / 100;
     })(),
 
-    // Slippage: read from UI as percentage, convert to decimal (0.05% → 0.0005)
-    // Bug #6 fix: expose slippage in Properties panel instead of hardcoding 0.0005
+    // Slippage: read from UI as percentage, convert to decimal (0% → 0.0)
+    // TV parity: default slippage is 0 (TradingView does not apply slippage by default)
     slippage: (() => {
       const el = document.getElementById('backtestSlippage');
-      const rawSlip = el != null ? parseFloat(el.value) : 0.05;
-      if (isNaN(rawSlip) || rawSlip < 0) return 0.0005;
+      const rawSlip = el != null ? parseFloat(el.value) : 0.0;
+      if (isNaN(rawSlip) || rawSlip < 0) return 0.0;
       if (rawSlip > 5.0) return 0.05; // cap at 5%
       return rawSlip / 100;
     })(),

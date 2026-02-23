@@ -293,7 +293,7 @@ async def create_backtest(request: BacktestCreateRequest):
     # Extract commission/slippage from strategy_params if provided
     params = request.strategy_params or {}
     commission = float(params.get("_commission", 0.0007))  # 0.07% TradingView parity
-    slippage = float(params.get("_slippage", 0.0005))  # Default 0.05%
+    slippage = float(params.get("_slippage", 0.0))  # Default 0% (TV parity: no slippage)
 
     # Extract no_trade_days from strategy_params (UI sends as _no_trade_days)
     no_trade_days_raw = params.get("_no_trade_days", [])
