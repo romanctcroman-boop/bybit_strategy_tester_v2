@@ -105,12 +105,32 @@ ignore = [
     "B904",   # raise without from in except
     "RUF012", # mutable class attributes
     "UP042",  # str+Enum pattern — intentional for JSON serialization compat
+    "RUF001", # ambiguous unicode character in string — false positive for Cyrillic/emoji
+    "RUF002", # ambiguous unicode character in docstring — false positive for Cyrillic/emoji
+    "RUF003", # ambiguous unicode character in comment — false positive for Cyrillic/emoji
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["E402", "E722", "F841", "B011"]
 "tests/**/*.py" = ["E402", "E722", "F841", "B011"]
-"scripts/*.py" = ["E402", "T201"]
+"scripts/*.py" = [
+    "E402",
+    "T201",
+    "F401",   # unused imports in debug scripts
+    "F821",   # undefined names (may reference runtime state)
+    "E741",   # ambiguous variable name (l, O, I) — debug scripts
+    "B007",   # unused loop variable — debug scripts
+    "SIM102",
+    "SIM108",
+    "SIM113",
+    "SIM105",
+    "SIM115", # simplification style
+    "E701",   # multiple statements on one line
+    "E722",   # bare except
+    "B023",   # function uses loop variable
+    "ANN",    # type annotations not required in debug scripts
+    "UP035",  # deprecated typing imports (Dict/List) — debug scripts keep py3.8 compat style
+]
 "analyze_*.py" = ["E402", "T201"]
 "check_*.py" = ["E402", "T201"]
 "debug_*.py" = ["E402", "T201"]
