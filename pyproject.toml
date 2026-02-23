@@ -244,6 +244,25 @@ disable_error_code = [
     "dict-item",
 ]
 
+# Debug/analysis scripts — disable all strict checks (these are one-off scripts)
+[[tool.mypy.overrides]]
+module = "scripts.*"
+disable_error_code = [
+    "union-attr",
+    "attr-defined",
+    "var-annotated",
+    "assignment",
+    "misc",
+    "return-value",
+    "arg-type",
+    "type-var",
+    "name-defined",
+    "operator",
+    "index",
+    "dict-item",
+]
+ignore_errors = true
+
 # ==============================================================================
 # Black (backup formatter if needed)
 # ==============================================================================

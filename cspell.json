@@ -360,7 +360,20 @@
         "raquo",
         "cmaes",
         "ored",
-        "Español"
+        "Español",
+        "tpnl",
+        "tsig",
+        "opnl",
+        "dstd",
+        "ppyr",
+        "wstd",
+        "wneg",
+        "norfr",
+        "brentq",
+        "mneg",
+        "dneg",
+        "bstd",
+        "urpnl"
     ],
     "ignorePaths": [
         ".gitignore",
