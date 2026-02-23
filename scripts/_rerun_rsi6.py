@@ -1,20 +1,15 @@
 """
-Rerun backtest for Strategy_RSI_L\\S_6 with TV-matching params (IC=1M, slippage=0)
-and compare entry signals to TV CSV q4.csv (47 of 104 trades listed).
+Rerun backtest for Strategy_RSI_L\\S_6 — all parameters loaded from DB.
 
-TV settings confirmed from q5.csv + DB (5c03fd86-a821-4a62-a783-4d617bf25bc7):
+DB strategy: 5c03fd86-a821-4a62-a783-4d617bf25bc7
   Timeframe: 30 minutes
-  IC=1,000,000  commission=0.07%  slippage=0 (TV)  leverage=10
-  position_size=10%  BaseCash=100 USDT  direction=both
-  SL=9.1%  TP=1.5%
+  IC=1,000,000  commission=0.07%  slippage=0.0  leverage=10
+  SL=9.1%  TP=1.5%  BaseCash=100 USDT  direction=both  pyramiding=1
   RSI period=14, source=close
   use_long_range=True,  long_rsi_more=10,  long_rsi_less=40
   use_short_range=True, short_rsi_more=50, short_rsi_less=65
   use_cross_level=True, cross_long_level=18, cross_short_level=63
   opposite_signal=False, use_cross_memory=False
-
-NOTE: RSI_6 DB has _slippage=0.0005, but TV uses 0 ticks (Проскальзывание=0).
-      We run with slippage=0 to match TV export exactly.
 
 TV export results (from q1/q2/q3.csv):
   net_profit=381.47  gross_profit=1305.81  gross_loss=924.34
@@ -150,6 +145,36 @@ def load_strategy_graph() -> dict:
     return graph
 
 
+def load_bt_params() -> dict:
+    """Read all backtest execution params from DB (parameters JSON + builder_blocks + timeframe)."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT parameters, builder_blocks, timeframe FROM strategies WHERE id=?",
+        (STRATEGY_ID,),
+    )
+    row = cur.fetchone()
+    conn.close()
+
+    params = json.loads(row[0]) if isinstance(row[0], str) else (row[0] or {})
+    blocks = json.loads(row[1]) if isinstance(row[1], str) else (row[1] or [])
+    timeframe = row[2]
+
+    # Find Static SL/TP block
+    sltp_block = next((b for b in blocks if b.get("type") == "static_sltp"), {})
+    sltp_params = sltp_block.get("params", {})
+
+    return {
+        "slippage":    float(params.get("_slippage", 0.0)),
+        "taker_fee":   float(params.get("_commission", 0.0007)),
+        "leverage":    int(params.get("_leverage", 10)),
+        "pyramiding":  int(params.get("_pyramiding", 1)),
+        "take_profit": float(sltp_params.get("take_profit_percent", 1.5)) / 100.0,
+        "stop_loss":   float(sltp_params.get("stop_loss_percent", 9.1)) / 100.0,
+        "interval":    str(timeframe or "30"),
+    }
+
+
 def generate_signals(ohlcv: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     """Generate signals using StrategyBuilderAdapter for Strategy_RSI_L\\S_6."""
     from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
@@ -173,9 +198,17 @@ def utc3_to_utc(s: str) -> pd.Timestamp:
 
 
 def main() -> None:
+    # Load all execution params from DB first
+    p = load_bt_params()
+
     print("=" * 72)
     print("RSI_L\\S_6 — Signal comparison vs TV (q4.csv, UTC+3 → signal bar = entry-30min)")
-    print("Timeframe: 30m | SL=9.1% | TP=1.5% | slippage=0 (TV) | IC=1,000,000")
+    print(
+        f"Params from DB: TF={p['interval']}m | SL={p['stop_loss']*100:.1f}% | "
+        f"TP={p['take_profit']*100:.1f}% | slippage={p['slippage']} | "
+        f"fee={p['taker_fee']} | lev={p['leverage']}x | pyramid={p['pyramiding']}"
+    )
+    print("IC=1,000,000  BaseCash=100 USDT  (not stored in DB)")
     print("=" * 72)
 
     # 1. Load OHLCV (30m bars)
@@ -333,18 +366,18 @@ def main() -> None:
             long_exits=long_exits,
             short_entries=short_entries,
             short_exits=short_exits,
-            initial_capital=1_000_000.0,
+            initial_capital=1_000_000.0,   # IC — not in DB, TV standard
             position_size=0.10,
             use_fixed_amount=True,
-            fixed_amount=100.0,  # TV: BaseCash=100 USDT
-            leverage=10,
-            stop_loss=0.091,  # SL=9.1%
-            take_profit=0.015,  # TP=1.5%
-            taker_fee=0.0007,  # commission=0.07%
-            slippage=0.0,  # TV: 0 ticks (DB has 0.0005 but TV uses 0)
+            fixed_amount=100.0,            # BaseCash=100 USDT — not in DB
+            leverage=p["leverage"],
+            stop_loss=p["stop_loss"],
+            take_profit=p["take_profit"],
+            taker_fee=p["taker_fee"],
+            slippage=p["slippage"],
             direction=TradeDirection.BOTH,
-            pyramiding=1,
-            interval="30",
+            pyramiding=p["pyramiding"],
+            interval=p["interval"],
         )
 
         engine = FallbackEngineV4()
