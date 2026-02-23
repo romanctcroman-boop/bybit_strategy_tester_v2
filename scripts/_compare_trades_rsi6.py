@@ -159,7 +159,7 @@ def load_bt_params() -> dict:
     params = json.loads(row[0]) if isinstance(row[0], str) else (row[0] or {})
     blocks = json.loads(row[1]) if isinstance(row[1], str) else (row[1] or [])
     timeframe = row[2]
-    sltp_block = next((b for b in blocks if b.get("type") == "static_sltp"), {})
+    sltp_block: dict = next((b for b in blocks if b.get("type") == "static_sltp"), {})
     sltp_params = sltp_block.get("params", {})
     return {
         "slippage": float(params.get("_slippage", 0.0)),
@@ -281,7 +281,7 @@ def main() -> None:
     for i, t in enumerate(our_trades):
         our_num = i + 1
         key = (t.direction, round(t.entry_price, 1))
-        tv = tv_lookup.get(key)
+        tv: TvTrade | None = tv_lookup.get(key)
 
         our_entry = normalize_ts(t.entry_time)
         our_exit = normalize_ts(t.exit_time)
@@ -348,7 +348,9 @@ def main() -> None:
     if unmatched_tv:
         print("=== TV trades NOT matched by engine (entry_price not found) ===")
         for tv in unmatched_tv:
-            print(f"  TV#{tv.num} {tv.side:5s} entry={tv.entry_price:.1f} ({tv.entry_utc3} UTC+3)  exit={tv.exit_price:.1f}  pnl={tv.pnl:.2f}")
+            print(
+                f"  TV#{tv.num} {tv.side:5s} entry={tv.entry_price:.1f} ({tv.entry_utc3} UTC+3)  exit={tv.exit_price:.1f}  pnl={tv.pnl:.2f}"
+            )
     else:
         print("=== All 47 TV trades matched in engine ✓ ===")
 
@@ -385,7 +387,9 @@ def main() -> None:
             tv_exit = utc3_to_utc(tv.exit_utc3)
 
             print(f"  Trade #{our_num} (TV#{tv_num}) — {side.upper()} — entry @ {ep:.1f}")
-            print(f"    Entry time:  our={str(normalize_ts(t.entry_time))[:19]}  tv={str(utc3_to_utc(tv.entry_utc3))[:19]}")
+            print(
+                f"    Entry time:  our={str(normalize_ts(t.entry_time))[:19]}  tv={str(utc3_to_utc(tv.entry_utc3))[:19]}"
+            )
             print(f"    Exit time:   our={str(our_exit)[:19]}  tv={str(tv_exit)[:19]}")
             print(
                 f"    Exit price:  our={t.exit_price:.4f}  tv={tv.exit_price:.4f}  diff={t.exit_price - tv.exit_price:+.4f}"

@@ -141,7 +141,7 @@ def load_bt_params() -> dict:
     blocks = json.loads(row[1]) if isinstance(row[1], str) else (row[1] or [])
     timeframe = row[2]
 
-    sltp_block = next((b for b in blocks if b.get("type") == "static_sltp"), {})
+    sltp_block: dict = next((b for b in blocks if b.get("type") == "static_sltp"), {})
     sltp_params = sltp_block.get("params", {})
 
     return {
