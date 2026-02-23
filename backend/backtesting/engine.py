@@ -527,9 +527,7 @@ def _build_performance_metrics(
                 worst_dd_bar_ib = int(np.argmax(dd_to_low_ib))
                 hwm_at_worst_ib = float(hwm_close_ib[worst_dd_bar_ib])
                 max_drawdown_intrabar = (
-                    (max_drawdown_intrabar_value / hwm_at_worst_ib * 100)
-                    if hwm_at_worst_ib > 0
-                    else 0.0
+                    (max_drawdown_intrabar_value / hwm_at_worst_ib * 100) if hwm_at_worst_ib > 0 else 0.0
                 )
 
                 # Max runup intrabar: per-trade approach [E]
@@ -635,10 +633,10 @@ def _build_performance_metrics(
                 # Open trades have xb_m set to last bar; use it directly
                 xb_eff = xb_m if xb_m is not None else (total_bars_m - 1)
                 side_m = str(getattr(t, "side", "")).lower()
-                mpct = margin_long_pct if any(x in side_m for x in ("buy", "long")) else margin_short_pct
+                margin_pct = margin_long_pct if any(x in side_m for x in ("buy", "long")) else margin_short_pct
                 # eb+1 to xb-1 inclusive (exclude entry and exit bars — TV convention)
                 for b_m in range(eb_m + 1, min(xb_eff, total_bars_m)):
-                    mvs_bar[b_m] = qty_m * close_arr_m[b_m] * mpct
+                    mvs_bar[b_m] = qty_m * close_arr_m[b_m] * margin_pct
 
             avg_margin_used = float(mvs_bar.mean()) if total_bars_m > 0 else 0.0
             max_margin_used = float(mvs_bar.max()) if total_bars_m > 0 else 0.0
