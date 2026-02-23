@@ -158,14 +158,14 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
         },
         "use_btc_source": {"type": "boolean", "default": False},
         "use_long_range": {"type": "boolean", "default": False},
-        "long_rsi_more": {"type": "number", "min": 0.1, "max": 100, "default": 30},
-        "long_rsi_less": {"type": "number", "min": 0.1, "max": 100, "default": 70},
+        "long_rsi_more": {"type": "number", "min": 0, "max": 100, "default": 0},    # TV: longRSIMin=0
+        "long_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 50},   # TV: longRSIMax=50
         "use_short_range": {"type": "boolean", "default": False},
-        "short_rsi_less": {"type": "number", "min": 0.1, "max": 100, "default": 70},
-        "short_rsi_more": {"type": "number", "min": 0.1, "max": 100, "default": 30},
+        "short_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 100}, # TV: shortRSIMax=100
+        "short_rsi_more": {"type": "number", "min": 0, "max": 100, "default": 50},  # TV: shortRSIMin=50
         "use_cross_level": {"type": "boolean", "default": False},
-        "cross_long_level": {"type": "number", "min": 0.1, "max": 100, "default": 30},
-        "cross_short_level": {"type": "number", "min": 0.1, "max": 100, "default": 70},
+        "cross_long_level": {"type": "number", "min": 0.1, "max": 100, "default": 29},   # TV: crossLevelLong=29
+        "cross_short_level": {"type": "number", "min": 0.1, "max": 100, "default": 55},  # TV: crossLevelShort=55
         "opposite_signal": {"type": "boolean", "default": False},
         "use_cross_memory": {"type": "boolean", "default": False},
         "cross_memory_bars": {"type": "integer", "min": 1, "max": 100, "default": 5},
@@ -929,39 +929,38 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
                     code="CROSS_VALIDATION",
                 )
             )
-        # Long range: "RSI is More" must be less than "RSI Less"
+        # Long range: long_rsi_more = lower bound (RSI >=), long_rsi_less = upper bound (RSI <=)
+        # TV: longRSIMin >= AND longRSIMax <= → need long_more < long_less
         if params.get("use_long_range", False):
-            long_more = params.get("long_rsi_more", 1)
+            long_more = params.get("long_rsi_more", 0)
             long_less = params.get("long_rsi_less", 50)
             if long_more >= long_less:
                 messages.append(
                     ValidationMessage(
                         severity=ValidationSeverity.ERROR,
-                        message="Long range: 'RSI is More' must be less than 'RSI Less'",
+                        message="Long range: lower bound ('RSI is More') must be less than upper bound ('RSI Less')",
                         field="long_rsi_more",
                         code="CROSS_VALIDATION",
                     )
                 )
-        # Short range: short_rsi_less is the UPPER bound (RSI <= short_rsi_less)
-        #              short_rsi_more is the LOWER bound (RSI >= short_rsi_more)
-        # Engine: short_range_condition = (rsi <= short_less) & (rsi >= short_more)
-        # So we need: short_more < short_less  (lower bound < upper bound)
+        # Short range: short_rsi_more = lower bound (RSI >=), short_rsi_less = upper bound (RSI <=)
+        # TV: shortRSIMin >= AND shortRSIMax <= → need short_more < short_less
         if params.get("use_short_range", False):
-            short_more = params.get("short_rsi_more", 30)
-            short_less = params.get("short_rsi_less", 70)
+            short_more = params.get("short_rsi_more", 50)
+            short_less = params.get("short_rsi_less", 100)
             if short_more >= short_less:
                 messages.append(
                     ValidationMessage(
                         severity=ValidationSeverity.ERROR,
-                        message="Short range: 'RSI More' (lower bound) must be less than 'RSI is Less' (upper bound)",
+                        message="Short range: lower bound ('RSI More') must be less than upper bound ('RSI is Less')",
                         field="short_rsi_more",
                         code="CROSS_VALIDATION",
                     )
                 )
-        # Cross levels: long cross level should typically be below short cross level
+        # Cross levels: TV warns when crossLevelLong >= crossLevelShort
         if params.get("use_cross_level", False):
-            cross_long = params.get("cross_long_level", 30)
-            cross_short = params.get("cross_short_level", 70)
+            cross_long = params.get("cross_long_level", 29)
+            cross_short = params.get("cross_short_level", 55)
             if cross_long >= cross_short:
                 messages.append(
                     ValidationMessage(

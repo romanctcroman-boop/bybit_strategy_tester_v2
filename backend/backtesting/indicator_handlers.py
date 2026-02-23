@@ -118,8 +118,8 @@ def _handle_rsi(
 
     # --- Range filter ---
     if use_long_range:
-        long_more = float(params.get("long_rsi_more", 30))
-        long_less = float(params.get("long_rsi_less", 70))
+        long_more = float(params.get("long_rsi_more", 0))    # TV: longRSIMin=0  (>= lower bound)
+        long_less = float(params.get("long_rsi_less", 50))   # TV: longRSIMax=50 (<= upper bound)
         if long_more > long_less:
             logger.warning(
                 "RSI range inversion: long_more={} > long_less={} — swapping",
@@ -132,8 +132,8 @@ def _handle_rsi(
         long_range_condition = pd.Series(True, index=ohlcv.index)
 
     if use_short_range:
-        short_less = float(params.get("short_rsi_less", 70))
-        short_more = float(params.get("short_rsi_more", 30))
+        short_less = float(params.get("short_rsi_less", 100))  # TV: shortRSIMax=100 (<= upper bound)
+        short_more = float(params.get("short_rsi_more", 50))   # TV: shortRSIMin=50  (>= lower bound)
         if short_more > short_less:
             logger.warning(
                 "RSI range inversion: short_more={} > short_less={} — swapping",
@@ -147,8 +147,8 @@ def _handle_rsi(
 
     # --- Cross level ---
     if use_cross_level:
-        cross_long_level = params.get("cross_long_level", 30)
-        cross_short_level = params.get("cross_short_level", 70)
+        cross_long_level = params.get("cross_long_level", 29)   # TV: crossLevelLong=29
+        cross_short_level = params.get("cross_short_level", 55)  # TV: crossLevelShort=55
         rsi_prev = rsi.shift(1)
         cross_long = (rsi_prev <= cross_long_level) & (rsi > cross_long_level)
         cross_short = (rsi_prev >= cross_short_level) & (rsi < cross_short_level)

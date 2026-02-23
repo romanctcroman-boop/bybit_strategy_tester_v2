@@ -3378,18 +3378,18 @@ function getDefaultParams(blockType) {
       timeframe: 'Chart',
       // BTC source
       use_btc_source: false,
-      // Long range filter
+      // Long range filter  (TV: longRSIMin=0 >= , longRSIMax=50 <=)
       use_long_range: false,
-      long_rsi_more: 30,
-      long_rsi_less: 70,
-      // Short range filter
+      long_rsi_more: 0,
+      long_rsi_less: 50,
+      // Short range filter (TV: shortRSIMin=50 >= , shortRSIMax=100 <=)
       use_short_range: false,
-      short_rsi_less: 70,
-      short_rsi_more: 30,
-      // Cross level
+      short_rsi_more: 50,
+      short_rsi_less: 100,
+      // Cross level       (TV: crossLevelLong=29, crossLevelShort=55)
       use_cross_level: false,
-      cross_long_level: 30,
-      cross_short_level: 70,
+      cross_long_level: 29,
+      cross_short_level: 55,
       opposite_signal: false,
       // Cross memory
       use_cross_memory: false,
