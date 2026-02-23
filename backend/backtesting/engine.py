@@ -488,12 +488,48 @@ def _build_performance_metrics(
                     equity_close_ib[i] = initial_capital + cum_pnl_ib + urpnl_c
                     equity_low_ib[i] = initial_capital + cum_pnl_ib + urpnl_l
 
-                # Max drawdown intrabar: HWM from close, drawdown to intrabar lows
-                hwm_close_ib = np.maximum.accumulate(equity_close_ib)
+                # Max drawdown intrabar: TradingView-parity HWM algorithm (Algorithm S)
+                # TV HWM updates only on realized equity events:
+                #   - At trade ENTRY: HWM = max(HWM, realized_equity + entry_commission)
+                #   - At trade EXIT:  HWM = max(HWM, realized_equity_after_exit)
+                #   - Out of position: HWM = max(HWM, realized_equity)
+                # This matches TV's behavior where entry commission is immediately
+                # subtracted from account equity and reflected in the HWM baseline.
+                commission_rate_ib = getattr(config, "commission_value", 0.0007) or 0.0007
+                hwm_close_ib = np.zeros(total_bars_ib)
+                cur_hwm_ib = initial_capital
+                cum_pnl_hwm = 0.0
+                cur_trade_hwm = None
+                for i in range(total_bars_ib):
+                    # Process exit first
+                    if i in trade_by_exit_ib and cur_trade_hwm is not None:
+                        tr_hwm = trade_by_exit_ib[i]
+                        if tr_hwm is cur_trade_hwm:
+                            cum_pnl_hwm += getattr(tr_hwm, "pnl", 0) or 0
+                            cur_hwm_ib = max(cur_hwm_ib, initial_capital + cum_pnl_hwm)
+                            cur_trade_hwm = None
+                    # Process entry
+                    if i in trade_by_entry_ib:
+                        t_new_hwm = trade_by_entry_ib[i]
+                        ep_new = getattr(t_new_hwm, "entry_price", 0) or 0
+                        qty_new = getattr(t_new_hwm, "size", 0) or 0
+                        e_comm = ep_new * qty_new * commission_rate_ib
+                        # At entry: HWM = realized + entry_commission (TV behavior)
+                        cur_hwm_ib = max(cur_hwm_ib, initial_capital + cum_pnl_hwm + e_comm)
+                        cur_trade_hwm = t_new_hwm
+                    # Out of position: update HWM with realized equity
+                    if cur_trade_hwm is None:
+                        cur_hwm_ib = max(cur_hwm_ib, initial_capital + cum_pnl_hwm)
+                    hwm_close_ib[i] = cur_hwm_ib
                 dd_to_low_ib = hwm_close_ib - equity_low_ib
                 max_drawdown_intrabar_value = float(dd_to_low_ib.max())
+                # TV parity: percentage is dd_value / HWM_at_worst_bar (not initial_capital)
+                worst_dd_bar_ib = int(np.argmax(dd_to_low_ib))
+                hwm_at_worst_ib = float(hwm_close_ib[worst_dd_bar_ib])
                 max_drawdown_intrabar = (
-                    (max_drawdown_intrabar_value / initial_capital * 100) if initial_capital > 0 else 0.0
+                    (max_drawdown_intrabar_value / hwm_at_worst_ib * 100)
+                    if hwm_at_worst_ib > 0
+                    else 0.0
                 )
 
                 # Max runup intrabar: per-trade approach [E]
@@ -1869,9 +1905,9 @@ class BacktestEngine:
                                 exit_reason = "take_profit"
                                 # Gap-through: if bar open already past TP, fill at open (TV parity)
                                 _bar_open = open_prices[i]
-                                if is_long and _bar_open >= tp_triggered_at[1]:
-                                    exit_price = _bar_open
-                                elif not is_long and _bar_open <= tp_triggered_at[1]:
+                                if (is_long and _bar_open >= tp_triggered_at[1]) or (
+                                    not is_long and _bar_open <= tp_triggered_at[1]
+                                ):
                                     exit_price = _bar_open
                                 else:
                                     exit_price = tp_triggered_at[1]
@@ -1888,9 +1924,9 @@ class BacktestEngine:
                                     exit_reason = "take_profit"
                                     # Gap-through: if bar open already past TP, fill at open (TV parity)
                                     _bar_open = open_prices[i]
-                                    if is_long and _bar_open >= tp_triggered_at[1]:
-                                        exit_price = _bar_open
-                                    elif not is_long and _bar_open <= tp_triggered_at[1]:
+                                    if (is_long and _bar_open >= tp_triggered_at[1]) or (
+                                        not is_long and _bar_open <= tp_triggered_at[1]
+                                    ):
                                         exit_price = _bar_open
                                     else:
                                         exit_price = tp_triggered_at[1]
@@ -1905,9 +1941,9 @@ class BacktestEngine:
                             exit_reason = "take_profit"
                             # Gap-through: if bar open already past TP, fill at open (TV parity)
                             _bar_open = open_prices[i]
-                            if is_long and _bar_open >= tp_triggered_at[1]:
-                                exit_price = _bar_open
-                            elif not is_long and _bar_open <= tp_triggered_at[1]:
+                            if (is_long and _bar_open >= tp_triggered_at[1]) or (
+                                not is_long and _bar_open <= tp_triggered_at[1]
+                            ):
                                 exit_price = _bar_open
                             else:
                                 exit_price = tp_triggered_at[1]

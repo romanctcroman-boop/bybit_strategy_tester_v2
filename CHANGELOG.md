@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TV Parity: max_drawdown_intrabar HWM Algorithm (2026-02-25):**
+
+    **Root cause**: Engine used `np.maximum.accumulate(equity_close)` for HWM — this created unrealistically high HWM peaks from unrealized PnL during open positions.
+
+    **Investigation**: Through bar-by-bar analysis, identified that:
+    - `equity_low[6393]` matched TV exactly (`10046.5845`) — adversarial equity was correct
+    - HWM mismatch: our `10197.9098` vs TV needed `10193.5745` (diff = `4.3353`)
+    - TV HWM never includes unrealized PnL peaks; instead HWM updates only at realized equity events
+
+    **Algorithm S (TV-parity)**:
+    - At trade **ENTRY**: `HWM = max(HWM, realized_equity + entry_commission)`
+    - At trade **EXIT**: `HWM = max(HWM, realized_equity_after_exit)`
+    - **Out of position**: `HWM = max(HWM, realized_equity)`
+    - Intrabar low is used for the adverse equity side (unchanged)
+
+    The entry commission (`ep * qty * 0.0007 ≈ 0.70`) is immediately reflected in HWM, matching TV's accounting where the commission is charged at entry and affects the equity base.
+
+    **Percentage formula fix**: TV computes `dd% = dd_value / HWM_at_worst_bar * 100`, not `/ initial_capital * 100`.
+
+    **Result**:
+    - `max_drawdown_intrabar_value`: `151.33` → `147.00` vs TV `146.99` (**0.01%** ✅)
+    - `max_drawdown_intrabar%`: `1.51%` → `1.4421%` vs TV `1.44%` (**0.15%** ✅)
+    - All 16/17 metrics now ✅ (only `open_pnl` remains ❌ by design — live price)
+
 - **TV Parity Complete — tp_sl_active_from, Intrabar Guard, Gap-Through, is_open (2026-02-24):**
 
     **Root cause 1 (tp_sl_active_from)**: TP/SL were checked starting from bar `entry_idx + 1` (one bar after entry). TradingView only activates TP/SL orders starting from `entry_idx + 2` (the bar after the entry bar's next bar). This caused trade #100 to exit one bar too early via the intrabar engine.
