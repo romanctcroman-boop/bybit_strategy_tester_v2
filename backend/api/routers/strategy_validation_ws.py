@@ -942,15 +942,18 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
                         code="CROSS_VALIDATION",
                     )
                 )
-        # Short range: "RSI More" must be less than "RSI is Less"
+        # Short range: short_rsi_less is the UPPER bound (RSI <= short_rsi_less)
+        #              short_rsi_more is the LOWER bound (RSI >= short_rsi_more)
+        # Engine: short_range_condition = (rsi <= short_less) & (rsi >= short_more)
+        # So we need: short_more < short_less  (lower bound < upper bound)
         if params.get("use_short_range", False):
-            short_more = params.get("short_rsi_more", 50)
-            short_less = params.get("short_rsi_less", 100)
+            short_more = params.get("short_rsi_more", 30)
+            short_less = params.get("short_rsi_less", 70)
             if short_more >= short_less:
                 messages.append(
                     ValidationMessage(
                         severity=ValidationSeverity.ERROR,
-                        message="Short range: 'RSI More' must be less than 'RSI is Less'",
+                        message="Short range: 'RSI More' (lower bound) must be less than 'RSI is Less' (upper bound)",
                         field="short_rsi_more",
                         code="CROSS_VALIDATION",
                     )
