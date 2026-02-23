@@ -99,7 +99,10 @@ def _handle_rsi(
     adapter: StrategyBuilderAdapter,
 ) -> dict[str, pd.Series]:
     period = _clamp_period(params.get("period", 14))
-    rsi = vbt.RSI.run(close, window=period).rsi
+    # Use Wilder's smoothed RSI (SMA seed + Wilder smoothing) which matches TradingView exactly.
+    # vbt.RSI uses a different smoothing (pure EWM) that diverges from TV RSI values.
+    rsi_arr = calculate_rsi(close.values, period=period)
+    rsi = pd.Series(rsi_arr, index=close.index)
 
     use_long_range = params.get("use_long_range", False)
     use_short_range = params.get("use_short_range", False)

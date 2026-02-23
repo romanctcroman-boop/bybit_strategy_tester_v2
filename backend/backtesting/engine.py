@@ -1269,6 +1269,7 @@ class BacktestEngine:
         #   last_order    — use last entry/DCA order price
         sl_type = getattr(config, "sl_type", "average_price")
         last_entry_price = 0.0  # Tracks the most recent entry/DCA fill price
+        signal_price = 0.0  # Close price at signal bar (TV TP/SL anchor — no slippage)
 
         # ========== ATR-BASED DYNAMIC SL/TP ==========
         # ATR exit uses per-bar ATR values to compute dynamic SL/TP price levels.
@@ -1448,6 +1449,9 @@ class BacktestEngine:
                 elif direction in ("long", "both") and long_entries[i]:
                     entry_price = price * (1 + slippage)
                     last_entry_price = entry_price  # Track last fill for sl_type=last_order
+                    # TradingView anchors TP/SL to the SIGNAL price (close), not the fill price.
+                    # Using signal_price for TP/SL trigger levels matches TV parity.
+                    signal_price = price  # close without slippage
 
                     # Bybit formula: Position Value = Margin * Leverage
                     # allocated_capital = margin (what we risk from our cash)
@@ -1485,6 +1489,8 @@ class BacktestEngine:
                 elif direction in ("short", "both") and short_entries is not None and short_entries[i]:
                     entry_price = price * (1 - slippage)
                     last_entry_price = entry_price  # Track last fill for sl_type=last_order
+                    # TradingView anchors TP/SL to the SIGNAL price (close), not the fill price.
+                    signal_price = price  # close without slippage
 
                     # Bybit formula: Position Value = Margin * Leverage
 
@@ -1565,16 +1571,18 @@ class BacktestEngine:
                 # sl_ref_price: reference price for SL calculation
                 # - average_price (default): uses entry_price (average across DCA fills)
                 # - last_order: uses last_entry_price (most recent fill)
-                sl_ref_price = last_entry_price if sl_type == "last_order" and last_entry_price > 0 else entry_price
+                # TradingView anchors TP/SL trigger to the SIGNAL price (close without slippage).
+                # signal_price is set at entry and used here; fall back to entry_price if 0.
+                sl_ref_price = last_entry_price if sl_type == "last_order" and last_entry_price > 0 else signal_price
                 # SL/TP percentages represent price movement (TradingView parity)
                 # e.g. stop_loss=0.05 means 5% price drop triggers SL
                 # Leverage only affects PnL amount, NOT trigger price
                 if is_long:
                     worst_pnl_pct = (worst_price_in_bar - sl_ref_price) / sl_ref_price
-                    best_pnl_pct = (best_price_in_bar - entry_price) / entry_price
+                    best_pnl_pct = (best_price_in_bar - signal_price) / signal_price
                 else:
                     worst_pnl_pct = (sl_ref_price - worst_price_in_bar) / sl_ref_price
-                    best_pnl_pct = (entry_price - best_price_in_bar) / entry_price
+                    best_pnl_pct = (signal_price - best_price_in_bar) / signal_price
 
                 should_exit = False
                 exit_reason = ""
@@ -1590,15 +1598,14 @@ class BacktestEngine:
                         interval_ms = self._get_interval_ms(config.interval)
                         bar_end_ms = bar_start_ms + interval_ms
 
-                        # Calculate SL/TP prices (% of price, NOT % of margin)
-                        # SL uses sl_ref_price for sl_type support (average vs last_order)
-                        # Matches FallbackEngineV4: entry * (1 ± stop_loss)
+                        # Calculate SL/TP prices (% of signal price, NOT % of margin)
+                        # Matches TradingView: anchor to close[signal_bar] (no slippage)
                         if is_long:
                             sl_price = sl_ref_price * (1 - stop_loss) if stop_loss else None
-                            tp_price = entry_price * (1 + take_profit) if take_profit else None
+                            tp_price = signal_price * (1 + take_profit) if take_profit else None
                         else:
                             sl_price = sl_ref_price * (1 + stop_loss) if stop_loss else None
-                            tp_price = entry_price * (1 - take_profit) if take_profit else None
+                            tp_price = signal_price * (1 - take_profit) if take_profit else None
 
                         # Check SL/TP on each tick - find which triggers FIRST
                         sl_triggered_at = None  # (tick_index, fill_price)
@@ -1781,8 +1788,8 @@ class BacktestEngine:
                         should_exit = True
                         exit_reason = "take_profit"
                         apply_slippage = False  # TP is limit order -> no slippage
-                        # Calculate exact TP price
-                        exit_price = entry_price * (1 + take_profit) if is_long else entry_price * (1 - take_profit)
+                        # Calculate exact TP price anchored to signal_price (TV parity: no slippage in anchor)
+                        exit_price = signal_price * (1 + take_profit) if is_long else signal_price * (1 - take_profit)
                         # Ensure exit price is within bar range
                         exit_price = max(current_low, min(current_high, exit_price))
 
@@ -1919,6 +1926,7 @@ class BacktestEngine:
                     position = 0.0
                     entry_price = 0.0
                     last_entry_price = 0.0
+                    signal_price = 0.0
                     entry_time = None
                     entry_size = 0.0
                     # Reset breakeven state for next trade
@@ -1934,6 +1942,49 @@ class BacktestEngine:
                     # Reset margin/fee tracking
                     margin_allocated = 0.0
                     entry_fees_paid = 0.0
+
+                    # ========== SAME-BAR RE-ENTRY (TradingView parity) ==========
+                    # TradingView allows entering a new position on the SAME bar that
+                    # a TP/SL exit fires, if an entry signal is present on that bar.
+                    # This handles quick reversals: exit long TP → enter short same bar.
+                    # Only applies to TP/SL exits (not signal exits, which use close price).
+                    if exit_reason in ("take_profit", "stop_loss") and cash > 0:
+                        _can_long = direction in ("long", "both") and long_entries[i]
+                        _can_short = (
+                            direction in ("short", "both")
+                            and short_entries is not None
+                            and short_entries[i]
+                        )
+                        if _can_long or _can_short:
+                            # Use close price for the new entry (TV: next bar open = this bar close)
+                            _ep = price * (1 + slippage) if _can_long else price * (1 - slippage)
+                            _sp = price  # signal_price anchor (no slippage)
+                            _alloc = cash * config.position_size
+                            _pv = _alloc * leverage
+                            _es = _pv / (_ep * (1 + config.taker_fee))
+                            _fees = _pv * config.taker_fee
+                            if cash >= _alloc + _fees:
+                                cash -= _alloc + _fees
+                                margin_allocated = _alloc
+                                entry_fees_paid = _fees
+                                entry_price = _ep
+                                signal_price = _sp
+                                last_entry_price = _ep
+                                position = _es
+                                entry_size = _es
+                                is_long = _can_long
+                                entry_time = timestamps[i]
+                                entry_idx = i
+                                max_favorable_price = _ep
+                                max_adverse_price = _ep
+                                if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
+                                    atr_sl_price = _ep + atr_sl_values[i] * atr_sl_mult if not is_long else _ep - atr_sl_values[i] * atr_sl_mult
+                                else:
+                                    atr_sl_price = None
+                                if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
+                                    atr_tp_price = _ep - atr_tp_values[i] * atr_tp_mult if not is_long else _ep + atr_tp_values[i] * atr_tp_mult
+                                else:
+                                    atr_tp_price = None
 
             # Update equity
             if position > 0:

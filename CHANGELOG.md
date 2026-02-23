@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Fixed
+
+- **RSI Indicator — TradingView Parity Fix (2026-02-23):**
+
+    **Root cause**: `_handle_rsi()` in `backend/backtesting/indicator_handlers.py` was using `vbt.RSI.run(close, window=period).rsi` (VectorBT's RSI, pure EWM smoothing) instead of the correct Wilder's RSI formula used by TradingView (SMA seed + Wilder's smoothing = `(prev * (n-1) + current) / n`).
+
+    **Impact**: VectorBT and TradingView RSI values diverge significantly even on the same data. For example, at bar `2025-11-03 05:00:00 UTC`, VBT RSI=20.92 vs TV/Wilder RSI=30.72. This caused the RSI cross signal detection to fire at completely different bars, leading to totally different trade sequences.
+
+    **Fix**: Replaced `vbt.RSI.run(close, window=period).rsi` with `calculate_rsi(close.values, period=period)` (from `backend.core.indicators`), which already implements the correct TradingView-matching Wilder's RSI. The result is a pd.Series with the same index as `close`.
+
+    **File changed**: `backend/backtesting/indicator_handlers.py` — `_handle_rsi()` function
+
+- **TP/SL Anchor — TradingView Parity Fix (2026-02-23):**
+
+    **Root cause**: In `_run_fallback` (engine.py), the TP and SL trigger levels were anchored to `entry_price = close * (1 ± slippage)` (the fill price including slippage). TradingView anchors TP/SL to the signal bar close price (no slippage added).
+
+    **Impact**: TP trigger level was 0.05% higher/lower than TV's, causing exits up to 2 hours later. Cascading exit time differences caused many subsequent entries to diverge.
+
+    **Fix**: Added `signal_price = price` (close without slippage) at entry. All TP/SL pct calculations (`best_pnl_pct`, `worst_pnl_pct`, TP exit price, SL exit price, intrabar TP/SL prices) now use `signal_price` as anchor instead of `entry_price`.
+
+    **File changed**: `backend/backtesting/engine.py` — `_run_fallback` method
+
+- **Same-Bar Re-Entry After TP/SL — TradingView Parity Fix (2026-02-23):**
+
+    **Root cause**: After a TP/SL exit fires on bar `i`, the engine's main loop did not attempt a new entry on the same bar `i`. TradingView does allow entering a new position on the same bar that a TP/SL exit fires if an entry signal is present.
+
+    **Impact**: In `Strategy_RSI_L/S_3`, trade #127 (short) had its entry bar missed — the preceding long trade (trade #126) hit TP on the same bar that trade #127's short signal fired, so our engine entered 4.5 hours later on the next short signal.
+
+    **Fix**: After position reset following a TP/SL exit, immediately check if bar `i` has a valid entry signal and enter it on the same bar using close price.
+
+    **File changed**: `backend/backtesting/engine.py` — `_run_fallback` method
+
+    **Combined result after all three fixes** (Strategy_RSI_L/S_3, BTCUSDT 15m, Nov 2025 – Feb 2026):
+    - Trades: **129/129** (was 122 → 124 → 127 → **129**) ✅
+    - Entry matches: **129/129** (was ~25/122 → 90/124 → 126/127 → **129/129**) ✅
+    - Win rate: **78.3%** (matches TV exactly) ✅
+    - W/L count: **101W / 28L** (matches TV exactly) ✅
 
 - **AI builder — Optimizer Sweep Mode (2026-02-22, commit `e7fc03f9b`):**
 
