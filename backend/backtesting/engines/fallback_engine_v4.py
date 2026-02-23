@@ -1207,7 +1207,7 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         # Carry-over signals: when a signal fires but position is full (pyramiding limit),
         # save it so it can execute on the very next bar once the position closes.
-        # This matches TradingView behaviour for TV#2-style missed entries.
+        # This matches TradingView behavior for TV#2-style missed entries.
         pending_long_signal_carry = False
         pending_short_signal_carry = False
 
@@ -2387,7 +2387,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                             }
                 else:
                     # Pyramiding limit reached: carry the signal to the next bar so it
-                    # fires as soon as the position closes (TradingView behaviour).
+                    # fires as soon as the position closes (TradingView behavior).
                     pending_long_signal_carry = True
 
             # SHORT Entry
@@ -2537,7 +2537,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                             }
                 else:
                     # Pyramiding limit reached: carry the signal to the next bar so it
-                    # fires as soon as the position closes (TradingView behaviour).
+                    # fires as soon as the position closes (TradingView behavior).
                     pending_short_signal_carry = True
 
             # === FUNDING FEE CALCULATION ===
@@ -2780,10 +2780,10 @@ class FallbackEngineV4(BaseBacktestEngine):
         durations = [t.duration_bars for t in trades if t.duration_bars is not None]
         if durations:
             metrics.avg_trade_duration = float(np.mean(durations))
-            win_durs = [t.duration_bars for t in trades if t.pnl > 0 and t.duration_bars is not None]
-            loss_durs = [t.duration_bars for t in trades if t.pnl < 0 and t.duration_bars is not None]
-            metrics.avg_winning_duration = float(np.mean(win_durs)) if win_durs else 0.0
-            metrics.avg_losing_duration = float(np.mean(loss_durs)) if loss_durs else 0.0
+            win_durations = [t.duration_bars for t in trades if t.pnl > 0 and t.duration_bars is not None]
+            loss_durations = [t.duration_bars for t in trades if t.pnl < 0 and t.duration_bars is not None]
+            metrics.avg_winning_duration = float(np.mean(win_durations)) if win_durations else 0.0
+            metrics.avg_losing_duration = float(np.mean(loss_durations)) if loss_durations else 0.0
 
         # Drawdown
         equity_arr = np.array(equity_curve)

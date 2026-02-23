@@ -18,7 +18,7 @@ sys.path.insert(0, r"d:\bybit_strategy_tester_v2")
 
 warnings.filterwarnings("ignore")
 
-from loguru import logger  # noqa: E402
+from loguru import logger
 
 logger.remove()
 logger.add(sys.stderr, level="WARNING")
@@ -157,9 +157,9 @@ def load_bt_params() -> dict:
 
 # ── Run backtest ───────────────────────────────────────────────────────────────
 def run_engine(ohlcv: pd.DataFrame, p: dict):
-    from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4  # noqa: PLC0415
-    from backend.backtesting.interfaces import BacktestInput, TradeDirection  # noqa: PLC0415
-    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter  # noqa: PLC0415
+    from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
+    from backend.backtesting.interfaces import BacktestInput, TradeDirection
+    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
     adapter = StrategyBuilderAdapter(load_strategy_graph())
     signals = adapter.generate_signals(ohlcv)
