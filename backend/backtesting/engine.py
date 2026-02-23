@@ -586,17 +586,22 @@ def _build_performance_metrics(
             total_bars_m = len(close_arr_m)
 
             # Build per-bar margin array (0 when flat, qty*close*margin_pct when in position)
+            # TV parity: use ALL trades (including open/end-of-backtest), range eb+1..xb-1
+            # i.e. exclude the entry bar and exit bar themselves — TV only counts bars where
+            # the position was held in full for the entire bar.
             mvs_bar = np.zeros(total_bars_m)
-            # Use closed trades only for margin (TV shows closed-trade margin, not open)
-            for t in closed_trades_for_metrics:
+            for t in trades:
                 eb_m = getattr(t, "entry_bar_index", None)
                 xb_m = getattr(t, "exit_bar_index", None)
                 qty_m = abs(getattr(t, "size", 0) or 0)
-                if eb_m is None or xb_m is None or qty_m == 0:
+                if eb_m is None or qty_m == 0:
                     continue
+                # Open trades have xb_m set to last bar; use it directly
+                xb_eff = xb_m if xb_m is not None else (total_bars_m - 1)
                 side_m = str(getattr(t, "side", "")).lower()
                 mpct = margin_long_pct if any(x in side_m for x in ("buy", "long")) else margin_short_pct
-                for b_m in range(eb_m, min(xb_m + 1, total_bars_m)):
+                # eb+1 to xb-1 inclusive (exclude entry and exit bars — TV convention)
+                for b_m in range(eb_m + 1, min(xb_eff, total_bars_m)):
                     mvs_bar[b_m] = qty_m * close_arr_m[b_m] * mpct
 
             avg_margin_used = float(mvs_bar.mean()) if total_bars_m > 0 else 0.0
