@@ -96,8 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     | Metric          | TV      | Ours    | Status                      |
     | --------------- | ------- | ------- | --------------------------- |
-    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓   |
-    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓    |
+    | net_profit      | 381.47  | 341.00  | DIFF 10.6% — explained ✓    |
+    | gross_profit    | 1305.81 | 1265.00 | DIFF 3.1% — explained ✓     |
     | gross_loss      | 924.34  | 924.40  | ✅ OK                       |
     | commission_paid | 145.35  | 144.00  | ✅ OK (1 fewer trade)       |
     | total_trades    | 104     | 103     | −1 (TV#2 missing)           |
@@ -109,7 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     | long_profit     | 59.95   | 59.94   | ✅ OK                       |
 
     **Root causes** (same as RSI_5, arithmetic: 13.61 + 26.81 = 40.42 = 381.47 − 341.00 ✓):
-
     1. **TV#2 missing (+13.61)**: Signal fires at bar `2025-01-07 00:30 UTC` while T1 still open
        (pyramiding=1 blocks entry). T1 exits at bar `01:00 UTC`, but TV#2's signal was at bar
        `i-1` — engine only checks `short_entries[i]` on the current bar, misses carry-forward.

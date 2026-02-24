@@ -80,11 +80,7 @@ def run_strategy(strategy_id: str, candles: pd.DataFrame) -> tuple:
         if signals.short_entries is not None
         else np.zeros(len(le), dtype=bool)
     )
-    lx = (
-        np.asarray(signals.exits.values, dtype=bool)
-        if signals.exits is not None
-        else np.zeros(len(le), dtype=bool)
-    )
+    lx = np.asarray(signals.exits.values, dtype=bool) if signals.exits is not None else np.zeros(len(le), dtype=bool)
     sx = (
         np.asarray(signals.short_exits.values, dtype=bool)
         if signals.short_exits is not None
@@ -118,19 +114,21 @@ def run_strategy(strategy_id: str, candles: pd.DataFrame) -> tuple:
 def trades_to_dicts(trades) -> list[dict]:
     out = []
     for t in trades:
-        out.append({
-            "pnl": t.pnl,
-            "pnl_pct": t.pnl_pct if hasattr(t, "pnl_pct") else 0.0,
-            "entry_price": t.entry_price,
-            "exit_price": t.exit_price,
-            "direction": t.direction,
-            "entry_time": t.entry_time,
-            "exit_time": t.exit_time,
-            "exit_reason": str(t.exit_reason),
-            "commission": getattr(t, "commission", 0.0),
-            "size": getattr(t, "size", 0.0),
-            "bars_held": getattr(t, "bars_held", 0),
-        })
+        out.append(
+            {
+                "pnl": t.pnl,
+                "pnl_pct": t.pnl_pct if hasattr(t, "pnl_pct") else 0.0,
+                "entry_price": t.entry_price,
+                "exit_price": t.exit_price,
+                "direction": t.direction,
+                "entry_time": t.entry_time,
+                "exit_time": t.exit_time,
+                "exit_reason": str(t.exit_reason),
+                "commission": getattr(t, "commission", 0.0),
+                "size": getattr(t, "size", 0.0),
+                "bars_held": getattr(t, "bars_held", 0),
+            }
+        )
     return out
 
 

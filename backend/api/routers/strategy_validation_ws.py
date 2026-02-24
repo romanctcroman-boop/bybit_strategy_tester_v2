@@ -158,13 +158,13 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
         },
         "use_btc_source": {"type": "boolean", "default": False},
         "use_long_range": {"type": "boolean", "default": False},
-        "long_rsi_more": {"type": "number", "min": 0, "max": 100, "default": 0},    # TV: longRSIMin=0
-        "long_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 50},   # TV: longRSIMax=50
+        "long_rsi_more": {"type": "number", "min": 0, "max": 100, "default": 0},  # TV: longRSIMin=0
+        "long_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 50},  # TV: longRSIMax=50
         "use_short_range": {"type": "boolean", "default": False},
-        "short_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 100}, # TV: shortRSIMax=100
+        "short_rsi_less": {"type": "number", "min": 0, "max": 100, "default": 100},  # TV: shortRSIMax=100
         "short_rsi_more": {"type": "number", "min": 0, "max": 100, "default": 50},  # TV: shortRSIMin=50
         "use_cross_level": {"type": "boolean", "default": False},
-        "cross_long_level": {"type": "number", "min": 0.1, "max": 100, "default": 29},   # TV: crossLevelLong=29
+        "cross_long_level": {"type": "number", "min": 0.1, "max": 100, "default": 29},  # TV: crossLevelLong=29
         "cross_short_level": {"type": "number", "min": 0.1, "max": 100, "default": 55},  # TV: crossLevelShort=55
         "opposite_signal": {"type": "boolean", "default": False},
         "use_cross_memory": {"type": "boolean", "default": False},

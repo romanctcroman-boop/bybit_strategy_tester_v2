@@ -14,11 +14,12 @@ import pandas as pd
 
 sys.path.insert(0, r"d:\bybit_strategy_tester_v2")
 
+import sqlite3
+
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.service import BacktestService
 from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
-import sqlite3
 
 DB_PATH = r"d:\bybit_strategy_tester_v2\data.sqlite3"
 
@@ -78,11 +79,7 @@ def run_strategy(strategy_id: str, candles: pd.DataFrame) -> list:
         if signals.short_entries is not None
         else np.zeros(len(le), dtype=bool)
     )
-    lx = (
-        np.asarray(signals.exits.values, dtype=bool)
-        if signals.exits is not None
-        else np.zeros(len(le), dtype=bool)
-    )
+    lx = np.asarray(signals.exits.values, dtype=bool) if signals.exits is not None else np.zeros(len(le), dtype=bool)
     sx = (
         np.asarray(signals.short_exits.values, dtype=bool)
         if signals.short_exits is not None
@@ -119,6 +116,7 @@ def fmt_time(t) -> str:
 
 def main():
     import warnings
+
     warnings.filterwarnings("ignore")
 
     print("Fetching candles (2025-01-01 to 2026-02-24) ...")
@@ -159,7 +157,7 @@ def main():
             tag = "[MISSING_A]" if a is None else "[MISSING_B]"
             t = a or b
             print(
-                f"{i+1:<4} {t.direction:<6} "
+                f"{i + 1:<4} {t.direction:<6} "
                 f"{'---':<20} {fmt_time(t.entry_time):<20} "
                 f"{'---':>9} {t.entry_price:>9.1f}  "
                 f"{'---':<20} {fmt_time(t.exit_time):<20}  "
@@ -189,17 +187,24 @@ def main():
             diverged += 1
             diverged_list.append(i + 1)
             diffs = []
-            if not same_dir: diffs.append("dir")
-            if not same_entry_t: diffs.append("entry_t")
-            if not same_exit_t: diffs.append("exit_t")
-            if not same_ep: diffs.append("ep")
-            if not same_xp: diffs.append("xp")
-            if not same_pnl: diffs.append("pnl")
-            if not same_reason: diffs.append("reason")
+            if not same_dir:
+                diffs.append("dir")
+            if not same_entry_t:
+                diffs.append("entry_t")
+            if not same_exit_t:
+                diffs.append("exit_t")
+            if not same_ep:
+                diffs.append("ep")
+            if not same_xp:
+                diffs.append("xp")
+            if not same_pnl:
+                diffs.append("pnl")
+            if not same_reason:
+                diffs.append("reason")
             status = f"[DIFF:{','.join(diffs)}]"
 
         print(
-            f"{i+1:<4} {a.direction:<6} "
+            f"{i + 1:<4} {a.direction:<6} "
             f"{fmt_time(a.entry_time):<20} {fmt_time(b.entry_time):<20} "
             f"{a.entry_price:>9.1f} {b.entry_price:>9.1f}  "
             f"{fmt_time(a.exit_time):<20} {fmt_time(b.exit_time):<20}  "
