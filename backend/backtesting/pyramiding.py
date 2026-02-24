@@ -471,10 +471,8 @@ class PyramidingManager:
 
         # Рассчитать P&L
         if direction == "long":
-            pnl_pct = (exit_price - avg_price) / avg_price
             gross_pnl = closed_size * (exit_price - avg_price)
         else:
-            pnl_pct = (avg_price - exit_price) / avg_price
             gross_pnl = closed_size * (avg_price - exit_price)
 
         # Комиссии (только за закрываемую часть)
@@ -482,6 +480,9 @@ class PyramidingManager:
         exit_fee = closed_size * exit_price * taker_fee
         fees = entry_fee + exit_fee
         net_pnl = gross_pnl - fees
+        # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
+        position_value = closed_size * avg_price
+        pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
 
         return {
             "entry_time": first_time,
@@ -532,12 +533,6 @@ class PyramidingManager:
             # Закрыть все сразу
             avg_price, total_size, total_allocated, first_bar, first_time = pos.close_all()
 
-            # Рассчитать P&L
-            if direction == "long":
-                pnl_pct = (exit_price - avg_price) / avg_price
-            else:
-                pnl_pct = (avg_price - exit_price) / avg_price
-
             gross_pnl = (
                 total_size * (exit_price - avg_price) if direction == "long" else total_size * (avg_price - exit_price)
             )
@@ -546,6 +541,9 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
+            # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
+            position_value = total_size * avg_price
+            pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
 
             trades.append(
                 {
@@ -569,11 +567,6 @@ class PyramidingManager:
             # Закрыть все сразу
             avg_price, total_size, total_allocated, first_bar, first_time = pos.close_all()
 
-            if direction == "long":
-                pnl_pct = (exit_price - avg_price) / avg_price
-            else:
-                pnl_pct = (avg_price - exit_price) / avg_price
-
             gross_pnl = (
                 total_size * (exit_price - avg_price) if direction == "long" else total_size * (avg_price - exit_price)
             )
@@ -582,6 +575,9 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
+            # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
+            position_value = total_size * avg_price
+            pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
 
             trades.append(
                 {
@@ -604,11 +600,6 @@ class PyramidingManager:
             # Закрыть первый вход
             entry = pos.close_fifo()
             if entry:
-                if direction == "long":
-                    pnl_pct = (exit_price - entry.entry_price) / entry.entry_price
-                else:
-                    pnl_pct = (entry.entry_price - exit_price) / entry.entry_price
-
                 gross_pnl = (
                     entry.size * (exit_price - entry.entry_price)
                     if direction == "long"
@@ -619,6 +610,9 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
+                # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
+                position_value = entry.size * entry.entry_price
+                pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
 
                 trades.append(
                     {
@@ -641,11 +635,6 @@ class PyramidingManager:
             # Закрыть последний вход
             entry = pos.close_lifo()
             if entry:
-                if direction == "long":
-                    pnl_pct = (exit_price - entry.entry_price) / entry.entry_price
-                else:
-                    pnl_pct = (entry.entry_price - exit_price) / entry.entry_price
-
                 gross_pnl = (
                     entry.size * (exit_price - entry.entry_price)
                     if direction == "long"
@@ -656,6 +645,9 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
+                # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
+                position_value = entry.size * entry.entry_price
+                pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
 
                 trades.append(
                     {
