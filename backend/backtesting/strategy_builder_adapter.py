@@ -287,7 +287,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             logger.warning("No main strategy node found. Entry/exit signals may not be connected.")
 
     def _requires_btcusdt_data(self) -> bool:
-        """Return True if any mfi_filter block has use_btcusdt_mfi=True.
+        """Return True if any block requires BTCUSDT OHLCV as an alternative data source.
+
+        Currently detected cases:
+        - ``mfi_filter`` block with ``use_btcusdt_mfi=True``  (Фича 3)
+        - ``rsi`` block with ``use_btc_source=True``           (RSI on BTC price)
 
         Called by the router BEFORE constructing the adapter so it can pre-load
         BTCUSDT OHLCV and pass it as the btcusdt_ohlcv kwarg.  Can also be
@@ -296,7 +300,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             needs_btc = StrategyBuilderAdapter(graph)._requires_btcusdt_data()
         """
         for block in self.blocks.values():
-            if block.get("type") == "mfi_filter" and block.get("params", {}).get("use_btcusdt_mfi", False):
+            btype = block.get("type", "")
+            bparams = block.get("params", {})
+            if btype == "mfi_filter" and bparams.get("use_btcusdt_mfi", False):
+                return True
+            if btype == "rsi" and bparams.get("use_btc_source", False):
                 return True
         return False
 

@@ -99,10 +99,63 @@ def _handle_rsi(
     adapter: StrategyBuilderAdapter,
 ) -> dict[str, pd.Series]:
     period = _clamp_period(params.get("period", 14))
+
+    # ── use_btc_source: compute RSI on BTCUSDT close instead of the current symbol ──
+    # TradingView "Use BTCUSDT as Source for RSI" passes BTC prices to the RSI formula
+    # while trading/evaluating signals on the altcoin chart. When enabled, the adapter
+    # must have been constructed with btcusdt_ohlcv that ideally includes warmup bars
+    # before the strategy period so that Wilder's smoothed RSI is fully converged.
+    rsi_source = close  # default: current symbol close
+    rsi_full_series: pd.Series | None = None  # pre-computed RSI on full BTC (incl. warmup)
+
+    if params.get("use_btc_source", False):
+        btc_ohlcv = getattr(adapter, "_btcusdt_ohlcv", None)
+        if btc_ohlcv is not None and len(btc_ohlcv) > 0:
+            # Normalise timezone so the index comparison works.
+            btc_close = btc_ohlcv["close"].copy()
+            if close.index.tz is None and btc_close.index.tz is not None:
+                btc_close.index = btc_close.index.tz_localize(None)
+            elif close.index.tz is not None and btc_close.index.tz is None:
+                btc_close.index = btc_close.index.tz_localize("UTC")
+
+            # Compute RSI on the FULL BTC series (may include warmup bars before strategy start).
+            # This is the key step: Wilder's smoothing converges over the warmup period so that
+            # RSI values at the strategy start match TradingView (which has years of history).
+            btc_rsi_full_arr = calculate_rsi(btc_close.values, period=period)
+            btc_rsi_full = pd.Series(btc_rsi_full_arr, index=btc_close.index)
+
+            # Trim (reindex) the already-computed RSI to the strategy period.
+            # forward-fill handles any minor timestamp gaps between BTC and ETH bars.
+            rsi_trimmed = btc_rsi_full.reindex(close.index, method="ffill")
+            na_ratio = rsi_trimmed.isna().mean()
+            if na_ratio < 0.2:
+                # Use this as the final RSI — override the default rsi_arr computation below
+                rsi_full_series = rsi_trimmed.fillna(
+                    pd.Series(calculate_rsi(close.values, period=period), index=close.index)
+                )
+                logger.debug(
+                    "RSI node | using BTCUSDT RSI source with {} warmup bars (na_ratio={:.1%})",
+                    max(0, len(btc_close) - len(close)),
+                    na_ratio,
+                )
+            else:
+                logger.warning(
+                    "RSI use_btc_source=True but alignment too poor (na_ratio={:.1%}) — falling back to main symbol",
+                    na_ratio,
+                )
+        else:
+            logger.warning(
+                "RSI use_btc_source=True but btcusdt_ohlcv not provided to adapter — falling back to main symbol"
+            )
+
     # Use Wilder's smoothed RSI (SMA seed + Wilder smoothing) which matches TradingView exactly.
     # vbt.RSI uses a different smoothing (pure EWM) that diverges from TV RSI values.
-    rsi_arr = calculate_rsi(close.values, period=period)
-    rsi = pd.Series(rsi_arr, index=close.index)
+    if rsi_full_series is not None:
+        # BTC-sourced RSI already computed above (with warmup)
+        rsi = rsi_full_series
+    else:
+        rsi_arr = calculate_rsi(rsi_source.values, period=period)
+        rsi = pd.Series(rsi_arr, index=close.index)
 
     use_long_range = params.get("use_long_range", False)
     use_short_range = params.get("use_short_range", False)

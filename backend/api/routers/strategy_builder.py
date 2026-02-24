@@ -2626,7 +2626,7 @@ async def run_backtest_from_builder(
 
         adapter = StrategyBuilderAdapter(strategy_graph)
 
-        # ── Фича 3: pre-load BTCUSDT OHLCV if any mfi_filter block requires it ──
+        # ── Фича 3: pre-load BTCUSDT OHLCV if any mfi_filter/rsi block requires it ──
         # We construct the adapter once without btcusdt_ohlcv to use the
         # _requires_btcusdt_data() probe, then reconstruct with the data when needed.
         if adapter._requires_btcusdt_data():
@@ -2634,10 +2634,23 @@ async def run_backtest_from_builder(
                 from backend.backtesting.service import BacktestService as _BSvc
 
                 _svc = _BSvc()
+
+                # Include warmup bars so Wilder RSI is stable at strategy start.
+                # 500 bars of the strategy interval gives sufficient RSI convergence.
+                _WARMUP_BARS = 500
+                try:
+                    _interval_minutes = int(request.interval)
+                except (ValueError, TypeError):
+                    _interval_minutes = 30  # safe fallback for non-numeric intervals (D/W/M)
+                import pandas as _pd
+
+                _btc_warmup_delta = _pd.Timedelta(minutes=_WARMUP_BARS * _interval_minutes)
+                _btc_start = request.start_date - _btc_warmup_delta
+
                 _btc_ohlcv = await _svc._fetch_historical_data(
                     symbol="BTCUSDT",
                     interval=request.interval,
-                    start_date=request.start_date,
+                    start_date=_btc_start,
                     end_date=request.end_date,
                     market_type=market_type,
                 )
