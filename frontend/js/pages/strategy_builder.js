@@ -10522,8 +10522,11 @@ async function loadStrategy(strategyId) {
     if (backtestEndDateEl) {
       const today = new Date().toISOString().slice(0, 10);
       const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
-      // If saved date is in the future, show today; otherwise use saved value
-      backtestEndDateEl.value = savedEnd > today ? today : savedEnd;
+      // Always use the later of saved end-date or today.
+      // Rationale: DB is updated daily, so running on today's data is always valid.
+      // A strategy saved yesterday with end=2026-02-23 should automatically advance
+      // to 2026-02-24 the next day so the user gets all available candles.
+      backtestEndDateEl.value = savedEnd > today ? savedEnd : today;
     }
 
     // Восстановить блоки и соединения
