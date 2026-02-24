@@ -200,7 +200,7 @@ def main():
         if not in_a or not in_b:
             tag = "[ONLY_A]" if not in_b else "[ONLY_B]"
             val = metrics_a.get(key, metrics_b.get(key))
-            print(f"  {key:<45} {str(val):>18} {'---':>18} {tag:>8}")
+            print(f"  {key:<45} {val!s:>18} {'---':>18} {tag:>8}")
             missing += 1
             mismatch_list.append((key, "MISSING"))
             continue

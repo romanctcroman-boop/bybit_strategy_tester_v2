@@ -114,7 +114,7 @@ class PyramidPosition:
         )
         return True
 
-    def close_all(self) -> tuple[float, float, float, int, datetime]:
+    def close_all(self) -> tuple[float, float, float, int, datetime | None]:
         """
         Закрыть ВСЕ входы (TV close_entries_rule = "ANY" или после TP/SL).
 

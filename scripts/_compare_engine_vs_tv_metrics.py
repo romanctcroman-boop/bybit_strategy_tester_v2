@@ -242,8 +242,7 @@ def build_engine_metrics(result) -> dict:
     sw = [p for p in short_pnl if p > 0]
     sl = [p for p in short_pnl if p < 0]
 
-    # pnl_pct per trade: TV uses (exit-entry)/entry * leverage * 100
-    win_pct = [t.pnl / INITIAL_CAPITAL * 100 * 0.10 for t in trades if t.pnl > 0]  # approx
+    # pnl_pct per trade: TV uses net_pnl / position_value
     # Better: use MetricsCalculator for these
     td = [
         {
@@ -367,7 +366,7 @@ def main():
         eng_v = eng.get(k, None)
 
         if eng_v is None:
-            print(f"  {k:<30} {str(tv_v):>16} {'---':>16} {'---':>10} [MISSING]")
+            print(f"  {k:<30} {tv_v!s:>16} {'---':>16} {'---':>10} [MISSING]")
             mismatched += 1
             mismatch_list.append(k)
             continue

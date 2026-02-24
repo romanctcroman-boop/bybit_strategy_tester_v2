@@ -1,6 +1,6 @@
 """
 Compare all 104 trades between strategy 9a4d45bc and strategy 5c03fd86.
-Both strategies are Strategy_RSI_L\S_6 with identical params — they must
+Both strategies are Strategy_RSI_L/S_6 with identical params — they must
 produce identical trade lists (entry_time, exit_time, entry_price,
 exit_price, pnl, direction, exit_reason).
 """
