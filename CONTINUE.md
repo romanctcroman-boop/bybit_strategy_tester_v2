@@ -7,11 +7,42 @@
 - P0-5 ✅ Завершён (formulas.py — централизация формул)
 - P0-4 ✅ Завершён (Circuit Breakers)
 - P0-3 ✅ Завершён (StateManager 245/245 тестов)
-- P0-1 ⏳ Ожидает
+- P0-1 ⏳ Ожидает (strategy_builder.js рефакторинг)
+
+**Последний коммит:** `cca085f40` — TradingView parity + engine fixes + frontend UX
 
 ---
 
-## ✅ Выполнено в этой сессии
+## ✅ Выполнено в этой сессии (2-я часть)
+
+### TV Parity: FallbackEngineV4 improvements (коммит cca085f40)
+
+- **Удалён signal carry-over** (`pending_long/short_signal_carry`) — TV не переносит сигналы,
+  движок теперь точно это воспроизводит.
+- **`entry_on_next_bar_open`** — новый флаг: сигнал bar[i-1] → вход по open[i] (TV default).
+- **Same-bar TP check** — при `entry_on_next_bar_open=True`, немедленная проверка TP внутри bar[i].
+- **TP exit price = точный TP level** (не close bar). Подтверждено по as4.csv (сделки #139, #142).
+
+### TV Parity: indicator_handlers.py (коммит cca085f40)
+
+- **`_detect_intrabar_rsi_crossings()`** — детектирует RSI пересечения внутри бара используя
+  5m/1m тики. Воспроизводит `calc_on_every_tick` из Pine Script (независимые one-step RSI
+  от base state bar[k-1] для каждого тика).
+
+### Frontend UX (коммит cca085f40)
+
+- **TradingViewEquityChart в Strategy Builder modal** — заменены legacy canvas-чарты.
+  `switchResultsTab('equity')` рендерит TVChart при первом открытии, resize при повторном.
+- **Inline backtest response** — метрики + сделки + equity_curve возвращаются напрямую из
+  `/api/v1/strategy-builder/backtest`, модал открывается без второго HTTP-запроса.
+- **`syncBtcSourceForNode()`** — автоматическая синхронизация BTCUSDT при включении
+  `use_btc_source` в блоке, с inline-прогрессом в попапе/панели свойств.
+- **`NoCacheFrontendMiddleware`** — браузер не кеширует frontend JS/CSS/HTML (dev mode).
+
+### Безопасность JSON сериализации (коммит cca085f40)
+
+- `inf`/`nan` → `0.0` во всех float-полях ответа API (`_safe_float`, `_sf`, `_fv`).
+  Устраняет `ValueError: Out of range float values are not JSON compliant`.
 
 ### P0-2: Рефакторинг backtest_results.js — ЗАВЕРШЁН ✅
 
@@ -23,7 +54,7 @@
 | 2    | TradesTable.js   | 9 функций таблицы сделок             | 54/54 ✅ | 60b465a7c |
 | 3    | MetricsPanels.js | 6 функций панелей метрик             | 47/47 ✅ | 22d0c49b1 |
 
-- `backtest_results.js`: 5466 → 4608 строк (−858 LOC, ещё −858 в фазе 2 итого)
+- `backtest_results.js`: 5466 → 4608 строк (−858 LOC)
 - Все 3 компонента — pure functions, 0 побочных эффектов, unit-тестируемые
 - `npm test` → **380/380** ✅
 

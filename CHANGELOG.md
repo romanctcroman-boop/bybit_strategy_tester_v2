@@ -7,7 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **TradingView equity chart in strategy builder backtest modal (2026-02-26, commit cca085f40):**
+
+    Replaced legacy `renderEquityChart` / `renderDrawdownChart` (canvas-based) in the
+    Strategy Builder results modal with the `TradingViewEquityChart` component.
+
+    **Changes:**
+    - `strategy-builder.html`: Chart.js + `chartjs-adapter-date-fns` + `TradingViewEquityChart.js`
+      loaded in `<head>`. Equity tab now has `div#equityChartContainer` + legend row (Buy&Hold +
+      Trade Excursions toggles).
+    - `strategy_builder.js`: `displayBacktestResults()` stores prepared equity data in
+      `window._sbEquityChartData`; `switchResultsTab('equity')` renders `TVChart` on first open,
+      resizes on subsequent opens. `closeBacktestResultsModal()` destroys chart instance.
+    - Inline metrics + trades + equity_curve now returned directly in `run_backtest` API response
+      (see backend section), eliminating the second `/api/v1/backtests/` fetch for the modal.
+
+- **FallbackEngineV4: `entry_on_next_bar_open` flag (2026-02-26, commit cca085f40):**
+
+    New `BacktestInput` field `entry_on_next_bar_open: bool = False`. When `True`:
+    - Signal from bar `i-1` (previous bar close) executes at bar `i` open — matches TradingView's
+      default `process_orders_on_close / calc_on_every_tick=false` behavior.
+    - Same-bar TP check: immediately after entry at bar `i` open, checks if `high/low` reaches
+      the TP level within bar `i`'s range (prevents 1-bar exit delay vs TV).
+    - TP exit price uses exact TP level (not `bar.close`). Verified against `as4.csv`.
+
+- **`_detect_intrabar_rsi_crossings()` in indicator_handlers.py (2026-02-26, commit cca085f40):**
+
+    New helper that detects RSI crossings occurring **within** a higher-TF bar using sub-TF
+    (5m/1m) ticks. Matches TradingView's `calc_on_every_tick` behavior:
+
+    - Each tick computes RSI as one-step hypothetical from bar `k-1` Wilder state (independent
+      of previous tick's RSI — matches Pine Script semantics).
+    - Cross fires when two consecutive ticks straddle the level.
+    - Caller ORs intrabar signals with bar-close cross signals.
+
+- **`NoCacheFrontendMiddleware` in app.py (2026-02-26, commit cca085f40):**
+
+    Starlette middleware that sets `Cache-Control: no-cache, no-store, must-revalidate` +
+    removes `ETag` / `Last-Modified` for all `.js`, `.css`, `.html` under `/frontend/`.
+    Eliminates browser caching issues during development.
+
+- **`syncBtcSourceForNode()` in strategy_builder.js (2026-02-26, commit cca085f40):**
+
+    When a block's `use_btc_source` / `use_btcusdt_mfi` / `use_btcusdt_momentum` checkbox is
+    enabled, automatically triggers BTCUSDT sync via SSE stream with inline progress display
+    (injected into active popup or properties panel). 10-second grace cache prevents duplicate syncs.
+
+- **Inline backtest response in strategy_builder API router (2026-02-26, commit cca085f40):**
+
+    `run_backtest_from_builder` now returns `metrics` + `trades` + `equity_curve` directly in
+    the response body. Frontend JS branch `if (data.metrics || data.trades || data.equity_curve)`
+    fires immediately, opening the results modal without a second HTTP round-trip.
+    All float fields sanitized via `_sf()` helper (inf/nan → 0.0).
+
 ### Fixed
+
+- **FallbackEngineV4: remove signal carry-over (2026-02-26, commit cca085f40):**
+
+    Removed `pending_long/short_signal_carry` logic. TradingView does **not** carry signals
+    when the pyramiding limit is reached or a pending exit blocks re-entry — the signal is
+    simply dropped. Next entry requires a fresh signal on a bar where the position allows it.
+
+    **Impact:** Engine behavior now matches TV for all strategies using `pyramiding=1`.
+
+- **backtests.py / strategy_builder.py: inf/nan JSON safety (2026-02-26, commit cca085f40):**
+
+    `_safe_float()` in `backtests.py` and `_sf()` in `strategy_builder.py` now replace
+    `math.inf` / `math.nan` with `0.0` (configurable default). Prevents
+    `ValueError: Out of range float values are not JSON compliant` crashes when extreme
+    metric values (e.g. infinite Sharpe) reach the serialization layer.
+
+- **marketdata.py: per-TF progress queue scoping (2026-02-26, commit cca085f40):**
+
+    Previously a single shared `progress_queue` was used across all TF iterations in
+    `sync_all_timeframes_stream`. Replaced with per-task scoped `pq` / `pq_b` queues.
+    Backfill now also runs as `asyncio.Task` with progress streaming (was a blocking `await`).
+    Per-TF `error` events are treated as non-fatal — partial warning shown, sync continues.
+
+- **strategy_builder.js: symbol picker cache check (2026-02-26, commit cca085f40):**
+
+    `loadAndShow()` and `input` event handlers now require `tickersDataCache` to also be warm
+    (`tickersCached`) before skipping the loading spinner. Prevents stale symbol dropdown
+    display when tickers data hasn't loaded yet.
 
 - **strategy_builder.js: ESLint `'import' and 'export' may only appear at the top level` (2026-02-26):**
 
