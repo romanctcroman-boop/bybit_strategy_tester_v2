@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **TradingView equity chart in strategy builder backtest modal (2026-02-26, commit cca085f40):**
+- **P0-1 COMPLETE: strategy_builder.js modular refactoring (2026-02-28, commit eeb75e6b3):**
+
+    Extracted 7 modules from `strategy_builder.js`, reducing it from 13,620 → 9,816 lines (−28%).
+    All 611 frontend tests pass.
+
+    **New modules (this session):**
+    - `frontend/js/components/UndoRedoModule.js` (~240 lines, 26 tests):
+      `getStateSnapshot`, `restoreStateSnapshot`, `pushUndo`, `undo`, `redo`,
+      `updateUndoRedoButtons`, `deleteSelected`, `duplicateSelected`, `alignBlocks`, `autoLayout`.
+    - `frontend/js/components/ValidateModule.js` (~320 lines, 23 tests):
+      `validateStrategyCompleteness`, `validateStrategy`, `updateValidationPanel`, `generateCode`.
+      Exposes `EXIT_BLOCK_TYPES` via `getExitBlockTypes()`.
+    - `frontend/js/components/SaveLoadModule.js` (~380 lines, 28 tests):
+      `saveStrategy`, `buildStrategyPayload`, `autoSaveStrategy`, `migrateLegacyBlocks`,
+      `loadStrategy`, `openVersionsModal`, `closeVersionsModal`, `revertToVersion`.
+
+    **Previously extracted (prior sessions):**
+    - `BacktestModule.js` (74 tests), `AiBuildModule.js` (26 tests),
+      `MyStrategiesModule.js` (24 tests), `ConnectionsModule.js` (30 tests).
+
+    **Test count:** 534 → 611 (+77 new tests).
+
+    **Pattern:** Factory `createXxxModule(deps)` → public API object. All deps injected.
+    Modules wired in `initializeStrategyBuilder()` in order:
+    SaveLoad → Validate → UndoRedo → Connections.
+
+
 
     Replaced legacy `renderEquityChart` / `renderDrawdownChart` (canvas-based) in the
     Strategy Builder results modal with the `TradingViewEquityChart` component.
