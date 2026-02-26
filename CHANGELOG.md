@@ -35,6 +35,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P0-2 Phase 1: ChartManager.js — Chart.js memory leak fix (2026-02-26):**
+
+    Created `frontend/js/components/ChartManager.js` — centralised lifecycle manager
+    for all Chart.js instances in `backtest_results.js`.
+
+    **Problem:** 7 Chart.js instances (drawdown, returns, monthly, tradeDistribution,
+    winLossDonut, waterfall, benchmarking) were created with `new Chart()` directly
+    without `.destroy()` on re-initialisation, causing "Canvas is already in use"
+    console errors and gradual memory growth on SPA navigation.
+
+    **Solution:**
+    - `ChartManager.init(name, canvas, config)` — always calls `destroy()` before
+      creating new instance; also calls `Chart.getChart(canvas)` to clear orphaned
+      charts registered by Chart.js internally
+    - `ChartManager.destroy(name)` — safe (catches exceptions, idempotent)
+    - `ChartManager.destroyAll()` — call before page unload / full re-init
+    - `ChartManager.clearAll()` — clears data without destroying (for display reset)
+    - `ChartManager.clear/update()` — per-chart data operations
+
+    **backtest_results.js changes:**
+    - Import `chartManager` from `../components/ChartManager.js`
+    - All 7 `new Chart(...)` calls → `chartManager.init(name, canvas, config)`
+    - `clearAllDisplayData()` now calls `chartManager.clearAll('none')` before manual forEach
+
+    **Tests:** `frontend/tests/components/ChartManager.test.js` — **34/34 ✅**
+    (8 describe blocks: init, destroy, destroyAll, get, has, getAll, size, clear,
+    clearAll, update, integration re-init cycle)
+
+    **Full suite:** `npm test` — **279/279 passed** (245 baseline + 34 new)
+
+    **Files added:**
+    - `frontend/js/components/ChartManager.js`
+    - `frontend/tests/components/ChartManager.test.js`
+    - `docs/refactoring/p0-2/PLAN.md`
+
+    **Files modified:**
+    - `frontend/js/pages/backtest_results.js` (chartManager integration)
+
 - **P0-5: Centralized formulas module (2026-02-26):**
 
     Created `backend/backtesting/formulas.py` — single source of truth for all backtest metric

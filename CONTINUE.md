@@ -3,10 +3,11 @@
 **Дата:** 2026-02-26
 **Статус:**
 
+- P0-2 🚀 В работе (Фаза 1 завершена: ChartManager)
 - P0-5 ✅ Завершён (formulas.py — централизация формул)
 - P0-4 ✅ Завершён (Circuit Breakers)
 - P0-3 ✅ Завершён (StateManager 245/245 тестов)
-- P0-1, P0-2 ⏳ Ожидают
+- P0-1 ⏳ Ожидает
 
 ---
 
@@ -81,7 +82,36 @@ pytest tests/backend/mcp/test_mcp_integration.py -v
 
 ---
 
-## ✅ P0-5: Централизация формул метрик — ЗАВЕРШЕНА (109/109 тестов)
+## 🚀 P0-2: Рефакторинг backtest_results.js — В РАБОТЕ
+
+### ✅ Фаза 1: ChartManager.js (завершена)
+
+**Проблема:** 7 Chart.js экземпляров создавались без `.destroy()` → "Canvas is already in use"
+
+**Решение:**
+- ✅ `frontend/js/components/ChartManager.js` — lifecycle manager (init/destroy/destroyAll/clear/update)
+- ✅ `frontend/tests/components/ChartManager.test.js` — **34/34 тестов**
+- ✅ `frontend/js/pages/backtest_results.js` — все `new Chart()` заменены на `chartManager.init()`
+- ✅ `docs/refactoring/p0-2/PLAN.md` — план всех 3 фаз
+
+**Тесты:** `npm test` → **279/279** (0 регрессий)
+
+### ⏳ Фаза 2: TradesTable.js (ожидает)
+
+**Вынести из backtest_results.js (~283 строки):**
+- `updateTVTradesListTab`, `renderTradesPage`, `renderTradePagination`
+- `updateTradePaginationControls`, `removeTradePagination`
+- `tradesPrevPage`, `tradesNextPage`, `sortTradesBy`, `updateTradeSortIndicators`
+
+### ⏳ Фаза 3: MetricsPanels.js (ожидает)
+
+**Вынести из backtest_results.js (~866 строк):**
+- `updateTVSummaryCards`, `updateTVDynamicsTab`, `updateTVTradeAnalysisTab`
+- `updateTVRiskReturnTab`, `formatTVCurrency`, `formatTVPercent`
+
+---
+
+
 
 **Статус:** ✅ Анализ | ✅ formulas.py | ✅ NumbaEngineV2 | ✅ Тесты | ✅ Документация
 
@@ -294,4 +324,4 @@ curl http://localhost:8000/monitoring/ai-agents/status
 ---
 
 _CONTINUE.md обновлён: 2026-02-26_
-_P0-3: 100% (245/245) | P0-4: выполнен | P0-5: 100% (109/109) | Следующий: P0-2_
+_P0-2: 🚀 Фаза 1 (ChartManager 34/34) | P0-5: 100% (109/109) | P0-3: 100% (245/245) | P0-4: done_

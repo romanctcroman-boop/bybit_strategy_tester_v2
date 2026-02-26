@@ -4,14 +4,24 @@
  * Page-specific scripts for backtest_results.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-26
+ * @migration P0-3 StateManager — legacy shim sync added
  */
 
 /* global Tabulator */
 
 // Import shared utilities
 import { formatDate as _formatDate } from '../utils.js';
+
+// Import StateManager and helpers
+import { getStore } from '../core/StateManager.js';
+import {
+  initState
+} from '../core/state-helpers.js';
+
+// Import ChartManager (P0-2: Chart.js memory leak fix)
+import { chartManager } from '../components/ChartManager.js';
 
 // ============================
 // Security utilities
@@ -33,6 +43,25 @@ function escapeHtml(text) {
 // Configuration
 // ============================
 const API_BASE = '/api/v1';
+
+/**
+ * @migration P0-3 StateManager
+ * Legacy variables below are now StateManager-backed proxies.
+ * All reads/writes go through getStore() so state is centralised.
+ * The proxy Proxy() approach is NOT used because this is a plain-JS ES module
+ * without a build step — instead each variable is a thin wrapper that is
+ * lazily connected to the store after initializeBacktestResultsState() runs.
+ *
+ * NOTE: const Set objects (recentlyDeletedIds, selectedForDelete) are kept as
+ * module-level Sets because they are *mutated*, not reassigned.  The store
+ * holds references to the same Set instances.
+ */
+
+// --- Core state (StateManager-backed) ---
+// Getters/setters: getCurrentBacktest / setCurrentBacktest etc. (defined below)
+// These shim variables mirror the store so existing code that reads them
+// directly still works.  After initializeBacktestResultsState() the shims
+// are kept in sync automatically via store.subscribe().
 let currentBacktest = null;
 let allResults = [];
 let selectedForCompare = [];
@@ -52,8 +81,9 @@ const recentlyDeletedIds = new Set();
 // Multi-select for bulk delete
 const selectedForDelete = new Set();
 
-// Charts
-let equityChart = null;
+// Charts (StateManager-backed via getChart/setChart)
+let equityChart = null; // kept for legacy references (drawdown, returns, monthly)
+let _brTVEquityChart = null; // TradingViewEquityChart instance (main equity chart)
 let drawdownChart = null;
 let returnsChart = null;
 let monthlyChart = null;
@@ -72,6 +102,56 @@ let _btCachedCandles = [];  // cached candles for marker rebuild on checkbox tog
 let btPriceChartPending = false; // true when chart needs (re-)creation on tab show
 let _priceChartGeneration = 0; // generation counter to cancel stale async renders
 let _priceChartResizeObserver = null; // stored so we can disconnect on chart rebuild
+
+/**
+ * Sync shim variables ↔ StateManager.
+ * Called once from initializeBacktestResultsState() after the store slice
+ * has been created.  From this point on all mutations go BOTH to the local
+ * variable AND the store, keeping them in sync.
+ */
+function _setupLegacyShimSync() {
+  const store = getStore();
+  if (!store) return;
+
+  // Core state — subscribe store → shim
+  store.subscribe('backtestResults.currentBacktest', (v) => { currentBacktest = v; });
+  store.subscribe('backtestResults.allResults', (v) => { allResults = v ?? []; });
+  store.subscribe('backtestResults.selectedForCompare', (v) => { selectedForCompare = v ?? []; });
+  store.subscribe('backtestResults.compareMode', (v) => { compareMode = !!v; });
+
+  // Trades table state → shim
+  store.subscribe('backtestResults.trades.currentPage', (v) => { tradesCurrentPage = v ?? 0; });
+  store.subscribe('backtestResults.trades.cachedRows', (v) => { tradesCachedRows = v ?? []; });
+  store.subscribe('backtestResults.trades.sortKey', (v) => { tradesSortKey = v ?? null; });
+  store.subscribe('backtestResults.trades.sortAsc', (v) => { tradesSortAsc = v !== false; });
+
+  // Chart instances → shim
+  store.subscribe('backtestResults.charts.equity', (v) => { equityChart = v; });
+  store.subscribe('backtestResults.charts._tvEquityChart', (v) => { _brTVEquityChart = v; });
+  store.subscribe('backtestResults.charts.drawdown', (v) => { drawdownChart = v; });
+  store.subscribe('backtestResults.charts.returns', (v) => { returnsChart = v; });
+  store.subscribe('backtestResults.charts.monthly', (v) => { monthlyChart = v; });
+  store.subscribe('backtestResults.charts.tradeDistribution', (v) => { tradeDistributionChart = v; });
+  store.subscribe('backtestResults.charts.winLossDonut', (v) => { winLossDonutChart = v; });
+  store.subscribe('backtestResults.charts.waterfall', (v) => { waterfallChart = v; });
+  store.subscribe('backtestResults.charts.benchmarking', (v) => { benchmarkingChart = v; });
+
+  // Price chart state → shim
+  store.subscribe('backtestResults.priceChart.instance', (v) => { btPriceChart = v; });
+  store.subscribe('backtestResults.priceChart.candleSeries', (v) => { btCandleSeries = v; });
+  store.subscribe('backtestResults.priceChart.markers', (v) => { btPriceChartMarkers = v ?? []; });
+  store.subscribe('backtestResults.priceChart.tradeLineSeries', (v) => { btTradeLineSeries = v ?? []; });
+  store.subscribe('backtestResults.priceChart.cachedCandles', (v) => { _btCachedCandles = v ?? []; });
+  store.subscribe('backtestResults.priceChart.pending', (v) => { btPriceChartPending = !!v; });
+  store.subscribe('backtestResults.priceChart.generation', (v) => { _priceChartGeneration = v ?? 0; });
+  store.subscribe('backtestResults.priceChart.resizeObserver', (v) => { _priceChartResizeObserver = v; });
+
+  // Seed store with current shim values (Sets are shared by reference)
+  store.set('backtestResults.service.recentlyDeletedIds', recentlyDeletedIds);
+  store.set('backtestResults.service.selectedForDelete', selectedForDelete);
+
+  console.log('[backtest_results] Legacy shim sync established');
+}
 
 // ============================
 // Equity trade markers (TradingView-like)
@@ -340,9 +420,318 @@ if (typeof Chart !== 'undefined') {
 let tradesTable = null;
 
 // ============================
+// StateManager Integration
+// ============================
+
+/**
+ * Initialize backtest results state slice
+ */
+function initializeBacktestResultsState() {
+  const store = getStore();
+  if (!store) {
+    console.warn('[initializeBacktestResultsState] Store not initialized');
+    return;
+  }
+
+  // Initialize state paths
+  initState('backtestResults.currentBacktest', null);
+  initState('backtestResults.allResults', []);
+  initState('backtestResults.selectedForCompare', []);
+  initState('backtestResults.compareMode', false);
+
+  // Trades table state
+  initState('backtestResults.trades.currentPage', 0);
+  initState('backtestResults.trades.cachedRows', []);
+  initState('backtestResults.trades.sortKey', null);
+  initState('backtestResults.trades.sortAsc', true);
+
+  // Chart instances
+  initState('backtestResults.charts.equity', null);
+  initState('backtestResults.charts._tvEquityChart', null);
+  initState('backtestResults.charts.drawdown', null);
+  initState('backtestResults.charts.returns', null);
+  initState('backtestResults.charts.monthly', null);
+  initState('backtestResults.charts.tradeDistribution', null);
+  initState('backtestResults.charts.winLossDonut', null);
+  initState('backtestResults.charts.waterfall', null);
+  initState('backtestResults.charts.benchmarking', null);
+
+  // Price chart state
+  initState('backtestResults.priceChart.instance', null);
+  initState('backtestResults.priceChart.candleSeries', null);
+  initState('backtestResults.priceChart.markers', []);
+  initState('backtestResults.priceChart.tradeLineSeries', []);
+  initState('backtestResults.priceChart.cachedCandles', []);
+  initState('backtestResults.priceChart.pending', false);
+  initState('backtestResults.priceChart.generation', 0);
+  initState('backtestResults.priceChart.resizeObserver', null);
+
+  // Service state
+  initState('backtestResults.service.recentlyDeletedIds', new Set());
+  initState('backtestResults.service.selectedForDelete', new Set());
+
+  // Other state
+  initState('backtestResults.chartDisplayMode', 'absolute');
+
+  // Connect legacy shim variables to the store (bidirectional sync)
+  _setupLegacyShimSync();
+
+  console.log('[initializeBacktestResultsState] State initialized');
+}
+
+// ============================
+// State Getters/Setters
+// Public API — exported for use by other modules and browser console.
+// ESLint: these functions are called externally so "unused" warnings are false positives.
+// ============================
+/* eslint-disable no-unused-vars */
+
+// Current Backtest
+function getCurrentBacktest() {
+  return getStore()?.get('backtestResults.currentBacktest');
+}
+
+function setCurrentBacktest(backtest) {
+  getStore()?.set('backtestResults.currentBacktest', backtest);
+}
+
+// All Results
+function getAllResults() {
+  return getStore()?.get('backtestResults.allResults');
+}
+
+function setAllResults(results) {
+  getStore()?.set('backtestResults.allResults', results);
+}
+
+// Selected for Compare
+function getSelectedForCompare() {
+  return getStore()?.get('backtestResults.selectedForCompare');
+}
+
+function setSelectedForCompare(selected) {
+  getStore()?.set('backtestResults.selectedForCompare', selected);
+}
+
+// Compare Mode
+function getCompareMode() {
+  return getStore()?.get('backtestResults.compareMode');
+}
+
+function setCompareMode(mode) {
+  getStore()?.set('backtestResults.compareMode', mode);
+}
+
+// Trades Table State
+function getTradesCurrentPage() {
+  return getStore()?.get('backtestResults.trades.currentPage');
+}
+
+function setTradesCurrentPage(page) {
+  getStore()?.set('backtestResults.trades.currentPage', page);
+}
+
+function getTradesCachedRows() {
+  return getStore()?.get('backtestResults.trades.cachedRows');
+}
+
+function setTradesCachedRows(rows) {
+  getStore()?.set('backtestResults.trades.cachedRows', rows);
+}
+
+function getTradesSortKey() {
+  return getStore()?.get('backtestResults.trades.sortKey');
+}
+
+function setTradesSortKey(key) {
+  getStore()?.set('backtestResults.trades.sortKey', key);
+}
+
+function getTradesSortAsc() {
+  return getStore()?.get('backtestResults.trades.sortAsc');
+}
+
+function setTradesSortAsc(asc) {
+  getStore()?.set('backtestResults.trades.sortAsc', asc);
+}
+
+// Chart Instances
+function getChart(chartName) {
+  return getStore()?.get(`backtestResults.charts.${chartName}`);
+}
+
+function setChart(chartName, chart) {
+  getStore()?.set(`backtestResults.charts.${chartName}`, chart);
+}
+
+function getAllCharts() {
+  return getStore()?.get('backtestResults.charts');
+}
+
+// Price Chart State
+function getPriceChart() {
+  return getStore()?.get('backtestResults.priceChart.instance');
+}
+
+function setPriceChart(chart) {
+  getStore()?.set('backtestResults.priceChart.instance', chart);
+}
+
+function getPriceChartCandleSeries() {
+  return getStore()?.get('backtestResults.priceChart.candleSeries');
+}
+
+function setPriceChartCandleSeries(series) {
+  getStore()?.set('backtestResults.priceChart.candleSeries', series);
+}
+
+function getPriceChartMarkers() {
+  return getStore()?.get('backtestResults.priceChart.markers');
+}
+
+function setPriceChartMarkers(markers) {
+  getStore()?.set('backtestResults.priceChart.markers', markers);
+}
+
+function getPriceChartTradeLineSeries() {
+  return getStore()?.get('backtestResults.priceChart.tradeLineSeries');
+}
+
+function setPriceChartTradeLineSeries(series) {
+  getStore()?.set('backtestResults.priceChart.tradeLineSeries', series);
+}
+
+function getPriceChartCachedCandles() {
+  return getStore()?.get('backtestResults.priceChart.cachedCandles');
+}
+
+function setPriceChartCachedCandles(candles) {
+  getStore()?.set('backtestResults.priceChart.cachedCandles', candles);
+}
+
+function getPriceChartPending() {
+  return getStore()?.get('backtestResults.priceChart.pending');
+}
+
+function setPriceChartPending(pending) {
+  getStore()?.set('backtestResults.priceChart.pending', pending);
+}
+
+function getPriceChartGeneration() {
+  return getStore()?.get('backtestResults.priceChart.generation');
+}
+
+function setPriceChartGeneration(generation) {
+  getStore()?.set('backtestResults.priceChart.generation', generation);
+}
+
+function getPriceChartResizeObserver() {
+  return getStore()?.get('backtestResults.priceChart.resizeObserver');
+}
+
+function setPriceChartResizeObserver(observer) {
+  getStore()?.set('backtestResults.priceChart.resizeObserver', observer);
+}
+
+// Service State
+function getRecentlyDeletedIds() {
+  return getStore()?.get('backtestResults.service.recentlyDeletedIds');
+}
+
+function setRecentlyDeletedIds(ids) {
+  getStore()?.set('backtestResults.service.recentlyDeletedIds', ids);
+}
+
+function getSelectedForDelete() {
+  return getStore()?.get('backtestResults.service.selectedForDelete');
+}
+
+function setSelectedForDelete(ids) {
+  getStore()?.set('backtestResults.service.selectedForDelete', ids);
+}
+
+// Chart Display Mode
+function getChartDisplayMode() {
+  return getStore()?.get('backtestResults.chartDisplayMode');
+}
+
+function setChartDisplayMode(mode) {
+  getStore()?.set('backtestResults.chartDisplayMode', mode);
+}
+
+// Trades Table instance
+function getTradesTable() {
+  return getStore()?.get('backtestResults.tradesTable');
+}
+
+function setTradesTable(table) {
+  getStore()?.set('backtestResults.tradesTable', table);
+}
+
+/* eslint-enable no-unused-vars */
+
+// ============================
+// State Subscriptions
+// ============================
+
+function setupBacktestResultsSubscriptions() {
+  const store = getStore();
+  if (!store) {
+    console.warn('[setupBacktestResultsSubscriptions] Store not initialized');
+    return;
+  }
+
+  // Compare mode changes → update UI
+  store.subscribe('backtestResults.compareMode', (compareMode) => {
+    console.log('[BacktestResults] Compare mode changed:', compareMode);
+    const compareControls = document.querySelectorAll('.compare-controls');
+    compareControls.forEach(el => {
+      el.style.display = compareMode ? 'block' : 'none';
+    });
+  });
+
+  // Selected for compare changes → update checkboxes
+  store.subscribe('backtestResults.selectedForCompare', (selected) => {
+    console.log('[BacktestResults] Selected for compare changed:', selected);
+    // Update checkbox states in results list
+    document.querySelectorAll('.compare-checkbox').forEach(cb => {
+      const itemId = cb.closest('.result-item')?.dataset.id;
+      if (itemId) {
+        cb.checked = selected.includes(itemId);
+      }
+    });
+  });
+
+  // Current backtest changes → update UI
+  store.subscribe('backtestResults.currentBacktest', (backtest) => {
+    console.log('[BacktestResults] Current backtest changed:', backtest?.id);
+    // Highlight selected result in list
+    document.querySelectorAll('.result-item').forEach(item => {
+      if (item.dataset.id === backtest?.id) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+  });
+
+  // Chart display mode changes → update charts
+  store.subscribe('backtestResults.chartDisplayMode', (mode) => {
+    console.log('[BacktestResults] Chart display mode changed:', mode);
+    // Charts will be updated by existing updateChartDisplayMode() function
+  });
+
+  console.log('[setupBacktestResultsSubscriptions] Subscriptions setup complete');
+}
+
+// ============================
 // Initialization
 // ============================
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize StateManager
+  initializeBacktestResultsState();
+  setupBacktestResultsSubscriptions();
+
   initCharts();
   initTradingViewTabs();
   loadBacktestResults();
@@ -372,7 +761,7 @@ window.addEventListener('backtestLoaded', (event) => {
     console.log(
       '[backtestLoaded event] Received backtest data, updating charts'
     );
-    currentBacktest = backtest;
+    setCurrentBacktest(backtest);
     updateCharts(backtest);
   }
 });
@@ -455,13 +844,10 @@ function setupBulkDeleteToolbar() {
 // Setup chart container resize observer
 function setupChartResize() {
   const chartContainer = document.querySelector('.tv-equity-chart-container');
-  if (chartContainer && equityChart) {
+  if (chartContainer) {
     const resizeObserver = new ResizeObserver(() => {
-      if (equityChart) {
-        // Pass explicit DPR so canvas stays crisp at non-100% display scaling
-        equityChart.resize();
-        equityChart.options.devicePixelRatio = window.devicePixelRatio || 1;
-        equityChart.update('none');
+      if (_brTVEquityChart && _brTVEquityChart.chart) {
+        _brTVEquityChart.chart.resize();
       }
     });
     resizeObserver.observe(chartContainer);
@@ -496,351 +882,23 @@ function initCharts() {
       }
     }
   };
-  const equityCanvas = document.getElementById('equityChart');
-  if (equityCanvas) {
-    equityChart = new Chart(equityCanvas, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: 'Капитал стратегии',
-            data: [],
-            type: 'line',
-            yAxisID: 'y',
-            borderColor: '#26a69a',
-            segment: {
-              borderColor: (ctx) => {
-                const y0 = ctx?.p0?.parsed?.y;
-                const y1 = ctx?.p1?.parsed?.y;
-                const y = (y0 + y1) / 2;
-                return y >= 0 ? '#26a69a' : '#ef5350';
-              }
-            },
-            backgroundColor: (ctx) => {
-              const chart = ctx.chart;
-              const { chartArea, scales } = chart;
-              if (!chartArea || !scales?.y) return 'rgba(38, 166, 154, 0.12)';
-
-              const zeroY = scales.y.getPixelForValue(0);
-              const top = chartArea.top;
-              const bottom = chartArea.bottom;
-
-              // Guard against invalid values
-              if (
-                !Number.isFinite(zeroY) ||
-                !Number.isFinite(top) ||
-                !Number.isFinite(bottom) ||
-                bottom <= top
-              ) {
-                return 'rgba(38, 166, 154, 0.12)';
-              }
-
-              // Two-part gradient: green above 0, red below 0 (TV-like)
-              const gradient = chart.ctx.createLinearGradient(
-                0,
-                top,
-                0,
-                bottom
-              );
-              let t = (zeroY - top) / (bottom - top);
-
-              // Clamp t to valid range and check for NaN
-              if (!Number.isFinite(t)) t = 0.5;
-              t = Math.min(1, Math.max(0, t));
-
-              gradient.addColorStop(0, 'rgba(38, 166, 154, 0.18)');
-              gradient.addColorStop(
-                Math.max(0, Math.min(0.999, t - 0.001)),
-                'rgba(38, 166, 154, 0.04)'
-              );
-              gradient.addColorStop(
-                Math.max(0.001, Math.min(1, t + 0.001)),
-                'rgba(239, 83, 80, 0.04)'
-              );
-              gradient.addColorStop(1, 'rgba(239, 83, 80, 0.14)');
-              return gradient;
-            },
-            fill: {
-              target: { value: 0 }
-            },
-            tension: 0,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            pointHitRadius: 8,
-            borderWidth: 4,
-            order: 1
-          },
-          {
-            label: 'Покупка и удержание',
-            data: [],
-            type: 'line',
-            yAxisID: 'y',
-            borderColor: '#ef5350',
-            backgroundColor: '#ef5350',
-            fill: false,
-            tension: 0,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderWidth: 2,
-            borderDash: [4, 6],
-            borderCapStyle: 'round',
-            order: 2
-          }
-          // TradingView-style Trade Excursion Bars are drawn by custom plugin
-          // (tradeExcursionBarsPlugin) instead of Chart.js datasets
-          // This allows unified bars with MFE up + MAE down in single bar
-        ]
-      },
-      options: {
-        ...chartOptions,
-        responsive: true,
-        maintainAspectRatio: false,
-        devicePixelRatio: window.devicePixelRatio || 1,
-        onClick: handleEquityChartClick,
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          equityTradeMarkers: {
-            enabled: false,
-            size: 7,
-            offsetY: 0
-          },
-          tradeExcursionBars: {
-            enabled: true // Draw unified MFE+MAE bars via custom plugin
-          },
-          annotation: {
-            annotations: {
-              zeroLine: {
-                type: 'line',
-                yMin: 0,
-                yMax: 0,
-                borderColor: '#787b86',
-                borderWidth: 1,
-                drawTime: 'afterDatasetsDraw'
-              }
-            }
-          },
-          datalabels: {
-            display: (context) => {
-              // Show label on last point of strategy line only
-              return (
-                context.datasetIndex === 0 &&
-                context.dataIndex === context.dataset.data.length - 1
-              );
-            },
-            align: 'left',
-            anchor: 'end',
-            offset: 8,
-            backgroundColor: (context) => {
-              const value = context.dataset.data[context.dataIndex];
-              return value >= 0 ? '#26a69a' : '#ef5350';
-            },
-            borderRadius: 6,
-            color: 'white',
-            font: { weight: 'bold', size: 13 },
-            padding: { left: 10, right: 10, top: 6, bottom: 6 },
-            formatter: (value) => {
-              const sign = value > 0 ? '+' : '';
-              return (
-                sign +
-                value.toLocaleString('ru-RU', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })
-              );
-            }
-          },
-          tooltip: {
-            enabled: true,
-            backgroundColor: 'rgba(30, 30, 30, 0.95)',
-            titleColor: '#ffffff',
-            bodyColor: '#c9d1d9',
-            borderColor: '#404040',
-            borderWidth: 1,
-            padding: 12,
-            cornerRadius: 8,
-            displayColors: false,
-            callbacks: {
-              title: function (context) {
-                const idx = context[0].dataIndex;
-                const tradeInfo = equityChart._tradeMap?.[idx];
-                if (tradeInfo) {
-                  const sideVal = (tradeInfo.side || 'long').toLowerCase();
-                  const side = (sideVal === 'short' || sideVal === 'sell') ? 'Short' : 'Long';
-                  return `Trade #${tradeInfo.tradeNum} • ${side}`;
-                }
-                const data = equityChart._equityData;
-                if (data && data[idx]) {
-                  const d = new Date(data[idx].timestamp);
-                  return d.toLocaleDateString('ru-RU', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-                }
-                return context[0].label;
-              },
-              label: function (context) {
-                const datasetLabel = context.dataset.label;
-                const idx = context.dataIndex;
-                const value = context.parsed.y;
-
-                const sign = value >= 0 ? '+' : '';
-                const color = value >= 0 ? '🟢' : '🔴';
-
-                // Trade-specific lines (prefer TV-like fields when hovering around a trade)
-                const tradeInfo = equityChart._tradeMap?.[idx];
-                if (tradeInfo && datasetLabel === 'Капитал стратегии') {
-                  const cumPnL = Number(tradeInfo.cumulativePnL ?? 0);
-                  const cumSign = cumPnL >= 0 ? '+' : '';
-
-                  const exitStr = tradeInfo.exitTime
-                    ? new Date(tradeInfo.exitTime).toLocaleString('ru-RU', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    })
-                    : null;
-
-                  const lines = [];
-                  lines.push(
-                    `Cumulative P&L: ${cumSign}${cumPnL.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USDT`
-                  );
-
-                  // Show MFE/MAE (Trades excursions) in TradingView style
-                  const mfeValue = tradeInfo.mfe_value;
-                  const maeValue = tradeInfo.mae_value;
-
-                  if (mfeValue !== null && mfeValue !== undefined) {
-                    lines.push(
-                      `Favorable excursion: ${Number(mfeValue).toFixed(2)} USDT`
-                    );
-                  }
-                  if (maeValue !== null && maeValue !== undefined) {
-                    lines.push(
-                      `Adverse excursion: ${Number(maeValue).toFixed(2)} USDT`
-                    );
-                  }
-
-                  if (exitStr) lines.push(exitStr);
-                  return lines;
-                }
-
-                // Default: show series value
-                if (datasetLabel === 'Капитал стратегии') {
-                  return `${color} Совокупные ПР/УБ  ${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
-                }
-
-                // Buy & Hold should only appear if enabled in legend
-                if (datasetLabel === 'Покупка и удержание') {
-                  const buyHoldCheckbox =
-                    document.getElementById('legendBuyHold');
-                  if (buyHoldCheckbox && !buyHoldCheckbox.checked) return null;
-                  return `   B&H ПР/УБ     ${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
-                }
-
-                // Skip Excursion/Realized bars in tooltip (they show in trade info above)
-                if (
-                  datasetLabel.includes('Excursion') ||
-                  datasetLabel.includes('Realized')
-                ) {
-                  return null;
-                }
-
-                return null;
-              }
-            },
-            filter: function (tooltipItem) {
-              // Hide excursion bars from tooltip list
-              const label = tooltipItem.dataset.label;
-              return (
-                !label.includes('Excursion') && !label.includes('Realized')
-              );
-            }
-          }
-        },
-        scales: {
-          x: {
-            offset: true, // Add padding at edges so bars don't touch boundaries
-            grid: {
-              color: '#2a2e39',
-              drawOnChartArea: true,
-              drawTicks: false
-            },
-            ticks: {
-              color: '#787b86',
-              maxTicksLimit: 12,
-              maxRotation: 0,
-              font: { size: 11 },
-              padding: 8
-            },
-            border: {
-              color: '#2a2e39'
-            }
-          },
-          y: {
-            position: 'right',
-            grace: '10%',
-            grid: {
-              color: '#2a2e39',
-              drawOnChartArea: true,
-              drawTicks: false
-            },
-            ticks: {
-              color: '#787b86',
-              font: { size: 11 },
-              padding: 8,
-              maxTicksLimit: 15,
-              callback: (v) => {
-                if (v > 0)
-                  return (
-                    '+' +
-                    v.toLocaleString('ru-RU', { minimumFractionDigits: 2 })
-                  );
-                if (v < 0)
-                  return v.toLocaleString('ru-RU', {
-                    minimumFractionDigits: 2
-                  });
-                return '0';
-              }
-            },
-            border: {
-              display: false
-            }
-          },
-          y2: {
-            display: false,
-            position: 'left',
-            grid: { display: false },
-            // MFE/MAE bars - each bar starts from 0
-            stacked: false,
-            beginAtZero: true
-          }
-        }
-      }
+  const equityContainer = document.getElementById('equityChartContainer');
+  if (equityContainer && typeof TradingViewEquityChart !== 'undefined') {
+    _brTVEquityChart = new TradingViewEquityChart('equityChartContainer', { // eslint-disable-line no-undef
+      showBuyHold: document.getElementById('legendBuyHold')?.checked ?? true,
+      showTradeExcursions: document.getElementById('legendTradesExcursions')?.checked ?? true,
+      height: null  // let CSS (.tv-equity-inner-container) control the height
     });
-
-    // Add pointer cursor to indicate equity chart is clickable (navigates to price chart)
-    equityCanvas.style.cursor = 'pointer';
-    equityCanvas.title = 'Click to navigate to price chart at this point';
+    setChart('_tvEquityChart', _brTVEquityChart);
+    // Keep equityChart as thin shim so legacy code that checks `equityChart` still passes truthy
+    equityChart = { _tvChart: _brTVEquityChart, canvas: equityContainer, _tradeMap: {}, _tradeRanges: [], _equityData: [], _initialCapital: 10000, _showTradeExcursions: true };
+    setChart('equity', equityChart);
   }
 
   // Drawdown Chart
   const drawdownCanvas = document.getElementById('drawdownChart');
   if (drawdownCanvas) {
-    drawdownChart = new Chart(drawdownCanvas, {
+    drawdownChart = chartManager.init('drawdown', drawdownCanvas, {
       type: 'line',
       data: {
         labels: [],
@@ -862,7 +920,7 @@ function initCharts() {
   // Returns Distribution
   const returnsCanvas = document.getElementById('returnsChart');
   if (returnsCanvas) {
-    returnsChart = new Chart(returnsCanvas, {
+    returnsChart = chartManager.init('returns', returnsCanvas, {
       type: 'bar',
       data: {
         labels: [],
@@ -887,7 +945,7 @@ function initCharts() {
   // Monthly P&L
   const monthlyCanvas = document.getElementById('monthlyChart');
   if (monthlyCanvas) {
-    monthlyChart = new Chart(monthlyCanvas, {
+    monthlyChart = chartManager.init('monthly', monthlyCanvas, {
       type: 'bar',
       data: {
         labels: [],
@@ -906,7 +964,7 @@ function initCharts() {
   // Trade Distribution Chart (in Trade Analysis tab)
   const tradeDistCanvas = document.getElementById('tradeDistributionChart');
   if (tradeDistCanvas) {
-    tradeDistributionChart = new Chart(tradeDistCanvas, {
+    tradeDistributionChart = chartManager.init('tradeDistribution', tradeDistCanvas, {
       type: 'bar',
       data: {
         labels: [],
@@ -992,7 +1050,7 @@ function initCharts() {
   // Win/Loss Donut Chart (in Trade Analysis tab)
   const winLossCanvas = document.getElementById('winLossDonutChart');
   if (winLossCanvas) {
-    winLossDonutChart = new Chart(winLossCanvas, {
+    winLossDonutChart = chartManager.init('winLossDonut', winLossCanvas, {
       type: 'doughnut',
       data: {
         labels: ['Победы', 'Убытки', 'Безубыточность'],
@@ -1039,7 +1097,7 @@ function initCharts() {
   // Waterfall Chart (in Dynamics tab)
   const waterfallCanvas = document.getElementById('waterfallChart');
   if (waterfallCanvas) {
-    waterfallChart = new Chart(waterfallCanvas, {
+    waterfallChart = chartManager.init('waterfall', waterfallCanvas, {
       type: 'bar',
       data: {
         labels: [
@@ -1135,7 +1193,7 @@ function initCharts() {
   // Benchmarking Chart (in Dynamics tab)
   const benchmarkingCanvas = document.getElementById('benchmarkingChart');
   if (benchmarkingCanvas) {
-    benchmarkingChart = new Chart(benchmarkingCanvas, {
+    benchmarkingChart = chartManager.init('benchmarking', benchmarkingCanvas, {
       type: 'bar',
       data: {
         labels: ['Покупка и удержание', 'Прибыльность стратегии'],
@@ -1195,6 +1253,14 @@ function initCharts() {
       }
     });
   }
+  // Sync all chart instances to StateManager after init
+  setChart('drawdown', drawdownChart);
+  setChart('returns', returnsChart);
+  setChart('monthly', monthlyChart);
+  setChart('tradeDistribution', tradeDistributionChart);
+  setChart('winLossDonut', winLossDonutChart);
+  setChart('waterfall', waterfallChart);
+  setChart('benchmarking', benchmarkingChart);
 }
 
 // ============================
@@ -1225,6 +1291,7 @@ function initTradingViewTabs() {
           'currentBacktest=', currentBacktest?.config?.symbol, currentBacktest?.config?.interval);
         if (btPriceChartPending && currentBacktest) {
           btPriceChartPending = false;
+          setPriceChartPending(false);
           updatePriceChart(currentBacktest);
         }
       }
@@ -1241,55 +1308,30 @@ function initTradingViewTabs() {
 // Chart legend checkbox controls
 function initChartLegendControls() {
   const legendBuyHold = document.getElementById('legendBuyHold');
-  const legendTradesExcursions = document.getElementById(
-    'legendTradesExcursions'
-  );
+  const legendTradesExcursions = document.getElementById('legendTradesExcursions');
 
+  // Buy & Hold toggle — delegate to TradingViewEquityChart
   if (legendBuyHold) {
     legendBuyHold.addEventListener('change', () => {
-      if (equityChart) {
-        // Dataset 1 is "Покупка и удержание"
-        equityChart.data.datasets[1].hidden = !legendBuyHold.checked;
-        recalcEquityYAxis();
-        equityChart.update('none');
+      if (_brTVEquityChart) {
+        _brTVEquityChart.toggleBuyHold(legendBuyHold.checked);
       }
     });
   }
 
-  // Trades excursions (MFE/MAE) toggle - now uses custom plugin
+  // MFE/MAE excursion bars toggle — delegate to TradingViewEquityChart
   if (legendTradesExcursions) {
     // Restore persisted state (default is checked)
     const saved = localStorage.getItem('tv_trades_excursions');
     if (saved === '0') {
       legendTradesExcursions.checked = false;
-    }
-
-    // Store on chart for quick access (used by plugin)
-    if (equityChart) {
-      equityChart._showTradeExcursions = legendTradesExcursions.checked;
-      // Also update in tvEquityChart if available
-      if (window.tvEquityChart) {
-        window.tvEquityChart.options.showTradeExcursions =
-          legendTradesExcursions.checked;
-      }
-      recalcEquityYAxis();
-      equityChart.update('none');
+      if (_brTVEquityChart) _brTVEquityChart.toggleTradeExcursions(false);
     }
 
     legendTradesExcursions.addEventListener('change', () => {
-      localStorage.setItem(
-        'tv_trades_excursions',
-        legendTradesExcursions.checked ? '1' : '0'
-      );
-      if (equityChart) {
-        equityChart._showTradeExcursions = legendTradesExcursions.checked;
-        // Also update in tvEquityChart if available
-        if (window.tvEquityChart) {
-          window.tvEquityChart.options.showTradeExcursions =
-            legendTradesExcursions.checked;
-        }
-        recalcEquityYAxis();
-        equityChart.update('none');
+      localStorage.setItem('tv_trades_excursions', legendTradesExcursions.checked ? '1' : '0');
+      if (_brTVEquityChart) {
+        _brTVEquityChart.toggleTradeExcursions(legendTradesExcursions.checked);
       }
     });
   }
@@ -1297,7 +1339,7 @@ function initChartLegendControls() {
   const legendRegimeOverlay = document.getElementById('legendRegimeOverlay');
   if (legendRegimeOverlay) {
     legendRegimeOverlay.addEventListener('change', () => {
-      if (equityChart && currentBacktest) {
+      if (currentBacktest) {
         if (legendRegimeOverlay.checked) {
           loadAndApplyRegimeOverlay(currentBacktest);
         } else {
@@ -1309,16 +1351,18 @@ function initChartLegendControls() {
 }
 
 function clearRegimeOverlay() {
-  if (!equityChart?.options?.plugins?.annotation?.annotations) return;
-  const ann = equityChart.options.plugins.annotation.annotations;
+  const innerChart = _brTVEquityChart?.chart;
+  if (!innerChart?.options?.plugins?.annotation?.annotations) return;
+  const ann = innerChart.options.plugins.annotation.annotations;
   Object.keys(ann).forEach((k) => {
     if (k.startsWith('regime_')) delete ann[k];
   });
-  equityChart.update('none');
+  innerChart.update('none');
 }
 
 async function loadAndApplyRegimeOverlay(backtest) {
-  if (!equityChart || !equityChart._equityData?.length) return;
+  const innerChart = _brTVEquityChart?.chart;
+  if (!innerChart || !_brTVEquityChart?.data?.timestamps?.length) return;
   const symbol = backtest.symbol || backtest.config?.symbol;
   const rawInterval = backtest.interval || backtest.config?.interval || '60';
   if (!symbol) return;
@@ -1326,7 +1370,12 @@ async function loadAndApplyRegimeOverlay(backtest) {
   const intervalMap = { 1: '1m', 5: '5m', 15: '15m', 30: '30m', 60: '1h', 120: '2h', 240: '4h', 360: '6h', 720: '12h', D: '1d', W: '1w' };
   const interval = intervalMap[s] || (/^(\d+[mhdw]|[mhdw])$/i.test(s) ? s : '1h');
 
-  const equityData = equityChart._equityData;
+  // Build equityData array from TV chart's stored data
+  const tvData = _brTVEquityChart.data;
+  const equityData = tvData.timestamps.map((t, i) => ({
+    timestamp: t,
+    equity: tvData.equity ? tvData.equity[i] : null
+  }));
   const firstTs = equityData[0]?.timestamp;
   const lastTs = equityData[equityData.length - 1]?.timestamp;
   const days = firstTs && lastTs ? Math.max(7, Math.ceil((new Date(lastTs) - new Date(firstTs)) / (24 * 60 * 60 * 1000))) : 30;
@@ -1358,7 +1407,7 @@ async function loadAndApplyRegimeOverlay(backtest) {
       return best.regime;
     };
 
-    const regimePerIdx = equityData.map((p, _i) => getRegimeAt(p.timestamp));
+    const regimePerIdx = equityData.map((p) => getRegimeAt(p.timestamp));
     const segments = [];
     let start = 0;
     for (let i = 1; i <= regimePerIdx.length; i++) {
@@ -1368,7 +1417,7 @@ async function loadAndApplyRegimeOverlay(backtest) {
       }
     }
 
-    const ann = equityChart.options.plugins.annotation.annotations;
+    const ann = innerChart.options.plugins.annotation.annotations;
     Object.keys(ann).forEach((k) => { if (k.startsWith('regime_')) delete ann[k]; });
     segments.forEach((seg, idx) => {
       if (seg.end < seg.start) return;
@@ -1383,7 +1432,7 @@ async function loadAndApplyRegimeOverlay(backtest) {
         drawTime: 'beforeDatasetsDraw'
       };
     });
-    equityChart.update('none');
+    innerChart.update('none');
   } catch (e) {
     console.warn('[Regime overlay] Failed to load:', e.message);
   }
@@ -1391,8 +1440,6 @@ async function loadAndApplyRegimeOverlay(backtest) {
 
 // Chart mode toggle (Absolute / Percent)
 let chartDisplayMode = 'absolute';
-let originalEquityData = null;
-let originalBuyHoldData = null;
 
 function initChartModeToggle() {
   const btnAbsolute = document.getElementById('btnAbsoluteMode');
@@ -1422,48 +1469,9 @@ function initChartModeToggle() {
 }
 
 function updateChartDisplayMode() {
-  if (!equityChart || !originalEquityData || originalEquityData.length === 0)
-    return;
-
-  // originalEquityData already contains P&L values (not absolute equity)
-  // For percent mode, we need to convert P&L to percentage of initial capital
-  // We need to store initial capital separately
-  const initialCapital = equityChart._initialCapital || 10000;
-
-  if (chartDisplayMode === 'percent') {
-    // Convert P&L to percentage of initial capital
-    const equityPct = originalEquityData.map((v) => (v / initialCapital) * 100);
-    const buyHoldPct =
-      originalBuyHoldData?.map((v) => (v / initialCapital) * 100) || [];
-
-    equityChart.data.datasets[0].data = equityPct;
-    equityChart.data.datasets[1].data = buyHoldPct;
-
-    // Update Y axis for percent display
-    equityChart.options.scales.y.ticks.callback = (value) => {
-      if (value > 0) return '+' + value.toFixed(2) + '%';
-      if (value < 0) return value.toFixed(2) + '%';
-      return '0%';
-    };
-  } else {
-    // Restore absolute P&L values
-    equityChart.data.datasets[0].data = [...originalEquityData];
-    equityChart.data.datasets[1].data = originalBuyHoldData
-      ? [...originalBuyHoldData]
-      : [];
-
-    // Reset Y axis for absolute display
-    equityChart.options.scales.y.ticks.callback = (v) => {
-      if (v > 0)
-        return '+' + v.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
-      if (v < 0) return v.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
-      return '0';
-    };
+  if (_brTVEquityChart) {
+    _brTVEquityChart.setDisplayMode(chartDisplayMode);
   }
-
-  // MFE/MAE bars use main Y axis now, so they automatically align with zero line
-
-  equityChart.update('none');
 }
 // Format TradingView style currency value with percentage
 function formatTVCurrency(value, pct, showSign = true) {
@@ -2483,6 +2491,8 @@ function updateTVTradesListTab(trades, config) {
   // Cache rows and render first page
   tradesCachedRows = allRows;
   tradesCurrentPage = 0;
+  setTradesCachedRows(tradesCachedRows);
+  setTradesCurrentPage(0);
   renderTradesPage(tbody);
   renderTradePagination(trades.length);
 }
@@ -2559,6 +2569,7 @@ function removeTradePagination() {
 function tradesPrevPage() {
   if (tradesCurrentPage > 0) {
     tradesCurrentPage--;
+    setTradesCurrentPage(tradesCurrentPage);
     renderTradesPage();
   }
 }
@@ -2568,6 +2579,7 @@ function tradesNextPage() {
   const totalPages = Math.ceil(tradesCachedRows.length / TRADES_PAGE_SIZE);
   if (tradesCurrentPage < totalPages - 1) {
     tradesCurrentPage++;
+    setTradesCurrentPage(tradesCurrentPage);
     renderTradesPage();
   }
 }
@@ -2581,12 +2593,15 @@ function sortTradesBy(key) {
     tradesSortKey = key;
     tradesSortAsc = true;
   }
+  setTradesSortKey(tradesSortKey);
+  setTradesSortAsc(tradesSortAsc);
   tradesCachedRows.sort((a, b) => {
     const aVal = a[`_${key}`];
     const bVal = b[`_${key}`];
     return tradesSortAsc ? aVal - bVal : bVal - aVal;
   });
   tradesCurrentPage = 0;
+  setTradesCurrentPage(0);
   renderTradesPage();
   updateTradeSortIndicators(key);
 }
@@ -2758,6 +2773,7 @@ async function loadBacktestResults() {
             metrics: backtestData.metrics || {}
           }
         ];
+        setAllResults(allResults);
 
         document.getElementById('resultsCount').textContent = '1';
         document.getElementById('emptyState').classList.add('d-none');
@@ -2822,6 +2838,7 @@ async function loadBacktestListBackground() {
 
     if (newResults.length > 0) {
       allResults = [...allResults, ...newResults];
+      setAllResults(allResults);
       document.getElementById('resultsCount').textContent = allResults.length;
       renderResultsList(allResults);
       populateFilters();
@@ -2864,6 +2881,7 @@ async function loadBacktestListFromAPI() {
         strategy_type:
           item.strategy_type || item.config?.strategy_type || 'Unknown'
       }));
+    setAllResults(allResults);
     console.log(
       '[loadBacktestListFromAPI] Loaded',
       allResults.length,
@@ -2963,16 +2981,19 @@ function selectAllForDelete() {
  */
 function clearAllDisplayData() {
   console.log('[clearAllDisplayData] Clearing all charts and metrics');
-  currentBacktest = null;
+  setCurrentBacktest(null);
 
-  // --- Equity Chart (Chart.js) ---
-  if (equityChart && equityChart.canvas) {
-    equityChart.data.labels = [];
-    equityChart.data.datasets.forEach((ds) => (ds.data = []));
-    equityChart.update('none');
+  // --- Equity Chart (TradingViewEquityChart) ---
+  if (_brTVEquityChart) {
+    // Re-render with empty data to clear the chart visually
+    _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
   }
 
   // --- Drawdown / Returns / Monthly / Trade Analysis Charts (Chart.js) ---
+  // Use chartManager.clearAll() to clear data without destroying instances.
+  // This avoids "Canvas is already in use" on next initCharts() call.
+  chartManager.clearAll('none');
+  // Keep local references in sync (they still point to the same Chart instances)
   [drawdownChart, returnsChart, monthlyChart, tradeDistributionChart, winLossDonutChart, waterfallChart, benchmarkingChart].forEach((chart) => {
     if (chart && chart.canvas) {
       chart.data.labels = [];
@@ -2985,17 +3006,25 @@ function clearAllDisplayData() {
   if (_priceChartResizeObserver) {
     _priceChartResizeObserver.disconnect();
     _priceChartResizeObserver = null;
+    setPriceChartResizeObserver(null);
   }
   if (btPriceChart) {
     btPriceChart.remove();
     btPriceChart = null;
     btCandleSeries = null;
+    setPriceChart(null);
+    setPriceChartCandleSeries(null);
   }
   btPriceChartMarkers = [];
   btTradeLineSeries = [];
   _btCachedCandles = [];
   btPriceChartPending = false;
   _priceChartGeneration++;
+  setPriceChartMarkers([]);
+  setPriceChartTradeLineSeries([]);
+  setPriceChartCachedCandles([]);
+  setPriceChartPending(false);
+  setPriceChartGeneration(_priceChartGeneration);
   const priceContainer = document.getElementById('btPriceChartContainer');
   if (priceContainer) {
     // Restore default inner structure with empty candlestick chart + hidden loading
@@ -3110,6 +3139,7 @@ async function deleteSelectedBacktests() {
         recentlyDeletedIds.add(id);
         setTimeout(() => recentlyDeletedIds.delete(id), 30000);
         allResults = allResults.filter((r) => r.backtest_id !== id);
+        setAllResults(allResults);
       } else {
         errors++;
       }
@@ -3126,11 +3156,9 @@ async function deleteSelectedBacktests() {
     currentBacktest &&
     idsToDelete.includes(currentBacktest.backtest_id)
   ) {
-    currentBacktest = null;
-    if (equityChart) {
-      equityChart.data.labels = [];
-      equityChart.data.datasets.forEach((ds) => (ds.data = []));
-      equityChart.update('none');
+    setCurrentBacktest(null);
+    if (_brTVEquityChart) {
+      _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
     }
   }
 
@@ -3213,15 +3241,14 @@ async function deleteBacktest(backtestId) {
       // Optimistic UI update: immediately remove from local array
       // This prevents the "ghost" item from appearing due to backend sync delay
       allResults = allResults.filter((r) => r.backtest_id !== backtestId);
+      setAllResults(allResults);
 
       // If we deleted the currently selected backtest, clear selection
       if (currentBacktest && currentBacktest.backtest_id === backtestId) {
-        currentBacktest = null;
+        setCurrentBacktest(null);
         // Clear charts and show empty state
-        if (equityChart) {
-          equityChart.data.labels = [];
-          equityChart.data.datasets.forEach((ds) => (ds.data = []));
-          equityChart.update('none');
+        if (_brTVEquityChart) {
+          _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
         }
       }
 
@@ -3377,10 +3404,11 @@ async function selectBacktest(backtestId) {
     // Fetch full details
     const response = await fetch(`${API_BASE}/backtests/${backtestId}`);
     if (!response.ok) {
-      currentBacktest = null;
+      setCurrentBacktest(null);
       throw new Error(`Failed to fetch backtest: ${response.status} ${response.statusText}`);
     }
     currentBacktest = await response.json();
+    setCurrentBacktest(currentBacktest);
 
     // Update TradingView style tabs
     updateTVReportHeader(currentBacktest);
@@ -3422,7 +3450,7 @@ async function selectBacktest(backtestId) {
       '[selectBacktest] Dispatched backtestLoaded event for AI Analysis'
     );
   } catch (error) {
-    currentBacktest = null;
+    setCurrentBacktest(null);
     console.error('Failed to load backtest details:', error);
     showToast('Failed to load backtest details', 'error');
   }
@@ -3558,7 +3586,7 @@ function updateMetrics(metrics) {
 
 // Downsample large arrays to improve chart performance
 // Uses LTTB (Largest Triangle Three Buckets) simplified algorithm
-function downsampleData(data, targetLength) {
+function _downsampleData(data, targetLength) {
   if (!data || data.length <= targetLength) return data;
 
   // Min-max bucket sampling: keeps both the minimum and maximum point
@@ -3607,7 +3635,7 @@ function downsampleData(data, targetLength) {
 }
 
 // Binary search to find closest timestamp index
-function findClosestIndex(sortedData, targetTime, getTime) {
+function _findClosestIndex(sortedData, targetTime, getTime) {
   if (!sortedData || sortedData.length === 0) return -1;
 
   const target = new Date(targetTime).getTime();
@@ -3641,7 +3669,7 @@ function findClosestIndex(sortedData, targetTime, getTime) {
  * Considers only currently VISIBLE layers (strategy P&L, B&H, MFE/MAE bars).
  * Called on initial render AND on every toggle change.
  */
-function recalcEquityYAxis() {
+function _recalcEquityYAxis() {
   if (!equityChart) return;
 
   let yMin = Infinity;
@@ -3711,225 +3739,82 @@ function updateCharts(backtest) {
   console.log('[updateCharts] equity_curve exists:', !!backtest.equity_curve);
   console.log('[updateCharts] trades count:', backtest.trades?.length || 0);
 
-  // Check if charts are initialized and canvas still exists
-  if (!equityChart || !equityChart.canvas) {
-    console.warn(
-      '[updateCharts] equityChart not initialized or canvas missing'
-    );
-    return;
-  }
-
-  // Equity Chart
-  if (backtest.equity_curve) {
-    console.log(
-      '[updateCharts] equity_curve found, type:',
-      Array.isArray(backtest.equity_curve) ? 'array' : 'object'
-    );
-
-    // Short date format for chart labels (like TradingView)
-    const formatShortDate = (ts) => {
-      if (!ts) return '';
-      const d = new Date(ts);
-      return d
-        .toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-        .replace('.', '');
-    };
-
-    // Support both formats:
-    // 1. Array of objects: [{timestamp, equity, drawdown}, ...]
-    // 2. Object with arrays: {timestamps: [], equity: [], drawdown: []}
-    let equityData = [];
-    let rawEquityData = []; // Keep original for trade matching
-
-    if (Array.isArray(backtest.equity_curve)) {
-      // New format from optimization API
-      rawEquityData = backtest.equity_curve;
-    } else {
-      // Legacy format - convert to array format for tooltip
-      const timestamps = backtest.equity_curve.timestamps || [];
-      const equities = backtest.equity_curve.equity || [];
-      const drawdowns = backtest.equity_curve.drawdown || [];
-      rawEquityData = timestamps.map((t, i) => ({
-        timestamp: t,
-        equity: equities[i],
-        drawdown: drawdowns[i] || 0
-      }));
-    }
-
-    // Downsample for chart display if too many points (target ~2000 points max)
-    const MAX_CHART_POINTS = 2000;
-    if (rawEquityData.length > MAX_CHART_POINTS) {
-      console.log(
-        `[updateCharts] Downsampling from ${rawEquityData.length} to ${MAX_CHART_POINTS} points`
-      );
-      equityData = downsampleData(rawEquityData, MAX_CHART_POINTS);
-    } else {
-      equityData = rawEquityData;
-    }
-
-    const labels = equityData.map((p) => formatShortDate(p.timestamp));
-    const values = equityData.map((p) => p.equity);
-    const drawdown = equityData.map((p) => p.drawdown || 0);
-
-    console.log(
-      '[updateCharts] labels:',
-      labels?.length,
-      'values:',
-      values?.length
-    );
-    console.log(
-      '[updateCharts] values sample:',
-      values?.slice(0, 5),
-      '...',
-      values?.slice(-3)
-    );
-
+  // ── Equity Chart (TradingViewEquityChart) ──────────────────────────────────
+  if (backtest.equity_curve && _brTVEquityChart) {
     try {
-      if (equityChart && equityChart.canvas) {
-        // Store data for tooltip access
-        equityChart._equityData = equityData;
-        equityChart.data.labels = labels;
+      const ec = backtest.equity_curve;
+      const isArray = Array.isArray(ec);
 
-        // Convert equity values to P&L (change from initial capital)
-        const initialEquity = values[0] || 10000;
-        equityChart._initialCapital = initialEquity; // Store for mode switching
-        const pnlValues = values.map((v) => v - initialEquity);
+      // Normalise equity_curve to parallel arrays
+      const timestamps = isArray ? ec.map((p) => p.timestamp) : (ec.timestamps || []);
+      const equityArr = isArray ? ec.map((p) => p.equity) : (ec.equity || []);
+      const bhEquityArr = isArray ? [] : (ec.bh_equity || []);
+      const drawdownArr = isArray ? ec.map((p) => p.drawdown || 0) : (ec.drawdown || []);
 
-        console.log(
-          '[updateCharts] initialEquity:',
-          initialEquity,
-          'pnlValues sample:',
-          pnlValues?.slice(0, 3),
-          '...',
-          pnlValues?.slice(-3)
-        );
+      // initial_capital: prefer config > metrics > first equity point
+      const initialCapital =
+        backtest.config?.initial_capital ||
+        backtest.metrics?.initial_capital ||
+        equityArr[0] ||
+        10000;
 
-        // Dataset 0: Strategy P&L line (green)
-        equityChart.data.datasets[0].data = pnlValues;
+      // Normalise trades for TradingViewEquityChart
+      const trades = (backtest.trades || []).map((t) => ({
+        entry_time: t.entry_time,
+        exit_time: t.exit_time,
+        side: t.side || 'long',
+        pnl: Number(t.pnl || 0),
+        mfe_pct: Number(t.mfe_pct ?? t.mfe ?? 0),
+        mae_pct: Number(t.mae_pct ?? t.mae ?? 0),
+        mfe: Number(t.mfe ?? 0),
+        mae: Number(t.mae ?? 0)
+      }));
 
-        // Dataset 1: Buy & Hold P&L line (red)
-        // Priority: 1. bh_equity from API, 2. klines data, 3. estimate from metrics
-        let buyHoldPnL;
-        const bhEquity = Array.isArray(backtest.equity_curve)
-          ? null
-          : backtest.equity_curve?.bh_equity || [];
+      // Render via TradingViewEquityChart
+      _brTVEquityChart.render({
+        timestamps,
+        equity: equityArr,
+        bh_equity: bhEquityArr,
+        trades,
+        initial_capital: initialCapital
+      });
 
-        if (bhEquity && bhEquity.length > 0) {
-          // Use actual Buy & Hold equity from backend
-          const bhInitial = bhEquity[0] || initialEquity;
-          buyHoldPnL = bhEquity.map((e) => e - bhInitial);
-        } else if (backtest.klines && backtest.klines.length > 0) {
-          const firstPrice = backtest.klines[0].close;
-          buyHoldPnL = backtest.klines.map((k) => {
-            const priceChange = (k.close - firstPrice) / firstPrice;
-            return initialEquity * priceChange;
-          });
-        } else if (backtest.metrics?.buy_hold_return_pct !== undefined) {
-          const bhReturn = backtest.metrics.buy_hold_return_pct / 100;
-          buyHoldPnL = values.map((_, i) => {
-            const progress = i / (values.length - 1 || 1);
-            return initialEquity * bhReturn * progress;
-          });
-        } else {
-          buyHoldPnL = values.map(() => 0);
-        }
-        equityChart.data.datasets[1].data = buyHoldPnL;
+      console.log('[updateCharts] _brTVEquityChart.render() called,',
+        timestamps.length, 'points,', trades.length, 'trades');
 
-        // Build trade map for tooltip AND trade ranges for MFE/MAE bars
-        const tradeMap = {};
-        const tradeRanges = []; // Array of {entryIdx, exitIdx, mfe, mae}
-        if (backtest.trades && backtest.trades.length > 0) {
-          let cumulativePnL = 0;
+      // Regime overlay
+      const legendRegimeOverlay = document.getElementById('legendRegimeOverlay');
+      if (legendRegimeOverlay?.checked) {
+        loadAndApplyRegimeOverlay(backtest);
+      } else {
+        clearRegimeOverlay();
+      }
 
-          // Use binary search for O(n log n) instead of O(n²)
-          const getTimestamp = (point) => point.timestamp;
-
-          backtest.trades.forEach((trade, tradeIdx) => {
-            const entryTime = trade.entry_time;
-            const exitTime = trade.exit_time;
-            const tradePnL = Number(trade.pnl || 0);
-            cumulativePnL += tradePnL;
-
-            // Find entry and exit indices using binary search
-            const entryIdx = findClosestIndex(
-              equityData,
-              entryTime,
-              getTimestamp
-            );
-            const exitIdx = findClosestIndex(
-              equityData,
-              exitTime,
-              getTimestamp
-            );
-
-            if (exitIdx >= 0) {
-              tradeMap[exitIdx] = {
-                tradeNum: tradeIdx + 1,
-                side: trade.side || 'long',
-                pnl: tradePnL,
-                cumulativePnL,
-                // MFE/MAE: absolute values (USDT) and percentages
-                mfe_value: trade.mfe ?? trade.mfe_value ?? null,
-                mae_value: trade.mae ?? trade.mae_value ?? null,
-                mfe_pct: trade.mfe_pct ?? null,
-                mae_pct: trade.mae_pct ?? null,
-                exitTime: exitTime
-              };
-            }
-
-            // Store trade range for MFE/MAE bars
-            if (entryIdx >= 0 && exitIdx >= 0) {
-              tradeRanges.push({
-                entryIdx: Math.min(entryIdx, exitIdx),
-                exitIdx: Math.max(entryIdx, exitIdx),
-                mfe: trade.mfe ?? trade.mfe_value ?? 0,
-                mae: trade.mae ?? trade.mae_value ?? 0
-              });
-            }
-          });
-        }
-        equityChart._tradeMap = tradeMap;
-        equityChart._tradeRanges = tradeRanges;
-
-        // Store original data for mode switching
-        originalEquityData = [...pnlValues];
-        originalBuyHoldData = [...buyHoldPnL];
-
-        // Calculate adaptive Y-axis and apply
-        recalcEquityYAxis();
-
-        // Trade Excursion Bars are now drawn by tradeExcursionBarsPlugin
-        // using _tradeRanges and _tradeMap stored above
-
-        equityChart.update('none');
-        console.log('[updateCharts] equityChart updated with P&L values');
-
-        const legendRegimeOverlay = document.getElementById('legendRegimeOverlay');
-        if (legendRegimeOverlay?.checked) {
-          loadAndApplyRegimeOverlay(backtest);
-        } else {
-          clearRegimeOverlay();
-        }
-
-        // Update current value badge in header — show final account balance, not just P&L delta
-        const lastPnL = pnlValues[pnlValues.length - 1] || 0;
-        const finalBalance = (backtest.config?.initial_capital || 10000) + lastPnL;
+      // Update current value badge
+      const lastEquity = equityArr[equityArr.length - 1];
+      if (lastEquity != null) {
+        const pnlDelta = lastEquity - initialCapital;
         const valueBadge = document.getElementById('tvEquityCurrentValue');
         if (valueBadge) {
-          valueBadge.textContent = `$${finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          valueBadge.title = `Изменение: ${lastPnL >= 0 ? '+' : ''}$${lastPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          valueBadge.classList.toggle('negative', finalBalance < (backtest.config?.initial_capital || 10000));
+          valueBadge.textContent = `$${lastEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valueBadge.title = `Изменение: ${pnlDelta >= 0 ? '+' : ''}$${pnlDelta.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valueBadge.classList.toggle('negative', lastEquity < initialCapital);
         }
       }
 
-      // Drawdown Chart (separate)
-      if (drawdownChart && drawdownChart.canvas) {
-        drawdownChart.data.labels = labels;
-        drawdownChart.data.datasets[0].data = drawdown;
+      // Also update Drawdown chart (separate Chart.js instance)
+      if (drawdownChart && drawdownChart.canvas && drawdownArr.length > 0) {
+        const shortLabels = timestamps.map((ts) => {
+          if (!ts) return '';
+          const d = new Date(ts);
+          return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+        });
+        drawdownChart.data.labels = shortLabels;
+        drawdownChart.data.datasets[0].data = drawdownArr;
         drawdownChart.update('none');
       }
     } catch (chartError) {
-      console.warn('[updateCharts] Chart update error:', chartError.message);
+      console.warn('[updateCharts] TradingViewEquityChart error:', chartError.message);
     }
   }
 
@@ -4553,6 +4438,7 @@ function updateCharts(backtest) {
   // Always mark as pending so a tab switch will trigger a refresh.
   // If the tab is already active, also kick off an immediate render.
   btPriceChartPending = true;
+  setPriceChartPending(true);
   const priceTab = document.getElementById('tab-price-chart');
   const priceTabActive = priceTab && priceTab.classList.contains('active');
   console.log('[updateCharts] Price chart: pending=true, tabActive=', priceTabActive,
@@ -4652,16 +4538,34 @@ function toggleResultsPanel() {
   const isCollapsed = panel.classList.contains('collapsed');
   localStorage.setItem('resultsPanelCollapsed', isCollapsed);
 
-  // Trigger chart resize after animation
-  setTimeout(() => {
+  // Force TV chart to resize after CSS transition (300ms) completes
+  const doResize = () => {
     window.dispatchEvent(new Event('resize'));
-  }, 350);
+    // Directly resize the TV chart using the module-level reference
+    if (_brTVEquityChart && _brTVEquityChart._lwChart) {
+      const c = _brTVEquityChart.container;
+      if (c && c.clientWidth > 0) {
+        _brTVEquityChart._lwChart.resize(
+          c.clientWidth,
+          c.clientHeight || 400
+        );
+      }
+    }
+  };
+  setTimeout(doResize, 320);   // after transition ends
+  setTimeout(doResize, 650);   // safety second pass
 }
 // Make available globally for onclick
 window.toggleResultsPanel = toggleResultsPanel;
 
 // Restore panel state on page load
 document.addEventListener('DOMContentLoaded', function () {
+  // Wire toggle button via addEventListener (avoids CSP unsafe-eval block)
+  const btn = document.getElementById('panelToggleBtn');
+  if (btn) {
+    btn.addEventListener('click', toggleResultsPanel);
+  }
+
   const savedState = localStorage.getItem('resultsPanelCollapsed');
   if (savedState === 'true') {
     const panel = document.getElementById('resultsPanel');
@@ -4692,7 +4596,9 @@ function applyFilters() {
 
 function toggleCompareMode() {
   compareMode = !compareMode;
+  setCompareMode(compareMode);
   selectedForCompare = [];
+  setSelectedForCompare(selectedForCompare);
 
   const btn = document.getElementById('btnCompare');
   btn.classList.toggle('btn-primary', compareMode);
@@ -4712,6 +4618,7 @@ function toggleCompareSelect(event, backtestId) {
   } else if (selectedForCompare.length < 3) {
     selectedForCompare.push(backtestId);
   }
+  setSelectedForCompare(selectedForCompare);
 
   const enoughSelected = selectedForCompare.length >= 2;
   const tooltipText = enoughSelected
@@ -5106,7 +5013,7 @@ function triggerBackgroundKlineSync(symbol) {
  * Handle click on equity chart: extract timestamp from clicked data point
  * and navigate the price chart to that candle.
  */
-function handleEquityChartClick(_event, elements, chart) {
+function _handleEquityChartClick(_event, elements, chart) {
   if (!elements || elements.length === 0) return;
 
   const idx = elements[0].index;
@@ -5156,6 +5063,7 @@ function navigatePriceChartToTime(targetTimeSec, tradeInfo = null) {
 
   // 3. Price chart not yet created — build it, then scroll after render
   btPriceChartPending = false;
+  setPriceChartPending(false);
   const originalUpdatePriceChart = updatePriceChart;
 
   // Wrap updatePriceChart to scroll after it completes
@@ -5397,6 +5305,10 @@ async function updatePriceChart(backtest) {
 
     btCandleSeries.setData(candles);
     _btCachedCandles = candles; // cache for marker rebuild on checkbox toggle
+    // Sync to StateManager
+    setPriceChart(btPriceChart);
+    setPriceChartCandleSeries(btCandleSeries);
+    setPriceChartCachedCandles(candles);
 
     // Add crosshair OHLC display
     btPriceChart.subscribeCrosshairMove((param) => {
@@ -5441,6 +5353,10 @@ async function updatePriceChart(backtest) {
       }
     });
     _priceChartResizeObserver.observe(container);
+    // Sync trade markers/lines and observer to StateManager
+    setPriceChartMarkers(btPriceChartMarkers);
+    setPriceChartTradeLineSeries(btTradeLineSeries);
+    setPriceChartResizeObserver(_priceChartResizeObserver);
 
     console.log(`[PriceChart] Rendered ${candles.length} candles, ${btPriceChartMarkers.length} trade markers for ${symbol}/${interval}`);
 
