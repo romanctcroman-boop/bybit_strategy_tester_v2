@@ -4,8 +4,9 @@
  * Page-specific scripts for strategy_builder.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-26
+ * @migration P0-3: StateManager integration with legacy shim-sync pattern
  */
 
 /* eslint-disable indent */
@@ -17,8 +18,15 @@ import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
 
+// Import StateManager
+import { getStore } from '../core/StateManager.js';
+import { initState } from '../core/state-helpers.js';
+
 // API Base URL - must be defined early before any usage
 const API_BASE = '/api/v1';
+
+// Build version marker — visible in DevTools console on load
+console.log('%c[Strategy Builder] v20260225f LOADED — modal branch active', 'color:#0f0;font-weight:bold');
 
 // Forward declaration for checkSymbolDataForProperties (initialized later after runCheckSymbolDataForProperties is defined)
 let checkSymbolDataForProperties = null;
@@ -546,6 +554,180 @@ const templates = [
   }
 ];
 
+// ============================================================
+// P0-3 StateManager Integration — Strategy Builder
+// ============================================================
+// Pattern: "Legacy Shim Sync"
+//   - Legacy module-level variables remain as shims (zero regression risk)
+//   - store.subscribe() keeps shims updated when store changes (store → shim)
+//   - Setter functions push mutations back to store (shim → store)
+//   - All existing code continues to read/write the same variable names
+// ============================================================
+
+/**
+ * Initialize all strategyBuilder state paths in the store.
+ * Called at the very beginning of initializeStrategyBuilder().
+ */
+function initializeStrategyBuilderState() {
+  const store = getStore();
+  if (!store) return;
+
+  initState(store, 'strategyBuilder', {
+    // Graph
+    graph: {
+      blocks: [],
+      connections: []
+    },
+    // Selection
+    selection: {
+      selectedBlockId: null,
+      selectedBlockIds: [],
+      selectedTemplate: null
+    },
+    // Viewport / canvas
+    viewport: {
+      zoom: 1,
+      isDragging: false,
+      dragOffset: { x: 0, y: 0 },
+      isMarqueeSelecting: false,
+      marqueeStart: { x: 0, y: 0 },
+      marqueeElement: null
+    },
+    // History (undo/redo)
+    history: {
+      lastAutoSavePayload: null,
+      skipNextAutoSave: false
+    },
+    // Connecting wires
+    connecting: {
+      isConnecting: false,
+      connectionStart: null,
+      tempLine: null
+    },
+    // Group drag
+    groupDrag: {
+      isGroupDragging: false,
+      groupDragOffsets: {}
+    },
+    // Misc / UI
+    ui: {
+      refreshDunnahBasePanel: null,
+      quickAddDialog: null,
+      currentBacktestResults: null
+    },
+    // Symbol sync state
+    sync: {
+      currentSyncAbortController: null,
+      currentSyncSymbol: null,
+      currentSyncStartTime: 0
+    }
+  });
+
+  _setupStrategyBuilderShimSync();
+}
+
+// ----------------------------------------------------------------
+// Getters & Setters
+// ----------------------------------------------------------------
+
+/* eslint-disable no-unused-vars */
+
+// Graph
+function getSBBlocks() { const s = getStore(); return s ? s.get('strategyBuilder.graph.blocks') ?? [] : strategyBlocks; }
+function setSBBlocks(v) { const s = getStore(); if (s) s.set('strategyBuilder.graph.blocks', v); }
+function getSBConnections() { const s = getStore(); return s ? s.get('strategyBuilder.graph.connections') ?? [] : connections; }
+function setSBConnections(v) { const s = getStore(); if (s) s.set('strategyBuilder.graph.connections', v); }
+
+// Selection
+function getSBSelectedBlockId() { const s = getStore(); return s ? s.get('strategyBuilder.selection.selectedBlockId') : selectedBlockId; }
+function setSBSelectedBlockId(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedBlockId', v); }
+function getSBSelectedBlockIds() { const s = getStore(); return s ? s.get('strategyBuilder.selection.selectedBlockIds') ?? [] : selectedBlockIds; }
+function setSBSelectedBlockIds(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedBlockIds', v); }
+function getSBSelectedTemplate() { const s = getStore(); return s ? s.get('strategyBuilder.selection.selectedTemplate') : selectedTemplate; }
+function setSBSelectedTemplate(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedTemplate', v); }
+
+// Viewport
+function getSBZoom() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.zoom') ?? 1 : zoom; }
+function setSBZoom(v) { const s = getStore(); if (s) s.set('strategyBuilder.viewport.zoom', v); }
+function getSBIsDragging() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.isDragging') ?? false : isDragging; }
+function setSBIsDragging(v) { const s = getStore(); if (s) s.set('strategyBuilder.viewport.isDragging', v); }
+function getSBDragOffset() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.dragOffset') ?? { x: 0, y: 0 } : dragOffset; }
+function setSBDragOffset(v) { const s = getStore(); if (s) s.set('strategyBuilder.viewport.dragOffset', v); }
+function getSBIsMarqueeSelecting() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.isMarqueeSelecting') ?? false : isMarqueeSelecting; }
+function setSBIsMarqueeSelecting(v) { const s = getStore(); if (s) s.set('strategyBuilder.viewport.isMarqueeSelecting', v); }
+function getSBMarqueeStart() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.marqueeStart') ?? { x: 0, y: 0 } : marqueeStart; }
+function setSBMarqueeStart(v) { const s = getStore(); if (s) s.set('strategyBuilder.viewport.marqueeStart', v); }
+
+// History
+function getSBLastAutoSavePayload() { const s = getStore(); return s ? s.get('strategyBuilder.history.lastAutoSavePayload') : lastAutoSavePayload; }
+function setSBLastAutoSavePayload(v) { const s = getStore(); if (s) s.set('strategyBuilder.history.lastAutoSavePayload', v); }
+function getSBSkipNextAutoSave() { const s = getStore(); return s ? s.get('strategyBuilder.history.skipNextAutoSave') ?? false : skipNextAutoSave; }
+function setSBSkipNextAutoSave(v) { const s = getStore(); if (s) s.set('strategyBuilder.history.skipNextAutoSave', v); }
+
+// Connecting
+function getSBIsConnecting() { const s = getStore(); return s ? s.get('strategyBuilder.connecting.isConnecting') ?? false : isConnecting; }
+function setSBIsConnecting(v) { const s = getStore(); if (s) s.set('strategyBuilder.connecting.isConnecting', v); }
+function getSBConnectionStart() { const s = getStore(); return s ? s.get('strategyBuilder.connecting.connectionStart') : connectionStart; }
+function setSBConnectionStart(v) { const s = getStore(); if (s) s.set('strategyBuilder.connecting.connectionStart', v); }
+
+// Group drag
+function getSBIsGroupDragging() { const s = getStore(); return s ? s.get('strategyBuilder.groupDrag.isGroupDragging') ?? false : isGroupDragging; }
+function setSBIsGroupDragging(v) { const s = getStore(); if (s) s.set('strategyBuilder.groupDrag.isGroupDragging', v); }
+function getSBGroupDragOffsets() { const s = getStore(); return s ? s.get('strategyBuilder.groupDrag.groupDragOffsets') ?? {} : groupDragOffsets; }
+function setSBGroupDragOffsets(v) { const s = getStore(); if (s) s.set('strategyBuilder.groupDrag.groupDragOffsets', v); }
+
+// Sync
+function getSBCurrentSyncSymbol() { const s = getStore(); return s ? s.get('strategyBuilder.sync.currentSyncSymbol') : currentSyncSymbol; }
+function setSBCurrentSyncSymbol(v) { const s = getStore(); if (s) s.set('strategyBuilder.sync.currentSyncSymbol', v); }
+function getSBCurrentSyncStartTime() { const s = getStore(); return s ? s.get('strategyBuilder.sync.currentSyncStartTime') ?? 0 : currentSyncStartTime; }
+function setSBCurrentSyncStartTime(v) { const s = getStore(); if (s) s.set('strategyBuilder.sync.currentSyncStartTime', v); }
+
+// UI misc
+function getSBCurrentBacktestResults() { const s = getStore(); return s ? s.get('strategyBuilder.ui.currentBacktestResults') : currentBacktestResults; }
+function setSBCurrentBacktestResults(v) { const s = getStore(); if (s) s.set('strategyBuilder.ui.currentBacktestResults', v); }
+
+/* eslint-enable no-unused-vars */
+
+/**
+ * Wire store.subscribe() so that store updates automatically propagate to
+ * the legacy shim variables (store → shim direction).
+ * Mutation sites call setter functions to push the other way (shim → store).
+ */
+function _setupStrategyBuilderShimSync() {
+  const store = getStore();
+  if (!store) return;
+
+  store.subscribe('strategyBuilder.graph.blocks', (v) => { strategyBlocks.length = 0; if (Array.isArray(v)) strategyBlocks.push(...v); });
+  store.subscribe('strategyBuilder.graph.connections', (v) => { connections.length = 0; if (Array.isArray(v)) connections.push(...v); });
+  store.subscribe('strategyBuilder.selection.selectedBlockId', (v) => { selectedBlockId = v ?? null; });
+  store.subscribe('strategyBuilder.selection.selectedBlockIds', (v) => { selectedBlockIds = Array.isArray(v) ? v : []; });
+  store.subscribe('strategyBuilder.selection.selectedTemplate', (v) => { selectedTemplate = v ?? null; });
+  store.subscribe('strategyBuilder.viewport.zoom', (v) => { zoom = v ?? 1; });
+  store.subscribe('strategyBuilder.viewport.isDragging', (v) => { isDragging = v ?? false; });
+  store.subscribe('strategyBuilder.viewport.dragOffset', (v) => { if (v) { dragOffset.x = v.x; dragOffset.y = v.y; } });
+  store.subscribe('strategyBuilder.viewport.isMarqueeSelecting', (v) => { isMarqueeSelecting = v ?? false; });
+  store.subscribe('strategyBuilder.viewport.marqueeStart', (v) => { if (v) { marqueeStart.x = v.x; marqueeStart.y = v.y; } });
+  store.subscribe('strategyBuilder.history.lastAutoSavePayload', (v) => { lastAutoSavePayload = v ?? null; });
+  store.subscribe('strategyBuilder.history.skipNextAutoSave', (v) => { skipNextAutoSave = v ?? false; });
+  store.subscribe('strategyBuilder.connecting.isConnecting', (v) => { isConnecting = v ?? false; });
+  store.subscribe('strategyBuilder.connecting.connectionStart', (v) => { connectionStart = v ?? null; });
+  store.subscribe('strategyBuilder.groupDrag.isGroupDragging', (v) => { isGroupDragging = v ?? false; });
+  store.subscribe('strategyBuilder.groupDrag.groupDragOffsets', (v) => { if (v) Object.assign(groupDragOffsets, v); });
+  store.subscribe('strategyBuilder.sync.currentSyncSymbol', (v) => { currentSyncSymbol = v ?? null; });
+  store.subscribe('strategyBuilder.sync.currentSyncStartTime', (v) => { currentSyncStartTime = v ?? 0; });
+  store.subscribe('strategyBuilder.ui.currentBacktestResults', (v) => { currentBacktestResults = v ?? null; });
+
+  // Seed arrays/objects into store (initial values from const declarations)
+  // Note: connections/undoStack/redoStack are const [] — they are the same objects in both shim and store
+  const s = store;
+  s.set('strategyBuilder.graph.blocks', strategyBlocks);
+  s.set('strategyBuilder.graph.connections', connections);
+}
+
+// ----------------------------------------------------------------
+// State
+// ----------------------------------------------------------------
+
 // State
 let strategyBlocks = [];
 const connections = [];
@@ -663,12 +845,15 @@ function tryLoadFromLocalStorage(strategyId) {
       // Normalize to ensure canonical format (fills missing id/type/portId)
       normalizeAllConnections();
     }
+    setSBBlocks(strategyBlocks);
+    setSBConnections(connections);
 
     // Restore UI state if available
     if (data.uiState) {
       // Restore zoom
       if (data.uiState.zoom && typeof data.uiState.zoom === 'number') {
         zoom = data.uiState.zoom;
+        setSBZoom(zoom);
         // updateZoom will be called after DOM is ready
       }
 
@@ -808,9 +993,11 @@ function clearAllAndReset() {
   try {
     // FIRST: Set flag to skip next autosave
     skipNextAutoSave = true;
+    setSBSkipNextAutoSave(true);
 
     // Clear last autosave payload to prevent immediate re-save
     lastAutoSavePayload = null;
+    setSBLastAutoSavePayload(null);
 
     // Clear ALL localStorage drafts (pass null to clear all)
     clearLocalStorageDraft(null);
@@ -969,6 +1156,9 @@ function showBackendConnectionBanner(message) {
 function initializeStrategyBuilder() {
   console.log('[Strategy Builder] Initializing...');
 
+  // P0-3: Initialize StateManager state paths + legacy shim sync
+  initializeStrategyBuilderState();
+
   try {
     // If opened from file://, API requests won't reach backend - show hint
     if (window.location.protocol === 'file:') {
@@ -1100,6 +1290,7 @@ function createMainStrategyNode() {
     params: {}
   };
   strategyBlocks.push(mainNode);
+  setSBBlocks(strategyBlocks);
 }
 
 function renderBlockLibrary() {
@@ -1643,8 +1834,9 @@ function initSymbolPicker() {
   async function loadAndShow() {
     const cat = getCategory();
     const cachedList = bybitSymbolsCache[cat] || [];
-    // If cache is warm, show immediately without loading spinner
-    if (cachedList.length > 0 && blockedSymbolsCache !== null) {
+    const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
+    // If all caches are warm (symbols + tickers + blocked), show immediately without loading spinner
+    if (cachedList.length > 0 && blockedSymbolsCache !== null && tickersCached) {
       showSymbolDropdown(input.value);
       return;
     }
@@ -1675,13 +1867,15 @@ function initSymbolPicker() {
     _symbolInputTimer = setTimeout(function () {
       const cat = getCategory();
       const list = bybitSymbolsCache[cat] || [];
-      if (list.length > 0 && blockedSymbolsCache !== null) showSymbolDropdown(input.value);
+      const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
+      if (list.length > 0 && blockedSymbolsCache !== null && tickersCached) showSymbolDropdown(input.value);
       else loadAndShow();
     }, 150);
   });
   input.addEventListener('click', function () {
     const cat = getCategory();
-    if ((bybitSymbolsCache[cat] || []).length > 0 && blockedSymbolsCache !== null) {
+    const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
+    if ((bybitSymbolsCache[cat] || []).length > 0 && blockedSymbolsCache !== null && tickersCached) {
       showSymbolDropdown(input.value);
     } else {
       loadAndShow();
@@ -2091,6 +2285,8 @@ async function syncSymbolData(forceRefresh = false) {
   currentSyncAbortController = controller;
   currentSyncSymbol = symbol;
   currentSyncStartTime = Date.now();
+  setSBCurrentSyncSymbol(symbol);
+  setSBCurrentSyncStartTime(currentSyncStartTime);
   const SYNC_INACTIVITY_TIMEOUT_MS = 90000; // 90 сек без SSE events = таймаут
   let timeoutId = setTimeout(() => controller.abort(), SYNC_INACTIVITY_TIMEOUT_MS);
 
@@ -2154,7 +2350,17 @@ async function syncSymbolData(forceRefresh = false) {
             clearTimeout(timeoutId);
             result = { timeframes: data.results, total_new_candles: data.totalNew, summary: data.message, cancelled: !!data.cancelled };
           } else if (data.event === 'error') {
-            throw new Error(data.message || 'Ошибка синхронизации');
+            // Per-TF error — do NOT abort the whole sync, server continues to next TF
+            // Update UI to show partial warning but keep waiting for 'complete'
+            const errMsg = data.message || `${data.tfName || data.tf || 'TF'}: ошибка`;
+            renderPropertiesDataStatus('syncing', {
+              symbol,
+              message: `⚠️ ${errMsg} — продолжаем...`,
+              step: data.step || 0,
+              totalSteps: data.totalSteps || totalSteps,
+              totalNew: data.totalNew || 0
+            });
+            console.warn('[DataSync] TF error (non-fatal):', errMsg);
           }
         } catch (parseErr) {
           if (parseErr instanceof SyntaxError) continue;
@@ -2182,12 +2388,14 @@ async function syncSymbolData(forceRefresh = false) {
 
     const timeframes = result.timeframes || {};
     const timeoutTfs = Object.entries(timeframes).filter(([, v]) => v && v.status === 'timeout').map(([tf]) => tf);
+    const errorTfs = Object.entries(timeframes).filter(([, v]) => v && v.status === 'error').map(([tf]) => tf);
+    const failedTfs = [...new Set([...timeoutTfs, ...errorTfs])];
     const totalNew = result.total_new_candles || 0;
-    if (timeoutTfs.length > 0) {
+    if (failedTfs.length > 0) {
       renderPropertiesDataStatus('synced', {
         symbol,
         totalNew,
-        message: `Синхронизировано частично: ${timeoutTfs.join(', ')} не успел(и). Остальные TF готовы. Кликните для повторной попытки.`
+        message: `Синхронизировано частично: ${failedTfs.join(', ')} не удалось (сеть). Остальные TF готовы. Кликните для повторной попытки.`
       });
     } else {
       renderPropertiesDataStatus('synced', {
@@ -2232,6 +2440,7 @@ async function syncSymbolData(forceRefresh = false) {
     if (currentSyncAbortController === controller) {
       currentSyncAbortController = null;
       currentSyncSymbol = null;
+      setSBCurrentSyncSymbol(null);
     }
     delete symbolSyncInProgress[symbol];
   }
@@ -3361,6 +3570,7 @@ function addBlockToCanvas(blockId, blockType, x = null, y = null) {
 
   pushUndo();
   strategyBlocks.push(block);
+  setSBBlocks(strategyBlocks);
 
   renderBlocks();
   selectBlock(block.id);
@@ -6168,6 +6378,8 @@ function insertPreset(presetId, x = 200, y = 200) {
   });
 
   // BUG#4 FIX: renderBlocks() calls renderConnections() internally — no double render
+  setSBBlocks(strategyBlocks);
+  setSBConnections(connections);
   renderBlocks();
 
   showNotification(`Пресет "${preset.name}" вставлен`, 'success');
@@ -6322,6 +6534,7 @@ function duplicateBlock(blockId) {
 
   pushUndo();
   strategyBlocks.push(newBlock);
+  setSBBlocks(strategyBlocks);
   renderBlocks();
   selectBlock(newBlock.id);
 }
@@ -6341,15 +6554,18 @@ function deleteBlock(blockId) {
       connections.splice(i, 1);
     }
   }
+  setSBConnections(connections);
 
   // Remove block
   const idx = strategyBlocks.findIndex(b => b.id === blockId);
   if (idx !== -1) {
     strategyBlocks.splice(idx, 1);
   }
+  setSBBlocks(strategyBlocks);
 
   if (selectedBlockId === blockId) {
     selectedBlockId = null;
+    setSBSelectedBlockId(null);
   }
 
   renderBlocks();
@@ -6395,6 +6611,7 @@ function selectBlock(blockId) {
   // Clear multi-selection when selecting single block
   clearMultiSelection();
   selectedBlockId = blockId;
+  setSBSelectedBlockId(blockId);
   renderBlocks();
   renderBlockProperties();
 }
@@ -6854,6 +7071,157 @@ function updateBlockParam(blockId, param, value) {
         }
       });
     }
+
+    // BTC-source checkbox enabled → trigger BTCUSDT sync for the node's TF
+    const BTC_SOURCE_PARAM_KEYS = ['use_btc_source', 'use_btcusdt_mfi', 'use_btcusdt_momentum'];
+    if (BTC_SOURCE_PARAM_KEYS.includes(param) && parsedValue === true) {
+      syncBtcSourceForNode(blockId);
+    }
+  }
+}
+
+// ============================================
+// BTC SOURCE SYNC FOR NODE
+// ============================================
+
+/**
+ * Sync BTCUSDT data for a node that uses "Use BTCUSDT as Source".
+ * Uses the node's own `timeframe` param to highlight the relevant TF in status.
+ * Shows inline status in the active popup or properties panel.
+ *
+ * @param {string} blockId - ID of the block that has BTC source enabled
+ */
+async function syncBtcSourceForNode(blockId) {
+  const block = strategyBlocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  const nodeTf = (block.params && block.params.timeframe) || null;
+  // TF names for display
+  const TF_DISPLAY = { '1': '1m', '5': '5m', '15': '15m', '30': '30m', '60': '1h', '240': '4h', 'D': '1D', 'W': '1W', 'M': '1M' };
+  const tfLabel = nodeTf && nodeTf !== 'Chart' ? (TF_DISPLAY[nodeTf] || nodeTf) : null;
+  const tfNote = tfLabel ? ` [TF: ${tfLabel}]` : '';
+
+  const marketEl = document.getElementById('builderMarketType');
+  const marketType = marketEl?.value === 'spot' ? 'spot' : 'linear';
+
+  // Find or create the inline BTC status container
+  // It is placed in the active popup OR in the properties panel after the BTC checkbox row
+  function _getBtcStatusEl() {
+    // Try popup first
+    const popup = document.querySelector(`.block-params-popup[data-block-id="${blockId}"]`);
+    if (popup) {
+      let el = popup.querySelector('.btc-source-sync-status');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'btc-source-sync-status';
+        el.style.cssText = 'margin: 4px 8px 4px 8px; padding: 6px 10px; border-radius: 4px; font-size: 11px; background: var(--input-bg, #1e2130); border: 1px solid var(--border-color, #3d4460); color: var(--text-secondary, #a0a8c3);';
+        // Insert at the top of popup-body
+        const body = popup.querySelector('.popup-body');
+        if (body) body.insertBefore(el, body.firstChild);
+        else popup.appendChild(el);
+      }
+      return el;
+    }
+    // Try properties panel
+    const propsEl = document.getElementById('blockProperties');
+    if (propsEl) {
+      let el = propsEl.querySelector('.btc-source-sync-status');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'btc-source-sync-status';
+        el.style.cssText = 'margin: 4px 0; padding: 6px 10px; border-radius: 4px; font-size: 11px; background: var(--input-bg, #1e2130); border: 1px solid var(--border-color, #3d4460); color: var(--text-secondary, #a0a8c3);';
+        propsEl.insertBefore(el, propsEl.firstChild);
+      }
+      return el;
+    }
+    return null;
+  }
+
+  function _setStatus(icon, text, color) {
+    const el = _getBtcStatusEl();
+    if (!el) return;
+    el.style.borderColor = color || 'var(--border-color, #3d4460)';
+    el.innerHTML = `<span style="margin-right:5px">${icon}</span>${text}`;
+  }
+
+  // Check cache — skip if synced recently (same logic as main sync, 10s grace)
+  const BTC_SYNC_CACHE_KEY = 'BTCUSDT_btcsource';
+  const lastSync = symbolSyncCache[BTC_SYNC_CACHE_KEY];
+  if (lastSync && Date.now() - lastSync < 10000) {
+    _setStatus('✓', `BTCUSDT${tfNote} — данные актуальны`, '#4caf50');
+    return;
+  }
+
+  _setStatus('🔍', `Проверка BTCUSDT${tfNote}...`, 'var(--border-color, #3d4460)');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  try {
+    const streamUrl = `${API_BASE}/marketdata/symbols/sync-all-tf-stream?symbol=BTCUSDT&market_type=${marketType}`;
+    console.log(`[BtcSourceSync] Starting BTCUSDT sync for node ${blockId} (TF=${nodeTf || 'Chart'}):`, streamUrl);
+
+    const response = await fetch(streamUrl, { signal: controller.signal });
+    if (!response.ok) {
+      clearTimeout(timeoutId);
+      _setStatus('⚠️', `BTCUSDT — ошибка HTTP ${response.status}`, '#f44336');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let result = null;
+
+    _setStatus('📥', `Синхронизация BTCUSDT${tfNote}...`, '#2196f3');
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      clearTimeout(timeoutId);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const dataMatch = line.match(/^data:\s*(.+)$/m);
+        if (!dataMatch) continue;
+        try {
+          const data = JSON.parse(dataMatch[1]);
+          if (data.event === 'progress') {
+            // Highlight the node's TF in the progress message
+            const isCurrent = nodeTf && nodeTf !== 'Chart' && data.tf === nodeTf;
+            const tfMark = isCurrent ? ` ← [${tfLabel}]` : '';
+            _setStatus('📥', `BTCUSDT: ${data.tfName || data.tf}${tfMark} (${data.step}/${data.totalSteps || 9})`, '#2196f3');
+          } else if (data.event === 'complete') {
+            clearTimeout(timeoutId);
+            result = data;
+          } else if (data.event === 'error') {
+            console.warn('[BtcSourceSync] TF error (non-fatal):', data.message);
+          }
+        } catch (_) { /* skip parse error */ }
+      }
+    }
+
+    clearTimeout(timeoutId);
+
+    if (result) {
+      symbolSyncCache[BTC_SYNC_CACHE_KEY] = Date.now();
+      const totalNew = result.totalNew || 0;
+      const newText = totalNew > 0 ? `, +${totalNew} свечей` : '';
+      _setStatus('✅', `BTCUSDT${tfNote} — готово${newText}`, '#4caf50');
+      console.log(`[BtcSourceSync] BTCUSDT sync complete for node ${blockId}`, result);
+    } else {
+      _setStatus('⚠️', `BTCUSDT${tfNote} — нет результата`, '#ff9800');
+    }
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      _setStatus('⚠️', `BTCUSDT${tfNote} — таймаут соединения`, '#ff9800');
+    } else {
+      _setStatus('⚠️', `BTCUSDT${tfNote} — ${e.message}`, '#f44336');
+    }
+    console.error('[BtcSourceSync] Failed:', e);
   }
 }
 
@@ -9272,8 +9640,11 @@ function loadTemplateData(templateId) {
   }
 
   // Re-render — BUG#4 FIX: renderBlocks() calls renderConnections() internally
+  setSBBlocks(strategyBlocks);
+  setSBConnections(connections);
   renderBlocks();
   selectedBlockId = null;
+  setSBSelectedBlockId(null);
   renderBlockProperties();
 
   showNotification(`Шаблон "${templateId}" загружен`, 'success');
@@ -9355,6 +9726,8 @@ function importTemplateFromFile(file) {
         }
       });
       // renderBlocks calls renderConnections internally
+      setSBBlocks(strategyBlocks);
+      setSBConnections(connections);
       renderBlocks();
       dispatchBlocksChanged();
       closeTemplatesModal();
@@ -9380,11 +9753,15 @@ function restoreStateSnapshot(snapshot) {
   strategyBlocks.push(...snapshot.blocks);
   connections.length = 0;
   connections.push(...(snapshot.connections || []));
+  setSBBlocks(strategyBlocks);
+  setSBConnections(connections);
   if (selectedBlockId && !strategyBlocks.some((b) => b.id === selectedBlockId)) {
     selectedBlockId = null;
+    setSBSelectedBlockId(null);
   }
   // Reset autosave payload so the restored state gets saved to localStorage
   lastAutoSavePayload = null;
+  setSBLastAutoSavePayload(null);
   renderBlocks(); // renderBlocks calls renderConnections() internally — BUG#4 FIX: no extra call
   renderBlockProperties();
   dispatchBlocksChanged();
@@ -9469,6 +9846,9 @@ function deleteSelected() {
 
     strategyBlocks = strategyBlocks.filter((b) => b.id !== selectedBlockId);
     selectedBlockId = null;
+    setSBBlocks(strategyBlocks);
+    setSBConnections(connections);
+    setSBSelectedBlockId(null);
     renderBlocks();
     renderBlockProperties();
   }
@@ -9488,6 +9868,7 @@ function duplicateSelected() {
         params: { ...block.params }
       };
       strategyBlocks.push(newBlock);
+      setSBBlocks(strategyBlocks);
       renderBlocks();
       selectBlock(newBlock.id);
     }
@@ -9508,16 +9889,19 @@ function fitToScreen() {
 
 function zoomIn() {
   zoom = Math.min(zoom + 0.1, 2);
+  setSBZoom(zoom);
   updateZoom();
 }
 
 function zoomOut() {
   zoom = Math.max(zoom - 0.1, 0.5);
+  setSBZoom(zoom);
   updateZoom();
 }
 
 function resetZoom() {
   zoom = 1;
+  setSBZoom(zoom);
   updateZoom();
 }
 
@@ -10322,6 +10706,7 @@ async function autoSaveStrategy() {
     // Skip autosave if reset was just performed
     if (skipNextAutoSave) {
       skipNextAutoSave = false;
+      setSBSkipNextAutoSave(false);
       console.log('[Strategy Builder] Skipping autosave after reset');
       return;
     }
@@ -10345,6 +10730,7 @@ async function autoSaveStrategy() {
       return; // нет изменений
     }
     lastAutoSavePayload = serialized;
+    setSBLastAutoSavePayload(serialized);
 
     // 1) LocalStorage draft
     try {
@@ -10596,6 +10982,8 @@ async function loadStrategy(strategyId) {
       connections.push(...strategy.connections);
     }
     normalizeAllConnections();
+    setSBBlocks(strategyBlocks);
+    setSBConnections(connections);
 
     console.log('[Strategy Builder] Connections normalized:', connections.map(c => ({
       id: c.id,
@@ -11188,6 +11576,7 @@ async function runBacktest() {
       }
 
       // Check if results are returned directly (for quick preview)
+      console.log('[SB v20260225f] data.metrics=', !!data.metrics, 'data.trades=', !!(data.trades && data.trades.length), 'data.equity_curve=', !!data.equity_curve, 'data.backtest_id=', data.backtest_id);
       if (data.metrics || data.trades || data.equity_curve) {
         // Show results in modal for quick preview
         showNotification('Бэктест завершён!', 'success');
@@ -11206,7 +11595,8 @@ async function runBacktest() {
             // Fallback to redirect
             window.location.href = `/frontend/backtest-results.html?backtest_id=${data.backtest_id}`;
           }
-        } catch {
+        } catch (fetchErr) {
+          console.error('[BacktestModal] fetch /api/v1/backtests/ failed:', fetchErr);
           // Fallback to redirect
           window.location.href = `/frontend/backtest-results.html?backtest_id=${data.backtest_id}`;
         }
@@ -11248,6 +11638,7 @@ let currentBacktestResults = null;
 function displayBacktestResults(results) {
   console.log('[Strategy Builder] Displaying backtest results:', results);
   currentBacktestResults = results;
+  setSBCurrentBacktestResults(results);
 
   const modal = document.getElementById('backtestResultsModal');
   if (!modal) {
@@ -11271,27 +11662,32 @@ function displayBacktestResults(results) {
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
 
-  // Initialize equity chart if data available.
-  // equity_curve can be either:
-  //   - Array format: [{equity, timestamp, drawdown}, ...]  (legacy/in-memory)
-  //   - Object format: {timestamps: [...], equity: [...], drawdown: [...]}  (DB/API)
+  // Store equity chart data globally so switchResultsTab can pick it up
   const ec = results.equity_curve;
-  if (ec) {
-    let chartData = null;
-    if (Array.isArray(ec) && ec.length > 0) {
-      chartData = ec;  // already array format
-    } else if (ec && typeof ec === 'object' && Array.isArray(ec.equity) && ec.equity.length > 0) {
-      // Convert object format to array format for renderEquityChart
-      chartData = ec.equity.map((val, i) => ({
-        equity: val,
-        timestamp: ec.timestamps ? ec.timestamps[i] : null,
-        drawdown: ec.drawdown ? ec.drawdown[i] : 0
-      }));
+  if (ec && typeof ec === 'object' && Array.isArray(ec.equity) && ec.equity.length > 0) {
+    // Build trade list: component uses mfe/mae as % values, so pass mfe_pct/mae_pct
+    const trades = (results.trades || []).map(t => ({
+      ...t,
+      mfe: Math.abs(t.mfe_pct || 0),
+      mae: Math.abs(t.mae_pct || 0)
+    }));
+
+    // Store prepared data so switchResultsTab can render it when tab becomes visible
+    window._sbEquityChartData = {
+      timestamps: ec.timestamps,
+      equity: ec.equity,
+      bh_equity: ec.bh_equity || [],
+      trades: trades,
+      initial_capital: (results.metrics && results.metrics.initial_capital) || results.initial_capital || 10000
+    };
+
+    // Destroy stale chart instance so switchResultsTab creates a fresh one
+    if (window._sbEquityChart) {
+      try { window._sbEquityChart.destroy(); } catch (_) { }
+      window._sbEquityChart = null;
     }
-    if (chartData) {
-      setTimeout(() => renderEquityChart(chartData), 100);
-      setTimeout(() => renderDrawdownChart(chartData), 100);
-    }
+  } else {
+    window._sbEquityChartData = null;
   }
 }
 
@@ -11729,21 +12125,29 @@ function switchResultsTab(tabId) {
   });
 
   // Re-render chart if equity tab
-  if (tabId === 'equity' && currentBacktestResults) {
-    const ec = currentBacktestResults.equity_curve;
-    let chartData = null;
-    if (Array.isArray(ec) && ec.length > 0) {
-      chartData = ec;
-    } else if (ec && typeof ec === 'object' && Array.isArray(ec.equity) && ec.equity.length > 0) {
-      chartData = ec.equity.map((val, i) => ({
-        equity: val,
-        timestamp: ec.timestamps ? ec.timestamps[i] : null,
-        drawdown: ec.drawdown ? ec.drawdown[i] : 0
-      }));
-    }
-    if (chartData) {
-      setTimeout(() => renderEquityChart(chartData), 100);
-      setTimeout(() => renderDrawdownChart(chartData), 100);
+  if (tabId === 'equity') {
+    const TVChart = window.TradingViewEquityChart;
+    const chartData = window._sbEquityChartData;
+    console.log('[EquityTab] switched, TVChart=', typeof TVChart, 'chartData=', chartData ? 'ok(' + chartData.equity?.length + ' pts)' : 'null', '_sbEquityChart=', !!window._sbEquityChart);
+
+    if (window._sbEquityChart) {
+      // Already rendered — just resize (container was hidden before, now visible)
+      setTimeout(() => {
+        try {
+          if (window._sbEquityChart.chart) window._sbEquityChart.chart.resize();
+        } catch (_) { }
+      }, 50);
+    } else if (chartData && typeof TVChart !== 'undefined') {
+      // First time opening equity tab — render now that container is visible
+      setTimeout(() => {
+        const showBH = document.getElementById('legendBuyHold')?.checked ?? false;
+        window._sbEquityChart = new TVChart('equityChartContainer', {
+          showBuyHold: showBH,
+          showTradeExcursions: true,
+          height: 320
+        });
+        window._sbEquityChart.render(chartData);
+      }, 100);
     }
   }
 }
@@ -11757,6 +12161,12 @@ function closeBacktestResultsModal() {
     modal.classList.remove('active');
     document.body.style.overflow = '';
   }
+  // Destroy chart so it's recreated fresh next time
+  if (window._sbEquityChart) {
+    try { window._sbEquityChart.destroy(); } catch (_) { }
+    window._sbEquityChart = null;
+  }
+  window._sbEquityChartData = null;
 }
 
 /**

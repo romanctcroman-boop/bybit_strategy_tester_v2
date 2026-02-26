@@ -262,9 +262,9 @@ def main() -> None:
     # ── 2. Build TV lookup: entry_price → TV trade ───────────────────────────
     # Key: (side, round(entry_price, 1))
     tv_lookup: dict[tuple[str, float], TvTrade] = {}
-    for tv in TV_TRADES:
-        key = (tv.side, round(tv.entry_price, 1))
-        tv_lookup[key] = tv
+    for tv_trade in TV_TRADES:
+        key = (tv_trade.side, round(tv_trade.entry_price, 1))
+        tv_lookup[key] = tv_trade
 
     # ── 3. Trade-by-trade diff table ─────────────────────────────────────────
     print(

@@ -648,11 +648,19 @@
             </div>
 
             <div class="results-tab-content" id="tab-equity">
-              <div class="equity-chart-container" id="equityChartContainer">
-                <canvas id="equityChart"></canvas>
-              </div>
-              <div class="drawdown-chart-container" id="drawdownChartContainer">
-                <canvas id="drawdownChart"></canvas>
+              <div id="equityChartContainer"></div>
+              <!-- Legend row: Buy&Hold + Trade Excursions toggles -->
+              <div class="equity-chart-legend">
+                <label>
+                  <input type="checkbox" id="legendBuyHold">
+                  <span class="legend-color-bh"></span>
+                  Покупка и удержание
+                </label>
+                <label>
+                  <input type="checkbox" id="legendTradesRunupDrawdown" checked>
+                  <span class="legend-color-excursions"></span>
+                  Отклонения сделок
+                </label>
               </div>
             </div>
 
@@ -701,11 +709,16 @@
         </div>
       </div>
 
+      <!-- Chart.js + adapter for TradingViewEquityChart -->
+      <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+      <script src="./js/components/TradingViewEquityChart.js?v=20260225c"></script>
+
       <!-- Production Init (must load before all other scripts) -->
       <script src="./js/init-production.js"></script>
       <script src="./js/sidebar-toggle.js"></script>
       <script src="./js/pages/strategy_builder_debug.js"></script>
-      <script type="module" src="./js/pages/strategy_builder.js?v=20260221l"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260225f"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
       <script src="./js/pages/optimization_panels.js?v=20260204"></script>
       <script src="./js/pages/optimization.js"></script>

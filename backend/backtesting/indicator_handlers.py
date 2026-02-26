@@ -91,6 +91,201 @@ def _calc_ma(src: pd.Series, length: int, ma_type: str) -> pd.Series:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _detect_intrabar_rsi_crossings(
+    btc_5m: pd.DataFrame,
+    bar_index: pd.DatetimeIndex,
+    btc_rsi_full: pd.Series,
+    btc_30m_close: pd.Series,
+    period: int,
+    cross_short_level: float,
+    cross_long_level: float,
+) -> tuple[pd.Series, pd.Series]:
+    """Detect RSI crossings that occur WITHIN a higher-timeframe bar using sub-TF ticks.
+
+    TradingView's ``calc_on_every_tick`` evaluates the RSI on every tick (here: every 1m
+    close) rather than only at the higher-TF bar close.  This can fire a signal on a bar
+    where the bar-close RSI does NOT cross the level, because the RSI dipped/spiked intra-
+    bar and then partially reverted.
+
+    Algorithm (one-step hypothetical RSI — matches TradingView)
+    -----------------------------------------------------------
+    In Pine Script with ``calc_on_every_tick``, at each tick within bar ``k``:
+
+        close    = tick_price          (current tick as the hypothetical bar close)
+        close[1] = close of bar k-1   (FIXED for all ticks — previous completed bar)
+
+    The RSI formula computes ``change = close - close[1]`` and applies one Wilder step
+    from bar k-1's state.  Crucially, **each tick is computed independently** from the
+    same base state — tick T's RSI does NOT depend on tick T-1's RSI.
+
+    For cross detection (``ta.crossunder(rsi, level)``):
+        rsi      = RSI at current tick  (one-step hypothetical from bar k-1 state)
+        rsi[1]   = RSI at previous tick (also one-step hypothetical from bar k-1 state)
+
+    Both are independent one-step computations from the SAME base.  The cross fires when
+    two consecutive ticks straddle the level.
+
+    Parameters
+    ----------
+    btc_5m : pd.DataFrame
+        BTC sub-timeframe OHLCV data (1m or 5m).
+    bar_index : pd.DatetimeIndex
+        The 30m strategy bar index (ETH chart timestamps).
+    btc_rsi_full : pd.Series
+        Full BTC 30m RSI series (includes warmup bars, indexed by BTC 30m timestamps).
+    btc_30m_close : pd.Series
+        Actual BTC 30m close prices (same index as btc_rsi_full). Used to reconstruct
+        Wilder avg_gain / avg_loss at each bar without resampling from sub-TF data.
+    period : int
+        RSI period (default 14).
+    cross_short_level, cross_long_level : float
+        RSI crossing levels.
+
+    Returns
+    -------
+    cross_short_ib, cross_long_ib : pd.Series[bool]  indexed by ``bar_index``
+        True where an intra-bar crossing was detected.  The caller ORs these with the
+        existing bar-close cross signals.
+    """
+    cross_short_ib = pd.Series(False, index=bar_index)
+    cross_long_ib = pd.Series(False, index=bar_index)
+
+    if btc_5m is None or len(btc_5m) == 0 or len(bar_index) < 2:
+        return cross_short_ib, cross_long_ib
+
+    # Normalize 5m index timezone to match bar_index
+    btc_5m_close = btc_5m["close"].copy()
+    if bar_index.tz is None and btc_5m_close.index.tz is not None:
+        btc_5m_close.index = btc_5m_close.index.tz_localize(None)
+    elif bar_index.tz is not None and btc_5m_close.index.tz is None:
+        btc_5m_close.index = btc_5m_close.index.tz_localize("UTC")
+
+    # Normalize btc_30m_close timezone
+    btc_30m_close_norm = btc_30m_close.copy()
+    if bar_index.tz is None and btc_30m_close_norm.index.tz is not None:
+        btc_30m_close_norm.index = btc_30m_close_norm.index.tz_localize(None)
+    elif bar_index.tz is not None and btc_30m_close_norm.index.tz is None:
+        btc_30m_close_norm.index = btc_30m_close_norm.index.tz_localize("UTC")
+
+    btc_5m_arr = btc_5m_close.values
+    btc_5m_idx_arr = np.array(btc_5m_close.index, dtype="datetime64[ns]")
+    bar_idx_arr = np.array(bar_index, dtype="datetime64[ns]")
+    n_bars = len(bar_index)
+
+    # ── Rebuild Wilder state (avg_gain, avg_loss) for every 30m bar ───────────
+    # Use the ACTUAL BTC 30m close prices (from btc_30m_close) rather than resampling
+    # from 5m data, to ensure the Wilder state exactly matches btc_rsi_full.
+    closes_30m = btc_30m_close_norm.values
+    ts_30m = np.array(btc_30m_close_norm.index, dtype="datetime64[ns]")
+    n_30m = len(closes_30m)
+
+    if n_30m < period + 2:
+        return cross_short_ib, cross_long_ib
+
+    avg_gain_arr = np.zeros(n_30m)
+    avg_loss_arr = np.zeros(n_30m)
+
+    deltas = np.diff(closes_30m)
+    gains = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+
+    if len(gains) < period:
+        return cross_short_ib, cross_long_ib
+
+    ag = np.mean(gains[:period])
+    al = np.mean(losses[:period])
+    avg_gain_arr[period] = ag
+    avg_loss_arr[period] = al
+
+    for i in range(period, len(gains)):
+        ag = (ag * (period - 1) + gains[i]) / period
+        al = (al * (period - 1) + losses[i]) / period
+        avg_gain_arr[i + 1] = ag
+        avg_loss_arr[i + 1] = al
+
+    # Lookup: 30m timestamp → index in avg_gain_arr / avg_loss_arr / closes_30m
+    ts_30m_map: dict[int, int] = {int(ts): idx for idx, ts in enumerate(ts_30m)}
+
+    # Align btc_rsi_full (full BTC 30m RSI) to bar_index for the "previous RSI" seed
+    rsi_full_aligned = btc_rsi_full.reindex(bar_index, method="ffill")
+
+    # ── For each 30m bar k, compute hypothetical RSI at each 5m tick ─────────
+    # Bar k's body contains 5m ticks with timestamps >= bar_idx[k] and < bar_idx[k+1].
+    # The anchor for the hypothetical RSI is the Wilder state at bar k-1's close.
+    for k in range(1, n_bars - 1):
+        bar_open_ts = bar_idx_arr[k]  # bar k opens here (inclusive lower bound for 5m)
+        bar_close_ts = bar_idx_arr[k + 1]  # bar k closes here (exclusive upper bound)
+
+        # 5m ticks within bar k: open <= tick < close
+        mask = (btc_5m_idx_arr >= bar_open_ts) & (btc_5m_idx_arr < bar_close_ts)
+        if not np.any(mask):
+            continue
+
+        idxs = np.where(mask)[0]
+
+        # Get Wilder state at end of bar k-1 (the bar BEFORE bar k).
+        prev_bar_ts = int(bar_idx_arr[k - 1])
+        state_idx = ts_30m_map.get(prev_bar_ts)
+        if state_idx is None:
+            continue
+        ag_prev = avg_gain_arr[state_idx]
+        al_prev = avg_loss_arr[state_idx]
+        if ag_prev == 0.0 and al_prev == 0.0:
+            # Not yet warmed up
+            continue
+
+        # close_prev_30m: BTC 30m close of bar k-1 (the anchor price for delta computation)
+        close_prev_30m = closes_30m[state_idx]
+        if np.isnan(close_prev_30m):
+            continue
+
+        # Seed: 30m RSI at bar k-1's close
+        prev_rsi_hyp: float = float(rsi_full_aligned.iloc[k - 1])
+        if np.isnan(prev_rsi_hyp):
+            continue
+
+        fired_short = False
+        fired_long = False
+
+        # One-step hypothetical: each tick independently computes RSI from the FIXED
+        # bar k-1 state.  This matches TradingView where close[1] always refers to the
+        # previous COMPLETED bar's close (not the previous tick's price).
+        #
+        # For each tick:  delta = tick_price - close_{k-1}  (constant anchor)
+        #                 ag_hyp = (ag_prev * (P-1) + max(delta,0)) / P
+        #                 al_hyp = (al_prev * (P-1) + max(-delta,0)) / P
+        #                 rsi_hyp = 100 - 100 / (1 + ag_hyp / al_hyp)
+        #
+        # Cross detection: compare consecutive ticks' INDEPENDENT RSI values.
+        # Seed the "previous RSI" with bar k-1's close RSI for the first tick.
+        prev_rsi_hyp_tick = prev_rsi_hyp  # bar k-1 close RSI
+
+        for i in idxs:
+            tick_price = btc_5m_arr[i]
+            # One-step from FIXED bar k-1 state (NOT from previous tick's state)
+            delta = tick_price - close_prev_30m
+            g = delta if delta > 0 else 0.0
+            lo = -delta if delta < 0 else 0.0
+            ag_h = (ag_prev * (period - 1) + g) / period
+            al_h = (al_prev * (period - 1) + lo) / period
+            cur_rsi_hyp = 100.0 if al_h < 1e-10 else 100.0 - 100.0 / (1.0 + ag_h / al_h)
+
+            if not fired_short and prev_rsi_hyp_tick >= cross_short_level and cur_rsi_hyp < cross_short_level:
+                fired_short = True
+            if not fired_long and prev_rsi_hyp_tick <= cross_long_level and cur_rsi_hyp > cross_long_level:
+                fired_long = True
+
+            # Advance the "previous tick RSI" for cross comparison (NOT the Wilder state)
+            prev_rsi_hyp_tick = cur_rsi_hyp
+
+        if fired_short:
+            cross_short_ib.iloc[k] = True  # signal on bar k (where the ticks occurred)
+        if fired_long:
+            cross_long_ib.iloc[k] = True
+
+    return cross_short_ib, cross_long_ib
+
+
 def _handle_rsi(
     params: dict[str, Any],
     ohlcv: pd.DataFrame,
@@ -107,6 +302,8 @@ def _handle_rsi(
     # before the strategy period so that Wilder's smoothed RSI is fully converged.
     rsi_source = close  # default: current symbol close
     rsi_full_series: pd.Series | None = None  # pre-computed RSI on full BTC (incl. warmup)
+    btc_rsi_full: pd.Series | None = None  # full-index BTC RSI (with warmup, before reindex)
+    btc_close_full: pd.Series | None = None  # BTC 30m close series (full, with warmup)
 
     if params.get("use_btc_source", False):
         btc_ohlcv = getattr(adapter, "_btcusdt_ohlcv", None)
@@ -117,6 +314,9 @@ def _handle_rsi(
                 btc_close.index = btc_close.index.tz_localize(None)
             elif close.index.tz is not None and btc_close.index.tz is None:
                 btc_close.index = btc_close.index.tz_localize("UTC")
+
+            # Store full BTC 30m close series (with warmup) for intra-bar Wilder state reconstruction
+            btc_close_full = btc_close
 
             # Compute RSI on the FULL BTC series (may include warmup bars before strategy start).
             # This is the key step: Wilder's smoothing converges over the warmup period so that
@@ -205,6 +405,44 @@ def _handle_rsi(
         rsi_prev = rsi.shift(1)
         cross_long = (rsi_prev <= cross_long_level) & (rsi > cross_long_level)
         cross_short = (rsi_prev >= cross_short_level) & (rsi < cross_short_level)
+
+        # ── Intra-bar RSI cross detection (TradingView parity) ──────────────────────
+        # TV evaluates the RSI on every tick (calc_on_every_tick).  When the RSI crosses
+        # a level within a bar but then partially reverts, the bar-close cross check above
+        # misses the signal.  If 5m BTC data is available we re-step the Wilder smoother
+        # through each 5m tick inside the bar and detect such crossings.
+        # This only applies when use_btc_source=True because that is the case where we have
+        # a separate BTC RSI series that TV also computes tick-by-tick.
+        btc_5m = getattr(adapter, "_btcusdt_5m_ohlcv", None)
+        if (
+            btc_5m is not None
+            and params.get("use_btc_source", False)
+            and rsi_full_series is not None
+            and btc_rsi_full is not None
+            and btc_close_full is not None
+        ):
+            # btc_rsi_full is the full-warmup BTC RSI series (before reindex to close.index)
+            # btc_close_full is the full-warmup BTC 30m close series (same index as btc_rsi_full)
+            # Both are in scope from the use_btc_source block above.
+            cross_short_ib, cross_long_ib = _detect_intrabar_rsi_crossings(
+                btc_5m=btc_5m,
+                bar_index=close.index,
+                btc_rsi_full=btc_rsi_full,  # full BTC 30m RSI (wider, with warmup)
+                btc_30m_close=btc_close_full,  # full BTC 30m close prices (same index)
+                period=period,
+                cross_short_level=float(cross_short_level),
+                cross_long_level=float(cross_long_level),
+            )
+            n_new_short = int((cross_short_ib & ~cross_short).sum())
+            n_new_long = int((cross_long_ib & ~cross_long).sum())
+            if n_new_short or n_new_long:
+                logger.debug(
+                    "RSI node | intra-bar crossings added: +{} short, +{} long",
+                    n_new_short,
+                    n_new_long,
+                )
+            cross_short = cross_short | cross_short_ib
+            cross_long = cross_long | cross_long_ib
 
         if params.get("opposite_signal", False):
             cross_long, cross_short = cross_short, cross_long

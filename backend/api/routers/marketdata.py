@@ -1950,6 +1950,9 @@ async def sync_all_timeframes_stream(
         "M": 2 * 30 * 86400000,
     }
 
+    # TF processing order: standard order (1m first)
+    TF_ORDER = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
+
     async def event_generator():
         """Generate SSE events for each TF sync.
 
@@ -1961,6 +1964,8 @@ async def sync_all_timeframes_stream(
         Key architecture: chunked fetch runs as asyncio.Task while this generator
         polls progress_queue and yields SSE events in parallel. This prevents
         the generator from blocking on long-running downloads (e.g. 1m TF = 570K candles).
+
+        Processing order: fast TFs (5m..M) first, heavy 1m last.
         """
         from backend.database import SessionLocal
 
@@ -1977,11 +1982,8 @@ async def sync_all_timeframes_stream(
             adapter = get_bybit_adapter()
             db = SessionLocal()
 
-            # Queue for progress events from chunked loader
-            progress_queue: asyncio.Queue = asyncio.Queue()
-
             try:
-                for step, tf in enumerate(ALL_TIMEFRAMES, 1):
+                for step, tf in enumerate(TF_ORDER, 1):
                     if await request.is_disconnected():
                         logger.info(f"[SYNC-STREAM] Client disconnected for {symbol}, stopping")
                         yield f"data: {json.dumps({'event': 'complete', 'totalNew': total_new, 'results': results, 'message': 'Синхронизация прервана (клиент отключился)', 'cancelled': True})}\n\n"
@@ -2028,7 +2030,7 @@ async def sync_all_timeframes_stream(
 
                         new_candles = 0
 
-                        # Cancellation flag (set by drain loop on disconnect)
+                        # Shared cancel flag
                         _cancel_flags: dict[str, bool] = {"disconnected": False}
 
                         def sync_cancel_check(_flags=_cancel_flags):
@@ -2036,13 +2038,12 @@ async def sync_all_timeframes_stream(
 
                         if needs_full_load:
                             logger.info(f"[SYNC-STREAM] Full load {symbol}/{tf} from {data_start_ts}")
-
-                            # Bind loop vars for on_progress callback
                             _tf, _tf_name, _step = tf, tf_name, step
+                            pq: asyncio.Queue = asyncio.Queue()
 
-                            def _on_progress(fetched, estimated, _tf=_tf, _tf_name=_tf_name, _step=_step):
+                            def _on_progress(fetched, estimated, _tf=_tf, _tf_name=_tf_name, _step=_step, _pq=pq):
                                 if fetched % 2000 < 1000:
-                                    progress_queue.put_nowait(("progress", _tf, _tf_name, _step, fetched, estimated))
+                                    _pq.put_nowait((_tf, _tf_name, _step, fetched, estimated))
 
                             task = asyncio.create_task(
                                 adapter.get_historical_klines_chunked(
@@ -2057,48 +2058,61 @@ async def sync_all_timeframes_stream(
                                     cancel_check=sync_cancel_check,
                                 )
                             )
-
-                            # Stream progress while task runs
                             while not task.done():
                                 if await request.is_disconnected():
                                     _cancel_flags["disconnected"] = True
-                                # Drain all progress events from queue
-                                while not progress_queue.empty():
-                                    item = progress_queue.get_nowait()
-                                    if item[0] == "progress":
-                                        _, p_tf, p_name, p_step, p_fetched, p_estimated = item
-                                        sub_msg = f"{p_name}: загружено {p_fetched}"
-                                        if p_estimated > 0:
-                                            sub_pct = min(99, int(p_fetched / p_estimated * 100))
-                                            sub_msg += f" из ~{p_estimated} ({sub_pct}%)"
-                                        yield f"data: {json.dumps({'event': 'progress', 'tf': p_tf, 'tfName': p_name, 'step': p_step, 'totalSteps': total_steps, 'percent': percent, 'message': sub_msg, 'candles_loaded': p_fetched, 'total_expected': p_estimated})}\n\n"
-                                # Send keepalive comment to prevent connection timeout
+                                while not pq.empty():
+                                    p_tf, p_name, p_step, p_fetched, p_est = pq.get_nowait()
+                                    sub_msg = f"{p_name}: загружено {p_fetched}"
+                                    if p_est > 0:
+                                        sub_pct = min(99, int(p_fetched / p_est * 100))
+                                        sub_msg += f" из ~{p_est} ({sub_pct}%)"
+                                    yield f"data: {json.dumps({'event': 'progress', 'tf': p_tf, 'tfName': p_name, 'step': p_step, 'totalSteps': total_steps, 'percent': percent, 'message': sub_msg, 'candles_loaded': p_fetched, 'total_expected': p_est})}\n\n"
                                 yield ": keepalive\n\n"
                                 await asyncio.sleep(1.0)
-
                             new_candles = task.result()
                             results[tf] = {"status": "loaded", "new_candles": new_candles}
 
                         elif needs_backfill:
-                            assert earliest_ts is not None  # guarded by needs_backfill check
+                            assert earliest_ts is not None
                             backfill_start = data_start_ts
                             logger.info(f"[SYNC-STREAM] Backfill {symbol}/{tf} from {backfill_start} to {earliest_ts}")
+                            pq_b: asyncio.Queue = asyncio.Queue()
 
-                            backfill_candles = await adapter.get_historical_klines_chunked(
-                                symbol=symbol,
-                                interval=tf,
-                                start_time=backfill_start,
-                                end_time=earliest_ts - 1,
-                                limit=1000,
-                                market_type=market_type,
-                                persist_every=5000,
-                                cancel_check=sync_cancel_check,
+                            def _on_prog_b(fetched, estimated, _tf=tf, _name=tf_name, _s=step, _pq_b=pq_b):
+                                if fetched % 2000 < 1000:
+                                    _pq_b.put_nowait((_tf, _name, _s, fetched, estimated))
+
+                            task_b = asyncio.create_task(
+                                adapter.get_historical_klines_chunked(
+                                    symbol=symbol,
+                                    interval=tf,
+                                    start_time=backfill_start,
+                                    end_time=earliest_ts - 1,
+                                    limit=1000,
+                                    market_type=market_type,
+                                    persist_every=5000,
+                                    on_progress=_on_prog_b,
+                                    cancel_check=sync_cancel_check,
+                                )
                             )
-                            new_candles += backfill_candles
+                            while not task_b.done():
+                                if await request.is_disconnected():
+                                    _cancel_flags["disconnected"] = True
+                                while not pq_b.empty():
+                                    p_tf, p_name, p_step, p_fetched, p_est = pq_b.get_nowait()
+                                    sub_msg = f"{p_name}: бэкфил {p_fetched}"
+                                    if p_est > 0:
+                                        sub_pct = min(99, int(p_fetched / p_est * 100))
+                                        sub_msg += f" из ~{p_est} ({sub_pct}%)"
+                                    yield f"data: {json.dumps({'event': 'progress', 'tf': p_tf, 'tfName': p_name, 'step': p_step, 'totalSteps': total_steps, 'percent': percent, 'message': sub_msg, 'candles_loaded': p_fetched, 'total_expected': p_est})}\n\n"
+                                yield ": keepalive\n\n"
+                                await asyncio.sleep(1.0)
+                            new_candles = task_b.result()
 
                             # Also update to latest if needed
                             if needs_update and not _cancel_flags["disconnected"]:
-                                assert latest_ts is not None  # guarded by needs_update check
+                                assert latest_ts is not None
                                 interval_ms = interval_ms_map.get(tf, 3600000)
                                 overlap = OVERLAP_CANDLES.get(tf, 3)
                                 start_ts = latest_ts - (interval_ms * overlap)
@@ -2117,7 +2131,7 @@ async def sync_all_timeframes_stream(
                             results[tf] = {"status": "backfilled", "new_candles": new_candles}
 
                         elif needs_update:
-                            assert latest_ts is not None  # guarded by needs_update check
+                            assert latest_ts is not None
                             interval_ms = interval_ms_map.get(tf, 3600000)
                             overlap = OVERLAP_CANDLES.get(tf, 3)
                             start_ts = latest_ts - (interval_ms * overlap)

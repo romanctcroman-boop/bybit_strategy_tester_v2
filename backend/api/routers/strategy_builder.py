@@ -2967,6 +2967,16 @@ async def run_backtest_from_builder(
 
         m = result.metrics
 
+        # Helper: sanitize float — converts inf/nan → 0.0 so JSON serialization never crashes
+        import math as _math
+
+        def _sf(v: Any, default: float = 0.0) -> float:
+            try:
+                f = float(v) if v is not None else default
+                return default if (_math.isnan(f) or _math.isinf(f)) else f
+            except (TypeError, ValueError):
+                return default
+
         # Normalize trades into dicts suitable for DB storage
         trades_source = result.trades or []
         trades_list = []
@@ -2975,55 +2985,55 @@ async def run_backtest_from_builder(
                 entry_time = getattr(t, "entry_time", None)
                 exit_time = getattr(t, "exit_time", None)
                 side = getattr(t, "side", None)
-                trade_fees = float(getattr(t, "fees", 0) or 0)
+                trade_fees = _sf(getattr(t, "fees", 0))
                 trades_list.append(
                     {
                         "entry_time": entry_time.isoformat() if entry_time else None,
                         "exit_time": exit_time.isoformat() if exit_time else None,
                         "side": _get_side_value(side),
-                        "entry_price": float(getattr(t, "entry_price", 0) or 0),
-                        "exit_price": float(getattr(t, "exit_price", 0) or 0),
-                        "size": float(getattr(t, "size", 1.0) or 1.0),
-                        "pnl": float(getattr(t, "pnl", 0) or 0),
-                        "pnl_pct": float(getattr(t, "pnl_pct", 0) or 0),
+                        "entry_price": _sf(getattr(t, "entry_price", 0)),
+                        "exit_price": _sf(getattr(t, "exit_price", 0)),
+                        "size": _sf(getattr(t, "size", 1.0), 1.0),
+                        "pnl": _sf(getattr(t, "pnl", 0)),
+                        "pnl_pct": _sf(getattr(t, "pnl_pct", 0)),
                         "fees": trade_fees,
                         "commission": trade_fees,
                         "duration_bars": int(getattr(t, "bars_in_trade", 0) or getattr(t, "duration_bars", 0) or 0),
                         "bars_in_trade": int(getattr(t, "bars_in_trade", 0) or 0),
-                        "duration_hours": float(getattr(t, "duration_hours", 0) or 0),
+                        "duration_hours": _sf(getattr(t, "duration_hours", 0)),
                         "entry_bar_index": int(getattr(t, "entry_bar_index", 0) or 0),
                         "exit_bar_index": int(getattr(t, "exit_bar_index", 0) or 0),
                         "exit_comment": str(getattr(t, "exit_comment", "") or ""),
-                        "mfe": float(getattr(t, "mfe", 0) or 0),
-                        "mae": float(getattr(t, "mae", 0) or 0),
-                        "mfe_pct": float(getattr(t, "mfe_pct", 0) or 0),
-                        "mae_pct": float(getattr(t, "mae_pct", 0) or 0),
+                        "mfe": _sf(getattr(t, "mfe", 0)),
+                        "mae": _sf(getattr(t, "mae", 0)),
+                        "mfe_pct": _sf(getattr(t, "mfe_pct", 0)),
+                        "mae_pct": _sf(getattr(t, "mae_pct", 0)),
                     }
                 )
             elif isinstance(t, dict):
-                trade_fees = float(t.get("fees", 0) or t.get("commission", 0) or 0)
+                trade_fees = _sf(t.get("fees") or t.get("commission"))
                 trades_list.append(
                     {
                         "entry_time": t.get("entry_time"),
                         "exit_time": t.get("exit_time"),
                         "side": t.get("side", "long"),
-                        "entry_price": float(t.get("entry_price", 0) or 0),
-                        "exit_price": float(t.get("exit_price", 0) or 0),
-                        "size": float(t.get("size", 1.0) or 1.0),
-                        "pnl": float(t.get("pnl", 0) or 0),
-                        "pnl_pct": float(t.get("pnl_pct", 0) or 0),
+                        "entry_price": _sf(t.get("entry_price", 0)),
+                        "exit_price": _sf(t.get("exit_price", 0)),
+                        "size": _sf(t.get("size", 1.0), 1.0),
+                        "pnl": _sf(t.get("pnl", 0)),
+                        "pnl_pct": _sf(t.get("pnl_pct", 0)),
                         "fees": trade_fees,
                         "commission": trade_fees,
                         "duration_bars": int(t.get("duration_bars", t.get("bars_in_trade", 0)) or 0),
                         "bars_in_trade": int(t.get("bars_in_trade", 0) or 0),
-                        "duration_hours": float(t.get("duration_hours", 0) or 0),
+                        "duration_hours": _sf(t.get("duration_hours", 0)),
                         "entry_bar_index": int(t.get("entry_bar_index", 0) or 0),
                         "exit_bar_index": int(t.get("exit_bar_index", 0) or 0),
                         "exit_comment": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
-                        "mfe": float(t.get("mfe", 0) or 0),
-                        "mae": float(t.get("mae", 0) or 0),
-                        "mfe_pct": float(t.get("mfe_pct", 0) or 0),
-                        "mae_pct": float(t.get("mae_pct", 0) or 0),
+                        "mfe": _sf(t.get("mfe", 0)),
+                        "mae": _sf(t.get("mae", 0)),
+                        "mfe_pct": _sf(t.get("mfe_pct", 0)),
+                        "mae_pct": _sf(t.get("mae_pct", 0)),
                     }
                 )
 
@@ -3117,20 +3127,65 @@ async def run_backtest_from_builder(
         db.commit()
         db.refresh(db_backtest)
 
-        # Return response with redirect URL
+        # Build inline metrics dict for direct modal display (avoids second fetch)
+        _m = result.metrics
+
+        inline_metrics: dict[str, Any] = {
+            "net_profit": _sf(_m.net_profit if _m else None),
+            "net_profit_pct": _sf(_m.net_profit_pct if _m else None),
+            "total_return": _sf(_m.total_return if _m else None),
+            "annual_return": _sf(_m.annual_return if _m else None),
+            "sharpe_ratio": _sf(_m.sharpe_ratio if _m else None),
+            "sortino_ratio": _sf(_m.sortino_ratio if _m else None),
+            "calmar_ratio": _sf(_m.calmar_ratio if _m else None),
+            "max_drawdown": _sf(_m.max_drawdown if _m else None),
+            "max_drawdown_value": _sf(_m.max_drawdown_value if _m else None),
+            "win_rate": _sf(_m.win_rate if _m else None),
+            "profit_factor": _sf(_m.profit_factor if _m else None),
+            "total_trades": int(_m.total_trades or 0) if _m else 0,
+            "winning_trades": int(_m.winning_trades or 0) if _m else 0,
+            "losing_trades": int(_m.losing_trades or 0) if _m else 0,
+            "avg_win": _sf(_m.avg_win if _m else None),
+            "avg_loss": _sf(_m.avg_loss if _m else None),
+            "avg_trade": _sf(_m.avg_trade if _m else None),
+            "gross_profit": _sf(_m.gross_profit if _m else None),
+            "gross_loss": _sf(_m.gross_loss if _m else None),
+            "total_commission": _sf(_m.total_commission if _m else None),
+            "buy_hold_return": _sf(_m.buy_hold_return if _m else None),
+            "buy_hold_return_pct": _sf(_m.buy_hold_return_pct if _m else None),
+            "cagr": _sf(_m.cagr if _m else None),
+            "recovery_factor": _sf(_m.recovery_factor if _m else None),
+            "expectancy": _sf(_m.expectancy if _m else None),
+            "max_consecutive_wins": int(_m.max_consecutive_wins or 0) if _m else 0,
+            "max_consecutive_losses": int(_m.max_consecutive_losses or 0) if _m else 0,
+            "long_trades": int(getattr(_m, "long_trades", 0) or 0) if _m else 0,
+            "short_trades": int(getattr(_m, "short_trades", 0) or 0) if _m else 0,
+            "long_win_rate": _sf(getattr(_m, "long_win_rate", None) if _m else None),
+            "short_win_rate": _sf(getattr(_m, "short_win_rate", None) if _m else None),
+            "exposure_time": _sf(getattr(_m, "exposure_time", None) if _m else None),
+            "initial_capital": float(backtest_config.initial_capital),
+        }
+
+        # Return response with full inline data — allows frontend modal to open without second fetch
         response_data: dict[str, Any] = {
             "backtest_id": str(db_backtest.id),
             "strategy_id": strategy_id,
             "status": "completed",
+            # Inline full results so JS branch `if (data.metrics || data.trades || data.equity_curve)` fires:
+            "metrics": inline_metrics,
+            "trades": trades_list,
+            "equity_curve": equity_payload,
+            "initial_capital": float(backtest_config.initial_capital),
+            # Legacy summary for backwards compat
             "results": {
-                "total_return": result.metrics.total_return if result.metrics else 0.0,
-                "sharpe_ratio": result.metrics.sharpe_ratio if result.metrics else 0.0,
-                "win_rate": result.metrics.win_rate if result.metrics else 0.0,
-                "total_trades": result.metrics.total_trades if result.metrics else 0,
-                "max_drawdown": result.metrics.max_drawdown if result.metrics else 0.0,
-                "net_profit": result.metrics.net_profit if result.metrics else 0.0,
-                "max_drawdown_pct": result.metrics.max_drawdown if result.metrics else 0.0,
-                "profit_factor": result.metrics.profit_factor if result.metrics else 0.0,
+                "total_return": _sf(_m.total_return if _m else None),
+                "sharpe_ratio": _sf(_m.sharpe_ratio if _m else None),
+                "win_rate": _sf(_m.win_rate if _m else None),
+                "total_trades": int(_m.total_trades or 0) if _m else 0,
+                "max_drawdown": _sf(_m.max_drawdown if _m else None),
+                "net_profit": _sf(_m.net_profit if _m else None),
+                "max_drawdown_pct": _sf(_m.max_drawdown if _m else None),
+                "profit_factor": _sf(_m.profit_factor if _m else None),
             },
             "redirect_url": f"/frontend/backtest-results.html?backtest_id={db_backtest.id}",
         }

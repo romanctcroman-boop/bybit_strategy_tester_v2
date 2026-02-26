@@ -117,7 +117,12 @@ class StrategyBuilderAdapter(BaseStrategy):
         "config": ["exit_long", "exit_short", "exit", "signal"],
     }
 
-    def __init__(self, strategy_graph: dict[str, Any], btcusdt_ohlcv: pd.DataFrame | None = None):
+    def __init__(
+        self,
+        strategy_graph: dict[str, Any],
+        btcusdt_ohlcv: pd.DataFrame | None = None,
+        btcusdt_5m_ohlcv: pd.DataFrame | None = None,
+    ):
         """
         Initialize adapter from strategy graph.
 
@@ -134,6 +139,11 @@ class StrategyBuilderAdapter(BaseStrategy):
                 use_btcusdt_mfi=True. Must be loaded by the caller (e.g. async
                 router) before constructing the adapter — do NOT use asyncio.run()
                 inside generate_signals. Pass None to disable the feature.
+            btcusdt_5m_ohlcv: Pre-loaded BTCUSDT 5-minute OHLCV DataFrame for
+                intra-bar RSI cross detection (TradingView parity). When provided,
+                _handle_rsi will check whether the RSI crossed the level within
+                each higher-timeframe bar using 5m ticks — matching TV's
+                calc_on_every_tick behaviour. Pass None to disable (bar-close only).
         """
         self.graph = strategy_graph
         self.name = strategy_graph.get("name", "Builder Strategy")
@@ -178,6 +188,11 @@ class StrategyBuilderAdapter(BaseStrategy):
         # BTCUSDT OHLCV for use_btcusdt_mfi feature (Фича 3)
         # Pre-loaded by the router; None means feature is disabled / data unavailable.
         self._btcusdt_ohlcv: pd.DataFrame | None = btcusdt_ohlcv
+
+        # BTCUSDT 5-minute OHLCV for intra-bar RSI cross detection (TV parity).
+        # When provided, _handle_rsi uses 5m ticks to detect RSI crossings that
+        # occur within a higher-timeframe bar but don't show at bar close.
+        self._btcusdt_5m_ohlcv: pd.DataFrame | None = btcusdt_5m_ohlcv
 
         # Validate
         self._validate_params()

@@ -161,17 +161,18 @@ def load_bt_params() -> dict:
     timeframe = row[2]
 
     # Find Static SL/TP block
-    sltp_block = next((b for b in blocks if b.get("type") == "static_sltp"), {})
-    sltp_params = sltp_block.get("params", {})
+    sltp_block: dict[str, object] = next((b for b in blocks if b.get("type") == "static_sltp"), {})
+    raw_sltp_params = sltp_block.get("params")
+    sltp_params: dict[str, object] = raw_sltp_params if isinstance(raw_sltp_params, dict) else {}
 
     return {
-        "slippage":    float(params.get("_slippage", 0.0)),
-        "taker_fee":   float(params.get("_commission", 0.0007)),
-        "leverage":    int(params.get("_leverage", 10)),
-        "pyramiding":  int(params.get("_pyramiding", 1)),
-        "take_profit": float(sltp_params.get("take_profit_percent", 1.5)) / 100.0,
-        "stop_loss":   float(sltp_params.get("stop_loss_percent", 9.1)) / 100.0,
-        "interval":    str(timeframe or "30"),
+        "slippage": float(params.get("_slippage", 0.0)),
+        "taker_fee": float(params.get("_commission", 0.0007)),
+        "leverage": int(params.get("_leverage", 10)),
+        "pyramiding": int(params.get("_pyramiding", 1)),
+        "take_profit": float(sltp_params.get("take_profit_percent", 1.5)) / 100.0,  # type: ignore[arg-type]
+        "stop_loss": float(sltp_params.get("stop_loss_percent", 9.1)) / 100.0,  # type: ignore[arg-type]
+        "interval": str(timeframe or "30"),
     }
 
 
@@ -204,8 +205,8 @@ def main() -> None:
     print("=" * 72)
     print("RSI_L\\S_6 — Signal comparison vs TV (q4.csv, UTC+3 → signal bar = entry-30min)")
     print(
-        f"Params from DB: TF={p['interval']}m | SL={p['stop_loss']*100:.1f}% | "
-        f"TP={p['take_profit']*100:.1f}% | slippage={p['slippage']} | "
+        f"Params from DB: TF={p['interval']}m | SL={p['stop_loss'] * 100:.1f}% | "
+        f"TP={p['take_profit'] * 100:.1f}% | slippage={p['slippage']} | "
         f"fee={p['taker_fee']} | lev={p['leverage']}x | pyramid={p['pyramiding']}"
     )
     print("IC=1,000,000  BaseCash=100 USDT  (not stored in DB)")
@@ -260,8 +261,8 @@ def main() -> None:
     print(f"Matched: {matched}/{len(TV_TRADES_RAW)}  Missing: {len(missing)}/{len(TV_TRADES_RAW)}")
     if missing:
         print("Missing signals:")
-        for m in missing:
-            print(f"  #{m[0]} {m[1]} entry@{m[2]} price={m[3]}")
+        for miss in missing:
+            print(f"  #{miss[0]} {miss[1]} entry@{miss[2]} price={miss[3]}")
 
     # 4. RSI debug for missing signals
     if missing:
@@ -273,8 +274,8 @@ def main() -> None:
             rsi_arr = calculate_rsi(ohlcv["close"].values, period=14)
             rsi = pd.Series(rsi_arr, index=ohlcv.index)
 
-            for m in missing:
-                num, side, tv_entry_str, tv_price = m
+            for miss in missing:
+                num, side, tv_entry_str, tv_price = miss
                 entry_bar_utc = utc3_to_utc(tv_entry_str)
                 signal_bar_utc = entry_bar_utc - pd.Timedelta(minutes=30)
                 prev_bar_utc = signal_bar_utc - pd.Timedelta(minutes=30)
@@ -366,10 +367,10 @@ def main() -> None:
             long_exits=long_exits,
             short_entries=short_entries,
             short_exits=short_exits,
-            initial_capital=1_000_000.0,   # IC — not in DB, TV standard
+            initial_capital=1_000_000.0,  # IC — not in DB, TV standard
             position_size=0.10,
             use_fixed_amount=True,
-            fixed_amount=100.0,            # BaseCash=100 USDT — not in DB
+            fixed_amount=100.0,  # BaseCash=100 USDT — not in DB
             leverage=p["leverage"],
             stop_loss=p["stop_loss"],
             take_profit=p["take_profit"],

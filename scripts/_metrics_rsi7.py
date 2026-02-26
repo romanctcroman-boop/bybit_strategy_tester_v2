@@ -233,7 +233,7 @@ def compute_metrics_from_result(result) -> dict:
     # From result metrics (MDD, Sharpe, etc.) — BacktestMetrics is a dataclass
     # max_drawdown is stored as PERCENTAGE (already multiplied by 100 in engine)
     mdd_pct = getattr(m, "max_drawdown", 0) or 0  # e.g. 0.0684 means 0.0684%
-    mdd_abs = mdd_pct / 100.0 * 1_000_000         # convert % to absolute USDT on 1M capital
+    mdd_abs = mdd_pct / 100.0 * 1_000_000  # convert % to absolute USDT on 1M capital
     sharpe = getattr(m, "sharpe_ratio", 0) or 0
     sortino = getattr(m, "sortino_ratio", 0) or 0
 
@@ -357,8 +357,8 @@ def compare_and_print(eng: dict) -> None:
         "commission_long": 44.27,
         "commission_short": 160.32,
         "unrealised": 2.55,
-        "mdd_abs": 735.35,    # Max intra-bar DD in USDT
-        "mdd_pct": 0.07,       # 0.07% of 1M capital
+        "mdd_abs": 735.35,  # Max intra-bar DD in USDT
+        "mdd_pct": 0.07,  # 0.07% of 1M capital
     }
 
     # --- Print header ---

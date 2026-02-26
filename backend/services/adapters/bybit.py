@@ -8,6 +8,7 @@ This module focuses on a small subset used by the strategy tester: fetching klin
 """
 
 import contextlib
+import functools
 import json
 import logging
 import os
@@ -798,10 +799,8 @@ class BybitAdapter:
 
             try:
                 loop = asyncio.get_event_loop()
-                r = await loop.run_in_executor(
-                    None,
-                    lambda p=params: requests.get(v5_kline_url, params=p, timeout=self.timeout),
-                )
+                _call = functools.partial(requests.get, v5_kline_url, params=dict(params), timeout=self.timeout)
+                r = await loop.run_in_executor(None, _call)
                 r.raise_for_status()
                 payload = r.json()
                 result = payload.get("result") or payload.get("data") or payload

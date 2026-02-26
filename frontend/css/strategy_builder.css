@@ -6046,6 +6046,51 @@ body.floating-window-open .zoom-controls {
     height: 200px;
 }
 
+/* TradingViewEquityChart container in strategy-builder modal */
+#equityChartContainer {
+    position: relative;
+    height: 320px;
+    background: #131722;
+    border-radius: var(--radius-md, 6px);
+    overflow: hidden;
+}
+
+/* Legend row below equity chart */
+.equity-chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 4px;
+    font-size: 12px;
+    color: var(--text-secondary, #787b86);
+}
+
+.equity-chart-legend label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.equity-chart-legend .legend-color-bh {
+    display: inline-block;
+    width: 20px;
+    height: 2px;
+    background: #ef5350;
+    vertical-align: middle;
+}
+
+.equity-chart-legend .legend-color-excursions {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: #26a69a;
+    border-radius: 2px;
+    vertical-align: middle;
+}
+
 /* Trades Table */
 .trades-table-container {
     overflow-x: auto;

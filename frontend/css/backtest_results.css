@@ -45,7 +45,7 @@ body {
 
 /* Navigation */
 .navbar {
-    background-color: var(--bg-secondary) !important;
+    background-color: var(--bg-primary) !important;
     border-bottom: 1px solid var(--border-color);
     padding: 0.5rem 1rem;
 }
@@ -83,14 +83,14 @@ body {
     gap: 0.75rem;
     width: 100%;
     transition: all 0.3s ease;
-    overflow: hidden;
+    overflow: visible; /* must not clip the absolute toggle button */
 }
 
 /* Left Panel - Collapsible Results List */
 .results-panel {
     position: relative;
-    width: 260px;
-    min-width: 260px;
+    width: 295px;
+    min-width: 295px;
     flex-shrink: 0;
     transition:
         width 0.3s ease,
@@ -111,7 +111,7 @@ body {
 }
 
 .panel-content {
-    width: 260px;
+    width: 295px;
     transition: opacity 0.3s ease;
     overflow: visible;
 }
@@ -124,12 +124,12 @@ body {
     box-sizing: border-box;
 }
 
-/* Panel Toggle Button */
+/* Panel Toggle Button — always fixed, never clipped by overflow */
 .panel-toggle-btn {
-    position: absolute;
-    right: -14px;
-    top: 12px;
-    z-index: 100;
+    position: fixed;
+    left: calc(295px + 1rem - 14px); /* right edge of expanded panel */
+    top: 68px;
+    z-index: 500;
     width: 28px;
     height: 28px;
     background: var(--bg-tertiary);
@@ -140,7 +140,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition:
+        left 0.3s ease,
+        background 0.2s,
+        color 0.2s;
     font-size: 0.75rem;
 }
 
@@ -150,11 +153,13 @@ body {
     border-color: var(--accent-blue);
 }
 
+/* Collapsed → slide button to left edge */
 .results-panel.collapsed .panel-toggle-btn {
     position: fixed;
-    left: 1rem;
-    top: 80px;
+    left: calc(1rem - 14px);
+    top: 68px;
     right: auto;
+    z-index: 500;
 }
 
 .results-panel.collapsed .panel-toggle-btn i {
@@ -172,13 +177,13 @@ body {
 
 /* Cards */
 .card {
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
 }
 
 .card-header {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     padding: 1rem 1.25rem;
 }
@@ -462,12 +467,12 @@ body {
 
 /* Trades Table */
 .tabulator {
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     border: none;
 }
 
 .tabulator .tabulator-header {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -481,7 +486,7 @@ body {
 }
 
 .tabulator-row {
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -654,6 +659,11 @@ body {
     box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
 }
 
+/* AI Analysis — hidden (takes up space below the chart) */
+.report-panel > div:has(#aiAnalysis) {
+    display: none !important;
+}
+
 /* AI Analysis */
 .ai-analysis {
     background: linear-gradient(135deg, rgba(163, 113, 247, 0.1) 0%, rgba(88, 166, 255, 0.1) 100%);
@@ -726,6 +736,7 @@ body {
     width: 100%;
     max-width: 100%;
     overflow: hidden;
+    margin-bottom: 0 !important; /* override Bootstrap mb-4 */
 }
 
 /* Report Tabs Navigation */
@@ -782,7 +793,7 @@ body {
 }
 
 .tv-data-table th {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-primary);
     color: var(--text-secondary);
     font-weight: 500;
     font-size: 0.75rem;
@@ -841,7 +852,7 @@ body {
 .tv-trades-table th {
     position: sticky;
     top: 0;
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-primary);
     color: var(--text-secondary);
     font-weight: 500;
     font-size: 0.7rem;
@@ -946,6 +957,7 @@ body {
     grid-template-columns: repeat(5, 1fr);
     gap: 0.75rem;
     margin-bottom: 1rem;
+    flex-shrink: 0; /* don't squeeze when parent is flex */
 }
 
 @media (max-width: 1200px) {
@@ -995,8 +1007,9 @@ body {
     align-items: center;
     padding: 0.25rem 1rem;
     border-bottom: 1px solid var(--border-color);
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     min-height: 38px;
+    flex-shrink: 0; /* pin to top, don't shrink */
 }
 
 .tv-report-date-range {
@@ -1063,18 +1076,35 @@ body {
 
 .tv-equity-chart-container {
     background-color: transparent;
-    border: 1px solid #2a2e39;
-    border-radius: 4px;
+    border: none;
+    border-radius: 0;
     padding: 0;
-    height: 700px;
+    /*
+     * Fill viewport minus:
+     *   56px navbar + 8px main-content padding-top
+     *   38px tabs-row
+     *   90px summary-cards + 16px margin-bottom
+     *   24px tab-content padding (top+bottom)
+     *   46px chart footer (legend + mode toggle)
+     * header is hidden → not subtracted
+     */
+    height: calc(100vh - 278px);
     min-height: 400px;
-    max-height: 1200px;
     width: 100%;
     max-width: 100%;
-    overflow: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     resize: vertical;
+}
+
+/* Inner wrapper for TradingViewEquityChart canvas */
+.tv-equity-inner-container {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+    position: relative;
 }
 
 /* Resize handle styling */
@@ -1093,14 +1123,9 @@ body {
     cursor: ns-resize;
 }
 
-/* Chart Header - TradingView style */
+/* Chart Header - TradingView style — hidden, title not needed */
 .tv-chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 16px;
-    border-bottom: 1px solid #2a2e39;
-    background: transparent;
+    display: none;
 }
 
 .tv-chart-header-right {
@@ -1146,14 +1171,40 @@ body {
     background: rgba(255, 255, 255, 0.06);
 }
 
+/* Expand button overlaid on the chart canvas (top-right corner) */
+.tv-chart-expand-overlay {
+    position: absolute;
+    top: 12px;
+    right: 60px; /* inside the TV chart, clear of the price scale */
+    z-index: 20;
+    background: rgba(19, 23, 34, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #787b86;
+    font-size: 13px;
+    padding: 4px 7px;
+    border-radius: 4px;
+    opacity: 0.6;
+    transition:
+        opacity 0.15s ease,
+        color 0.15s ease,
+        background 0.15s ease;
+}
+
+.tv-chart-expand-overlay:hover {
+    opacity: 1;
+    color: #d1d4dc;
+    background: rgba(42, 46, 57, 0.92);
+}
+
 /* Chart Wrapper - transparent background */
 .tv-chart-wrapper {
     flex: 1;
     padding: 8px 0 8px 0;
-    min-height: 600px;
+    min-height: 200px; /* reduced: container height now handles the size */
     height: 100%;
     position: relative;
-    background: transparent;
+    background: var(--bg-primary);
+    overflow: hidden;
 }
 
 .tv-chart-wrapper canvas {
@@ -1189,7 +1240,8 @@ body {
     align-items: center;
     padding: 8px 16px;
     border-top: 1px solid #2a2e39;
-    background: transparent;
+    background: var(--bg-primary);
+    flex-shrink: 0;
 }
 
 .tv-chart-legend {
@@ -1232,7 +1284,7 @@ body {
 }
 
 .tv-legend-color-bh {
-    background: #ef5350;
+    background: #2962ff;
 }
 
 .tv-legend-color-runup {
@@ -1250,10 +1302,10 @@ body {
 /* Mode Toggle Buttons (Absolute / Percentage) */
 .tv-chart-mode-toggle {
     display: flex;
-    background: #2a2e39;
+    background: var(--bg-primary);
     border-radius: 4px;
     overflow: hidden;
-    border: 1px solid #363a45;
+    border: 1px solid var(--border-color);
 }
 
 .tv-mode-btn {
@@ -1268,7 +1320,7 @@ body {
 }
 
 .tv-mode-btn:first-child {
-    border-right: 1px solid #363a45;
+    border-right: 1px solid var(--border-color);
 }
 
 .tv-mode-btn:hover {
@@ -1284,8 +1336,8 @@ body {
 /* P&L Bars at bottom of chart */
 .tv-pnl-bars-container {
     height: 40px;
-    background: #131722;
-    border-top: 1px solid #2a2e39;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -1481,7 +1533,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -1567,7 +1619,7 @@ body {
 .bt-price-chart-info {
     padding: 4px 12px;
     font-size: 0.75rem;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 12px;
@@ -1576,7 +1628,7 @@ body {
 .bt-price-chart-controls {
     padding: 4px 12px;
     font-size: 0.75rem;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 16px;
@@ -1611,4 +1663,3 @@ body {
 .sortable-th {
     cursor: pointer;
 }
-

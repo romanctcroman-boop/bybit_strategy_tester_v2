@@ -33,7 +33,7 @@ class BacktestService:
     """
 
     def __init__(self, engine: BacktestEngine | None = None):
-        self.engine = engine or get_engine()
+        self.engine: BacktestEngine = engine or get_engine()
         self._adapter: BybitAdapter | None = None
 
     @property
@@ -123,7 +123,9 @@ class BacktestService:
             # If dca_enabled=True, use DCAEngine; otherwise use default engine
             dca_enabled = getattr(config, "dca_enabled", False)
             if dca_enabled:
-                engine = select_engine(
+                from backend.backtesting.engines.dca_engine import DCAEngine
+
+                _base_engine = select_engine(
                     engine_type=getattr(config, "engine_type", "auto"),
                     dca_enabled=True,
                     pyramiding=getattr(config, "pyramiding", 1),
@@ -131,11 +133,13 @@ class BacktestService:
                 )
                 logger.info("Using DCAEngine for DCA-enabled backtest")
                 # DCAEngine uses run_from_config method
-                result = engine.run_from_config(config, ohlcv)
+                assert isinstance(_base_engine, DCAEngine), (
+                    "Expected DCAEngine from select_engine with dca_enabled=True"
+                )
+                result = _base_engine.run_from_config(config, ohlcv)
             else:
-                engine = self.engine
-                # Standard engine uses run method
-                result = engine.run(config, ohlcv)
+                # Standard engine (BacktestEngine) uses run(config, ohlcv)
+                result = self.engine.run(config, ohlcv)
 
             _record_metrics(result)
             return result
@@ -246,6 +250,84 @@ class BacktestService:
 
                     # Check if we have enough data (at least 50 candles)
                     if len(df) >= 50:
+                        # ── Gap-prefill: if local data starts significantly later than
+                        # requested start_date, attempt to fetch the missing warmup bars
+                        # from the Bybit API and prepend them.  This is critical for
+                        # indicators like Wilder's RSI that need warm-up history to
+                        # converge to TradingView-parity values (e.g. BTC RSI source
+                        # when the DB only has data from DATA_START_DATE = 2025-01-01).
+                        first_local_ts = df.index[0]
+                        # Use a 2-bar tolerance to avoid unnecessary API calls
+                        try:
+                            _interval_minutes_gap = int(db_interval)
+                        except ValueError:
+                            _interval_minutes_gap = 1440  # daily
+                        _tolerance = pd.Timedelta(minutes=_interval_minutes_gap * 2)
+                        start_date_tz = (
+                            pd.Timestamp(start_date).tz_localize("UTC")
+                            if start_date.tzinfo is None
+                            else pd.Timestamp(start_date)
+                        )
+                        if first_local_ts.tz is None:
+                            first_local_ts_tz = first_local_ts.tz_localize("UTC")
+                        else:
+                            first_local_ts_tz = first_local_ts
+                        gap = first_local_ts_tz - start_date_tz
+                        if gap > _tolerance:
+                            logger.info(
+                                f"Local DB starts at {first_local_ts} but requested from {start_date}; "
+                                f"fetching {gap} of warmup data from Bybit API"
+                            )
+                            try:
+                                warmup_candles = await self.adapter.get_historical_klines(
+                                    symbol=symbol,
+                                    interval=db_interval,
+                                    start_time=start_ts,
+                                    end_time=int(first_local_ts_tz.timestamp() * 1000) - 1,
+                                    market_type=market_type,
+                                )
+                                if warmup_candles:
+                                    warmup_df = pd.DataFrame(warmup_candles)
+                                    # Normalise columns
+                                    col_map = {
+                                        "startTime": "timestamp",
+                                        "openPrice": "open",
+                                        "highPrice": "high",
+                                        "lowPrice": "low",
+                                        "closePrice": "close",
+                                        "open_time": "timestamp",
+                                    }
+                                    for old_c, new_c in col_map.items():
+                                        if old_c in warmup_df.columns and new_c not in warmup_df.columns:
+                                            warmup_df = warmup_df.rename(columns={old_c: new_c})
+                                    for col in ["open", "high", "low", "close", "volume"]:
+                                        if col in warmup_df.columns:
+                                            warmup_df[col] = pd.to_numeric(warmup_df[col], errors="coerce")
+                                    if "timestamp" in warmup_df.columns:
+                                        if warmup_df["timestamp"].dtype in ["int64", "float64"]:
+                                            warmup_df["timestamp"] = pd.to_datetime(warmup_df["timestamp"], unit="ms")
+                                        else:
+                                            warmup_df["timestamp"] = pd.to_datetime(warmup_df["timestamp"])
+                                        warmup_df = warmup_df.set_index("timestamp")
+                                    warmup_df = warmup_df.sort_index()
+                                    # Drop any overlap
+                                    warmup_df = warmup_df[
+                                        warmup_df.index < first_local_ts_tz.tz_localize(None)
+                                        if first_local_ts.tz is None
+                                        else first_local_ts_tz
+                                    ]
+                                    if len(warmup_df) > 0:
+                                        df = pd.concat([warmup_df, df])
+                                        df = df[~df.index.duplicated(keep="last")]
+                                        df = df.sort_index()
+                                        logger.info(
+                                            f"Prepended {len(warmup_df)} warmup candles from API; total={len(df)}"
+                                        )
+                            except Exception as _gap_err:
+                                logger.warning(
+                                    f"Failed to fetch warmup gap from API: {_gap_err} — continuing without it"
+                                )
+
                         logger.info(f"Using {len(df)} candles from local database")
                         return df
                     else:

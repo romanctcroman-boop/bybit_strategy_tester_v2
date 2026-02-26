@@ -67,15 +67,17 @@ FastAPI router                                          → JSON response + warn
 | ------------------------ | ------------------------------------------------- | --------------------------------------------------------- |
 | `BacktestConfig`         | `backend/backtesting/models.py`                   | All backtest parameters (single Pydantic model)           |
 | `BacktestEngine`         | `backend/backtesting/engine.py`                   | FallbackEngineV4 — gold standard engine                   |
-| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder_adapter.py` | Graph → BaseStrategy (2888 lines)                         |
-| `indicator_handlers`     | `backend/backtesting/indicator_handlers.py`       | 36 indicator handlers extracted from adapter (1345 lines) |
+| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder_adapter.py` | Graph → BaseStrategy (**3575 lines**)                     |
+| `indicator_handlers`     | `backend/backtesting/indicator_handlers.py`       | **40+** indicator handlers + INDICATOR_DISPATCH (**2217 lines**) |
 | `MetricsCalculator`      | `backend/core/metrics_calculator.py`              | Single source of truth for 166 metrics                    |
 | `DataService`            | `backend/services/data_service.py`                | OHLCV loading                                             |
 | `UnifiedAgentInterface`  | `backend/agents/unified_agent_interface.py`       | All AI agent calls                                        |
 | `database_policy`        | `backend/config/database_policy.py`               | DATA_START_DATE, retention constants                      |
-| Strategies (built-in)    | `backend/backtesting/strategies.py`               | SMA, RSI, MACD, BB, Grid, DCA                             |
-| Indicators               | `backend/core/indicators/`                        | 30+ technical indicators                                  |
+| Strategies (built-in)    | `backend/backtesting/strategies/`                 | SMA, RSI, MACD, BB, Grid, DCA (**directory**)             |
+| Indicators               | `backend/core/indicators/`                        | **40+** technical indicators                              |
 | Optimization             | `backend/optimization/`                           | Optuna (TPE/CMA-ES), Ray, grid                            |
+| `OrderExecutor`          | `backend/trading/order_executor.py`               | Live trading order execution                              |
+| `PositionManager`        | `backend/trading/position_manager.py`             | Live trading position management                          |
 
 ### API entry points
 
@@ -134,7 +136,7 @@ The adapter (`StrategyBuilderAdapter`) accepts a `strategy_graph: dict` with thi
 
 ### SignalResult contract
 
-`generate_signals()` returns a `SignalResult` dataclass (defined in `backend/backtesting/strategies.py`):
+`generate_signals()` returns a `SignalResult` dataclass (defined in `backend/backtesting/strategies/__init__.py`):
 
 ```python
 @dataclass
@@ -161,6 +163,7 @@ All series must have the same index as the input OHLCV DataFrame. The engine ite
 | `"fallback_v3"`                                             | FallbackEngineV3     | Deprecated — backward compat only                |
 | `"fallback_v2"`                                             | FallbackEngineV2     | Deprecated — backward compat only                |
 
+> **Engine location:** `backend/backtesting/engines/fallback_engine_v4.py`
 > When `dca_enabled=True` in config, DCAEngine is **always** used regardless of `engine_type`.
 > VectorBT is used **only** inside the optimization pipeline, never for standalone backtests.
 
@@ -239,9 +242,9 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── engine.py                # BacktestEngine — FallbackEngineV4 (gold standard)
 │   │   ├── engine_selector.py       # Engine selection: auto / fallback / numba / gpu
 │   │   ├── models.py                # BacktestConfig, BacktestResult, PerformanceMetrics
-│   │   ├── strategies.py            # Built-in: SMA, RSI, MACD, Bollinger, Grid, DCA
-│   │   ├── strategy_builder_adapter.py  # Builder graph → BaseStrategy (2888 lines)
-│   │   ├── indicator_handlers.py    # 36 indicator handlers + INDICATOR_DISPATCH table (1345 lines)
+│   │   ├── strategies/              # Built-in strategies: SMA, RSI, MACD, Bollinger, Grid, DCA
+│   │   ├── strategy_builder_adapter.py  # Builder graph → BaseStrategy (3575 lines)
+│   │   ├── indicator_handlers.py    # 40+ indicator handlers + INDICATOR_DISPATCH table (2217 lines)
 │   │   ├── numba_engine.py          # JIT engine (Numba)
 │   │   ├── vectorbt_sltp.py         # VectorBT SL/TP (for optimization only)
 │   │   ├── fast_optimizer.py        # [DEPRECATED] RSI-only Numba optimizer
@@ -250,6 +253,8 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── monte_carlo.py           # Monte Carlo simulation
 │   │   ├── position_sizing.py       # Position sizing
 │   │   ├── service.py               # BacktestService (service layer)
+│   │   ├── dca_strategies/          # DCA, Martingale, Grid strategies
+│   │   ├── engines/                 # Engine implementations: fallback_engine_v4.py
 │   │   ├── mtf/                     # Multi-timeframe module
 │   │   └── universal_engine/        # Extended engine (28 sub-modules, experimental)
 │   │
@@ -267,11 +272,16 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── models/                  # ORM models: strategy, backtest, trade, optimization
 │   │   └── repository/              # BaseRepository, KlineRepository
 │   │
+│   ├── models/                      # Additional data models (non-ORM)
+│   │
 │   ├── optimization/
 │   │   ├── optuna_optimizer.py      # Bayesian (TPE/CMA-ES) via Optuna
 │   │   ├── ray_optimizer.py         # Ray-distributed optimization
 │   │   ├── builder_optimizer.py     # Strategy Builder parameter optimization
-│   │   └── scoring.py               # Scoring functions (Sharpe, SQN, Calmar, …)
+│   │   ├── scoring.py               # Scoring functions (Sharpe, SQN, Calmar, …)
+│   │   ├── workers.py               # Workers for distributed optimization
+│   │   ├── filters.py               # Optimization filters
+│   │   └── recommendations.py       # Optimization recommendations
 │   │
 │   ├── services/
 │   │   ├── data_service.py          # DataService.load_ohlcv() — OHLCV loading
@@ -279,11 +289,28 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── strategies/              # Service-level strategies: momentum, breakout, dca, grid
 │   │   ├── risk_management/         # RiskEngine, PositionSizing, StopLossManager
 │   │   ├── live_trading/            # Live trading: Bybit WS, OrderExecutor, PositionManager
+│   │   ├── advanced_backtesting/    # Portfolio strategies, advanced metrics
 │   │   └── adapters/                # Bybit, Binance data adapters
+│   │
+│   ├── trading/                     # Live trading execution
+│   │   ├── order_executor.py        # Order execution logic
+│   │   ├── position_manager.py      # Position management
+│   │   └── strategy_runner.py       # Live strategy runner
+│   │
+│   ├── queue/                       # Task queue management
+│   │
+│   ├── reliability/                 # Fault tolerance
+│   │   ├── circuit_breaker.py       # Circuit breaker pattern
+│   │   └── retry_logic.py           # Retry mechanisms
+│   │
+│   ├── validation/                  # Data validation
+│   │
+│   ├── experimental/                # Experimental features
 │   │
 │   ├── ml/                          # ML modules (optional)
 │   │   ├── ai_backtest_executor.py  # AI-driven backtest
 │   │   ├── regime_detection.py      # Market regime detection
+│   │   ├── rl/                      # Reinforcement learning
 │   │   └── enhanced/                # AutoML, Feature Store, Model Registry
 │   │
 │   ├── monitoring/                  # Prometheus, health checks, cost tracking
@@ -297,23 +324,34 @@ d:/bybit_strategy_tester_v2/
 │   ├── optimizations.html           # Parameter optimization
 │   ├── dashboard.html               # Main dashboard
 │   ├── css/strategy_builder.css
-│   └── js/
-│       ├── pages/strategy_builder.js   # Builder logic (blocks, connections, run)
-│       ├── pages/backtest_results.js   # Tables and charts
-│       ├── pages/optimization.js       # Optimization management
-│       ├── shared/leverageManager.js   # Shared leverage module
-│       ├── shared/instrumentService.js # Symbols service
-│       └── core/ / components/         # EventBus, StateManager, ApiClient, UI components
+│   ├── js/
+│   │   ├── pages/strategy_builder.js   # Builder logic (blocks, connections, run) — 13378 lines
+│   │   ├── pages/backtest_results.js   # Tables and charts
+│   │   ├── pages/optimization.js       # Optimization management
+│   │   ├── shared/leverageManager.js   # Shared leverage module
+│   │   ├── shared/instrumentService.js # Symbols service
+│   │   ├── services/                   # Additional services
+│   │   ├── testing/                    # Frontend testing utilities
+│   │   └── core/ / components/         # EventBus, StateManager, ApiClient, UI components
+│   ├── libs/                          # External libraries (vanilla JS, no npm build)
+│   └── dist/                          # Build artifacts (if using Vite)
 │
 ├── tests/
 │   ├── conftest.py
 │   ├── backend/
 │   │   ├── backtesting/             # test_engine.py, test_strategy_builder_parity.py
 │   │   ├── api/                     # test_strategies_crud.py, test_strategy_builder.py
-│   │   └── services/                # test_walk_forward.py, test_monte_carlo.py
-│   ├── integration/                 # Postgres upsert, Redis streams
-│   ├── ai_agents/                   # 56 divergence + agent tests
-│   └── e2e/                         # test_strategy_builder_full_flow.py
+│   │   ├── agents/                  # Agent system tests
+│   │   └── core/                    # Core module tests
+│   ├── advanced_backtesting/        # Advanced backtesting tests
+│   ├── ai_agents/                   # 56+ divergence + agent tests
+│   ├── backtesting/                 # Engine, GPU, MTF tests
+│   ├── chaos/                       # Chaos engineering tests
+│   ├── e2e/                         # test_strategy_builder_full_flow.py
+│   ├── frontend/                    # Frontend tests
+│   ├── integration/                 # Postgres upsert, Redis streams, agent collaboration
+│   ├── load/                        # Load testing
+│   └── security/                    # Security audit tests
 │
 ├── mcp-server/                      # MCP orchestrator (disabled in prod)
 ├── documentation/                   # PRODUCTION_DEPLOYMENT_CHECKLIST, specs
@@ -692,12 +730,35 @@ Collected here for clarity — do **not** use in new code:
 
 ## 13. Test Infrastructure
 
+### Test statistics (as of 2026-02-26)
+
+- **214 test files** across 10 test directories
+- **179+ tests passing** (full parity suite + AI agents + E2E)
+
 ### conftest.py layout
 
 | File                 | Purpose                                                              |
 | -------------------- | -------------------------------------------------------------------- |
 | `conftest.py` (root) | Adds project root to `sys.path`; pre-imports `backend` package       |
 | `tests/conftest.py`  | Fixes import resolution between `tests/backend/` and real `backend/` |
+
+### Test directories
+
+| Directory                    | Purpose                                                    | Key Tests                                                    |
+| ---------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| `tests/backend/backtesting/` | Core backtesting tests                                     | `test_engine.py`, `test_strategy_builder_parity.py`          |
+| `tests/backend/api/`         | API router tests                                           | `test_strategies_crud.py`, `test_strategy_builder.py`        |
+| `tests/backend/agents/`      | Agent system tests                                         | 40+ agent tests (memory, pipeline, LLM clients)              |
+| `tests/backend/core/`        | Core module tests                                          | `test_metrics_calculator_comprehensive.py`                   |
+| `tests/ai_agents/`           | AI agent integration tests                                 | 56+ divergence + agent tests                                 |
+| `tests/e2e/`                 | End-to-end tests                                           | `test_strategy_builder_full_flow.py`                        |
+| `tests/integration/`         | Integration tests                                          | Postgres upsert, Redis streams, agent collaboration          |
+| `tests/advanced_backtesting/`| Advanced backtesting features                              | Engine basic tests                                           |
+| `tests/backtesting/`         | Engine-specific tests                                      | GPU, MTF, universal engine tests                             |
+| `tests/chaos/`               | Chaos engineering tests                                    | Fault tolerance, failure scenarios                           |
+| `tests/frontend/`            | Frontend tests                                             | JavaScript module tests                                      |
+| `tests/load/`                | Load testing                                               | Performance under load                                       |
+| `tests/security/`            | Security audit tests                                       | API security, vulnerability scans                            |
 
 ### Key fixtures (defined in test files / conftest)
 
@@ -707,6 +768,22 @@ Collected here for clarity — do **not** use in new code:
 - `backtest_config` — pre-configured `BacktestConfig` with safe defaults
 
 > **Rule:** Never call real Bybit API in unit tests — always mock via `mock_adapter`.
+
+### Running tests
+
+```bash
+# All tests
+pytest tests/ -x -q
+
+# Specific test suites
+pytest tests/backend/backtesting/test_engine.py -v
+pytest tests/backend/backtesting/test_strategy_builder_parity.py -v
+pytest tests/ai_agents/test_divergence_block_ai_agents.py -v
+pytest tests/e2e/test_strategy_builder_full_flow.py -v
+
+# With coverage
+pytest tests/ --cov=backend --cov-report=html
+```
 
 ---
 
@@ -828,3 +905,54 @@ If changing `commission_rate`, `initial_capital`, `position_size`, `leverage`, `
 - [ ] Update `CHANGELOG.md` with what changed
 - [ ] If structural change, update `CLAUDE.md` (this file) and `docs/ARCHITECTURE.md`
 - [ ] Commit with descriptive message
+
+---
+
+## 16. Changes After 2026-02-21 (Documentation Update)
+
+### 2026-02-26 — CLAUDE.md Documentation Sync
+
+This update synchronizes CLAUDE.md with the actual codebase state.
+
+**File size updates:**
+- `strategy_builder_adapter.py`: 2888 → **3575 lines** (+687 lines, new features)
+- `indicator_handlers.py`: 1345 → **2217 lines** (+872 lines, 40+ indicators)
+- `strategy_builder.js`: **13378 lines** (frontend)
+
+**Structural changes:**
+- `backend/backtesting/strategies.py` → `backend/backtesting/strategies/` (directory)
+- Added directories: `trading/`, `queue/`, `reliability/`, `validation/`, `experimental/`
+- Added `backend/models/` (non-ORM data models)
+- Added `backend/services/advanced_backtesting/` (portfolio strategies)
+- Added `backend/ml/rl/` (reinforcement learning)
+
+**Optimization module expanded:**
+- New files: `workers.py`, `filters.py`, `recommendations.py`
+
+**Test infrastructure growth:**
+- 214 test files (from ~179)
+- New directories: `tests/advanced_backtesting/`, `tests/backtesting/`, `tests/chaos/`, `tests/frontend/`, `tests/load/`, `tests/security/`
+- Enhanced `tests/backend/agents/` (40+ agent tests)
+
+**Frontend enhancements:**
+- New directories: `frontend/js/services/`, `frontend/js/testing/`, `frontend/libs/`
+- Vite configuration added (`vite.config.js`, `package.json`)
+
+**Documentation files updated:**
+- `CHANGELOG.md`: 3391 lines (comprehensive change log)
+- `docs/DECISIONS.md`: 6 ADRs (ADR-001 through ADR-006)
+
+**Key features added since 2026-02-21:**
+- Complete metrics implementation in `FallbackEngineV4._calculate_metrics`:
+  - Long/short breakdown metrics
+  - Duration metrics (avg_trade_duration, avg_winning_duration, avg_losing_duration)
+  - `commission_paid` tracking
+  - `recovery_factor`, `expectancy`, `payoff_ratio`
+- RSI `use_btc_source` feature with full warmup series computation
+- Enhanced BTC warmup for RSI parity (500 bars)
+
+**Known residual issues:**
+- RSI Wilder smoothing structural diff vs TradingView (4-trade divergence due to warmup limits)
+- Commission 0.001 defaults remain in: `optimize_tasks.py`, `fast_optimizer.py`, `ai_backtest_executor.py` (legacy/experimental paths)
+
+---

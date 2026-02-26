@@ -104,12 +104,7 @@
                 <!-- Left Panel - Collapsible Results List -->
                 <div class="results-panel" id="resultsPanel">
                     <!-- Toggle Button -->
-                    <button
-                        class="panel-toggle-btn"
-                        id="panelToggleBtn"
-                        onclick="toggleResultsPanel()"
-                        title="Toggle results panel"
-                    >
+                    <button class="panel-toggle-btn" id="panelToggleBtn" title="Toggle results panel">
                         <i class="bi bi-chevron-left" id="toggleIcon"></i>
                     </button>
 
@@ -300,15 +295,18 @@
                                 <div class="tv-equity-chart-container">
                                     <div class="tv-chart-header">
                                         <span class="tv-chart-title">График капитала</span>
-                                        <div class="tv-chart-header-right">
-                                            <span id="tvEquityCurrentValue" class="tv-equity-value-badge">+$0.00</span>
-                                            <button class="tv-chart-expand-btn" id="btnExpandChart" title="Развернуть">
-                                                <i class="bi bi-arrows-fullscreen"></i>
-                                            </button>
-                                        </div>
                                     </div>
                                     <div class="tv-chart-wrapper" id="equityChartWrapper">
-                                        <canvas id="equityChart"></canvas>
+                                        <!-- Fullscreen button — positioned over the chart -->
+                                        <button
+                                            class="tv-chart-expand-btn tv-chart-expand-overlay"
+                                            id="btnExpandChart"
+                                            title="Развернуть"
+                                        >
+                                            <i class="bi bi-arrows-fullscreen"></i>
+                                        </button>
+                                        <!-- TradingViewEquityChart renders into this div -->
+                                        <div id="equityChartContainer" class="tv-equity-inner-container"></div>
                                     </div>
                                     <div class="tv-chart-footer">
                                         <div class="tv-chart-legend">
@@ -324,14 +322,6 @@
                                                 <input type="checkbox" id="legendTradesExcursions" checked />
                                                 <span class="tv-legend-color tv-legend-color-runup"></span>
                                                 Trades excursions
-                                            </label>
-                                            <label
-                                                class="tv-legend-item tv-legend-item-regime-overlay"
-                                                title="Наложение режимов рынка (тренд/боковик/волатильность) на график"
-                                            >
-                                                <input type="checkbox" id="legendRegimeOverlay" />
-                                                <span class="tv-legend-color tv-legend-color-regime"></span>
-                                                Режим рынка
                                             </label>
                                         </div>
                                         <div class="tv-chart-mode-toggle">
@@ -878,8 +868,8 @@
                         </div>
                     </div>
 
-                    <!-- AI Analysis (moved below report) -->
-                    <div class="card">
+                    <!-- AI Analysis — hidden, kept for JS compatibility -->
+                    <div class="card" id="aiAnalysisCard" style="display: none">
                         <div class="card-header">
                             <span class="card-title"> <i class="bi bi-robot me-2"></i>AI Analysis </span>
                         </div>
@@ -1379,14 +1369,16 @@
             integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
             crossorigin="anonymous"
         ></script>
+        <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+        <!-- chart.js kept for other charts (drawdown, trades, dynamics) -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <!-- Date adapter for time scale -->
         <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
-        <!-- TradingView-style Equity Chart Component -->
-        <script src="./js/components/TradingViewEquityChart.js?v=20260217"></script>
+        <!-- TradingView Lightweight Charts Equity Component -->
+        <script src="./js/components/TradingViewEquityChart.js?v=20260226aj"></script>
 
         <!-- Custom plugin for donut center text -->
         <script>
@@ -1459,7 +1451,7 @@
                 .catch((e) => console.error('API error:', e));
         </script>
 
-        <script type="module" src="./js/pages/backtest_results.js?v=20260217j"></script>
+        <script type="module" src="./js/pages/backtest_results.js?v=20260226ai"></script>
 
         <!-- Fallback: if module fails, load data manually after 2 seconds -->
         <script>

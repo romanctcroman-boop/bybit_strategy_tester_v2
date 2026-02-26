@@ -216,17 +216,61 @@ class McpToolInfo:
 
 
 class MCPFastAPIBridge:
-    """Singleton bridge for MCP tool introspection & invocation."""
+    """Singleton bridge for MCP tool introspection & invocation.
+    
+    P0-4 IMPLEMENTATION: Per-tool circuit breakers with category-based thresholds.
+    
+    Categories:
+    - high: Agent-to-Agent, Backtest (3 failures → open)
+    - medium: Strategy Builder, System, Memory (5 failures → open)
+    - low: Indicators, Risk, Files, Strategies (10 failures → open)
+    """
+
+    # Category thresholds
+    BREAKER_THRESHOLDS = {
+        "high": 3,    # Critical tools (AI API calls, long operations)
+        "medium": 5,  # Medium criticality (internal operations)
+        "low": 10,    # Low criticality (fast computations, files)
+    }
+    
+    # Tool categorization (auto-populated in _categorize_tools())
+    TOOL_CATEGORIES = {
+        # High criticality
+        "mcp_agent_to_agent_send_to_deepseek": "high",
+        "mcp_agent_to_agent_send_to_perplexity": "high",
+        "mcp_agent_to_agent_get_consensus": "high",
+        "run_backtest": "high",
+        "get_backtest_metrics": "high",
+        # Medium criticality (Strategy Builder - 52 tools)
+        "memory_store": "medium",
+        "memory_recall": "medium",
+        "memory_get_stats": "medium",
+        "memory_consolidate": "medium",
+        "memory_forget": "medium",
+        "check_system_health": "medium",
+        "generate_backtest_report": "medium",
+        "log_agent_action": "medium",
+        # Low criticality (will be auto-populated for indicators, risk, etc.)
+    }
 
     def __init__(self) -> None:
         self._initialized = False
         self._tools: dict[str, McpToolInfo] = {}
         self._lock = asyncio.Lock()
+        
+        # P0-4: Per-tool circuit breakers
+        self.circuit_breakers: dict[str, str] = {}  # tool_name → breaker_name
+        self.breaker_categories: dict[str, str] = {}  # tool_name → category
+        self.tool_metrics: dict[str, dict] = {}  # tool_name → metrics
+        
+        # Legacy single breaker (for backward compatibility)
         self.breaker_name = "mcp_server"
         self.circuit_manager = None
+        
         if get_circuit_manager is not None:
             try:
                 self.circuit_manager = get_circuit_manager()
+                # Register legacy single breaker for backward compatibility
                 if self.breaker_name not in self.circuit_manager.get_all_breakers():
                     self.circuit_manager.register_breaker(
                         name=self.breaker_name,
@@ -267,6 +311,103 @@ class MCPFastAPIBridge:
                 )
             except Exception as e:
                 logger.error(f"[ERROR] Failed to initialize MCP bridge: {e}")
+        
+        # P0-4: Register per-tool circuit breakers after tools are loaded
+        if self._initialized:
+            self._register_per_tool_breakers()
+
+    def _get_tool_category(self, tool_name: str) -> str:
+        """Get category for a tool (high/medium/low).
+        
+        P0-4: Category-based circuit breaker thresholds.
+        """
+        # Check explicit categorization first
+        if tool_name in self.TOOL_CATEGORIES:
+            return self.TOOL_CATEGORIES[tool_name]
+        
+        # Auto-categorize by prefix/pattern
+        # High criticality: Agent-to-Agent
+        if tool_name.startswith("mcp_agent_to_agent"):
+            return "high"
+        
+        # High criticality: Backtest operations
+        if "backtest" in tool_name.lower():
+            return "high"
+        
+        # Medium criticality: Strategy Builder
+        if tool_name.startswith("builder_"):
+            return "medium"
+        
+        # Medium criticality: Memory, System
+        if tool_name.startswith("memory_") or tool_name.startswith("check_") or tool_name.startswith("generate_") or tool_name.startswith("log_"):
+            return "medium"
+        
+        # Low criticality: Indicators, Risk, Files, Strategies (default)
+        return "low"
+
+    def _register_per_tool_breakers(self) -> None:
+        """Register individual circuit breaker for each tool.
+        
+        P0-4 IMPLEMENTATION: Per-tool circuit breakers with category-based thresholds.
+        
+        Benefits:
+        - Isolation: Failure in one tool doesn't affect others
+        - Appropriate thresholds: Critical tools fail fast, non-critical are more resilient
+        - Better monitoring: Per-tool metrics and alerting
+        """
+        if not self.circuit_manager:
+            logger.warning("Circuit breaker manager not available; skipping per-tool registration")
+            return
+        
+        registered_count = 0
+        for tool_name in self._tools.keys():
+            try:
+                # Get category and threshold
+                category = self._get_tool_category(tool_name)
+                fail_max = self.BREAKER_THRESHOLDS[category]
+                
+                # Create unique breaker name per tool
+                breaker_name = f"mcp_tool_{tool_name}"
+                
+                # Register breaker if not exists
+                if breaker_name not in self.circuit_manager.get_all_breakers():
+                    self.circuit_manager.register_breaker(
+                        name=breaker_name,
+                        fail_max=fail_max,
+                        timeout_duration=30,  # 30 seconds recovery timeout
+                        expected_exception=Exception,
+                    )
+                    
+                    # Store mapping
+                    self.circuit_breakers[tool_name] = breaker_name
+                    self.breaker_categories[tool_name] = category
+                    
+                    # Initialize metrics
+                    self.tool_metrics[tool_name] = {
+                        "calls": 0,
+                        "successes": 0,
+                        "failures": 0,
+                        "timeouts": 0,
+                        "circuit_breaks": 0,
+                        "last_call": None,
+                        "last_error": None,
+                        "avg_latency_ms": 0.0,
+                    }
+                    
+                    registered_count += 1
+                    logger.debug(
+                        f"🔌 Registered circuit breaker for '{tool_name}' "
+                        f"(category: {category}, threshold: {fail_max})"
+                    )
+                
+            except Exception as exc:
+                logger.warning(
+                    f"⚠️ Could not register circuit breaker for '{tool_name}': {exc}"
+                )
+        
+        logger.info(
+            f"[OK] Per-tool circuit breakers registered: {registered_count}/{len(self._tools)} tools"
+        )
 
     async def list_tools(self) -> list[dict]:
         if not self._initialized:
@@ -275,11 +416,31 @@ class MCPFastAPIBridge:
             {"name": t.name, "description": t.description} for t in self._tools.values()
         ]
 
-    async def _execute_with_breaker(self, func: Callable[[], Any]):
-        """Execute coroutine factory through the shared circuit breaker if available."""
+    async def _execute_with_breaker(
+        self, func: Callable[[], Any], tool_name: str | None = None
+    ):
+        """Execute coroutine factory through circuit breaker.
+        
+        P0-4: Uses per-tool circuit breaker if available, falls back to legacy single breaker.
+        
+        Args:
+            func: Async function to execute
+            tool_name: Optional tool name for per-tool breaker (default: legacy single breaker)
+        """
         if not self.circuit_manager:
             result = func()
             return await result if asyncio.iscoroutine(result) else result
+        
+        # P0-4: Use per-tool breaker if tool_name provided
+        if tool_name and tool_name in self.circuit_breakers:
+            breaker_name = self.circuit_breakers[tool_name]
+            category = self.breaker_categories.get(tool_name, "unknown")
+            logger.debug(
+                f"🔌 Executing '{tool_name}' through {category} circuit breaker"
+            )
+            return await self.circuit_manager.call_with_breaker(breaker_name, func)
+        
+        # Fallback to legacy single breaker
         return await self.circuit_manager.call_with_breaker(self.breaker_name, func)
 
     async def call_tool(
@@ -290,10 +451,19 @@ class MCPFastAPIBridge:
 
         ✅ FIX: Implements progressive timeouts (30→60→120→300→600s)
         instead of single fixed timeout.
+        
+        P0-4: Uses per-tool circuit breaker with category-based thresholds.
         """
+        import time
+        
         if not self._initialized:
             await self.initialize()
         arguments = arguments or {}
+
+        # P0-4: Record metrics
+        if name in self.tool_metrics:
+            self.tool_metrics[name]["calls"] += 1
+            self.tool_metrics[name]["last_call"] = time.time()
 
         # ✅ FIX: Progressive timeout configuration
         PROGRESSIVE_TIMEOUTS = [60, 120, 300, 600]  # 1m, 2m, 5m, 10m
@@ -311,24 +481,35 @@ class MCPFastAPIBridge:
                         timeout=timeout,
                     )
 
-                return await self._execute_with_breaker(_attempt_call)
+                # P0-4: Pass tool_name for per-tool breaker
+                return await self._execute_with_breaker(_attempt_call, tool_name=name)
 
             except TimeoutError as e:
                 last_exception = e
                 logger.warning(
                     f"⚠️ MCP tool '{name}' timeout after {timeout}s (attempt {attempt}/{len(PROGRESSIVE_TIMEOUTS)})"
                 )
+                
+                # P0-4: Record timeout metrics
+                if name in self.tool_metrics:
+                    self.tool_metrics[name]["timeouts"] += 1
+                
                 if attempt < len(PROGRESSIVE_TIMEOUTS):
                     await asyncio.sleep(2)  # Small delay between retries
                     continue
                 else:
                     # All attempts exhausted
                     break
+                    
             except CircuitBreakerError as e:
                 last_exception = e
                 logger.warning(
                     "⚠️ MCP circuit breaker open; tool '%s' execution skipped", name
                 )
+                
+                # P0-4: Record circuit break metrics
+                if name in self.tool_metrics:
+                    self.tool_metrics[name]["circuit_breaks"] += 1
                 break
 
             except Exception as e:
@@ -337,18 +518,23 @@ class MCPFastAPIBridge:
                 logger.error(
                     f"❌ MCP tool '{name}' failed with {type(e).__name__}: {e}"
                 )
+                
+                # P0-4: Record failure metrics
+                if name in self.tool_metrics:
+                    self.tool_metrics[name]["failures"] += 1
+                    self.tool_metrics[name]["last_error"] = str(e)
                 break
 
         # All retries exhausted or non-timeout error
         if isinstance(last_exception, CircuitBreakerError):
             error = StructuredError(
                 error_type="CircuitBreakerOpen",
-                message="Circuit breaker open for MCP server",
+                message=f"Circuit breaker open for tool '{name}'",
                 stage="circuit_breaker",
                 retryable=True,
                 tool=name,
                 correlation_id=None,
-                details={},
+                details={"breaker_name": self.circuit_breakers.get(name, "unknown")},
             )
         else:
             error = StructuredError(
@@ -497,12 +683,23 @@ class MCPFastAPIBridge:
                 MCP_BRIDGE_CALLS.labels(tool=name, success="true").inc()
             except Exception as _e:
                 logger.warning("Failed to update metrics: {}", _e)
+            
             # Observe duration success path
             try:
                 from backend.api.app import MCP_BRIDGE_DURATION
 
                 duration = time.perf_counter() - start_time
                 MCP_BRIDGE_DURATION.labels(tool=name, success="true").observe(duration)
+                
+                # P0-4: Record per-tool metrics
+                if name in self.tool_metrics:
+                    # Update running average latency
+                    current_avg = self.tool_metrics[name]["avg_latency_ms"]
+                    current_calls = self.tool_metrics[name]["calls"]
+                    new_avg = ((current_avg * (current_calls - 1)) + (duration * 1000)) / current_calls
+                    self.tool_metrics[name]["avg_latency_ms"] = new_avg
+                    self.tool_metrics[name]["successes"] += 1
+                    
             except Exception as _e:
                 logger.warning("Failed to update metrics: {}", _e)
 
@@ -604,6 +801,60 @@ class MCPFastAPIBridge:
                 details={"exception_type": error_type},
             )
             return error.to_dict()
+
+    def get_tool_metrics(self, tool_name: str | None = None) -> dict:
+        """Get metrics for a specific tool or all tools.
+        
+        P0-4: Per-tool metrics API.
+        
+        Args:
+            tool_name: Optional tool name. If None, returns metrics for all tools.
+            
+        Returns:
+            Dict with tool metrics or dict of all tool metrics.
+        """
+        if tool_name:
+            return self.tool_metrics.get(tool_name, {})
+        return self.tool_metrics
+
+    def get_breaker_status(self, tool_name: str | None = None) -> dict:
+        """Get circuit breaker status for a specific tool or all tools.
+        
+        P0-4: Per-tool circuit breaker status API.
+        
+        Args:
+            tool_name: Optional tool name. If None, returns status for all tools.
+            
+        Returns:
+            Dict with breaker status (name, category, state).
+        """
+        if tool_name:
+            breaker_name = self.circuit_breakers.get(tool_name, "unknown")
+            category = self.breaker_categories.get(tool_name, "unknown")
+            
+            # Get breaker state from circuit manager
+            state = "unknown"
+            if self.circuit_manager and breaker_name in self.circuit_manager.get_all_breakers():
+                try:
+                    breaker = self.circuit_manager.breakers.get(breaker_name)
+                    if breaker:
+                        state = breaker.state.name if hasattr(breaker, 'state') else "unknown"
+                except Exception:
+                    pass
+            
+            return {
+                "tool": tool_name,
+                "breaker_name": breaker_name,
+                "category": category,
+                "state": state,
+                "threshold": self.BREAKER_THRESHOLDS.get(category, 3),
+            }
+        
+        # Return status for all tools
+        return {
+            name: self.get_breaker_status(name)
+            for name in self._tools.keys()
+        }
 
 
 _bridge_instance: MCPFastAPIBridge | None = None

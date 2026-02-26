@@ -845,6 +845,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         # Пирамидинг
         pyramiding = input_data.pyramiding
         close_entries_rule = getattr(input_data, "close_entries_rule", "ALL")
+        entry_on_next_bar_open = getattr(input_data, "entry_on_next_bar_open", False)
 
         # === РЕЖИМЫ ВЫХОДА (НОВАЯ СИСТЕМА) ===
         # Импортируем Enum'ы если доступны
@@ -1205,11 +1206,9 @@ class FallbackEngineV4(BaseBacktestEngine):
         pending_short_exit_reason = None
         pending_short_exit_price = 0.0
 
-        # Carry-over signals: when a signal fires but position is full (pyramiding limit),
-        # save it so it can execute on the very next bar once the position closes.
-        # This matches TradingView behavior for TV#2-style missed entries.
-        pending_long_signal_carry = False
-        pending_short_signal_carry = False
+        # NOTE: Signal carry-over has been REMOVED for TradingView parity.
+        # TV does NOT carry signals — when pyramiding is full or a pending exit blocks
+        # re-entry, the signal is simply dropped. The engine now matches this behavior.
 
         # === MFE/MAE TRACKING ===
         # MFE = Maximum Favorable Excursion (лучшая нереализованная прибыль)
@@ -1355,18 +1354,19 @@ class FallbackEngineV4(BaseBacktestEngine):
                 exit_time_long = prev_bar_time
                 # TV same-bar entry+exit convention: when TP triggers on the very first bar
                 # after entry (i.e. entry_bar + 1 == tp_bar), TradingView records:
-                #   exit_price = bar.close of the TP bar (not exact TP level)
+                #   exit_price = exact TP level (NOT bar.close)
                 #   exit_time  = open of the bar AFTER the TP bar (= current_time, bar i)
-                # because in Pine Script both entry and TP-exit fill on consecutive bars
-                # treated as a single "same-bar" event.
+                # Verified against as4.csv: TV trades #139 (long) and #142 (short) confirm
+                # TV uses exact TP level price, not close price.
                 long_pos = pyramid_mgr.get_position("long")
                 if (
                     pending_long_exit_reason == ExitReason.TAKE_PROFIT
                     and long_pos is not None
-                    and long_pos.first_entry_bar == i - 2
+                    and long_pos.first_entry_bar >= i - 2
                 ):
-                    exit_price = close_prices[i - 1]
-                    exit_time_long = current_time  # TV uses bar-i open time, not bar-(i-1)
+                    # Same-bar TP: keep exit_price = exact TP level (not bar close)
+                    # exit_time stays as prev_bar_time (bar where TP triggered)
+                    pass
                 # Ensure exit_reason is not None
                 effective_exit_reason = pending_long_exit_reason or ExitReason.UNKNOWN
                 closed_trades = pyramid_mgr.close_position(
@@ -1427,18 +1427,21 @@ class FallbackEngineV4(BaseBacktestEngine):
                 exit_time_short = prev_bar_time
                 # TV same-bar entry+exit convention: when TP triggers on the very first bar
                 # after entry (i.e. entry_bar + 1 == tp_bar), TradingView records:
-                #   exit_price = bar.close of the TP bar (not exact TP level)
+                #   exit_price = exact TP level (NOT bar.close)
                 #   exit_time  = open of the bar AFTER the TP bar (= current_time, bar i)
-                # because in Pine Script both entry and TP-exit fill on consecutive bars
-                # treated as a single "same-bar" event.
+                # Verified against as4.csv: TV trades #139 (long) and #142 (short) confirm
+                # TV uses exact TP level price, not close price.
+                # Also handles entry-bar TP: entry at bar i, TP hit on same bar i,
+                # exit executes at bar i+1 → first_entry_bar == i - 1.
                 short_pos = pyramid_mgr.get_position("short")
                 if (
                     pending_short_exit_reason == ExitReason.TAKE_PROFIT
                     and short_pos is not None
-                    and short_pos.first_entry_bar == i - 2
+                    and short_pos.first_entry_bar >= i - 2
                 ):
-                    exit_price = close_prices[i - 1]
-                    exit_time_short = current_time  # TV uses bar-i open time, not bar-(i-1)
+                    # Same-bar TP: keep exit_price = exact TP level (not bar close)
+                    # exit_time stays as prev_bar_time (bar where TP triggered)
+                    pass
                 # Ensure exit_reason is not None
                 effective_short_exit_reason = pending_short_exit_reason or ExitReason.UNKNOWN
                 closed_trades = pyramid_mgr.close_position(
@@ -2236,19 +2239,15 @@ class FallbackEngineV4(BaseBacktestEngine):
                     can_short = False
 
             # LONG Entry
-            # TV carry-over: use signal from this bar OR a signal that was blocked last bar
-            # because the pyramiding limit was reached (position was full).
-            # Note: pending exit executes earlier in this same bar-loop iteration, so when
-            # the carry fires, last_exit_bar == i (the exit happened *this* bar).
-            _long_carry_active = pending_long_signal_carry and last_exit_bar == i
-            _long_signal_this_bar = long_entries[i] or _long_carry_active
-            pending_long_signal_carry = False  # consume / reset regardless
-            # Save carry signal when entry is blocked by a pending exit on the same bar
-            # (i.e. the position is about to close this bar — TV would re-enter next bar).
-            if long_entries[i] and pending_long_exit:
-                pending_long_signal_carry = True
+            # entry_on_next_bar_open: when True, the signal fires on bar i-1 (previous bar's
+            # close) and the entry executes at the OPEN of bar i — matching TradingView's
+            # default behaviour (process_orders_on_close / calc_on_every_tick=false).
+            # NOTE: TradingView does NOT carry signals. When pyramiding is full or a pending
+            # exit blocks re-entry, the signal is simply dropped. The next entry can only
+            # happen when a fresh signal fires on a bar where the position is empty.
+            _long_raw_signal = long_entries[i - 1] if entry_on_next_bar_open and i > 0 else long_entries[i]
             if (
-                _long_signal_this_bar
+                _long_raw_signal
                 and can_long
                 and not pending_long_exit
                 and time_allows_entry
@@ -2270,9 +2269,12 @@ class FallbackEngineV4(BaseBacktestEngine):
                         volume_impact=slippage_volume_impact,
                         volatility_mult=slippage_volatility_mult,
                     )
-                    # Carry-over signal: TV enters at open of current bar (= close of prev bar)
-                    # because the signal was already "live" at previous bar's close.
-                    _base_price_long = close_prices[i - 1] if _long_carry_active else close_price
+                    # entry_on_next_bar_open=True → enter at open of this bar (bar i), which
+                    # is the bar AFTER the signal bar (i-1). This matches TradingView parity.
+                    if entry_on_next_bar_open:
+                        _base_price_long = open_prices[i]
+                    else:
+                        _base_price_long = close_price
                     entry_price = _base_price_long * (1 + effective_slippage)
 
                     # === POSITION SIZING ===
@@ -2386,24 +2388,20 @@ class FallbackEngineV4(BaseBacktestEngine):
                                 "capital": order_capital,
                             }
                 else:
-                    # Pyramiding limit reached: carry the signal to the next bar so it
-                    # fires as soon as the position closes (TradingView behavior).
-                    pending_long_signal_carry = True
+                    # Pyramiding limit reached: signal is dropped (TradingView behavior).
+                    # TV does NOT carry signals — the next entry requires a fresh signal
+                    # on a bar where the position is empty or pyramiding allows it.
+                    pass
 
             # SHORT Entry
-            # TV carry-over: use signal from this bar OR a signal that was blocked last bar
-            # because the pyramiding limit was reached (position was full).
-            # Note: pending exit executes earlier in this same bar-loop iteration, so when
-            # the carry fires, last_exit_bar == i (the exit happened *this* bar).
-            _short_carry_active = pending_short_signal_carry and last_exit_bar == i
-            _short_signal_this_bar = short_entries[i] or _short_carry_active
-            pending_short_signal_carry = False  # consume / reset regardless
-            # Save carry signal when entry is blocked by a pending exit on the same bar
-            # (i.e. the position is about to close this bar — TV would re-enter next bar).
-            if short_entries[i] and pending_short_exit:
-                pending_short_signal_carry = True
+            # entry_on_next_bar_open: when True, the signal fires on bar i-1 (previous bar's
+            # close) and the entry executes at the OPEN of bar i — matching TradingView parity.
+            # NOTE: TradingView does NOT carry signals. When pyramiding is full or a pending
+            # exit blocks re-entry, the signal is simply dropped. The next entry can only
+            # happen when a fresh signal fires on a bar where the position is empty.
+            _short_raw_signal = short_entries[i - 1] if entry_on_next_bar_open and i > 0 else short_entries[i]
             if (
-                _short_signal_this_bar
+                _short_raw_signal
                 and can_short
                 and not pending_short_exit
                 and time_allows_entry
@@ -2425,9 +2423,12 @@ class FallbackEngineV4(BaseBacktestEngine):
                         volume_impact=slippage_volume_impact,
                         volatility_mult=slippage_volatility_mult,
                     )
-                    # Carry-over signal: TV enters at open of current bar (= close of prev bar)
-                    # because the signal was already "live" at previous bar's close.
-                    _base_price_short = close_prices[i - 1] if _short_carry_active else close_price
+                    # entry_on_next_bar_open=True → enter at open of this bar (bar i), which
+                    # is the bar AFTER the signal bar (i-1). This matches TradingView parity.
+                    if entry_on_next_bar_open:
+                        _base_price_short = open_prices[i]
+                    else:
+                        _base_price_short = close_price
                     entry_price = _base_price_short * (1 - effective_slippage)
 
                     # === POSITION SIZING ===
@@ -2536,9 +2537,49 @@ class FallbackEngineV4(BaseBacktestEngine):
                                 "capital": order_capital,
                             }
                 else:
-                    # Pyramiding limit reached: carry the signal to the next bar so it
-                    # fires as soon as the position closes (TradingView behavior).
-                    pending_short_signal_carry = True
+                    # Pyramiding limit reached: signal is dropped (TradingView behavior).
+                    # TV does NOT carry signals — the next entry requires a fresh signal
+                    # on a bar where the position is empty or pyramiding allows it.
+                    pass
+
+            # === SAME-BAR TP CHECK (TradingView parity) ===
+            # When entry_on_next_bar_open=True, entry happens at bar i's open.
+            # TV checks TP on the same bar: if TP is reachable within bar i's range,
+            # TV exits immediately on bar i (exit_time = entry_time, price = TP level).
+            # Without this check, the engine only evaluates TP on the NEXT bar (i+1),
+            # causing a 1-bar exit delay vs TV.
+            if entry_on_next_bar_open:
+                # LONG: entered at open_prices[i], check if high reaches TP
+                if pyramid_mgr.has_position("long") and not pending_long_exit and tp_mode != TpMode.MULTI:
+                    long_pos = pyramid_mgr.get_position("long")
+                    if long_pos is not None and long_pos.first_entry_bar == i:
+                        # Just entered this bar — check TP
+                        tp_price_check = None
+                        if tp_mode == TpMode.ATR and atr_values is not None and current_atr > 0:
+                            tp_price_check = pyramid_mgr.get_atr_tp_price("long", current_atr, atr_tp_multiplier)
+                        elif tp_mode == TpMode.FIXED and take_profit > 0:
+                            tp_price_check = pyramid_mgr.get_tp_price("long", take_profit)
+
+                        if tp_price_check and high_price >= tp_price_check:
+                            pending_long_exit = True
+                            pending_long_exit_reason = ExitReason.TAKE_PROFIT
+                            pending_long_exit_price = tp_price_check
+
+                # SHORT: entered at open_prices[i], check if low reaches TP
+                if pyramid_mgr.has_position("short") and not pending_short_exit and tp_mode != TpMode.MULTI:
+                    short_pos = pyramid_mgr.get_position("short")
+                    if short_pos is not None and short_pos.first_entry_bar == i:
+                        # Just entered this bar — check TP
+                        tp_price_check = None
+                        if tp_mode == TpMode.ATR and atr_values is not None and current_atr > 0:
+                            tp_price_check = pyramid_mgr.get_atr_tp_price("short", current_atr, atr_tp_multiplier)
+                        elif tp_mode == TpMode.FIXED and take_profit > 0:
+                            tp_price_check = pyramid_mgr.get_tp_price("short", take_profit)
+
+                        if tp_price_check and low_price <= tp_price_check:
+                            pending_short_exit = True
+                            pending_short_exit_reason = ExitReason.TAKE_PROFIT
+                            pending_short_exit_price = tp_price_check
 
             # === FUNDING FEE CALCULATION ===
             if include_funding and funding_interval_hours > 0:

@@ -1,863 +1,782 @@
 /**
- * 📊 TradingView-style Equity Chart Component
+ * 📊 TradingView Lightweight Charts — Equity Chart Component
  *
- * Professional equity curve visualization matching TradingView's design:
- * - Main equity line with gradient fill
- * - Buy & Hold comparison line
- * - Trade excursions (run-up/drawdown bars)
- * - Profit/Loss period bars at bottom
- * - Interactive tooltips with detailed info
- * - Zoom and pan support
+ * Built on the official TradingView Lightweight Charts library (v4, MIT).
+ * Replicates TradingView Strategy Tester chart appearance:
+ *   - Baseline series: teal above initial capital, red below (TV-style color change)
+ *   - Stepped line (lineType:2) with trade-exit circle markers
+ *   - Buy & Hold line series
+ *   - MFE/MAE bars via canvas overlay in bottom zone (TV histogram style)
+ *   - Regime overlay via TV histogram series (background bands)
+ *   - Crosshair, zoom/pan, price scale — all native TV behaviour
  *
- * @version 2.0.0
- * @date 2026-01-13
+ * Public API (unchanged so backtest_results.js needs no edits):
+ *   render(data)
+ *   setDisplayMode('absolute'|'percent')
+ *   toggleBuyHold(bool)
+ *   toggleTradeExcursions(bool)
+ *   destroy()
+ *   .chart          ← shim object with .resize() and regime annotation compat
+ *   .data           ← last rendered data object
+ *
+ * @version 3.1.0 — 2026-02-25
  */
+
+// LightweightCharts is loaded via CDN script tag (window.LightweightCharts)
 
 class TradingViewEquityChart {
   constructor(containerId, options = {}) {
     this.containerId = containerId;
     this.container = document.getElementById(containerId);
-    this.chart = null;
     this.data = null;
-
-    // Default options matching TradingView style
-    this.options = {
-      showBuyHold: true,
-      showTradeExcursions: false,
-      displayMode: "absolute", // 'absolute' or 'percent'
-      height: 320,
-      colors: {
-        equity: "#26a69a", // TradingView teal/green
-        equityFill: "rgba(38, 166, 154, 0.15)",
-        equityGradientStart: "rgba(38, 166, 154, 0.4)",
-        equityGradientEnd: "rgba(38, 166, 154, 0.02)",
-        buyHold: "#ef5350", // TradingView red
-        buyHoldFill: "rgba(239, 83, 80, 0.05)",
-        positive: "#26a69a", // Green for profit
-        negative: "#ef5350", // Red for loss
-        grid: "rgba(42, 46, 57, 0.8)",
-        gridLight: "rgba(42, 46, 57, 0.4)",
-        text: "#787b86",
-        textBright: "#d1d4dc",
-        background: "#131722",
-        tooltipBg: "#1e222d",
-        crosshair: "#758696",
-      },
-      ...options,
-    };
-
     this.trades = [];
     this.initialCapital = 10000;
+
+    // .chart shim — exposed so backtest_results.js .chart.resize() etc. works
+    this.chart = null;
+
+    this.options = {
+      showBuyHold: false,
+      showTradeExcursions: false,
+      displayMode: 'absolute',   // 'absolute' | 'percent'
+      height: null,              // null → fills CSS container
+      ...options
+    };
+
+    // Internal state
+    this._lwChart = null;   // LightweightCharts IChartApi
+    this._equitySeries = null;
+    this._bhSeries = null;
+    this._mfeSeries = null;
+    this._maeSeries = null;
+    this._excursionCanvas = null;
+    this._excursionRAF = null;
+    this._resizeObserver = null;
+    this._regimeRects = new Map();
+    this._regimeAnnotations = {};  // Chart.js compat shim
   }
 
-  /**
-   * Initialize and render the chart
-   * @param {Object} data - Chart data with equity, timestamps, trades, etc.
-   */
+  // ─── PUBLIC API ────────────────────────────────────────────────────────────
+
   render(data) {
-    if (!this.container || !data) {
-      console.warn("TradingViewEquityChart: Container or data not found");
+    if (!this.container) {
+      console.warn('[TVEquityChart] Container not found:', this.containerId);
       return;
     }
-
     this.data = data;
-    this.trades = data.trades || [];
+    // Normalise mfe/mae fields — accept mfe_pct, mfe_percent, or mfe (all %)
+    this.trades = (data.trades || []).map((t) => ({
+      ...t,
+      mfe: Math.abs(Number(t.mfe_pct ?? t.mfe_percent ?? t.mfe ?? 0)),
+      mae: Math.abs(Number(t.mae_pct ?? t.mae_percent ?? t.mae ?? 0))
+    }));
     this.initialCapital = data.initial_capital || 10000;
+    this._dbgLogged = false;  // reset per render
 
-    // Destroy existing chart
-    if (this.chart) {
-      this.chart.destroy();
-    }
-
-    // Prepare datasets
-    const datasets = this._prepareDatasets(data);
-
-    // Create MFE/MAE drawing plugin
-    const tradeExcursionsPlugin = this._createTradeExcursionsPlugin();
-
-    // Create chart
-    const ctx = this._getOrCreateCanvas();
-
-    this.chart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: this._formatLabels(data.timestamps),
-        datasets: datasets,
-      },
-      options: this._getChartOptions(data),
-      plugins: [tradeExcursionsPlugin],
-    });
-
-    // Setup legend interactivity
+    this._destroyInternal();
+    this._createChart();
+    this._buildSeries(data);
+    this._setupResizeObserver();
     this._setupLegendInteractivity();
-
-    return this.chart;
   }
 
-  /**
-   * Prepare datasets for Chart.js
-   */
-  _prepareDatasets(data) {
-    const datasets = [];
-    const equity = data.equity || [];
-    const timestamps = data.timestamps || [];
-    const isPercent = this.options.displayMode === "percent";
-
-    // Calculate Buy & Hold values (for optional B&H line)
-    let bhValues = data.bh_equity || this._calculateBuyHold(data);
-
-    if (isPercent) {
-      const baseBh = bhValues[0] || this.initialCapital;
-      bhValues = bhValues.map((v) => ((v - baseBh) / baseBh) * 100);
-    }
-
-    // 1. Trade Excursion Bars (TradingView style)
-    // Each bar = one trade, showing MFE (up) and MAE (down)
-    // Two layers: light (full excursion) and dark (realized P&L)
-    const tradeExcursions = this._calculateTradeExcursionBars(timestamps);
-
-    // Layer 1: Full excursion (light colors) - MFE positive, MAE negative
-    datasets.push({
-      type: "bar",
-      label: "Excursion",
-      data: tradeExcursions.fullExcursion,
-      backgroundColor: tradeExcursions.fullColors,
-      barPercentage: 0.85,
-      categoryPercentage: 1.0,
-      order: 3,
-      yAxisID: "y3",
-      maxBarThickness: 50,
-    });
-
-    // Layer 2: Realized P&L (dark colors) - overlaid on top
-    datasets.push({
-      type: "bar",
-      label: "Realized P&L",
-      data: tradeExcursions.realizedPnL,
-      backgroundColor: tradeExcursions.realizedColors,
-      barPercentage: 0.85,
-      categoryPercentage: 1.0,
-      order: 2,
-      yAxisID: "y3",
-      maxBarThickness: 50,
-    });
-
-    // 3. Buy & Hold line (if enabled)
-    if (this.options.showBuyHold && bhValues.length > 0) {
-      datasets.push({
-        label: "Покупка и удержание",
-        data: bhValues,
-        borderColor: this.options.colors.buyHold,
-        backgroundColor: "transparent",
-        borderWidth: 1.5,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: this.options.colors.buyHold,
-        tension: 0,
-        fill: false,
-        order: 1,
-        yAxisID: "y",
-      });
-    }
-
-    // 4. Main equity line - stepped line based on TRADES (TradingView style)
-    // Calculate equity at each trade exit point
-    const tradeEquity = this._calculateTradeBasedEquity(
-      timestamps,
-      equity,
-      isPercent,
-    );
-
-    datasets.push({
-      label: "Equity",
-      data: tradeEquity.values,
-      borderColor: this.options.colors.equity,
-      backgroundColor: (context) => this._createGradient(context),
-      borderWidth: 2,
-      pointRadius: 3,
-      pointHoverRadius: 5,
-      pointBackgroundColor: this.options.colors.equity,
-      pointHoverBackgroundColor: this.options.colors.equity,
-      pointHoverBorderColor: "#fff",
-      pointHoverBorderWidth: 2,
-      stepped: "after", // Creates stepped line like TradingView
-      fill: true,
-      order: 0,
-      yAxisID: "y",
-      spanGaps: true, // Connect points even with null values between
-    });
-
-    return datasets;
-  }
-
-  /**
-   * Calculate equity values based on trade exits (not every candle)
-   * Returns sparse array with values only at trade exit points
-   */
-  _calculateTradeBasedEquity(timestamps, fullEquity, isPercent = false) {
-    // Create sparse array - null except at trade exits
-    const values = new Array(timestamps.length).fill(null);
-    const baseEquity = this.initialCapital;
-
-    if (!this.trades || this.trades.length === 0) {
-      // No trades - use first and last equity points only
-      if (fullEquity.length > 0) {
-        const first = isPercent ? 0 : fullEquity[0];
-        const last = isPercent
-          ? ((fullEquity[fullEquity.length - 1] - fullEquity[0]) /
-              fullEquity[0]) *
-            100
-          : fullEquity[fullEquity.length - 1];
-        values[0] = first;
-        values[fullEquity.length - 1] = last;
-      }
-      return { values };
-    }
-
-    // Start with initial capital (or 0% in percent mode) at first timestamp
-    values[0] = isPercent ? 0 : baseEquity;
-
-    // Add equity point at each trade exit
-    let runningEquity = baseEquity;
-
-    this.trades.forEach((trade) => {
-      const exitTime = trade.exit_time
-        ? new Date(trade.exit_time).getTime()
-        : new Date(trade.entry_time).getTime();
-
-      // Find closest timestamp index
-      let closestIdx = 0;
-      let minDiff = Infinity;
-
-      for (let i = 0; i < timestamps.length; i++) {
-        const ts = new Date(timestamps[i]).getTime();
-        const diff = Math.abs(ts - exitTime);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIdx = i;
-        }
-      }
-
-      // Update running equity with trade P&L
-      runningEquity += trade.pnl || 0;
-
-      // Store value (absolute or percent)
-      if (isPercent) {
-        values[closestIdx] = ((runningEquity - baseEquity) / baseEquity) * 100;
-      } else {
-        values[closestIdx] = runningEquity;
-      }
-    });
-
-    return { values };
-  }
-
-  /**
-   * Create gradient fill for equity line
-   */
-  _createGradient(context) {
-    if (!context.chart.chartArea) return this.options.colors.equityFill;
-
-    const { top, bottom } = context.chart.chartArea;
-    const ctx = context.chart.ctx;
-    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-
-    gradient.addColorStop(0, this.options.colors.equityGradientStart);
-    gradient.addColorStop(0.5, this.options.colors.equityFill);
-    gradient.addColorStop(1, this.options.colors.equityGradientEnd);
-
-    return gradient;
-  }
-
-  /**
-   * Calculate Buy & Hold equity if not provided
-   */
-  _calculateBuyHold(data) {
-    if (!data.first_price || !data.close_prices) {
-      // Generate approximate based on equity change ratio
-      const equity = data.equity || [];
-      if (equity.length === 0) return [];
-
-      // Just return a flat line at initial capital for now
-      return equity.map(() => this.initialCapital);
-    }
-
-    const firstPrice = data.first_price;
-    const shares = this.initialCapital / firstPrice;
-    return data.close_prices.map((p) => shares * p);
-  }
-
-  /**
-   * Calculate Trade Excursion bars (TradingView style)
-   * Each bar = one trade, positioned at its exit time
-   * Returns two layers: full excursion (light) and realized P&L (dark)
-   */
-  _calculateTradeExcursionBars(timestamps) {
-    // Create sparse arrays - null except at trade positions
-    const fullExcursion = new Array(timestamps.length).fill(null);
-    const realizedPnL = new Array(timestamps.length).fill(null);
-    const fullColors = new Array(timestamps.length).fill("transparent");
-    const realizedColors = new Array(timestamps.length).fill("transparent");
-
-    // Light colors for full excursion
-    const greenLight = "rgba(38, 166, 154, 0.35)";
-    const redLight = "rgba(239, 83, 80, 0.35)";
-    // Dark colors for realized P&L
-    const greenDark = "rgba(38, 166, 154, 0.9)";
-    const redDark = "rgba(239, 83, 80, 0.9)";
-
-    if (!this.trades || this.trades.length === 0) {
-      return { fullExcursion, realizedPnL, fullColors, realizedColors };
-    }
-
-    // For each trade, find closest timestamp and set values
-    this.trades.forEach((trade) => {
-      const exitTime = trade.exit_time
-        ? new Date(trade.exit_time).getTime()
-        : new Date(trade.entry_time).getTime();
-
-      // Find closest timestamp index
-      let closestIdx = 0;
-      let minDiff = Infinity;
-      for (let i = 0; i < timestamps.length; i++) {
-        const ts = new Date(timestamps[i]).getTime();
-        const diff = Math.abs(ts - exitTime);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIdx = i;
-        }
-      }
-
-      const mfe = Math.abs(trade.mfe || 0); // Maximum Favorable Excursion (%)
-      const mae = Math.abs(trade.mae || 0); // Maximum Adverse Excursion (%)
-      const pnl = trade.pnl || 0;
-      const pnlPercent = Math.abs((pnl / this.initialCapital) * 100);
-
-      // For profitable trades: show MFE (green bar up)
-      // For losing trades: show MAE (red bar down, negative value)
-      if (pnl >= 0) {
-        // Profitable trade - green bars
-        fullExcursion[closestIdx] = mfe; // Full favorable excursion
-        fullColors[closestIdx] = greenLight;
-        realizedPnL[closestIdx] = Math.min(pnlPercent, mfe); // Realized profit (capped at MFE)
-        realizedColors[closestIdx] = greenDark;
-      } else {
-        // Losing trade - red bars (negative to go down)
-        fullExcursion[closestIdx] = -mae; // Full adverse excursion
-        fullColors[closestIdx] = redLight;
-        realizedPnL[closestIdx] = -Math.min(pnlPercent, mae); // Realized loss (capped at MAE)
-        realizedColors[closestIdx] = redDark;
-      }
-    });
-
-    return { fullExcursion, realizedPnL, fullColors, realizedColors };
-  }
-
-  // NOTE: Trade excursions (MFE/MAE) are now drawn by custom plugin
-  // See _createTradeExcursionsPlugin() method at end of class
-
-  /**
-   * Format timestamp labels
-   */
-  _formatLabels(timestamps) {
-    if (!timestamps || timestamps.length === 0) return [];
-
-    return timestamps.map((ts) => {
-      const date = new Date(ts);
-      return date;
-    });
-  }
-
-  /**
-   * Get chart configuration options
-   */
-  _getChartOptions(data) {
-    const isPercent = this.options.displayMode === "percent";
-    const equity = data.equity || [];
-
-    // Calculate fixed Y-axis range based on ALL data (equity + buy&hold)
-    // This prevents scale from changing when toggling datasets
-    let yMin = Infinity;
-    let yMax = -Infinity;
-
-    // Include equity data
-    equity.forEach((v) => {
-      if (v !== null && v !== undefined) {
-        yMin = Math.min(yMin, v);
-        yMax = Math.max(yMax, v);
-      }
-    });
-
-    // Include Buy & Hold data (always, even if hidden)
-    const bhEquity = data.bh_equity || this._calculateBuyHold(data);
-    bhEquity.forEach((v) => {
-      if (v !== null && v !== undefined) {
-        yMin = Math.min(yMin, v);
-        yMax = Math.max(yMax, v);
-      }
-    });
-
-    // Convert to percent mode if needed
-    if (isPercent) {
-      const baseEquity = equity[0] || this.initialCapital;
-      const baseBh = bhEquity[0] || this.initialCapital;
-      yMin = Math.min(
-        ((yMin - baseEquity) / baseEquity) * 100,
-        ((yMin - baseBh) / baseBh) * 100,
-      );
-      yMax = Math.max(
-        ((yMax - baseEquity) / baseEquity) * 100,
-        ((yMax - baseBh) / baseBh) * 100,
-      );
-    }
-
-    // Add 5% padding to the range
-    const padding = (yMax - yMin) * 0.05;
-    yMin -= padding;
-    yMax += padding;
-
-    // Calculate max excursion for MFE/MAE axis (they are in %)
-    let maxExcursion = 1;
-    if (this.trades && this.trades.length > 0) {
-      this.trades.forEach((trade) => {
-        const mfe = Math.abs(trade.mfe || 0);
-        const mae = Math.abs(trade.mae || 0);
-        maxExcursion = Math.max(maxExcursion, mfe, mae);
-      });
-    }
-
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
-      plugins: {
-        legend: {
-          display: false, // We use custom legend in footer
-        },
-        tooltip: {
-          enabled: true,
-          backgroundColor: this.options.colors.tooltipBg,
-          titleColor: this.options.colors.textBright,
-          bodyColor: this.options.colors.text,
-          borderColor: this.options.colors.grid,
-          borderWidth: 1,
-          padding: 12,
-          displayColors: true,
-          callbacks: {
-            title: (items) => {
-              if (!items.length) return "";
-              const date = new Date(data.timestamps[items[0].dataIndex]);
-              return date.toLocaleDateString("ru-RU", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              });
-            },
-            label: (context) => {
-              if (context.dataset.label === "Excursion") return null;
-              if (context.dataset.label === "Realized P&L") return null;
-              if (context.dataset.label === "MFE") return null;
-              if (context.dataset.label === "MAE") return null;
-
-              const value = context.parsed.y;
-              if (isPercent) {
-                return `${context.dataset.label}: ${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
-              }
-              return `${context.dataset.label}: ${this._formatCurrency(value)}`;
-            },
-            afterBody: (items) => {
-              if (!items.length) return [];
-              const idx = items[0].dataIndex;
-              const lines = [];
-
-              // Add P&L info
-              if (equity[idx] && equity[0]) {
-                const pnl = equity[idx] - equity[0];
-                const pnlPct = ((equity[idx] - equity[0]) / equity[0]) * 100;
-                lines.push("");
-                lines.push(
-                  `P&L: ${pnl >= 0 ? "+" : ""}${this._formatCurrency(pnl)} (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%)`,
-                );
-              }
-
-              // Find trade at this timestamp
-              const timestamp = data.timestamps[idx];
-              const trade = this._findTradeAtTime(timestamp);
-              if (trade) {
-                lines.push("");
-                lines.push(`📊 ${trade.direction.toUpperCase()} Trade`);
-                lines.push(
-                  `   Entry: ${this._formatCurrency(trade.entry_price)}`,
-                );
-                if (trade.exit_price) {
-                  lines.push(
-                    `   Exit: ${this._formatCurrency(trade.exit_price)}`,
-                  );
-                }
-                lines.push(
-                  `   P&L: ${trade.pnl >= 0 ? "+" : ""}${this._formatCurrency(trade.pnl)}`,
-                );
-                if (trade.mfe) lines.push(`   MFE: +${trade.mfe.toFixed(2)}%`);
-                if (trade.mae)
-                  lines.push(`   MAE: -${Math.abs(trade.mae).toFixed(2)}%`);
-              }
-
-              return lines;
-            },
-          },
-          filter: (item) => {
-            // Hide Excursion bars and MFE/MAE from tooltip legend
-            return (
-              item.dataset.label !== "Excursion" &&
-              item.dataset.label !== "Realized P&L" &&
-              item.dataset.label !== "MFE" &&
-              item.dataset.label !== "MAE"
-            );
-          },
-        },
-        crosshair: {
-          line: {
-            color: this.options.colors.crosshair,
-            width: 1,
-            dashPattern: [5, 5],
-          },
-          sync: {
-            enabled: false,
-          },
-          zoom: {
-            enabled: false,
-          },
-        },
-      },
-      scales: {
-        x: {
-          type: "time",
-          time: {
-            unit: this._getTimeUnit(data.timestamps),
-            displayFormats: {
-              day: "d MMM",
-              week: "d MMM",
-              month: "MMM yyyy",
-            },
-          },
-          grid: {
-            color: this.options.colors.gridLight,
-            drawBorder: false,
-          },
-          ticks: {
-            color: this.options.colors.text,
-            maxTicksLimit: 12,
-            font: { size: 11 },
-          },
-          border: {
-            display: false,
-          },
-        },
-        y: {
-          position: "right",
-          min: yMin,
-          max: yMax,
-          grid: {
-            color: this.options.colors.grid,
-            drawBorder: false,
-          },
-          ticks: {
-            color: this.options.colors.text,
-            font: { size: 11 },
-            callback: (value) => {
-              if (isPercent) {
-                return value.toFixed(0) + "%";
-              }
-              return this._formatCurrencyShort(value);
-            },
-          },
-          border: {
-            display: false,
-          },
-        },
-        y2: {
-          // MFE/MAE axis (values in %)
-          display: false,
-          position: "right",
-          min: -maxExcursion * 1.1,
-          max: maxExcursion * 1.1,
-          grid: { display: false },
-        },
-        y3: {
-          // Trade excursion bars axis (values in %)
-          display: false,
-          position: "left",
-          min: -maxExcursion * 1.5,
-          max: maxExcursion * 1.5,
-          grid: { display: false },
-        },
-      },
-      animation: {
-        duration: 750,
-        easing: "easeOutQuart",
-      },
-    };
-  }
-
-  /**
-   * Determine appropriate time unit based on date range
-   */
-  _getTimeUnit(timestamps) {
-    if (!timestamps || timestamps.length < 2) return "day";
-
-    const first = new Date(timestamps[0]);
-    const last = new Date(timestamps[timestamps.length - 1]);
-    const days = (last - first) / (1000 * 60 * 60 * 24);
-
-    if (days > 365) return "month";
-    if (days > 60) return "week";
-    return "day";
-  }
-
-  /**
-   * Find trade at specific timestamp
-   */
-  _findTradeAtTime(timestamp) {
-    const ts = new Date(timestamp).getTime();
-    return this.trades.find((t) => {
-      const entry = new Date(t.entry_time).getTime();
-      const exit = t.exit_time ? new Date(t.exit_time).getTime() : entry;
-      return ts >= entry && ts <= exit;
-    });
-  }
-
-  /**
-   * Format currency value
-   */
-  _formatCurrency(value) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-
-  /**
-   * Format currency short (for axis)
-   */
-  _formatCurrencyShort(value) {
-    if (Math.abs(value) >= 1000000) {
-      return "$" + (value / 1000000).toFixed(1) + "M";
-    }
-    if (Math.abs(value) >= 1000) {
-      return "$" + (value / 1000).toFixed(0) + "K";
-    }
-    return "$" + value.toFixed(0);
-  }
-
-  /**
-   * Get or create canvas element
-   */
-  _getOrCreateCanvas() {
-    let canvas = this.container.querySelector("canvas");
-    if (!canvas) {
-      canvas = document.createElement("canvas");
-      this.container.appendChild(canvas);
-    }
-    return canvas.getContext("2d");
-  }
-
-  /**
-   * Setup legend checkbox interactivity
-   */
-  _setupLegendInteractivity() {
-    // Buy & Hold toggle
-    const bhCheckbox = document.getElementById("legendBuyHold");
-    if (bhCheckbox) {
-      bhCheckbox.addEventListener("change", () => {
-        this.options.showBuyHold = bhCheckbox.checked;
-        if (this.data) this.render(this.data);
-      });
-    }
-
-    // Trade excursions toggle
-    const excursionsCheckbox = document.getElementById(
-      "legendTradesRunupDrawdown",
-    );
-    if (excursionsCheckbox) {
-      excursionsCheckbox.addEventListener("change", () => {
-        this.options.showTradeExcursions = excursionsCheckbox.checked;
-        if (this.data) this.render(this.data);
-      });
-    }
-  }
-
-  /**
-   * Switch between absolute and percent mode
-   */
   setDisplayMode(mode) {
     this.options.displayMode = mode;
     if (this.data) this.render(this.data);
   }
 
-  /**
-   * Toggle Buy & Hold visibility
-   */
   toggleBuyHold(show) {
     this.options.showBuyHold = show;
     if (this.data) this.render(this.data);
   }
 
-  /**
-   * Toggle trade excursions
-   */
   toggleTradeExcursions(show) {
     this.options.showTradeExcursions = show;
-    if (this.data) this.render(this.data);
-  }
-
-  /**
-   * Update chart with new data
-   */
-  update(data) {
-    this.render(data);
-  }
-
-  /**
-   * Destroy chart instance
-   */
-  destroy() {
-    if (this.chart) {
-      this.chart.destroy();
-      this.chart = null;
+    if (show) {
+      requestAnimationFrame(() => requestAnimationFrame(() => this._buildExcursionSeries()));
+    } else {
+      this._removeExcursionSeries();
     }
   }
 
-  /**
-   * Get current display value at cursor position
-   */
-  getCurrentValue() {
-    if (!this.chart || !this.data) return null;
-    const lastIdx = this.data.equity.length - 1;
-    return {
-      equity: this.data.equity[lastIdx],
-      pnl:
-        this.data.equity[lastIdx] -
-        (this.data.equity[0] || this.initialCapital),
-      pnlPct:
-        ((this.data.equity[lastIdx] - this.data.equity[0]) /
-          this.data.equity[0]) *
-        100,
+  update(data) { this.render(data); }
+
+  destroy() { this._destroyInternal(); }
+
+  // ─── CHART CREATION ────────────────────────────────────────────────────────
+
+  _createChart() {
+    if (typeof LightweightCharts === 'undefined') {
+      console.error('[TVEquityChart] LightweightCharts library not loaded!');
+      return;
+    }
+
+    const h = this.options.height || this.container.clientHeight || 400;
+
+    this._lwChart = LightweightCharts.createChart(this.container, {
+      width: this.container.clientWidth,
+      height: h,
+      layout: {
+        background: { color: '#0d1117' },
+        textColor: '#787b86'
+      },
+      grid: {
+        vertLines: { color: 'rgba(48,54,61,0.5)' },
+        horzLines: { color: 'rgba(48,54,61,0.8)' }
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: {
+          color: '#758696', width: 1,
+          style: LightweightCharts.LineStyle.Dashed,
+          labelBackgroundColor: '#21262d'
+        },
+        horzLine: {
+          color: '#758696', width: 1,
+          style: LightweightCharts.LineStyle.Dashed,
+          labelBackgroundColor: '#21262d'
+        }
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(48,54,61,0.8)'
+      },
+      timeScale: {
+        borderColor: 'rgba(48,54,61,0.8)',
+        timeVisible: true,
+        secondsVisible: false
+      },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true }
+    });
+
+    // Build .chart shim expected by backtest_results.js
+    const self = this;
+    this.chart = {
+      resize: () => {
+        if (self._lwChart && self.container) {
+          const newW = self.container.clientWidth;
+          const newH = self.container.clientHeight || 400;
+          self._lwChart.resize(newW, newH);
+        }
+      },
+      // Regime overlay compat: backtest_results.js does
+      //   innerChart.options.plugins.annotation.annotations[key] = box
+      //   innerChart.update('none')
+      options: {
+        plugins: {
+          annotation: {
+            get annotations() { return self._regimeAnnotations; }
+          }
+        }
+      },
+      update: () => { self._applyRegimeAnnotations(); }
     };
   }
 
-  /**
-   * Create custom plugin for drawing MFE/MAE trade excursions (TradingView style)
-   *
-   * Each bar has TWO layers:
-   * - OUTER (light): Full excursion height (MFE up, MAE down)
-   * - INNER (dark): Realized P&L portion
-   *
-   * This shows how much of the potential move was CAPTURED vs MISSED
-   */
-  _createTradeExcursionsPlugin() {
+  // ─── SERIES ────────────────────────────────────────────────────────────────
+
+  _buildSeries(data) {
+    if (!this._lwChart) return;
+
+    const isPercent = this.options.displayMode === 'percent';
+    const timestamps = data.timestamps || [];
+    const equity = data.equity || [];
+
+    if (timestamps.length === 0) return;
+
+    // ── 0. MFE/MAE histogram series — added FIRST so they render BEHIND equity ──
+    // In TV LW Charts z-order = add order: first added = bottom layer.
+    // We create them empty now; data is filled in _buildExcursionSeries().
+    // This guarantees equity line always draws on top of the bars.
+    if (this.options.showTradeExcursions) {
+      this._mfeSeries = this._lwChart.addHistogramSeries({
+        priceScaleId: 'right',
+        lastValueVisible: false,
+        priceLineVisible: false
+      });
+      this._maeSeries = this._lwChart.addHistogramSeries({
+        priceScaleId: 'right',
+        lastValueVisible: false,
+        priceLineVisible: false
+      });
+    }
+
+    // ── 1. Equity as BASELINE series — added AFTER bars so it draws ON TOP ──
+    // We ALWAYS display P&L (equity − initialCapital), so baseValue = 0.
+    this._equitySeries = this._lwChart.addBaselineSeries({
+      baseValue: { type: 'price', price: 0 },
+      // Above zero: teal (profit) — fill is 15% more transparent than before
+      topLineColor: '#26a69a',
+      topFillColor1: 'rgba(38,166,154,0.13)',
+      topFillColor2: 'rgba(38,166,154,0.00)',
+      // Below zero: red (loss) — fill is 15% more transparent than before
+      bottomLineColor: '#ef5350',
+      bottomFillColor1: 'rgba(239,83,80,0.00)',
+      bottomFillColor2: 'rgba(239,83,80,0.07)',
+      lineWidth: 2,
+      lineType: 2,           // Stepped line — matches TV Strategy Tester
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 5,
+      crosshairMarkerBorderColor: '#fff',
+      crosshairMarkerBackgroundColor: '#26a69a',
+      title: 'Equity'
+    });
+
+    const equityPoints = this._buildEquityPoints(timestamps, equity, isPercent);
+    if (equityPoints.length > 0) {
+      this._equitySeries.setData(equityPoints);
+    }
+    this._equityPoints = equityPoints;
+
+    // autoscaleInfoProvider — locks the visible Y range to the UNION of:
+    //   • equity P&L range  [minV … maxV]   (always includes 0)
+    //   • bar zone          [-budgetMae … +budgetMfe]  (when excursions on)
+    // A small pad (3%) is added above the equity max and below equity min
+    // so the line never touches the chart edge.
+    // The bar budget is NOT added on top of equity max — bars share the same
+    // zero, so their zone is already accounted for by including [-budget, 0].
     const self = this;
+    this._equitySeries.applyOptions({
+      autoscaleInfoProvider: () => {
+        const vals = equityPoints.map(p => p.value);
+        if (!vals.length) return null;
+        const maxV = Math.max(...vals, 0);   // always ≥ 0
+        const minV = Math.min(...vals, 0);   // always ≤ 0
+        const range = Math.max(maxV - minV, 1);
+        const pad = range * 0.03;           // 3% breathing room
+        const budgetMfe = self.options.showTradeExcursions
+          ? (self._budgetMfe || 200) : 0;
+        const budgetMae = self.options.showTradeExcursions
+          ? (self._budgetMae || 200) : 0;
+        // Union: equity zone ∪ bar zone, both anchored at zero
+        return {
+          priceRange: {
+            minValue: Math.min(minV - pad, -budgetMae),
+            maxValue: Math.max(maxV + pad, budgetMfe)
+          },
+          margins: { above: 2, below: 2 }
+        };
+      }
+    });
+    this._equitySeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.05, bottom: 0.02 }
+    });
 
-    return {
-      id: "tradeExcursions",
-      afterDatasetsDraw(chart) {
-        if (
-          !self.options.showTradeExcursions ||
-          !self.trades ||
-          self.trades.length === 0
-        ) {
-          return;
-        }
+    // ── Zero line — dashed separator ───────────────────────────────────────
+    this._equitySeries.createPriceLine({
+      price: 0,
+      color: 'rgba(120,123,134,0.6)',
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      axisLabelColor: 'rgba(120,123,134,0.85)',
+      axisLabelTextColor: '#d1d4dc',
+      title: ''
+    });
 
-        const ctx = chart.ctx;
-        const yAxis = chart.scales.y2;
-
-        if (!yAxis) return;
-
-        const chartArea = chart.chartArea;
-        const numTrades = self.trades.length;
-
-        // Calculate bar width: divide chart width by number of trades with small gaps
-        const totalWidth = chartArea.right - chartArea.left;
-        const gapPx = 2; // 2 pixels between bars
-        const barWidth = Math.max(
-          4,
-          (totalWidth - gapPx * (numTrades - 1)) / numTrades,
-        );
-
-        // Colors
-        const greenLight = "rgba(38, 166, 154, 0.35)"; // Light green (potential)
-        const greenDark = "rgba(38, 166, 154, 0.85)"; // Dark green (realized)
-        const redLight = "rgba(239, 83, 80, 0.35)"; // Light red (potential)
-        const redDark = "rgba(239, 83, 80, 0.85)"; // Dark red (realized)
-
-        // Draw each trade bar
-        self.trades.forEach((trade, idx) => {
-          const mfe = Math.abs(trade.mfe || 0); // Maximum Favorable Excursion (%)
-          const mae = Math.abs(trade.mae || 0); // Maximum Adverse Excursion (%)
-          const pnl = trade.pnl || 0; // Realized P&L
-
-          // Calculate realized % based on entry price and position size
-          // For simplicity, convert P&L to % of initial capital
-          const pnlPercent = (pnl / self.initialCapital) * 100;
-
-          // Calculate X position - evenly distribute across chart
-          const x = chartArea.left + idx * (barWidth + gapPx);
-          const bodyWidth = barWidth * 0.85;
-          const bodyX = x + (barWidth - bodyWidth) / 2;
-
-          // Calculate Y positions
-          const y0 = yAxis.getPixelForValue(0);
-          const yMfe = yAxis.getPixelForValue(mfe);
-          const yMae = yAxis.getPixelForValue(-mae);
-
-          // === GREEN SIDE (MFE - favorable excursion) ===
-          if (mfe > 0) {
-            // 1. Draw OUTER light green bar (full MFE potential)
-            ctx.fillStyle = greenLight;
-            ctx.fillRect(bodyX, yMfe, bodyWidth, y0 - yMfe);
-
-            // 2. Draw INNER dark green bar (realized profit if positive)
-            if (pnl > 0) {
-              // Realized profit as % - cap at MFE
-              const realizedMfe = Math.min(Math.abs(pnlPercent), mfe);
-              const yRealizedMfe = yAxis.getPixelForValue(realizedMfe);
-              ctx.fillStyle = greenDark;
-              ctx.fillRect(bodyX, yRealizedMfe, bodyWidth, y0 - yRealizedMfe);
-            }
-          }
-
-          // === RED SIDE (MAE - adverse excursion) ===
-          if (mae > 0) {
-            // 1. Draw OUTER light red bar (full MAE potential)
-            ctx.fillStyle = redLight;
-            ctx.fillRect(bodyX, y0, bodyWidth, yMae - y0);
-
-            // 2. Draw INNER dark red bar (realized loss if negative)
-            if (pnl < 0) {
-              // Realized loss as % - cap at MAE
-              const realizedMae = Math.min(Math.abs(pnlPercent), mae);
-              const yRealizedMae = yAxis.getPixelForValue(-realizedMae);
-              ctx.fillStyle = redDark;
-              ctx.fillRect(bodyX, y0, bodyWidth, yRealizedMae - y0);
-            }
-          }
+    // ── 2. Trade-exit circle markers ────────────────────────────────────────
+    // Shown only when trades < 200 (strictly: 199 shown, 200 hidden).
+    // size:0 is the smallest marker TV supports — roughly half of size:1.
+    if (this.trades.length > 0 && this.trades.length < 200) {
+      const markers = [];
+      this.trades.forEach((trade, i) => {
+        if (i >= equityPoints.length) return;
+        const pt = equityPoints[i];
+        const pnl = trade.pnl || 0;
+        markers.push({
+          time: pt.time,
+          position: 'inBar',
+          color: pnl >= 0 ? '#26a69a' : '#ef5350',
+          shape: 'circle',
+          size: 0
         });
-      },
+      });
+      if (markers.length > 0) {
+        markers.sort((a, b) => a.time - b.time);
+        this._equitySeries.setMarkers(markers);
+      }
+    }
+
+    // ── 3. Buy & Hold ───────────────────────────────────────────────────────
+    if (this.options.showBuyHold) {
+      this._buildBHSeries(data, isPercent);
+    }
+
+    // ── 4. Fit view, then fill bar data ─────────────────────────────────────
+    this._lwChart.timeScale().fitContent();
+
+    if (this.options.showTradeExcursions) {
+      requestAnimationFrame(() => requestAnimationFrame(() => this._buildExcursionSeries()));
+    }
+
+    // ── 5. HTML tooltip ─────────────────────────────────────────────────────
+    this._buildTooltip(data, isPercent);
+  }
+
+  _buildEquityPoints(timestamps, equity, isPercent) {
+    // Always display P&L (equity - initialCapital).
+    // In percent mode: ((equity - base) / base) * 100
+    // In absolute mode: equity - base   (so zero = break-even)
+    const base = equity[0] || this.initialCapital;
+    const raw = [];
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const v = equity[i];
+      if (v === null || v === undefined) continue;
+      const time = this._toUnixSec(timestamps[i]);
+      if (!time) continue;
+      const pnl = v - base;
+      raw.push({ time, value: isPercent ? (pnl / base) * 100 : pnl });
+    }
+
+    raw.sort((a, b) => a.time - b.time);
+    return this._dedup(raw);
+  }
+
+  _buildBHSeries(data, isPercent) {
+    const bh = data.bh_equity || [];
+    const ts = data.timestamps || [];
+    if (!bh.length || !ts.length) return;
+
+    // Same convention as equity: show P&L from initial value (base)
+    const base = bh[0] || this.initialCapital;
+    const raw = [];
+
+    for (let i = 0; i < Math.min(ts.length, bh.length); i++) {
+      const v = bh[i];
+      if (v == null) continue;
+      const time = this._toUnixSec(ts[i]);
+      if (!time) continue;
+      const pnl = v - base;
+      raw.push({ time, value: isPercent ? (pnl / base) * 100 : pnl });
+    }
+
+    raw.sort((a, b) => a.time - b.time);
+    const points = this._dedup(raw);
+    if (!points.length) return;
+
+    this._bhSeries = this._lwChart.addLineSeries({
+      color: '#2962ff',
+      lineWidth: 1.5,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerRadius: 4,
+      title: 'B&H'
+    });
+    this._bhSeries.setData(points);
+
+    // Same autoscale logic as equity: show actual B&H range + bar budgets,
+    // always include 0, never stretch beyond what the data requires.
+    const self = this;
+    this._bhSeries.applyOptions({
+      autoscaleInfoProvider: () => {
+        const pvals = points.map(p => p.value);
+        if (!pvals.length) return null;
+        const maxV = Math.max(...pvals, 0);
+        const minV = Math.min(...pvals, 0);
+        const range = Math.max(maxV - minV, 1);
+        const pad = range * 0.03;
+        const budgetMfe = self.options.showTradeExcursions
+          ? (self._budgetMfe || 200) : 0;
+        const budgetMae = self.options.showTradeExcursions
+          ? (self._budgetMae || 200) : 0;
+        return {
+          priceRange: {
+            minValue: Math.min(minV - pad, -budgetMae),
+            maxValue: Math.max(maxV + pad, budgetMfe)
+          },
+          margins: { above: 2, below: 2 }
+        };
+      }
+    });
+  }
+
+  // ─── MFE/MAE HISTOGRAM SERIES ─────────────────────────────────────────────
+  //
+  // KEY DESIGN: bars are on the SAME 'right' scale as equity, and are added
+  // to the chart BEFORE the equity series so they render BEHIND it (TV z-order
+  // = add order: first added = bottom layer).
+  //
+  // When showTradeExcursions=true at render time, empty bar series are created
+  // in _buildSeries() BEFORE equity is added.  _buildExcursionSeries() then
+  // fills them with data (or creates them if called from toggleTradeExcursions).
+  //
+  // Bar values are expressed in equity P&L units (USDT/%) so the zero of the
+  // bars IS the zero of the equity axis — they track together automatically.
+
+  _buildExcursionSeries() {
+    if (!this._lwChart || !this.trades.length || !this._equityPoints?.length) return;
+
+    const maxMfe = Math.max(...this.trades.map(t => t.mfe || 0), 0.001);
+    const maxMae = Math.max(...this.trades.map(t => t.mae || 0), 0.001);
+
+    // ── Bar zone height in equity P&L units (USDT / %) ────────────────────
+    // Step 1: raw zone height = 35% of the visible equity range.
+    // Step 2: snap UP to nearest multiple of 50 (in equity units) for a
+    //         clean scale — e.g. 1800 range → raw=630 → snap=650.
+    // Step 3: clamp to [200, 600] so tiny or huge ranges stay reasonable.
+    //   tiny equity (range=300): raw=105 → snap=150 → clamp → 200
+    //   normal (range=1800):     raw=630 → snap=650 → clamp → 600
+    //   large (range=5000):      raw=1750 → snap=1800 → clamp → 600
+    const vals = this._equityPoints.map(p => p.value);
+    const eqMax = Math.max(...vals, 0);
+    const eqMin = Math.min(...vals, 0);
+    const eqRange = Math.max(eqMax - eqMin, 1);
+
+    const snapBudget = (raw) => {
+      const snapped = Math.ceil(raw / 50) * 50;
+      return Math.min(Math.max(snapped, 200), 600);
     };
+
+    const budgetMfe = snapBudget(eqRange * 0.35);
+    const budgetMae = snapBudget(eqRange * 0.35);
+    this._budgetMfe = budgetMfe;
+    this._budgetMae = budgetMae;
+
+    const mfeData = [];
+    const maeData = [];
+
+    this.trades.forEach((trade, i) => {
+      if (i >= this._equityPoints.length) return;
+      const time = this._equityPoints[i].time;
+      const pnl = trade.pnl || 0;
+      const mfe = trade.mfe || 0;
+      const mae = trade.mae || 0;
+
+      // MFE: POSITIVE value → bar grows UP from zero
+      mfeData.push({
+        time,
+        value: mfe > 0 ? (mfe / maxMfe) * budgetMfe : 0,
+        color: mfe > 0
+          ? (pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)')
+          : 'rgba(0,0,0,0)'
+      });
+
+      // MAE: NEGATIVE value → bar grows DOWN from zero
+      maeData.push({
+        time,
+        value: mae > 0 ? -((mae / maxMae) * budgetMae) : 0,
+        color: mae > 0
+          ? (pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)')
+          : 'rgba(0,0,0,0)'
+      });
+    });
+
+    // Scale locked to the snapped budget: MFE above zero, MAE below zero
+    const barOpts = {
+      priceScaleId: 'right',
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => ({
+        priceRange: {
+          minValue: -budgetMae,
+          maxValue: budgetMfe
+        }
+      })
+    };
+
+    if (this._mfeSeries) {
+      this._mfeSeries.applyOptions(barOpts);
+      this._mfeSeries.setData(mfeData.sort((a, b) => a.time - b.time));
+    } else {
+      this._mfeSeries = this._lwChart.addHistogramSeries(barOpts);
+      this._mfeSeries.setData(mfeData.sort((a, b) => a.time - b.time));
+    }
+
+    if (this._maeSeries) {
+      this._maeSeries.applyOptions({ ...barOpts });
+      this._maeSeries.setData(maeData.sort((a, b) => a.time - b.time));
+    } else {
+      this._maeSeries = this._lwChart.addHistogramSeries({ ...barOpts });
+      this._maeSeries.setData(maeData.sort((a, b) => a.time - b.time));
+    }
+
+    // Nudge equity autoscaleInfoProvider to include bar budgets in its range
+    if (this._equitySeries) {
+      this._equitySeries.applyOptions({});
+    }
+  }
+
+  _removeExcursionSeries() {
+    if (this._excursionCanvas) {
+      this._excursionCanvas.remove();
+      this._excursionCanvas = null;
+    }
+    if (this._mfeSeries) {
+      try { this._lwChart.removeSeries(this._mfeSeries); } catch (e) { /* gone */ }
+      this._mfeSeries = null;
+    }
+    if (this._maeSeries) {
+      try { this._lwChart.removeSeries(this._maeSeries); } catch (e) { /* gone */ }
+      this._maeSeries = null;
+    }
+    this._budgetMfe = 0;
+    this._budgetMae = 0;
+    if (this._equitySeries) {
+      this._equitySeries.applyOptions({});  // recompute — no budget reserved
+    }
+  }
+
+  // ─── HTML TOOLTIP ──────────────────────────────────────────────────────────
+
+  _buildTooltip(data, isPercent) {
+    if (!this._lwChart) return;
+
+    let tt = this.container.querySelector('.lwc-tt');
+    if (!tt) {
+      tt = document.createElement('div');
+      tt.className = 'lwc-tt';
+      tt.style.cssText = [
+        'position:absolute', 'padding:8px 12px',
+        'background:#161b22', 'border:1px solid rgba(48,54,61,0.9)',
+        'border-radius:4px', 'color:#d1d4dc',
+        'font-size:11px', 'font-family:system-ui,sans-serif',
+        'line-height:1.65', 'pointer-events:none',
+        'display:none', 'z-index:20', 'white-space:nowrap'
+      ].join(';');
+      this.container.appendChild(tt);
+    }
+
+    const equity = data.equity || [];
+    const timestamps = data.timestamps || [];
+    const base = equity[0] || this.initialCapital;
+
+    this._lwChart.subscribeCrosshairMove((param) => {
+      if (!param.point || !param.time || param.point.x < 0) {
+        tt.style.display = 'none';
+        return;
+      }
+
+      // Find closest equity index
+      const ms = param.time * 1000;
+      let ci = 0, minD = Infinity;
+      for (let i = 0; i < timestamps.length; i++) {
+        const d = Math.abs(new Date(timestamps[i]).getTime() - ms);
+        if (d < minD) { minD = d; ci = i; }
+      }
+
+      const ev = equity[ci];
+      const dateStr = new Date(param.time * 1000).toLocaleDateString('ru-RU', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+
+      let html = `<div style="color:#787b86;margin-bottom:4px">${dateStr}</div>`;
+
+      if (ev != null) {
+        const pnl = ev - base;
+        const pnlPct = (pnl / base) * 100;
+        const col = pnl >= 0 ? '#26a69a' : '#ef5350';
+        const sign = pnl >= 0 ? '+' : '';
+        if (isPercent) {
+          html += `<div>P&amp;L: <span style="color:${col}">${sign}${pnlPct.toFixed(2)}%</span></div>`;
+        } else {
+          html += `<div>P&amp;L: <span style="color:${col}">${sign}${this._fmt(pnl)}</span></div>`;
+          html += `<div style="color:#787b86;font-size:10px">Капитал: ${this._fmt(ev)}</div>`;
+        }
+      }
+
+      const trade = this._findTradeAtTime(timestamps[ci]);
+      if (trade) {
+        const side = (trade.direction || trade.side || 'long').toUpperCase();
+        const tc = (trade.pnl || 0) >= 0 ? '#26a69a' : '#ef5350';
+        html += '<div style="margin-top:4px;border-top:1px solid rgba(42,46,57,0.8);padding-top:4px">';
+        html += `<div>📊 ${side} Trade</div>`;
+        if (trade.entry_price) html += `<div style="color:#787b86">Entry: ${this._fmt(trade.entry_price)}</div>`;
+        if (trade.exit_price) html += `<div style="color:#787b86">Exit: ${this._fmt(trade.exit_price)}</div>`;
+        html += `<div>P&amp;L: <span style="color:${tc}">${(trade.pnl || 0) >= 0 ? '+' : ''}${this._fmt(trade.pnl || 0)}</span></div>`;
+        if (trade.mfe) html += `<div style="color:#26a69a">MFE: +${Number(trade.mfe).toFixed(2)}%</div>`;
+        if (trade.mae) html += `<div style="color:#ef5350">MAE: -${Math.abs(Number(trade.mae)).toFixed(2)}%</div>`;
+        html += '</div>';
+      }
+
+      tt.innerHTML = html;
+      tt.style.display = 'block';
+
+      // Position tooltip (avoid clipping at edges)
+      const tw = tt.offsetWidth, th = tt.offsetHeight;
+      const cx = param.point.x, cy = param.point.y;
+      const cw = this.container.clientWidth, ch = this.container.clientHeight;
+      tt.style.left = (cx + tw + 20 < cw ? cx + 12 : cx - tw - 12) + 'px';
+      tt.style.top = (cy + th + 20 < ch ? cy + 8 : cy - th - 8) + 'px';
+    });
+  }
+
+  // ─── REGIME OVERLAY COMPAT ─────────────────────────────────────────────────
+  // backtest_results.js mutates this._regimeAnnotations then calls .chart.update()
+  // We translate Chart.js box annotation {xMin,xMax,backgroundColor} → TV histogram bands
+
+  _applyRegimeAnnotations() {
+    if (!this._lwChart || !this._equitySeries) return;
+
+    // Remove previous regime series
+    this._regimeRects.forEach((s) => {
+      try { this._lwChart.removeSeries(s); } catch (e) { /* already removed */ }
+    });
+    this._regimeRects.clear();
+
+    const data = this.data;
+    if (!data?.timestamps?.length) return;
+
+    Object.entries(this._regimeAnnotations).forEach(([key, box]) => {
+      if (!key.startsWith('regime_')) return;
+
+      const si = Math.max(0, Math.round((box.xMin || 0) + 0.5));
+      const ei = Math.min(data.timestamps.length - 1, Math.round((box.xMax || 0) - 0.5));
+      if (si > ei) return;
+
+      const t1 = this._toUnixSec(data.timestamps[si]);
+      const t2 = this._toUnixSec(data.timestamps[ei]);
+      if (!t1 || !t2) return;
+
+      const col = box.backgroundColor || 'rgba(158,158,158,0.08)';
+      const eq = (data.equity || []).filter(v => v != null);
+      const top = eq.length ? Math.max(...eq) * 1.10 : 12000;
+
+      const series = this._lwChart.addHistogramSeries({
+        color: col,
+        priceScaleId: '',
+        lastValueVisible: false,
+        priceLineVisible: false,
+        autoscaleInfoProvider: () => ({
+          priceRange: { minValue: 0, maxValue: top }
+        })
+      });
+
+      const pts = [];
+      for (let i = si; i <= ei; i++) {
+        const t = this._toUnixSec(data.timestamps[i]);
+        if (t) pts.push({ time: t, value: top });
+      }
+      pts.sort((a, b) => a.time - b.time);
+      const deduped = this._dedup(pts);
+      if (deduped.length) {
+        series.setData(deduped);
+        this._regimeRects.set(key, series);
+      }
+    });
+  }
+
+  // ─── RESIZE OBSERVER ───────────────────────────────────────────────────────
+
+  _setupResizeObserver() {
+    if (this._resizeObserver) this._resizeObserver.disconnect();
+    if (!window.ResizeObserver || !this._lwChart) return;
+
+    // Observe the wrapper (parent of container) so panel collapse/expand triggers resize
+    const watchTarget = this.container.parentElement || this.container;
+
+    this._resizeObserver = new ResizeObserver(() => {
+      if (!this._lwChart || !this.container) return;
+      const newW = this.container.clientWidth;
+      const newH = this.container.clientHeight || 400;
+      if (newW > 0 && newH > 0) {
+        this._lwChart.resize(newW, newH);
+      }
+    });
+    this._resizeObserver.observe(watchTarget);
+    // Also observe the container itself for height changes
+    if (watchTarget !== this.container) {
+      this._resizeObserver.observe(this.container);
+    }
+  }
+
+  // ─── LEGEND CHECKBOXES ─────────────────────────────────────────────────────
+
+  _setupLegendInteractivity() {
+    const bhCb = document.getElementById('legendBuyHold');
+    if (bhCb) {
+      bhCb.onchange = () => {
+        this.options.showBuyHold = bhCb.checked;
+        if (this.data) this.render(this.data);
+      };
+    }
+
+    const exCb = document.getElementById('legendTradesRunupDrawdown')
+      || document.getElementById('legendTradesExcursions');
+    if (exCb) {
+      exCb.onchange = () => {
+        this.toggleTradeExcursions(exCb.checked);
+      };
+    }
+  }
+
+  // ─── CLEANUP ───────────────────────────────────────────────────────────────
+
+  _destroyInternal() {
+    if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+    this._excursionCanvas = null;  // canvas no longer used
+    this._mfeSeries = null;
+    this._maeSeries = null;
+    this._budgetMfe = 0;
+    this._budgetMae = 0;
+    if (this._lwChart) { this._lwChart.remove(); this._lwChart = null; }
+    this._equitySeries = null;
+    this._bhSeries = null;
+    this._equityPoints = null;
+    this._dbgLogged = false;
+    this._regimeRects.clear();
+    this._regimeAnnotations = {};
+    this.chart = null;
+  }
+
+  // ─── HELPERS ───────────────────────────────────────────────────────────────
+
+  _toUnixSec(ts) {
+    if (!ts) return null;
+    if (typeof ts === 'number') {
+      const ms = ts > 1e12 ? ts : ts * 1000;
+      return isNaN(ms) ? null : Math.floor(ms / 1000);
+    }
+    // For ISO strings: if no timezone suffix, treat as UTC (add Z)
+    // This matches how the backend stores datetimes (all UTC)
+    const str = String(ts).trim();
+    // If no timezone info present, append Z so Date() treats it as UTC
+    // (matches backend's all-UTC storage)
+    const hasTimezone = str.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(str);
+    const normalized = hasTimezone ? str : str + 'Z';
+    const ms = new Date(normalized).getTime();
+    return isNaN(ms) ? null : Math.floor(ms / 1000);
+  }
+
+  _dedup(points) {
+    const out = [];
+    for (let i = 0; i < points.length; i++) {
+      if (i === 0 || points[i].time !== points[i - 1].time) {
+        out.push(points[i]);
+      } else {
+        out[out.length - 1] = points[i]; // keep last for same second
+      }
+    }
+    return out;
+  }
+
+  _findTradeAtTime(timestamp) {
+    if (!timestamp || !this.trades) return null;
+    const ms = typeof timestamp === 'number'
+      ? (timestamp > 1e12 ? timestamp : timestamp * 1000)
+      : new Date(timestamp).getTime();
+    return this.trades.find((t) => {
+      const entry = new Date(t.entry_time).getTime();
+      const exit = t.exit_time ? new Date(t.exit_time).getTime() : entry;
+      return ms >= entry && ms <= exit;
+    }) || null;
+  }
+
+  _fmt(value) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    }).format(value);
   }
 }
 
-// Export for module usage
+// ── Module exports ────────────────────────────────────────────────────────────
 /* eslint-disable no-undef */
-if (typeof module !== "undefined" && module.exports) {
+if (typeof module !== 'undefined' && module.exports) {
   module.exports = TradingViewEquityChart;
 }
 /* eslint-enable no-undef */
 
-// Make globally available
 window.TradingViewEquityChart = TradingViewEquityChart;

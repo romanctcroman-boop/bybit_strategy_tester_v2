@@ -301,6 +301,10 @@ class BacktestInput:
     # market: немедленное исполнение по рынку
     # limit: лимитный ордер с отступом
     # stop: стоп-ордер (вход на пробой)
+    entry_on_next_bar_open: bool = False  # TradingView parity: enter at open of bar after signal
+    # When True, a signal on bar i causes entry at open_prices[i+1] (next bar open).
+    # This matches TradingView's default calc_on_every_tick=false / process_orders_on_close
+    # behaviour where market orders fill at the next bar's open.
     limit_entry_offset: float = 0.001  # Отступ лимитника от цены (0.1%)
     limit_entry_timeout_bars: int = 5  # Отмена лимитника через N баров
     stop_entry_offset: float = 0.001  # Отступ стоп-ордера от цены

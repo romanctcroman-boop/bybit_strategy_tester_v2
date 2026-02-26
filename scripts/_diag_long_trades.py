@@ -1,16 +1,20 @@
 """Diagnose long losing trades in engine vs TV."""
+
 import asyncio
 import json
 import sqlite3
 import sys
 import warnings
+
 warnings.filterwarnings("ignore")
 sys.path.insert(0, r"d:\bybit_strategy_tester_v2")
 from loguru import logger
+
 logger.remove()
 logger.add(sys.stderr, level="ERROR")
 import numpy as np
 import pandas as pd
+
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.service import BacktestService
@@ -34,8 +38,12 @@ async def run():
     blocks = json.loads(br)
     conns = json.loads(cr)
     graph = {
-        "name": name, "blocks": blocks, "connections": conns,
-        "market_type": "linear", "direction": "both", "interval": "30",
+        "name": name,
+        "blocks": blocks,
+        "connections": conns,
+        "market_type": "linear",
+        "direction": "both",
+        "interval": "30",
     }
     svc = BacktestService()
     candles = await svc._fetch_historical_data("ETHUSDT", "30", START_DATE, END_DATE)
@@ -50,12 +58,19 @@ async def run():
         df_w = pd.DataFrame(raw_warmup)
         # Handle multiple possible column naming conventions from Bybit API
         col_map = {
-            "startTime": "timestamp", "open_time": "timestamp", "t": "timestamp",
-            "openPrice": "open", "o": "open",
-            "highPrice": "high", "h": "high",
-            "lowPrice": "low", "l": "low",
-            "closePrice": "close", "c": "close",
-            "volume": "volume", "v": "volume",
+            "startTime": "timestamp",
+            "open_time": "timestamp",
+            "t": "timestamp",
+            "openPrice": "open",
+            "o": "open",
+            "highPrice": "high",
+            "h": "high",
+            "lowPrice": "low",
+            "l": "low",
+            "closePrice": "close",
+            "c": "close",
+            "volume": "volume",
+            "v": "volume",
         }
         df_w = df_w.rename(columns={k: v for k, v in col_map.items() if k in df_w.columns})
         if "timestamp" not in df_w.columns:
@@ -82,12 +97,27 @@ async def run():
     se = np.asarray(signals.short_entries.values, dtype=bool)
     lx = np.asarray(signals.exits.values, dtype=bool)
     sx = np.asarray(signals.short_exits.values, dtype=bool)
-    result = FallbackEngineV4().run(BacktestInput(
-        candles=candles, long_entries=le, long_exits=lx, short_entries=se, short_exits=sx,
-        initial_capital=1_000_000.0, position_size=0.10, use_fixed_amount=True, fixed_amount=100.0,
-        leverage=10, stop_loss=0.132, take_profit=0.023, taker_fee=0.0007, slippage=0.0,
-        direction=TradeDirection.BOTH, pyramiding=1, interval="30",
-    ))
+    result = FallbackEngineV4().run(
+        BacktestInput(
+            candles=candles,
+            long_entries=le,
+            long_exits=lx,
+            short_entries=se,
+            short_exits=sx,
+            initial_capital=1_000_000.0,
+            position_size=0.10,
+            use_fixed_amount=True,
+            fixed_amount=100.0,
+            leverage=10,
+            stop_loss=0.132,
+            take_profit=0.023,
+            taker_fee=0.0007,
+            slippage=0.0,
+            direction=TradeDirection.BOTH,
+            pyramiding=1,
+            interval="30",
+        )
+    )
 
     trades = result.trades
     long_closed = [t for t in trades if t.direction == "long" and not getattr(t, "is_open", False)]
@@ -99,7 +129,9 @@ async def run():
     for t in long_closed:
         ts_in = pd.Timestamp(t.entry_time)
         ts_out = pd.Timestamp(t.exit_time)
-        print(f"  {str(ts_in)[:16]} -> {str(ts_out)[:16]}  ep={t.entry_price:.2f}  xp={t.exit_price:.2f}  pnl={t.pnl:.2f}  reason={t.exit_reason}")
+        print(
+            f"  {str(ts_in)[:16]} -> {str(ts_out)[:16]}  ep={t.entry_price:.2f}  xp={t.exit_price:.2f}  pnl={t.pnl:.2f}  reason={t.exit_reason}"
+        )
 
     print()
     print("=== ALL SHORT LOSERS ===")
@@ -107,7 +139,9 @@ async def run():
     for t in short_losing:
         ts_in = pd.Timestamp(t.entry_time)
         ts_out = pd.Timestamp(t.exit_time)
-        print(f"  {str(ts_in)[:16]} -> {str(ts_out)[:16]}  ep={t.entry_price:.2f}  xp={t.exit_price:.2f}  pnl={t.pnl:.2f}  reason={t.exit_reason}")
+        print(
+            f"  {str(ts_in)[:16]} -> {str(ts_out)[:16]}  ep={t.entry_price:.2f}  xp={t.exit_price:.2f}  pnl={t.pnl:.2f}  reason={t.exit_reason}"
+        )
 
 
 asyncio.run(run())

@@ -1,7 +1,7 @@
 """
 Find the 3 missing trades between our engine (118) and TV (121).
 
-Strategy: 
+Strategy:
 - Our engine enters at close[signal_bar] (1 bar EARLY vs TV)
 - TV enters at open[signal_bar+1] = close[signal_bar] (same price but TV's position
   starts 1 bar later)
@@ -15,10 +15,10 @@ The real mechanism:
   if a position exits at bar X+1 (execution bar), and a NEW signal fires at bar X,
   we'll MISS it because our position is still open at bar X
   (exit is pending, executed at open of bar X+1, but we check exit at start of X+1).
-  
+
   Actually the engine checks:
     1. Execute pending exits first
-    2. Check SL/TP for open positions  
+    2. Check SL/TP for open positions
     3. Check new entries
 
   So if: pending_exit runs at bar X+1 (open), AND signal fires at bar X,
@@ -29,6 +29,7 @@ The real mechanism:
 Let me trace through all signal bars and see where our position is still open
 when a signal fires, that TV would have caught.
 """
+
 import sys
 from datetime import UTC, datetime
 
@@ -77,11 +78,14 @@ def get_signals(ohlcv):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT builder_blocks, builder_connections, builder_graph, name FROM strategies WHERE id=?", (STRATEGY_ID,))
+    cursor.execute(
+        "SELECT builder_blocks, builder_connections, builder_graph, name FROM strategies WHERE id=?", (STRATEGY_ID,)
+    )
     row = cursor.fetchone()
     conn.close()
 
     import json
+
     builder_blocks = json.loads(row[0]) if isinstance(row[0], str) else row[0]
     builder_connections = json.loads(row[1]) if isinstance(row[1], str) else row[1]
     builder_graph_raw = json.loads(row[2]) if isinstance(row[2], str) else row[2]
@@ -117,14 +121,14 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
     """
     sl_pct = 0.03
     tp_pct = 0.015
-    
+
     times = ohlcv.index
     closes = ohlcv["close"].values
     highs = ohlcv["high"].values
     lows = ohlcv["low"].values
-    
+
     n = len(times)
-    
+
     # State
     long_open = False
     short_open = False
@@ -134,36 +138,36 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
     short_entry_price = 0.0
     short_sl = 0.0
     short_tp = 0.0
-    
+
     pending_long_exit = False
     pending_short_exit = False
     pending_long_exit_price = 0.0
     pending_short_exit_price = 0.0
-    
-    trades = []         # completed trades
-    skipped = []        # signals that were skipped (position still open)
-    
+
+    trades = []  # completed trades
+    skipped = []  # signals that were skipped (position still open)
+
     long_entry_bar = -1
     short_entry_bar = -1
-    
+
     for i in range(n):
         t = times[i]
         c = closes[i]
         h = highs[i]
         lo = lows[i]
-        
+
         # 1. Execute pending exits
         if pending_long_exit and long_open:
             pnl = (pending_long_exit_price / long_entry_price - 1) * (100 / 1.015)  # approx
             trades.append((long_entry_bar, i, "long", long_entry_price, pending_long_exit_price))
             long_open = False
             pending_long_exit = False
-        
+
         if pending_short_exit and short_open:
             trades.append((short_entry_bar, i, "short", short_entry_price, pending_short_exit_price))
             short_open = False
             pending_short_exit = False
-        
+
         # 2. Check SL/TP for open positions
         if long_open:
             if lo <= long_sl:
@@ -172,7 +176,7 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
             elif h >= long_tp:
                 pending_long_exit = True
                 pending_long_exit_price = long_tp
-        
+
         if short_open:
             if h >= short_sl:
                 pending_short_exit = True
@@ -180,7 +184,7 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
             elif lo <= short_tp:
                 pending_short_exit = True
                 pending_short_exit_price = short_tp
-        
+
         # 3. Check new signals — pyramiding=1, so block if already open or pending
         if long_arr[i]:
             if long_open or pending_long_exit:
@@ -192,7 +196,7 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
                 long_sl = c * (1 - sl_pct)
                 long_tp = c * (1 + tp_pct)
                 long_entry_bar = i
-        
+
         if short_arr[i]:
             if short_open or pending_short_exit:
                 skipped.append((i, t, "short", c, "short_already_open"))
@@ -203,37 +207,37 @@ def run_backtest_with_signal_trace(ohlcv, long_arr, short_arr):
                 short_sl = c * (1 + sl_pct)
                 short_tp = c * (1 - tp_pct)
                 short_entry_bar = i
-    
+
     return trades, skipped
 
 
 def main():
     print("=== Finding 3 missing trades: signal blocked analysis ===")
-    
+
     ohlcv = load_ohlcv()
     long_arr, short_arr = get_signals(ohlcv)
-    
+
     print(f"Total signals: {long_arr.sum()} long, {short_arr.sum()} short = {long_arr.sum() + short_arr.sum()} total")
     print()
-    
+
     trades, skipped = run_backtest_with_signal_trace(ohlcv, long_arr, short_arr)
-    
+
     print(f"Simulated trades: {len(trades)}")
     print(f"Skipped signals: {len(skipped)}")
     print()
-    
+
     if skipped:
         print("=== Skipped signals (position still open when signal fired) ===")
         print(f"{'#':<4} {'time (UTC)':<22} {'side':<7} {'close':<10} {'reason'}")
         print("-" * 60)
         for j, (idx, t, side, price, reason) in enumerate(skipped):
-            print(f"{j+1:<4} {str(t)[:19]:<22} {side:<7} {price:<10.1f} {reason}")
-    
+            print(f"{j + 1:<4} {str(t)[:19]:<22} {side:<7} {price:<10.1f} {reason}")
+
     print()
     print("=== Detailed skip analysis: what PREV trade was blocking? ===")
     times = ohlcv.index
     closes = ohlcv["close"].values
-    
+
     for idx, t, side, price, reason in skipped:
         # Find which trade was blocking
         # Trade is blocking if it started before idx and exits >= idx

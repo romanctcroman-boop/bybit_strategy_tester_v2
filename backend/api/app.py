@@ -1,6 +1,7 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 # Ensure UTF-8 streams on Windows to avoid emoji-related encoding crashes
 try:  # pragma: no cover - platform-specific safeguard
@@ -171,8 +172,35 @@ Most endpoints require API key authentication via `X-API-Key` header.
 for _mcp_logger_name in ("fastmcp", "fastmcp.openapi", "fastmcp.server"):
     logging.getLogger(_mcp_logger_name).setLevel(logging.ERROR)
 
+
 # =============================
-# Mount static files for frontend (MUST be after app creation but before workers start)
+# No-cache middleware for frontend JS/CSS/HTML (dev mode)
+# =============================
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+
+class NoCacheFrontendMiddleware(BaseHTTPMiddleware):
+    """Force browsers to revalidate frontend assets on every request."""
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/frontend/") and path.rsplit(".", 1)[-1] in ("js", "css", "html"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            # Remove ETag and Last-Modified so browser cannot use conditional GET
+            import contextlib
+
+            with contextlib.suppress(KeyError, AttributeError):
+                del response.headers["ETag"]
+            with contextlib.suppress(KeyError, AttributeError):
+                del response.headers["Last-Modified"]
+        return response
+
+
+app.add_middleware(NoCacheFrontendMiddleware)
 # =============================
 _frontend_dir = Path(__file__).parent.parent.parent / "frontend"
 logging.getLogger("uvicorn.error").info(f"[FRONTEND] Dir check: {_frontend_dir}, exists={_frontend_dir.exists()}")
@@ -234,11 +262,14 @@ from datetime import UTC
 
 # Make FastMCP optional - may fail on Windows due to pywintypes issues
 _FASTMCP_AVAILABLE = False
-FastMCP = None
-mcp = None
+
+mcp: Any = None
+# FastMCP is dynamically imported and may not be present; use Any to avoid Mypy errors
+FastMCP: Any = None
+mcp: Any = None
 
 try:
-    from fastmcp import FastMCP
+    from fastmcp import FastMCP  # type: ignore[assignment]
 
     _FASTMCP_AVAILABLE = True
 except ImportError as _mcp_err:
@@ -257,7 +288,7 @@ except Exception as _mcp_err:
 
 # Recommended: Create MCP server from FastAPI app (industry standard)
 if _FASTMCP_AVAILABLE and FastMCP is not None:
-    mcp = FastMCP.from_fastapi(app=app, name="Bybit Strategy Tester", version="2.0.0")
+    mcp = FastMCP.from_fastapi(app=app, name="Bybit Strategy Tester", version="2.0.0")  # type: ignore[union-attr]
 else:
     logging.getLogger("uvicorn.error").info("MCP server disabled - FastMCP not available")
 
@@ -280,6 +311,10 @@ else:
                 return func
 
             return decorator
+
+        async def get_tools(self) -> dict:
+            """Stub — returns empty dict when FastMCP is unavailable."""
+            return {}
 
     mcp = _DummyMCP()
 
@@ -334,9 +369,10 @@ async def mcp_health_native():
     tool_count = 0
     tools_registered = []
     try:
-        tools_dict = await mcp.get_tools()
-        tools_registered = list(tools_dict.keys())
-        tool_count = len(tools_registered)
+        if mcp is not None:
+            tools_dict = await mcp.get_tools()
+            tools_registered = list(tools_dict.keys())
+            tool_count = len(tools_registered)
         checks["mcp_tools_available"] = tool_count > 0
     except Exception:
         checks["mcp_tools_available"] = False
@@ -944,7 +980,7 @@ def exchangez():
 
     t0 = time.perf_counter()
     url = "https://api.bybit.com/v5/market/kline"
-    params = {"category": "linear", "symbol": "BTCUSDT", "interval": "1", "limit": 1}
+    params: dict[str, str] = {"category": "linear", "symbol": "BTCUSDT", "interval": "1", "limit": "1"}
     try:
         r = requests.get(url, params=params, timeout=2.0)
         latency = time.perf_counter() - t0

@@ -71,12 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **P0-2 complete — all 3 phases:**
 
-    | Phase | Component | Extracted | Tests |
-    |-------|-----------|-----------|-------|
-    | 1 | ChartManager.js | 7 Chart.js lifecycle leaks | 34 |
-    | 2 | TradesTable.js | 9 trade-table functions | 54 |
-    | 3 | MetricsPanels.js | 6 metrics-panel functions | 47 |
-    | Total | — | −2000+ LOC from backtest_results.js | +135 |
+    | Phase | Component        | Extracted                           | Tests |
+    | ----- | ---------------- | ----------------------------------- | ----- |
+    | 1     | ChartManager.js  | 7 Chart.js lifecycle leaks          | 34    |
+    | 2     | TradesTable.js   | 9 trade-table functions             | 54    |
+    | 3     | MetricsPanels.js | 6 metrics-panel functions           | 47    |
+    | Total | —                | −2000+ LOC from backtest_results.js | +135  |
 
 - **P0-2 Phase 2: TradesTable.js — trades table functions extracted (2026-02-26):**
 

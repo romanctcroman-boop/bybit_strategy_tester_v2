@@ -49,11 +49,16 @@ def _get_side_value(side: Any) -> str:
 
 
 def _safe_float(val: Any, default: float = 0.0) -> float:
-    """Safely convert SQLAlchemy Column or other value to float."""
+    """Safely convert SQLAlchemy Column or other value to float.
+    Also replaces inf/nan with default to keep JSON serialization valid.
+    """
+    import math as _math
+
     if val is None:
         return default
     try:
-        return float(val)
+        f = float(val)
+        return default if (_math.isnan(f) or _math.isinf(f)) else f
     except (TypeError, ValueError):
         return default
 
@@ -190,18 +195,28 @@ def build_equity_curve_response(
     # Sort indices chronologically
     indices = sorted(set(exit_indices))
 
+    # Helper: sanitize float values to avoid JSON serialization errors with inf/nan
+    import math as _math
+
+    def _fv(v: Any) -> float:
+        try:
+            f = float(v)
+            return 0.0 if (_math.isnan(f) or _math.isinf(f)) else f
+        except (TypeError, ValueError):
+            return 0.0
+
     return {
         "timestamps": [
             timestamps[i].isoformat() if hasattr(timestamps[i], "isoformat") else str(timestamps[i])
             for i in indices
             if i < len(timestamps)
         ],
-        "equity": [float(equity[i]) for i in indices if i < len(equity)],
-        "drawdown": [float(drawdown[i]) for i in indices if i < len(drawdown)],
-        "bh_equity": [float(bh_equity[i]) for i in indices if i < len(bh_equity)] if bh_equity else [],
-        "bh_drawdown": [float(bh_drawdown[i]) for i in indices if i < len(bh_drawdown)] if bh_drawdown else [],
-        "returns": [float(returns[i]) for i in indices if i < len(returns)] if returns else [],
-        "runup": [float(runup[i]) for i in indices if i < len(runup)] if runup else [],
+        "equity": [_fv(equity[i]) for i in indices if i < len(equity)],
+        "drawdown": [_fv(drawdown[i]) for i in indices if i < len(drawdown)],
+        "bh_equity": [_fv(bh_equity[i]) for i in indices if i < len(bh_equity)] if bh_equity else [],
+        "bh_drawdown": [_fv(bh_drawdown[i]) for i in indices if i < len(bh_drawdown)] if bh_drawdown else [],
+        "returns": [_fv(returns[i]) for i in indices if i < len(returns)] if returns else [],
+        "runup": [_fv(runup[i]) for i in indices if i < len(runup)] if runup else [],
     }
 
 

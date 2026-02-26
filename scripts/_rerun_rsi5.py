@@ -457,7 +457,11 @@ def main():
         # Find in our engine trades
         tv27_naive = tv27_entry_utc.replace(tzinfo=None)
         for t in our_trades:
-            entry_naive = t.entry_time.replace(tzinfo=None) if hasattr(t.entry_time, "tzinfo") and t.entry_time.tzinfo else t.entry_time
+            entry_naive = (
+                t.entry_time.replace(tzinfo=None)
+                if hasattr(t.entry_time, "tzinfo") and t.entry_time.tzinfo
+                else t.entry_time
+            )
             if abs((entry_naive - tv27_naive).total_seconds()) < 1800:  # within 30min
                 print(
                     f"  Our trade: entry={t.entry_time} price={t.entry_price:.1f} "

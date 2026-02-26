@@ -4,23 +4,106 @@
  * Page-specific scripts for dashboard.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-26
+ * 
+ * @migration StateManager v2.0 - P0-3
+ * - Replaced global variables with StateManager
+ * - Added state subscriptions for reactive UI updates
+ * - Centralized state management
  */
 
 // Import shared utilities
 import { formatNumber, formatDate } from '../utils.js';
+import { getStore } from '../core/StateManager.js';
+import { 
+    bindToState, 
+    bindInputToState, 
+    bindCheckboxToState,
+    initState 
+} from '../core/state-helpers.js';
 
 // Configuration
 const API_BASE = '/api/v1';
-let currentPeriod = '24h';
+
+// Get store instance
+const store = getStore();
+
+// ==========================================
+// STATE INITIALIZATION
+// ==========================================
+
+/**
+ * Initialize dashboard state in StateManager
+ * Called once on DOMContentLoaded
+ */
+function initializeDashboardState() {
+    if (!store) {
+        console.error('[Dashboard] StateManager not initialized');
+        return;
+    }
+
+    // Initialize dashboard state slice
+    store.merge('dashboard', {
+        currentPeriod: '24h',
+        dateRange: {
+            from: null,
+            to: null
+        },
+        metrics: {},
+        lastUpdate: null,
+        portfolioDays: 7,
+        calendar: {
+            year: new Date().getFullYear(),
+            month: new Date().getMonth()
+        },
+        charts: {
+            performance: null,
+            distribution: null,
+            winRate: null,
+            activity: null,
+            portfolioHistory: null,
+            pnlMini: null
+        },
+        ws: {
+            connected: false,
+            reconnectAttempts: 0,
+            reconnectTimeout: null
+        },
+        market: {
+            data: [],
+            tickerData: []
+        },
+        watchlist: JSON.parse(localStorage.getItem('dashboard_watchlist') || '["BTCUSDT","ETHUSDT","SOLUSDT"]'),
+        watchlistPrices: {}
+    });
+
+    console.log('[Dashboard] State initialized');
+}
+
+/**
+ * Get current period from state
+ * @returns {string} Current period
+ */
+function getCurrentPeriod() {
+    return store.get('dashboard.currentPeriod') || '24h';
+}
+
+/**
+ * Set current period in state
+ * @param {string} period - Period value
+ */
+function setCurrentPeriod(period) {
+    store.set('dashboard.currentPeriod', period);
+}
 
 // Period selector — scoped to toolbar only (avoid portfolio period buttons)
 document.querySelectorAll('.dashboard-toolbar .period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.dashboard-toolbar .period-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        currentPeriod = btn.dataset.period;
+        // Update state instead of global variable
+        setCurrentPeriod(btn.dataset.period);
         refreshDashboard();
     });
 });
@@ -310,11 +393,28 @@ Chart.defaults.color = chartColors.text;
 Chart.defaults.borderColor = chartColors.grid;
 Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 
-// Chart instances
-let performanceChart = null;
-let distributionChart = null;
-let winRateChart = null;
-let activityChart = null;
+// ==========================================
+// CHART INSTANCES - StateManager Storage
+// Chart instances are stored in StateManager
+// ==========================================
+
+/**
+ * Get chart instance from state
+ * @param {string} chartName - Chart name (performance, distribution, winRate, activity, portfolioHistory, pnlMini)
+ * @returns {Chart|null} Chart instance or null
+ */
+function getChart(chartName) {
+    return store.get(`dashboard.charts.${chartName}`) || null;
+}
+
+/**
+ * Set chart instance in state
+ * @param {string} chartName - Chart name
+ * @param {Chart|null} chart - Chart instance
+ */
+function setChart(chartName, chart) {
+    store.set(`dashboard.charts.${chartName}`, chart);
+}
 
 // Initialize all charts
 function initializeCharts() {
@@ -329,7 +429,7 @@ function initPerformanceChart() {
     const ctx = document.getElementById('performanceChart');
     if (!ctx) return;
 
-    performanceChart = new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
@@ -371,6 +471,9 @@ function initPerformanceChart() {
             }
         }
     });
+
+    // Store chart instance in StateManager
+    setChart('performance', chart);
 }
 
 // Returns Distribution Chart (Bar/Histogram)
@@ -378,7 +481,7 @@ function initDistributionChart() {
     const ctx = document.getElementById('distributionChart');
     if (!ctx) return;
 
-    distributionChart = new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: ['< -20%', '-20 to -10%', '-10 to 0%', '0 to 10%', '10 to 20%', '> 20%'],
@@ -412,6 +515,9 @@ function initDistributionChart() {
             }
         }
     });
+
+    // Store chart instance in StateManager
+    setChart('distribution', chart);
 }
 
 // Win Rate by Strategy Chart (Doughnut)
@@ -419,7 +525,7 @@ function initWinRateChart() {
     const ctx = document.getElementById('winRateChart');
     if (!ctx) return;
 
-    winRateChart = new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['SMA Crossover', 'RSI', 'MACD', 'Bollinger', 'Custom'],
@@ -452,6 +558,9 @@ function initWinRateChart() {
             }
         }
     });
+
+    // Store chart instance in StateManager
+    setChart('winRate', chart);
 }
 
 // Activity Timeline Chart (Bar)
@@ -459,7 +568,7 @@ function initActivityChart() {
     const ctx = document.getElementById('activityChart');
     if (!ctx) return;
 
-    activityChart = new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: [],
@@ -486,11 +595,20 @@ function initActivityChart() {
             }
         }
     });
+
+    // Store chart instance in StateManager
+    setChart('activity', chart);
 }
 
 // Update charts with data
 function updateChartsWithData(performers) {
     if (!performers || performers.length === 0) return;
+
+    // Get chart instances from StateManager
+    const performanceChart = getChart('performance');
+    const distributionChart = getChart('distribution');
+    const winRateChart = getChart('winRate');
+    const activityChart = getChart('activity');
 
     // Performance chart - cumulative returns
     const sortedByDate = [...performers].sort((a, b) =>
@@ -568,11 +686,8 @@ function updateChartsWithData(performers) {
 // ==========================================
 // WEBSOCKET REAL-TIME UPDATES
 // With Exponential Backoff & Jitter
+// State stored in StateManager.ws
 // ==========================================
-
-let ws = null;
-let wsReconnectAttempts = 0;
-let wsReconnectTimeout = null;
 
 // WebSocket configuration
 const WS_CONFIG = {
@@ -584,17 +699,64 @@ const WS_CONFIG = {
     pongTimeout: 5000          // Wait 5 seconds for pong
 };
 
-let wsPingInterval = null;
-let wsPongTimeout = null;
+/**
+ * Get WebSocket instance from state
+ * @returns {WebSocket|null} WebSocket instance
+ */
+function getWebSocket() {
+    return store.get('dashboard.ws.instance') || null;
+}
+
+/**
+ * Set WebSocket instance in state
+ * @param {WebSocket|null} ws - WebSocket instance
+ */
+function setWebSocket(ws) {
+    store.set('dashboard.ws.instance', ws);
+}
+
+/**
+ * Get WebSocket reconnect attempts count
+ * @returns {number} Reconnect attempts
+ */
+function getWsReconnectAttempts() {
+    return store.get('dashboard.ws.reconnectAttempts') || 0;
+}
+
+/**
+ * Set WebSocket reconnect attempts count
+ * @param {number} attempts - Reconnect attempts
+ */
+function setWsReconnectAttempts(attempts) {
+    store.set('dashboard.ws.reconnectAttempts', attempts);
+}
+
+/**
+ * Get WebSocket reconnect timeout ID
+ * @returns {number|null} Timeout ID
+ */
+function getWsReconnectTimeout() {
+    return store.get('dashboard.ws.reconnectTimeout') || null;
+}
+
+/**
+ * Set WebSocket reconnect timeout ID
+ * @param {number|null} timeoutId - Timeout ID
+ */
+function setWsReconnectTimeout(timeoutId) {
+    store.set('dashboard.ws.reconnectTimeout', timeoutId);
+}
 
 function initWebSocket() {
     // Clear any existing reconnect timeout
-    if (wsReconnectTimeout) {
-        clearTimeout(wsReconnectTimeout);
-        wsReconnectTimeout = null;
+    const existingTimeout = getWsReconnectTimeout();
+    if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        setWsReconnectTimeout(null);
     }
 
     // Close existing connection if any
+    const ws = getWebSocket();
     if (ws && ws.readyState !== WebSocket.CLOSED) {
         ws.close();
     }
@@ -603,25 +765,27 @@ function initWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/api/v1/dashboard/ws`;
 
     try {
-        ws = new WebSocket(wsUrl);
+        const newWs = new WebSocket(wsUrl);
+        setWebSocket(newWs);
 
-        ws.onopen = () => {
+        newWs.onopen = () => {
             console.log('[WebSocket] Connected successfully');
-            wsReconnectAttempts = 0;
+            setWsReconnectAttempts(0);
             updateWsStatus('connected');
 
             // Start ping interval to keep connection alive
             startPingInterval();
         };
 
-        ws.onmessage = (event) => {
+        newWs.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
 
                 // Clear pong timeout on any message
-                if (wsPongTimeout) {
-                    clearTimeout(wsPongTimeout);
-                    wsPongTimeout = null;
+                const pongTimeout = getWsPongTimeout();
+                if (pongTimeout) {
+                    clearTimeout(pongTimeout);
+                    setWsPongTimeout(null);
                 }
 
                 handleWsMessage(data);
@@ -630,14 +794,14 @@ function initWebSocket() {
             }
         };
 
-        ws.onclose = (event) => {
+        newWs.onclose = (event) => {
             console.log(`[WebSocket] Disconnected (code: ${event.code}, reason: ${event.reason || 'none'})`);
             updateWsStatus('disconnected');
             stopPingInterval();
             attemptWsReconnect();
         };
 
-        ws.onerror = (error) => {
+        newWs.onerror = (error) => {
             console.error('[WebSocket] Error:', error);
             updateWsStatus('disconnected');
         };
@@ -649,44 +813,85 @@ function initWebSocket() {
     }
 }
 
+/**
+ * Get WebSocket ping interval ID
+ * @returns {number|null} Interval ID
+ */
+function getWsPingInterval() {
+    return store.get('dashboard.ws.pingInterval') || null;
+}
+
+/**
+ * Set WebSocket ping interval ID
+ * @param {number|null} intervalId - Interval ID
+ */
+function setWsPingInterval(intervalId) {
+    store.set('dashboard.ws.pingInterval', intervalId);
+}
+
+/**
+ * Get WebSocket pong timeout ID
+ * @returns {number|null} Timeout ID
+ */
+function getWsPongTimeout() {
+    return store.get('dashboard.ws.pongTimeout') || null;
+}
+
+/**
+ * Set WebSocket pong timeout ID
+ * @param {number|null} timeoutId - Timeout ID
+ */
+function setWsPongTimeout(timeoutId) {
+    store.set('dashboard.ws.pongTimeout', timeoutId);
+}
+
 function startPingInterval() {
     stopPingInterval();
-    wsPingInterval = setInterval(() => {
+    const intervalId = setInterval(() => {
+        const ws = getWebSocket();
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
 
             // Set timeout for pong response
-            wsPongTimeout = setTimeout(() => {
+            const timeoutId = setTimeout(() => {
                 console.warn('[WebSocket] Pong timeout - connection may be dead');
                 ws.close();
             }, WS_CONFIG.pongTimeout);
+            setWsPongTimeout(timeoutId);
         }
     }, WS_CONFIG.pingInterval);
+    setWsPingInterval(intervalId);
 }
 
 function stopPingInterval() {
-    if (wsPingInterval) {
-        clearInterval(wsPingInterval);
-        wsPingInterval = null;
+    const pingInterval = getWsPingInterval();
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        setWsPingInterval(null);
     }
-    if (wsPongTimeout) {
-        clearTimeout(wsPongTimeout);
-        wsPongTimeout = null;
+    const pongTimeout = getWsPongTimeout();
+    if (pongTimeout) {
+        clearTimeout(pongTimeout);
+        setWsPongTimeout(null);
     }
 }
 
 function attemptWsReconnect() {
-    if (wsReconnectAttempts >= WS_CONFIG.maxReconnect) {
+    const maxReconnect = WS_CONFIG.maxReconnect;
+    const currentAttempts = getWsReconnectAttempts();
+    
+    if (currentAttempts >= maxReconnect) {
         console.log('[WebSocket] Max reconnect attempts reached, falling back to polling only');
         showToast('Live updates unavailable. Using polling mode.', 'warning');
         return;
     }
 
-    wsReconnectAttempts++;
+    const newAttempts = currentAttempts + 1;
+    setWsReconnectAttempts(newAttempts);
 
     // Calculate exponential backoff with jitter
     const exponentialDelay = Math.min(
-        WS_CONFIG.baseDelay * Math.pow(2, wsReconnectAttempts - 1),
+        WS_CONFIG.baseDelay * Math.pow(2, newAttempts - 1),
         WS_CONFIG.maxDelay
     );
 
@@ -694,15 +899,16 @@ function attemptWsReconnect() {
     const jitter = exponentialDelay * WS_CONFIG.jitterFactor * (Math.random() * 2 - 1);
     const delay = Math.round(exponentialDelay + jitter);
 
-    console.log(`[WebSocket] Reconnect attempt ${wsReconnectAttempts}/${WS_CONFIG.maxReconnect} in ${delay}ms`);
+    console.log(`[WebSocket] Reconnect attempt ${newAttempts}/${maxReconnect} in ${delay}ms`);
 
-    wsReconnectTimeout = setTimeout(initWebSocket, delay);
+    const timeoutId = setTimeout(initWebSocket, delay);
+    setWsReconnectTimeout(timeoutId);
 }
 
 // Manual reconnect function (can be called from UI)
 function reconnectWebSocket() {
     console.log('[WebSocket] Manual reconnect requested');
-    wsReconnectAttempts = 0;
+    setWsReconnectAttempts(0);
     initWebSocket();
 }
 
@@ -793,12 +999,13 @@ function showNotification(message, type = 'info') {
 }
 
 // ==========================================
-// CUSTOM DATE RANGE
+// CUSTOM DATE RANGE - StateManager Version
 // ==========================================
 
-let customDateFrom = null;
-let customDateTo = null;
-
+/**
+ * Apply custom date range from date pickers
+ * Updates state and triggers refresh
+ */
 function applyCustomDateRange() {
     const fromInput = document.getElementById('dateFrom');
     const toInput = document.getElementById('dateTo');
@@ -808,24 +1015,36 @@ function applyCustomDateRange() {
         return;
     }
 
-    customDateFrom = fromInput.value;
-    customDateTo = toInput.value;
+    const fromDate = fromInput.value;
+    const toDate = toInput.value;
+
+    // Update state with date range
+    store.set('dashboard.dateRange', {
+        from: fromDate,
+        to: toDate
+    });
 
     // Clear period button selection (toolbar only)
     document.querySelectorAll('.dashboard-toolbar .period-btn').forEach(b => b.classList.remove('active'));
 
-    // Set custom period
-    currentPeriod = 'custom';
+    // Set custom period in state
+    setCurrentPeriod('custom');
 
     refreshDashboard();
 }
 
-// Modify the fetch URL to include custom dates
+/**
+ * Get metrics API URL based on current period and date range
+ * @returns {string} API URL
+ */
 function getMetricsUrl() {
-    if (currentPeriod === 'custom' && customDateFrom && customDateTo) {
-        return `${API_BASE}/dashboard/metrics/summary?from=${customDateFrom}&to=${customDateTo}`;
+    const period = getCurrentPeriod();
+    const dateRange = store.get('dashboard.dateRange');
+
+    if (period === 'custom' && dateRange?.from && dateRange?.to) {
+        return `${API_BASE}/dashboard/metrics/summary?from=${dateRange.from}&to=${dateRange.to}`;
     }
-    return `${API_BASE}/dashboard/metrics/summary?period=${currentPeriod}`;
+    return `${API_BASE}/dashboard/metrics/summary?period=${period}`;
 }
 
 // Set default dates (last 7 days)
@@ -894,14 +1113,18 @@ window.addEventListener('beforeunload', () => {
 
     // Stop WebSocket ping and close connection
     stopPingInterval();
+    const ws = getWebSocket();
     if (ws) {
         ws.onclose = null; // Prevent reconnect on intentional close
         ws.close();
+        setWebSocket(null);
     }
 
     // Clear any pending reconnect timeout
-    if (wsReconnectTimeout) {
-        clearTimeout(wsReconnectTimeout);
+    const reconnectTimeout = getWsReconnectTimeout();
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        setWsReconnectTimeout(null);
     }
 });
 
@@ -921,18 +1144,31 @@ document.head.appendChild(style);
 
 // =====================================================
 // NEW: Dashboard Improvements - Milestone 4.4
+// State stored in StateManager
 // =====================================================
 
-let portfolioHistoryChart = null;
-let pnlMiniChart = null;
-let portfolioDays = 7;
+/**
+ * Get portfolio days from state
+ * @returns {number} Portfolio days
+ */
+function getPortfolioDays() {
+    return store.get('dashboard.portfolioDays') || 7;
+}
+
+/**
+ * Set portfolio days in state
+ * @param {number} days - Portfolio days
+ */
+function setPortfolioDays(days) {
+    store.set('dashboard.portfolioDays', days);
+}
 
 // Initialize new charts
 function initializeNewCharts() {
     // Portfolio History Chart
     const portfolioCtx = document.getElementById('portfolioHistoryChart');
     if (portfolioCtx) {
-        portfolioHistoryChart = new Chart(portfolioCtx, {
+        const chart = new Chart(portfolioCtx, {
             type: 'line',
             data: {
                 labels: [],
@@ -966,12 +1202,14 @@ function initializeNewCharts() {
                 }
             }
         });
+        // Store chart instance in StateManager
+        setChart('portfolioHistory', chart);
     }
 
     // P&L Mini Chart
     const pnlCtx = document.getElementById('pnlMiniChart');
     if (pnlCtx) {
-        pnlMiniChart = new Chart(pnlCtx, {
+        const chart = new Chart(pnlCtx, {
             type: 'line',
             data: {
                 labels: [],
@@ -994,19 +1232,23 @@ function initializeNewCharts() {
                 }
             }
         });
+        // Store chart instance in StateManager
+        setChart('pnlMini', chart);
     }
 }
 
 // Load Portfolio History
 async function loadPortfolioHistory() {
     try {
-        const response = await fetch(`${API_BASE}/dashboard/portfolio/history?days=${portfolioDays}`);
+        const days = getPortfolioDays();
+        const response = await fetch(`${API_BASE}/dashboard/portfolio/history?days=${days}`);
         if (!response.ok) throw new Error('Failed to load portfolio history');
 
         const data = await response.json();
 
         // API returns data_points with {timestamp, equity, pnl, ...}
         const points = data.data_points || data.history || [];
+        const portfolioHistoryChart = getChart('portfolioHistory');
         if (portfolioHistoryChart && points.length > 0) {
             portfolioHistoryChart.data.labels = points.map(h =>
                 new Date(h.timestamp).toLocaleDateString()
@@ -1092,6 +1334,7 @@ async function loadCurrentPnL() {
         if (openPos) openPos.textContent = data.open_positions || 0;
 
         // Update mini chart
+        const pnlMiniChart = getChart('pnlMini');
         if (pnlMiniChart && data.hourly_pnl && data.hourly_pnl.length > 0) {
             pnlMiniChart.data.labels = data.hourly_pnl.map((_, i) => i);
             pnlMiniChart.data.datasets[0].data = data.hourly_pnl;
@@ -1169,7 +1412,8 @@ document.querySelectorAll('#portfolioPeriodSelector .period-btn').forEach(btn =>
             b.classList.remove('active')
         );
         btn.classList.add('active');
-        portfolioDays = parseInt(btn.dataset.days);
+        // Update state instead of global variable
+        setPortfolioDays(parseInt(btn.dataset.days));
         loadPortfolioHistory();
     });
 });
@@ -1338,6 +1582,12 @@ document.addEventListener('visibilitychange', () => {
 // All dashboard initialization in one place
 // =====================================================
 document.addEventListener('DOMContentLoaded', () => {
+    // ---- State Initialization ----
+    initializeDashboardState();
+
+    // ---- Subscribe to State Changes ----
+    setupDashboardSubscriptions();
+
     // ---- Core Initialization ----
     initDatePickers();
     initializeCharts();
@@ -1387,6 +1637,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('[Dashboard] Initialized with IntervalManager:', IntervalManager.status());
 });
+
+/**
+ * Setup subscriptions to state changes for reactive UI updates
+ */
+function setupDashboardSubscriptions() {
+    if (!store) return;
+
+    // Subscribe to period changes - update UI buttons
+    store.subscribe('dashboard.currentPeriod', (period) => {
+        // Update active button state
+        document.querySelectorAll('.dashboard-toolbar .period-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.period === period);
+        });
+        console.log('[Dashboard] Period changed:', period);
+    });
+
+    // Subscribe to date range changes
+    store.subscribe('dashboard.dateRange', (dateRange) => {
+        if (dateRange?.from && dateRange?.to) {
+            console.log('[Dashboard] Date range changed:', dateRange);
+        }
+    });
+
+    // Subscribe to WebSocket connection status
+    store.subscribe('dashboard.ws.connected', (connected) => {
+        const statusEl = document.getElementById('wsStatus');
+        if (statusEl) {
+            statusEl.className = 'ws-status ' + (connected ? 'connected' : 'disconnected');
+        }
+    });
+
+    // Subscribe to portfolio days changes
+    store.subscribe('dashboard.portfolioDays', (days) => {
+        // Update active button in portfolio period selector
+        document.querySelectorAll('#portfolioPeriodSelector .period-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.days) === days);
+        });
+        console.log('[Dashboard] Portfolio days changed:', days);
+    });
+
+    // Subscribe to watchlist changes
+    store.subscribe('dashboard.watchlist', (watchlist) => {
+        console.log('[Dashboard] Watchlist changed:', watchlist);
+        renderWatchlist();
+    });
+
+    // Subscribe to market data changes
+    store.subscribe('dashboard.market.data', (marketData) => {
+        if (marketData && marketData.length > 0) {
+            renderMarketOverview();
+            updateRiskHeatmap();
+        }
+    });
+
+    console.log('[Dashboard] Subscriptions setup complete');
+}
 
 // =====================================================
 // NEW: Enhanced Dashboard Features
@@ -1479,8 +1785,76 @@ function hideShortcuts() {
     document.getElementById('shortcutsModal')?.classList.remove('show');
 }
 
+// ==========================================
+// MARKET DATA - StateManager Storage
+// ==========================================
+
+/**
+ * Get market data from state
+ * @returns {Array} Market data array
+ */
+function getMarketData() {
+    return store.get('dashboard.market.data') || [];
+}
+
+/**
+ * Set market data in state
+ * @param {Array} data - Market data
+ */
+function setMarketData(data) {
+    store.set('dashboard.market.data', data);
+}
+
+/**
+ * Get ticker data from state
+ * @returns {Array} Ticker data array
+ */
+function getTickerData() {
+    return store.get('dashboard.market.tickerData') || [];
+}
+
+/**
+ * Set ticker data in state
+ * @param {Array} data - Ticker data
+ */
+function setTickerData(data) {
+    store.set('dashboard.market.tickerData', data);
+}
+
+/**
+ * Get watchlist from state
+ * @returns {Array} Watchlist array
+ */
+function getWatchlist() {
+    return store.get('dashboard.watchlist') || [];
+}
+
+/**
+ * Set watchlist in state
+ * @param {Array} list - Watchlist
+ */
+function setWatchlist(list) {
+    store.set('dashboard.watchlist', list);
+    localStorage.setItem('dashboard_watchlist', JSON.stringify(list));
+}
+
+/**
+ * Get watchlist prices from state
+ * @returns {Object} Watchlist prices
+ */
+function getWatchlistPrices() {
+    return store.get('dashboard.watchlistPrices') || {};
+}
+
+/**
+ * Set watchlist prices in state
+ * @param {Object} prices - Watchlist prices
+ */
+function setWatchlistPrices(prices) {
+    store.set('dashboard.watchlistPrices', prices);
+}
+
 // Market Overview - Dynamic top by volume from Bybit API
-let marketData = [];
 
 // Fetch real market data from API - Dynamic top 6 by trading volume
 async function fetchMarketData() {
@@ -1490,7 +1864,7 @@ async function fetchMarketData() {
         const data = await response.json();
         if (data.success && data.tickers) {
             // Replace marketData with dynamic top from API
-            marketData = data.tickers.map(ticker => ({
+            const newMarketData = data.tickers.map(ticker => ({
                 symbol: ticker.symbol,
                 name: ticker.name,
                 icon: ticker.icon,
@@ -1500,6 +1874,8 @@ async function fetchMarketData() {
                 volume_24h: ticker.volume_24h || 0,
                 turnover_24h: ticker.turnover_24h || 0
             }));
+            // Update state
+            setMarketData(newMarketData);
             // Re-render market overview with new data
             renderMarketOverview();
             updateLiveTicker();
@@ -1512,6 +1888,7 @@ async function fetchMarketData() {
 }
 
 function renderMarketOverview() {
+    const marketData = getMarketData();
     const container = document.getElementById('marketOverview');
     if (!container) return;
 
@@ -1556,8 +1933,11 @@ function updateMarketData() {
     fetchMarketData();
 }
 
-// Live Ticker - Top 20 by volume (separate from cards)
-let tickerData = [];
+// ==========================================
+// LIVE TICKER - StateManager Storage
+// ==========================================
+
+let tickerInitialized = false;
 
 async function fetchTickerData() {
     try {
@@ -1565,7 +1945,8 @@ async function fetchTickerData() {
         const response = await fetch('/api/v1/dashboard/market/tickers?top=20');
         const data = await response.json();
         if (data.success && data.tickers) {
-            tickerData = data.tickers;
+            // Update state
+            setTickerData(data.tickers);
             renderLiveTicker();
         }
     } catch (err) {
@@ -1574,10 +1955,9 @@ async function fetchTickerData() {
     }
 }
 
-let tickerInitialized = false;
-
 function renderLiveTicker() {
     const track = document.getElementById('tickerTrack');
+    const tickerData = getTickerData();
     if (!track || tickerData.length === 0) return;
 
     const tickerItems = tickerData.map(m => ({
@@ -1730,10 +2110,8 @@ function showToast(message, type = 'info', duration = 4000) {
 })();
 
 // =====================================================
-// Watchlist with API Updates
+// Watchlist with API Updates - StateManager Storage
 // =====================================================
-let watchlist = JSON.parse(localStorage.getItem('dashboard_watchlist') || '["BTCUSDT","ETHUSDT","SOLUSDT"]');
-const watchlistPrices = {};
 
 function initWatchlist() {
     renderWatchlist();
@@ -1741,6 +2119,7 @@ function initWatchlist() {
 }
 
 async function updateWatchlistPrices() {
+    const watchlist = getWatchlist();
     if (watchlist.length === 0) return;
 
     try {
@@ -1749,13 +2128,16 @@ async function updateWatchlistPrices() {
         const data = await response.json();
 
         if (data.success && data.tickers) {
+            const prices = {};
             data.tickers.forEach(ticker => {
-                watchlistPrices[ticker.symbol] = {
+                prices[ticker.symbol] = {
                     price: ticker.price,
                     change: ticker.change,
                     name: ticker.name || ticker.symbol.replace('USDT', '')
                 };
             });
+            // Update state
+            setWatchlistPrices(prices);
             renderWatchlist();
         }
     } catch (err) {
@@ -1765,6 +2147,8 @@ async function updateWatchlistPrices() {
 
 function renderWatchlist() {
     const container = document.getElementById('watchlistWidget');
+    const watchlist = getWatchlist();
+    const watchlistPrices = getWatchlistPrices();
     if (!container) return;
 
     if (watchlist.length === 0) {
@@ -1813,41 +2197,67 @@ function addToWatchlist() {
     if (symbol) {
         const normalized = symbol.toUpperCase().replace(/[^A-Z]/g, '');
         const finalSymbol = normalized.endsWith('USDT') ? normalized : normalized + 'USDT';
+        const watchlist = getWatchlist();
 
         if (watchlist.includes(finalSymbol)) {
             showToast(`${finalSymbol} is already in your watchlist`, 'warning');
             return;
         }
 
-        watchlist.push(finalSymbol);
-        localStorage.setItem('dashboard_watchlist', JSON.stringify(watchlist));
+        const newWatchlist = [...watchlist, finalSymbol];
+        setWatchlist(newWatchlist);
         showToast(`${finalSymbol.replace('USDT', '/USDT')} added to watchlist`, 'success');
         updateWatchlistPrices();
     }
 }
 
 function removeFromWatchlist(symbol) {
-    watchlist = watchlist.filter(s => s !== symbol);
-    localStorage.setItem('dashboard_watchlist', JSON.stringify(watchlist));
+    const watchlist = getWatchlist();
+    const newWatchlist = watchlist.filter(s => s !== symbol);
+    setWatchlist(newWatchlist);
     showToast(`${symbol.replace('USDT', '/USDT')} removed from watchlist`, 'info');
     renderWatchlist();
 }
 
-// Mini Calendar
-let calendarYear, calendarMonth;
+// ==========================================
+// MINI CALENDAR - StateManager Storage
+// ==========================================
+
+/**
+ * Get calendar state
+ * @returns {{year: number, month: number}} Calendar state
+ */
+function getCalendarState() {
+    return store.get('dashboard.calendar') || {
+        year: new Date().getFullYear(),
+        month: new Date().getMonth()
+    };
+}
+
+/**
+ * Set calendar state
+ * @param {number} year - Year
+ * @param {number} month - Month
+ */
+function setCalendarState(year, month) {
+    store.set('dashboard.calendar', { year, month });
+}
 
 function initMiniCalendar() {
-    const today = new Date();
-    calendarYear = today.getFullYear();
-    calendarMonth = today.getMonth();
-    renderCalendar(calendarYear, calendarMonth);
+    const calendar = getCalendarState();
+    renderCalendar(calendar.year, calendar.month);
 }
 
 function changeMonth(delta) {
-    calendarMonth += delta;
-    if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
-    if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
-    renderCalendar(calendarYear, calendarMonth);
+    const calendar = getCalendarState();
+    let newMonth = calendar.month + delta;
+    let newYear = calendar.year;
+    
+    if (newMonth > 11) { newMonth = 0; newYear++; }
+    if (newMonth < 0) { newMonth = 11; newYear--; }
+    
+    setCalendarState(newYear, newMonth);
+    renderCalendar(newYear, newMonth);
 }
 
 function renderCalendar(year, month) {
