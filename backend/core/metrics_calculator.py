@@ -19,6 +19,14 @@ TradingView Compliance:
 - Win Rate: percentage (0-100)
 - Profit Factor: gross_profit / gross_loss
 - Max Drawdown: peak-to-trough in percentage
+
+Architecture (P0-5):
+- Pure math formulas (sharpe, sortino, calmar etc.) live in:
+      backend/backtesting/formulas.py  ← single source of truth
+- This module is the "TV-gold-standard" implementation that:
+  1. Orchestrates full metrics calculation (166 metrics)
+  2. Provides legacy API (calculate_sharpe, calculate_win_rate, etc.)
+- NumbaEngineV2 uses formulas.py directly (no duplication since P0-5).
 """
 
 import math

@@ -38,6 +38,18 @@ except ImportError:
     NUMBA_AVAILABLE = False
     logger.warning("Numba not available, falling back to Python")
 
+from backend.backtesting.formulas import (
+    ANNUALIZATION_HOURLY,
+    calc_calmar,
+    calc_expectancy,
+    calc_max_drawdown,
+    calc_payoff_ratio,
+    calc_profit_factor,
+    calc_recovery_factor,
+    calc_returns_from_equity,
+    calc_sharpe,
+    calc_sortino,
+)
 from backend.backtesting.interfaces import (
     BacktestInput,
     BacktestMetrics,
@@ -3349,20 +3361,25 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics.gross_profit = sum(p for p in pnls if p > 0)
         metrics.gross_loss = abs(sum(p for p in pnls if p < 0))
 
-        # === DRAWDOWN ===
+        # === DRAWDOWN (via formulas.py — TV-parity) ===
+        max_dd_pct, _max_dd_val, _max_dd_dur = calc_max_drawdown(equity_curve)
+        metrics.max_drawdown = max_dd_pct
+        # avg_drawdown: mean of per-bar drawdown series
         peak = np.maximum.accumulate(equity_curve)
-        drawdown_pct = (peak - equity_curve) / np.maximum(peak, 1) * 100
-        metrics.max_drawdown = float(np.max(drawdown_pct))  # Percentage for consistency
-        metrics.avg_drawdown = float(np.mean(drawdown_pct))
+        drawdown_pct_series = np.where(peak > 0, (peak - equity_curve) / peak * 100, 0.0)
+        metrics.avg_drawdown = float(np.mean(drawdown_pct_series))
 
         # === TRADES ===
         metrics.total_trades = len(trades)
         metrics.winning_trades = sum(1 for t in trades if t.pnl > 0)
         metrics.losing_trades = sum(1 for t in trades if t.pnl < 0)
-        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0
+        # win_rate: доля 0-1 (контракт BacktestMetrics.win_rate, interfaces.py:730)
+        # NOTE: calc_win_rate() в formulas.py возвращает % (0-100) — для TV display.
+        #       Здесь используем долю (0-1) для совместимости с V4 gold standard.
+        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0.0
 
-        # Profit factor
-        metrics.profit_factor = metrics.gross_profit / metrics.gross_loss if metrics.gross_loss > 0 else 10.0
+        # profit_factor: capped at 100 via formulas.py — TV-parity
+        metrics.profit_factor = calc_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         # === AVERAGES ===
         wins = [t.pnl for t in trades if t.pnl > 0]
@@ -3380,8 +3397,12 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         metrics.long_trades = len(long_trades)
         metrics.short_trades = len(short_trades)
-        metrics.long_win_rate = sum(1 for t in long_trades if t.pnl > 0) / len(long_trades) if long_trades else 0
-        metrics.short_win_rate = sum(1 for t in short_trades if t.pnl > 0) / len(short_trades) if short_trades else 0
+        metrics.long_win_rate = (
+            sum(1 for t in long_trades if t.pnl > 0) / len(long_trades) if long_trades else 0.0
+        )
+        metrics.short_win_rate = (
+            sum(1 for t in short_trades if t.pnl > 0) / len(short_trades) if short_trades else 0.0
+        )
         metrics.long_profit = sum(t.pnl for t in long_trades)
         metrics.short_profit = sum(t.pnl for t in short_trades)
 
@@ -3394,34 +3415,25 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics.avg_winning_duration = float(np.mean(winning_durations)) if winning_durations else 0.0
         metrics.avg_losing_duration = float(np.mean(losing_durations)) if losing_durations else 0.0
 
-        # === SHARPE RATIO ===
-        returns = np.diff(equity_curve) / np.maximum(equity_curve[:-1], 1)
-        returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
-        if len(returns) > 1 and np.std(returns) > 0:
-            metrics.sharpe_ratio = float(np.mean(returns) / np.std(returns) * np.sqrt(252 * 24))
+        # === RISK-ADJUSTED RATIOS (via formulas.py — TV-parity) ===
+        returns = calc_returns_from_equity(equity_curve)
 
-        # === SORTINO RATIO ===
-        downside_returns = returns[returns < 0]
-        if len(downside_returns) > 1:
-            downside_std = float(np.std(downside_returns))
-            if downside_std > 0:
-                metrics.sortino_ratio = float(np.mean(returns) / downside_std * np.sqrt(252 * 24))
+        metrics.sharpe_ratio = calc_sharpe(returns, annualization_factor=ANNUALIZATION_HOURLY)
+        metrics.sortino_ratio = calc_sortino(returns, annualization_factor=ANNUALIZATION_HOURLY)
 
-        # === CALMAR RATIO ===
-        if metrics.max_drawdown > 0:
-            annual_return = metrics.total_return * (365 * 24 / len(equity_curve))
-            metrics.calmar_ratio = annual_return / metrics.max_drawdown
+        # Calmar: using total_return and max_drawdown
+        bars_per_year = 365 * 24
+        years = max(len(equity_curve) / bars_per_year, 1e-6)
+        metrics.calmar_ratio = calc_calmar(metrics.total_return, metrics.max_drawdown, years=years)
 
-        # === EXPECTANCY ===
-        metrics.expectancy = metrics.win_rate * metrics.avg_win + (1 - metrics.win_rate) * metrics.avg_loss
+        # === EXPECTANCY (via formulas.py — передаём % т.к. calc_expectancy ожидает win_rate_pct) ===
+        metrics.expectancy = calc_expectancy(metrics.win_rate * 100.0, metrics.avg_win, metrics.avg_loss)
 
-        # === PAYOFF RATIO ===
-        if metrics.avg_loss != 0:
-            metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss)
+        # === PAYOFF RATIO (via formulas.py) ===
+        metrics.payoff_ratio = calc_payoff_ratio(metrics.avg_win, metrics.avg_loss)
 
-        # === RECOVERY FACTOR ===
-        if metrics.max_drawdown > 0:
-            metrics.recovery_factor = metrics.net_profit / (initial_capital * metrics.max_drawdown / 100)
+        # === RECOVERY FACTOR (via formulas.py) ===
+        metrics.recovery_factor = calc_recovery_factor(metrics.net_profit, initial_capital, metrics.max_drawdown)
 
         return metrics
 

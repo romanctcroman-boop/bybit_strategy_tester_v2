@@ -9,6 +9,157 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **strategy_builder.js: ESLint `'import' and 'export' may only appear at the top level` (2026-02-26):**
+
+    Fixed a structural JavaScript bug — `function displayBacktestResults(results)` (line 11638)
+    was missing its closing `}`, causing all ~2000 lines after it (including other functions,
+    init code, and the `export` statement at line 13597) to be parsed as nested inside that
+    function body.
+
+    **Root cause**: Closing `}` was absent after the `else { window._sbEquityChartData = null; }`
+    block that ends `displayBacktestResults`. All subsequent top-level functions
+    (`renderResultsSummaryCards`, `renderOverviewMetrics`, `renderTradesTable`, etc.) appeared
+    at 2-space indent, making them look like nested declarations.
+
+    **Fix**: Added `}` to properly close `displayBacktestResults` and promoted the following
+    functions to top-level (removed erroneous 2-space indent from JSDoc + declaration lines).
+
+    **Verification**:
+    - `npx eslint js/pages/strategy_builder.js` — the `top level` error is gone; 3 remaining
+      errors are pre-existing `no-empty` in `catch (_) {}` blocks (unrelated)
+    - `npm test` — **212/212 passed** (was 203/212; the 9 previously-failing `ticker-sync.test.js`
+      tests now pass too because `export { syncSymbolData, runCheckSymbolDataForProperties }` is
+      finally at the true module top level)
+
+    **Files changed**: `frontend/js/pages/strategy_builder.js`
+
+### Added
+
+- **P0-5: Centralized formulas module (2026-02-26):**
+
+    Created `backend/backtesting/formulas.py` — single source of truth for all backtest metric
+    formulas. Eliminates duplication between `MetricsCalculator` and `NumbaEngineV2`, and
+    documents all known divergences from TradingView parity.
+
+    **15 pure functions:**
+    `calc_win_rate`, `calc_profit_factor`, `calc_max_drawdown`, `calc_sharpe`, `calc_sortino`,
+    `calc_calmar`, `calc_cagr`, `calc_expectancy`, `calc_payoff_ratio`, `calc_recovery_factor`,
+    `calc_ulcer_index`, `calc_sqn`, `calc_returns_from_equity`
+
+    **Key design decisions:**
+    - `calc_win_rate()` returns % (0-100) for TV display; `BacktestMetrics.win_rate` stays
+      fraction (0-1) per `interfaces.py` contract — conversion handled at boundary
+    - `calc_calmar()` uses CAGR-based formula (TV-compatible); old inline formulas removed
+    - `calc_sharpe()` uses RFR=0.02, ddof=1, clamp ±100 (TV-parity)
+    - `calc_sortino()` uses TV downside formula (std of negative returns only)
+
+    **NumbaEngineV2 updated** to use formulas.py — all inline formula duplication removed.
+
+    **MetricsCalculator** docstring updated with P0-5 architecture note; functions untouched
+    (legacy API preserved).
+
+    **Tests**: `tests/backend/backtesting/test_formulas.py` — **109/109 ✅**
+    (16 test classes: constants, all 13 functions, consistency, edge cases)
+
+    **Verification**: 285 passed, 3 failed (pre-existing failures unrelated to P0-5; confirmed
+    by running tests without formulas.py changes — same 3 failures)
+
+    **Files added**:
+    - `backend/backtesting/formulas.py`
+    - `tests/backend/backtesting/test_formulas.py`
+
+    **Files modified**:
+    - `backend/backtesting/engines/numba_engine_v2.py` (formulas.py integration)
+    - `backend/core/metrics_calculator.py` (docstring update)
+
+- **P0-3 StateManager: Integration tests + documentation (2026-02-26):**
+
+    Completed the final deliverables for the P0-3 StateManager refactoring project:
+
+    **Integration tests** — `frontend/tests/integration/state-sync.test.js` (33 new tests):
+    - `StateManager — core reactivity` (7 tests): get/set/subscribe/unsubscribe/wildcard/batch/reset
+    - `backtest_results — store→shim sync` (7 tests): currentBacktest, allResults, compareMode,
+      pagination, chartDisplayMode, selectedCompareIds, activeTab
+    - `strategy_builder — store→shim sync` (12 tests): blocks, connections, selectedBlockId, zoom,
+      isDragging, dragOffset, isConnecting, isGroupDragging, currentSyncSymbol, currentBacktestResults
+    - `Cross-page state isolation` (2 tests): independent stores per page
+    - `Setter → store → shim round-trip` (3 tests): full lifecycle validation
+
+    **API Reference** — `docs/state_manager/API.md`:
+    Full API documentation for StateManager: constructor options, all 11 methods
+    (get/set/merge/batch/delete/subscribe/computed/use/undo/redo/reset), helper functions,
+    shim-sync pattern, and usage examples.
+
+    **Migration Guide** — `docs/state_manager/MIGRATION_GUIDE.md`:
+    Step-by-step migration guide (7 steps) with real examples from all 3 migrated pages,
+    complete path tables (strategy_builder: 36 paths, backtest_results: 28 paths),
+    common mistakes section, test templates, and a migration checklist.
+
+    **Verification**: `npm test` — **245/245 passed** (212 baseline + 33 new integration tests)
+
+    **Files added**:
+    - `frontend/tests/integration/state-sync.test.js`
+    - `docs/state_manager/API.md`
+    - `docs/state_manager/MIGRATION_GUIDE.md`
+
+### Changed
+
+- **P0-3 StateManager: strategy_builder.js migration completed (2026-02-26):**
+
+    Completed the StateManager "shim sync" migration for `frontend/js/pages/strategy_builder.js`
+    (13,378 → 13,597 lines). All 19 state namespaces mirrored into the store; legacy shim
+    variables unchanged for zero regression risk.
+
+    **Changes to `strategy_builder.js`**:
+    - Added imports: `getStore` from StateManager, `initState` from state-helpers
+    - Added `initializeStrategyBuilderState()` — initializes 19 state paths under `strategyBuilder.*`
+    - Added `_setupStrategyBuilderShimSync()` — 18 `store.subscribe()` calls (store→shim)
+    - Added 30+ getters/setters (`getSBBlocks`, `setSBBlocks`, `getSBZoom`, `setSBZoom`, etc.)
+    - Added setter calls at all mutation sites: `addBlock`, `deleteBlock`, `duplicateBlock`,
+      `insertPreset`, `selectBlock`, `restoreStateSnapshot`, `deleteSelected`, `duplicateSelected`,
+      `loadTemplate`, `importTemplateFromFile`, `loadStrategy`, `tryLoadFromLocalStorage`,
+      `createMainStrategyNode`, `syncSymbolData`, `displayBacktestResults`, `autoSaveStrategy`
+    - ESLint: 0 new errors (1 pre-existing `export` inside conditional block, not our code)
+
+    **State paths added (19 total)**:
+    - `strategyBuilder.graph.{blocks,connections}` — mirrors `strategyBlocks[]`, `connections[]`
+    - `strategyBuilder.selection.{selectedBlockId,selectedBlockIds,selectedTemplate}`
+    - `strategyBuilder.viewport.{zoom,isDragging,dragOffset,isMarqueeSelecting,marqueeStart}`
+    - `strategyBuilder.history.{lastAutoSavePayload,skipNextAutoSave}`
+    - `strategyBuilder.connecting.{isConnecting,connectionStart}`
+    - `strategyBuilder.groupDrag.{isGroupDragging,groupDragOffsets}`
+    - `strategyBuilder.sync.{currentSyncSymbol,currentSyncStartTime}`
+    - `strategyBuilder.ui.{currentBacktestResults}`
+
+    **New test file**: `frontend/tests/pages/strategy_builder_state.test.js` — 36 tests, 36/36 ✅
+
+    **Full test suite**: 203 passed, 9 pre-existing failures in `ticker-sync.test.js` (unrelated)
+
+    **New docs**: `docs/refactoring/p0-3-state-manager/strategy-builder-migration-report.md`
+
+- **P0-3 StateManager: backtest_results.js migration completed (2026-02-26):**
+
+    Completed the StateManager "shim sync" migration for `frontend/js/pages/backtest_results.js`
+    (5,653 lines). Legacy global variables are kept as module-level shims for zero regression
+    risk; `_setupLegacyShimSync()` wires bidirectional sync via `store.subscribe()` + setter calls.
+
+    **Changes to `backtest_results.js`**:
+    - Added `_setupLegacyShimSync()` with 24 `store.subscribe()` calls (store→shim direction)
+    - Added setter calls at all mutation points: `setAllResults()`, `setCompareMode()`,
+      `setCurrentBacktest()`, `setPriceChart*()`, `setTrades*()`, `setChart()` etc.
+    - `initCharts()`: added `setChart()` for all 7 Chart.js + 2 TradingView instances
+    - Removed unused imports (`bindToState`, `bindInputToState`, `bindCheckboxToState`)
+    - ESLint: added `eslint-disable no-unused-vars` around getter block → 0 errors
+
+    **New test file**: `frontend/tests/pages/backtest_results_state.test.js` — 28 tests, 28/28 ✅
+
+    **Full test suite**: 167 passed, 9 pre-existing failures in `ticker-sync.test.js` (unrelated)
+
+    **Updated docs**:
+    - `docs/refactoring/p0-3-state-manager/backtest-results-migration-report.md` → ✅ Завершено
+
+### Fixed
+
 - **RSI use_btc_source: Compute Wilder RSI on full BTC series before trimming (2026-02-24):**
 
     `_handle_rsi` in `indicator_handlers.py` was completely ignoring `use_btc_source=True` —
@@ -29,11 +180,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Effect on RSI_L/S_7 ETHUSDT 30m**:
 
-    | Stage              | Engine trades | TV trades | Status                                    |
-    | ------------------ | ------------- | --------- | ----------------------------------------- |
-    | Before fix         | 118           | 146+1     | BTC source completely ignored             |
-    | After source fix   | 151           | 146+1     | BTC source works, warmup issue remains    |
-    | After warmup fix   | 150+1         | 146+1     | First trade matches, diff=4 structural    |
+    | Stage            | Engine trades | TV trades | Status                                 |
+    | ---------------- | ------------- | --------- | -------------------------------------- |
+    | Before fix       | 118           | 146+1     | BTC source completely ignored          |
+    | After source fix | 151           | 146+1     | BTC source works, warmup issue remains |
+    | After warmup fix | 150+1         | 146+1     | First trade matches, diff=4 structural |
 
     **Residual 4-trade diff** is an irreducible structural limitation: TV accumulates Wilder RSI
     state over years of BTC history; our 500-bar warmup fully converges (~100 bars) but to a
@@ -42,19 +193,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Metrics matching** (34/52 = 65% with warmup fix; all loss-side metrics match exactly):
 
-    | Category          | TV         | Engine     | Match |
-    | ----------------- | ---------- | ---------- | ----- |
-    | n_open            | 1          | 1          | ✅    |
-    | n_losing_all      | 14         | 14         | ✅    |
-    | avg_loss_all      | 133.49     | 133.45     | ✅    |
-    | worst_loss_all    | 133.49     | 133.49     | ✅    |
-    | gross_loss_all    | 1868.84    | 1868.34    | ✅    |
-    | profit_factor_all | 1.526      | 1.568      | ✅    |
-    | mdd_pct           | 0.07%      | 0.07%      | ✅    |
-    | commission_all    | 204.58     | 209.39     | ✅    |
-    | n_winning_all     | 132        | 136        | ❌ (+4 extra short wins) |
-    | net_profit_all    | 983.40     | 1062.84    | ❌ (+4 extra trades) |
-    | sharpe/sortino    | -9.15/-0.99| 2.49/0     | ❌ methodology diff |
+    | Category          | TV          | Engine  | Match                    |
+    | ----------------- | ----------- | ------- | ------------------------ |
+    | n_open            | 1           | 1       | ✅                       |
+    | n_losing_all      | 14          | 14      | ✅                       |
+    | avg_loss_all      | 133.49      | 133.45  | ✅                       |
+    | worst_loss_all    | 133.49      | 133.49  | ✅                       |
+    | gross_loss_all    | 1868.84     | 1868.34 | ✅                       |
+    | profit_factor_all | 1.526       | 1.568   | ✅                       |
+    | mdd_pct           | 0.07%       | 0.07%   | ✅                       |
+    | commission_all    | 204.58      | 209.39  | ✅                       |
+    | n_winning_all     | 132         | 136     | ❌ (+4 extra short wins) |
+    | net_profit_all    | 983.40      | 1062.84 | ❌ (+4 extra trades)     |
+    | sharpe/sortino    | -9.15/-0.99 | 2.49/0  | ❌ methodology diff      |
 
 - **FallbackEngineV4.\_calculate_metrics: Complete metrics implementation (2026-02-26):**
 
