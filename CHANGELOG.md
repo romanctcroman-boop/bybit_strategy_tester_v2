@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P0-3 COMPLETE: StateManager migration for all 6 frontend pages (commit 860b58617):**
+
+    Completed migration of all P0-3 pages to StateManager (3 were done in a prior session).
+
+    **Newly migrated pages:**
+
+    - `trading.js` (829 lines): `initializeTradingState()` + `_setupTradingShimSync()` — 12 subscriptions
+      covering `currentSymbol`, `currentTimeframe`, `currentSide`, `currentLeverage`,
+      `candleData`, `volumeData`, and 6 chart instance slots
+    - `analytics.js` (451 lines): `initializeAnalyticsState()` — 3 subscriptions for
+      `equityChart`, `riskDistributionChart`, `refreshInterval`
+    - `optimization.js` (788 lines): class-based migration via `_initStateManager()` method
+      called from constructor; `config`, `currentJobId`, `results` synced bi-directionally;
+      `saveConfig()` and `loadSavedConfig()` push to store on each write
+
+    **All 6 P0-3 pages now use StateManager:**
+    `dashboard.js` ✅ `backtest_results.js` ✅ `strategy_builder.js` ✅
+    `trading.js` ✅ `analytics.js` ✅ `optimization.js` ✅
+
+    **New tests:** 54 vitest tests across 3 new files:
+    - `frontend/tests/pages/trading_state.test.js` (18 tests)
+    - `frontend/tests/pages/analytics_state.test.js` (16 tests)
+    - `frontend/tests/pages/optimization_state.test.js` (20 tests)
+    - **Total: 665/665 passing** (up from 611)
+
 - **P0-5 COMPLETE: Centralized metric formulas — single source of truth (commit 29c8108ac):**
 
     Migrated `FallbackEngineV4._calculate_metrics` (122-line inline) to `backend/backtesting/formulas.py`.
