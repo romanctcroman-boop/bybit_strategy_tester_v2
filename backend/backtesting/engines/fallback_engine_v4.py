@@ -19,6 +19,17 @@ import numpy as np
 import pandas as pd
 
 from backend.backtesting.atr_calculator import calculate_atr_fast
+from backend.backtesting.formulas import (
+    ANNUALIZATION_HOURLY,
+    calc_expectancy,
+    calc_max_drawdown,
+    calc_payoff_ratio,
+    calc_profit_factor,
+    calc_recovery_factor,
+    calc_returns_from_equity,
+    calc_sharpe,
+    calc_sortino,
+)
 from backend.backtesting.interfaces import (
     BacktestInput,
     BacktestMetrics,
@@ -2780,7 +2791,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         equity_curve: list[float],
         initial_capital: float,
     ) -> BacktestMetrics:
-        """Calculate backtest metrics."""
+        """Calculate backtest metrics via formulas.py (TV-parity gold standard)."""
         metrics = BacktestMetrics()
 
         if not trades:
@@ -2788,20 +2799,26 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         pnls = [t.pnl for t in trades]
 
+        # === BASIC TRADE COUNTS ===
         metrics.total_trades = len(trades)
         metrics.winning_trades = sum(1 for p in pnls if p > 0)
         metrics.losing_trades = sum(1 for p in pnls if p < 0)
-        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0
 
+        # win_rate: доля 0-1 (контракт BacktestMetrics; TV display конвертирует в %)
+        # calc_win_rate() из formulas.py возвращает 0-100%, поэтому делим обратно
+        metrics.win_rate = metrics.winning_trades / metrics.total_trades if metrics.total_trades > 0 else 0.0
+
+        # === P&L AGGREGATES ===
         metrics.gross_profit = sum(p for p in pnls if p > 0)
         metrics.gross_loss = abs(sum(p for p in pnls if p < 0))
         metrics.net_profit = sum(pnls)
-        metrics.total_return = (metrics.net_profit / initial_capital) * 100
+        metrics.total_return = (metrics.net_profit / initial_capital) * 100 if initial_capital > 0 else 0.0
 
-        # Commission paid (sum of all fees across all trades)
+        # Commission paid
         metrics.commission_paid = float(sum(getattr(t, "fees", 0) or 0 for t in trades))
 
-        metrics.profit_factor = metrics.gross_profit / metrics.gross_loss if metrics.gross_loss > 0 else float("inf")
+        # === RATIOS (via formulas.py — TV-parity) ===
+        metrics.profit_factor = calc_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         winning_pnls = [p for p in pnls if p > 0]
         losing_pnls = [p for p in pnls if p < 0]
@@ -2810,14 +2827,12 @@ class FallbackEngineV4(BaseBacktestEngine):
         metrics.avg_trade = float(np.mean(pnls)) if pnls else 0.0
         metrics.largest_win = float(max(winning_pnls)) if winning_pnls else 0.0
         metrics.largest_loss = float(min(losing_pnls)) if losing_pnls else 0.0
-        metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss) if metrics.avg_loss != 0 else float("inf")
-        metrics.expectancy = (
-            metrics.win_rate * metrics.avg_win + (1 - metrics.win_rate) * metrics.avg_loss
-            if metrics.total_trades > 0
-            else 0.0
-        )
 
-        # Duration metrics
+        metrics.payoff_ratio = calc_payoff_ratio(metrics.avg_win, metrics.avg_loss)
+        # expectancy принимает win_rate_pct (0-100) — конвертируем долю → %
+        metrics.expectancy = calc_expectancy(metrics.win_rate * 100.0, metrics.avg_win, metrics.avg_loss)
+
+        # === DURATION METRICS ===
         durations = [t.duration_bars for t in trades if t.duration_bars is not None]
         if durations:
             metrics.avg_trade_duration = float(np.mean(durations))
@@ -2826,21 +2841,18 @@ class FallbackEngineV4(BaseBacktestEngine):
             metrics.avg_winning_duration = float(np.mean(win_durations)) if win_durations else 0.0
             metrics.avg_losing_duration = float(np.mean(loss_durations)) if loss_durations else 0.0
 
-        # Drawdown
-        equity_arr = np.array(equity_curve)
-        peak = np.maximum.accumulate(equity_arr)
-        drawdown = (peak - equity_arr) / peak
-        metrics.max_drawdown = float(np.max(drawdown)) * 100
+        # === DRAWDOWN (via formulas.py — TV-parity, safe peak=0) ===
+        equity_arr = np.asarray(equity_curve, dtype=np.float64)
+        max_dd_pct, _max_dd_val, _max_dd_dur = calc_max_drawdown(equity_arr)
+        metrics.max_drawdown = max_dd_pct
 
-        # Sharpe
-        if len(pnls) > 1:
-            returns = np.array(pnls) / initial_capital
-            if np.std(returns) > 0:
-                metrics.sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252)
+        # === RISK-ADJUSTED RATIOS (via formulas.py — TV-parity) ===
+        returns = calc_returns_from_equity(equity_arr)
+        metrics.sharpe_ratio = calc_sharpe(returns, annualization_factor=ANNUALIZATION_HOURLY)
+        metrics.sortino_ratio = calc_sortino(returns, annualization_factor=ANNUALIZATION_HOURLY)
 
         # Recovery factor
-        if metrics.max_drawdown > 0:
-            metrics.recovery_factor = metrics.net_profit / (metrics.max_drawdown / 100 * initial_capital)
+        metrics.recovery_factor = calc_recovery_factor(metrics.net_profit, initial_capital, metrics.max_drawdown)
 
         # === LONG/SHORT BREAKDOWN ===
         long_trades = [t for t in trades if str(getattr(t, "direction", "")).lower() == "long"]
@@ -2853,17 +2865,21 @@ class FallbackEngineV4(BaseBacktestEngine):
             wins = [p for p in s_pnls if p > 0]
             losses = [p for p in s_pnls if p < 0]
             n = len(s_pnls)
+            gp = sum(wins)
+            gl = abs(sum(losses))
+            avg_w = float(np.mean(wins)) if wins else 0.0
+            avg_l = float(np.mean(losses)) if losses else 0.0
             return {
                 "total": n,
                 "winning": len(wins),
                 "losing": len(losses),
-                "gross_profit": sum(wins),
-                "gross_loss": abs(sum(losses)),
+                "gross_profit": gp,
+                "gross_loss": gl,
                 "net_profit": sum(s_pnls),
                 "win_rate": len(wins) / n if n > 0 else 0.0,
-                "profit_factor": sum(wins) / abs(sum(losses)) if losses else float("inf"),
-                "avg_win": float(np.mean(wins)) if wins else 0.0,
-                "avg_loss": float(np.mean(losses)) if losses else 0.0,
+                "profit_factor": calc_profit_factor(gp, gl),
+                "avg_win": avg_w,
+                "avg_loss": avg_l,
                 "largest_win": float(max(wins)) if wins else 0.0,
                 "largest_loss": float(min(losses)) if losses else 0.0,
             }
