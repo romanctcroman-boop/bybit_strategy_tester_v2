@@ -35,6 +35,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P0-2 Phase 3: MetricsPanels.js — metrics panel functions extracted (2026-02-26):**
+
+    Created `frontend/js/components/MetricsPanels.js` — pure-function module with 6 exported
+    functions extracted from `backtest_results.js` (was ~5466 lines, now ~4608 lines, −858 LOC).
+
+    **Functions extracted:**
+    - `formatTVCurrency(value, pct, showSign)` — `ru-RU` locale, cleans `-0,00`, dual-value HTML
+    - `formatTVPercent(value, showSign)` — `toFixed(2)`, cleans `-0.00`
+    - `updateTVSummaryCards(metrics)` — Tab 1: net profit, drawdown, total trades, win rate, profit factor
+    - `updateTVDynamicsTab(metrics, config, trades, equityCurve)` — Tab 2: 30+ metrics including
+      runup/drawdown computed from equity curve when backend data absent
+    - `updateTVTradeAnalysisTab(metrics, config, _trades)` — Tab 3: all trade counts, win rates,
+      avg P&L, largest trades, bars, consecutive runs
+    - `updateTVRiskReturnTab(metrics, _trades, _config)` — Tab 4: Sharpe/Sortino/Calmar/Kelly
+      with color thresholds
+
+    **backtest_results.js changes:**
+    - Import 4 tab-updater functions from `../components/MetricsPanels.js`
+    - Formatters (`formatTVCurrency`, `formatTVPercent`) used internally within MetricsPanels only
+    - Removed 6 inline function definitions (−870 lines net)
+
+    **Tests:** `frontend/tests/components/MetricsPanels.test.js` — **47/47 ✅**
+    (6 describe blocks: formatTVCurrency × 8, formatTVPercent × 5, updateTVSummaryCards × 8,
+    updateTVDynamicsTab × 9, updateTVTradeAnalysisTab × 8, updateTVRiskReturnTab × 11)
+
+    **Full suite:** `npm test` — **380/380 passed** (was 333)
+
+    **Files added:**
+    - `frontend/js/components/MetricsPanels.js`
+    - `frontend/tests/components/MetricsPanels.test.js`
+
+    **Files modified:**
+    - `frontend/js/pages/backtest_results.js` (−858 lines, import 4 functions)
+
+    **P0-2 complete — all 3 phases:**
+
+    | Phase | Component | Extracted | Tests |
+    |-------|-----------|-----------|-------|
+    | 1 | ChartManager.js | 7 Chart.js lifecycle leaks | 34 |
+    | 2 | TradesTable.js | 9 trade-table functions | 54 |
+    | 3 | MetricsPanels.js | 6 metrics-panel functions | 47 |
+    | Total | — | −2000+ LOC from backtest_results.js | +135 |
+
+- **P0-2 Phase 2: TradesTable.js — trades table functions extracted (2026-02-26):**
+
+    Created `frontend/js/components/TradesTable.js` — pure-function module with 9 exported
+    functions for the trades table (render, sort, paginate).
+
+    **Key exports:**
+    - `TRADES_PAGE_SIZE = 25` — single source of truth
+    - `buildTradeRow(trade, idx)` — pure row builder
+    - `buildTradeRows(trades)` — array → HTML rows
+    - `sortRows(rows, column, direction)` — DOM-free sort comparator
+    - `renderPage(tbody, rows, page)` — idempotent page renderer
+    - `renderPagination(container, total, page)` — pagination HTML
+    - `updatePaginationControls(page, total)`, `removePagination(container)`, `updateSortIndicators(col)`
+
+    **Tests:** `frontend/tests/components/TradesTable.test.js` — **54/54 ✅**
+
+    **Full suite:** `npm test` — **333/333 passed** (was 279)
+
+    **Files added:**
+    - `frontend/js/components/TradesTable.js`
+    - `frontend/tests/components/TradesTable.test.js`
+
+    **Files modified:**
+    - `frontend/js/pages/backtest_results.js` (9 inline functions replaced)
+
 - **P0-2 Phase 1: ChartManager.js — Chart.js memory leak fix (2026-02-26):**
 
     Created `frontend/js/components/ChartManager.js` — centralised lifecycle manager

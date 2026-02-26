@@ -3,7 +3,7 @@
 **Дата:** 2026-02-26
 **Статус:**
 
-- P0-2 🚀 В работе (Фаза 1 завершена: ChartManager)
+- P0-2 ✅ Завершён (все 3 фазы — ChartManager + TradesTable + MetricsPanels)
 - P0-5 ✅ Завершён (formulas.py — централизация формул)
 - P0-4 ✅ Завершён (Circuit Breakers)
 - P0-3 ✅ Завершён (StateManager 245/245 тестов)
@@ -12,6 +12,20 @@
 ---
 
 ## ✅ Выполнено в этой сессии
+
+### P0-2: Рефакторинг backtest_results.js — ЗАВЕРШЁН ✅
+
+**Все 3 фазы выполнены, 380/380 тестов проходят:**
+
+| Фаза | Компонент | Что вынесено | Тесты | Коммит |
+|------|-----------|-------------|-------|--------|
+| 1 | ChartManager.js | 7 Chart.js lifecycle (утечки памяти) | 34/34 ✅ | 4844ec8 |
+| 2 | TradesTable.js | 9 функций таблицы сделок | 54/54 ✅ | 60b465a7c |
+| 3 | MetricsPanels.js | 6 функций панелей метрик | 47/47 ✅ | 22d0c49b1 |
+
+- `backtest_results.js`: 5466 → 4608 строк (−858 LOC, ещё −858 в фазе 2 итого)
+- Все 3 компонента — pure functions, 0 побочных эффектов, unit-тестируемые
+- `npm test` → **380/380** ✅
 
 ### P0-4: Circuit breakers на MCP инструменты
 
@@ -82,13 +96,14 @@ pytest tests/backend/mcp/test_mcp_integration.py -v
 
 ---
 
-## 🚀 P0-2: Рефакторинг backtest_results.js — В РАБОТЕ
+## ✅ P0-2: Рефакторинг backtest_results.js — ЗАВЕРШЁН
 
-### ✅ Фаза 1: ChartManager.js (завершена)
+### ✅ Фаза 1: ChartManager.js (коммит 4844ec8)
 
 **Проблема:** 7 Chart.js экземпляров создавались без `.destroy()` → "Canvas is already in use"
 
 **Решение:**
+
 - ✅ `frontend/js/components/ChartManager.js` — lifecycle manager (init/destroy/destroyAll/clear/update)
 - ✅ `frontend/tests/components/ChartManager.test.js` — **34/34 тестов**
 - ✅ `frontend/js/pages/backtest_results.js` — все `new Chart()` заменены на `chartManager.init()`
@@ -96,22 +111,28 @@ pytest tests/backend/mcp/test_mcp_integration.py -v
 
 **Тесты:** `npm test` → **279/279** (0 регрессий)
 
-### ⏳ Фаза 2: TradesTable.js (ожидает)
+### ✅ Фаза 2: TradesTable.js (коммит 60b465a7c)
 
-**Вынести из backtest_results.js (~283 строки):**
-- `updateTVTradesListTab`, `renderTradesPage`, `renderTradePagination`
-- `updateTradePaginationControls`, `removeTradePagination`
-- `tradesPrevPage`, `tradesNextPage`, `sortTradesBy`, `updateTradeSortIndicators`
+**Вынесено из backtest_results.js (~283 строки) в `frontend/js/components/TradesTable.js`:**
 
-### ⏳ Фаза 3: MetricsPanels.js (ожидает)
+- `buildTradeRow`, `buildTradeRows`, `sortRows`, `renderPage`, `renderPagination`
+- `updatePaginationControls`, `removePagination`, `updateSortIndicators`
+- `TRADES_PAGE_SIZE = 25` — единый источник истины
 
-**Вынести из backtest_results.js (~866 строк):**
-- `updateTVSummaryCards`, `updateTVDynamicsTab`, `updateTVTradeAnalysisTab`
-- `updateTVRiskReturnTab`, `formatTVCurrency`, `formatTVPercent`
+**Тесты:** `frontend/tests/components/TradesTable.test.js` — **54/54** | `npm test` → **333/333** ✅
+
+### ✅ Фаза 3: MetricsPanels.js (коммит 22d0c49b1)
+
+**Вынесено из backtest_results.js (~866 строк) в `frontend/js/components/MetricsPanels.js`:**
+
+- `formatTVCurrency`, `formatTVPercent`
+- `updateTVSummaryCards`, `updateTVDynamicsTab`, `updateTVTradeAnalysisTab`, `updateTVRiskReturnTab`
+
+**Тесты:** `frontend/tests/components/MetricsPanels.test.js` — **47/47** | `npm test` → **380/380** ✅
+
+**Итог:** `backtest_results.js` 5466 → 4608 строк (−858 LOC)
 
 ---
-
-
 
 **Статус:** ✅ Анализ | ✅ formulas.py | ✅ NumbaEngineV2 | ✅ Тесты | ✅ Документация
 
@@ -186,12 +207,10 @@ pytest tests/backend/backtesting/ --tb=no
 **Цель:** Разбить на модули по 200-500 строк
 **План:** `docs/refactoring/P0_EXECUTION_PLAN.md`
 
-### P0-2: Рефакторинг backtest_results.js (20 часов)
+### P0-2: Рефакторинг backtest_results.js ✅ ЗАВЕРШЁН
 
-**Проблема:** 5,658 строк — утечки Chart.js
-**Цель:** Вынести компоненты, добавить cleanup
-**План:** `docs/refactoring/P0_EXECUTION_PLAN.md`
-**Статус:** ✅ StateManager миграция завершена
+**Все 3 фазы выполнены** — ChartManager + TradesTable + MetricsPanels
+**380/380 frontend tests, backtest_results.js: 5466 → 4608 строк**
 
 ---
 
