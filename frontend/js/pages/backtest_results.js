@@ -23,6 +23,18 @@ import {
 // Import ChartManager (P0-2: Chart.js memory leak fix)
 import { chartManager } from '../components/ChartManager.js';
 
+// Import TradesTable utilities (P0-2 Phase 2)
+import {
+  TRADES_PAGE_SIZE,
+  buildTradeRows,
+  sortRows,
+  renderPage as renderTradesPageUtil,
+  renderPagination,
+  updatePaginationControls,
+  removePagination,
+  updateSortIndicators
+} from '../components/TradesTable.js';
+
 // ============================
 // Security utilities
 // ============================
@@ -69,7 +81,7 @@ let compareMode = false;
 
 // Trades table pagination state
 let tradesCurrentPage = 0;       // 0-based page index
-const TRADES_PAGE_SIZE = 25;     // rows per page
+// TRADES_PAGE_SIZE imported from TradesTable.js
 let tradesCachedRows = [];       // pre-built HTML rows (reversed, newest-first)
 let tradesSortKey = null;        // active sort column key
 let tradesSortAsc = true;        // sort direction
@@ -2350,219 +2362,30 @@ function updateTVTradesListTab(trades, config) {
     tbody.innerHTML =
       '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:2rem;">Нет сделок для отображения</td></tr>';
     if (countEl) countEl.textContent = '0';
-    removeTradePagination();
+    removePagination();
     return;
   }
 
   if (countEl) countEl.textContent = trades.length;
 
   const initialCapital = config?.initial_capital || 10000;
-
-  // Helper to detect Long trades
-  const isLongTrade = (t) => {
-    if (t.direction === 'long' || t.direction === 'Long') return true;
-    if (
-      t.side === 'long' ||
-      t.side === 'Long' ||
-      t.side === 'Buy' ||
-      t.side === 'buy'
-    )
-      return true;
-    if (t.type === 'Длинная' || t.type === 'long') return true;
-    return false;
-  };
-
-  // Format date like TradingView: "Nov 17, 2025, 21:15"
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '--';
-    const d = new Date(dateStr);
-    return d
-      .toLocaleString('en-US', {
-        month: 'short',
-        day: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      })
-      .replace(',', '');
-  };
-
-  // Calculate cumulative P&L chronologically
-  let runningPnL = 0;
-  const cumulativePnLs = [];
-  for (let i = 0; i < trades.length; i++) {
-    runningPnL += trades[i].pnl || 0;
-    cumulativePnLs.push(runningPnL);
-  }
-
-  // Build full rows array with sort metadata — newest first by default
-  const allRows = [];
-  for (let i = trades.length - 1; i >= 0; i--) {
-    const trade = trades[i];
-    const tradeNum = i + 1;
-    const pnl = trade.pnl || 0;
-    const pnlPct = trade.return_pct || trade.pnl_pct || 0;
-    const cumulativePnL = cumulativePnLs[i];
-    const cumulativePnLPct = (cumulativePnL / initialCapital) * 100;
-
-    const isLong = isLongTrade(trade);
-    const typeText = isLong ? 'Long' : 'Short';
-    const typeClass = isLong ? 'tv-trade-long' : 'tv-trade-short';
-
-    const exitSignal =
-      trade.exit_reason ||
-      trade.exit_signal ||
-      (isLong ? 'Long SL/TP' : 'Short SL/TP');
-    const entrySignal = isLong ? 'Long' : 'Short';
-
-    const positionValue = (trade.size || 0) * (trade.entry_price || 0);
-    const positionDisplay =
-      positionValue >= 1000
-        ? `${(positionValue / 1000).toFixed(2)}K USD`
-        : `${positionValue.toFixed(2)} USD`;
-
-    // MFE/MAE — always show as absolute values (backend may send negative MFE/MAE)
-    const mfe = Math.abs(trade.mfe ?? trade.mfe_value ?? 0);
-    const mfePct = Math.abs(trade.mfe_pct ?? 0);
-    const mae = Math.abs(trade.mae ?? trade.mae_value ?? 0);
-    const maePct = Math.abs(trade.mae_pct ?? 0);
-
-    const exitDate = trade.exit_time ? new Date(trade.exit_time).getTime() : 0;
-
-    allRows.push({
-      // Sort keys
-      _date: exitDate,
-      _pnl: pnl,
-      _mfe: mfe,
-      _mae: mae,
-      _cumPnl: cumulativePnL,
-      // Rendered HTML pair
-      html: `
-            <tr class="tv-trade-exit-row">
-                <td rowspan="2" class="tv-trade-num-cell">
-                    <span class="tv-trade-number">${tradeNum}</span>
-                    <span class="${typeClass}">${typeText}</span>
-                </td>
-                <td class="tv-trade-type-cell">Exit</td>
-                <td>${formatDate(trade.exit_time)}</td>
-                <td>${exitSignal}</td>
-                <td>${(trade.exit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
-                <td>
-                    <div>${trade.size?.toFixed(2) || '0.01'}</div>
-                    <div class="tv-trade-secondary">${positionDisplay}</div>
-                </td>
-                <td class="${pnl >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
-                    <div>${pnl >= 0 ? '+' : ''}${pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
-                    <div class="tv-trade-secondary">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</div>
-                </td>
-                <td class="tv-value-neutral">
-                    <div>${mfe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
-                    <div class="tv-trade-secondary">${mfePct.toFixed(2)}%</div>
-                </td>
-                <td class="${mae > 0 ? 'tv-value-negative' : 'tv-value-neutral'}">
-                    <div>${mae.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
-                    <div class="tv-trade-secondary">${maePct.toFixed(2)}%</div>
-                </td>
-                <td class="${cumulativePnL >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
-                    <div>${cumulativePnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
-                    <div class="tv-trade-secondary">${cumulativePnLPct.toFixed(2)}%</div>
-                </td>
-            </tr>
-            <tr class="tv-trade-entry-row">
-                <td class="tv-trade-type-cell">Entry</td>
-                <td>${formatDate(trade.entry_time)}</td>
-                <td>${entrySignal}</td>
-                <td>${(trade.entry_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
-                <td colspan="5"></td>
-            </tr>`
-    });
-  }
-
-  // Apply active sort
-  if (tradesSortKey) {
-    allRows.sort((a, b) => {
-      const aVal = a[tradesSortKey];
-      const bVal = b[tradesSortKey];
-      return tradesSortAsc ? aVal - bVal : bVal - aVal;
-    });
-  }
-
-  // Cache rows and render first page
-  tradesCachedRows = allRows;
+  tradesCachedRows = buildTradeRows(trades, initialCapital, tradesSortKey, tradesSortAsc);
   tradesCurrentPage = 0;
   setTradesCachedRows(tradesCachedRows);
   setTradesCurrentPage(0);
-  renderTradesPage(tbody);
-  renderTradePagination(trades.length);
+  renderTradesPageUtil(tbody, tradesCachedRows, tradesCurrentPage);
+  updatePaginationControls(tradesCachedRows.length, tradesCurrentPage);
+  const container = document.getElementById('tvTradesContainer') ||
+    document.querySelector('.tv-trades-container');
+  renderPagination(container, trades.length, tradesCurrentPage);
 }
 
 /** Renders the current page of cached trade rows into tbody */
 function renderTradesPage(tbody) {
   const tgt = tbody || document.getElementById('tvTradesListBody');
   if (!tgt) return;
-  const start = tradesCurrentPage * TRADES_PAGE_SIZE;
-  const pageRows = tradesCachedRows.slice(start, start + TRADES_PAGE_SIZE);
-  tgt.innerHTML = pageRows.map((r) => r.html).join('');
-  updateTradePaginationControls();
-}
-
-/** Renders or updates the pagination controls below the trades table */
-function renderTradePagination(totalTrades) {
-  const container = document.getElementById('tvTradesContainer') ||
-    document.querySelector('.tv-trades-container');
-  if (!container) return;
-
-  const totalPages = Math.ceil(totalTrades / TRADES_PAGE_SIZE);
-  if (totalPages <= 1) {
-    removeTradePagination();
-    return;
-  }
-
-  let paginationEl = document.getElementById('tradesPagination');
-  if (!paginationEl) {
-    paginationEl = document.createElement('div');
-    paginationEl.id = 'tradesPagination';
-    paginationEl.className = 'trades-pagination';
-    container.after(paginationEl);
-  }
-
-  paginationEl.innerHTML = `
-    <div class="d-flex align-items-center justify-content-center gap-2 py-2">
-      <button class="btn btn-sm btn-outline-secondary" id="tradesPrevBtn"
-              onclick="tradesPrevPage()" ${tradesCurrentPage === 0 ? 'disabled' : ''}>
-        <i class="bi bi-chevron-left"></i>
-      </button>
-      <span class="text-secondary" id="tradesPageInfo">
-        Стр. ${tradesCurrentPage + 1} / ${totalPages}
-        <small class="ms-1">(сделки ${tradesCurrentPage * TRADES_PAGE_SIZE + 1}–${Math.min((tradesCurrentPage + 1) * TRADES_PAGE_SIZE, totalTrades)} из ${totalTrades})</small>
-      </span>
-      <button class="btn btn-sm btn-outline-secondary" id="tradesNextBtn"
-              onclick="tradesNextPage()" ${tradesCurrentPage >= totalPages - 1 ? 'disabled' : ''}>
-        <i class="bi bi-chevron-right"></i>
-      </button>
-    </div>`;
-}
-
-/** Updates only the pagination control state (prev/next buttons and info text) */
-function updateTradePaginationControls() {
-  const paginationEl = document.getElementById('tradesPagination');
-  if (!paginationEl) return;
-  const totalPages = Math.ceil(tradesCachedRows.length / TRADES_PAGE_SIZE);
-  const infoEl = document.getElementById('tradesPageInfo');
-  if (infoEl) {
-    infoEl.innerHTML = `Стр. ${tradesCurrentPage + 1} / ${totalPages}
-      <small class="ms-1">(сделки ${tradesCurrentPage * TRADES_PAGE_SIZE + 1}–${Math.min((tradesCurrentPage + 1) * TRADES_PAGE_SIZE, tradesCachedRows.length)} из ${tradesCachedRows.length})</small>`;
-  }
-  const prev = document.getElementById('tradesPrevBtn');
-  const next = document.getElementById('tradesNextBtn');
-  if (prev) prev.disabled = tradesCurrentPage === 0;
-  if (next) next.disabled = tradesCurrentPage >= totalPages - 1;
-}
-
-function removeTradePagination() {
-  const el = document.getElementById('tradesPagination');
-  if (el) el.remove();
+  renderTradesPageUtil(tgt, tradesCachedRows, tradesCurrentPage);
+  updatePaginationControls(tradesCachedRows.length, tradesCurrentPage);
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -2587,39 +2410,15 @@ function tradesNextPage() {
 /** Sort trades table by column key. Called from table header click handlers. */
 // eslint-disable-next-line no-unused-vars
 function sortTradesBy(key) {
-  if (tradesSortKey === key) {
-    tradesSortAsc = !tradesSortAsc;
-  } else {
-    tradesSortKey = key;
-    tradesSortAsc = true;
-  }
+  tradesSortAsc = tradesSortKey === key ? !tradesSortAsc : true;
+  tradesSortKey = key;
   setTradesSortKey(tradesSortKey);
   setTradesSortAsc(tradesSortAsc);
-  tradesCachedRows.sort((a, b) => {
-    const aVal = a[`_${key}`];
-    const bVal = b[`_${key}`];
-    return tradesSortAsc ? aVal - bVal : bVal - aVal;
-  });
+  sortRows(tradesCachedRows, key, tradesSortAsc);
   tradesCurrentPage = 0;
   setTradesCurrentPage(0);
   renderTradesPage();
-  updateTradeSortIndicators(key);
-}
-
-/** Updates the sort indicator arrows in table headers */
-function updateTradeSortIndicators(activeKey) {
-  document.querySelectorAll('#tvTradesListTable th[data-sort]').forEach((th) => {
-    const key = th.dataset.sort;
-    const icon = th.querySelector('.sort-icon');
-    if (!icon) return;
-    if (key === activeKey) {
-      icon.textContent = tradesSortAsc ? ' ▲' : ' ▼';
-      th.classList.add('sort-active');
-    } else {
-      icon.textContent = ' ⇅';
-      th.classList.remove('sort-active');
-    }
-  });
+  updateSortIndicators(key, tradesSortAsc);
 }
 
 // Update Report Header
