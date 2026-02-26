@@ -4,9 +4,18 @@
  * Handles optimization configuration, execution, and results display
  * for the Strategy Builder Manual Mode.
  *
- * @version 1.0.0
- * @date 2025-01-24
+ * @version 2.0.0
+ * @date 2026-02-27
+ *
+ * @migration StateManager v2.0 - P0-3
+ * - OptimizationManager state persisted to StateManager
+ * - config, currentJobId, results synced via store
  */
+
+import { getStore } from '../core/StateManager.js';
+
+// Get store instance (module-level, available to class methods)
+const store = getStore();
 
 class OptimizationManager {
     constructor() {
@@ -35,7 +44,39 @@ class OptimizationManager {
         this.pollInterval = null;
         this.results = null;
 
+        this._initStateManager();
         this.init();
+    }
+
+    /**
+     * Initialize StateManager integration.
+     * Syncs instance properties to store and subscribes to external changes.
+     */
+    _initStateManager() {
+        if (!store) return;
+
+        store.merge('optimization', {
+            config: this.config,
+            currentJobId: null,
+            results: null,
+            isRunning: false
+        });
+
+        // Instance → store: overwrite state with current config
+        store.set('optimization.config', this.config);
+
+        // Store → instance: react to external config changes (e.g. from other pages)
+        store.subscribe('optimization.config', (v) => {
+            if (v && v !== this.config) {
+                this.config = { ...this.config, ...v };
+            }
+        });
+        store.subscribe('optimization.currentJobId', (v) => {
+            this.currentJobId = v;
+        });
+        store.subscribe('optimization.results', (v) => {
+            this.results = v;
+        });
     }
 
     init() {
@@ -197,14 +238,17 @@ class OptimizationManager {
     }
 
     /**
-     * Save configuration to localStorage
+     * Save configuration to localStorage and StateManager
      */
     saveConfig() {
         localStorage.setItem('optimizationConfig', JSON.stringify(this.config));
+        if (store) {
+            store.set('optimization.config', this.config);
+        }
     }
 
     /**
-     * Load saved configuration from localStorage
+     * Load saved configuration from localStorage (and sync to StateManager)
      */
     loadSavedConfig() {
         const saved = localStorage.getItem('optimizationConfig');
@@ -213,6 +257,9 @@ class OptimizationManager {
                 const parsed = JSON.parse(saved);
                 this.config = { ...this.config, ...parsed };
                 this.applyConfigToUI();
+                if (store) {
+                    store.set('optimization.config', this.config);
+                }
             } catch (e) {
                 console.warn('Failed to load optimization config:', e);
             }

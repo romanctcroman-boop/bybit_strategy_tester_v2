@@ -4,8 +4,13 @@
  * Page-specific scripts for trading.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-27
+ *
+ * @migration StateManager v2.0 - P0-3
+ * - Replaced global variables with StateManager
+ * - Legacy shim variables kept for backward compatibility
+ * - State subscriptions for reactive UI updates
  */
 
 // Import shared utilities
@@ -14,6 +19,70 @@ import { apiClient, API_CONFIG } from '../api.js';
 // eslint-disable-next-line no-unused-vars
 import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js';
 import liveTrading from '../services/liveTrading.js';
+import { getStore } from '../core/StateManager.js';
+
+// Get store instance
+const store = getStore();
+
+// ==========================================
+// STATE INITIALIZATION
+// ==========================================
+
+/**
+ * Initialize trading page state in StateManager.
+ * Called once on DOMContentLoaded.
+ */
+function initializeTradingState() {
+    if (!store) {
+        console.error('[Trading] StateManager not initialized');
+        return;
+    }
+
+    store.merge('trading', {
+        currentSymbol: 'BTCUSDT',
+        currentTimeframe: '60',
+        currentSide: 'buy',
+        currentLeverage: 5,
+        candleData: [],
+        volumeData: [],
+        charts: {
+            chart: null,
+            volumeChart: null,
+            candleSeries: null,
+            volumeSeries: null,
+            volumeSmaSeries: null,
+            priceLine: null
+        }
+    });
+
+    // Shim-sync: keep legacy vars in sync with store for backward compatibility
+    _setupTradingShimSync();
+}
+
+/**
+ * Bidirectional sync: store.trading ↔ legacy module-level variables.
+ * Allows existing code using `currentSymbol` etc. to keep working.
+ */
+function _setupTradingShimSync() {
+    // Store → legacy vars
+    store.subscribe('trading.currentSymbol', (v) => { currentSymbol = v; });
+    store.subscribe('trading.currentTimeframe', (v) => { currentTimeframe = v; });
+    store.subscribe('trading.currentSide', (v) => { currentSide = v; });
+    store.subscribe('trading.currentLeverage', (v) => { currentLeverage = v; });
+    store.subscribe('trading.candleData', (v) => { candleData = v; });
+    store.subscribe('trading.volumeData', (v) => { volumeData = v; });
+    store.subscribe('trading.charts.chart', (v) => { chart = v; });
+    store.subscribe('trading.charts.volumeChart', (v) => { volumeChart = v; });
+    store.subscribe('trading.charts.candleSeries', (v) => { candleSeries = v; });
+    store.subscribe('trading.charts.volumeSeries', (v) => { volumeSeries = v; });
+    store.subscribe('trading.charts.volumeSmaSeries', (v) => { volumeSmaSeries = v; });
+    store.subscribe('trading.charts.priceLine', (v) => { priceLine = v; });
+}
+
+// ==========================================
+// LEGACY STATE VARIABLES (shim — kept for compatibility)
+// Read/write via StateManager; these vars stay in sync via _setupTradingShimSync()
+// ==========================================
 
 // State
 let currentSymbol = 'BTCUSDT';
@@ -77,6 +146,7 @@ const openOrdersData = [
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initializeTradingState();
     initCharts();
     loadCandleData();
     renderWatchlist();

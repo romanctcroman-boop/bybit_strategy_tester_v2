@@ -4,17 +4,60 @@
  * Page-specific scripts for analytics.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-27
+ *
+ * @migration StateManager v2.0 - P0-3
+ * - Replaced global variables with StateManager
+ * - Legacy shim variables kept for backward compatibility
  */
 
 // Import shared utilities
 import { apiClient as _apiClient, API_CONFIG as _API_CONFIG } from '../api.js';
 import { formatNumber as _formatNumber, formatCurrency, formatDate as _formatDate, debounce as _debounce } from '../utils.js';
+import { getStore } from '../core/StateManager.js';
 
 // Configuration
 const API_BASE = window.location.origin;
 const RISK_API = `${API_BASE}/api/v1/risk`;
+
+// Get store instance
+const store = getStore();
+
+// ==========================================
+// STATE INITIALIZATION
+// ==========================================
+
+/**
+ * Initialize analytics page state in StateManager.
+ * Called once on DOMContentLoaded.
+ */
+function initializeAnalyticsState() {
+    if (!store) {
+        console.error('[Analytics] StateManager not initialized');
+        return;
+    }
+
+    store.merge('analytics', {
+        charts: {
+            equityChart: null,
+            riskDistributionChart: null
+        },
+        refreshInterval: null,
+        currentPeriod: '1M',
+        riskData: {},
+        equityData: {}
+    });
+
+    // Shim-sync: keep legacy vars in sync with store
+    store.subscribe('analytics.charts.equityChart', (v) => { equityChart = v; });
+    store.subscribe('analytics.charts.riskDistributionChart', (v) => { riskDistributionChart = v; });
+    store.subscribe('analytics.refreshInterval', (v) => { refreshInterval = v; });
+}
+
+// ==========================================
+// LEGACY STATE VARIABLES (shim — kept for compatibility)
+// ==========================================
 
 let equityChart = null;
 let riskDistributionChart = null;
@@ -23,6 +66,7 @@ let refreshInterval = null;
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
+    initializeAnalyticsState();
     initCharts();
     refreshData();
 
