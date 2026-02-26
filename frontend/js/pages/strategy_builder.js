@@ -35,6 +35,10 @@ import {
 // Import AiBuildModule — extracted during P0-1 refactoring
 import { createAiBuildModule } from '../components/AiBuildModule.js';
 import { createMyStrategiesModule } from '../components/MyStrategiesModule.js';
+import { createConnectionsModule } from '../components/ConnectionsModule.js';
+import { createUndoRedoModule } from '../components/UndoRedoModule.js';
+import { createValidateModule } from '../components/ValidateModule.js';
+import { createSaveLoadModule } from '../components/SaveLoadModule.js';
 
 // API Base URL - must be defined early before any usage
 const API_BASE = '/api/v1';
@@ -745,9 +749,12 @@ function _setupStrategyBuilderShimSync() {
 // State
 let strategyBlocks = [];
 const connections = [];
-const undoStack = [];
-const redoStack = [];
-const MAX_UNDO_HISTORY = 50;
+// eslint-disable-next-line no-unused-vars
+const undoStack = [];  // Managed by UndoRedoModule — kept for store-subscriber compatibility
+// eslint-disable-next-line no-unused-vars
+const redoStack = [];  // Managed by UndoRedoModule — kept for store-subscriber compatibility
+// eslint-disable-next-line no-unused-vars
+const MAX_UNDO_HISTORY = 50;  // Canonical value lives in UndoRedoModule.js
 let lastAutoSavePayload = null;
 let _eventListenersInitialized = false; // Must be declared before initializeStrategyBuilder() call
 const AUTOSAVE_INTERVAL_MS = 30000;
@@ -763,6 +770,16 @@ let currentBacktestResults = null; // Legacy shim — mirrored from store (strat
 let _backtestModule = null;        // Initialized in initializeStrategyBuilder() via _initBacktestModule()
 let _aiModule = null;              // Initialized in initializeStrategyBuilder() via _initAiBuildModule()
 let _myStrategiesModule = null;    // Initialized in initializeStrategyBuilder() via _initMyStrategiesModule()
+let _connectionsModule = null;     // Initialized in initializeStrategyBuilder() via _initConnectionsModule()
+let _undoRedoModule = null;        // Initialized in initializeStrategyBuilder() via _initUndoRedoModule()
+let _validateModule = null;        // Initialized in initializeStrategyBuilder() via _initValidateModule()
+let _saveLoadModule = null;        // Initialized in initializeStrategyBuilder() via _initSaveLoadModule()
+
+// Connection state — kept as module-level vars for store-subscriber fallback (getSBIsConnecting etc.)
+let isConnecting = false;
+let connectionStart = null;
+// eslint-disable-next-line no-unused-vars
+const _tempLine = null; // Reserved for store-sync extension
 
 // Marquee selection variables
 let isMarqueeSelecting = false;
@@ -1185,6 +1202,18 @@ function initializeStrategyBuilder() {
 
   // P0-1: Initialize extracted MyStrategiesModule
   _initMyStrategiesModule();
+
+  // P0-1: Initialize extracted SaveLoadModule (first — others depend on saveStrategy)
+  _initSaveLoadModule();
+
+  // P0-1: Initialize extracted ValidateModule (second — UndoRedo depends on validateStrategy)
+  _initValidateModule();
+
+  // P0-1: Initialize extracted UndoRedoModule (third — depends on validateStrategy delegate)
+  _initUndoRedoModule();
+
+  // P0-1: Initialize extracted ConnectionsModule
+  _initConnectionsModule();
 
   try {
     // If opened from file://, API requests won't reach backend - show hint
@@ -7727,677 +7756,6 @@ function applyNodeRepulsionForGroup(movedBlockId, excludeIds) {
   });
 }
 
-// ============================================
-
-let isConnecting = false;
-let connectionStart = null;
-let tempLine = null;
-
-function initConnectionSystem() {
-  const _canvas = document.getElementById('connectionsCanvas');
-  const container = document.getElementById('canvasContainer');
-
-  // Listen for port clicks (left button — start connection)
-  container.addEventListener('mousedown', (e) => {
-    const port = e.target.closest('.port');
-    if (port) {
-      e.stopPropagation();
-      startConnection(port, e);
-    }
-  });
-
-  // Right-click on port — disconnect all connections from that port
-  container.addEventListener('contextmenu', (e) => {
-    const port = e.target.closest('.port');
-    if (port) {
-      e.preventDefault();
-      e.stopPropagation();
-      disconnectPort(port);
-      return;
-    }
-    // Right-click on connection line — delete that connection
-    const connLine = e.target.closest('.connection-line');
-    if (connLine && connLine.dataset.connectionId) {
-      e.preventDefault();
-      e.stopPropagation();
-      deleteConnection(connLine.dataset.connectionId);
-    }
-  });
-
-  // Left-click on connection line — delete (event delegation, avoids listener leak)
-  container.addEventListener('click', (e) => {
-    const connLine = e.target.closest('.connection-line:not(.temp)');
-    if (connLine && connLine.dataset.connectionId) {
-      deleteConnection(connLine.dataset.connectionId);
-    }
-  });
-
-  // Listen for mouse move during connection
-  container.addEventListener('mousemove', (e) => {
-    if (isConnecting) {
-      updateTempConnection(e);
-    }
-  });
-
-  // Listen for mouse up to complete connection
-  container.addEventListener('mouseup', (e) => {
-    if (isConnecting) {
-      const port = e.target.closest('.port');
-      if (port && port !== connectionStart.element) {
-        completeConnection(port);
-      } else {
-        cancelConnection();
-      }
-    }
-  });
-}
-
-function startConnection(portElement, _event) {
-  isConnecting = true;
-  const rect = portElement.getBoundingClientRect();
-  const containerRect = document
-    .getElementById('canvasContainer')
-    .getBoundingClientRect();
-
-  connectionStart = {
-    element: portElement,
-    blockId: portElement.dataset.blockId,
-    portId: portElement.dataset.portId,
-    portType: portElement.dataset.portType,
-    direction: portElement.dataset.direction,
-    x: rect.left + rect.width / 2 - containerRect.left,
-    y: rect.top + rect.height / 2 - containerRect.top
-  };
-
-  // Create temp line
-  const svg = document.getElementById('connectionsCanvas');
-  tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  tempLine.classList.add('connection-line', 'temp');
-  svg.appendChild(tempLine);
-
-  portElement.classList.add('connecting');
-
-  // Highlight compatible ports
-  highlightCompatiblePorts(connectionStart);
-}
-
-/**
- * Map config block types to their preferred Strategy node target port.
- * SL/TP blocks → sl_tp, Close conditions → close_cond, DCA/Grid → dca_grid.
- */
-const CONFIG_BLOCK_TARGET_PORT = {
-  // SL/TP blocks → sl_tp port
-  static_sltp: 'sl_tp',
-  trailing_stop_exit: 'sl_tp',
-  atr_exit: 'sl_tp',
-  multi_tp_exit: 'sl_tp',
-  // Close condition blocks → close_cond port
-  close_by_time: 'close_cond',
-  close_channel: 'close_cond',
-  close_ma_cross: 'close_cond',
-  close_rsi: 'close_cond',
-  close_stochastic: 'close_cond',
-  close_psar: 'close_cond',
-  // DCA/Grid blocks → dca_grid port
-  dca: 'dca_grid',
-  grid_orders: 'dca_grid'
-};
-
-/**
- * Get the preferred Strategy node target port ID for a given block type.
- * Returns null if the block type has no specific preference (non-config).
- */
-function getPreferredStrategyPort(blockType) {
-  return CONFIG_BLOCK_TARGET_PORT[blockType] || null;
-}
-
-/**
- * Highlight ports that are compatible with the connection being made.
- * For config ports: only highlight the CORRECT Strategy node port
- * (e.g. DCA block → only DCA port, not SL/TP or Close).
- * @param {Object} startInfo - Connection start info with portType and direction
- */
-function highlightCompatiblePorts(startInfo) {
-  const allPorts = document.querySelectorAll('.port');
-  const compatibleType = startInfo.portType;
-  const oppositeDirection = startInfo.direction === 'output' ? 'input' : 'output';
-
-  // For config blocks, determine preferred target port on Strategy node
-  let preferredTargetPortId = null;
-  if (compatibleType === 'config') {
-    const sourceBlock = strategyBlocks.find(b => b.id === startInfo.blockId);
-    if (sourceBlock) {
-      preferredTargetPortId = getPreferredStrategyPort(sourceBlock.type);
-    }
-  }
-
-  allPorts.forEach(port => {
-    // Skip the starting port itself
-    if (port === startInfo.element) return;
-
-    const portType = port.dataset.portType;
-    const portDirection = port.dataset.direction;
-    const portBlockId = port.dataset.blockId;
-    const portId = port.dataset.portId;
-
-    // Basic compatibility: same type, opposite direction, different block
-    let isCompatible =
-      portType === compatibleType &&
-      portDirection === oppositeDirection &&
-      portBlockId !== startInfo.blockId;
-
-    // Smart config filtering: if dragging from a config block,
-    // only highlight the CORRECT port on the Strategy node
-    if (isCompatible && compatibleType === 'config' && preferredTargetPortId) {
-      const targetBlock = strategyBlocks.find(b => b.id === portBlockId);
-      if (targetBlock && targetBlock.isMain) {
-        // On Strategy node — only highlight the preferred port
-        isCompatible = (portId === preferredTargetPortId);
-      }
-    }
-
-    if (isCompatible) {
-      port.classList.add('port-compatible');
-    } else {
-      port.classList.add('port-incompatible');
-    }
-  });
-}
-
-/**
- * Remove all port highlighting
- */
-function clearPortHighlights() {
-  document.querySelectorAll('.port').forEach((port) => {
-    port.classList.remove('port-compatible', 'port-incompatible');
-  });
-}
-
-/**
- * Try to auto-connect when a block is dropped near a compatible port
- * @param {string} droppedBlockId - ID of the block that was just dropped
- */
-function tryAutoSnapConnection(droppedBlockId) {
-  const droppedBlock = document.getElementById(droppedBlockId);
-  if (!droppedBlock) return;
-
-  const SNAP_DISTANCE = 50; // pixels - distance threshold for auto-snap
-  const droppedPorts = droppedBlock.querySelectorAll('.port');
-
-  // Get all ports from other blocks
-  const otherPorts = document.querySelectorAll(
-    `.port:not([data-block-id="${droppedBlockId}"])`
-  );
-
-  let bestMatch = null;
-  let bestDistance = SNAP_DISTANCE;
-
-  droppedPorts.forEach((droppedPort) => {
-    const droppedRect = droppedPort.getBoundingClientRect();
-    const droppedCenterX = droppedRect.left + droppedRect.width / 2;
-    const droppedCenterY = droppedRect.top + droppedRect.height / 2;
-
-    const droppedType = droppedPort.dataset.portType;
-    const droppedDirection = droppedPort.dataset.direction;
-    const droppedPortId = droppedPort.dataset.portId;
-
-    otherPorts.forEach((otherPort) => {
-      const otherType = otherPort.dataset.portType;
-      const otherDirection = otherPort.dataset.direction;
-      const otherBlockId = otherPort.dataset.blockId;
-      const otherPortId = otherPort.dataset.portId;
-
-      // Check compatibility: same type, opposite direction
-      if (otherType !== droppedType || otherDirection === droppedDirection) {
-        return;
-      }
-
-      // Smart config filtering: config blocks should only snap to correct port
-      if (droppedType === 'config') {
-        const droppedBlockData = strategyBlocks.find(b => b.id === droppedBlockId);
-        const otherBlockData = strategyBlocks.find(b => b.id === otherBlockId);
-        if (droppedBlockData && otherBlockData?.isMain) {
-          const preferred = getPreferredStrategyPort(droppedBlockData.type);
-          if (preferred && otherPortId !== preferred) return;
-        }
-      }
-
-      // Check if already connected
-      const alreadyConnected = connections.some((c) => {
-        const matchesDropped =
-          (c.source.blockId === droppedBlockId &&
-            c.source.portId === droppedPortId) ||
-          (c.target.blockId === droppedBlockId &&
-            c.target.portId === droppedPortId);
-        const matchesOther =
-          (c.source.blockId === otherBlockId &&
-            c.source.portId === otherPortId) ||
-          (c.target.blockId === otherBlockId &&
-            c.target.portId === otherPortId);
-        return matchesDropped && matchesOther;
-      });
-
-      if (alreadyConnected) return;
-
-      // Calculate distance
-      const otherRect = otherPort.getBoundingClientRect();
-      const otherCenterX = otherRect.left + otherRect.width / 2;
-      const otherCenterY = otherRect.top + otherRect.height / 2;
-
-      const distance = Math.sqrt(
-        Math.pow(droppedCenterX - otherCenterX, 2) +
-        Math.pow(droppedCenterY - otherCenterY, 2)
-      );
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestMatch = {
-          droppedPort: {
-            blockId: droppedBlockId,
-            portId: droppedPortId,
-            direction: droppedDirection
-          },
-          otherPort: {
-            blockId: otherBlockId,
-            portId: otherPortId,
-            direction: otherDirection
-          },
-          type: droppedType
-        };
-      }
-    });
-  });
-
-  // Create connection if found close match
-  if (bestMatch) {
-    const source =
-      bestMatch.droppedPort.direction === 'output'
-        ? bestMatch.droppedPort
-        : bestMatch.otherPort;
-    const target =
-      bestMatch.droppedPort.direction === 'output'
-        ? bestMatch.otherPort
-        : bestMatch.droppedPort;
-
-    // Check if this exact connection already exists
-    const exists = connections.some(
-      (c) =>
-        c.source.blockId === source.blockId &&
-        c.source.portId === source.portId &&
-        c.target.blockId === target.blockId &&
-        c.target.portId === target.portId
-    );
-
-    if (!exists) {
-      pushUndo();
-      connections.push({
-        id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        source: { blockId: source.blockId, portId: source.portId },
-        target: { blockId: target.blockId, portId: target.portId },
-        type: bestMatch.type
-      });
-
-      // Visual feedback
-      showNotification('Соединение создано автоматически', 'success');
-    }
-  }
-}
-
-function updateTempConnection(event) {
-  if (!tempLine || !connectionStart) return;
-
-  const containerRect = document
-    .getElementById('canvasContainer')
-    .getBoundingClientRect();
-  const endX = event.clientX - containerRect.left;
-  const endY = event.clientY - containerRect.top;
-
-  const path = createBezierPath(
-    connectionStart.x,
-    connectionStart.y,
-    endX,
-    endY,
-    connectionStart.direction === 'output'
-  );
-  tempLine.setAttribute('d', path);
-}
-
-function completeConnection(endPortElement) {
-  const endDirection = endPortElement.dataset.direction;
-
-  // Validate: can't connect same direction
-  if (connectionStart.direction === endDirection) {
-    cancelConnection();
-    return;
-  }
-
-  // Validate: can't connect same block
-  if (connectionStart.blockId === endPortElement.dataset.blockId) {
-    cancelConnection();
-    return;
-  }
-
-  // Validate: port types should be compatible
-  const startType = connectionStart.portType;
-  const endType = endPortElement.dataset.portType;
-  if (startType !== endType) {
-    // Allow data->data, condition->condition, flow->flow
-    cancelConnection();
-    showNotification('Несовместимые типы портов', 'error');
-    return;
-  }
-
-  // Determine source and target
-  let source, target;
-  if (connectionStart.direction === 'output') {
-    source = {
-      blockId: connectionStart.blockId,
-      portId: connectionStart.portId
-    };
-    target = {
-      blockId: endPortElement.dataset.blockId,
-      portId: endPortElement.dataset.portId
-    };
-  } else {
-    source = {
-      blockId: endPortElement.dataset.blockId,
-      portId: endPortElement.dataset.portId
-    };
-    target = {
-      blockId: connectionStart.blockId,
-      portId: connectionStart.portId
-    };
-  }
-
-  // Smart config redirect: if a config block connects to the wrong
-  // Strategy port, silently redirect to the correct one
-  if (startType === 'config') {
-    const sourceBlock = strategyBlocks.find(b => b.id === source.blockId);
-    const targetBlock = strategyBlocks.find(b => b.id === target.blockId);
-    if (sourceBlock && targetBlock?.isMain) {
-      const preferred = getPreferredStrategyPort(sourceBlock.type);
-      if (preferred) {
-        target.portId = preferred;
-      }
-    }
-  }
-
-  // Check if connection already exists
-  const exists = connections.some(
-    (c) =>
-      c.source.blockId === source.blockId &&
-      c.source.portId === source.portId &&
-      c.target.blockId === target.blockId &&
-      c.target.portId === target.portId
-  );
-
-  if (!exists) {
-    pushUndo();
-    connections.push({
-      id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      source,
-      target,
-      type: startType
-    });
-  }
-
-  cancelConnection();
-  renderConnections();
-}
-
-function cancelConnection() {
-  isConnecting = false;
-  if (tempLine) {
-    tempLine.remove();
-    tempLine = null;
-  }
-  if (connectionStart?.element) {
-    connectionStart.element.classList.remove('connecting');
-  }
-  connectionStart = null;
-
-  // Clear port highlighting
-  clearPortHighlights();
-}
-
-/**
- * Normalize a connection object to the canonical internal format:
- *   { id, source: { blockId, portId }, target: { blockId, portId }, type }
- *
- * Handles 3 backend formats:
- * 1. { source: { blockId, portId }, target: { blockId, portId } }  — builder_connect_blocks
- * 2. { from, to }                                                  — legacy/test
- * 3. { source_block, source_output, target_block, target_input }   — old manual
- */
-function normalizeConnection(conn) {
-  // Already in canonical format
-  if (conn.source && typeof conn.source === 'object' && conn.source.blockId) {
-    return {
-      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      source: { blockId: conn.source.blockId, portId: conn.source.portId || 'out' },
-      target: { blockId: conn.target.blockId, portId: conn.target.portId || 'in' },
-      type: conn.type || 'data'
-    };
-  }
-
-  // Format 3: { source_block, source_output, target_block, target_input }
-  if (conn.source_block && conn.target_block) {
-    return {
-      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      source: { blockId: conn.source_block, portId: conn.source_output || 'out' },
-      target: { blockId: conn.target_block, portId: conn.target_input || 'in' },
-      type: conn.type || 'data'
-    };
-  }
-
-  // Format 2: { from, to } — legacy, no port info
-  if (conn.from && conn.to) {
-    return {
-      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      source: { blockId: conn.from, portId: 'out' },
-      target: { blockId: conn.to, portId: 'in' },
-      type: conn.type || 'data'
-    };
-  }
-
-  // Unknown format — log and return as-is with defaults
-  console.warn('[Strategy Builder] Unknown connection format:', conn);
-  return {
-    id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    source: { blockId: conn.source || '', portId: 'out' },
-    target: { blockId: conn.target || '', portId: 'in' },
-    type: conn.type || 'data'
-  };
-}
-
-/**
- * Normalize all connections in-place. Called after loading from API.
- */
-function normalizeAllConnections() {
-  for (let i = 0; i < connections.length; i++) {
-    connections[i] = normalizeConnection(connections[i]);
-  }
-}
-
-function renderConnections() {
-  const svg = document.getElementById('connectionsCanvas');
-  // Clear existing connections (except temp)
-  svg
-    .querySelectorAll('.connection-line:not(.temp)')
-    .forEach((el) => el.remove());
-
-  connections.forEach((conn) => {
-    const sourceBlock = document.getElementById(conn.source.blockId);
-    const targetBlock = document.getElementById(conn.target.blockId);
-
-    if (!sourceBlock || !targetBlock) {
-      console.warn('[renderConnections] Block not found:', {
-        sourceBlockId: conn.source.blockId,
-        targetBlockId: conn.target.blockId,
-        sourceFound: !!sourceBlock,
-        targetFound: !!targetBlock
-      });
-      return;
-    }
-
-    // Find ports
-    const sourcePort = sourceBlock.querySelector(
-      `[data-port-id="${conn.source.portId}"][data-direction="output"]`
-    );
-    const targetPort = targetBlock.querySelector(
-      `[data-port-id="${conn.target.portId}"][data-direction="input"]`
-    );
-
-    if (!sourcePort || !targetPort) {
-      console.warn('[renderConnections] Port not found:', {
-        sourceBlockId: conn.source.blockId,
-        sourcePortId: conn.source.portId,
-        targetBlockId: conn.target.blockId,
-        targetPortId: conn.target.portId,
-        sourcePortFound: !!sourcePort,
-        targetPortFound: !!targetPort,
-        availableSourcePorts: Array.from(sourceBlock.querySelectorAll('[data-direction="output"]')).map(p => p.dataset.portId),
-        availableTargetPorts: Array.from(targetBlock.querySelectorAll('[data-direction="input"]')).map(p => p.dataset.portId)
-      });
-    }
-
-    if (!sourcePort || !targetPort) return;
-
-    const containerRect = document
-      .getElementById('canvasContainer')
-      .getBoundingClientRect();
-    const sourceRect = sourcePort.getBoundingClientRect();
-    const targetRect = targetPort.getBoundingClientRect();
-
-    const startX = sourceRect.left + sourceRect.width / 2 - containerRect.left;
-    const startY = sourceRect.top + sourceRect.height / 2 - containerRect.top;
-    const endX = targetRect.left + targetRect.width / 2 - containerRect.left;
-    const endY = targetRect.top + targetRect.height / 2 - containerRect.top;
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.classList.add('connection-line', conn.type);
-
-    // Add per-config-port color class for differentiated connection lines
-    if (conn.type === 'config') {
-      const tPortId = conn.target.portId;
-      if (tPortId === 'sl_tp') path.classList.add('config-sltp');
-      else if (tPortId === 'close_cond') path.classList.add('config-close');
-      else if (tPortId === 'dca_grid') path.classList.add('config-dca');
-    }
-
-    // Direction mismatch detection:
-    // If user selected direction "short" but wire goes to entry_long/exit_long → mismatch
-    // If user selected direction "long" but wire goes to entry_short/exit_short → mismatch
-    // Also: source port "long" wired to entry_short (or vice versa) → signal/port mismatch
-    const direction = document.getElementById('builderDirection')?.value || 'both';
-    const targetPortId = conn.target.portId;
-    const sourcePortId = conn.source.portId;
-
-    const isLongTarget = targetPortId === 'entry_long' || targetPortId === 'exit_long';
-    const isShortTarget = targetPortId === 'entry_short' || targetPortId === 'exit_short';
-
-    let isMismatch = false;
-
-    // Case 1: Direction filter conflicts with target port
-    if (direction === 'long' && isShortTarget) {
-      isMismatch = true;
-    } else if (direction === 'short' && isLongTarget) {
-      isMismatch = true;
-    }
-
-    // Case 2: Source signal direction conflicts with target port
-    // e.g., divergence "long"/"bullish" output → entry_short (cross-wired)
-    const isLongSource = sourcePortId === 'long' || sourcePortId === 'bullish';
-    const isShortSource = sourcePortId === 'short' || sourcePortId === 'bearish';
-    if (isLongSource && isShortTarget) {
-      isMismatch = true;
-    } else if (isShortSource && isLongTarget) {
-      isMismatch = true;
-    }
-
-    if (isMismatch) {
-      path.classList.add('direction-mismatch');
-      // Add tooltip explaining the mismatch
-      const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-      if (direction !== 'both' && (isLongTarget || isShortTarget)) {
-        const portDir = isLongTarget ? 'Long' : 'Short';
-        const selDir = direction === 'long' ? 'Long' : 'Short';
-        titleEl.textContent = `⚠ Несоответствие: направление "${selDir}", но провод подключён к "${portDir}" порту`;
-      } else {
-        titleEl.textContent = `⚠ Несоответствие: сигнал "${sourcePortId}" подключён к "${targetPortId}" порту`;
-      }
-      path.appendChild(titleEl);
-    }
-
-    path.setAttribute('d', createBezierPath(startX, startY, endX, endY, true));
-    path.dataset.connectionId = conn.id;
-
-    // Event listeners handled by delegation in initConnectionSystem()
-
-    svg.appendChild(path);
-
-    // Mark ports as connected
-    sourcePort.classList.add('connected');
-    targetPort.classList.add('connected');
-  });
-}
-
-function createBezierPath(x1, y1, x2, y2, fromOutput) {
-  const dx = Math.abs(x2 - x1);
-  const controlOffset = Math.max(50, dx * 0.5);
-
-  if (fromOutput) {
-    return `M ${x1} ${y1} C ${x1 + controlOffset} ${y1}, ${x2 - controlOffset} ${y2}, ${x2} ${y2}`;
-  } else {
-    return `M ${x1} ${y1} C ${x1 - controlOffset} ${y1}, ${x2 + controlOffset} ${y2}, ${x2} ${y2}`;
-  }
-}
-
-function deleteConnection(connectionId) {
-  const index = connections.findIndex((c) => c.id === connectionId);
-  if (index !== -1) {
-    pushUndo();
-    connections.splice(index, 1);
-    // BUG#4 FIX: renderBlocks() already calls renderConnections() internally — no double render
-    renderBlocks(); // Update port states + connections
-  }
-}
-
-/**
- * Disconnect all connections from a specific port (right-click on port).
- * Removes every connection where the port is either source or target.
- * @param {HTMLElement} portElement - The .port DOM element
- */
-function disconnectPort(portElement) {
-  const blockId = portElement.dataset.blockId;
-  const portId = portElement.dataset.portId;
-  const direction = portElement.dataset.direction;
-
-  if (!blockId || !portId) return;
-
-  // Find all connections involving this port
-  const toRemove = connections.filter(c => {
-    if (direction === 'output') {
-      return c.source.blockId === blockId && c.source.portId === portId;
-    } else {
-      return c.target.blockId === blockId && c.target.portId === portId;
-    }
-  });
-
-  if (toRemove.length === 0) return;
-
-  pushUndo();
-  const removeIds = new Set(toRemove.map(c => c.id));
-  for (let i = connections.length - 1; i >= 0; i--) {
-    if (removeIds.has(connections[i].id)) {
-      connections.splice(i, 1);
-    }
-  }
-
-  renderConnections();
-  renderBlocks();
-  console.log(`[Strategy Builder] Disconnected ${toRemove.length} connection(s) from port ${portId} on block ${blockId}`);
-}
 
 // Modal functions
 function openTemplatesModal() {
@@ -9766,634 +9124,6 @@ function importTemplateFromFile(file) {
   reader.readAsText(file);
 }
 
-// Undo/Redo helpers
-function getStateSnapshot() {
-  return {
-    blocks: JSON.parse(JSON.stringify(strategyBlocks)),
-    connections: JSON.parse(JSON.stringify(connections))
-  };
-}
-
-function restoreStateSnapshot(snapshot) {
-  if (!snapshot?.blocks) return;
-  strategyBlocks.length = 0;
-  strategyBlocks.push(...snapshot.blocks);
-  connections.length = 0;
-  connections.push(...(snapshot.connections || []));
-  setSBBlocks(strategyBlocks);
-  setSBConnections(connections);
-  if (selectedBlockId && !strategyBlocks.some((b) => b.id === selectedBlockId)) {
-    selectedBlockId = null;
-    setSBSelectedBlockId(null);
-  }
-  // Reset autosave payload so the restored state gets saved to localStorage
-  lastAutoSavePayload = null;
-  setSBLastAutoSavePayload(null);
-  renderBlocks(); // renderBlocks calls renderConnections() internally — BUG#4 FIX: no extra call
-  renderBlockProperties();
-  dispatchBlocksChanged();
-  // Re-validate if the validation panel is currently visible (BUG#11)
-  const vp = document.querySelector('.validation-panel');
-  if (vp && vp.classList.contains('visible')) {
-    validateStrategy().catch((err) => console.warn('[Strategy Builder] Re-validate error:', err));
-  }
-}
-
-function pushUndo() {
-  const snapshot = getStateSnapshot();
-  if (undoStack.length >= MAX_UNDO_HISTORY) undoStack.shift();
-  undoStack.push(snapshot);
-  redoStack.length = 0;
-  updateUndoRedoButtons();
-}
-
-function undo() {
-  if (undoStack.length === 0) return;
-  redoStack.push(getStateSnapshot());
-  const prev = undoStack.pop();
-  restoreStateSnapshot(prev);
-  updateUndoRedoButtons();
-  showNotification(`Отмена (осталось: ${undoStack.length})`, 'info');
-}
-
-function redo() {
-  if (redoStack.length === 0) return;
-  undoStack.push(getStateSnapshot());
-  const next = redoStack.pop();
-  restoreStateSnapshot(next);
-  updateUndoRedoButtons();
-  showNotification(`Повтор (осталось: ${redoStack.length})`, 'info');
-}
-
-/**
- * Update undo/redo button states and tooltips
- */
-function updateUndoRedoButtons() {
-  const undoBtn = document.querySelector('button[onclick="undo()"]');
-  const redoBtn = document.querySelector('button[onclick="redo()"]');
-
-  if (undoBtn) {
-    undoBtn.disabled = undoStack.length === 0;
-    undoBtn.title = undoStack.length > 0
-      ? `Отмена (${undoStack.length} шагов)`
-      : 'Отмена (нет действий)';
-    undoBtn.classList.toggle('btn-disabled', undoStack.length === 0);
-  }
-
-  if (redoBtn) {
-    redoBtn.disabled = redoStack.length === 0;
-    redoBtn.title = redoStack.length > 0
-      ? `Повтор (${redoStack.length} шагов)`
-      : 'Повтор (нет действий)';
-    redoBtn.classList.toggle('btn-disabled', redoStack.length === 0);
-  }
-}
-
-// Toolbar functions (called from HTML buttons)
-
-function deleteSelected() {
-  if (selectedBlockId) {
-    const block = strategyBlocks.find((b) => b.id === selectedBlockId);
-    if (block && block.isMain) {
-      console.log('Cannot delete main Strategy node');
-      return;
-    }
-    pushUndo();
-
-    // Remove connections involving this block
-    const connectionsToRemove = connections.filter(
-      (c) =>
-        c.source.blockId === selectedBlockId ||
-        c.target.blockId === selectedBlockId
-    );
-    connectionsToRemove.forEach((c) => {
-      const idx = connections.indexOf(c);
-      if (idx !== -1) connections.splice(idx, 1);
-    });
-
-    strategyBlocks = strategyBlocks.filter((b) => b.id !== selectedBlockId);
-    selectedBlockId = null;
-    setSBBlocks(strategyBlocks);
-    setSBConnections(connections);
-    setSBSelectedBlockId(null);
-    renderBlocks();
-    renderBlockProperties();
-  }
-}
-
-function duplicateSelected() {
-  if (selectedBlockId) {
-    const block = strategyBlocks.find((b) => b.id === selectedBlockId);
-    if (block && !block.isMain) {
-      pushUndo();
-      const newBlock = {
-        ...block,
-        id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        x: block.x + 30,
-        y: block.y + 30,
-        isMain: false,
-        params: { ...block.params }
-      };
-      strategyBlocks.push(newBlock);
-      setSBBlocks(strategyBlocks);
-      renderBlocks();
-      selectBlock(newBlock.id);
-    }
-  }
-}
-
-function alignBlocks(direction) {
-  console.log(`Align ${direction}`);
-}
-
-function autoLayout() {
-  console.log('Auto layout');
-}
-
-function fitToScreen() {
-  resetZoom();
-}
-
-function zoomIn() {
-  zoom = Math.min(zoom + 0.1, 2);
-  setSBZoom(zoom);
-  updateZoom();
-}
-
-function zoomOut() {
-  zoom = Math.max(zoom - 0.1, 0.5);
-  setSBZoom(zoom);
-  updateZoom();
-}
-
-function resetZoom() {
-  zoom = 1;
-  setSBZoom(zoom);
-  updateZoom();
-}
-
-function updateZoom() {
-  document.getElementById('zoomLevel').textContent =
-    `${Math.round(zoom * 100)}%`;
-  document.getElementById('blocksContainer').style.transform = `scale(${zoom})`;
-  document.getElementById('blocksContainer').style.transformOrigin = '0 0';
-}
-
-// =============================================
-// EXIT BLOCK TYPES (standalone — backend reads from builder_blocks, no connections needed)
-// =============================================
-const EXIT_BLOCK_TYPES = new Set([
-  'static_sltp', 'trailing_stop_exit', 'atr_exit',
-  'multi_tp_exit',
-  'tp_percent', 'sl_percent',
-  'rsi_close', 'stoch_close', 'channel_close', 'ma_close',
-  'psar_close', 'time_bars_close'
-]);
-
-/**
- * Quick 3-part validation for pre-backtest check.
- * Returns { valid, errors[], warnings[] } without updating UI panels.
- *
- * Part 1: Parameters (symbol, dates, capital)
- * Part 2: Entry conditions (connections to entry_long/entry_short)
- * Part 3: Exit conditions (exit blocks OR connections to exit_long/exit_short)
- */
-function validateStrategyCompleteness() {
-  const result = { valid: true, errors: [], warnings: [] };
-
-  const mainNode = strategyBlocks.find((b) => b.isMain);
-  if (!mainNode) {
-    result.valid = false;
-    result.errors.push('Main strategy node is missing');
-    return result;
-  }
-
-  // Part 1: Parameters
-  const symbol = document.getElementById('backtestSymbol')?.value?.trim();
-  const startDate = document.getElementById('backtestStartDate')?.value?.trim();
-  const endDate = document.getElementById('backtestEndDate')?.value?.trim();
-  const capital = parseFloat(document.getElementById('backtestCapital')?.value);
-  if (!symbol) { result.valid = false; result.errors.push('⚙️ Параметры: не выбран Symbol'); }
-  if (!startDate || !endDate) { result.valid = false; result.errors.push('⚙️ Параметры: не заданы даты'); }
-  if (startDate && endDate && startDate >= endDate) {
-    result.valid = false;
-    result.errors.push('⚙️ Параметры: Start Date должна быть раньше End Date');
-  }
-  if (startDate && endDate && startDate < endDate) {
-    const diffMs = new Date(endDate) - new Date(startDate);
-    const diffYears = diffMs / (365.25 * 24 * 60 * 60 * 1000);
-    if (diffYears > 10) {
-      result.warnings.push('⚙️ Параметры: диапазон дат > 10 лет — бэктест может быть очень долгим');
-    }
-  }
-  if (!capital || capital <= 0) { result.valid = false; result.errors.push('⚙️ Параметры: Capital должен быть > 0'); }
-
-  // Part 2: Entry conditions
-  const hasEntryLong = connections.some((c) =>
-    c.target.blockId === mainNode.id && c.target.portId === 'entry_long'
-  );
-  const hasEntryShort = connections.some((c) =>
-    c.target.blockId === mainNode.id && c.target.portId === 'entry_short'
-  );
-  if (!hasEntryLong && !hasEntryShort) {
-    result.valid = false;
-    result.errors.push('🟢 Вход: нет условий входа (подключите сигналы к Entry Long или Entry Short)');
-  }
-
-  // Part 3: Exit conditions
-  const hasExitBlocks = strategyBlocks.some((b) =>
-    !b.isMain && EXIT_BLOCK_TYPES.has(b.type)
-  );
-  const hasExitSignals = connections.some((c) =>
-    c.target.blockId === mainNode.id &&
-    (c.target.portId === 'exit_long' || c.target.portId === 'exit_short')
-  );
-  if (!hasExitBlocks && !hasExitSignals) {
-    result.valid = false;
-    result.errors.push('🔴 Выход: нет условий выхода (добавьте блок SL/TP или подключите сигналы к Exit Long/Exit Short)');
-  } else if (!hasExitBlocks) {
-    result.warnings.push('🔴 Выход: нет блока SL/TP — нет защиты стоп-лоссом');
-  }
-
-  return result;
-}
-
-// Strategy actions
-async function validateStrategy() {
-  try {
-    console.log('[Strategy Builder] validateStrategy called');
-    console.log('[Strategy Builder] Current blocks:', strategyBlocks.length);
-    console.log('[Strategy Builder] Current connections:', connections.length);
-
-    showNotification('Валидация стратегии...', 'info');
-
-    const result = {
-      valid: true,
-      errors: [],
-      warnings: []
-    };
-
-    // =============================================
-    // PART 0: BASIC STRUCTURE
-    // =============================================
-
-    // Check for blocks
-    if (strategyBlocks.length === 0) {
-      result.valid = false;
-      result.errors.push('Strategy has no blocks');
-    }
-
-    // Check for main strategy node
-    const mainNode = strategyBlocks.find((b) => b.isMain);
-    if (!mainNode) {
-      result.valid = false;
-      result.errors.push('Main strategy node is missing');
-    }
-
-    // =============================================
-    // PART 1: PARAMETERS (Properties panel)
-    // =============================================
-    const symbol = document.getElementById('backtestSymbol')?.value?.trim();
-    const startDate = document.getElementById('backtestStartDate')?.value?.trim();
-    const endDate = document.getElementById('backtestEndDate')?.value?.trim();
-    const capital = parseFloat(document.getElementById('backtestCapital')?.value);
-
-    if (!symbol) {
-      result.valid = false;
-      result.errors.push('⚙️ Parameters: Symbol not selected');
-    }
-    if (!startDate || !endDate) {
-      result.valid = false;
-      result.errors.push('⚙️ Parameters: Start/End date not set');
-    }
-    if (!capital || capital <= 0) {
-      result.valid = false;
-      result.errors.push('⚙️ Parameters: Initial capital must be > 0');
-    }
-
-    // =============================================
-    // PART 2: ENTRY CONDITIONS
-    // =============================================
-    if (mainNode) {
-      const entryLongConns = connections.filter((c) =>
-        c.target.blockId === mainNode.id && c.target.portId === 'entry_long'
-      );
-      const entryShortConns = connections.filter((c) =>
-        c.target.blockId === mainNode.id && c.target.portId === 'entry_short'
-      );
-
-      const hasEntryLong = entryLongConns.length > 0;
-      const hasEntryShort = entryShortConns.length > 0;
-
-      if (!hasEntryLong && !hasEntryShort) {
-        result.valid = false;
-        result.errors.push('🟢 Entry: No entry conditions connected (connect signals to Entry Long or Entry Short)');
-      } else {
-        // Check that connected sources are condition/logic blocks OR indicators with signal ports (long/short)
-        const allEntryConns = [...entryLongConns, ...entryShortConns];
-        const hasConditionSignals = allEntryConns.some((c) => {
-          const sourceBlock = strategyBlocks.find((b) => b.id === c.source.blockId);
-          if (!sourceBlock) return false;
-          // Direct condition/logic blocks
-          if (sourceBlock.category === 'condition' || sourceBlock.category === 'logic') return true;
-          if (['less_than', 'greater_than', 'crossover', 'crossunder', 'equals', 'between', 'and', 'or', 'not'].includes(sourceBlock.type)) return true;
-          // Indicator blocks with condition-type output ports (e.g. RSI long/short, MACD long/short)
-          const sourcePortId = c.source.portId;
-          const portDef = getBlockPorts(sourceBlock.type, sourceBlock.category);
-          if (portDef && portDef.outputs) {
-            const port = portDef.outputs.find((p) => p.id === sourcePortId);
-            if (port && port.type === 'condition') return true;
-          }
-          return false;
-        });
-        if (!hasConditionSignals) {
-          result.warnings.push('🟢 Entry: Entry ports connected but no condition blocks detected');
-        }
-
-        // Info about which entries are connected (only warn if direction is "both")
-        const direction = document.getElementById('builderDirection')?.value || 'both';
-        if (hasEntryLong && !hasEntryShort && direction === 'both') {
-          result.warnings.push('🟢 Entry: Only Long entries — consider adding Short for "both" direction');
-        } else if (!hasEntryLong && hasEntryShort && direction === 'both') {
-          result.warnings.push('🟢 Entry: Only Short entries — consider adding Long for "both" direction');
-        }
-      }
-    }
-
-    // =============================================
-    // PART 3: EXIT CONDITIONS
-    // =============================================
-    // Check for exit blocks (standalone — backend reads them from builder_blocks)
-    const exitBlocks = strategyBlocks.filter((b) =>
-      !b.isMain && EXIT_BLOCK_TYPES.has(b.type)
-    );
-    const hasExitBlocks = exitBlocks.length > 0;
-
-    // Check for signal-based exits (connections to exit_long/exit_short)
-    let hasExitSignals = false;
-    if (mainNode) {
-      const exitLongConns = connections.filter((c) =>
-        c.target.blockId === mainNode.id && c.target.portId === 'exit_long'
-      );
-      const exitShortConns = connections.filter((c) =>
-        c.target.blockId === mainNode.id && c.target.portId === 'exit_short'
-      );
-      hasExitSignals = exitLongConns.length > 0 || exitShortConns.length > 0;
-    }
-
-    if (!hasExitBlocks && !hasExitSignals) {
-      result.valid = false;
-      result.errors.push('🔴 Exit: No exit conditions (add SL/TP block or connect signals to Exit Long/Exit Short)');
-    } else {
-      // Detailed info about exits
-      const exitInfo = [];
-      if (hasExitBlocks) {
-        const exitNames = exitBlocks.map((b) => b.name || b.type).join(', ');
-        exitInfo.push(`blocks: ${exitNames}`);
-      }
-      if (hasExitSignals) {
-        exitInfo.push('signal exits connected');
-      }
-
-      // Warn if no SL/TP specifically (risk management)
-      const hasSLTP = exitBlocks.some((b) =>
-        b.type === 'static_sltp' || b.type === 'tp_percent' || b.type === 'sl_percent' || b.type === 'atr_exit'
-      );
-      if (!hasSLTP) {
-        result.warnings.push('🔴 Exit: No SL/TP block — trades have no stop-loss protection');
-      }
-    }
-
-    // =============================================
-    // DISCONNECTED BLOCKS CHECK
-    // =============================================
-
-    // Check for disconnected blocks (blocks without connections)
-    const connectedBlockIds = new Set();
-    connections.forEach((c) => {
-      connectedBlockIds.add(c.source.blockId);
-      connectedBlockIds.add(c.target.blockId);
-    });
-    // Exit blocks don't need connections (backend reads them from builder_blocks)
-    const disconnectedBlocks = strategyBlocks.filter((b) =>
-      !b.isMain && !connectedBlockIds.has(b.id) && !EXIT_BLOCK_TYPES.has(b.type)
-    );
-    if (disconnectedBlocks.length > 0) {
-      result.warnings.push(`${disconnectedBlocks.length} block(s) are not connected`);
-    }
-
-    // =============================================
-    // BLOCK PARAMETER VALIDATION
-    // =============================================
-
-    let blocksWithInvalidParams = 0;
-    strategyBlocks.forEach((block) => {
-      if (block.isMain) return; // Skip main strategy node
-
-      const paramValidation = validateBlockParams(block);
-      updateBlockValidationState(block.id, paramValidation);
-
-      if (!paramValidation.valid) {
-        blocksWithInvalidParams++;
-        // Add first error as detailed message
-        if (paramValidation.errors.length > 0) {
-          result.errors.push(`Block "${block.name}": ${paramValidation.errors[0]}`);
-        }
-      }
-    });
-
-    if (blocksWithInvalidParams > 0) {
-      result.valid = false;
-      if (blocksWithInvalidParams > 1) {
-        result.warnings.push(`${blocksWithInvalidParams} blocks have invalid parameters (hover for details)`);
-      }
-    }
-
-    console.log('[Strategy Builder] Validation result:', result);
-    updateValidationPanel(result);
-
-  } catch (error) {
-    console.error('[Strategy Builder] Validation error:', error);
-    showNotification(`Ошибка валидации: ${error.message}`, 'error');
-    updateValidationPanel({
-      valid: false,
-      errors: [`Validation failed: ${error.message}`],
-      warnings: []
-    });
-  }
-}
-
-function updateValidationPanel(result) {
-  console.log('[Strategy Builder] updateValidationPanel called');
-  const status = document.getElementById('validationStatus');
-  const list = document.getElementById('validationList');
-
-  if (!status || !list) {
-    console.warn('[Strategy Builder] Validation panel elements not found');
-    // Fallback: show in console and toast notification
-    const messages = [...result.errors, ...result.warnings];
-    if (messages.length > 0) {
-      showNotification(`Валидация:\n${messages.join('\n')}`, 'warning');
-    } else {
-      showNotification('Стратегия валидна!', 'success');
-    }
-    return;
-  }
-
-  // Note: Sidebar-right opening is handled separately by the Validate button
-  // Validation panel visibility is controlled by CSS classes, not inline styles
-
-  // Update status
-  if (result.valid && result.errors.length === 0) {
-    status.className = 'validation-status valid';
-    status.innerHTML = '<i class="bi bi-check-circle-fill"></i> Valid';
-    status.style.color = '#28a745';
-  } else {
-    status.className = 'validation-status invalid';
-    status.innerHTML = '<i class="bi bi-x-circle-fill"></i> Invalid';
-    status.style.color = '#dc3545';
-  }
-
-  // Build messages HTML
-  let html = '';
-  result.errors.forEach((err) => {
-    html += `<div class="validation-item error"><i class="bi bi-x-circle"></i><span>${err}</span></div>`;
-  });
-  result.warnings.forEach((warn) => {
-    html += `<div class="validation-item warning"><i class="bi bi-exclamation-triangle"></i><span>${warn}</span></div>`;
-  });
-
-  if (html === '') {
-    html =
-      '<div class="validation-item info"><i class="bi bi-info-circle"></i><span>Strategy is ready for backtesting</span></div>';
-  }
-
-  list.innerHTML = html;
-  list.style.display = 'block';
-  list.style.visibility = 'visible';
-
-  console.log('[Strategy Builder] Validation panel updated', {
-    valid: result.valid,
-    errors: result.errors.length,
-    warnings: result.warnings.length,
-    statusVisible: status.offsetParent !== null,
-    listVisible: list.offsetParent !== null
-  });
-
-  // Also show notification
-  if (result.errors.length > 0) {
-    showNotification(`Валидация не пройдена: ${result.errors[0]}`, 'error');
-  } else if (result.warnings.length > 0) {
-    showNotification(`Предупреждения: ${result.warnings[0]}`, 'warning');
-  } else {
-    showNotification('Стратегия валидна!', 'success');
-  }
-}
-
-async function generateCode() {
-  console.log('[Strategy Builder] generateCode called');
-
-  // Guard: symbol must be selected before generating code
-  const symbolForCode = document.getElementById('backtestSymbol')?.value?.trim();
-  if (!symbolForCode) {
-    showNotification('Выберите тикер в поле Symbol перед генерацией кода', 'warning');
-    return;
-  }
-
-  const strategyId = getStrategyIdFromURL();
-  console.log('[Strategy Builder] Strategy ID from URL:', strategyId);
-
-  if (!strategyId) {
-    showNotification('Сохраните стратегию перед генерацией кода', 'warning');
-    if (confirm('Strategy not saved. Save now?')) {
-      await saveStrategy();
-      // Re-check after save
-      const newId = getStrategyIdFromURL();
-      if (!newId) {
-        showNotification('Не удалось получить ID стратегии после сохранения', 'error');
-        return;
-      }
-    } else {
-      return;
-    }
-  }
-
-  const finalId = getStrategyIdFromURL();
-  if (!finalId) {
-    showNotification('ID стратегии отсутствует. Невозможно сгенерировать код.', 'error');
-    return;
-  }
-
-  try {
-    showNotification('Генерация Python кода...', 'info');
-
-    const url = `/api/v1/strategy-builder/strategies/${finalId}/generate-code`;
-    console.log(`[Strategy Builder] Generate code request: POST ${url}`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        template: 'backtest',
-        include_comments: true,
-        include_logging: true,
-        async_mode: false
-      })
-    });
-
-    console.log(`[Strategy Builder] Generate code response: status=${response.status}, ok=${response.ok}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Strategy Builder] Generate code error: status=${response.status}, body=${errorText}`);
-      let errorDetail = 'Unknown error';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorDetail = errorJson.detail || errorJson.message || errorText;
-      } catch {
-        errorDetail = errorText || `HTTP ${response.status}`;
-      }
-      showNotification(`Генерация кода не удалась: ${errorDetail}`, 'error');
-      return;
-    }
-
-    const data = await response.json();
-    console.log('[Strategy Builder] Generate code success:', { success: data.success, code_length: data.code?.length || 0 });
-
-    if (!data.success) {
-      const errors = data.errors || data.detail || 'Unknown error';
-      showNotification(`Генерация кода не удалась: ${JSON.stringify(errors)}`, 'error');
-      return;
-    }
-
-    const code = data.code || '';
-    if (!code) {
-      showNotification('Генерация кода вернула пустой результат', 'warning');
-      return;
-    }
-
-    // Open code in a new window for now
-    const win = window.open('', '_blank');
-    if (win) {
-      const escaped = code
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      win.document.write(
-        `<html><head><title>Сгенерированный код стратегии</title></head><body><pre style="white-space:pre; font-family:monospace; font-size:12px; padding:16px;">${escaped}</pre></body></html>`
-      );
-      win.document.close();
-    } else {
-      // Fallback: log to console
-      console.log('Generated code:', code);
-      showNotification('Всплывающее окно заблокировано. Код в консоли.', 'warning');
-    }
-
-    showNotification('Код успешно сгенерирован', 'success');
-  } catch (err) {
-    showNotification(`Ошибка генерации кода: ${err.message}`, 'error');
-  }
-}
 
 // Helper function to get strategy ID from URL
 function getStrategyIdFromURL() {
@@ -10502,593 +9232,36 @@ function showNotification(message, type = 'info') {
   }
 }
 
-async function saveStrategy() {
-  console.log('[Strategy Builder] saveStrategy called');
-
-  // Offline guard: fall back to localStorage draft instead of failing silently
-  if (!navigator.onLine) {
-    showNotification('Нет подключения к сети. Стратегия сохранена в черновик (localStorage).', 'warning');
-    autoSaveStrategy().catch((err) => console.warn('[Strategy Builder] Offline autosave error:', err));
-    return;
-  }
-
-  const strategy = buildStrategyPayload();
-  console.log('[Strategy Builder] Strategy payload:', strategy);
-
-  // Валидация
-  if (!strategy.name || strategy.name.trim() === '') {
-    showNotification('Название стратегии обязательно', 'error');
-    return;
-  }
-
-  if (!strategy.blocks || strategy.blocks.length === 0) {
-    showNotification('Стратегия должна иметь хотя бы один блок', 'warning');
-  }
-
-  // WebSocket server-side validation before save
-  if (wsValidation && wsValidation.isWsConnected()) {
-    console.log('[Strategy Builder] Running server-side validation before save...');
-    let wsTimedOut = false;
-    const wsValidationResult = await new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
-        wsTimedOut = true;
-        resolve({ valid: true, fallback: true });
-      }, 3000);
-      wsValidation.validateStrategy(strategy.blocks, strategy.connections, (result) => {
-        clearTimeout(timeoutId);
-        resolve(result);
-      });
-    });
-
-    if (wsTimedOut) {
-      console.warn('[Strategy Builder] WS validation timeout — saving without server validation');
-      showNotification('Серверная валидация недоступна (таймаут). Сохранение без проверки.', 'warning');
-    }
-
-    if (!wsValidationResult.fallback && !wsValidationResult.valid) {
-      const errorCount = wsValidationResult.messages?.filter(m => m.severity === 'error').length || 0;
-      const warningCount = wsValidationResult.messages?.filter(m => m.severity === 'warning').length || 0;
-
-      console.warn('[Strategy Builder] Server validation failed:', wsValidationResult.messages);
-
-      if (errorCount > 0) {
-        const errorMsgs = wsValidationResult.messages
-          .filter(m => m.severity === 'error')
-          .map(m => m.message)
-          .slice(0, 3)
-          .join('\n• ');
-        showNotification(`Валидация не пройдена (${errorCount} ошибок):\n• ${errorMsgs}`, 'error');
-        return;
-      } else if (warningCount > 0) {
-        // Warnings - ask user to continue
-        const warningMsgs = wsValidationResult.messages
-          .filter(m => m.severity === 'warning')
-          .map(m => m.message)
-          .slice(0, 3)
-          .join('\n• ');
-        if (!confirm(`Обнаружены предупреждения (${warningCount}):\n• ${warningMsgs}\n\nСохранить всё равно?`)) {
-          return;
-        }
-      }
-    }
-    console.log('[Strategy Builder] Server validation passed');
-  }
-
-  try {
-    const strategyId = getStrategyIdFromURL();
-
-    // Если стратегия есть в URL, но она не Strategy Builder стратегия, создаем новую
-    // Для этого сначала проверяем, существует ли она как Strategy Builder стратегия
-    let finalStrategyId = strategyId;
-    if (strategyId) {
-      try {
-        const checkResponse = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}`);
-        if (!checkResponse.ok) {
-          console.warn(`[Strategy Builder] Strategy ${strategyId} not found as Strategy Builder strategy, will create new`);
-          finalStrategyId = null; // Создадим новую стратегию
-        }
-      } catch (checkErr) {
-        console.warn(`[Strategy Builder] Error checking strategy: ${checkErr}, will create new`);
-        finalStrategyId = null;
-      }
-    }
-
-    const method = finalStrategyId ? 'PUT' : 'POST';
-    const url = finalStrategyId
-      ? `/api/v1/strategy-builder/strategies/${finalStrategyId}`
-      : '/api/v1/strategy-builder/strategies';
-
-    console.log(`[Strategy Builder] Saving strategy: method=${method}, url=${url}, id=${finalStrategyId || 'new'}`);
-    console.log(`[Strategy Builder] Payload blocks: ${strategy.blocks.length}, connections: ${strategy.connections.length}`);
-
-    const response = await fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(strategy)
-    });
-
-    console.log(`[Strategy Builder] Save response: status=${response.status}, ok=${response.ok}`);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('[Strategy Builder] Save success:', data);
-      updateLastSaved(data.updated_at || new Date().toISOString());
-      showNotification('Стратегия успешно сохранена!', 'success');
-
-      // Clear localStorage draft — saved successfully, draft no longer needed
-      const savedId = finalStrategyId || data.id;
-      if (savedId) {
-        clearLocalStorageDraft(savedId);
-        console.log(`[Strategy Builder] Cleared localStorage draft for strategy ${savedId}`);
-      }
-
-      // Обновить URL если новая стратегия
-      if (!finalStrategyId && data.id) {
-        console.log(`[Strategy Builder] Updating URL with new strategy ID: ${data.id}`);
-        window.history.pushState({}, '', `?id=${data.id}`);
-      }
-    } else {
-      const errorText = await response.text();
-      console.error(`[Strategy Builder] Save error: status=${response.status}, body=${errorText}`);
-      let errorDetail = 'Unknown error';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorDetail = errorJson.detail || errorJson.message || errorText;
-      } catch {
-        errorDetail = errorText || `HTTP ${response.status}`;
-      }
-      showNotification(`Ошибка сохранения стратегии: ${errorDetail}`, 'error');
-    }
-  } catch (err) {
-    console.error('[Strategy Builder] Save exception:', err);
-    showNotification(`Не удалось сохранить стратегию: ${err.message}`, 'error');
-  }
+// ============================================
+// ZOOM FUNCTIONS
+// ============================================
+function fitToScreen() {
+  resetZoom();
 }
 
-function buildStrategyPayload() {
-  const nameEl = document.getElementById('strategyName');
-  const timeframeEl = document.getElementById('strategyTimeframe');
-  const marketTypeEl = document.getElementById('builderMarketType');
-  const directionEl = document.getElementById('builderDirection');
-  const symbolEl = document.getElementById('strategySymbol');
-  const backtestSymbolEl = document.getElementById('backtestSymbol');
-  const backtestCapitalEl = document.getElementById('backtestCapital');
-
-  const symbol = symbolEl?.value || backtestSymbolEl?.value || 'BTCUSDT';
-  const initialCapital = parseFloat(backtestCapitalEl?.value || 10000);
-
-  console.log('[Strategy Builder] Form elements:', {
-    name: nameEl?.value,
-    timeframe: timeframeEl?.value,
-    symbol,
-    market_type: marketTypeEl?.value,
-    direction: directionEl?.value,
-    initial_capital: initialCapital
-  });
-
-  const backtestLeverageEl = document.getElementById('backtestLeverage');
-  const backtestPositionSizeTypeEl = document.getElementById('backtestPositionSizeType');
-  const backtestPositionSizeEl = document.getElementById('backtestPositionSize');
-  const leverage = parseInt(backtestLeverageEl?.value, 10) || 10;
-  const positionSizeType = backtestPositionSizeTypeEl?.value || 'percent';
-  const positionSizeVal = parseFloat(backtestPositionSizeEl?.value) || 100;
-  const noTradeDays = getNoTradeDaysFromUI();
-  const payload = {
-    name: nameEl?.value || 'New Strategy',
-    description: '',
-    timeframe: timeframeEl?.value || '15',
-    symbol,
-    market_type: marketTypeEl?.value || 'linear',
-    direction: directionEl?.value || 'both',
-    initial_capital: initialCapital,
-    leverage,
-    position_size: positionSizeType === 'percent' ? positionSizeVal / 100 : positionSizeVal,
-    parameters: {
-      _position_size_type: positionSizeType,
-      _order_amount: positionSizeType === 'fixed_amount' ? positionSizeVal : undefined,
-      _no_trade_days: noTradeDays.length ? noTradeDays : undefined,
-      _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100,
-      _slippage: parseFloat(document.getElementById('backtestSlippage')?.value || '0') / 100,
-      _pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value || '1', 10) || 1,
-      _start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
-      _end_date: document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10)
-    },
-    blocks: strategyBlocks.map(b => ({
-      id: b.id,
-      type: b.type,
-      category: b.category,
-      name: b.name,
-      icon: b.icon,
-      x: b.x,
-      y: b.y,
-      isMain: b.isMain || false,
-      params: b.params || {},
-      optimizationParams: b.optimizationParams || {}
-    })),
-    connections: connections.map(c => ({
-      id: c.id,
-      source: c.source,
-      target: c.target,
-      type: c.type || 'data'
-    })),
-    // UI state for restoration
-    uiState: {
-      zoom: zoom,
-      strategyName: nameEl?.value || 'New Strategy',
-      savedAt: new Date().toISOString()
-    }
-  };
-
-  console.log('[Strategy Builder] Payload built:', {
-    ...payload,
-    blocks_count: payload.blocks.length,
-    connections_count: payload.connections.length
-  });
-
-  return payload;
+function zoomIn() {
+  zoom = Math.min(zoom + 0.1, 2);
+  setSBZoom(zoom);
+  updateZoom();
 }
 
-async function autoSaveStrategy() {
-  try {
-    // Skip autosave if reset was just performed
-    if (skipNextAutoSave) {
-      skipNextAutoSave = false;
-      setSBSkipNextAutoSave(false);
-      console.log('[Strategy Builder] Skipping autosave after reset');
-      return;
-    }
-
-    const strategyId = getStrategyIdFromURL() || 'draft';
-    const payload = buildStrategyPayload();
-
-    // Не автосохраняем пустые стратегии
-    if (!payload.blocks.length && !connections.length) {
-      return;
-    }
-
-    // Don't autosave if only Strategy node exists (clean state)
-    if (payload.blocks.length === 1 && payload.blocks[0].type === 'strategy' && !connections.length) {
-      console.log('[Strategy Builder] Skipping autosave - clean initial state');
-      return;
-    }
-
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastAutoSavePayload) {
-      return; // нет изменений
-    }
-    lastAutoSavePayload = serialized;
-    setSBLastAutoSavePayload(serialized);
-
-    // 1) LocalStorage draft
-    try {
-      const key = `strategy_builder_draft_${strategyId}`;
-      window.localStorage.setItem(key, serialized);
-    } catch (e) {
-      console.warn('LocalStorage autosave failed:', e);
-    }
-
-    // 2) Remote autosave only если есть реальный ID (стратегия уже сохранена)
-    if (strategyId !== 'draft') {
-      // Pre-check: skip remote save if browser is offline
-      if (!navigator.onLine) {
-        console.warn('[Strategy Builder] Autosave skipped — browser is offline');
-        return;
-      }
-
-      const url = `/api/v1/strategy-builder/strategies/${strategyId}`;
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: serialized
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        updateLastSaved(data.updated_at || new Date().toISOString());
-      } else {
-        // Тихая ошибка, без алерта — не мешать пользователю
-        console.warn('Autosave PUT failed', await response.text());
-      }
-    }
-  } catch (err) {
-    console.warn('Autosave failed:', err);
-  }
+function zoomOut() {
+  zoom = Math.max(zoom - 0.1, 0.5);
+  setSBZoom(zoom);
+  updateZoom();
 }
 
-/**
- * Migrate legacy blocks to new unified block types.
- * Converts old tp_percent + sl_percent blocks into a single static_sltp block.
- */
-function migrateLegacyBlocks(blocks) {
-  const tpBlock = blocks.find(b => b.type === 'tp_percent');
-  const slBlock = blocks.find(b => b.type === 'sl_percent');
-
-  if (!tpBlock && !slBlock) return blocks;
-
-  // Build merged static_sltp params from legacy blocks
-  const tpParams = tpBlock?.params || tpBlock?.config || {};
-  const slParams = slBlock?.params || slBlock?.config || {};
-  const mergedParams = {
-    take_profit_percent: tpParams.take_profit_percent ?? 1.5,
-    stop_loss_percent: slParams.stop_loss_percent ?? 1.5,
-    close_only_in_profit: false,
-    activate_breakeven: false,
-    breakeven_activation_percent: 0.5,
-    new_breakeven_sl_percent: 0.1
-  };
-
-  // Use position of the first found legacy block
-  const refBlock = tpBlock || slBlock;
-  const staticSltpBlock = {
-    id: refBlock.id,
-    type: 'static_sltp',
-    name: 'Static SL/TP',
-    x: refBlock.x,
-    y: refBlock.y,
-    params: mergedParams,
-    config: mergedParams
-  };
-
-  // Filter out both legacy blocks and add the merged one
-  const filtered = blocks.filter(b => b.type !== 'tp_percent' && b.type !== 'sl_percent');
-  filtered.push(staticSltpBlock);
-
-  console.log('[Migration] Converted tp_percent + sl_percent → static_sltp', mergedParams);
-  return filtered;
+function resetZoom() {
+  zoom = 1;
+  setSBZoom(zoom);
+  updateZoom();
 }
 
-async function loadStrategy(strategyId) {
-  // Close any open block params popup before loading a new strategy
-  closeBlockParamsPopup();
-
-  try {
-    const url = `/api/v1/strategy-builder/strategies/${strategyId}`;
-    console.log(`[Strategy Builder] Loading strategy: GET ${url}`);
-
-    const response = await fetch(url);
-    console.log(`[Strategy Builder] Load response: status=${response.status}, ok=${response.ok}`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        const errorText = await response.text();
-        console.error(`[Strategy Builder] Strategy not found: ${errorText}`);
-        showNotification('Стратегия не найдена. Возможно, это не Strategy Builder стратегия.', 'error');
-        return;
-      }
-      const errorText = await response.text();
-      console.error(`[Strategy Builder] Load error: status=${response.status}, body=${errorText}`);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const strategy = await response.json();
-    console.log('[Strategy Builder] Strategy loaded:', {
-      id: strategy.id,
-      name: strategy.name,
-      is_builder_strategy: strategy.is_builder_strategy,
-      blocks_count: strategy.blocks?.length || 0,
-      connections_count: strategy.connections?.length || 0
-    });
-
-    // Обновить UI поля
-    document.getElementById('strategyName').value = strategy.name || 'New Strategy';
-    syncStrategyNameDisplay();
-    if (document.getElementById('strategyTimeframe')) {
-      document.getElementById('strategyTimeframe').value = normalizeTimeframeForDropdown(strategy.timeframe) || '15';
-    }
-    if (document.getElementById('builderMarketType')) {
-      document.getElementById('builderMarketType').value = strategy.market_type || 'linear';
-    }
-    if (document.getElementById('builderDirection')) {
-      document.getElementById('builderDirection').value = strategy.direction || 'both';
-    }
-    // Синхронизировать поля бэктеста с данными стратегии
-    const backtestSymbol = document.getElementById('backtestSymbol');
-    const backtestCapital = document.getElementById('backtestCapital');
-    const backtestLeverage = document.getElementById('backtestLeverage');
-    if (backtestSymbol) backtestSymbol.value = strategy.symbol || 'BTCUSDT';
-    if (backtestCapital) backtestCapital.value = strategy.initial_capital || 10000;
-    const maxLeverage = 100; // Bug #2 fix: use 100 as default; actual max is loaded dynamically from exchange
-    const lev = Math.min(maxLeverage, Math.max(1, strategy.leverage != null ? strategy.leverage : 10));
-    const backtestLeverageRange = document.getElementById('backtestLeverageRange');
-    if (backtestLeverage) backtestLeverage.value = lev;
-    if (backtestLeverageRange) backtestLeverageRange.value = lev;
-    updateBacktestLeverageDisplay(lev);
-    const params = strategy.parameters || {};
-    const posType = params._position_size_type || 'percent';
-    const backtestPositionSizeType = document.getElementById('backtestPositionSizeType');
-    const backtestPositionSize = document.getElementById('backtestPositionSize');
-    if (backtestPositionSizeType) backtestPositionSizeType.value = posType;
-    if (backtestPositionSize) {
-      const posVal = strategy.position_size != null
-        ? (posType === 'percent' ? strategy.position_size * 100 : strategy.position_size)
-        : (params._order_amount || 100);
-      backtestPositionSize.value = posVal;
-    }
-    updateBacktestPositionSizeInput();
-    updateBacktestLeverageRisk();
-
-    const noTradeDays = strategy.parameters?._no_trade_days;
-    if (Array.isArray(noTradeDays) && noTradeDays.length >= 0) {
-      setNoTradeDaysInUI(noTradeDays);
-    }
-
-    const backtestCommission = document.getElementById('backtestCommission');
-    if (backtestCommission && strategy.parameters?._commission != null) {
-      backtestCommission.value = (strategy.parameters._commission * 100).toFixed(2);
-    }
-    const backtestSlippage = document.getElementById('backtestSlippage');
-    if (backtestSlippage && strategy.parameters?._slippage != null) {
-      backtestSlippage.value = (strategy.parameters._slippage * 100).toFixed(2);
-    }
-    const backtestPyramiding = document.getElementById('backtestPyramiding');
-    if (backtestPyramiding && strategy.parameters?._pyramiding != null) {
-      backtestPyramiding.value = strategy.parameters._pyramiding;
-    }
-
-    // Bug #3 fix: restore saved dates; don't auto-overwrite with today on load
-    const backtestStartDateEl = document.getElementById('backtestStartDate');
-    const backtestEndDateEl = document.getElementById('backtestEndDate');
-    if (backtestStartDateEl) {
-      const savedStart = strategy.parameters?._start_date || strategy.start_date || '2025-01-01';
-      backtestStartDateEl.value = savedStart;
-    }
-    if (backtestEndDateEl) {
-      const today = new Date().toISOString().slice(0, 10);
-      const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
-      // Always use the later of saved end-date or today.
-      // Rationale: DB is updated daily, so running on today's data is always valid.
-      // A strategy saved yesterday with end=2026-02-23 should automatically advance
-      // to 2026-02-24 the next day so the user gets all available candles.
-      backtestEndDateEl.value = savedEnd > today ? savedEnd : today;
-    }
-
-    // Восстановить блоки и соединения
-    pushUndo();
-    strategyBlocks.length = 0; // Clear all existing blocks
-
-    // Добавить загруженные блоки (with legacy migration + enrichment)
-    if (strategy.blocks && Array.isArray(strategy.blocks)) {
-      const migratedBlocks = migrateLegacyBlocks(strategy.blocks);
-
-      // First, handle main_strategy node
-      const mainBlock = migratedBlocks.find(b => b.isMain || b.id === 'main_strategy' || b.type === 'strategy');
-      if (mainBlock) {
-        strategyBlocks.push({
-          id: mainBlock.id || 'main_strategy',
-          type: mainBlock.type || 'strategy',
-          category: 'main',
-          name: mainBlock.name || 'Strategy',
-          icon: mainBlock.icon || 'diagram-3',
-          x: mainBlock.x || 800,
-          y: mainBlock.y || 300,
-          isMain: true,
-          params: mainBlock.params || {}
-        });
-      } else {
-        // No main node from API — create default
-        createMainStrategyNode();
-      }
-
-      // Then add other blocks with icon enrichment from blockLibrary
-      migratedBlocks.forEach(block => {
-        if (block.isMain || block.id === 'main_strategy' || block.type === 'strategy') return;
-
-        // Look up icon from blockLibrary
-        let icon = block.icon;
-        if (!icon) {
-          for (const categoryBlocks of Object.values(blockLibrary)) {
-            const def = categoryBlocks.find(b => b.id === block.type);
-            if (def) {
-              icon = def.icon;
-              break;
-            }
-          }
-        }
-
-        strategyBlocks.push({
-          id: block.id,
-          type: block.type,
-          category: block.category || 'indicator',
-          name: block.name || block.type,
-          icon: icon || 'box',
-          x: block.x || 100,
-          y: block.y || 100,
-          params: block.params || {},
-          optimizationParams: block.optimizationParams || {}
-        });
-      });
-    }
-
-    console.log('[Strategy Builder] Blocks loaded and enriched:', strategyBlocks.map(b => ({
-      id: b.id, type: b.type, category: b.category, icon: b.icon, isMain: b.isMain
-    })));
-
-    // Восстановить соединения
-    connections.length = 0;
-    if (strategy.connections && Array.isArray(strategy.connections)) {
-      connections.push(...strategy.connections);
-    }
-    normalizeAllConnections();
-    setSBBlocks(strategyBlocks);
-    setSBConnections(connections);
-
-    console.log('[Strategy Builder] Connections normalized:', connections.map(c => ({
-      id: c.id,
-      src: `${c.source.blockId}:${c.source.portId}`,
-      tgt: `${c.target.blockId}:${c.target.portId}`
-    })));
-
-    // Перерисовать canvas (renderBlocks calls renderConnections internally)
-    renderBlocks();
-
-    updateLastSaved(strategy.updated_at);
-    showNotification('Стратегия успешно загружена!', 'success');
-    // Enable action buttons now that symbol is populated from loaded strategy
-    updateRunButtonsState();
-    // Запустить проверку/синхронизацию данных для загруженного символа и TF
-    runCheckSymbolDataForProperties();
-  } catch (err) {
-    showNotification(`Ошибка загрузки стратегии: ${err.message}`, 'error');
-  }
-}
-
-async function openVersionsModal() {
-  const strategyId = getStrategyIdFromURL();
-  if (!strategyId) {
-    showNotification('Откройте существующую стратегию', 'warning');
-    return;
-  }
-  const modal = document.getElementById('versionsModal');
-  const listEl = document.getElementById('versionsList');
-  if (!modal || !listEl) return;
-
-  listEl.innerHTML = '<p class="text-muted">Загрузка...</p>';
-  modal.classList.add('active');
-
-  try {
-    const res = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/versions`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const versions = data.versions || [];
-    if (versions.length === 0) {
-      listEl.innerHTML = '<p class="text-muted">Нет сохранённых версий.</p>';
-      return;
-    }
-    listEl.innerHTML = versions
-      .map(
-        (v) => `
-        <div class="version-item d-flex justify-content-between align-items-center py-2 border-bottom">
-          <span><strong>v${v.version}</strong> · ${formatDate(v.created_at) || v.created_at || ''}</span>
-          <button class="btn btn-sm btn-outline-primary" onclick="revertToVersion('${strategyId}', ${v.id})">
-            <i class="bi bi-arrow-counterclockwise"></i> Restore
-          </button>
-        </div>
-      `
-      )
-      .join('');
-  } catch (err) {
-    listEl.innerHTML = `<p class="text-danger">Ошибка: ${escapeHtml(err.message)}</p>`;
-  }
-}
-
-function closeVersionsModal() {
-  const modal = document.getElementById('versionsModal');
-  if (modal) modal.classList.remove('active');
-}
-
-async function revertToVersion(strategyId, versionId) {
-  if (!confirm('Восстановить эту версию? Текущие изменения будут заменены.')) return;
-  try {
-    const res = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/revert/${versionId}`, {
-      method: 'POST'
-    });
-    if (!res.ok) throw new Error(await res.text());
-    closeVersionsModal();
-    await loadStrategy(strategyId);
-    showNotification('Версия восстановлена', 'success');
-  } catch (err) {
-    showNotification(`Ошибка: ${err.message}`, 'error');
-  }
+function updateZoom() {
+  document.getElementById('zoomLevel').textContent =
+    `${Math.round(zoom * 100)}%`;
+  document.getElementById('blocksContainer').style.transform = `scale(${zoom})`;
+  document.getElementById('blocksContainer').style.transformOrigin = '0 0';
 }
 
 
@@ -11196,6 +9369,143 @@ async function batchDeleteSelected() { return _myStrategiesModule ? _myStrategie
 async function cloneStrategy(id, name) { return _myStrategiesModule ? _myStrategiesModule.cloneStrategy(id, name) : Promise.resolve(); }
 async function deleteStrategyById(id, name) { return _myStrategiesModule ? _myStrategiesModule.deleteStrategyById(id, name) : Promise.resolve(); }
 function filterStrategiesList() { if (_myStrategiesModule) _myStrategiesModule.filterStrategiesList(); }
+
+
+// ============================================
+// CONNECTIONS MODULE
+// Functions are wired to ConnectionsModule instance.
+// See: frontend/js/components/ConnectionsModule.js
+// ============================================
+
+// NOTE: _connectionsModule is declared near other state vars to avoid TDZ.
+
+function _initConnectionsModule() {
+  _connectionsModule = createConnectionsModule({
+    getBlocks: () => strategyBlocks,
+    getConnections: () => connections,
+    addConnection: (c) => { connections.push(c); },
+    removeConnection: (id) => {
+      const idx = connections.findIndex(conn => conn.id === id);
+      if (idx !== -1) connections.splice(idx, 1);
+    },
+    pushUndo,
+    showNotification,
+    renderBlocks
+  });
+}
+
+// Delegate wrappers so existing call sites work unchanged
+function initConnectionSystem() { if (_connectionsModule) _connectionsModule.initConnectionSystem(); }
+function renderConnections() { if (_connectionsModule) _connectionsModule.renderConnections(); }
+function normalizeConnection(c) { return _connectionsModule ? _connectionsModule.normalizeConnection(c) : c; }
+function normalizeAllConnections() { if (_connectionsModule) _connectionsModule.normalizeAllConnections(); }
+function deleteConnection(id) { if (_connectionsModule) _connectionsModule.deleteConnection(id); }
+function disconnectPort(el) { if (_connectionsModule) _connectionsModule.disconnectPort(el); }
+function tryAutoSnapConnection(id) { if (_connectionsModule) _connectionsModule.tryAutoSnapConnection(id); }
+function createBezierPath(x1, y1, x2, y2, fo) { return _connectionsModule ? _connectionsModule.createBezierPath(x1, y1, x2, y2, fo) : ''; }
+function getPreferredStrategyPort(t) { return _connectionsModule ? _connectionsModule.getPreferredStrategyPort(t) : null; }
+
+
+// ============================================
+// SAVE/LOAD MODULE
+// See: frontend/js/components/SaveLoadModule.js
+// ============================================
+function _initSaveLoadModule() {
+  _saveLoadModule = createSaveLoadModule({
+    getBlocks: () => strategyBlocks,
+    getConnections: () => connections,
+    setBlocks: (arr) => { strategyBlocks = arr; setSBBlocks(arr); },
+    setConnections: (arr) => { connections.length = 0; connections.push(...arr); setSBConnections(connections); },
+    getStrategyIdFromURL,
+    showNotification,
+    renderBlocks,
+    normalizeAllConnections,
+    syncStrategyNameDisplay,
+    renderBlockProperties,
+    pushUndo: () => pushUndo(),
+    createMainStrategyNode,
+    getBlockLibrary: () => blockLibrary,
+    updateRunButtonsState,
+    runCheckSymbolDataForProperties,
+    updateBacktestLeverageDisplay,
+    updateBacktestPositionSizeInput,
+    updateBacktestLeverageRisk,
+    setNoTradeDaysInUI,
+    getNoTradeDaysFromUI,
+    normalizeTimeframeForDropdown,
+    getLastAutoSavePayload: () => getSBLastAutoSavePayload() ?? lastAutoSavePayload,
+    setLastAutoSavePayload: (v) => { lastAutoSavePayload = v; setSBLastAutoSavePayload(v); },
+    getSkipNextAutoSave: () => skipNextAutoSave,
+    setSkipNextAutoSave: (v) => { skipNextAutoSave = v; setSBSkipNextAutoSave(v); },
+    closeBlockParamsPopup,
+    wsValidation,
+    getZoom: () => zoom,
+    escapeHtml,
+    formatDate
+  });
+}
+async function saveStrategy() { return _saveLoadModule ? _saveLoadModule.saveStrategy() : Promise.resolve(); }
+function buildStrategyPayload() { return _saveLoadModule ? _saveLoadModule.buildStrategyPayload() : {}; }
+async function autoSaveStrategy() { return _saveLoadModule ? _saveLoadModule.autoSaveStrategy() : Promise.resolve(); }
+function migrateLegacyBlocks(blocks) { return _saveLoadModule ? _saveLoadModule.migrateLegacyBlocks(blocks) : blocks; }
+async function loadStrategy(id) { return _saveLoadModule ? _saveLoadModule.loadStrategy(id) : Promise.resolve(); }
+async function openVersionsModal() { return _saveLoadModule ? _saveLoadModule.openVersionsModal() : Promise.resolve(); }
+function closeVersionsModal() { if (_saveLoadModule) _saveLoadModule.closeVersionsModal(); }
+async function revertToVersion(sId, vId) { return _saveLoadModule ? _saveLoadModule.revertToVersion(sId, vId) : Promise.resolve(); }
+
+// ============================================
+// VALIDATE MODULE
+// See: frontend/js/components/ValidateModule.js
+// ============================================
+function _initValidateModule() {
+  _validateModule = createValidateModule({
+    getBlocks: () => strategyBlocks,
+    getConnections: () => connections,
+    getBlockPorts,
+    validateBlockParams,
+    updateBlockValidationState,
+    getStrategyIdFromURL,
+    saveStrategy: () => saveStrategy(),
+    showNotification,
+    escapeHtml
+  });
+}
+function validateStrategyCompleteness() { return _validateModule ? _validateModule.validateStrategyCompleteness() : { valid: false, errors: [], warnings: [] }; }
+async function validateStrategy() { return _validateModule ? _validateModule.validateStrategy() : Promise.resolve(); }
+function updateValidationPanel(r) { if (_validateModule) _validateModule.updateValidationPanel(r); }
+async function generateCode() { return _validateModule ? _validateModule.generateCode() : Promise.resolve(); }
+
+// ============================================
+// UNDO/REDO MODULE
+// See: frontend/js/components/UndoRedoModule.js
+// ============================================
+function _initUndoRedoModule() {
+  _undoRedoModule = createUndoRedoModule({
+    getBlocks: () => strategyBlocks,
+    getConnections: () => connections,
+    setBlocks: (arr) => { strategyBlocks = arr; setSBBlocks(arr); },
+    setConnections: (arr) => { connections.length = 0; connections.push(...arr); setSBConnections(connections); },
+    getSelectedBlockId: () => getSBSelectedBlockId(),
+    setSelectedBlockId: (id) => { selectedBlockId = id; setSBSelectedBlockId(id); },
+    renderBlocks,
+    renderBlockProperties,
+    dispatchBlocksChanged,
+    validateStrategy: () => validateStrategy(),
+    showNotification,
+    selectBlock,
+    setLastAutoSavePayload: (v) => { lastAutoSavePayload = v; setSBLastAutoSavePayload(v); }
+  });
+}
+function getStateSnapshot() { return _undoRedoModule ? _undoRedoModule.getStateSnapshot() : { blocks: [], connections: [] }; }
+function restoreStateSnapshot(s) { if (_undoRedoModule) _undoRedoModule.restoreStateSnapshot(s); }
+function pushUndo() { if (_undoRedoModule) _undoRedoModule.pushUndo(); }
+function undo() { if (_undoRedoModule) _undoRedoModule.undo(); }
+function redo() { if (_undoRedoModule) _undoRedoModule.redo(); }
+function updateUndoRedoButtons() { if (_undoRedoModule) _undoRedoModule.updateUndoRedoButtons(); }
+function deleteSelected() { if (_undoRedoModule) _undoRedoModule.deleteSelected(); }
+function duplicateSelected() { if (_undoRedoModule) _undoRedoModule.duplicateSelected(); }
+function alignBlocks(d) { if (_undoRedoModule) _undoRedoModule.alignBlocks(d); }
+function autoLayout() { if (_undoRedoModule) _undoRedoModule.autoLayout(); }
 
 
 // ============================================
@@ -11344,6 +9654,12 @@ window.blockValidationRules = blockValidationRules;
 // Connection functions
 window.renderConnections = renderConnections;
 window.deleteConnection = deleteConnection;
+window.normalizeConnection = normalizeConnection;
+window.normalizeAllConnections = normalizeAllConnections;
+window.disconnectPort = disconnectPort;
+window.tryAutoSnapConnection = tryAutoSnapConnection;
+window.createBezierPath = createBezierPath;
+window.getPreferredStrategyPort = getPreferredStrategyPort;
 
 // Canvas functions
 window.zoomIn = zoomIn;
@@ -11356,6 +9672,11 @@ window.exportAsTemplate = exportAsTemplate;
 window.importTemplateFromFile = importTemplateFromFile;
 window.revertToVersion = revertToVersion;
 window.deleteSelected = deleteSelected;
+window.getStateSnapshot = getStateSnapshot;
+window.restoreStateSnapshot = restoreStateSnapshot;
+window.buildStrategyPayload = buildStrategyPayload;
+window.migrateLegacyBlocks = migrateLegacyBlocks;
+window.updateValidationPanel = updateValidationPanel;
 
 // LocalStorage persistence functions
 window.tryLoadFromLocalStorage = tryLoadFromLocalStorage;
