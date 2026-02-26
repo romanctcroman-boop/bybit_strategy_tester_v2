@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P0-5 COMPLETE: Centralized metric formulas — single source of truth (commit 29c8108ac):**
+
+    Migrated `FallbackEngineV4._calculate_metrics` (122-line inline) to `backend/backtesting/formulas.py`.
+    Both `FallbackEngineV4` and `NumbaEngineV2` now use the same TV-parity formula library.
+
+    **Fixes in FallbackV4 after migration:**
+    - `profit_factor`: was `gp/gl if gl>0 else float("inf")` → now capped at 100.0 (TV-parity)
+    - `max_drawdown`: was `(peak-equity)/peak` (divide-by-zero if peak=0) → now `np.where(peak>0, ...)` safe
+    - `sharpe_ratio`: was `mean/std * sqrt(252)` (wrong daily factor, no RFR) → now `ANNUALIZATION_HOURLY=8766 + RFR=2%`
+    - `sortino_ratio`: was **completely absent** → now `calc_sortino(returns, ANNUALIZATION_HOURLY)`
+    - `payoff_ratio`, `expectancy`, `recovery_factor`: inline → centralized safe formulas
+
+    **New test file:** `tests/backtesting/test_formula_parity.py` — 59 tests:
+    - Unit tests for each formula function (win_rate, profit_factor, payoff_ratio, expectancy,
+      max_drawdown, sharpe, sortino, calmar, cagr, returns_from_equity, ulcer_index, sqn)
+    - Parity tests: FallbackV4 == NumbaV2 for same trade set
+    - Regression: sharpe uses hourly annualization (not sqrt(252))
+    - Integration: verifies both engines import from `backend.backtesting.formulas`
+
+    **Status:** `metrics_calculator.py` — no inline formulas (receives metrics from engine, correct).
+
 - **P0-1 COMPLETE: strategy_builder.js modular refactoring (2026-02-28, commit eeb75e6b3):**
 
     Extracted 7 modules from `strategy_builder.js`, reducing it from 13,620 → 9,816 lines (−28%).
