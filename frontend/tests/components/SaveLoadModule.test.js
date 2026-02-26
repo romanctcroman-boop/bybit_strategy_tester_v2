@@ -267,23 +267,23 @@ describe('saveStrategy', () => {
         vi.stubGlobal('navigator', { onLine: true });
     });
 
-  it('shows warning when strategy has no blocks', async () => {
-    setDom({ name: 'Valid Name' });
-    // Make fetch succeed (POST new strategy)
-    fetch
-      .mockResolvedValueOnce({ ok: false, text: vi.fn().mockResolvedValue('not found') })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ id: 'new-1', updated_at: new Date().toISOString() })
-      });
-    const { mod, mocks } = setup({ blocks: [] });
-    await mod.saveStrategy();
-    const allCalls = mocks.showNotification.mock.calls;
-    const hasBlocksWarning = allCalls.some(
-      ([msg, type]) => msg.includes('блок') && type === 'warning'
-    );
-    expect(hasBlocksWarning).toBe(true);
-  });    it('shows offline warning when navigator.onLine is false', async () => {
+    it('shows warning when strategy has no blocks', async () => {
+        setDom({ name: 'Valid Name' });
+        // Make fetch succeed (POST new strategy)
+        fetch
+            .mockResolvedValueOnce({ ok: false, text: vi.fn().mockResolvedValue('not found') })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: vi.fn().mockResolvedValue({ id: 'new-1', updated_at: new Date().toISOString() })
+            });
+        const { mod, mocks } = setup({ blocks: [] });
+        await mod.saveStrategy();
+        const allCalls = mocks.showNotification.mock.calls;
+        const hasBlocksWarning = allCalls.some(
+            ([msg, type]) => msg.includes('блок') && type === 'warning'
+        );
+        expect(hasBlocksWarning).toBe(true);
+    }); it('shows offline warning when navigator.onLine is false', async () => {
         vi.stubGlobal('navigator', { onLine: false });
         setDom();
         const { mod, mocks } = setup({ blocks: [makeMainBlock()] });

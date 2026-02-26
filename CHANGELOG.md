@@ -35,8 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Modules wired in `initializeStrategyBuilder()` in order:
     SaveLoad → Validate → UndoRedo → Connections.
 
-
-
     Replaced legacy `renderEquityChart` / `renderDrawdownChart` (canvas-based) in the
     Strategy Builder results modal with the `TradingViewEquityChart` component.
 
