@@ -37,7 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     New helper that detects RSI crossings occurring **within** a higher-TF bar using sub-TF
     (5m/1m) ticks. Matches TradingView's `calc_on_every_tick` behavior:
-
     - Each tick computes RSI as one-step hypothetical from bar `k-1` Wilder state (independent
       of previous tick's RSI — matches Pine Script semantics).
     - Cross fires when two consecutive ticks straddle the level.
