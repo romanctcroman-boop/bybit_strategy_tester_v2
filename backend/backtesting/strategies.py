@@ -1143,3 +1143,54 @@ def list_available_strategies() -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Convenience alias used by portfolio backtesting tests
+# ---------------------------------------------------------------------------
+
+class RSIStrategy(BaseStrategy):
+    """
+    Simple RSI mean-reversion strategy.
+
+    Generates long signals when RSI drops below *oversold* and
+    short signals when RSI rises above *overbought*.
+
+    Params:
+        period (int): RSI lookback period (default 14).
+        oversold (float): Oversold threshold (default 30).
+        overbought (float): Overbought threshold (default 70).
+    """
+
+    description = "RSI mean-reversion strategy"
+
+    def __init__(self, period: int = 14, oversold: float = 30.0, overbought: float = 70.0, **kwargs):
+        super().__init__(
+            params={"period": int(period), "oversold": oversold, "overbought": overbought},
+            **kwargs,
+        )
+        self.period = int(period)
+        self.oversold = oversold
+        self.overbought = overbought
+
+    @classmethod
+    def get_default_params(cls) -> dict:
+        return {"period": 14, "oversold": 30.0, "overbought": 70.0}
+
+    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        df = data.copy()
+        df["signal"] = 0
+
+        close = df["close"]
+        delta = close.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(com=self.period - 1, min_periods=self.period).mean()
+        avg_loss = loss.ewm(com=self.period - 1, min_periods=self.period).mean()
+        rs = avg_gain / (avg_loss + 1e-10)
+        rsi = 100 - (100 / (1 + rs))
+
+        df.loc[rsi < self.oversold, "signal"] = 1
+        df.loc[rsi > self.overbought, "signal"] = -1
+        return df
+

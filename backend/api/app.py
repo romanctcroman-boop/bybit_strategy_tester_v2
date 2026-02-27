@@ -571,14 +571,6 @@ app.include_router(
     tags=["agent-monitoring"],
 )  # NEW: Agent Monitoring - SystemMonitor metrics & alerts
 
-# Reports API
-from backend.api.routers import reports as reports_router
-
-app.include_router(
-    reports_router.router,
-    tags=["reports"],
-)  # NEW: Report Generator - strategy performance reports (JSON/HTML)
-
 app.include_router(
     enhanced_ml_router.router, tags=["machine-learning"]
 )  # NEW: Enhanced ML - drift detection, model registry, AutoML, online learning
