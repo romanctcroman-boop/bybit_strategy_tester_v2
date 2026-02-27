@@ -38,7 +38,9 @@ export function createMyStrategiesModule(deps) {
     // ── fetchStrategiesList ───────────────────────────────────────────────────
     async function fetchStrategiesList() {
         try {
-            const resp = await fetch('/api/v1/strategy-builder/strategies?page=1&page_size=100');
+            const resp = await fetch('/api/v1/strategy-builder/strategies?page=1&page_size=100', {
+                cache: 'no-store'
+            });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             _strategiesCache = data.strategies || [];
@@ -248,7 +250,7 @@ export function createMyStrategiesModule(deps) {
             showNotification(`Deleted ${data.deleted_count} strateg${data.deleted_count === 1 ? 'y' : 'ies'}`, 'success');
 
             _selectedStrategyIds.clear();
-            _strategiesCache = null;
+            _strategiesCache = [];
             const strategies = await fetchStrategiesList();
             renderStrategiesList(strategies);
             updateBatchDeleteUI();
@@ -288,7 +290,7 @@ export function createMyStrategiesModule(deps) {
             showNotification(`Strategy "${name}" deleted`, 'success');
             _selectedStrategyIds.delete(strategyId);
 
-            _strategiesCache = null;
+            _strategiesCache = [];
             const strategies = await fetchStrategiesList();
             renderStrategiesList(strategies);
             updateBatchDeleteUI();
