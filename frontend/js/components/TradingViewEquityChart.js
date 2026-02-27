@@ -64,11 +64,14 @@ class TradingViewEquityChart {
       return;
     }
     this.data = data;
-    // Normalise mfe/mae fields — accept mfe_pct, mfe_percent, or mfe (all %)
+    // Normalise mfe/mae fields.
+    // Use absolute USD values (mfe / mae) for bar scaling so bars are in the
+    // same units as the equity P&L axis.  Fallback to pct-derived values only
+    // when absolute fields are absent (old result format).
     this.trades = (data.trades || []).map((t) => ({
       ...t,
-      mfe: Math.abs(Number(t.mfe_pct ?? t.mfe_percent ?? t.mfe ?? 0)),
-      mae: Math.abs(Number(t.mae_pct ?? t.mae_percent ?? t.mae ?? 0))
+      mfe: Math.abs(Number(t.mfe ?? t.mfe_pct ?? t.mfe_percent ?? 0)),
+      mae: Math.abs(Number(t.mae ?? t.mae_pct ?? t.mae_percent ?? 0))
     }));
     this.initialCapital = data.initial_capital || 10000;
     this._dbgLogged = false;  // reset per render
@@ -185,9 +188,10 @@ class TradingViewEquityChart {
     if (timestamps.length === 0) return;
 
     // ── 0. MFE/MAE histogram series — added FIRST so they render BEHIND equity ──
-    // In TV LW Charts z-order = add order: first added = bottom layer.
-    // We create them empty now; data is filled in _buildExcursionSeries().
-    // This guarantees equity line always draws on top of the bars.
+    // Bars share the same 'right' scale as equity so their zero IS the equity
+    // zero line (TradingView-style anchoring).  The equity autoscaleInfoProvider
+    // reserves ±budget space so bars stay visible even when equity is deeply
+    // negative.
     if (this.options.showTradeExcursions) {
       this._mfeSeries = this._lwChart.addHistogramSeries({
         priceScaleId: 'right',
@@ -230,14 +234,12 @@ class TradingViewEquityChart {
     }
     this._equityPoints = equityPoints;
 
-    // autoscaleInfoProvider — locks the visible Y range to the UNION of:
-    //   • equity P&L range  [minV … maxV]   (always includes 0)
-    //   • bar zone          [-budgetMae … +budgetMfe]  (when excursions on)
-    // A small pad (3%) is added above the equity max and below equity min
-    // so the line never touches the chart edge.
-    // The bar budget is NOT added on top of equity max — bars share the same
-    // zero, so their zone is already accounted for by including [-budget, 0].
-    const self = this;
+    // autoscaleInfoProvider — locks the visible Y range to the equity P&L.
+    // Always includes 0 (break-even line) with 3% breathing room at the edges.
+    // The MFE/MAE bars are on the same 'right' scale and grow from zero, so
+    // we extend the price range to always include ±budgetMfe/Mae (set after
+    // _buildExcursionSeries runs).  Before bars are built _budgetMfe = 0 so
+    // the range is just the equity range — this is fine.
     this._equitySeries.applyOptions({
       autoscaleInfoProvider: () => {
         const vals = equityPoints.map(p => p.value);
@@ -245,12 +247,9 @@ class TradingViewEquityChart {
         const maxV = Math.max(...vals, 0);   // always ≥ 0
         const minV = Math.min(...vals, 0);   // always ≤ 0
         const range = Math.max(maxV - minV, 1);
-        const pad = range * 0.03;           // 3% breathing room
-        const budgetMfe = self.options.showTradeExcursions
-          ? (self._budgetMfe || 200) : 0;
-        const budgetMae = self.options.showTradeExcursions
-          ? (self._budgetMae || 200) : 0;
-        // Union: equity zone ∪ bar zone, both anchored at zero
+        const pad = range * 0.03;            // 3% breathing room
+        const budgetMfe = this._budgetMfe || 0;
+        const budgetMae = this._budgetMae || 0;
         return {
           priceRange: {
             minValue: Math.min(minV - pad, -budgetMae),
@@ -260,8 +259,11 @@ class TradingViewEquityChart {
         };
       }
     });
+    // scaleMargins: reserve top 18% for MFE bars, bottom 18% for MAE bars.
+    // Equity curve lives in the middle 64%, zero line stays near the top of
+    // that zone when equity is deeply negative (typical losing strategy view).
     this._equitySeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.05, bottom: 0.02 }
+      scaleMargins: { top: 0.18, bottom: 0.18 }
     });
 
     // ── Zero line — dashed separator ───────────────────────────────────────
@@ -367,9 +369,8 @@ class TradingViewEquityChart {
     });
     this._bhSeries.setData(points);
 
-    // Same autoscale logic as equity: show actual B&H range + bar budgets,
-    // always include 0, never stretch beyond what the data requires.
-    const self = this;
+    // Same autoscale logic as equity: always include 0 with 3% padding.
+    // Also includes ±budget to match equity's reserved bar space.
     this._bhSeries.applyOptions({
       autoscaleInfoProvider: () => {
         const pvals = points.map(p => p.value);
@@ -378,10 +379,8 @@ class TradingViewEquityChart {
         const minV = Math.min(...pvals, 0);
         const range = Math.max(maxV - minV, 1);
         const pad = range * 0.03;
-        const budgetMfe = self.options.showTradeExcursions
-          ? (self._budgetMfe || 200) : 0;
-        const budgetMae = self.options.showTradeExcursions
-          ? (self._budgetMae || 200) : 0;
+        const budgetMfe = this._budgetMfe || 0;
+        const budgetMae = this._budgetMae || 0;
         return {
           priceRange: {
             minValue: Math.min(minV - pad, -budgetMae),
@@ -405,95 +404,121 @@ class TradingViewEquityChart {
   //
   // Bar values are expressed in equity P&L units (USDT/%) so the zero of the
   // bars IS the zero of the equity axis — they track together automatically.
+  // The equity autoscaleInfoProvider reserves ±budget space so bars stay
+  // visible even when the equity line is far below zero.
 
   _buildExcursionSeries() {
     if (!this._lwChart || !this.trades.length || !this._equityPoints?.length) return;
 
-    const maxMfe = Math.max(...this.trades.map(t => t.mfe || 0), 0.001);
-    const maxMae = Math.max(...this.trades.map(t => t.mae || 0), 0.001);
+    // In percent mode the equity axis shows % P&L, so use mfe_pct/mae_pct.
+    // In absolute mode use mfe/mae (USDT) — same units as equity axis.
+    const isPercent = this.options.displayMode === 'percent';
 
-    // ── Bar zone height in equity P&L units (USDT / %) ────────────────────
-    // Step 1: raw zone height = 35% of the visible equity range.
-    // Step 2: snap UP to nearest multiple of 50 (in equity units) for a
-    //         clean scale — e.g. 1800 range → raw=630 → snap=650.
-    // Step 3: clamp to [200, 600] so tiny or huge ranges stay reasonable.
-    //   tiny equity (range=300): raw=105 → snap=150 → clamp → 200
-    //   normal (range=1800):     raw=630 → snap=650 → clamp → 600
-    //   large (range=5000):      raw=1750 → snap=1800 → clamp → 600
-    const vals = this._equityPoints.map(p => p.value);
-    const eqMax = Math.max(...vals, 0);
-    const eqMin = Math.min(...vals, 0);
-    const eqRange = Math.max(eqMax - eqMin, 1);
+    // CRITICAL: Always use the correct field for the mode — never mix units!
+    // In absolute mode: use mfe/mae (USD values from backend)
+    // In percent mode: use mfe_pct/mae_pct (percentage values from backend)
+    const getMfe = (t) => Math.abs(Number(isPercent
+      ? (t.mfe_pct ?? t.mfe_percent ?? 0)  // Percent mode: use percentage fields only
+      : (t.mfe ?? 0)));                     // Absolute mode: use USD fields only
+    const getMae = (t) => Math.abs(Number(isPercent
+      ? (t.mae_pct ?? t.mae_percent ?? 0)  // Percent mode: use percentage fields only
+      : (t.mae ?? 0)));                     // Absolute mode: use USD fields only
 
-    const snapBudget = (raw) => {
-      const snapped = Math.ceil(raw / 50) * 50;
-      return Math.min(Math.max(snapped, 200), 600);
-    };
+    // Get equity range for proportional scaling
+    const equityValues = this._equityPoints.map(p => p.value);
+    const equityMax = Math.max(...equityValues, 0);
+    const equityMin = Math.min(...equityValues, 0);
+    const equityRange = Math.max(equityMax - equityMin, 1);
 
-    const budgetMfe = snapBudget(eqRange * 0.35);
-    const budgetMae = snapBudget(eqRange * 0.35);
-    this._budgetMfe = budgetMfe;
-    this._budgetMae = budgetMae;
+    // TradingView style: bars occupy fixed percentage of chart height
+    // This ensures all bars have consistent visual scale
+    const barHeightFraction = 0.12;  // Bars occupy 12% of chart height
+    const maxBarHeight = equityRange * barHeightFraction;
 
-    const mfeData = [];
-    const maeData = [];
+    // Calculate P90 of MFE/MAE values for scaling
+    const allMfe = this.trades.map(getMfe).filter(v => v > 0).sort((a, b) => a - b);
+    const allMae = this.trades.map(getMae).filter(v => v > 0).sort((a, b) => a - b);
+    const p90Mfe = allMfe.length ? (allMfe[Math.floor(allMfe.length * 0.90)] ?? allMfe[allMfe.length - 1]) : 1;
+    const p90Mae = allMae.length ? (allMae[Math.floor(allMae.length * 0.90)] ?? allMae[allMae.length - 1]) : 1;
 
+    // Scale factor: map p90 values to maxBarHeight so bars are proportional
+    // but still show relative differences between trades
+    const scaleMfe = p90Mfe > 0 ? maxBarHeight / p90Mfe : 1;
+    const scaleMae = p90Mae > 0 ? maxBarHeight / p90Mae : 1;
+
+    // Store for equity/BH autoscaleInfoProvider so they reserve the right gap.
+    this._budgetMfe = maxBarHeight;
+    this._budgetMae = maxBarHeight;
+
+    const mfeMap = new Map();
+    const maeMap = new Map();
+
+    // IMPORTANT: equity_curve.timestamps and trades[] are parallel arrays.
+    // Use equityPoints[i].time so bars align with equity steps (UTC-correct).
     this.trades.forEach((trade, i) => {
-      if (i >= this._equityPoints.length) return;
-      const time = this._equityPoints[i].time;
+      const epTime = i < this._equityPoints.length ? this._equityPoints[i].time : null;
+      const tradeTime = this._toUnixSec(trade.exit_time);
+      const time = epTime ?? tradeTime;
+      if (!time) return;
       const pnl = trade.pnl || 0;
-      const mfe = trade.mfe || 0;
-      const mae = trade.mae || 0;
+      const mfe = getMfe(trade);
+      const mae = getMae(trade);
 
-      // MFE: POSITIVE value → bar grows UP from zero
-      mfeData.push({
-        time,
-        value: mfe > 0 ? (mfe / maxMfe) * budgetMfe : 0,
-        color: mfe > 0
-          ? (pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)')
-          : 'rgba(0,0,0,0)'
-      });
+      // Scale MFE/MAE values proportionally — preserve relative differences
+      // but cap at maxBarHeight so bars don't overflow
+      const scaledMfe = mfe > 0 ? Math.min(mfe * scaleMfe, maxBarHeight) : 0;
+      const scaledMae = mae > 0 ? Math.min(mae * scaleMae, maxBarHeight) : 0;
 
-      // MAE: NEGATIVE value → bar grows DOWN from zero
-      maeData.push({
-        time,
-        value: mae > 0 ? -((mae / maxMae) * budgetMae) : 0,
-        color: mae > 0
-          ? (pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)')
-          : 'rgba(0,0,0,0)'
-      });
+      // MFE: positive value → bar grows UP from zero
+      if (scaledMfe > 0) {
+        mfeMap.set(time, {
+          time,
+          value: scaledMfe,
+          color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
+        });
+      }
+
+      // MAE: negative value → bar grows DOWN from zero
+      if (scaledMae > 0) {
+        maeMap.set(time, {
+          time,
+          value: -scaledMae,
+          color: pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)'
+        });
+      }
     });
 
-    // Scale locked to the snapped budget: MFE above zero, MAE below zero
+    const mfeData = Array.from(mfeMap.values()).sort((a, b) => a.time - b.time);
+    const maeData = Array.from(maeMap.values()).sort((a, b) => a.time - b.time);
+
+    // Both series on 'right' scale — same axis as equity.
+    // autoscaleInfoProvider locks the data range to ±maxBarHeight so LWC
+    // doesn't auto-zoom based on bar values (bars stay consistent height).
     const barOpts = {
       priceScaleId: 'right',
       lastValueVisible: false,
       priceLineVisible: false,
       autoscaleInfoProvider: () => ({
-        priceRange: {
-          minValue: -budgetMae,
-          maxValue: budgetMfe
-        }
+        priceRange: { minValue: -maxBarHeight, maxValue: maxBarHeight }
       })
     };
 
     if (this._mfeSeries) {
       this._mfeSeries.applyOptions(barOpts);
-      this._mfeSeries.setData(mfeData.sort((a, b) => a.time - b.time));
+      this._mfeSeries.setData(mfeData);
     } else {
       this._mfeSeries = this._lwChart.addHistogramSeries(barOpts);
-      this._mfeSeries.setData(mfeData.sort((a, b) => a.time - b.time));
+      this._mfeSeries.setData(mfeData);
     }
 
     if (this._maeSeries) {
       this._maeSeries.applyOptions({ ...barOpts });
-      this._maeSeries.setData(maeData.sort((a, b) => a.time - b.time));
+      this._maeSeries.setData(maeData);
     } else {
       this._maeSeries = this._lwChart.addHistogramSeries({ ...barOpts });
-      this._maeSeries.setData(maeData.sort((a, b) => a.time - b.time));
+      this._maeSeries.setData(maeData);
     }
 
-    // Nudge equity autoscaleInfoProvider to include bar budgets in its range
     if (this._equitySeries) {
       this._equitySeries.applyOptions({});
     }
@@ -586,8 +611,11 @@ class TradingViewEquityChart {
         if (trade.entry_price) html += `<div style="color:#787b86">Entry: ${this._fmt(trade.entry_price)}</div>`;
         if (trade.exit_price) html += `<div style="color:#787b86">Exit: ${this._fmt(trade.exit_price)}</div>`;
         html += `<div>P&amp;L: <span style="color:${tc}">${(trade.pnl || 0) >= 0 ? '+' : ''}${this._fmt(trade.pnl || 0)}</span></div>`;
-        if (trade.mfe) html += `<div style="color:#26a69a">MFE: +${Number(trade.mfe).toFixed(2)}%</div>`;
-        if (trade.mae) html += `<div style="color:#ef5350">MAE: -${Math.abs(Number(trade.mae)).toFixed(2)}%</div>`;
+        // Display MFE/MAE in percentage (use mfe_pct/mae_pct if available, otherwise fallback to mfe/mae as %)
+        const mfePct = trade.mfe_pct ?? trade.mfe_percent ?? trade.mfe ?? 0;
+        const maePct = trade.mae_pct ?? trade.mae_percent ?? trade.mae ?? 0;
+        if (mfePct) html += `<div style="color:#26a69a">MFE: +${Number(mfePct).toFixed(2)}%</div>`;
+        if (maePct) html += `<div style="color:#ef5350">MAE: -${Math.abs(Number(maePct)).toFixed(2)}%</div>`;
         html += '</div>';
       }
 

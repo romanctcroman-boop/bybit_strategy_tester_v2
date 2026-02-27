@@ -1762,9 +1762,10 @@ class BacktestEngine:
                     entry_idx = i  # kept for diagnostics/traceability
                     tp_sl_active_from = i + 1  # TV: TP/SL orders activate on bar after signal bar
                     # For short: favorable = lowest price (price going down), adverse = highest (going up)
-                    # Initialize from entry_price so first-bar intrabar moves are captured correctly
-                    max_favorable_price = entry_price  # best price = entry (will track lower)
-                    max_adverse_price = entry_price  # worst price = entry (will track higher)
+                    # Initialize from current bar's low/high so entry-bar intrabar moves are captured.
+                    # Mirrors long-entry init (max_favorable_price = current_high, max_adverse_price = current_low).
+                    max_favorable_price = current_low  # best price = lowest on entry bar (tracks lower)
+                    max_adverse_price = current_high  # worst price = highest on entry bar (tracks higher)
 
                     # Calculate ATR-based SL/TP prices at entry bar (short)
                     if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
@@ -2272,8 +2273,14 @@ class BacktestEngine:
                                 entry_time = timestamps[i]
                                 entry_idx = i
                                 tp_sl_active_from = i + 1  # TV: TP/SL activate on bar after signal bar
-                                max_favorable_price = _ep
-                                max_adverse_price = _ep
+                                # Same-bar re-entry: initialize MFE/MAE from bar's OHLC (not just _ep)
+                                # so the entry bar's full price movement is captured.
+                                if is_long:
+                                    max_favorable_price = current_high  # captures entry bar's high
+                                    max_adverse_price = current_low  # captures entry bar's low
+                                else:
+                                    max_favorable_price = current_low  # for short: best = lowest
+                                    max_adverse_price = current_high  # for short: worst = highest
                                 if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
                                     atr_sl_price = (
                                         _ep + atr_sl_values[i] * atr_sl_mult
