@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Refactored
+
+- **Sprint 1 P0 COMPLETE: Split all 4 monolithic files (>3500 lines each) into packages (commits 47386e873..4c57a7f51):**
+
+    All four P0 tasks executed with zero test regressions vs monolith baseline:
+
+    | Task | File | Lines | New Location | Commit |
+    |------|------|-------|--------------|--------|
+    | P0-1 | `backend/backtesting/gpu_optimizer.py` | 3,500 | `backend/backtesting/gpu/` package | `47386e873` |
+    | P0-2 | `backend/api/routers/optimizations.py` | 3,835 | `backend/api/routers/optimizations/` package (9 modules) | `fedd51d1d` |
+    | P0-3 | `backend/backtesting/strategy_builder_adapter.py` | 3,574 | `backend/backtesting/strategy_builder/` package | `864eb4dfa` |
+    | P0-4 | `backend/api/routers/strategy_builder.py` | 3,554 | `backend/api/routers/strategy_builder/` package | `4c57a7f51` |
+
+    **Backward compatibility:** All original import paths preserved via `__init__.py` re-exports and
+    stub modules. No callers needed updating. Test patch paths (`patch("...strategy_builder.get_db")`)
+    continue to work via `get_db` re-export in package `__init__.py`.
+
+    **Monolith backups** kept in place (`*_MONOLITH_BACKUP.py`) for reference and diff comparison.
+
 ### Added
 
 - **P0-3 COMPLETE: StateManager migration for all 6 frontend pages (commit 860b58617):**
@@ -14,7 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Completed migration of all P0-3 pages to StateManager (3 were done in a prior session).
 
     **Newly migrated pages:**
-
     - `trading.js` (829 lines): `initializeTradingState()` + `_setupTradingShimSync()` — 12 subscriptions
       covering `currentSymbol`, `currentTimeframe`, `currentSide`, `currentLeverage`,
       `candleData`, `volumeData`, and 6 chart instance slots
