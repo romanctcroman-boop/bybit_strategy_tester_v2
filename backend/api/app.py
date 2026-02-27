@@ -53,6 +53,9 @@ from backend.api.routers import (
 from backend.api.routers import (
     advanced_backtesting as advanced_backtesting_router,
 )
+from backend.api.routers import (
+    advanced_blocks as advanced_blocks_router,
+)
 from backend.api.routers import agents as agents_router
 from backend.api.routers import ai as ai_router
 from backend.api.routers import ai_pipeline as ai_pipeline_router
@@ -75,6 +78,7 @@ from backend.api.routers import (
 from backend.api.routers import enhanced_ml as enhanced_ml_router
 from backend.api.routers import executions as executions_router
 from backend.api.routers import file_ops as file_ops_router
+from backend.api.routers import genetic_optimizer as genetic_optimizer_router
 from backend.api.routers import health as health_router
 from backend.api.routers import (
     health_monitoring as health_monitoring_router,
@@ -88,10 +92,13 @@ from backend.api.routers import monitoring as monitoring_router
 from backend.api.routers import monte_carlo as monte_carlo_router
 from backend.api.routers import paper_trading as paper_trading_router
 from backend.api.routers import perplexity as perplexity_router
+from backend.api.routers import portfolio as portfolio_router
 from backend.api.routers import queue as queue_router
+from backend.api.routers import reports as reports_router
 from backend.api.routers import risk_management as risk_management_router
 from backend.api.routers import security as security_router
 from backend.api.routers import slo_error_budget as slo_router
+from backend.api.routers import social_trading as social_trading_router
 from backend.api.routers import (
     strategy_builder as strategy_builder_router,
 )
@@ -470,6 +477,10 @@ app.include_router(tick_charts_router.router, prefix="/api/v1/marketdata", tags=
 
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(optimizations.router, prefix="/api/v1/optimizations", tags=["optimizations"])
+app.include_router(genetic_optimizer_router.router, prefix="/api/v1/genetic", tags=["genetic-optimization"])
+app.include_router(portfolio_router.router, prefix="/api/v1/portfolio", tags=["portfolio"])
+app.include_router(reports_router.router, prefix="/api/v1/reports", tags=["reports"])
+app.include_router(social_trading_router.router, prefix="/api/v1/social", tags=["social-trading"])
 app.include_router(live_router.router, prefix="/api/v1", tags=["live"])
 app.include_router(live_router.router, prefix="/ws", tags=["live-ws"])
 app.include_router(
@@ -524,6 +535,11 @@ app.include_router(test_runner_router.router, prefix="/api/v1", tags=["tests"])
 app.include_router(
     advanced_backtesting_router.router, prefix="/api/v1", tags=["advanced-backtesting"]
 )  # NEW: Advanced backtesting with slippage, portfolio, analytics
+app.include_router(
+    advanced_blocks_router.router,
+    prefix="/api/v1/advanced-blocks",
+    tags=["advanced-blocks"],
+)  # P1-12: Advanced Strategy Builder Blocks (Volume Profile, Order Flow, ML Signal)
 app.include_router(perplexity_router.router, prefix="/api/v1", tags=["perplexity"])
 app.include_router(ai_router.router, prefix="/api/v1", tags=["ai"])
 app.include_router(agents_router.router, prefix="/api/v1/agents", tags=["agents"])  # NEW: AI Agents API
