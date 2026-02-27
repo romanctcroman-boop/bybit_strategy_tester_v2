@@ -20,6 +20,7 @@
  * @param {function(): string|null} deps.getStrategyIdFromURL - Reads ?id= from URL
  * @param {function(string, string): void} deps.showNotification - Toast notification
  * @param {function(): void}       deps.renderBlocks         - Re-renders canvas blocks
+ * @param {function(): void}       deps.renderConnections    - Re-renders canvas connections/wires
  * @param {function(): void}       deps.normalizeAllConnections - Normalises all connection geometry
  * @param {function(): void}       deps.syncStrategyNameDisplay - Syncs strategy name header
  * @param {function(): void}       deps.renderBlockProperties - Re-renders properties panel
@@ -53,6 +54,7 @@ export function createSaveLoadModule({
     getStrategyIdFromURL,
     showNotification,
     renderBlocks,
+    renderConnections,
     normalizeAllConnections,
     syncStrategyNameDisplay,
     // eslint-disable-next-line no-unused-vars
@@ -388,6 +390,8 @@ export function createSaveLoadModule({
      */
     async function loadStrategy(strategyId) {
         closeBlockParamsPopup();
+        // Prevent autosave from firing during load (connections not yet restored)
+        setSkipNextAutoSave(true);
 
         try {
             const url = `/api/v1/strategy-builder/strategies/${strategyId}`;
@@ -529,19 +533,23 @@ export function createSaveLoadModule({
             // Restore connections
             const connections = getConnections();
             connections.length = 0;
-            if (strategy.connections && Array.isArray(strategy.connections)) {
-                connections.push(...strategy.connections);
-            }
+            const restoredConnections = (strategy.connections && Array.isArray(strategy.connections))
+                ? [...strategy.connections]
+                : [];
+            connections.push(...restoredConnections);
             normalizeAllConnections();
             setBlocks(blocks);
-            setConnections(connections);
+            setConnections([...connections]);
 
             renderBlocks();
-            _updateLastSaved(strategy.updated_at);
+            renderConnections();
+            // Re-enable autosave now that state is fully restored
+            setSkipNextAutoSave(false);
             showNotification('Стратегия успешно загружена!', 'success');
             updateRunButtonsState();
             runCheckSymbolDataForProperties();
         } catch (err) {
+            setSkipNextAutoSave(false);
             showNotification(`Ошибка загрузки стратегии: ${err.message}`, 'error');
         }
     }

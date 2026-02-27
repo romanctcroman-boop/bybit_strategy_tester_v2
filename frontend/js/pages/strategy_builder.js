@@ -11,7 +11,10 @@
 
 /* eslint-disable indent */
 
-// Import shared utilities
+// Import advanced blocks (P2-6)
+import { createMLBlocksModule } from '../components/MLBlocksModule.js';
+import { createSentimentBlocksModule } from '../components/SentimentBlocksModule.js';
+import { createOrderFlowBlocksModule } from '../components/OrderFlowBlocksModule.js';
 import { formatDate, debounce } from '../utils.js';
 import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
 
@@ -6074,7 +6077,7 @@ function showQuickAddDialog(x, y) {
   const categoriesDiv = quickAddDialog.querySelector('.quick-add-categories');
   const mainCategories = [
     { key: 'indicators', label: 'Индикаторы', icon: 'graph-up' },
-    { key: 'filters', label: 'Фильтры', icon: 'funnel' },
+    { key: 'filters', label: 'Фильт��ы', icon: 'funnel' },
     { key: 'conditions', label: 'Условия', icon: 'signpost' },
     { key: 'exits', label: 'Выходы', icon: 'box-arrow-right' }
   ];
@@ -9419,6 +9422,7 @@ function _initSaveLoadModule() {
     getStrategyIdFromURL,
     showNotification,
     renderBlocks,
+    renderConnections,
     normalizeAllConnections,
     syncStrategyNameDisplay,
     renderBlockProperties,
