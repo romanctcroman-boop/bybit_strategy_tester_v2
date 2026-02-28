@@ -459,23 +459,59 @@ class TradingViewEquityChart {
     this._budgetMfe = maxBarHeight;
     this._budgetMae = maxBarHeight;
 
-    // KEY INSIGHT from debug:
-    // EC timestamps = bar OPEN times, which are 3h behind exit_time on 30m TF
-    // (the engine records the open of the bar that triggered the exit signal,
-    //  not the actual exit candle open).
-    // → Multiple trade exit_times map to the SAME EC timestamp → bars disappear.
+    // LWC histogram bars must use timestamps that exist in the chart's timeScale.
+    // The timeScale is defined by the equity series (EC timestamps = bar open times).
+    // Using arbitrary exit_time values causes bars to disappear because LWC can't
+    // place them on unknown time positions.
     //
-    // Fix: use trade.exit_time directly as the histogram timestamp.
-    // LWC accepts any unix-sec values — they don't have to match the equity series.
-    // This gives every trade its own unique timestamp → no collisions, no missing bars.
+    // Strategy: map each trade to its closest EC timestamp (binary search).
+    // Collision handling: if two trades map to the same EC slot, assign the second
+    // trade to the nearest FREE adjacent EC slot (walk forward/backward).
+    // This ensures every trade gets a visible bar with no overwrites.
 
-    const mfeMap = new Map();
-    const maeMap = new Map();
+    // Build sorted array of EC unix-sec times for fast lookup
+    const ecTimes = this._equityPoints.map(p => p.time).sort((a, b) => a - b);
+
+    // Binary search: index of closest EC time to targetSec
+    const closestEcIdx = (targetSec) => {
+      let lo = 0, hi = ecTimes.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (ecTimes[mid] < targetSec) lo = mid + 1; else hi = mid;
+      }
+      if (lo > 0 && Math.abs(ecTimes[lo - 1] - targetSec) <= Math.abs(ecTimes[lo] - targetSec)) lo--;
+      return lo;
+    };
+
+    // Find next free EC slot starting from idx, searching outward
+    const usedSlots = new Set();
+    const claimSlot = (startIdx) => {
+      // Search forward then backward for a free EC slot
+      for (let delta = 0; delta < ecTimes.length; delta++) {
+        const fwd = startIdx + delta;
+        if (fwd < ecTimes.length && !usedSlots.has(ecTimes[fwd])) {
+          usedSlots.add(ecTimes[fwd]);
+          return ecTimes[fwd];
+        }
+        const bwd = startIdx - delta;
+        if (delta > 0 && bwd >= 0 && !usedSlots.has(ecTimes[bwd])) {
+          usedSlots.add(ecTimes[bwd]);
+          return ecTimes[bwd];
+        }
+      }
+      return null; // shouldn't happen (more trades than EC points is impossible)
+    };
+
+    const mfeData = [];
+    const maeData = [];
 
     this.trades.forEach((trade) => {
-      // Use exit_time directly — always unique per trade, matches TV bar position
-      const finalTime = this._toUnixSec(trade.exit_time);
-      if (!finalTime) return;
+      const exitSec = this._toUnixSec(trade.exit_time);
+      if (!exitSec) return;
+
+      const idx = closestEcIdx(exitSec);
+      const slot = claimSlot(idx);
+      if (!slot) return;
 
       const pnl = trade.pnl || 0;
       const mfe = getMfe(trade);
@@ -484,29 +520,24 @@ class TradingViewEquityChart {
       const scaledMfe = mfe > 0 ? logNorm(mfe, maxMfe) * maxBarHeight : 0;
       const scaledMae = mae > 0 ? logNorm(mae, maxMae) * maxBarHeight : 0;
 
-      // MFE bar — grows UP. Sum if two trades share exact same exit_time (rare).
       if (scaledMfe > 0) {
-        const prev = mfeMap.get(finalTime);
-        mfeMap.set(finalTime, {
-          time: finalTime,
-          value: (prev ? prev.value : 0) + scaledMfe,
+        mfeData.push({
+          time: slot,
+          value: scaledMfe,
           color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
         });
       }
-
-      // MAE bar — grows DOWN. Sum if collision.
       if (scaledMae > 0) {
-        const prev = maeMap.get(finalTime);
-        maeMap.set(finalTime, {
-          time: finalTime,
-          value: (prev ? prev.value : 0) - scaledMae,
+        maeData.push({
+          time: slot,
+          value: -scaledMae,
           color: pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)'
         });
       }
     });
 
-    const mfeData = Array.from(mfeMap.values()).sort((a, b) => a.time - b.time);
-    const maeData = Array.from(maeMap.values()).sort((a, b) => a.time - b.time);
+    mfeData.sort((a, b) => a.time - b.time);
+    maeData.sort((a, b) => a.time - b.time);
 
     // Both series on 'right' scale — same axis as equity.
     // autoscaleInfoProvider locks the data range to ±maxBarHeight so LWC
