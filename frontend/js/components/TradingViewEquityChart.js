@@ -459,46 +459,42 @@ class TradingViewEquityChart {
     this._budgetMfe = maxBarHeight;
     this._budgetMae = maxBarHeight;
 
-    // Maps: unix-sec → { value, color, count } — we SUM scaled values when multiple
-    // trades share the same equity-curve timestamp (LWC requires unique timestamps,
-    // Map.set() would silently overwrite → bars disappear).
-    // summing keeps every trade visible as a combined bar height.
+    // KEY INSIGHT from debug:
+    // EC timestamps = bar OPEN times, which are 3h behind exit_time on 30m TF
+    // (the engine records the open of the bar that triggered the exit signal,
+    //  not the actual exit candle open).
+    // → Multiple trade exit_times map to the SAME EC timestamp → bars disappear.
+    //
+    // Fix: use trade.exit_time directly as the histogram timestamp.
+    // LWC accepts any unix-sec values — they don't have to match the equity series.
+    // This gives every trade its own unique timestamp → no collisions, no missing bars.
+
     const mfeMap = new Map();
     const maeMap = new Map();
 
     this.trades.forEach((trade) => {
-      const exitEpoch = this._toEpochMs(trade.exit_time);
-      if (!exitEpoch) return;
-
-      // Find the closest equity point within a 6-bar window.
-      // EC timestamps are bar open-times (offset from exit_time by ≤1 bar).
-      // We use the same 6h window as the tooltip to keep them in sync.
-      const equityTime = this._findEquityTimeForExit(exitEpoch, 6 * 3600);
-      const finalTime = equityTime ?? this._toUnixSec(trade.exit_time);
+      // Use exit_time directly — always unique per trade, matches TV bar position
+      const finalTime = this._toUnixSec(trade.exit_time);
       if (!finalTime) return;
 
       const pnl = trade.pnl || 0;
       const mfe = getMfe(trade);
       const mae = getMae(trade);
 
-      // Log-normalise: maps [0..max] → [0, minNorm..1] × maxBarHeight
-      // All non-zero bars stay visible (floor = minNorm × maxBarHeight)
       const scaledMfe = mfe > 0 ? logNorm(mfe, maxMfe) * maxBarHeight : 0;
       const scaledMae = mae > 0 ? logNorm(mae, maxMae) * maxBarHeight : 0;
 
-      // MFE bar — grows UP from zero.
-      // When multiple trades land on the same timestamp, SUM their heights.
+      // MFE bar — grows UP. Sum if two trades share exact same exit_time (rare).
       if (scaledMfe > 0) {
         const prev = mfeMap.get(finalTime);
         mfeMap.set(finalTime, {
           time: finalTime,
           value: (prev ? prev.value : 0) + scaledMfe,
-          // colour: winning trade dominates; if any trade on this ts is a loss, dim it
           color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
         });
       }
 
-      // MAE bar — grows DOWN from zero.
+      // MAE bar — grows DOWN. Sum if collision.
       if (scaledMae > 0) {
         const prev = maeMap.get(finalTime);
         maeMap.set(finalTime, {
