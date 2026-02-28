@@ -767,7 +767,7 @@ class UnifiedStateManager:
         4. Update metrics
         """
         start = time.time()
-        results = {
+        results: dict[str, Any] = {
             "synced_orders": 0,
             "synced_positions": 0,
             "conflicts_detected": 0,
@@ -851,23 +851,22 @@ class UnifiedStateManager:
         redis_hash = self._hash_order(redis_order)
         postgres_hash = self._hash_order(postgres_order)
 
-        if redis_hash != postgres_hash:
-            # Conflict exists if both were updated after last sync
-            if self.metrics.last_sync and (
-                redis_order.updated_at > self.metrics.last_sync
-                and postgres_order.updated_at > self.metrics.last_sync
-            ):
-                conflict = StateConflict(
-                    conflict_id=str(uuid.uuid4()),
-                    entity_type="order",
-                    entity_id=redis_order.order_id,
-                    redis_state=redis_order.to_dict(),
-                    postgres_state=postgres_order.to_dict(),
-                    redis_timestamp=redis_order.updated_at,
-                    postgres_timestamp=postgres_order.updated_at,
-                )
-                self._conflicts[conflict.conflict_id] = conflict
-                return conflict
+        if redis_hash != postgres_hash and (
+            self.metrics.last_sync
+            and redis_order.updated_at > self.metrics.last_sync
+            and postgres_order.updated_at > self.metrics.last_sync
+        ):
+            conflict = StateConflict(
+                conflict_id=str(uuid.uuid4()),
+                entity_type="order",
+                entity_id=redis_order.order_id,
+                redis_state=redis_order.to_dict(),
+                postgres_state=postgres_order.to_dict(),
+                redis_timestamp=redis_order.updated_at,
+                postgres_timestamp=postgres_order.updated_at,
+            )
+            self._conflicts[conflict.conflict_id] = conflict
+            return conflict
         return None
 
     async def _check_position_conflict(self, redis_pos: Position, postgres_pos: Position) -> StateConflict | None:
@@ -875,19 +874,23 @@ class UnifiedStateManager:
         redis_hash = self._hash_position(redis_pos)
         postgres_hash = self._hash_position(postgres_pos)
 
-        if redis_hash != postgres_hash and self.metrics.last_sync:
-            if redis_pos.updated_at > self.metrics.last_sync and postgres_pos.updated_at > self.metrics.last_sync:
-                conflict = StateConflict(
-                    conflict_id=str(uuid.uuid4()),
-                    entity_type="position",
-                    entity_id=redis_pos.position_id,
-                    redis_state=redis_pos.to_dict(),
-                    postgres_state=postgres_pos.to_dict(),
-                    redis_timestamp=redis_pos.updated_at,
-                    postgres_timestamp=postgres_pos.updated_at,
-                )
-                self._conflicts[conflict.conflict_id] = conflict
-                return conflict
+        if (
+            redis_hash != postgres_hash
+            and self.metrics.last_sync
+            and redis_pos.updated_at > self.metrics.last_sync
+            and postgres_pos.updated_at > self.metrics.last_sync
+        ):
+            conflict = StateConflict(
+                conflict_id=str(uuid.uuid4()),
+                entity_type="position",
+                entity_id=redis_pos.position_id,
+                redis_state=redis_pos.to_dict(),
+                postgres_state=postgres_pos.to_dict(),
+                redis_timestamp=redis_pos.updated_at,
+                postgres_timestamp=postgres_pos.updated_at,
+            )
+            self._conflicts[conflict.conflict_id] = conflict
+            return conflict
         return None
 
     async def _resolve_conflict(self, conflict: StateConflict) -> bool:
