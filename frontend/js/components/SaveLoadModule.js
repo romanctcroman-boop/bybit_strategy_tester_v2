@@ -86,8 +86,19 @@ export function createSaveLoadModule({
     // -----------------------------------------------
 
     /**
+     * Name of the strategy as it was when last loaded/saved to backend.
+     * Used to detect "Save As" intent: if current name differs → POST (new record).
+     * @type {string|null}
+     */
+    let _loadedStrategyName = null;
+
+    /**
      * Save strategy to the backend (PUT if existing, POST if new).
      * Falls back to localStorage draft when offline.
+     *
+     * "Save As" detection: if the strategy name has been changed since the
+     * last load/save, a new strategy is created (POST) and the URL is updated
+     * to point to the new ID, leaving the original strategy intact.
      */
     async function saveStrategy() {
         console.log('[SaveLoadModule] saveStrategy called');
@@ -157,7 +168,13 @@ export function createSaveLoadModule({
             const strategyId = getStrategyIdFromURL();
             let finalStrategyId = strategyId;
 
-            if (strategyId) {
+            // "Save As" detection: if the user renamed the strategy, treat it as a
+            // brand-new record (POST) instead of overwriting the original (PUT).
+            const currentName = (document.getElementById('strategyName')?.value || '').trim();
+            const nameChanged = _loadedStrategyName !== null && currentName !== _loadedStrategyName;
+
+            if (strategyId && !nameChanged) {
+                // Existing strategy with same name → verify it still exists on the server
                 try {
                     const checkResponse = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}`);
                     if (!checkResponse.ok) {
@@ -166,6 +183,9 @@ export function createSaveLoadModule({
                 } catch {
                     finalStrategyId = null;
                 }
+            } else if (nameChanged) {
+                // Name changed → force POST so a new strategy is created
+                finalStrategyId = null;
             }
 
             const method = finalStrategyId ? 'PUT' : 'POST';
@@ -182,12 +202,21 @@ export function createSaveLoadModule({
             if (response.ok) {
                 const data = await response.json();
                 _updateLastSaved(data.updated_at || new Date().toISOString());
-                showNotification('Стратегия успешно сохранена!', 'success');
+
+                // Update loaded name tracker so subsequent saves with same name do PUT
+                _loadedStrategyName = currentName;
+
+                if (nameChanged) {
+                    showNotification(`Стратегия сохранена как новая: «${currentName}»`, 'success');
+                } else {
+                    showNotification('Стратегия успешно сохранена!', 'success');
+                }
 
                 const savedId = finalStrategyId || data.id;
                 if (savedId) {
                     _clearLocalStorageDraft(savedId);
                 }
+                // Always update URL when a new record is created (POST)
                 if (!finalStrategyId && data.id) {
                     window.history.pushState({}, '', `?id=${data.id}`);
                 }
@@ -408,8 +437,11 @@ export function createSaveLoadModule({
 
             const strategy = await response.json();
 
+            // Track the loaded name so saveStrategy() can detect a rename ("Save As")
+            _loadedStrategyName = strategy.name || 'New Strategy';
+
             // Populate form fields
-            document.getElementById('strategyName').value = strategy.name || 'New Strategy';
+            document.getElementById('strategyName').value = _loadedStrategyName;
             syncStrategyNameDisplay();
 
             if (document.getElementById('strategyTimeframe')) {
