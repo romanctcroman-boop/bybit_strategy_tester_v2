@@ -1891,8 +1891,6 @@ async def sync_all_timeframes_stream(
     request: Request,
     symbol: str = Query(..., description="Trading pair symbol"),
     market_type: str = Query("linear", description="Market type: 'spot' or 'linear'"),
-    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD). Defaults to DATA_START_DATE (2025-01-01)"),
-    end_date: str | None = Query(None, description="End date (YYYY-MM-DD). Defaults to now. Cannot exceed current time."),
 ):
     """
     Stream progress of syncing ALL timeframes using Server-Sent Events (SSE).
@@ -1909,30 +1907,8 @@ async def sync_all_timeframes_stream(
     from fastapi.responses import StreamingResponse
 
     symbol = symbol.upper()
-    real_now_ts = int(datetime.now(UTC).timestamp() * 1000)
-
-    # Resolve start timestamp: use provided start_date but not earlier than DATA_START
-    if start_date:
-        try:
-            parsed_start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC)
-            parsed_start_ts = int(parsed_start.timestamp() * 1000)
-            data_start_ts = max(parsed_start_ts, DATA_START_TIMESTAMP_MS)
-        except ValueError:
-            data_start_ts = DATA_START_TIMESTAMP_MS
-    else:
-        data_start_ts = DATA_START_TIMESTAMP_MS
-
-    # Resolve end timestamp: use provided end_date but not in the future
-    if end_date:
-        try:
-            parsed_end = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=UTC)
-            # End of the selected day (23:59:59)
-            parsed_end_ts = int(parsed_end.timestamp() * 1000) + 86399000
-            now_ts = min(parsed_end_ts, real_now_ts)
-        except ValueError:
-            now_ts = real_now_ts
-    else:
-        now_ts = real_now_ts
+    data_start_ts = DATA_START_TIMESTAMP_MS
+    now_ts = int(datetime.now(UTC).timestamp() * 1000)
     total_steps = len(ALL_TIMEFRAMES)
 
     # Human-readable TF names (1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M)
