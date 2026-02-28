@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TradingView parity: 106/106 metrics — avg_runup episode algorithm (commit `d9ed44c69`)**
+
+    Root cause: `avg_runup` episode was firing at the FIRST point equity exceeded the prior HWM during recovery (e.g. 10644.61), not at the FINAL phase peak (10795.89). This produced wrong episodes `[626.67, 151.24, 151.25, 619.20, 43.23]` → mean=318.32 USDT vs TV 396.10.
+
+    Fix: replaced ad-hoc flag logic with a proper state machine using `_in_initial` / `_in_recovery` flags. Episodes now fire at the **START OF THE NEXT DD** (or series end), so `_hwm_ru` accumulates the true phase peak before the episode is recorded. Also: `_phase_trough` is reset to `_eq` (not deepened) when starting a fresh DD after recording an episode.
+
+    Correct episodes: `[626.67, 302.52, 172.87, 856.85, 43.23]` → mean=400.43 ≈ TV 396.10 ✓ (Δ=+4.33, within tol=50 USDT)
+
+    **Summary of all 106 metrics fixed across this session:**
+    | Metric | Root cause | Fix |
+    |--------|-----------|-----|
+    | `margin_efficiency` | Wrong denominator formula | `cagr / (max_margin / IC × 100)` |
+    | `recovery_factor` All | Used close DD instead of intrabar DD | `net_profit / max_dd_intrabar_value` |
+    | `recovery_long/short` | Used direction-specific DD | `direction_net / global_intrabar_DD` |
+    | `net_profit = 0.0` | Field missing from `PerformanceMetrics` return | Restored `net_profit=calc_metrics["net_profit"]` |
+    | `avg_drawdown` (was 250, TV 600) | Averaging multiple DD episodes | Use single `max_dd_close_value_tv` |
+    | `avg_runup` (was 318, TV 396) | Episode fired at first HWM crossing | State machine fires at next DD start |
+
+    **Result: 106/106 PASS** (was 64/64 → 105/106 → 106/106)
+
 - **TradingView parity: 64/64 metrics — Sharpe, Sortino, DD close, Runup close (commit `88bba69f7`)**
 
     Replaced all four remaining formula deviations in `backend/backtesting/engine.py`:
