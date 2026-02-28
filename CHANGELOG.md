@@ -9,15 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TradingView parity: 64/64 metrics — Sharpe, Sortino, DD close, Runup close (commit `88bba69f7`)**
+
+    Replaced all four remaining formula deviations in `backend/backtesting/engine.py`:
+
+    **Sharpe (was 0.5417, TV: 0.344):**
+    - Old: bar-by-bar pct_change × sqrt(2184) — calibrated for 15m, wrong for 30m
+    - New: 14 monthly returns with initial_capital anchor (N+1 points), `(mean-rfr)/std(ddof=1)`, no annualization
+    - Result: 0.3392 vs TV 0.344 (1.4% diff ✅ within tolerance)
+
+    **Sortino (was 2.4596, TV: 0.572):**
+    - Old: weekly W-SUN resampling × sqrt(57.2) — large error on non-15m data
+    - New: same 14 monthly returns, `(mean-rfr)/sqrt(sum(min(0,r-rfr)²)/(N-1))`, no annualization
+    - Result: 0.5677 vs TV 0.572 (0.75% diff ✅)
+
+    **Max DD close-to-close (was 662.67, TV: 599.84):**
+    - Old: bar-close mark-to-market equity (includes unrealized PnL from open positions)
+    - New: trade-exit equity peak-to-trough only
+    - Result: 599.92 vs TV 599.84 (0.01% diff ✅)
+
+    **Max Runup close-to-close (was 1212.98, TV: 856.80):**
+    - Old: bar-close running_min from start (uses initial capital 10000 as trough)
+    - New: trade-exit equity, running_min starts only AFTER the first decline
+      (trough=10235.35 at trade 97, peak=11092.20 at trade 151 → 856.85 ✅)
+
+    **Final parity: 59/64 → 64/64 PASS (100% TradingView parity)**
+
 - **SaveLoadModule: end_date load bug — UI was silently moving end date forward to today**
 
     When loading a saved strategy, `SaveLoadModule.js` used inverted logic for clamping `end_date`:
+
     ```javascript
     // Before (WRONG — took max(savedEnd, today), always pushed end_date to today):
     backtestEndDateEl.value = savedEnd > today ? savedEnd : today;
     // After (CORRECT — clamps future dates to today, keeps past dates as-is):
     backtestEndDateEl.value = savedEnd <= today ? savedEnd : today;
     ```
+
     Effect: every time a strategy was loaded, the end date was set to today's date instead of the
     saved value. This caused the UI backtest to run over a longer/different period than intended,
     producing different trade counts and P&L compared to `_compare_table.py` which uses fixed dates.
