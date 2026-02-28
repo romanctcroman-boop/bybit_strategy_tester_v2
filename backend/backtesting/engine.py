@@ -1701,81 +1701,91 @@ class BacktestEngine:
 
                 # Long entry
                 elif direction in ("long", "both") and long_entries[i]:
-                    entry_price = price * (1 + slippage)
-                    last_entry_price = entry_price  # Track last fill for sl_type=last_order
-                    # TradingView anchors TP/SL to the SIGNAL price (close), not the fill price.
-                    # Using signal_price for TP/SL trigger levels matches TV parity.
-                    signal_price = price  # close without slippage
-
-                    # TradingView "% of equity" sizing with recalculate=OFF:
-                    # notional = initial_capital * position_size (FIXED, not current equity)
-                    # margin   = notional / leverage
-                    # This matches TV "Объём заявки = 10% от капитала", recalculate=OFF.
-                    position_value = config.initial_capital * config.position_size  # fixed notional
-                    margin_allocated = position_value / leverage  # margin locked from cash
-                    entry_size = position_value / entry_price  # quantity in base currency
-
-                    fees = position_value * config.commission_value  # use commission_value (0.07%)
-
-                    cash -= margin_allocated + fees  # deduct only margin + entry fee
-                    entry_fees_paid = fees  # Save entry fees for accurate recording
-                    position = entry_size
-                    is_long = True
-                    entry_time = timestamps[i]
-                    entry_idx = i  # kept for diagnostics/traceability
-                    # TradingView: entry fills at close of bar i, TP/SL orders activate on bar i+1.
-                    # If bar i+1 gaps through TP, fill at bar i+1 open.
-                    tp_sl_active_from = i + 1
-                    # Initialize MFE/MAE with current bar's high/low
-                    max_favorable_price = current_high  # Best high so far
-                    max_adverse_price = current_low  # Worst low so far
-
-                    # Calculate ATR-based SL/TP prices at entry bar
-                    if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
-                        atr_sl_price = entry_price - atr_sl_values[i] * atr_sl_mult
+                    # TradingView parity: signals are generated on close of bar i,
+                    # but strategy.entry() fills at OPEN of bar i+1 (process_on_close=false default).
+                    # If i+1 is out of range, skip this signal (can't fill past last bar).
+                    if i + 1 >= len(close):
+                        pass
                     else:
-                        atr_sl_price = None
-                    if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
-                        atr_tp_price = entry_price + atr_tp_values[i] * atr_tp_mult
-                    else:
-                        atr_tp_price = None
+                        entry_price = open_prices[i + 1] * (1 + slippage)
+                        last_entry_price = entry_price  # Track last fill for sl_type=last_order
+                        # TradingView anchors TP/SL to the SIGNAL price (close of bar i).
+                        signal_price = price  # close[i] without slippage
+
+                        # TradingView "% of equity" sizing with recalculate=OFF:
+                        # notional = initial_capital * position_size (FIXED, not current equity)
+                        # margin   = notional / leverage
+                        # This matches TV "Объём заявки = 10% от капитала", recalculate=OFF.
+                        position_value = config.initial_capital * config.position_size  # fixed notional
+                        margin_allocated = position_value / leverage  # margin locked from cash
+                        entry_size = position_value / entry_price  # quantity in base currency
+
+                        fees = position_value * config.commission_value  # use commission_value (0.07%)
+
+                        cash -= margin_allocated + fees  # deduct only margin + entry fee
+                        entry_fees_paid = fees  # Save entry fees for accurate recording
+                        position = entry_size
+                        is_long = True
+                        entry_time = timestamps[i + 1]  # entry fills on bar i+1
+                        entry_idx = i + 1  # kept for diagnostics/traceability
+                        # TradingView: entry fills at open of bar i+1, TP/SL active from bar i+1
+                        # (same bar as entry — checked AFTER entry on next iteration).
+                        tp_sl_active_from = i + 1
+                        # Initialize MFE/MAE with bar i+1 OHLC (entry bar)
+                        max_favorable_price = high[i + 1]  # Best high so far (entry bar)
+                        max_adverse_price = low[i + 1]  # Worst low so far (entry bar)
+
+                        # Calculate ATR-based SL/TP prices at entry bar
+                        if use_atr_sl and atr_sl_values is not None and (i + 1) < len(atr_sl_values):
+                            atr_sl_price = entry_price - atr_sl_values[i + 1] * atr_sl_mult
+                        else:
+                            atr_sl_price = None
+                        if use_atr_tp and atr_tp_values is not None and (i + 1) < len(atr_tp_values):
+                            atr_tp_price = entry_price + atr_tp_values[i + 1] * atr_tp_mult
+                        else:
+                            atr_tp_price = None
 
                 # Short entry
                 elif direction in ("short", "both") and short_entries is not None and short_entries[i]:
-                    entry_price = price * (1 - slippage)
-                    last_entry_price = entry_price  # Track last fill for sl_type=last_order
-                    # TradingView anchors TP/SL to the SIGNAL price (close), not the fill price.
-                    signal_price = price  # close without slippage
-
-                    # TradingView "% of equity" sizing with recalculate=OFF (fixed notional).
-                    position_value = config.initial_capital * config.position_size  # fixed notional
-                    margin_allocated = position_value / leverage  # margin locked from cash
-                    entry_size = position_value / entry_price  # quantity in base currency
-
-                    fees = position_value * config.commission_value  # use commission_value (0.07%)
-
-                    cash -= margin_allocated + fees  # deduct only margin + entry fee
-                    entry_fees_paid = fees  # Save entry fees for accurate recording
-                    position = entry_size
-                    is_long = False
-                    entry_time = timestamps[i]
-                    entry_idx = i  # kept for diagnostics/traceability
-                    tp_sl_active_from = i + 1  # TV: TP/SL orders activate on bar after signal bar
-                    # For short: favorable = lowest price (price going down), adverse = highest (going up)
-                    # Initialize from current bar's low/high so entry-bar intrabar moves are captured.
-                    # Mirrors long-entry init (max_favorable_price = current_high, max_adverse_price = current_low).
-                    max_favorable_price = current_low  # best price = lowest on entry bar (tracks lower)
-                    max_adverse_price = current_high  # worst price = highest on entry bar (tracks higher)
-
-                    # Calculate ATR-based SL/TP prices at entry bar (short)
-                    if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
-                        atr_sl_price = entry_price + atr_sl_values[i] * atr_sl_mult
+                    # TradingView parity: signals are generated on close of bar i,
+                    # but strategy.entry() fills at OPEN of bar i+1 (process_on_close=false default).
+                    # If i+1 is out of range, skip this signal (can't fill past last bar).
+                    if i + 1 >= len(close):
+                        pass
                     else:
-                        atr_sl_price = None
-                    if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
-                        atr_tp_price = entry_price - atr_tp_values[i] * atr_tp_mult
-                    else:
-                        atr_tp_price = None
+                        entry_price = open_prices[i + 1] * (1 - slippage)
+                        last_entry_price = entry_price  # Track last fill for sl_type=last_order
+                        # TradingView anchors TP/SL to the SIGNAL price (close of bar i).
+                        signal_price = price  # close[i] without slippage
+
+                        # TradingView "% of equity" sizing with recalculate=OFF (fixed notional).
+                        position_value = config.initial_capital * config.position_size  # fixed notional
+                        margin_allocated = position_value / leverage  # margin locked from cash
+                        entry_size = position_value / entry_price  # quantity in base currency
+
+                        fees = position_value * config.commission_value  # use commission_value (0.07%)
+
+                        cash -= margin_allocated + fees  # deduct only margin + entry fee
+                        entry_fees_paid = fees  # Save entry fees for accurate recording
+                        position = entry_size
+                        is_long = False
+                        entry_time = timestamps[i + 1]  # entry fills on bar i+1
+                        entry_idx = i + 1  # kept for diagnostics/traceability
+                        tp_sl_active_from = i + 1  # TV: TP/SL active from entry bar (bar i+1)
+                        # For short: favorable = lowest price (price going down), adverse = highest (going up).
+                        # Initialize from bar i+1 (entry bar) OHLC.
+                        max_favorable_price = low[i + 1]  # best price = lowest on entry bar
+                        max_adverse_price = high[i + 1]  # worst price = highest on entry bar
+
+                        # Calculate ATR-based SL/TP prices at entry bar (short)
+                        if use_atr_sl and atr_sl_values is not None and (i + 1) < len(atr_sl_values):
+                            atr_sl_price = entry_price + atr_sl_values[i + 1] * atr_sl_mult
+                        else:
+                            atr_sl_price = None
+                        if use_atr_tp and atr_tp_values is not None and (i + 1) < len(atr_tp_values):
+                            atr_tp_price = entry_price - atr_tp_values[i + 1] * atr_tp_mult
+                        else:
+                            atr_tp_price = None
 
             # While in position: update MFE/MAE and check exits
             elif position > 0:

@@ -458,32 +458,30 @@ def _handle_rsi(
         long_cross_condition = pd.Series(True, index=ohlcv.index)
         short_cross_condition = pd.Series(True, index=ohlcv.index)
 
-    # ── TRADINGVIEW PARITY FIX (2026-02-28) ──────────────────────────────────
-    # After analyzing TV export a4.csv (154 trades):
-    # - 0% of trades had actual RSI crosses (cross up 24 or cross down 52)
-    # - 100% of trades were range-only entries (RSI in range without cross)
+    # ── TRADINGVIEW PARITY FIX (2026-03-01) ──────────────────────────────────
+    # After deep analysis of TV export a4.csv (154 trades) and bar-by-bar comparison:
     #
-    # This indicates TV uses "Range ONLY" logic when BOTH range and cross are enabled:
-    # - If use_cross_level=True AND use_long_range=True: use ONLY range (ignore cross)
-    # - If use_cross_level=True AND use_long_range=False: use ONLY cross
-    # - If use_cross_level=False AND use_long_range=True: use ONLY range
+    # TV signal logic: cross AND range (both conditions must be true)
+    # - RsiSE (Short Entry): RSI crosses DOWN through cross_short_level AND RSI in short_range
+    # - RsiLE (Long Entry):  RSI crosses UP through cross_long_level AND RSI in long_range
     #
-    # Previous (INCORRECT): AND logic
-    #   long_signal = long_range_condition & long_cross_condition
+    # TV executes strategy.entry() on the NEXT bar's open after the signal bar.
+    # The entry price in the trade log equals open[signal_bar + 1].
     #
-    # Also incorrect: OR logic (generates too many signals)
-    #   long_signal = long_range_condition | long_cross_condition
-    #
-    # Correct (TV parity): Range takes precedence over cross
-    #   if use_long_range: long_signal = long_range_condition
-    #   else: long_signal = long_cross_condition
+    # Example (verified against a4.csv):
+    #   Signal bar 2025-01-01 13:00 UTC: BTC RSI 52.93→51.08 (cross52 down) AND RSI∈[50,70]
+    #   Entry bar 2025-01-01 13:30 UTC: ETH open = 3334.62 ← matches TV entry price ✅
     # ──────────────────────────────────────────────────────────────────────────
-    if use_long_range:
+    if use_long_range and use_cross_level:
+        long_signal = long_cross_condition & long_range_condition
+    elif use_long_range:
         long_signal = long_range_condition
     else:
         long_signal = long_cross_condition
-    
-    if use_short_range:
+
+    if use_short_range and use_cross_level:
+        short_signal = short_cross_condition & short_range_condition
+    elif use_short_range:
         short_signal = short_range_condition
     else:
         short_signal = short_cross_condition
