@@ -424,27 +424,36 @@ class TradingViewEquityChart {
       ? (t.mae_pct ?? t.mae_percent ?? 0)  // Percent mode: use percentage fields only
       : (t.mae ?? 0)));                     // Absolute mode: use USD fields only
 
-    // Get equity range for proportional scaling
+    // Fixed chart-height budget for MFE/MAE bars (in price-axis units = equity P&L units).
+    // We use the FULL equity axis range so bars always occupy the same visual fraction
+    // of the chart regardless of which half of trades they belong to.
     const equityValues = this._equityPoints.map(p => p.value);
     const equityMax = Math.max(...equityValues, 0);
     const equityMin = Math.min(...equityValues, 0);
     const equityRange = Math.max(equityMax - equityMin, 1);
 
-    // TradingView style: bars occupy fixed percentage of chart height
-    // This ensures all bars have consistent visual scale
-    const barHeightFraction = 0.12;  // Bars occupy 12% of chart height
+    // Each bar occupies up to 20% of the full equity axis height.
+    const barHeightFraction = 0.20;
     const maxBarHeight = equityRange * barHeightFraction;
 
-    // Calculate P90 of MFE/MAE values for scaling
-    const allMfe = this.trades.map(getMfe).filter(v => v > 0).sort((a, b) => a - b);
-    const allMae = this.trades.map(getMae).filter(v => v > 0).sort((a, b) => a - b);
-    const p90Mfe = allMfe.length ? (allMfe[Math.floor(allMfe.length * 0.90)] ?? allMfe[allMfe.length - 1]) : 1;
-    const p90Mae = allMae.length ? (allMae[Math.floor(allMae.length * 0.90)] ?? allMae[allMae.length - 1]) : 1;
+    // ── Normalization: log-scale within [minBar, maxBar] mapped to [10%, 100%] ──
+    // Problem with linear P90-scaling: when early trades have large MFE/MAE and
+    // later trades have small values, the P90 anchor is dominated by the large ones,
+    // making small-value bars nearly invisible.
+    // Fix: normalise each value to [minNorm..1] using log(1+x)/log(1+max),
+    // then apply a floor of minNorm (10%) so every non-zero bar stays visible.
+    const allMfeRaw = this.trades.map(getMfe);
+    const allMaeRaw = this.trades.map(getMae);
+    const maxMfe = Math.max(...allMfeRaw, 1e-9);
+    const maxMae = Math.max(...allMaeRaw, 1e-9);
+    const minNorm = 0.10;  // smallest non-zero bar = 10% of maxBarHeight
 
-    // Scale factor: map p90 values to maxBarHeight so bars are proportional
-    // but still show relative differences between trades
-    const scaleMfe = p90Mfe > 0 ? maxBarHeight / p90Mfe : 1;
-    const scaleMae = p90Mae > 0 ? maxBarHeight / p90Mae : 1;
+    // log-normalise a raw value to [minNorm, 1]
+    const logNorm = (val, maxVal) => {
+      if (val <= 0) return 0;
+      const n = Math.log1p(val) / Math.log1p(maxVal);   // 0..1
+      return minNorm + n * (1 - minNorm);                // minNorm..1
+    };
 
     // Store for equity/BH autoscaleInfoProvider so they reserve the right gap.
     this._budgetMfe = maxBarHeight;
@@ -455,7 +464,7 @@ class TradingViewEquityChart {
 
     // CRITICAL FIX: equityPoints contains ALL equity curve timestamps (every bar),
     // while trades contains only closed trades. We must match by exit_time, NOT by index!
-    // 
+    //
     // Build a lookup map: exit_time (epoch ms) → equity point time (unix sec)
     const exitTimeToEquityTime = new Map();
     this.trades.forEach((trade) => {
@@ -473,23 +482,23 @@ class TradingViewEquityChart {
     this.trades.forEach((trade, tradeIdx) => {
       const exitEpoch = this._toEpochMs(trade.exit_time);
       const time = exitEpoch ? exitTimeToEquityTime.get(exitEpoch) : null;
-      
+
       if (!time) {
         // Fallback: use trade exit_time directly if no equity point match
         console.warn(`[MFE/MAE] No equity point match for trade #${tradeIdx + 1}, using fallback`);
       }
-      
+
       const finalTime = time ?? this._toUnixSec(trade.exit_time);
       if (!finalTime) return;
-      
+
       const pnl = trade.pnl || 0;
       const mfe = getMfe(trade);
       const mae = getMae(trade);
 
-      // Scale MFE/MAE values proportionally — preserve relative differences
-      // but cap at maxBarHeight so bars don't overflow
-      const scaledMfe = mfe > 0 ? Math.min(mfe * scaleMfe, maxBarHeight) : 0;
-      const scaledMae = mae > 0 ? Math.min(mae * scaleMae, maxBarHeight) : 0;
+      // Log-normalise: maps [0..max] → [0, minNorm..1] × maxBarHeight
+      // All non-zero bars stay visible (floor = minNorm × maxBarHeight)
+      const scaledMfe = mfe > 0 ? logNorm(mfe, maxMfe) * maxBarHeight : 0;
+      const scaledMae = mae > 0 ? logNorm(mae, maxMae) * maxBarHeight : 0;
 
       // MFE: positive value → bar grows UP from zero
       if (scaledMfe > 0) {
@@ -832,18 +841,18 @@ class TradingViewEquityChart {
     /**
      * Find the closest equity point time (unix sec) for a given exit timestamp.
      * Uses binary search for efficiency on large equity curves.
-     * 
+     *
      * @param {number} exitEpochMs - Exit time in epoch milliseconds
      * @returns {number|null} - Closest equity point time in unix seconds, or null
      */
     if (!this._equityPoints || this._equityPoints.length === 0) return null;
-    
+
     const targetTime = Math.floor(exitEpochMs / 1000);
-    
+
     // Binary search for closest time
     let left = 0;
     let right = this._equityPoints.length - 1;
-    
+
     while (left < right) {
       const mid = Math.floor((left + right) / 2);
       if (this._equityPoints[mid].time < targetTime) {
@@ -852,15 +861,15 @@ class TradingViewEquityChart {
         right = mid;
       }
     }
-    
+
     // Check both left and left-1 to find closest
     const idx = left;
     if (idx === 0) return this._equityPoints[0].time;
     if (idx >= this._equityPoints.length) return this._equityPoints[this._equityPoints.length - 1].time;
-    
+
     const diffPrev = Math.abs(this._equityPoints[idx - 1].time - targetTime);
     const diffCurr = Math.abs(this._equityPoints[idx].time - targetTime);
-    
+
     return diffPrev <= diffCurr ? this._equityPoints[idx - 1].time : this._equityPoints[idx].time;
   }
 
