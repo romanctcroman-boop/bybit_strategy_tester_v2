@@ -2366,7 +2366,17 @@ async function syncSymbolData(forceRefresh = false) {
     });
     updatePropertiesProgressBar(true, { indeterminate: false, percent: 0 });
 
-    const streamUrl = `${API_BASE}/marketdata/symbols/sync-all-tf-stream?symbol=${encodeURIComponent(symbol)}&market_type=${marketType}`;
+    // Build sync URL with date range from form fields
+    const startDateVal = document.getElementById('backtestStartDate')?.value || '';
+    const endDateRaw = document.getElementById('backtestEndDate')?.value || '';
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const endDateVal = (!endDateRaw || endDateRaw > todayStr) ? todayStr : endDateRaw;
+    const syncDateParams = [
+      startDateVal ? `start_date=${encodeURIComponent(startDateVal)}` : '',
+      endDateVal ? `end_date=${encodeURIComponent(endDateVal)}` : ''
+    ].filter(Boolean).join('&');
+
+    const streamUrl = `${API_BASE}/marketdata/symbols/sync-all-tf-stream?symbol=${encodeURIComponent(symbol)}&market_type=${marketType}${syncDateParams ? '&' + syncDateParams : ''}`;
     console.log('[DataSync] Starting sync (stream):', streamUrl);
 
     const response = await fetch(streamUrl, { signal: controller.signal });
