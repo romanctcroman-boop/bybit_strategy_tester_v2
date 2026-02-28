@@ -9,33 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **TradingView parity: cross+range signal logic + entry on next-bar open (2026-03-01)**
+- **TradingView parity: strict ta.crossover/crossunder + BTC SPOT source (commit `b702001e3`)**
+
+    Two remaining bugs identified by deep-dive into divergent trades.
+
+    **Bug 1 — Crossover/crossunder semantics in `indicator_handlers.py`:**
+    Pine Script `ta.crossover(a, b)` = `a[1] < b AND a >= b` (prev must be STRICTLY below).
+    Pine Script `ta.crossunder(a, b)` = `a[1] > b AND a <= b` (prev must be STRICTLY above).
+    Our code used `prev <= level` (inclusive) — fires an extra signal when `prev_RSI == level` exactly.
+
+    ```python
+    # Before (WRONG — inclusive prev):
+    cross_long = (rsi_prev <= cross_long_level) & (rsi > cross_long_level)
+    cross_short = (rsi_prev >= cross_short_level) & (rsi < cross_short_level)
+    # After (CORRECT — strict prev, matches Pine Script):
+    cross_long = (rsi_prev < cross_long_level) & (rsi >= cross_long_level)
+    cross_short = (rsi_prev > cross_short_level) & (rsi <= cross_short_level)
+    ```
+
+    **Bug 2 — BTC data source in `router.py`:**
+    TV Pine Script uses `request.security(syminfo.prefix + ":" + btcTickerInput)`.
+    On a Bybit chart `syminfo.prefix = "BYBIT"` → resolves to `BYBIT:BTCUSDT` = **SPOT market**.
+    Our code was passing `market_type=market_type` (same as the main chart = `"linear"` for ETHUSDT perp).
+    BTC SPOT vs LINEAR prices differ by ~$40 at RSI boundary → SPOT RSI at 2025-01-28 14:00 = 51.98 (crossunder ✅)
+    vs LINEAR RSI = 52.06 (no cross ❌). Fixed to always use `market_type="spot"` for BTC reference data.
+
+    **Verification (scripts/_diff_trades.py):**
+    - 153/153 trades match TV exactly (100% parity on available data)
+    - 1 TV trade (`2026-02-27 06:30`) missing only due to DB data boundary
+      (ETH data ends `2026-02-27 00:00`, signal fires at `06:00 UTC` — not yet in DB)
+
+    | Metric | Ours | TradingView | Delta |
+    |--------|------|-------------|-------|
+    | Total trades | 153 | 154 | -1 (data boundary) |
+    | Win rate | 90.20% | 90.26% | ~0% |
+    | Net profit | 980.32 USDT | 1001.98 USDT | ~2% (last trade excluded) |
+    | Matching entries | **153/153** | — | **100%** |
+
+
   Commit `ac92de4f2`. Deep bar-by-bar analysis against `temp_analysis/a4.csv` (154 TV trades).
 
-  **Root cause #1 — Wrong signal logic in `indicator_handlers.py`:**
-  Previous commit `c0cb5143` used range-only (ignoring cross). Analysis showed TV uses
-  `cross AND range` (RsiSE/RsiLE are cross events, not range states).
-  - `RsiSE` = RSI crosses DOWN through `cross_short_level` AND RSI in `[short_rsi_more, short_rsi_less]`
-  - `RsiLE` = RSI crosses UP through `cross_long_level` AND RSI in `[long_rsi_more, long_rsi_less]`
-  Fixed: `long_signal = long_cross_condition & long_range_condition` (AND, not range-only).
+    **Root cause #1 — Wrong signal logic in `indicator_handlers.py`:**
+    Previous commit `c0cb5143` used range-only (ignoring cross). Analysis showed TV uses
+    `cross AND range` (RsiSE/RsiLE are cross events, not range states).
+    - `RsiSE` = RSI crosses DOWN through `cross_short_level` AND RSI in `[short_rsi_more, short_rsi_less]`
+    - `RsiLE` = RSI crosses UP through `cross_long_level` AND RSI in `[long_rsi_more, long_rsi_less]`
+      Fixed: `long_signal = long_cross_condition & long_range_condition` (AND, not range-only).
 
-  **Root cause #2 — Engine entered on bar close, not next-bar open (`engine.py`):**
-  TV uses Pine Script default `process_on_close=false`: `strategy.entry()` fills at OPEN
-  of the bar AFTER the signal bar. Our engine used `close[i]` as entry price.
-  Fixed: `entry_price = open_prices[i+1]`, `entry_time = timestamps[i+1]`.
+    **Root cause #2 — Engine entered on bar close, not next-bar open (`engine.py`):**
+    TV uses Pine Script default `process_on_close=false`: `strategy.entry()` fills at OPEN
+    of the bar AFTER the signal bar. Our engine used `close[i]` as entry price.
+    Fixed: `entry_price = open_prices[i+1]`, `entry_time = timestamps[i+1]`.
 
-  **Verification:**
-  - TV displays times in UTC+3 (MSK). Signal @ `13:00 UTC` → entry @ `13:30 UTC` = `16:30 MSK` ✅
-  - Entry prices: 141/154 match TV exactly (verified by price comparison).
-  - Remaining 13 differ only due to RSI divergence from slightly different BTC source data.
+    **Verification:**
+    - TV displays times in UTC+3 (MSK). Signal @ `13:00 UTC` → entry @ `13:30 UTC` = `16:30 MSK` ✅
+    - Entry prices: 141/154 match TV exactly (verified by price comparison).
+    - Remaining 13 differ only due to RSI divergence from slightly different BTC source data.
 
-  **Results:**
-  | Metric | Ours | TradingView | Delta |
-  |--------|------|-------------|-------|
-  | Total trades | 153 | 154 | -1 |
-  | Win rate | 90.20% | 90.26% | -0.06% |
-  | Net profit | 980.32 USDT | 1001.98 USDT | -2.16% |
-  | Matching entries | 141/154 | — | 91.6% |
+    **Results:**
+    | Metric | Ours | TradingView | Delta |
+    |--------|------|-------------|-------|
+    | Total trades | 153 | 154 | -1 |
+    | Win rate | 90.20% | 90.26% | -0.06% |
+    | Net profit | 980.32 USDT | 1001.98 USDT | -2.16% |
+    | Matching entries | 141/154 | — | 91.6% |
 
 - **TradingView parity: RSI range/cross signal logic (2026-02-28, `indicator_handlers.py`)**
 
