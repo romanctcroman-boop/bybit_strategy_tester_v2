@@ -2526,6 +2526,29 @@ async def run_backtest_from_builder(
             detail="Strategy has no blocks. Add blocks before running backtest.",
         )
 
+    # ── Diagnostic log: dump all request params for TV parity debugging ──
+    logger.info(
+        "[BacktestRequest] symbol={} interval={} start={} end={} "
+        "capital={} pos_size={} pos_size_type={} leverage={} direction={} "
+        "market_type={} sl={} tp={} commission={} slippage={} pyramiding={} engine={}",
+        request.symbol,
+        request.interval,
+        request.start_date,
+        request.end_date,
+        request.initial_capital,
+        request.position_size,
+        request.position_size_type,
+        request.leverage,
+        request.direction,
+        request.market_type,
+        request.stop_loss,
+        request.take_profit,
+        request.commission,
+        request.slippage,
+        request.pyramiding,
+        request.engine,
+    )
+
     # =============================================
     # 3-PART VALIDATION: Parameters, Entry, Exit
     # =============================================
