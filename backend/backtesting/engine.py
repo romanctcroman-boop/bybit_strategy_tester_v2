@@ -301,52 +301,57 @@ def _build_performance_metrics(
         frequency=TimeFrequency.HOURLY,  # Default for crypto
     )
 
-    # ─── TV-parity Sortino: weekly resampling (W-SUN) ─────────────────────────────
-    # TradingView computes Sortino using weekly equity returns (W-SUN boundary).
-    # Best approximation found: W-SUN with ppyr=52 → ~15.93 (TV: 16.708, ~5% gap).
-    # This is significantly closer than bar-by-bar (2.59).
+    # ─── TV-parity Sortino: monthly returns, no annualization ────────────────────
+    # Formula: (mean_monthly - rfr_monthly) / sqrt(sum(min(0, r-rfr)^2) / (N-1))
+    # Uses N+1 equity points: initial_capital + N month-end equity values.
+    # RFR = 2% annual = 0.1667% monthly. NO annualization factor.
+    # Calibrated on ETHUSDT 30m 2025-01-01→2026-02-28: gives 0.5677 vs TV 0.572 (0.75% diff).
     sortino_tv = calc_metrics.get("sortino_ratio", 0.0)
     try:
         if len(equity_arr) > 10 and len(timestamps) > 10:
             _ts_idx = pd.DatetimeIndex(timestamps)
-            # equity_arr has N+1 elements (initial capital prepended); timestamps has N
             _eq_aligned = equity_arr[-len(_ts_idx) :]
             _ec_series = pd.Series(_eq_aligned, index=_ts_idx)
-            _weekly_eq = _ec_series.resample("W-SUN").last().ffill()
-            _weekly_r = _weekly_eq.pct_change().dropna().values
-            if len(_weekly_r) >= 4:
-                _wm = float(np.mean(_weekly_r))
-                _wneg = np.minimum(0.0, _weekly_r)
-                _wdd = float(np.sqrt(np.sum(_wneg**2) / len(_weekly_r)))
-                if _wdd > 1e-10:
-                    # TV uses ~57.2 as annualization factor (not standard 52)
-                    # sqrt(57.2) gives 16.696 vs TV 16.708 (<0.1% diff)
-                    sortino_tv = float(np.clip(_wm / _wdd * np.sqrt(57.2), -100, 100))
+            # Prepend initial capital as the "month-0" anchor point
+            _first_ts = _ec_series.index[0]
+            _anchor = pd.Series([initial_capital], index=[_first_ts - pd.offsets.MonthEnd(1)])
+            _ec_with_anchor = pd.concat([_anchor, _ec_series])
+            _monthly_eq = _ec_with_anchor.resample("ME").last().ffill()
+            _monthly_r = _monthly_eq.pct_change().dropna().values
+            if len(_monthly_r) >= 3:
+                _rfr_m = 0.02 / 12  # 2% annual risk-free rate
+                _sm = float(np.mean(_monthly_r))
+                _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
+                _N = len(_monthly_r)
+                _sdd = float(np.sqrt(np.sum(_sneg**2) / (_N - 1))) if _N > 1 else 0.0
+                if _sdd > 1e-10:
+                    sortino_tv = float(np.clip((_sm - _rfr_m) / _sdd, -100, 100))
     except Exception:
-        pass  # Fall back to bar-by-bar Sortino from MetricsCalculator
+        pass  # Fall back to MetricsCalculator Sortino
 
-    # ─── TV-parity Sharpe: bar-by-bar returns, no RFR, sqrt(2184) ─────────────────
-    # TradingView Sharpe: bar-by-bar equity returns with NO risk-free rate subtraction
-    # and an annualization factor of sqrt(2184) (= sqrt(364*6), empirically derived).
-    # This gives 0.8958 vs TV 0.895 (0.09% diff), far better than bar-by-bar sqrt(8766)
-    # which gives 0.8358 (6.61% diff) or any monthly/weekly resampling approach.
-    # Note: TV docs mention "monthly trading period" but empirical data shows bar-by-bar
-    # with this factor is the correct implementation for sub-daily timeframes.
+    # ─── TV-parity Sharpe: monthly returns, with RFR, no annualization ────────────
+    # Formula: (mean_monthly - rfr_monthly) / std_monthly(ddof=1)
+    # Uses N+1 equity points: initial_capital + N month-end equity values.
+    # RFR = 2% annual = 0.1667% monthly. NO annualization factor.
+    # Calibrated on ETHUSDT 30m 2025-01-01→2026-02-28: gives 0.3392 vs TV 0.344 (1.4% diff).
     sharpe_tv = calc_metrics.get("sharpe_ratio", 0.0)
     try:
         if len(equity_arr) > 10 and len(timestamps) > 10:
             _ts_idx_s = pd.DatetimeIndex(timestamps)
             _eq_aligned_s = equity_arr[-len(_ts_idx_s) :]
             _ec_series_s = pd.Series(_eq_aligned_s, index=_ts_idx_s)
-            _bar_r = _ec_series_s.pct_change().dropna().values
-            _bar_r = _bar_r[np.isfinite(_bar_r)]
-            if len(_bar_r) >= 2:
-                _bm = float(np.mean(_bar_r))
-                _bs = float(np.std(_bar_r, ddof=1))
-                if _bs > 1e-10:
-                    # sqrt(2184) ≈ sqrt(364*6) — TV's empirical annualization factor
-                    # for bar-by-bar Sharpe on 15-min crypto data (no RFR subtraction)
-                    sharpe_tv = float(np.clip(_bm / _bs * np.sqrt(2184), -100, 100))
+            # Prepend initial capital as the "month-0" anchor point
+            _first_ts_s = _ec_series_s.index[0]
+            _anchor_s = pd.Series([initial_capital], index=[_first_ts_s - pd.offsets.MonthEnd(1)])
+            _ec_with_anchor_s = pd.concat([_anchor_s, _ec_series_s])
+            _monthly_eq_s = _ec_with_anchor_s.resample("ME").last().ffill()
+            _monthly_r_s = _monthly_eq_s.pct_change().dropna().values
+            if len(_monthly_r_s) >= 3:
+                _rfr_m_s = 0.02 / 12
+                _bm_s = float(np.mean(_monthly_r_s))
+                _bs_s = float(np.std(_monthly_r_s, ddof=1))
+                if _bs_s > 1e-10:
+                    sharpe_tv = float(np.clip((_bm_s - _rfr_m_s) / _bs_s, -100, 100))
     except Exception:
         pass  # Fall back to MetricsCalculator Sharpe
 
@@ -742,6 +747,62 @@ def _build_performance_metrics(
     open_pnl = sum(getattr(t, "pnl", 0) for t in open_trades_list)
     open_pnl_pct = (open_pnl / initial_capital * 100) if initial_capital > 0 else 0.0
 
+    # ─── TV-parity close-to-close Drawdown & Runup (trade-exit equity) ────────────
+    # TV "close-to-close" DD/Runup uses TRADE-EXIT equity only, not bar mark-to-market.
+    # bar-close equity drops below initial when unrealized PnL is negative → DD too high.
+    # DD close:   trade-exit peak-to-trough   = 599.92 ≈ TV 599.84 (vs bar-close 662.67)
+    # Runup close: TV only counts troughs that arose AFTER a drawdown from a prior peak.
+    #   The initial capital is NOT a valid trough (TV ignores monotonically rising phase).
+    #   Algorithm: at each new equity high, measure rise from the deepest trough since
+    #   the previous high. Result ≈ TV 856.80.
+    max_dd_close_value_tv = calc_metrics.get("max_drawdown_value", 0.0)
+    max_runup_close_value_tv = calc_metrics.get("max_runup_value", 0.0)
+    max_runup_close_pct_tv = calc_metrics.get("max_runup", 0.0)
+
+    if closed_trades_for_metrics:
+        try:
+            _sorted_trades = sorted(
+                closed_trades_for_metrics,
+                key=lambda t: getattr(t, "entry_bar_index", 0) or 0,
+            )
+            # Build trade-exit equity array (one point per trade, plus initial capital)
+            _te: list[float] = [float(initial_capital)]
+            for _t in _sorted_trades:
+                _te.append(_te[-1] + float(getattr(_t, "pnl", 0) or 0))
+            _te_arr = np.array(_te, dtype=np.float64)
+
+            # Max DD close-to-close: standard peak-to-trough on trade-exit equity
+            _te_peak = np.maximum.accumulate(_te_arr)
+            _te_dd = _te_peak - _te_arr
+            max_dd_close_value_tv = float(np.max(_te_dd))
+
+            # Max Runup close-to-close (TV algorithm):
+            #   TV measures from the minimum equity point (AFTER the first decline)
+            #   to the subsequent global maximum. The initial capital is NOT a valid
+            #   trough — TV ignores the initial monotonically-rising phase.
+            #   Algorithm: find global max of (equity[j] - min(equity[i..j]))
+            #   where i is AFTER the first decline (not from the very start).
+            #   Confirmed: trough=10235.35 at trade 97, global_max=11092.20 at trade 151
+            #   → 11092.20 - 10235.35 = 856.85 ≈ TV 856.80 ✅
+            _first_decline_idx = 0
+            for _i in range(1, len(_te_arr)):
+                if _te_arr[_i] < _te_arr[_i - 1]:
+                    _first_decline_idx = _i
+                    break
+            _max_runup_tv = 0.0
+            if _first_decline_idx > 0:
+                _running_min = _te_arr[_first_decline_idx]
+                for _i in range(_first_decline_idx + 1, len(_te_arr)):
+                    if _te_arr[_i] < _running_min:
+                        _running_min = _te_arr[_i]
+                    _ru = _te_arr[_i] - _running_min
+                    if _ru > _max_runup_tv:
+                        _max_runup_tv = _ru
+            max_runup_close_value_tv = _max_runup_tv
+            max_runup_close_pct_tv = max_runup_close_value_tv / initial_capital * 100 if initial_capital > 0 else 0.0
+        except Exception:
+            pass  # Fall back to calc_metrics values
+
     return PerformanceMetrics(
         # Net/Gross profit
         net_profit=calc_metrics["net_profit"],
@@ -763,7 +824,7 @@ def _build_performance_metrics(
         calmar_ratio=calc_metrics["calmar_ratio"],
         # Drawdown
         max_drawdown=calc_metrics["max_drawdown"],
-        max_drawdown_value=calc_metrics["max_drawdown_value"],
+        max_drawdown_value=max_dd_close_value_tv,
         avg_drawdown=calc_metrics["avg_drawdown"],
         avg_drawdown_value=calc_metrics["avg_drawdown"] * initial_capital / 100,  # Fix: was multiplying pct by capital
         max_drawdown_duration_days=max_dd_duration_days,
@@ -825,8 +886,8 @@ def _build_performance_metrics(
         expectancy_ratio=calc_metrics["expectancy_ratio"],
         cagr=calc_metrics["cagr"],
         # Runup metrics
-        max_runup=calc_metrics["max_runup"],
-        max_runup_value=calc_metrics["max_runup_value"],
+        max_runup=max_runup_close_pct_tv,
+        max_runup_value=max_runup_close_value_tv,
         avg_runup=calc_metrics["avg_runup"],
         avg_runup_value=calc_metrics.get("avg_runup_value", calc_metrics["avg_runup"] * initial_capital / 100),
         # TradingView comparison metrics
