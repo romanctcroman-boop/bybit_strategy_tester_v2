@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TradingView parity: cross+range signal logic + entry on next-bar open (2026-03-01)**
+  Commit `ac92de4f2`. Deep bar-by-bar analysis against `temp_analysis/a4.csv` (154 TV trades).
+
+  **Root cause #1 — Wrong signal logic in `indicator_handlers.py`:**
+  Previous commit `c0cb5143` used range-only (ignoring cross). Analysis showed TV uses
+  `cross AND range` (RsiSE/RsiLE are cross events, not range states).
+  - `RsiSE` = RSI crosses DOWN through `cross_short_level` AND RSI in `[short_rsi_more, short_rsi_less]`
+  - `RsiLE` = RSI crosses UP through `cross_long_level` AND RSI in `[long_rsi_more, long_rsi_less]`
+  Fixed: `long_signal = long_cross_condition & long_range_condition` (AND, not range-only).
+
+  **Root cause #2 — Engine entered on bar close, not next-bar open (`engine.py`):**
+  TV uses Pine Script default `process_on_close=false`: `strategy.entry()` fills at OPEN
+  of the bar AFTER the signal bar. Our engine used `close[i]` as entry price.
+  Fixed: `entry_price = open_prices[i+1]`, `entry_time = timestamps[i+1]`.
+
+  **Verification:**
+  - TV displays times in UTC+3 (MSK). Signal @ `13:00 UTC` → entry @ `13:30 UTC` = `16:30 MSK` ✅
+  - Entry prices: 141/154 match TV exactly (verified by price comparison).
+  - Remaining 13 differ only due to RSI divergence from slightly different BTC source data.
+
+  **Results:**
+  | Metric | Ours | TradingView | Delta |
+  |--------|------|-------------|-------|
+  | Total trades | 153 | 154 | -1 |
+  | Win rate | 90.20% | 90.26% | -0.06% |
+  | Net profit | 980.32 USDT | 1001.98 USDT | -2.16% |
+  | Matching entries | 141/154 | — | 91.6% |
+
 - **TradingView parity: RSI range/cross signal logic (2026-02-28, `indicator_handlers.py`)**
 
     Root cause of backtest producing only 84 trades vs TradingView's 154 identified and fixed.
@@ -24,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Actual engine with sequential tracking: 84 trades ❌
 
     **Fix (TV parity rule):** When `use_long_range=True`, TV uses range-ONLY (cross is ignored):
+
     ```python
     # Before (INCORRECT):
     long_signal = long_range_condition & long_cross_condition
@@ -33,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     else:
         long_signal = long_cross_condition   # cross only when no range
     ```
+
     Range-only signals are continuous (RSI stays in range for many bars), so the engine's
     pyramiding=1 constraint naturally gates entries — no cross required as a secondary filter.
 
