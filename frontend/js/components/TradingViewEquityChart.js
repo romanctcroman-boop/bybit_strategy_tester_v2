@@ -459,36 +459,22 @@ class TradingViewEquityChart {
     this._budgetMfe = maxBarHeight;
     this._budgetMae = maxBarHeight;
 
+    // Maps: unix-sec → { value, color, count } — we SUM scaled values when multiple
+    // trades share the same equity-curve timestamp (LWC requires unique timestamps,
+    // Map.set() would silently overwrite → bars disappear).
+    // summing keeps every trade visible as a combined bar height.
     const mfeMap = new Map();
     const maeMap = new Map();
 
-    // CRITICAL FIX: equityPoints contains ALL equity curve timestamps (every bar),
-    // while trades contains only closed trades. We must match by exit_time, NOT by index!
-    //
-    // Build a lookup map: exit_time (epoch ms) → equity point time (unix sec)
-    const exitTimeToEquityTime = new Map();
     this.trades.forEach((trade) => {
       const exitEpoch = this._toEpochMs(trade.exit_time);
-      if (exitEpoch) {
-        // Find closest equity point for this exit time
-        const equityTime = this._findEquityTimeForExit(exitEpoch);
-        if (equityTime) {
-          exitTimeToEquityTime.set(exitEpoch, equityTime);
-        }
-      }
-    });
+      if (!exitEpoch) return;
 
-    // Now build MFE/MAE bars using the correct time mapping
-    this.trades.forEach((trade, tradeIdx) => {
-      const exitEpoch = this._toEpochMs(trade.exit_time);
-      const time = exitEpoch ? exitTimeToEquityTime.get(exitEpoch) : null;
-
-      if (!time) {
-        // Fallback: use trade exit_time directly if no equity point match
-        console.warn(`[MFE/MAE] No equity point match for trade #${tradeIdx + 1}, using fallback`);
-      }
-
-      const finalTime = time ?? this._toUnixSec(trade.exit_time);
+      // Find the closest equity point within a 6-bar window.
+      // EC timestamps are bar open-times (offset from exit_time by ≤1 bar).
+      // We use the same 6h window as the tooltip to keep them in sync.
+      const equityTime = this._findEquityTimeForExit(exitEpoch, 6 * 3600);
+      const finalTime = equityTime ?? this._toUnixSec(trade.exit_time);
       if (!finalTime) return;
 
       const pnl = trade.pnl || 0;
@@ -500,20 +486,24 @@ class TradingViewEquityChart {
       const scaledMfe = mfe > 0 ? logNorm(mfe, maxMfe) * maxBarHeight : 0;
       const scaledMae = mae > 0 ? logNorm(mae, maxMae) * maxBarHeight : 0;
 
-      // MFE: positive value → bar grows UP from zero
+      // MFE bar — grows UP from zero.
+      // When multiple trades land on the same timestamp, SUM their heights.
       if (scaledMfe > 0) {
+        const prev = mfeMap.get(finalTime);
         mfeMap.set(finalTime, {
           time: finalTime,
-          value: scaledMfe,
+          value: (prev ? prev.value : 0) + scaledMfe,
+          // colour: winning trade dominates; if any trade on this ts is a loss, dim it
           color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
         });
       }
 
-      // MAE: negative value → bar grows DOWN from zero
+      // MAE bar — grows DOWN from zero.
       if (scaledMae > 0) {
+        const prev = maeMap.get(finalTime);
         maeMap.set(finalTime, {
           time: finalTime,
-          value: -scaledMae,
+          value: (prev ? prev.value : 0) - scaledMae,
           color: pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)'
         });
       }
@@ -638,9 +628,9 @@ class TradingViewEquityChart {
         : '<span style="display:inline-block;width:8px;margin-right:6px;flex-shrink:0"></span>';
       const vc = valueColor || '#d1d4dc';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:1px 0">'
-           + `<span style="display:flex;align-items:center;color:#787b86;font-size:11px">${dot}${label}</span>`
-           + `<span style="color:${vc};font-size:12px;font-weight:500">${value}</span>`
-           + '</div>';
+        + `<span style="display:flex;align-items:center;color:#787b86;font-size:11px">${dot}${label}</span>`
+        + `<span style="color:${vc};font-size:12px;font-weight:500">${value}</span>`
+        + '</div>';
     };
 
     this._lwChart.subscribeCrosshairMove((param) => {
@@ -689,8 +679,8 @@ class TradingViewEquityChart {
       // MFE / MAE
       const mfeUsdt = Math.abs(trade.mfe ?? 0);
       const maeUsdt = Math.abs(trade.mae ?? 0);
-      const mfePct  = Math.abs(trade.mfe_pct ?? trade.mfe_percent ?? 0);
-      const maePct  = Math.abs(trade.mae_pct ?? trade.mae_percent ?? 0);
+      const mfePct = Math.abs(trade.mfe_pct ?? trade.mfe_percent ?? 0);
+      const maePct = Math.abs(trade.mae_pct ?? trade.mae_percent ?? 0);
 
       const mfeStr = isPercent
         ? `+${mfePct.toFixed(2)}%`
@@ -723,9 +713,9 @@ class TradingViewEquityChart {
       const cx = param.point.x, cy = param.point.y;
       const cw = this.container.clientWidth, ch = this.container.clientHeight;
       const leftX = cx + tw + 20 < cw ? cx + 14 : cx - tw - 14;
-      const topY  = Math.min(Math.max(cy - th / 2, 4), ch - th - 4);
+      const topY = Math.min(Math.max(cy - th / 2, 4), ch - th - 4);
       tt.style.left = `${leftX}px`;
-      tt.style.top  = `${topY}px`;
+      tt.style.top = `${topY}px`;
     });
   }
 
@@ -881,13 +871,14 @@ class TradingViewEquityChart {
     return isNaN(ms) ? null : Math.floor(ms / 1000);
   }
 
-  _findEquityTimeForExit(exitEpochMs) {
+  _findEquityTimeForExit(exitEpochMs, maxWindowSec = Infinity) {
     /**
      * Find the closest equity point time (unix sec) for a given exit timestamp.
      * Uses binary search for efficiency on large equity curves.
      *
-     * @param {number} exitEpochMs - Exit time in epoch milliseconds
-     * @returns {number|null} - Closest equity point time in unix seconds, or null
+     * @param {number} exitEpochMs   - Exit time in epoch milliseconds
+     * @param {number} maxWindowSec  - Max allowed distance in seconds (default: unlimited)
+     * @returns {number|null}        - Closest equity point time in unix seconds, or null
      */
     if (!this._equityPoints || this._equityPoints.length === 0) return null;
 
@@ -906,15 +897,19 @@ class TradingViewEquityChart {
       }
     }
 
-    // Check both left and left-1 to find closest
+    // Check both neighbours to find the truly closest point
     const idx = left;
-    if (idx === 0) return this._equityPoints[0].time;
-    if (idx >= this._equityPoints.length) return this._equityPoints[this._equityPoints.length - 1].time;
+    let bestIdx = idx;
+    if (idx > 0) {
+      const diffPrev = Math.abs(this._equityPoints[idx - 1].time - targetTime);
+      const diffCurr = Math.abs(this._equityPoints[idx].time - targetTime);
+      bestIdx = diffPrev <= diffCurr ? idx - 1 : idx;
+    }
 
-    const diffPrev = Math.abs(this._equityPoints[idx - 1].time - targetTime);
-    const diffCurr = Math.abs(this._equityPoints[idx].time - targetTime);
+    const bestDiff = Math.abs(this._equityPoints[bestIdx].time - targetTime);
+    if (bestDiff > maxWindowSec) return null;   // outside allowed window
 
-    return diffPrev <= diffCurr ? this._equityPoints[idx - 1].time : this._equityPoints[idx].time;
+    return this._equityPoints[bestIdx].time;
   }
 
   _dedup(points) {
