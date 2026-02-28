@@ -403,8 +403,13 @@ def _handle_rsi(
         cross_long_level = params.get("cross_long_level", 29)  # TV: crossLevelLong=29
         cross_short_level = params.get("cross_short_level", 55)  # TV: crossLevelShort=55
         rsi_prev = rsi.shift(1)
-        cross_long = (rsi_prev <= cross_long_level) & (rsi > cross_long_level)
-        cross_short = (rsi_prev >= cross_short_level) & (rsi < cross_short_level)
+        # TradingView Pine Script ta.crossover(a, b) = a[1] < b  AND a >= b
+        # TradingView Pine Script ta.crossunder(a, b) = a[1] > b AND a <= b
+        # i.e. prev must be STRICTLY below/above the level (not equal).
+        # Previously we used <= and >= for prev which included prev==level, producing
+        # extra false signals when RSI was exactly at the level on the previous bar.
+        cross_long = (rsi_prev < cross_long_level) & (rsi >= cross_long_level)
+        cross_short = (rsi_prev > cross_short_level) & (rsi <= cross_short_level)
 
         # ── Intra-bar RSI cross detection (TradingView parity) ──────────────────────
         # TV evaluates the RSI on every tick (calc_on_every_tick).  When the RSI crosses

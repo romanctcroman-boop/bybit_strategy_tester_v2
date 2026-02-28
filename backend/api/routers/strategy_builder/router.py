@@ -2647,12 +2647,15 @@ async def run_backtest_from_builder(
                 _btc_warmup_delta = _pd.Timedelta(minutes=_WARMUP_BARS * _interval_minutes)
                 _btc_start = request.start_date - _btc_warmup_delta
 
+                # TV Pine Script uses request.security(syminfo.prefix + ":" + btcTickerInput)
+                # On Bybit charts syminfo.prefix = "BYBIT", so it fetches BYBIT:BTCUSDT = SPOT market.
+                # Using "spot" here matches TradingView's data source for BTC reference RSI.
                 _btc_ohlcv = await _svc._fetch_historical_data(
                     symbol="BTCUSDT",
                     interval=request.interval,
                     start_date=_btc_start,
                     end_date=request.end_date,
-                    market_type=market_type,
+                    market_type="spot",
                 )
                 if _btc_ohlcv is not None and len(_btc_ohlcv) > 0:
                     adapter = StrategyBuilderAdapter(strategy_graph, btcusdt_ohlcv=_btc_ohlcv)
