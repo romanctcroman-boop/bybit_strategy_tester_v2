@@ -283,12 +283,26 @@ class TradingViewEquityChart {
     // size:0 is the smallest marker TV supports — roughly half of size:1.
     if (this.trades.length > 0 && this.trades.length < 200) {
       const markers = [];
-      this.trades.forEach((trade, i) => {
-        if (i >= equityPoints.length) return;
-        const pt = equityPoints[i];
+      // Build a sorted array of EC times for binary search
+      const ecTimesForMarkers = equityPoints.map(p => p.time);
+
+      this.trades.forEach((trade) => {
+        const exitSec = this._toUnixSec(trade.exit_time);
+        if (!exitSec) return;
+
+        // Binary search: find closest EC timestamp to trade exit_time
+        let lo = 0, hi = ecTimesForMarkers.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (ecTimesForMarkers[mid] < exitSec) lo = mid + 1; else hi = mid;
+        }
+        if (lo > 0 && Math.abs(ecTimesForMarkers[lo - 1] - exitSec) < Math.abs(ecTimesForMarkers[lo] - exitSec)) lo--;
+        const markerTime = ecTimesForMarkers[lo];
+        if (!markerTime) return;
+
         const pnl = trade.pnl || 0;
         markers.push({
-          time: pt.time,
+          time: markerTime,
           position: 'inBar',
           color: pnl >= 0 ? '#26a69a' : '#ef5350',
           shape: 'circle',
@@ -360,8 +374,8 @@ class TradingViewEquityChart {
     if (!points.length) return;
 
     this._bhSeries = this._lwChart.addLineSeries({
-      color: '#2962ff',
-      lineWidth: 1.5,
+      color: 'rgba(120,123,134,0.85)',   // TV-style: muted grey, equity line stays dominant
+      lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: true,
       crosshairMarkerRadius: 4,
@@ -433,26 +447,25 @@ class TradingViewEquityChart {
     const equityRange = Math.max(equityMax - equityMin, 1);
 
     // Each bar occupies up to 20% of the full equity axis height.
-    const barHeightFraction = 0.20;
-    const maxBarHeight = equityRange * barHeightFraction;
+    const maxBarHeight = equityRange * 0.20;
 
-    // ── Normalization: log-scale within [minBar, maxBar] mapped to [10%, 100%] ──
-    // Problem with linear P90-scaling: when early trades have large MFE/MAE and
-    // later trades have small values, the P90 anchor is dominated by the large ones,
-    // making small-value bars nearly invisible.
-    // Fix: normalise each value to [minNorm..1] using log(1+x)/log(1+max),
-    // then apply a floor of minNorm (10%) so every non-zero bar stays visible.
+    // ── Normalization: TV-style LINEAR scaling ──
+    // Largest MFE/MAE bar = maxBarHeight (20% of equity range).
+    // All others are proportional: a trade with half the max MFE gets half the bar.
+    // This matches TradingView Strategy Tester which uses linear proportional bars
+    // (large losses/wins → tall bars, small → short, visually intuitive).
+    // Minimum visible floor: 4% of maxBarHeight so very small values are still seen.
     const allMfeRaw = this.trades.map(getMfe);
     const allMaeRaw = this.trades.map(getMae);
     const maxMfe = Math.max(...allMfeRaw, 1e-9);
     const maxMae = Math.max(...allMaeRaw, 1e-9);
-    const minNorm = 0.10;  // smallest non-zero bar = 10% of maxBarHeight
+    const minFloor = 0.04; // 4% of maxBarHeight = minimum visible bar height
 
-    // log-normalise a raw value to [minNorm, 1]
-    const logNorm = (val, maxVal) => {
+    // Linear-scale a raw value to [minFloor..1] × maxBarHeight
+    const linearScale = (val, maxVal) => {
       if (val <= 0) return 0;
-      const n = Math.log1p(val) / Math.log1p(maxVal);   // 0..1
-      return minNorm + n * (1 - minNorm);                // minNorm..1
+      const ratio = val / maxVal;          // 0..1, linear
+      return Math.max(ratio, minFloor);    // never below 4% floor
     };
 
     // Store for equity/BH autoscaleInfoProvider so they reserve the right gap.
@@ -513,25 +526,26 @@ class TradingViewEquityChart {
       const slot = claimSlot(idx);
       if (!slot) return;
 
-      const pnl = trade.pnl || 0;
       const mfe = getMfe(trade);
       const mae = getMae(trade);
 
-      const scaledMfe = mfe > 0 ? logNorm(mfe, maxMfe) * maxBarHeight : 0;
-      const scaledMae = mae > 0 ? logNorm(mae, maxMae) * maxBarHeight : 0;
+      const scaledMfe = mfe > 0 ? linearScale(mfe, maxMfe) * maxBarHeight : 0;
+      const scaledMae = mae > 0 ? linearScale(mae, maxMae) * maxBarHeight : 0;
 
+      // TV uses a single uniform color for all MFE bars and a single color for
+      // all MAE bars — no realized/unrealized tonal split.
       if (scaledMfe > 0) {
         mfeData.push({
           time: slot,
           value: scaledMfe,
-          color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
+          color: 'rgba(38,166,154,0.75)'   // teal — all MFE bars same color
         });
       }
       if (scaledMae > 0) {
         maeData.push({
           time: slot,
           value: -scaledMae,
-          color: pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)'
+          color: 'rgba(239,83,80,0.75)'    // red — all MAE bars same color
         });
       }
     });
