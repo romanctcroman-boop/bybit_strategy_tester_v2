@@ -453,13 +453,35 @@ class TradingViewEquityChart {
     const mfeMap = new Map();
     const maeMap = new Map();
 
-    // IMPORTANT: equity_curve.timestamps and trades[] are parallel arrays.
-    // Use equityPoints[i].time so bars align with equity steps (UTC-correct).
-    this.trades.forEach((trade, i) => {
-      const epTime = i < this._equityPoints.length ? this._equityPoints[i].time : null;
-      const tradeTime = this._toUnixSec(trade.exit_time);
-      const time = epTime ?? tradeTime;
-      if (!time) return;
+    // CRITICAL FIX: equityPoints contains ALL equity curve timestamps (every bar),
+    // while trades contains only closed trades. We must match by exit_time, NOT by index!
+    // 
+    // Build a lookup map: exit_time (epoch ms) → equity point time (unix sec)
+    const exitTimeToEquityTime = new Map();
+    this.trades.forEach((trade) => {
+      const exitEpoch = this._toEpochMs(trade.exit_time);
+      if (exitEpoch) {
+        // Find closest equity point for this exit time
+        const equityTime = this._findEquityTimeForExit(exitEpoch);
+        if (equityTime) {
+          exitTimeToEquityTime.set(exitEpoch, equityTime);
+        }
+      }
+    });
+
+    // Now build MFE/MAE bars using the correct time mapping
+    this.trades.forEach((trade, tradeIdx) => {
+      const exitEpoch = this._toEpochMs(trade.exit_time);
+      const time = exitEpoch ? exitTimeToEquityTime.get(exitEpoch) : null;
+      
+      if (!time) {
+        // Fallback: use trade exit_time directly if no equity point match
+        console.warn(`[MFE/MAE] No equity point match for trade #${tradeIdx + 1}, using fallback`);
+      }
+      
+      const finalTime = time ?? this._toUnixSec(trade.exit_time);
+      if (!finalTime) return;
+      
       const pnl = trade.pnl || 0;
       const mfe = getMfe(trade);
       const mae = getMae(trade);
@@ -471,8 +493,8 @@ class TradingViewEquityChart {
 
       // MFE: positive value → bar grows UP from zero
       if (scaledMfe > 0) {
-        mfeMap.set(time, {
-          time,
+        mfeMap.set(finalTime, {
+          time: finalTime,
           value: scaledMfe,
           color: pnl >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(38,166,154,0.30)'
         });
@@ -480,8 +502,8 @@ class TradingViewEquityChart {
 
       // MAE: negative value → bar grows DOWN from zero
       if (scaledMae > 0) {
-        maeMap.set(time, {
-          time,
+        maeMap.set(finalTime, {
+          time: finalTime,
           value: -scaledMae,
           color: pnl < 0 ? 'rgba(239,83,80,0.75)' : 'rgba(239,83,80,0.30)'
         });
@@ -568,6 +590,29 @@ class TradingViewEquityChart {
     const timestamps = data.timestamps || [];
     const base = equity[0] || this.initialCapital;
 
+    // Pre-compute: for each equity point index, which trade is it?
+    // EC timestamps are bar open times (not exact exit times), so we use
+    // closest-exit-time matching (within one timeframe bar = 4h window) rather
+    // than the range check that misses points between trades.
+    const ecIndexToTrade = new Array(timestamps.length).fill(null);
+    if (this.trades && this.trades.length) {
+      timestamps.forEach((ts, i) => {
+        const ecMs = new Date(ts).getTime();
+        let bestTrade = null;
+        let bestDiff = Infinity;
+        this.trades.forEach((t) => {
+          if (!t.exit_time) return;
+          const diff = Math.abs(new Date(t.exit_time).getTime() - ecMs);
+          // Max window: 6 hours (covers ±1 bar on any supported timeframe up to 4h)
+          if (diff < bestDiff && diff <= 6 * 3600 * 1000) {
+            bestDiff = diff;
+            bestTrade = t;
+          }
+        });
+        ecIndexToTrade[i] = bestTrade;
+      });
+    }
+
     this._lwChart.subscribeCrosshairMove((param) => {
       if (!param.point || !param.time || param.point.x < 0) {
         tt.style.display = 'none';
@@ -602,7 +647,7 @@ class TradingViewEquityChart {
         }
       }
 
-      const trade = this._findTradeAtTime(timestamps[ci]);
+      const trade = ecIndexToTrade[ci];
       if (trade) {
         const side = (trade.direction || trade.side || 'long').toUpperCase();
         const tc = (trade.pnl || 0) >= 0 ? '#26a69a' : '#ef5350';
@@ -751,6 +796,21 @@ class TradingViewEquityChart {
 
   // ─── HELPERS ───────────────────────────────────────────────────────────────
 
+  _toEpochMs(ts) {
+    /** Convert timestamp to epoch milliseconds for reliable matching. */
+    if (!ts) return null;
+    if (typeof ts === 'number') {
+      const val = ts > 1e12 ? ts : ts * 1000;
+      return isNaN(val) ? null : Math.round(val);
+    }
+    // For ISO strings: if no timezone suffix, treat as UTC (add Z)
+    const str = String(ts).trim();
+    const hasTimezone = str.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(str);
+    const normalized = hasTimezone ? str : str + 'Z';
+    const ms = new Date(normalized).getTime();
+    return isNaN(ms) ? null : Math.round(ms);
+  }
+
   _toUnixSec(ts) {
     if (!ts) return null;
     if (typeof ts === 'number') {
@@ -766,6 +826,42 @@ class TradingViewEquityChart {
     const normalized = hasTimezone ? str : str + 'Z';
     const ms = new Date(normalized).getTime();
     return isNaN(ms) ? null : Math.floor(ms / 1000);
+  }
+
+  _findEquityTimeForExit(exitEpochMs) {
+    /**
+     * Find the closest equity point time (unix sec) for a given exit timestamp.
+     * Uses binary search for efficiency on large equity curves.
+     * 
+     * @param {number} exitEpochMs - Exit time in epoch milliseconds
+     * @returns {number|null} - Closest equity point time in unix seconds, or null
+     */
+    if (!this._equityPoints || this._equityPoints.length === 0) return null;
+    
+    const targetTime = Math.floor(exitEpochMs / 1000);
+    
+    // Binary search for closest time
+    let left = 0;
+    let right = this._equityPoints.length - 1;
+    
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (this._equityPoints[mid].time < targetTime) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+    
+    // Check both left and left-1 to find closest
+    const idx = left;
+    if (idx === 0) return this._equityPoints[0].time;
+    if (idx >= this._equityPoints.length) return this._equityPoints[this._equityPoints.length - 1].time;
+    
+    const diffPrev = Math.abs(this._equityPoints[idx - 1].time - targetTime);
+    const diffCurr = Math.abs(this._equityPoints[idx].time - targetTime);
+    
+    return diffPrev <= diffCurr ? this._equityPoints[idx - 1].time : this._equityPoints[idx].time;
   }
 
   _dedup(points) {
