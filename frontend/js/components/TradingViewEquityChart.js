@@ -584,13 +584,22 @@ class TradingViewEquityChart {
     if (!tt) {
       tt = document.createElement('div');
       tt.className = 'lwc-tt';
+      // TV-style tooltip: dark semi-transparent, subtle border, no shadow
       tt.style.cssText = [
-        'position:absolute', 'padding:8px 12px',
-        'background:#161b22', 'border:1px solid rgba(48,54,61,0.9)',
-        'border-radius:4px', 'color:#d1d4dc',
-        'font-size:11px', 'font-family:system-ui,sans-serif',
-        'line-height:1.65', 'pointer-events:none',
-        'display:none', 'z-index:20', 'white-space:nowrap'
+        'position:absolute',
+        'min-width:210px',
+        'padding:10px 12px 8px',
+        'background:rgba(19,23,34,0.93)',
+        'border:1px solid rgba(255,255,255,0.08)',
+        'border-radius:4px',
+        'color:#d1d4dc',
+        'font-size:12px',
+        'font-family:-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',
+        'line-height:1.5',
+        'pointer-events:none',
+        'display:none',
+        'z-index:20',
+        'white-space:nowrap'
       ].join(';');
       this.container.appendChild(tt);
     }
@@ -622,6 +631,18 @@ class TradingViewEquityChart {
       });
     }
 
+    // Helper: one TV-style row — coloured dot + label + right-aligned value
+    const tvRow = (dotColor, label, value, valueColor) => {
+      const dot = dotColor
+        ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px;flex-shrink:0"></span>`
+        : '<span style="display:inline-block;width:8px;margin-right:6px;flex-shrink:0"></span>';
+      const vc = valueColor || '#d1d4dc';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:1px 0">'
+           + `<span style="display:flex;align-items:center;color:#787b86;font-size:11px">${dot}${label}</span>`
+           + `<span style="color:${vc};font-size:12px;font-weight:500">${value}</span>`
+           + '</div>';
+    };
+
     this._lwChart.subscribeCrosshairMove((param) => {
       if (!param.point || !param.time || param.point.x < 0) {
         tt.style.display = 'none';
@@ -636,63 +657,75 @@ class TradingViewEquityChart {
         if (d < minD) { minD = d; ci = i; }
       }
 
-      const ev = equity[ci];
-      const dateStr = new Date(param.time * 1000).toLocaleDateString('ru-RU', {
-        day: 'numeric', month: 'short', year: 'numeric'
-      });
-
-      let html = `<div style="color:#787b86;margin-bottom:4px">${dateStr}</div>`;
-
-      if (ev != null) {
-        const pnl = ev - base;
-        const pnlPct = (pnl / base) * 100;
-        const col = pnl >= 0 ? '#26a69a' : '#ef5350';
-        const sign = pnl >= 0 ? '+' : '';
-        if (isPercent) {
-          html += `<div>P&amp;L: <span style="color:${col}">${sign}${pnlPct.toFixed(2)}%</span></div>`;
-        } else {
-          html += `<div>P&amp;L: <span style="color:${col}">${sign}${this._fmt(pnl)}</span></div>`;
-          html += `<div style="color:#787b86;font-size:10px">Капитал: ${this._fmt(ev)}</div>`;
-        }
-      }
-
       const trade = ecIndexToTrade[ci];
-      if (trade) {
-        const side = (trade.direction || trade.side || 'long').toUpperCase();
-        const tc = (trade.pnl || 0) >= 0 ? '#26a69a' : '#ef5350';
-        html += '<div style="margin-top:4px;border-top:1px solid rgba(42,46,57,0.8);padding-top:4px">';
-        html += `<div>📊 ${side} Trade</div>`;
-        if (trade.entry_price) html += `<div style="color:#787b86">Entry: ${this._fmt(trade.entry_price)}</div>`;
-        if (trade.exit_price) html += `<div style="color:#787b86">Exit: ${this._fmt(trade.exit_price)}</div>`;
-        html += `<div>P&amp;L: <span style="color:${tc}">${(trade.pnl || 0) >= 0 ? '+' : ''}${this._fmt(trade.pnl || 0)}</span></div>`;
-        // MFE/MAE: show USDT value (primary) + % (secondary) — matches TradingView style
-        // TV calls them "Favorable excursion" / "Adverse excursion"
-        const mfeUsdt = trade.mfe ?? 0;
-        const mfePct  = trade.mfe_pct ?? trade.mfe_percent ?? 0;
-        const maeUsdt = Math.abs(trade.mae ?? 0);
-        const maePct  = Math.abs(trade.mae_pct ?? trade.mae_percent ?? 0);
-        if (mfeUsdt > 0) {
-          html += `<div style="color:#26a69a">MFE: +${this._fmt(mfeUsdt)}`
-                + (mfePct ? ` <span style='color:#787b86;font-size:10px'>(+${Number(mfePct).toFixed(2)}%)</span>` : '')
-                + '</div>';
-        }
-        if (maeUsdt > 0) {
-          html += `<div style="color:#ef5350">MAE: -${this._fmt(maeUsdt)}`
-                + (maePct ? ` <span style='color:#787b86;font-size:10px'>(-${Number(maePct).toFixed(2)}%)</span>` : '')
-                + '</div>';
-        }
+      if (!trade) { tt.style.display = 'none'; return; }
+
+      // ── TV-style header: "Trade #N Long/Short" centred ──
+      const ev = equity[ci];
+      const rawPnl = ev - base;   // cumulative P&L from start
+      const side = (trade.direction || trade.side || 'long');
+      const sideLabel = side === 'long' ? 'Long' : 'Short';
+
+      // Find trade index for numbering
+      const tradeIdx = this.trades.indexOf(trade);
+      const tradeNum = tradeIdx >= 0 ? tradeIdx + 1 : '?';
+
+      // Exit datetime in TV format: "Mon, Mar 10, 2025, 21:30"
+      const exitDate = trade.exit_time ? new Date(trade.exit_time) : null;
+      const exitDateStr = exitDate
+        ? exitDate.toLocaleString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric',
+          year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+        })
+        : '';
+
+      // Cumulative P&L colour
+      const pnlCol = rawPnl >= 0 ? '#26a69a' : '#ef5350';
+      const pnlSign = rawPnl >= 0 ? '+' : '';
+      const pnlStr = isPercent
+        ? `${pnlSign}${((rawPnl / base) * 100).toFixed(2)}%`
+        : `${pnlSign}${this._fmtUsdt(rawPnl)}`;
+
+      // MFE / MAE
+      const mfeUsdt = Math.abs(trade.mfe ?? 0);
+      const maeUsdt = Math.abs(trade.mae ?? 0);
+      const mfePct  = Math.abs(trade.mfe_pct ?? trade.mfe_percent ?? 0);
+      const maePct  = Math.abs(trade.mae_pct ?? trade.mae_percent ?? 0);
+
+      const mfeStr = isPercent
+        ? `+${mfePct.toFixed(2)}%`
+        : `${mfeUsdt > 0 ? '+' : ''}${this._fmtUsdt(mfeUsdt)}`;
+      const maeStr = isPercent
+        ? `-${maePct.toFixed(2)}%`
+        : (maeUsdt > 0 ? `-${this._fmtUsdt(maeUsdt)}` : '0.00 USDT');
+
+      let html = '';
+      // Header
+      html += `<div style="text-align:center;color:#d1d4dc;font-size:12px;font-weight:600;margin-bottom:7px">Trade #${tradeNum} ${sideLabel}</div>`;
+      // Divider
+      html += '<div style="border-top:1px solid rgba(255,255,255,0.07);margin-bottom:6px"></div>';
+      // Rows
+      html += tvRow('#26a69a', 'Cumulative P&L', pnlStr, pnlCol);
+      html += tvRow('#26a69a', 'Favorable excursion', mfeStr, '#26a69a');
+      html += tvRow('#ef5350', 'Adverse excursion', maeStr, '#ef5350');
+      // Footer: exit datetime
+      if (exitDateStr) {
+        html += '<div style="border-top:1px solid rgba(255,255,255,0.07);margin-top:6px;padding-top:5px">';
+        html += `<div style="text-align:center;color:#787b86;font-size:11px">${exitDateStr}</div>`;
         html += '</div>';
       }
 
       tt.innerHTML = html;
       tt.style.display = 'block';
 
-      // Position tooltip (avoid clipping at edges)
+      // Position tooltip — prefer right of cursor, flip left if near edge
       const tw = tt.offsetWidth, th = tt.offsetHeight;
       const cx = param.point.x, cy = param.point.y;
       const cw = this.container.clientWidth, ch = this.container.clientHeight;
-      tt.style.left = (cx + tw + 20 < cw ? cx + 12 : cx - tw - 12) + 'px';
-      tt.style.top = (cy + th + 20 < ch ? cy + 8 : cy - th - 8) + 'px';
+      const leftX = cx + tw + 20 < cw ? cx + 14 : cx - tw - 14;
+      const topY  = Math.min(Math.max(cy - th / 2, 4), ch - th - 4);
+      tt.style.left = `${leftX}px`;
+      tt.style.top  = `${topY}px`;
     });
   }
 
@@ -913,6 +946,16 @@ class TradingViewEquityChart {
       style: 'currency', currency: 'USD',
       minimumFractionDigits: 2, maximumFractionDigits: 2
     }).format(value);
+  }
+
+  /** Format a USDT value in TradingView style: "133.31 USDT" (no $ sign) */
+  _fmtUsdt(value) {
+    const abs = Math.abs(value);
+    const formatted = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(abs);
+    return `${formatted} USDT`;
   }
 }
 
