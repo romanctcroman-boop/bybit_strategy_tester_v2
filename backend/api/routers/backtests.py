@@ -1319,16 +1319,24 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 )
 
         equity_curve_data = None
+        # Track whether EC is already pre-filtered (dict format = one-point-per-trade,
+        # stored by build_equity_curve_response). Pre-filtered ECs must NOT be re-filtered
+        # because their timestamps are bar times, not trade exit times — re-filtering causes
+        # timestamp mismatch → fallback to 2 points with empty bh_equity → blank chart.
+        _ec_already_filtered = False
+
         logger.info(f"[DEBUG] bt.equity_curve type: {type(bt.equity_curve)}, truthy: {bool(bt.equity_curve)}")
         if bt.equity_curve:
             logger.info(
                 f"[DEBUG] equity_curve is dict: {isinstance(bt.equity_curve, dict)}, has equity: {'equity' in bt.equity_curve if isinstance(bt.equity_curve, dict) else 'N/A'}"
             )
             # Support both formats:
-            # 1. List of objects: [{timestamp, equity, drawdown}, ...]
-            # 2. Dict with arrays: {timestamps: [], equity: [], drawdown: [], bh_equity: [], ...}
+            # 1. Dict with arrays: {timestamps: [], equity: [], drawdown: [], bh_equity: [], ...}
+            #    → already pre-filtered (one point per trade), skip re-filtering.
+            # 2. List of objects: [{timestamp, equity, drawdown}, ...]
+            #    → bar-level data, needs filtering via build_equity_curve_response.
             if isinstance(bt.equity_curve, dict) and "equity" in bt.equity_curve:
-                # Dict format - already in EquityCurve-like structure
+                # Dict format — pre-filtered, load directly
                 timestamps_raw = bt.equity_curve.get("timestamps", [])
                 timestamps = []
                 for ts in timestamps_raw:
@@ -1344,9 +1352,16 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                     drawdown=bt.equity_curve.get("drawdown", []),
                     bh_equity=bt.equity_curve.get("bh_equity", []),
                     bh_drawdown=bt.equity_curve.get("bh_drawdown", []),
+                    returns=bt.equity_curve.get("returns", []),
+                    runup=bt.equity_curve.get("runup", []),
+                )
+                _ec_already_filtered = True
+                logger.info(
+                    f"[get_backtest] Dict EC loaded: {len(equity_curve_data.equity)} pts, "
+                    f"bh_equity={len(equity_curve_data.bh_equity)} pts — skip re-filter"
                 )
             elif isinstance(bt.equity_curve, list) and len(bt.equity_curve) > 0:
-                # List format - convert to EquityCurve
+                # List format — bar-level, convert then filter below
                 timestamps = []
                 equity = []
                 drawdown = []
@@ -1365,6 +1380,25 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                     timestamps=timestamps,
                     equity=equity,
                     drawdown=drawdown,
+                )
+                logger.info(f"[get_backtest] List EC loaded: {len(equity)} bar-level pts — will filter")
+
+        # Apply equity curve filtering ONLY for raw bar-level list format.
+        # Dict-format ECs are already pre-filtered (one point per trade exit).
+        if equity_curve_data and trades_data and not _ec_already_filtered:
+            filtered_equity = build_equity_curve_response(equity_curve_data, trades_data)
+            if filtered_equity:
+                equity_curve_data = EquityCurve(
+                    timestamps=[
+                        datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        for ts in filtered_equity.get("timestamps", [])
+                    ],
+                    equity=filtered_equity.get("equity", []),
+                    drawdown=filtered_equity.get("drawdown", []),
+                    bh_equity=filtered_equity.get("bh_equity", []),
+                    bh_drawdown=filtered_equity.get("bh_drawdown", []),
+                    returns=filtered_equity.get("returns", []),
+                    runup=filtered_equity.get("runup", []),
                 )
 
         return BacktestResult(
@@ -1421,6 +1455,9 @@ async def get_backtest_equity(backtest_id: str):
     - equity values
     - drawdown values
     - returns
+
+    NOTE: Equity curve is filtered to one point per trade exit (TradingView compatible).
+    Number of points = number of closed trades.
     """
     service = get_backtest_service()
     result = service.get_result(backtest_id)
@@ -1437,9 +1474,17 @@ async def get_backtest_equity(backtest_id: str):
             detail=f"No equity curve data for backtest {backtest_id}",
         )
 
+    # Apply filtering: one point per trade exit
+    equity_curve_data = result.equity_curve
+    if result.trades:
+        filtered = build_equity_curve_response(equity_curve_data, result.trades)
+        if filtered:
+            return filtered
+
+    # Fallback to raw equity curve if no trades or filtering failed
     return {
         "backtest_id": backtest_id,
-        "equity_curve": result.equity_curve,
+        "equity_curve": equity_curve_data,
     }
 
 
@@ -2158,15 +2203,24 @@ async def save_optimization_result(
                         ec = full_result.equity_curve
                         if hasattr(ec, "timestamps") and hasattr(ec, "equity"):
                             drawdowns = ec.drawdown if hasattr(ec, "drawdown") and ec.drawdown else [0] * len(ec.equity)
-                            equity_curve_data = [
-                                {
-                                    "timestamp": t.isoformat() if hasattr(t, "isoformat") else str(t),
-                                    "equity": v,
-                                    "drawdown": d,
-                                }
-                                for t, v, d in zip(ec.timestamps, ec.equity, drawdowns, strict=False)
-                            ]
-                            logger.info("Got %s equity curve points", len(equity_curve_data))
+                            # Store as dict format (supports bh_equity, bh_drawdown, returns, runup)
+                            # This is critical for the Buy & Hold line in the equity chart.
+                            equity_curve_data = {
+                                "timestamps": [
+                                    t.isoformat() if hasattr(t, "isoformat") else str(t) for t in ec.timestamps
+                                ],
+                                "equity": list(ec.equity),
+                                "drawdown": list(drawdowns),
+                                "bh_equity": list(ec.bh_equity) if ec.bh_equity else [],
+                                "bh_drawdown": list(ec.bh_drawdown) if ec.bh_drawdown else [],
+                                "returns": list(ec.returns) if ec.returns else [],
+                                "runup": list(ec.runup) if ec.runup else [],
+                            }
+                            logger.info(
+                                "Got %s equity curve points (with bh_equity=%s pts)",
+                                len(ec.equity),
+                                len(ec.bh_equity) if ec.bh_equity else 0,
+                            )
                         else:
                             logger.warning("Equity curve missing timestamps or equity attributes")
                     else:

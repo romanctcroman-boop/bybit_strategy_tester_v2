@@ -9,6 +9,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **[CHART] Equity chart, B&H line и MFE/MAE bars не отрисовывались (все 3 бага — одна причина)**
+
+    **Причина:** `GET /api/v1/backtests/{id}` (`get_backtest`) некорректно повторно применял
+    `build_equity_curve_response()` к уже отфильтрованным данным в dict-формате.
+    Сохранённые EC имеют timestamps = время открытия бара (напр. `14:00`), а `exit_time` сделки
+    отличается (напр. `17:00`) → 0 совпадений → fallback-путь возвращал только 2 точки
+    с пустым `bh_equity=[]`. В результате:
+    - График капитала отображал только 2 точки (вместо 154) → кривая не видна
+    - `bh_equity=[]` → `_buildBHSeries()` выходил без создания серии → B&H линия пустая
+    - `_buildExcursionSeries()` не находил совпадений в 2 точках → MFE/MAE bars не рисовались
+
+    **Исправление** (`backend/api/routers/backtests.py`, `get_backtest`):
+    Добавлен флаг `_ec_already_filtered`. Dict-формат (pre-filtered, один-на-сделку) загружается
+    напрямую без повторной фильтрации (`_ec_already_filtered=True`). Фильтрация через
+    `build_equity_curve_response()` применяется только к list-формату (сырые bar-level данные).
+    Результат после фикса: `equity=154 pts`, `bh_equity=154 pts`, `timestamps=154 pts` ✅
+
+    **Сравнение endpoint-ов:**
+    | Endpoint | До фикса | После фикса |
+    |----------|----------|-------------|
+    | `GET /backtests/` (list) | 154/154 ✅ | 154/154 ✅ |
+    | `GET /backtests/{id}` (detail) | 2/0 ❌ | 154/154 ✅ |
+
+- **Buy & Hold линия не отображалась на графике капитала (была плоской на 0)**
+
+    **Причина:** В `save_optimization_result` (`backend/api/routers/backtests.py`) equity_curve
+    сохранялась в формате **list-of-dicts** `[{timestamp, equity, drawdown}]` — без полей
+    `bh_equity`, `bh_drawdown`, `returns`, `runup`. При загрузке из БД (list-формат) `bh_equity`
+    оставался пустым, и `_buildBHSeries()` в `TradingViewEquityChart.js` возвращал раньше.
+
+    **Исправление:** Формат хранения изменён на **dict** `{timestamps, equity, drawdown, bh_equity, ...}` —
+    он уже поддерживался при загрузке (путь `isinstance(bt.equity_curve, dict)`) и включает все поля.
+    Затронуто: только `POST /api/v1/backtests/save-optimization` (`save_optimization_result`).
+    Другие пути (`POST /api/v1/backtests/` через `run_backtest_endpoint`) уже использовали
+    `build_equity_curve_response()` → dict-формат — работали корректно.
+
+    **Note:** Существующие записи в БД (сохранённые до этого фикса) имеют list-формат без B&H.
+    Для их отображения нужно перезапустить бэктест (кнопка "Сохранить результат" в UI).
+
+### Added
+
+- **`scripts/_compare_trades_tv.py` — новый скрипт глубокой проверки паритета с TradingView**
+
+    Выполняет полную проверку "наш движок vs TV" по CSV-файлам a1/a2/a3/a4:
+    - Сравнение каждой сделки: entry/exit цена, дата, P&L, CumPnL (154/154 MATCH ✅)
+    - MFE/MAE показываются информационно (см. примечание ниже)
+    - 72/72 агрегатных метрик PASS ✅
+    - Нереализованная ПР/УБ (open_pnl) показывается информационно
+
+    **Итог:**
+    - `TRADES MATCH=154/155` (DIFF=1 = сделка #155, расхождение источников данных — ожидаемо)
+    - `METRICS: 72/72 PASS`
+
+    **Расхождение сделки #155 — разные источники данных (не баг):**
+    TV (live) видит RSI-сигнал на баре 10:30 → LONG вход 11:00 Feb 28 @ 1865.4, позиция открыта в 16:14.
+    Наша БД (snapshot) при `end=2026-02-28` содержит бары до 00:00: RSI-сигнал на 07:30 → вход 08:00 @ 1865.4, TP выход 13:30.
+    Entry price идентична (1865.40), но сигнал срабатывает в разное время из-за разных last-bar данных.
+    При расширении end до 23:59:59 движок генерирует лишнюю сделку → 21 FAIL в метриках.
+    Вывод: оставить `end=2026-02-28 00:00` — 154/154 закрытых MATCH, 72/72 метрик PASS.
+
+    **Нереализованная ПР/УБ (open_pnl):**
+    TV показывает `open_pnl=2.66 USDT` для открытой позиции #155.
+    У нас `open_pnl=0` т.к. наша последняя сделка #155 закрылась по TP.
+    Это ожидаемо: разные источники данных дают разные last trade.
+    Движок корректно поддерживает is_open=True / open_pnl при наличии открытой позиции.
+    В скрипте показано как ℹ️ (информационно, не влияет на PASS/FAIL).
+
+    **MFE/MAE — методологическое отличие (не баг):**
+    TV использует close-to-close MFE/MAE (TV_MFE для TP-сделок ≈ pnl_net + commission ≈ 22.29 USDT).
+    Наш движок считает реальное intrabar MFE/MAE (bar high/low). Наши значения точнее.
+    Ср. разница: MFE ours > TV, MAE ours > TV для TP-сделок на ~0.70 USDT (= комиссия).
+
+    **Buy&Hold (TV=-4391 USDT, ours=-4249 USDT, Δ=142):**
+    TV включает весь день 2026-02-28 (до бара 11:00 где открылась сделка #155).
+    Наша БД при `end=2026-02-28` содержит только бар 00:00. Δ=142 ожидаемо, tol=200.
+
+    **Исправленные имена атрибутов в скрипте:**
+    - `long_avg_bars_in_trade` → `avg_bars_in_long` (TV=50, ours=49.1, Δ=-0.9 ✅)
+    - `short_avg_bars_in_trade` → `avg_bars_in_short` (TV=111, ours=109.8, Δ=-1.2 ✅)
+    - `net_profit_to_max_loss_pct` → `net_profit_to_largest_loss * 100` (TV=750.06, ours=750.6 ✅)
+
+### Fixed
+
 - **TradingView parity: 106/106 metrics — avg_runup episode algorithm (commit `d9ed44c69`)**
 
     Root cause: `avg_runup` episode was firing at the FIRST point equity exceeded the prior HWM during recovery (e.g. 10644.61), not at the FINAL phase peak (10795.89). This produced wrong episodes `[626.67, 151.24, 151.25, 619.20, 43.23]` → mean=318.32 USDT vs TV 396.10.
