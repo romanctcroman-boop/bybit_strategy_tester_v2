@@ -665,11 +665,22 @@ class TradingViewEquityChart {
         if (trade.entry_price) html += `<div style="color:#787b86">Entry: ${this._fmt(trade.entry_price)}</div>`;
         if (trade.exit_price) html += `<div style="color:#787b86">Exit: ${this._fmt(trade.exit_price)}</div>`;
         html += `<div>P&amp;L: <span style="color:${tc}">${(trade.pnl || 0) >= 0 ? '+' : ''}${this._fmt(trade.pnl || 0)}</span></div>`;
-        // Display MFE/MAE in percentage (use mfe_pct/mae_pct if available, otherwise fallback to mfe/mae as %)
-        const mfePct = trade.mfe_pct ?? trade.mfe_percent ?? trade.mfe ?? 0;
-        const maePct = trade.mae_pct ?? trade.mae_percent ?? trade.mae ?? 0;
-        if (mfePct) html += `<div style="color:#26a69a">MFE: +${Number(mfePct).toFixed(2)}%</div>`;
-        if (maePct) html += `<div style="color:#ef5350">MAE: -${Math.abs(Number(maePct)).toFixed(2)}%</div>`;
+        // MFE/MAE: show USDT value (primary) + % (secondary) — matches TradingView style
+        // TV calls them "Favorable excursion" / "Adverse excursion"
+        const mfeUsdt = trade.mfe ?? 0;
+        const mfePct  = trade.mfe_pct ?? trade.mfe_percent ?? 0;
+        const maeUsdt = Math.abs(trade.mae ?? 0);
+        const maePct  = Math.abs(trade.mae_pct ?? trade.mae_percent ?? 0);
+        if (mfeUsdt > 0) {
+          html += `<div style="color:#26a69a">MFE: +${this._fmt(mfeUsdt)}`
+                + (mfePct ? ` <span style='color:#787b86;font-size:10px'>(+${Number(mfePct).toFixed(2)}%)</span>` : '')
+                + '</div>';
+        }
+        if (maeUsdt > 0) {
+          html += `<div style="color:#ef5350">MAE: -${this._fmt(maeUsdt)}`
+                + (maePct ? ` <span style='color:#787b86;font-size:10px'>(-${Number(maePct).toFixed(2)}%)</span>` : '')
+                + '</div>';
+        }
         html += '</div>';
       }
 
