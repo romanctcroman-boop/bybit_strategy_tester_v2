@@ -7,18 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **TradingView parity: RSI range/cross signal logic (2026-02-28, `indicator_handlers.py`)**
+
+    Root cause of backtest producing only 84 trades vs TradingView's 154 identified and fixed.
+
+    **Problem:** The RSI handler used AND logic — `range_condition & cross_condition` — requiring
+    both the range filter AND the cross-level filter to be true simultaneously. This produced only
+    ~50 long + ~606 short raw signals, but the engine's sequential L/S position tracker (single
+    `position` scalar) blocked most entries. Net result: 84 trades instead of 154.
+
+    **Investigation findings (scripts in `scripts/_*.py`):**
+    - WITH BTC source: 50 long + 606 short signals (AND logic)
+    - Manual simulation with independent L/S tracking: 158 trades ≈ TV's 154 ✅
+    - Actual engine with sequential tracking: 84 trades ❌
+
+    **Fix (TV parity rule):** When `use_long_range=True`, TV uses range-ONLY (cross is ignored):
+    ```python
+    # Before (INCORRECT):
+    long_signal = long_range_condition & long_cross_condition
+    # After (TV parity):
+    if use_long_range:
+        long_signal = long_range_condition   # range takes precedence
+    else:
+        long_signal = long_cross_condition   # cross only when no range
+    ```
+    Range-only signals are continuous (RSI stays in range for many bars), so the engine's
+    pyramiding=1 constraint naturally gates entries — no cross required as a secondary filter.
+
+    **Result after fix:** 153 trades (30L + 123S), win rate 90.20%, net profit 980.32 USDT
+    vs TradingView: 154 trades (30L + 124S), win rate 90.26%, net profit 1001.98 USDT.
+    Off by 1 trade (~21 USDT) — within bar-timing tolerance.
+
+- **Frontend: `total_return` display fix (`MetricsPanels.js` line 225)**
+
+    `metrics.total_return` is stored as a decimal fraction (0.098 = 9.8%), but was passed
+    directly to `formatTVPercent()` which only appends `%` — showing `0.10%` instead of `9.80%`.
+    Fixed by multiplying by 100 before display: `(metrics.total_return || 0) * 100`.
+
 ### Refactored
 
 - **Sprint 1 P0 COMPLETE: Split all 4 monolithic files (>3500 lines each) into packages (commits 47386e873..4c57a7f51):**
 
     All four P0 tasks executed with zero test regressions vs monolith baseline:
 
-    | Task | File | Lines | New Location | Commit |
-    |------|------|-------|--------------|--------|
-    | P0-1 | `backend/backtesting/gpu_optimizer.py` | 3,500 | `backend/backtesting/gpu/` package | `47386e873` |
-    | P0-2 | `backend/api/routers/optimizations.py` | 3,835 | `backend/api/routers/optimizations/` package (9 modules) | `fedd51d1d` |
-    | P0-3 | `backend/backtesting/strategy_builder_adapter.py` | 3,574 | `backend/backtesting/strategy_builder/` package | `864eb4dfa` |
-    | P0-4 | `backend/api/routers/strategy_builder.py` | 3,554 | `backend/api/routers/strategy_builder/` package | `4c57a7f51` |
+    | Task | File                                              | Lines | New Location                                             | Commit      |
+    | ---- | ------------------------------------------------- | ----- | -------------------------------------------------------- | ----------- |
+    | P0-1 | `backend/backtesting/gpu_optimizer.py`            | 3,500 | `backend/backtesting/gpu/` package                       | `47386e873` |
+    | P0-2 | `backend/api/routers/optimizations.py`            | 3,835 | `backend/api/routers/optimizations/` package (9 modules) | `fedd51d1d` |
+    | P0-3 | `backend/backtesting/strategy_builder_adapter.py` | 3,574 | `backend/backtesting/strategy_builder/` package          | `864eb4dfa` |
+    | P0-4 | `backend/api/routers/strategy_builder.py`         | 3,554 | `backend/api/routers/strategy_builder/` package          | `4c57a7f51` |
 
     **Backward compatibility:** All original import paths preserved via `__init__.py` re-exports and
     stub modules. No callers needed updating. Test patch paths (`patch("...strategy_builder.get_db")`)

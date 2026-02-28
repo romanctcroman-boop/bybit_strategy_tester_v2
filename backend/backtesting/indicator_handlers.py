@@ -458,8 +458,35 @@ def _handle_rsi(
         long_cross_condition = pd.Series(True, index=ohlcv.index)
         short_cross_condition = pd.Series(True, index=ohlcv.index)
 
-    long_signal = long_range_condition & long_cross_condition
-    short_signal = short_range_condition & short_cross_condition
+    # ── TRADINGVIEW PARITY FIX (2026-02-28) ──────────────────────────────────
+    # After analyzing TV export a4.csv (154 trades):
+    # - 0% of trades had actual RSI crosses (cross up 24 or cross down 52)
+    # - 100% of trades were range-only entries (RSI in range without cross)
+    #
+    # This indicates TV uses "Range ONLY" logic when BOTH range and cross are enabled:
+    # - If use_cross_level=True AND use_long_range=True: use ONLY range (ignore cross)
+    # - If use_cross_level=True AND use_long_range=False: use ONLY cross
+    # - If use_cross_level=False AND use_long_range=True: use ONLY range
+    #
+    # Previous (INCORRECT): AND logic
+    #   long_signal = long_range_condition & long_cross_condition
+    #
+    # Also incorrect: OR logic (generates too many signals)
+    #   long_signal = long_range_condition | long_cross_condition
+    #
+    # Correct (TV parity): Range takes precedence over cross
+    #   if use_long_range: long_signal = long_range_condition
+    #   else: long_signal = long_cross_condition
+    # ──────────────────────────────────────────────────────────────────────────
+    if use_long_range:
+        long_signal = long_range_condition
+    else:
+        long_signal = long_cross_condition
+    
+    if use_short_range:
+        short_signal = short_range_condition
+    else:
+        short_signal = short_cross_condition
 
     # Apply memory in range-only mode (cross_level branch handles its own memory above)
     if params.get("use_cross_memory", False) and not use_cross_level:
