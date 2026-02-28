@@ -476,7 +476,8 @@ export function createSaveLoadModule({
             if (backtestEndDateEl) {
                 const today = new Date().toISOString().slice(0, 10);
                 const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
-                backtestEndDateEl.value = savedEnd > today ? savedEnd : today;
+                // Clamp to today: don't allow future dates, but don't push saved past dates forward.
+                backtestEndDateEl.value = savedEnd <= today ? savedEnd : today;
             }
 
             // Restore blocks

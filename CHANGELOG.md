@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SaveLoadModule: end_date load bug — UI was silently moving end date forward to today**
+
+    When loading a saved strategy, `SaveLoadModule.js` used inverted logic for clamping `end_date`:
+    ```javascript
+    // Before (WRONG — took max(savedEnd, today), always pushed end_date to today):
+    backtestEndDateEl.value = savedEnd > today ? savedEnd : today;
+    // After (CORRECT — clamps future dates to today, keeps past dates as-is):
+    backtestEndDateEl.value = savedEnd <= today ? savedEnd : today;
+    ```
+    Effect: every time a strategy was loaded, the end date was set to today's date instead of the
+    saved value. This caused the UI backtest to run over a longer/different period than intended,
+    producing different trade counts and P&L compared to `_compare_table.py` which uses fixed dates.
+
 - **TradingView parity: strict ta.crossover/crossunder + BTC SPOT source (commit `b702001e3`)**
 
     Two remaining bugs identified by deep-dive into divergent trades.
@@ -34,20 +47,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     BTC SPOT vs LINEAR prices differ by ~$40 at RSI boundary → SPOT RSI at 2025-01-28 14:00 = 51.98 (crossunder ✅)
     vs LINEAR RSI = 52.06 (no cross ❌). Fixed to always use `market_type="spot"` for BTC reference data.
 
-    **Verification (scripts/_diff_trades.py):**
+    **Verification (scripts/\_diff_trades.py):**
     - 153/153 trades match TV exactly (100% parity on available data)
     - 1 TV trade (`2026-02-27 06:30`) missing only due to DB data boundary
       (ETH data ends `2026-02-27 00:00`, signal fires at `06:00 UTC` — not yet in DB)
 
-    | Metric | Ours | TradingView | Delta |
-    |--------|------|-------------|-------|
-    | Total trades | 153 | 154 | -1 (data boundary) |
-    | Win rate | 90.20% | 90.26% | ~0% |
-    | Net profit | 980.32 USDT | 1001.98 USDT | ~2% (last trade excluded) |
-    | Matching entries | **153/153** | — | **100%** |
+    | Metric           | Ours        | TradingView  | Delta                     |
+    | ---------------- | ----------- | ------------ | ------------------------- |
+    | Total trades     | 153         | 154          | -1 (data boundary)        |
+    | Win rate         | 90.20%      | 90.26%       | ~0%                       |
+    | Net profit       | 980.32 USDT | 1001.98 USDT | ~2% (last trade excluded) |
+    | Matching entries | **153/153** | —            | **100%**                  |
 
-
-  Commit `ac92de4f2`. Deep bar-by-bar analysis against `temp_analysis/a4.csv` (154 TV trades).
+    Commit `ac92de4f2`. Deep bar-by-bar analysis against `temp_analysis/a4.csv` (154 TV trades).
 
     **Root cause #1 — Wrong signal logic in `indicator_handlers.py`:**
     Previous commit `c0cb5143` used range-only (ignoring cross). Analysis showed TV uses
