@@ -1155,9 +1155,9 @@ function resetFormToDefaults() {
   if (startDateEl) startDateEl.value = '2025-01-01';
   const endDateEl = document.getElementById('backtestEndDate');
   if (endDateEl) {
-    // Bug #3 fix: default to today, not a far-future date like 2030-01-01
-    const today = new Date();
-    endDateEl.value = today.toISOString().split('T')[0];
+    // Default to 2030-01-01 — the engine clamps to current datetime if this
+    // date is in the future, so the user never needs to update it manually.
+    endDateEl.value = '2030-01-01';
   }
 
   // Clear no-trade days checkboxes

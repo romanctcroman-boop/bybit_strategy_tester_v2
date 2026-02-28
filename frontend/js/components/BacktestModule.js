@@ -787,14 +787,11 @@ export function createBacktestModule(deps) {
             interval: interval,
             start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
             end_date: (() => {
-                const endVal = document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10);
+                const endVal = document.getElementById('backtestEndDate')?.value || '2030-01-01';
                 const today = new Date().toISOString().slice(0, 10);
-                if (endVal > today) {
-                    showNotification(`End Date ${endVal} в будущем — бэктест запускается по сегодняшнюю дату (${today})`, 'info');
-                    console.info(`[Backtest] End date ${endVal} is in the future, clamped to ${today}`);
-                    return today;
-                }
-                return endVal;
+                // If end date is in the future, clamp silently to today.
+                // The user sets 2030-01-01 as a "run to latest available data" sentinel.
+                return endVal > today ? today : endVal;
             })(),
             market_type: document.getElementById('builderMarketType')?.value || 'linear',
             initial_capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
@@ -1025,14 +1022,20 @@ export function createBacktestModule(deps) {
             return;
         }
 
-        // Bug #4 fix: validate date range on frontend before sending — avoids cryptic HTTP 422
+        // Validate date range before sending — avoids cryptic HTTP 422
         const DATA_START_DATE = '2025-01-01'; // Must match backend/config/database_policy.py
         const startDateVal = document.getElementById('backtestStartDate')?.value || DATA_START_DATE;
-        const endDateRaw = document.getElementById('backtestEndDate')?.value;
-        if (!endDateRaw) {
-            showNotification('Укажите End Date перед запуском бэктеста', 'warning');
-            document.getElementById('backtestEndDate')?.focus();
-            return;
+        const nowDateStr = new Date().toISOString().slice(0, 10);
+
+        // End date: if empty or in the future → auto-clamp to today (no error shown, just info)
+        let endDateRaw = document.getElementById('backtestEndDate')?.value;
+        if (!endDateRaw || endDateRaw > nowDateStr) {
+            if (endDateRaw && endDateRaw > nowDateStr) {
+                console.info(`[Backtest] End date ${endDateRaw} is in the future — auto-clamped to ${nowDateStr}`);
+            }
+            endDateRaw = nowDateStr;
+            const endEl = document.getElementById('backtestEndDate');
+            if (endEl) endEl.value = nowDateStr;
         }
         const endDateVal = endDateRaw;
         if (startDateVal < DATA_START_DATE) {
