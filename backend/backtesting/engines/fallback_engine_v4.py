@@ -1393,20 +1393,38 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                 for trade_data in closed_trades:
                     cash += trade_data["allocated"] + trade_data["pnl"]
+
+                    # TV parity: MAE is capped at the absolute price move to exit
+                    # (entry - exit) * size for long. If SL fires and price continues lower
+                    # within the same bar, TV does NOT count post-exit movement as adverse.
+                    ep = trade_data["entry_price"]
+                    xp = trade_data["exit_price"]
+                    sz = trade_data["size"]
+                    price_move_long = abs(ep - xp) * sz  # max possible MAE = actual exit move
+                    capped_long_mfe = long_accumulated_mfe                        # MFE never capped
+                    capped_long_mae = min(long_accumulated_mae, price_move_long)  # MAE capped at exit move
+
+                    # Calculate MFE/MAE percentages from USD values
+                    entry_value = ep * sz
+                    mfe_pct = (capped_long_mfe / entry_value * 100) if entry_value > 0 else 0.0
+                    mae_pct = (capped_long_mae / entry_value * 100) if entry_value > 0 else 0.0
+
                     trade_record = TradeRecord(
                         entry_time=trade_data["entry_time"],
                         exit_time=trade_data["exit_time"],
                         direction="long",
-                        entry_price=trade_data["entry_price"],
-                        exit_price=trade_data["exit_price"],
-                        size=trade_data["size"],
+                        entry_price=ep,
+                        exit_price=xp,
+                        size=sz,
                         pnl=trade_data["pnl"],
                         pnl_pct=trade_data["pnl_pct"],
                         fees=trade_data["fees"],
                         exit_reason=effective_exit_reason,
                         duration_bars=trade_data["duration_bars"],
-                        mfe=long_accumulated_mfe,
-                        mae=long_accumulated_mae,
+                        mfe=capped_long_mfe,
+                        mae=capped_long_mae,
+                        mfe_pct=mfe_pct,
+                        mae_pct=mae_pct,
                     )
                     trades.append(trade_record)
 
@@ -1468,20 +1486,38 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                 for trade_data in closed_trades:
                     cash += trade_data["allocated"] + trade_data["pnl"]
+
+                    # TV parity: MAE is capped at the absolute price move to exit
+                    # (exit - entry) * size for short. If SL fires and price continues higher
+                    # within the same bar, TV does NOT count post-exit movement as adverse.
+                    ep = trade_data["entry_price"]
+                    xp = trade_data["exit_price"]
+                    sz = trade_data["size"]
+                    price_move_short = abs(xp - ep) * sz  # max possible MAE = actual exit move
+                    capped_short_mfe = short_accumulated_mfe                         # MFE never capped
+                    capped_short_mae = min(short_accumulated_mae, price_move_short)  # MAE capped at exit move
+
+                    # Calculate MFE/MAE percentages from USD values
+                    entry_value = ep * sz
+                    mfe_pct = (capped_short_mfe / entry_value * 100) if entry_value > 0 else 0.0
+                    mae_pct = (capped_short_mae / entry_value * 100) if entry_value > 0 else 0.0
+
                     trade_record = TradeRecord(
                         entry_time=trade_data["entry_time"],
                         exit_time=trade_data["exit_time"],
                         direction="short",
-                        entry_price=trade_data["entry_price"],
-                        exit_price=trade_data["exit_price"],
-                        size=trade_data["size"],
+                        entry_price=ep,
+                        exit_price=xp,
+                        size=sz,
                         pnl=trade_data["pnl"],
                         pnl_pct=trade_data["pnl_pct"],
                         fees=trade_data["fees"],
                         exit_reason=effective_short_exit_reason,
                         duration_bars=trade_data["duration_bars"],
-                        mfe=short_accumulated_mfe,
-                        mae=short_accumulated_mae,
+                        mfe=capped_short_mfe,
+                        mae=capped_short_mae,
+                        mfe_pct=mfe_pct,
+                        mae_pct=mae_pct,
                     )
                     trades.append(trade_record)
 
@@ -1694,6 +1730,21 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                         if partial_result is not None:
                             cash += partial_result["allocated"] + partial_result["pnl"]
+
+                            # For partial close, scale MFE/MAE proportionally to the closed portion
+                            # Get the position size before partial close to calculate the proportion
+                            pos_before = pyramid_mgr.get_total_size("long")
+                            partial_size = partial_result["size"]
+                            
+                            # Scale MFE/MAE: only the portion that was closed
+                            mfe_proportional = long_accumulated_mfe * (partial_size / pos_before) if pos_before > 0 else long_accumulated_mfe
+                            mae_proportional = long_accumulated_mae * (partial_size / pos_before) if pos_before > 0 else long_accumulated_mae
+                            
+                            # Calculate MFE/MAE percentages from proportional USD values
+                            entry_value = partial_result["entry_price"] * partial_result["size"]
+                            mfe_pct = (mfe_proportional / entry_value * 100) if entry_value > 0 else 0.0
+                            mae_pct = (mae_proportional / entry_value * 100) if entry_value > 0 else 0.0
+
                             trades.append(
                                 TradeRecord(
                                     entry_time=partial_result["entry_time"],
@@ -1707,8 +1758,10 @@ class FallbackEngineV4(BaseBacktestEngine):
                                     fees=partial_result["fees"],
                                     exit_reason=ExitReason.TAKE_PROFIT,
                                     duration_bars=partial_result["duration_bars"],
-                                    mfe=long_accumulated_mfe,
-                                    mae=long_accumulated_mae,
+                                    mfe=mfe_proportional,
+                                    mae=mae_proportional,
+                                    mfe_pct=mfe_pct,
+                                    mae_pct=mae_pct,
                                 )
                             )
 
@@ -1750,6 +1803,21 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                         if short_partial is not None:
                             cash += short_partial["allocated"] + short_partial["pnl"]
+
+                            # For partial close, scale MFE/MAE proportionally to the closed portion
+                            # Get the position size before partial close to calculate the proportion
+                            pos_before = pyramid_mgr.get_total_size("short")
+                            partial_size = short_partial["size"]
+                            
+                            # Scale MFE/MAE: only the portion that was closed
+                            mfe_proportional = short_accumulated_mfe * (partial_size / pos_before) if pos_before > 0 else short_accumulated_mfe
+                            mae_proportional = short_accumulated_mae * (partial_size / pos_before) if pos_before > 0 else short_accumulated_mae
+                            
+                            # Calculate MFE/MAE percentages from proportional USD values
+                            entry_value = short_partial["entry_price"] * short_partial["size"]
+                            mfe_pct = (mfe_proportional / entry_value * 100) if entry_value > 0 else 0.0
+                            mae_pct = (mae_proportional / entry_value * 100) if entry_value > 0 else 0.0
+
                             trades.append(
                                 TradeRecord(
                                     entry_time=short_partial["entry_time"],
@@ -1763,8 +1831,10 @@ class FallbackEngineV4(BaseBacktestEngine):
                                     fees=short_partial["fees"],
                                     exit_reason=ExitReason.TAKE_PROFIT,
                                     duration_bars=short_partial["duration_bars"],
-                                    mfe=short_accumulated_mfe,
-                                    mae=short_accumulated_mae,
+                                    mfe=mfe_proportional,
+                                    mae=mae_proportional,
+                                    mfe_pct=mfe_pct,
+                                    mae_pct=mae_pct,
                                 )
                             )
 
@@ -2282,10 +2352,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     )
                     # entry_on_next_bar_open=True → enter at open of this bar (bar i), which
                     # is the bar AFTER the signal bar (i-1). This matches TradingView parity.
-                    if entry_on_next_bar_open:
-                        _base_price_long = open_prices[i]
-                    else:
-                        _base_price_long = close_price
+                    _base_price_long = open_prices[i] if entry_on_next_bar_open else close_price
                     entry_price = _base_price_long * (1 + effective_slippage)
 
                     # === POSITION SIZING ===
@@ -2436,10 +2503,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     )
                     # entry_on_next_bar_open=True → enter at open of this bar (bar i), which
                     # is the bar AFTER the signal bar (i-1). This matches TradingView parity.
-                    if entry_on_next_bar_open:
-                        _base_price_short = open_prices[i]
-                    else:
-                        _base_price_short = close_price
+                    _base_price_short = open_prices[i] if entry_on_next_bar_open else close_price
                     entry_price = _base_price_short * (1 - effective_slippage)
 
                     # === POSITION SIZING ===
@@ -2669,6 +2733,12 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                 for trade_data in closed:
                     cash += trade_data["allocated"] + trade_data["pnl"]
+                    
+                    # Calculate MFE/MAE percentages from USD values
+                    entry_value = trade_data["entry_price"] * trade_data["size"]
+                    mfe_pct = (final_mfe / entry_value * 100) if entry_value > 0 else 0.0
+                    mae_pct = (final_mae / entry_value * 100) if entry_value > 0 else 0.0
+                    
                     trades.append(
                         TradeRecord(
                             entry_time=trade_data["entry_time"],
@@ -2684,6 +2754,8 @@ class FallbackEngineV4(BaseBacktestEngine):
                             duration_bars=trade_data["duration_bars"],
                             mfe=final_mfe,
                             mae=final_mae,
+                            mfe_pct=mfe_pct,
+                            mae_pct=mae_pct,
                         )
                     )
 
