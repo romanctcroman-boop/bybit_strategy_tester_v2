@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **[ENGINE PARITY] Sharpe/Sortino TV-совместимость: equity-based returns + ddof=0**
+- **[INDICATOR_HANDLERS] MACD EMA formula fix: replace `vbt.MACD.run()` with `ewm(adjust=False)` for TV parity**
+
+    **Problem:** `StrategyBuilderAdapter` MACD blocks produced 62 trades (UI) vs 42 TV reference.
+    Strategy_MACD_03 stored in DB with `total_trades=62`.
+
+    **Root cause (two compounding bugs):**
+    1. **Wrong EMA formula** — `_handle_macd` used `vbt.MACD.run()` which uses a different EMA
+       seed than TradingView's `ta.ema()`. Max diff on ETHUSDT 30m: **22.71 USDT** (mean 1.07).
+       This caused ~10x more crossover events: 487 long intersections vs TV's ~42 entries.
+    2. **Signal memory ON by default** — `disable_signal_memory: false` in frontend defaults
+       - `signal_memory_bars: 5` extended each crossover signal to 5 bars, further inflating
+       intersections when both `use_cross_signal` AND `use_cross_zero` were active.
+
+    **Verified diagnostics (`scripts/_diag_adapter_signals.py`):**
+    - Before fix: `memory=ON` → 68 trades (57 after EMA fix), `memory=OFF` → 45 trades (42 after EMA fix)
+    - After EMA fix with `memory=OFF`: **42 trades, 88.1% WR** = exact TV parity ✅
+
+    **Changes:**
+    - `backend/backtesting/indicator_handlers.py`: `_handle_macd` — replaced `vbt.MACD.run()`
+      with `close.ewm(span=fast, adjust=False)` to match TradingView `ta.ema()` / `ta.macd()`.
+    - `frontend/js/pages/strategy_builder.js`: MACD block default changed
+      `disable_signal_memory: false → true` (no memory by default = TV parity).
+      Also fixed inverted tooltip text.
+
+    **TV parity check:** `compare_macd_tv.py` still passes 9/9 metrics after fix. ✅
+
+
 
     **Проблема:** Sharpe = 0.914 vs TV = 0.934 (−2.1%), Sortino = 4.14 vs TV = 4.19 (−1.2%).
 
@@ -193,13 +219,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Итоговые результаты калибровки (все движки):**
 
-    | Engine | Trades | Net Profit | Status |
-    |--------|--------|------------|--------|
-    | FallbackEngineV4 | 155 | 1023.52 | ✅ PASS |
-    | NumbaEngineV2 | 155 | 1023.52 | ✅ PASS |
-    | FallbackEngineV3 | 155 | 1023.52 | ✅ PASS |
-    | FallbackEngineV2 | 155 | 1023.52 | ✅ PASS |
-    | BacktestEngine (engine.py) | 155 | 1023.52 | ✅ PASS |
+    | Engine                     | Trades | Net Profit | Status  |
+    | -------------------------- | ------ | ---------- | ------- |
+    | FallbackEngineV4           | 155    | 1023.52    | ✅ PASS |
+    | NumbaEngineV2              | 155    | 1023.52    | ✅ PASS |
+    | FallbackEngineV3           | 155    | 1023.52    | ✅ PASS |
+    | FallbackEngineV2           | 155    | 1023.52    | ✅ PASS |
+    | BacktestEngine (engine.py) | 155    | 1023.52    | ✅ PASS |
 
     **Причина:** `GET /api/v1/backtests/{id}` (`get_backtest`) некорректно повторно применял
     `build_equity_curve_response()` к уже отфильтрованным данным в dict-формате.
@@ -218,10 +244,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Сравнение endpoint-ов:**
 
-    | Endpoint | До фикса | После фикса |
-    |----------|----------|-------------|
-    | `GET /backtests/` (list) | 154/154 ✅ | 154/154 ✅ |
-    | `GET /backtests/{id}` (detail) | 2/0 ❌ | 154/154 ✅ |
+    | Endpoint                       | До фикса   | После фикса |
+    | ------------------------------ | ---------- | ----------- |
+    | `GET /backtests/` (list)       | 154/154 ✅ | 154/154 ✅  |
+    | `GET /backtests/{id}` (detail) | 2/0 ❌     | 154/154 ✅  |
 
 - **Buy & Hold линия не отображалась на графике капитала (была плоской на 0)**
 
@@ -293,14 +319,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Summary of all 106 metrics fixed across this session:**
 
-    | Metric | Root cause | Fix |
-    |--------|-----------|-----|
-    | `margin_efficiency` | Wrong denominator formula | `cagr / (max_margin / IC × 100)` |
-    | `recovery_factor` All | Used close DD instead of intrabar DD | `net_profit / max_dd_intrabar_value` |
-    | `recovery_long/short` | Used direction-specific DD | `direction_net / global_intrabar_DD` |
-    | `net_profit = 0.0` | Field missing from `PerformanceMetrics` return | Restored `net_profit=calc_metrics["net_profit"]` |
-    | `avg_drawdown` (was 250, TV 600) | Averaging multiple DD episodes | Use single `max_dd_close_value_tv` |
-    | `avg_runup` (was 318, TV 396) | Episode fired at first HWM crossing | State machine fires at next DD start |
+    | Metric                           | Root cause                                     | Fix                                              |
+    | -------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
+    | `margin_efficiency`              | Wrong denominator formula                      | `cagr / (max_margin / IC × 100)`                 |
+    | `recovery_factor` All            | Used close DD instead of intrabar DD           | `net_profit / max_dd_intrabar_value`             |
+    | `recovery_long/short`            | Used direction-specific DD                     | `direction_net / global_intrabar_DD`             |
+    | `net_profit = 0.0`               | Field missing from `PerformanceMetrics` return | Restored `net_profit=calc_metrics["net_profit"]` |
+    | `avg_drawdown` (was 250, TV 600) | Averaging multiple DD episodes                 | Use single `max_dd_close_value_tv`               |
+    | `avg_runup` (was 318, TV 396)    | Episode fired at first HWM crossing            | State machine fires at next DD start             |
 
     **Result: 106/106 PASS** (was 64/64 → 105/106 → 106/106)
 
@@ -403,12 +429,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Results:**
 
-    | Metric | Ours | TradingView | Delta |
-    |--------|------|-------------|-------|
-    | Total trades | 153 | 154 | -1 |
-    | Win rate | 90.20% | 90.26% | -0.06% |
-    | Net profit | 980.32 USDT | 1001.98 USDT | -2.16% |
-    | Matching entries | 141/154 | — | 91.6% |
+    | Metric           | Ours        | TradingView  | Delta  |
+    | ---------------- | ----------- | ------------ | ------ |
+    | Total trades     | 153         | 154          | -1     |
+    | Win rate         | 90.20%      | 90.26%       | -0.06% |
+    | Net profit       | 980.32 USDT | 1001.98 USDT | -2.16% |
+    | Matching entries | 141/154     | —            | 91.6%  |
 
 - **TradingView parity: RSI range/cross signal logic (2026-02-28, `indicator_handlers.py`)**
 

@@ -17,6 +17,7 @@ import { createSentimentBlocksModule } from '../components/SentimentBlocksModule
 import { createOrderFlowBlocksModule } from '../components/OrderFlowBlocksModule.js';
 import { formatDate, debounce } from '../utils.js';
 import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
+import { localDateStr } from '../utils/dateUtils.js';
 
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
@@ -3708,8 +3709,9 @@ function getDefaultParams(blockType) {
       use_macd_cross_signal: false,
       signal_only_if_macd_positive: false,
       opposite_macd_cross_signal: false,
-      // Signal Memory
-      disable_signal_memory: false,
+      // Signal Memory (disabled by default for TV parity — enable only when
+      // combining MACD signals with other conditions as a multi-bar filter)
+      disable_signal_memory: true,
       signal_memory_bars: 5
     },
     supertrend: {
@@ -4404,10 +4406,11 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'macd_cross_zero_level', label: 'Cross Line Level (0)', type: 'number', optimizable: true },
         { type: 'divider' },
         { key: 'use_macd_cross_signal', label: 'Use MACD Cross with Signal Line', type: 'checkbox', tooltip: 'Long when MACD crosses above Signal line, Short when crosses below' },
-        { key: 'signal_only_if_macd_positive', label: 'Signal only if MACD < 0 (Long) or > 0 (Short)', type: 'checkbox', tooltip: 'Filter: only generate long signals when MACD < 0, short when MACD > 0' },
         { key: 'opposite_macd_cross_signal', label: 'Opposite Signal - MACD Cross with Signal Line', type: 'checkbox', tooltip: 'Swap long/short signals for signal line cross' },
         { type: 'divider' },
-        { key: 'disable_signal_memory', label: '==Disable Signal Memory (for both MACD Crosses)==', type: 'checkbox', tooltip: 'When disabled, cross signals only fire on the exact bar of crossing. When enabled, signals persist for N bars.' }
+        { key: 'signal_only_if_macd_positive', label: 'Filter by Zero (LONG if MACD>0, SHORT if MACD<0)', type: 'checkbox', tooltip: 'Filter: only generate long signals when MACD > 0, short when MACD < 0' },
+        { key: 'disable_signal_memory', label: '==Disable Signal Memory (for both MACD Crosses)==', type: 'checkbox', tooltip: 'When CHECKED (default): cross signals fire only on the exact bar of crossing — matches TradingView parity. When UNCHECKED: signals persist for N bars after crossing (useful for combining with other conditions).' },
+        { key: 'signal_memory_bars', label: 'Keep MACD Signal in Memory for N bars', type: 'number', optimizable: true, min: 1, max: 100, step: 1, tooltip: 'Number of bars to keep MACD cross signal in memory (used when Signal Memory is enabled)' }
       ]
     },
     supertrend: {
@@ -5032,7 +5035,7 @@ function getBlockPorts(blockId, _category) {
       outputs: [
         { id: 'macd', label: 'MACD', type: 'data' },
         { id: 'signal', label: 'Signal', type: 'data' },
-        { id: 'hist', label: 'Hist', type: 'data' },
+        { id: 'histogram', label: 'Hist', type: 'data' },
         { id: 'long', label: 'Long', type: 'condition' },
         { id: 'short', label: 'Short', type: 'condition' }
       ]
@@ -5979,11 +5982,17 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
 function positionPopupInViewport(popup, blockEl) {
   const blockRect = blockEl.getBoundingClientRect();
   const popupWidth = popup.offsetWidth || 320;
-  const popupHeight = popup.offsetHeight || 400;
   const padding = 10; // Gap between block and popup
   const margin = 10; // Margin from viewport edges
   const viewportH = window.innerHeight;
   const viewportW = window.innerWidth;
+
+  // Cap popup height so it never exceeds available viewport space
+  const maxAllowedHeight = viewportH - margin * 2;
+  popup.style.maxHeight = `${maxAllowedHeight}px`;
+
+  // Re-measure after clamping max-height
+  const popupHeight = Math.min(popup.offsetHeight || 400, maxAllowedHeight);
 
   let left, top;
 
@@ -9818,3 +9827,16 @@ if (typeof window !== 'undefined') {
 
 // Export for frontend tests (ticker sync flow)
 export { syncSymbolData, runCheckSymbolDataForProperties };
+
+// ── Reset End Date button ─────────────────────────────────────────────────────
+// Sets backtestEndDate to today (local date) on click.
+document.addEventListener('DOMContentLoaded', () => {
+  const resetBtn = document.getElementById('resetEndDateBtn');
+  const endDateEl = document.getElementById('backtestEndDate');
+  if (resetBtn && endDateEl) {
+    resetBtn.addEventListener('click', () => {
+      endDateEl.value = localDateStr();
+      endDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+});

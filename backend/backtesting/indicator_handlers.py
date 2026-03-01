@@ -516,10 +516,15 @@ def _handle_macd(
     slow = _clamp_period(_param(params, 26, "slow_period", "slowPeriod"))
     signal_p = _clamp_period(_param(params, 9, "signal_period", "signalPeriod"))
 
-    macd_result = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=signal_p)
-    macd_line = macd_result.macd
-    signal_line = macd_result.signal
-    histogram = macd_result.hist
+    # Use ewm(adjust=False) to match TradingView ta.ema() / ta.macd() exactly.
+    # vbt.MACD.run() uses a different EMA seed that produces significantly
+    # different values (max diff ~22 USDT on ETHUSDT 30m), causing ~10x more
+    # crossovers and breaking TV parity.  See CLAUDE.md §5 and DECISIONS.md.
+    fast_ema = close.ewm(span=fast, adjust=False).mean()
+    slow_ema = close.ewm(span=slow, adjust=False).mean()
+    macd_line = fast_ema - slow_ema
+    signal_line = macd_line.ewm(span=signal_p, adjust=False).mean()
+    histogram = macd_line - signal_line
 
     # Support both old keys (use_macd_cross / use_zero_cross) and new frontend keys
     # (use_macd_cross_signal / use_macd_cross_zero).
@@ -539,9 +544,17 @@ def _handle_macd(
         if params.get("opposite_macd_cross_signal", params.get("opposite_signal", False)):
             cross_long, cross_short = cross_short, cross_long
 
-        # Memory: frontend sends disable_signal_memory (default False = ON) + signal_memory_bars.
+        # signal_only_if_macd_positive:
+        #   long only when MACD > 0 (MACD line above zero — positive momentum)
+        #   short only when MACD < 0 (MACD line below zero — negative momentum)
+        # Matches TradingView label: "Filter by Zero (LONG if MACD>0, SHORT if MACD<0)"
+        if params.get("signal_only_if_macd_positive", False):
+            cross_long = cross_long & (macd_line > 0)
+            cross_short = cross_short & (macd_line < 0)
+
+        # Memory: frontend sends disable_signal_memory (default False = memory ON) + signal_memory_bars.
         # Legacy path: use_cross_memory + cross_memory_bars.
-        disable_memory = params.get("disable_signal_memory", True)
+        disable_memory = params.get("disable_signal_memory", False)
         if not disable_memory or params.get("use_cross_memory", False):
             memory_bars = int(params.get("signal_memory_bars", params.get("cross_memory_bars", 5)))
             cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
@@ -556,14 +569,15 @@ def _handle_macd(
         short_signal = short_signal & (histogram < -hist_threshold)
 
     if use_zero_cross:
+        zero_level = float(params.get("macd_cross_zero_level", params.get("zero_level", 0.0)))
         macd_prev = macd_line.shift(1)
-        zero_cross_long = (macd_prev <= 0) & (macd_line > 0)
-        zero_cross_short = (macd_prev >= 0) & (macd_line < 0)
+        zero_cross_long = (macd_prev <= zero_level) & (macd_line > zero_level)
+        zero_cross_short = (macd_prev >= zero_level) & (macd_line < zero_level)
 
         if params.get("opposite_macd_cross_zero", params.get("opposite_signal", False)):
             zero_cross_long, zero_cross_short = zero_cross_short, zero_cross_long
 
-        disable_memory = params.get("disable_signal_memory", True)
+        disable_memory = params.get("disable_signal_memory", False)
         if not disable_memory or params.get("use_zero_cross_memory", False):
             memory_bars = int(params.get("signal_memory_bars", params.get("zero_cross_memory_bars", 5)))
             zero_cross_long = adapter._apply_signal_memory(zero_cross_long, memory_bars)
