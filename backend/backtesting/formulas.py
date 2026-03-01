@@ -48,7 +48,9 @@ __all__ = [
     "calc_recovery_factor",
     "calc_returns_from_equity",
     "calc_sharpe",
+    "calc_sharpe_monthly_tv",
     "calc_sortino",
+    "calc_sortino_monthly_tv",
     "calc_sqn",
     "calc_ulcer_index",
     "calc_win_rate",
@@ -422,6 +424,390 @@ def calc_sortino(
 
     sortino = (mean_r - mar) / downside_dev * math.sqrt(annualization_factor)
     return float(np.clip(sortino, _RATIO_CLIP_MIN, _RATIO_CLIP_MAX))
+
+
+def calc_sharpe_monthly_tv(
+    equity_curve: np.ndarray,
+    timestamps: np.ndarray,
+    initial_capital: float,
+    risk_free_rate: float = 0.02,
+    trades: list | None = None,
+) -> float:
+    """
+    TradingView-совместимый Sharpe Ratio через МЕСЯЧНЫЕ доходности.
+
+    TV формула (верифицировано 2026-02):
+        1. Equity-based monthly returns: r_i = (eq_end_month_i - eq_start_month_i) / eq_start_month_i
+           — TV использует relative equity returns, не pnl/initial_capital!
+           Equity строится нарастающим итогом: initial_capital + cumsum(trade_pnl)
+           Месяцы группируются по EXIT_TIME сделки.
+        2. rfr_monthly = risk_free_rate / 12
+        3. Sharpe = (mean(r) - rfr_monthly) / std(r, ddof=0)
+           — TV использует POPULATION std (ddof=0), не ddof=1!
+           — БЕЗ умножения на sqrt(12). TV не аннуализирует (оставляет monthly).
+
+    Верифицировано (Strategy_MACD_01, 42 сделки, ETHUSDT 30m):
+        - equity returns + ddof=0 → 0.9336 ≈ TV=0.934 ✅ (was: 0.914 with pnl/IC + ddof=1)
+
+    Args:
+        equity_curve:    Массив значений капитала (len == len(timestamps))
+        timestamps:      Массив int64 unix-ms или pd.DatetimeIndex / np.ndarray datetime64
+        initial_capital: Начальный капитал (> 0)
+        risk_free_rate:  Годовая безрисковая ставка (0.02 = 2%)
+        trades:          Список TradeRecord (preferred); если None, используется equity_curve
+
+    Returns:
+        Sharpe Ratio (monthly, не аннуализированный), клипован в [-100, 100].
+        0.0 при недостаточном количестве месяцев (< 2).
+    """
+    if initial_capital <= 0:
+        return 0.0
+
+    if trades is not None:
+        monthly_returns = _aggregate_monthly_equity_returns_from_trades(trades, initial_capital)
+    else:
+        if len(equity_curve) < 2:
+            return 0.0
+        monthly_returns = _aggregate_monthly_returns(equity_curve, timestamps, initial_capital)
+
+    if len(monthly_returns) < 2:
+        return 0.0
+
+    m = np.asarray(monthly_returns, dtype=np.float64)
+    mean_m = float(np.mean(m))
+    std_m = float(np.std(m, ddof=0))  # TV uses population std (ddof=0)
+
+    if std_m <= 1e-10:
+        return 0.0
+
+    rfr_monthly = risk_free_rate / 12.0
+    sharpe = (mean_m - rfr_monthly) / std_m
+    return float(np.clip(sharpe, _RATIO_CLIP_MIN, _RATIO_CLIP_MAX))
+
+
+def calc_sortino_monthly_tv(
+    equity_curve: np.ndarray,
+    timestamps: np.ndarray,
+    initial_capital: float,
+    risk_free_rate: float = 0.02,
+    trades: list | None = None,
+) -> float:
+    """
+    TradingView-совместимый Sortino Ratio через МЕСЯЧНЫЕ доходности.
+
+    TV формула (верифицировано 2026-02, Strategy_MACD_01, 42 сделки):
+        1. Equity-based monthly returns (r_i = (eq_end - eq_start) / eq_start)
+           — аналогично calc_sharpe_monthly_tv
+        2. rfr_monthly = risk_free_rate / 12
+        3. negative_dev = min(0, r - rfr_monthly) для каждого месяца
+        4. downside_dev = sqrt( sum(negative_dev^2) / N )   # ddof=0 (population)!
+        5. Sortino = (mean(r) - rfr_monthly) / downside_dev
+           — БЕЗ умножения на sqrt(12).
+
+    Верифицировано:
+        - equity returns + ddof=0 → 4.1903 ≈ TV=4.19 ✅ (was: 4.14 with pnl/IC + ddof=1)
+
+    Args:
+        equity_curve:    Массив значений капитала
+        timestamps:      Массив временных меток (unix-ms int64 или datetime64)
+        initial_capital: Начальный капитал (> 0)
+        risk_free_rate:  Годовая безрисковая ставка (0.02 = 2%)
+        trades:          Список TradeRecord (preferred); если None, используется equity_curve
+
+    Returns:
+        Sortino Ratio (monthly, не аннуализированный), клипован в [-100, 100].
+        0.0 при < 2 месяцев.
+    """
+    if initial_capital <= 0:
+        return 0.0
+
+    if trades is not None:
+        monthly_returns = _aggregate_monthly_equity_returns_from_trades(trades, initial_capital)
+    else:
+        if len(equity_curve) < 2:
+            return 0.0
+        monthly_returns = _aggregate_monthly_returns(equity_curve, timestamps, initial_capital)
+
+    if len(monthly_returns) < 2:
+        return 0.0
+
+    m = np.asarray(monthly_returns, dtype=np.float64)
+    N = len(m)
+    mean_m = float(np.mean(m))
+    rfr_monthly = risk_free_rate / 12.0
+
+    negative_dev = np.minimum(0.0, m - rfr_monthly)
+    downside_variance = float(np.sum(np.square(negative_dev))) / N  # TV uses ddof=0 (population)
+    downside_dev = math.sqrt(downside_variance)
+
+    if downside_dev <= 1e-10:
+        # No downside → perfect strategy
+        return _RATIO_CLIP_MAX if mean_m > rfr_monthly else 0.0
+
+    sortino = (mean_m - rfr_monthly) / downside_dev
+    return float(np.clip(sortino, _RATIO_CLIP_MIN, _RATIO_CLIP_MAX))
+
+
+def _aggregate_monthly_equity_returns_from_trades(
+    trades: list,
+    initial_capital: float,
+) -> list[float]:
+    """
+    TV-совместимые equity-based monthly returns из закрытых сделок.
+
+    TV формула (верифицировано 2026-02, Strategy_MACD_01, 42 сделки):
+        1. Строим running equity: eq_0=initial_capital, eq_i = eq_{i-1} + pnl_i
+           Сделки сортируются по EXIT_TIME.
+        2. Группируем по (year, month) через EXIT_TIME:
+           equity_month_start = equity перед первой сделкой месяца
+           equity_month_end   = equity после последней сделки месяца
+        3. monthly_return[i] = (equity_month_end - equity_month_start) / equity_month_start
+           — RELATIVE return на старт-месяц, НЕ на initial_capital!
+        4. Пустые месяцы (без сделок) = 0.0, equity_start = equity_end предыдущего.
+
+    Это отличается от _aggregate_monthly_returns_from_trades который использует
+    pnl / initial_capital. TV использует relative equity returns.
+
+    Args:
+        trades:          Список TradeRecord с полями exit_time и pnl
+        initial_capital: Начальный капитал (> 0)
+
+    Returns:
+        Список месячных доходностей (fraction), отсортированных по (year, month).
+        Пустые месяцы включены как 0.0.
+    """
+    import pandas as pd
+
+    if not trades or initial_capital <= 0:
+        return []
+
+    # Sort trades by exit_time
+    def get_exit_ts(trade: object) -> "pd.Timestamp":
+        et = getattr(trade, "exit_time", None) or getattr(trade, "entry_time", None)
+        if et is None:
+            return pd.Timestamp("2099-01-01", tz="UTC")
+        if isinstance(et, pd.Timestamp):
+            ts = et
+        else:
+            ts = pd.Timestamp(et)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        return ts
+
+    sorted_trades = sorted(trades, key=get_exit_ts)
+
+    # Accumulate monthly PnL by exit_time
+    monthly_pnl: dict[tuple[int, int], float] = {}
+    first_month: tuple[int, int] | None = None
+    last_month: tuple[int, int] | None = None
+
+    for trade in sorted_trades:
+        et = getattr(trade, "exit_time", None) or getattr(trade, "entry_time", None)
+        pnl = float(getattr(trade, "pnl", 0.0))
+        if et is None:
+            continue
+
+        if isinstance(et, pd.Timestamp):
+            ts = et
+        else:
+            ts = pd.Timestamp(et)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+
+        key = (int(ts.year), int(ts.month))
+        monthly_pnl[key] = monthly_pnl.get(key, 0.0) + pnl
+
+        if first_month is None or key < first_month:
+            first_month = key
+        if last_month is None or key > last_month:
+            last_month = key
+
+    if first_month is None or last_month is None:
+        return []
+
+    # Build running equity month-by-month
+    result: list[float] = []
+    running_equity = float(initial_capital)
+
+    y, m = first_month
+    while (y, m) <= last_month:
+        key = (y, m)
+        month_pnl = monthly_pnl.get(key, 0.0)
+        eq_start = running_equity
+        eq_end = running_equity + month_pnl
+        running_equity = eq_end
+
+        # Relative return: (end - start) / start
+        if eq_start > 0.0:
+            r = (eq_end - eq_start) / eq_start
+        else:
+            r = 0.0
+        result.append(r)
+
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    return result
+
+
+def _aggregate_monthly_returns_from_trades(
+    trades: list,
+    initial_capital: float,
+) -> list[float]:
+    """
+    Агрегировать доходности по месяцам используя ЗАКРЫТЫЕ сделки (TradeRecord).
+
+    TV-совместимый метод (верифицировано по CSV-экспорту TV):
+        - Группирует PnL сделок по (year, month) EXIT_TIME  ← TV использует exit_time!
+        - monthly_return[i] = sum_pnl_in_month[i] / initial_capital
+        - Покрывает все месяцы от первой до последней сделки, включая пустые месяцы (0.0)
+
+    ВАЖНО: TV bucket-ирует сделки по времени ЗАКРЫТИЯ (exit_time), а не открытия.
+    Это подтверждено сравнением с TV CSV-экспортом (Strategy_MACD_01, 42 сделки):
+        - By exit_time: Sharpe=0.914≈0.934, Sortino_H=4.14≈4.19 ✅
+        - By entry_time: Sharpe=0.802, Sortino_H=1.63 ✗
+
+    Формула Sortino (TV-верифицированная):
+        Sortino = (mean - rfr/12) / sqrt( sum(min(0, r - rfr/12)^2) / N )
+
+    Это вспомогательная функция; основной метод — _aggregate_monthly_equity_returns_from_trades.
+    Оставлена для совместимости с equity_curve-based вызовами.
+
+    Args:
+        trades:          Список TradeRecord с полями exit_time и pnl
+        initial_capital: Начальный капитал (> 0)
+
+    Returns:
+        Список месячных доходностей (fraction), отсортированных по (year, month).
+        Пустые месяцы включены как 0.0.
+    """
+    import pandas as pd
+
+    if not trades or initial_capital <= 0:
+        return []
+
+    # Accumulate PnL per month using EXIT_TIME (TV-verified: TV buckets by close date)
+    monthly_pnl: dict[tuple[int, int], float] = {}
+    first_month: tuple[int, int] | None = None
+    last_month: tuple[int, int] | None = None
+
+    for trade in trades:
+        # Use exit_time (TV-parity). Fall back to entry_time if exit_time not available.
+        et = getattr(trade, "exit_time", None) or getattr(trade, "entry_time", None)
+        pnl = float(getattr(trade, "pnl", 0.0))
+        if et is None:
+            continue
+
+        # Normalize to pd.Timestamp
+        if isinstance(et, str):
+            ts = pd.Timestamp(et)
+        elif isinstance(et, pd.Timestamp):
+            ts = et
+        else:
+            ts = pd.Timestamp(et)
+
+        # Ensure UTC-aware for consistent month extraction
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+
+        key = (int(ts.year), int(ts.month))
+        monthly_pnl[key] = monthly_pnl.get(key, 0.0) + pnl
+
+        if first_month is None or key < first_month:
+            first_month = key
+        if last_month is None or key > last_month:
+            last_month = key
+
+    if first_month is None or last_month is None:
+        return []
+
+    # Build full month range (include months with no trades as 0.0)
+    result: list[float] = []
+    y, m = first_month
+    while (y, m) <= last_month:
+        pnl = monthly_pnl.get((y, m), 0.0)
+        result.append(pnl / initial_capital)
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    return result
+
+
+def _aggregate_monthly_returns(
+    equity_curve: np.ndarray,
+    timestamps: np.ndarray,
+    initial_capital: float,
+) -> list[float]:
+    """
+    Вспомогательная функция: агрегировать доходности по месяцам.
+
+    Группирует бары по (year, month) и считает:
+        monthly_return = (equity_end_of_month - equity_start_of_month) / initial_capital
+
+    Используется calc_sharpe_monthly_tv() и calc_sortino_monthly_tv().
+
+    Args:
+        equity_curve:    Массив значений капитала (len >= 2)
+        timestamps:      Массив временных меток.
+                         Поддерживаемые форматы:
+                           - int64 unix-milliseconds
+                           - np.datetime64
+                           - pd.DatetimeIndex (передаётся как .values)
+        initial_capital: Начальный капитал для нормирования
+
+    Returns:
+        Список месячных доходностей (fraction, не %).
+        Пустой список если < 1 полного месяца.
+    """
+    import pandas as pd
+
+    equity = np.asarray(equity_curve, dtype=np.float64)
+    ts = timestamps
+
+    # Convert timestamps to pandas DatetimeIndex for easy month extraction
+    if hasattr(ts, "values"):
+        # pd.DatetimeIndex or pd.Series
+        ts_pd = pd.DatetimeIndex(ts.values)
+    elif isinstance(ts, np.ndarray):
+        if ts.dtype.kind == "M":  # datetime64
+            ts_pd = pd.DatetimeIndex(ts)
+        elif ts.dtype.kind in ("i", "u"):  # int (unix ms)
+            ts_pd = pd.to_datetime(ts, unit="ms", utc=True)
+        else:
+            try:
+                ts_pd = pd.DatetimeIndex(ts)
+            except Exception:
+                return []
+    else:
+        try:
+            ts_pd = pd.DatetimeIndex(ts)
+        except Exception:
+            return []
+
+    if len(ts_pd) != len(equity):
+        return []
+
+    # Group by (year, month) — use first equity value in month as start, last as end
+    monthly_pnl: dict[tuple[int, int], float] = {}
+    monthly_start: dict[tuple[int, int], float] = {}
+
+    for i, (eq, ts_i) in enumerate(zip(equity, ts_pd, strict=True)):
+        key = (int(ts_i.year), int(ts_i.month))
+        if key not in monthly_start:
+            monthly_start[key] = equity[i - 1] if i > 0 else initial_capital
+        monthly_pnl[key] = float(eq)  # last equity value seen in this month
+
+    monthly_returns: list[float] = []
+    for key in sorted(monthly_pnl):
+        start_eq = monthly_start[key]
+        end_eq = monthly_pnl[key]
+        monthly_returns.append((end_eq - start_eq) / initial_capital)
+
+    return monthly_returns
 
 
 def calc_calmar(
