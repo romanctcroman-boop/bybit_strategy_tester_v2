@@ -60,6 +60,34 @@ validator = StrategyValidator()
 indicator_library = IndicatorLibrary()
 
 
+# === Block param normalization ===
+
+
+def _normalize_indicator_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize indicator block params to enforce TV-parity defaults on save.
+
+    Prevents stale frontend state (e.g. old saved strategies that pre-date the
+    TV-parity fix) from overwriting corrected defaults back to wrong values.
+
+    Current rules:
+    - MACD blocks: ``disable_signal_memory`` must be ``True`` (memory OFF =
+      TV-parity).  Any ``False`` / missing value is corrected to ``True``.
+    """
+    import copy
+
+    normalized: list[dict[str, Any]] = copy.deepcopy(blocks)
+    for block in normalized:
+        block_type = (block.get("type") or "").lower()
+        if block_type == "macd":
+            params = block.setdefault("params", {})
+            # TV parity: signal memory must be OFF (disable_signal_memory=True).
+            # The flag name is inverted: True  → memory disabled (correct/TV).
+            #                            False → memory enabled  (wrong/extra trades).
+            if not params.get("disable_signal_memory", False):
+                params["disable_signal_memory"] = True
+    return normalized
+
+
 # === Pydantic Models ===
 
 
@@ -423,7 +451,7 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
             parameters=params,
             is_builder_strategy=True,
             builder_graph=builder_graph_data,
-            builder_blocks=request.blocks,
+            builder_blocks=_normalize_indicator_blocks(request.blocks),
             builder_connections=request.connections,
         )
         db.add(db_strategy)
@@ -638,13 +666,14 @@ async def update_strategy(
         if request.position_size is not None:
             db_strategy.position_size = request.position_size  # type: ignore[assignment]
         db_strategy.parameters = params  # type: ignore[assignment]
+        _normalized_blocks = _normalize_indicator_blocks(request.blocks)
         db_strategy.builder_graph = {  # type: ignore[assignment]
-            "blocks": request.blocks,
+            "blocks": _normalized_blocks,
             "connections": request.connections,
             "market_type": request.market_type,
             "direction": request.direction,
         }
-        db_strategy.builder_blocks = request.blocks  # type: ignore[assignment]
+        db_strategy.builder_blocks = _normalized_blocks  # type: ignore[assignment]
         db_strategy.builder_connections = request.connections  # type: ignore[assignment]
 
         db.commit()
