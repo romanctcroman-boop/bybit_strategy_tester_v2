@@ -87,4 +87,3 @@ for i, t in enumerate(trades[:20]):
     print(f"  #{i + 1:3d} exit={t.get('exit_time', '')}  ec={et_str}  diff={diff}s  mfe={mfe:.2f}  mae={mae:.2f}")
 
 conn.close()
-

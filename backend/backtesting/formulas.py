@@ -582,14 +582,11 @@ def _aggregate_monthly_equity_returns_from_trades(
         return []
 
     # Sort trades by exit_time
-    def get_exit_ts(trade: object) -> "pd.Timestamp":
+    def get_exit_ts(trade: object) -> pd.Timestamp:
         et = getattr(trade, "exit_time", None) or getattr(trade, "entry_time", None)
         if et is None:
             return pd.Timestamp("2099-01-01", tz="UTC")
-        if isinstance(et, pd.Timestamp):
-            ts = et
-        else:
-            ts = pd.Timestamp(et)
+        ts = et if isinstance(et, pd.Timestamp) else pd.Timestamp(et)
         if ts.tzinfo is None:
             ts = ts.tz_localize("UTC")
         return ts
@@ -607,10 +604,7 @@ def _aggregate_monthly_equity_returns_from_trades(
         if et is None:
             continue
 
-        if isinstance(et, pd.Timestamp):
-            ts = et
-        else:
-            ts = pd.Timestamp(et)
+        ts = et if isinstance(et, pd.Timestamp) else pd.Timestamp(et)
         if ts.tzinfo is None:
             ts = ts.tz_localize("UTC")
 
@@ -638,10 +632,7 @@ def _aggregate_monthly_equity_returns_from_trades(
         running_equity = eq_end
 
         # Relative return: (end - start) / start
-        if eq_start > 0.0:
-            r = (eq_end - eq_start) / eq_start
-        else:
-            r = 0.0
+        r = (eq_end - eq_start) / eq_start if eq_start > 0.0 else 0.0
         result.append(r)
 
         m += 1

@@ -192,6 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Результат:** `TypeError: TradeRecord.__init__() got an unexpected keyword argument 'mfe_pct'` → устранён ✅
 
     **Итоговые результаты калибровки (все движки):**
+
     | Engine | Trades | Net Profit | Status |
     |--------|--------|------------|--------|
     | FallbackEngineV4 | 155 | 1023.52 | ✅ PASS |
@@ -216,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Результат после фикса: `equity=154 pts`, `bh_equity=154 pts`, `timestamps=154 pts` ✅
 
     **Сравнение endpoint-ов:**
+
     | Endpoint | До фикса | После фикса |
     |----------|----------|-------------|
     | `GET /backtests/` (list) | 154/154 ✅ | 154/154 ✅ |
@@ -290,6 +292,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Correct episodes: `[626.67, 302.52, 172.87, 856.85, 43.23]` → mean=400.43 ≈ TV 396.10 ✓ (Δ=+4.33, within tol=50 USDT)
 
     **Summary of all 106 metrics fixed across this session:**
+
     | Metric | Root cause | Fix |
     |--------|-----------|-----|
     | `margin_efficiency` | Wrong denominator formula | `cagr / (max_margin / IC × 100)` |
@@ -399,6 +402,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Remaining 13 differ only due to RSI divergence from slightly different BTC source data.
 
     **Results:**
+
     | Metric | Ours | TradingView | Delta |
     |--------|------|-------------|-------|
     | Total trades | 153 | 154 | -1 |
