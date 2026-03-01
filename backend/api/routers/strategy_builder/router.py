@@ -2557,9 +2557,9 @@ async def run_backtest_from_builder(
 
     # ── Diagnostic log: dump all request params for TV parity debugging ──
     logger.info(
-        "[BacktestRequest] symbol={} interval={} start={} end={} "
-        "capital={} pos_size={} pos_size_type={} leverage={} direction={} "
-        "market_type={} sl={} tp={} commission={} slippage={} pyramiding={} engine={}",
+        "[BacktestRequest] symbol=%s interval=%s start=%s end=%s "
+        "capital=%s pos_size=%s pos_size_type=%s leverage=%s direction=%s "
+        "market_type=%s sl=%s tp=%s commission=%s slippage=%s pyramiding=%s engine=%s",
         request.symbol,
         request.interval,
         request.start_date,
@@ -2720,7 +2720,7 @@ async def run_backtest_from_builder(
                         "[Фича3] BTCUSDT OHLCV fetch returned empty — use_btcusdt_mfi will fall back to main symbol"
                     )
             except Exception as _btc_err:
-                logger.warning("[Фича3] Failed to pre-load BTCUSDT OHLCV: {} — continuing without it", _btc_err)
+                logger.warning("[Фича3] Failed to pre-load BTCUSDT OHLCV: %s — continuing without it", _btc_err)
 
         # Extract DCA config from blocks (if any)
         block_dca_config = adapter.extract_dca_config()
@@ -2917,13 +2917,30 @@ async def run_backtest_from_builder(
 
         service = BacktestService()
         try:
-            ohlcv = await service._fetch_historical_data(
+            # Load with warmup bars so EWM/EMA indicators converge before start_date.
+            # Without warmup the first few candles give cold-start crossovers that
+            # don't appear on TradingView (which has years of prior data).
+            # Load a fixed 45-day warmup window regardless of interval.
+            # 45 days guarantees EWM convergence for any period up to ~200 bars
+            # (EWM needs ~5x the period to stabilise; 45d × 48 bars/30min = 2160 bars).
+            # This matches TradingView which has years of prior data.
+            import datetime as _dt_warmup
+
+            _WARMUP_DAYS = 45
+            _warmup_start = backtest_config.start_date - _dt_warmup.timedelta(days=_WARMUP_DAYS)
+
+            ohlcv_full = await service._fetch_historical_data(
                 symbol=backtest_config.symbol,
                 interval=backtest_config.interval,
-                start_date=backtest_config.start_date,
+                start_date=_warmup_start,
                 end_date=backtest_config.end_date,
                 market_type=market_type,
             )
+            # Trim after warmup: keep full data for the engine (signals will be warm)
+            # The adapter generates signals on ohlcv_full so EWM is warm at start_date.
+            # After signal generation we slice OHLCV to [start_date, end_date] so that
+            # trades cannot open in the warmup window.
+            ohlcv = ohlcv_full
         except Exception as fetch_err:  # pragma: no cover - network issues
             # In test environment (no network in CI/sandbox), generate synthetic OHLCV
             import os
@@ -2960,12 +2977,65 @@ async def run_backtest_from_builder(
 
         # Pre-backtest signal check: detect direction/signal mismatches
         backtest_warnings: list[str] = []
+        # Pre-compute signals on FULL warmup data so EWM/EMA are converged at start_date.
+        # Then slice both OHLCV and signals to [start_date, end_date] so that
+        # no trades can open in the warmup window.
         try:
-            pre_signals = adapter.generate_signals(ohlcv)
-            long_count = int(pre_signals.entries.sum())
-            short_count = int(pre_signals.short_entries.sum()) if pre_signals.short_entries is not None else 0
-            exit_long_count = int(pre_signals.exits.sum())
-            exit_short_count = int(pre_signals.short_exits.sum()) if pre_signals.short_exits is not None else 0
+            pre_signals_warm = adapter.generate_signals(ohlcv)
+
+            # Determine the actual start cutoff (timezone-aware or naive matching ohlcv index)
+            _cutoff = backtest_config.start_date
+            if hasattr(ohlcv.index, "tz") and ohlcv.index.tz is not None and _cutoff.tzinfo is None:
+                import datetime as _dtmod2
+
+                _cutoff = _cutoff.replace(tzinfo=_dtmod2.UTC)
+            elif (hasattr(ohlcv.index, "tz") and ohlcv.index.tz is None) and (_cutoff.tzinfo is not None):
+                _cutoff = _cutoff.replace(tzinfo=None)
+
+            _mask = ohlcv.index >= _cutoff
+            _n_warmup = int((_mask == False).sum())  # noqa: E712
+            if _n_warmup > 0:
+                logger.info(
+                    "[Warmup] Slicing %d warmup bars, keeping %d bars from %s",
+                    _n_warmup,
+                    int(_mask.sum()),
+                    _cutoff,
+                )
+                ohlcv = ohlcv.loc[_mask].copy()
+
+                # Slice signal arrays to match the trimmed OHLCV.
+                # Use the same DatetimeIndex as the trimmed ohlcv so alignment is exact.
+                _warm_index = ohlcv.index  # already sliced above
+                for _attr in (
+                    "entries",
+                    "exits",
+                    "long_entries",
+                    "long_exits",
+                    "short_entries",
+                    "short_exits",
+                ):
+                    _arr = getattr(pre_signals_warm, _attr, None)
+                    if _arr is not None and hasattr(_arr, "loc"):
+                        # pandas Series — align by DatetimeIndex
+                        _sliced = _arr.loc[_warm_index]
+                        setattr(pre_signals_warm, _attr, _sliced)
+                    elif _arr is not None and hasattr(_arr, "__getitem__"):
+                        # numpy array or similar — use positional boolean mask
+                        setattr(pre_signals_warm, _attr, _arr[_mask.values])
+
+                # Count signals for warning checks
+            long_count = int(pre_signals_warm.entries.sum()) if pre_signals_warm.entries is not None else 0
+            short_count = (
+                int(pre_signals_warm.short_entries.sum())
+                if hasattr(pre_signals_warm, "short_entries") and pre_signals_warm.short_entries is not None
+                else 0
+            )
+            exit_long_count = int(pre_signals_warm.exits.sum()) if pre_signals_warm.exits is not None else 0
+            exit_short_count = (
+                int(pre_signals_warm.short_exits.sum())
+                if hasattr(pre_signals_warm, "short_exits") and pre_signals_warm.short_exits is not None
+                else 0
+            )
 
             if direction == "long" and long_count == 0 and short_count > 0:
                 backtest_warnings.append(
@@ -2997,24 +3067,49 @@ async def run_backtest_from_builder(
             if backtest_warnings:
                 for w in backtest_warnings:
                     logger.warning(f"[BacktestWarning] {w}")
+
         except Exception as e:
-            logger.debug(f"Pre-backtest signal check failed (non-critical): {e}")
+            logger.warning(f"[Warmup] Pre-backtest signal check failed (non-critical): {e!r}")
+            logger.exception("[Warmup] Traceback:")
+            pre_signals_warm = None  # type: ignore[assignment]
 
         # Run backtest with appropriate engine
         from backend.backtesting.models import BacktestStatus
+
+        # Wrap pre-computed warm signals in a passthrough adapter so the engine
+        # uses the correctly warmed signals instead of recomputing from cold start.
+        _backtest_adapter: Any = adapter
+        if pre_signals_warm is not None:
+            # Simple duck-typed wrapper — does NOT subclass BaseStrategy to avoid
+            # triggering abstract _validate_params().  The engine only calls
+            # generate_signals(ohlcv) on the custom_strategy object.
+            class _PrecomputedSignalAdapter:
+                """Passthrough: returns pre-computed (warm) signals without recomputing."""
+
+                def __init__(self, signals: Any, wrapped: Any) -> None:
+                    self._signals = signals
+                    self._wrapped = wrapped
+
+                def generate_signals(self, data: Any) -> Any:
+                    return self._signals
+
+                def __repr__(self) -> str:
+                    return repr(self._wrapped)
+
+            _backtest_adapter = _PrecomputedSignalAdapter(pre_signals_warm, adapter)
 
         if dca_enabled or engine_type == "dca":
             # Use DCA Engine for DCA/Martingale strategies
             from backend.backtesting.engines.dca_engine import DCAEngine
 
             dca_engine = DCAEngine()
-            result = dca_engine.run_from_config(backtest_config, ohlcv, custom_strategy=adapter)
+            result = dca_engine.run_from_config(backtest_config, ohlcv, custom_strategy=_backtest_adapter)
         else:
             # Use standard BacktestEngine
             from backend.backtesting.engine import BacktestEngine
 
             engine = BacktestEngine()
-            result = engine.run(backtest_config, ohlcv, custom_strategy=adapter)
+            result = engine.run(backtest_config, ohlcv, custom_strategy=_backtest_adapter)
 
         # Save backtest to database with full metrics (parity with backtests.py)
         # Backtest model already imported at top

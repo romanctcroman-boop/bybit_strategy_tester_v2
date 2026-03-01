@@ -840,10 +840,10 @@ def _build_performance_metrics(
             # Calibrated: 5 episodes [626.67, 302.52, 172.87, 856.85, 43.23]
             #             → mean=400.43 ≈ TV 396.10 ✓ (within tol=50 USDT)
             runup_episodes = []
-            _hwm_ru = _te_av_arr[0]       # running all-time-high equity
-            _phase_trough = _te_av_arr[0] # trough at start of current runup phase
-            _in_initial = True            # True during initial rising phase (no DD yet)
-            _in_recovery = False          # True during a post-DD recovery phase
+            _hwm_ru = _te_av_arr[0]  # running all-time-high equity
+            _phase_trough = _te_av_arr[0]  # trough at start of current runup phase
+            _in_initial = True  # True during initial rising phase (no DD yet)
+            _in_recovery = False  # True during a post-DD recovery phase
 
             for _j in range(1, len(_te_av_arr)):
                 _eq = _te_av_arr[_j]
@@ -2413,60 +2413,78 @@ class BacktestEngine:
                     margin_allocated = 0.0
                     entry_fees_paid = 0.0
 
-                    # ========== SAME-BAR RE-ENTRY (TradingView parity) ==========
-                    # TradingView allows entering a new position on the SAME bar that
-                    # a TP/SL exit fires, if an entry signal is present on that bar.
-                    # This handles quick reversals: exit long TP → enter short same bar.
-                    # Only applies to TP/SL exits (not signal exits, which use close price).
-                    if exit_reason in ("take_profit", "stop_loss") and cash > 0:
-                        _can_long = direction in ("long", "both") and long_entries[i]
-                        _can_short = direction in ("short", "both") and short_entries is not None and short_entries[i]
-                        if _can_long or _can_short:
-                            # Use close price for the new entry (TV: next bar open = this bar close)
-                            _ep = price * (1 + slippage) if _can_long else price * (1 - slippage)
-                            _sp = price  # signal_price anchor (no slippage)
-                            # TV "% of equity" sizing with recalculate=OFF (fixed notional)
-                            _pv = config.initial_capital * config.position_size  # fixed notional
-                            _alloc = _pv / leverage  # margin locked
-                            _es = _pv / _ep
-                            _fees = _pv * config.commission_value  # use commission_value (0.07%)
-                            if cash >= _alloc + _fees:
-                                cash -= _alloc + _fees
-                                margin_allocated = _alloc
-                                entry_fees_paid = _fees
-                                entry_price = _ep
-                                signal_price = _sp
-                                last_entry_price = _ep
-                                position = _es
-                                entry_size = _es
-                                is_long = _can_long
-                                entry_time = timestamps[i]
-                                entry_idx = i
-                                tp_sl_active_from = i + 1  # TV: TP/SL activate on bar after signal bar
-                                # Same-bar re-entry: initialize MFE/MAE from bar's OHLC (not just _ep)
-                                # so the entry bar's full price movement is captured.
-                                if is_long:
-                                    max_favorable_price = current_high  # captures entry bar's high
-                                    max_adverse_price = current_low  # captures entry bar's low
-                                else:
-                                    max_favorable_price = current_low  # for short: best = lowest
-                                    max_adverse_price = current_high  # for short: worst = highest
-                                if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
-                                    atr_sl_price = (
-                                        _ep + atr_sl_values[i] * atr_sl_mult
-                                        if not is_long
-                                        else _ep - atr_sl_values[i] * atr_sl_mult
-                                    )
-                                else:
-                                    atr_sl_price = None
-                                if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
-                                    atr_tp_price = (
-                                        _ep - atr_tp_values[i] * atr_tp_mult
-                                        if not is_long
-                                        else _ep + atr_tp_values[i] * atr_tp_mult
-                                    )
-                                else:
-                                    atr_tp_price = None
+                    # ========== TV PARITY: SAME-BAR RE-ENTRY AFTER TP/SL ==========
+                    # TradingView: when a TP/SL fires on bar i, the position closes and
+                    # a new entry signal on bar i can still open a new trade at open[i+1].
+                    # This matches FallbackEngineV4's entry_on_next_bar_open=True logic
+                    # where long_entries[i] triggers an open at open_prices[i+1].
+                    # Without this check, the signal at bar i is lost because the position
+                    # was open during bar i and the next iteration at bar i+1 only sees
+                    # long_entries[i+1] — which may be False.
+                    # Note: we only do this on TP/SL/trailing exits; signal exits already
+                    # imply no concurrent entry signal in standard strategies.
+                    if exit_reason in ("take_profit", "stop_loss", "trailing_stop") and i + 1 < len(close):
+                        _prev_long = is_long  # direction we just closed
+                        # Check for a LONG re-entry signal on this bar
+                        if direction in ("long", "both") and long_entries[i]:
+                            next_entry_price = open_prices[i + 1] * (1 + slippage)
+                            next_signal_price = price  # close[i]
+                            position_value_new = config.initial_capital * config.position_size
+                            next_margin = position_value_new / leverage
+                            if cash >= next_margin:
+                                next_size = position_value_new / next_entry_price
+                                next_fees = position_value_new * config.commission_value
+                                cash -= next_margin + next_fees
+                                position = next_size
+                                is_long = True
+                                entry_price = next_entry_price
+                                last_entry_price = next_entry_price
+                                signal_price = next_signal_price
+                                entry_time = timestamps[i + 1] if i + 1 < len(timestamps) else timestamps[i]
+                                entry_size = next_size
+                                entry_idx = i + 1
+                                tp_sl_active_from = i + 1
+                                margin_allocated = next_margin
+                                entry_fees_paid = next_fees
+                                max_favorable_price = next_entry_price
+                                max_adverse_price = next_entry_price
+                                breakeven_active = False
+                                breakeven_sl_price = None
+                                atr_sl_price = None
+                                atr_tp_price = None
+                                trailing_active = False
+                                trailing_peak_price = 0.0
+                                trailing_stop_price = None
+                        # Check for a SHORT re-entry signal (only if we didn't already open long)
+                        elif direction in ("short", "both") and short_entries is not None and short_entries[i]:
+                            next_entry_price = open_prices[i + 1] * (1 - slippage)
+                            next_signal_price = price  # close[i]
+                            position_value_new = config.initial_capital * config.position_size
+                            next_margin = position_value_new / leverage
+                            if cash >= next_margin:
+                                next_size = position_value_new / next_entry_price
+                                next_fees = position_value_new * config.commission_value
+                                cash -= next_margin + next_fees
+                                position = next_size
+                                is_long = False
+                                entry_price = next_entry_price
+                                last_entry_price = next_entry_price
+                                signal_price = next_signal_price
+                                entry_time = timestamps[i + 1] if i + 1 < len(timestamps) else timestamps[i]
+                                entry_size = next_size
+                                entry_idx = i + 1
+                                tp_sl_active_from = i + 1
+                                margin_allocated = next_margin
+                                entry_fees_paid = next_fees
+                                max_favorable_price = next_entry_price
+                                max_adverse_price = next_entry_price
+                                breakeven_active = False
+                                breakeven_sl_price = None
+                                atr_sl_price = None
+                                atr_tp_price = None
+                                trailing_active = False
+                                trailing_peak_price = 0.0
+                                trailing_stop_price = None
 
             # Update equity
             if position > 0:

@@ -200,8 +200,17 @@ class BacktestService:
         db_interval = interval_map.get(interval, interval)
 
         # Convert to timestamps (ms)
-        start_ts = int(start_date.timestamp() * 1000)
-        end_ts = int(end_date.timestamp() * 1000)
+        # Ensure timezone-aware UTC to avoid local-timezone offset on naive datetimes
+        import datetime as _dtmod
+
+        def _to_utc_ts(dt: "datetime") -> int:
+            if dt.tzinfo is None:
+                # Treat naive datetime as UTC (server may be in non-UTC timezone)
+                dt = dt.replace(tzinfo=_dtmod.UTC)
+            return int(dt.timestamp() * 1000)
+
+        start_ts = _to_utc_ts(start_date)
+        end_ts = _to_utc_ts(end_date)
 
         # ===== STEP 1: Try local database first =====
         try:
