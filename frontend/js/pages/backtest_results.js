@@ -3322,32 +3322,54 @@ function updateCharts(backtest) {
           : ((m.buy_hold_return || 0) / initialCapital) * 100;
 
       // Strategy range from equity curve (in %)
-      let stratMinPct = strategyReturnPct * 1.3;  // fallback: slightly worse
-      let stratMaxPct = strategyReturnPct * 0.7;  // fallback: slightly better
-      if (strategyReturnPct < 0) {
-        // For losses, min is more negative, max is less negative
-        stratMinPct = strategyReturnPct * 1.3;
-        stratMaxPct = strategyReturnPct * 0.7;
-      } else {
-        stratMinPct = strategyReturnPct * 0.7;
-        stratMaxPct = strategyReturnPct * 1.3;
-      }
-      if (backtest.equity_curve && backtest.equity_curve.length > 0) {
-        const equityValues = backtest.equity_curve.map(
-          (e) => e.equity || e.value || e
-        );
-        const minEquity = Math.min(...equityValues);
-        const maxEquity = Math.max(...equityValues);
-        stratMinPct = ((minEquity - initialCapital) / initialCapital) * 100;
-        stratMaxPct = ((maxEquity - initialCapital) / initialCapital) * 100;
+      let stratMinPct = strategyReturnPct < 0
+        ? strategyReturnPct * 1.3
+        : strategyReturnPct * 0.7;
+      let stratMaxPct = strategyReturnPct < 0
+        ? strategyReturnPct * 0.7
+        : strategyReturnPct * 1.3;
+
+      // BH range defaults (±30% of BH value)
+      let bhRangeLow = Math.min(bhReturnPct * (bhReturnPct < 0 ? 1.3 : 0.7), bhReturnPct);
+      let bhRangeHigh = Math.max(bhReturnPct * (bhReturnPct < 0 ? 0.7 : 1.3), bhReturnPct);
+
+      // equity_curve from backend is a dict: { equity: [...], bh_equity: [...], timestamps: [...] }
+      // (NOT an array) — extract arrays accordingly
+      const ec = backtest.equity_curve;
+
+      // bhCurrentPct: prefer last bh_equity value (matches actual BH at end date)
+      // falls back to metrics.buy_hold_return_pct
+      let bhCurrentPct = bhReturnPct;
+
+      if (ec) {
+        // Strategy equity array
+        const stratArr = Array.isArray(ec)
+          ? ec.map((e) => (typeof e === 'object' ? e.equity || e.value || 0 : Number(e)))
+          : Array.isArray(ec.equity) ? ec.equity : [];
+        if (stratArr.length > 0) {
+          const minE = Math.min(...stratArr);
+          const maxE = Math.max(...stratArr);
+          stratMinPct = ((minE - initialCapital) / initialCapital) * 100;
+          stratMaxPct = ((maxE - initialCapital) / initialCapital) * 100;
+        }
+        // BH equity array — gives actual min/max range + current value for Buy & Hold bar
+        const bhArr = Array.isArray(ec)
+          ? []
+          : Array.isArray(ec.bh_equity) ? ec.bh_equity : [];
+        if (bhArr.length > 0) {
+          const bhMinE = Math.min(...bhArr);
+          const bhMaxE = Math.max(...bhArr);
+          bhRangeLow  = ((bhMinE - initialCapital) / initialCapital) * 100;
+          bhRangeHigh = ((bhMaxE - initialCapital) / initialCapital) * 100;
+          bhCurrentPct = ((bhArr[bhArr.length - 1] - initialCapital) / initialCapital) * 100;
+        }
       }
       // Ensure current value is always within [min, max]
-      const stratRangeLow = Math.min(stratMinPct, strategyReturnPct);
+      const stratRangeLow  = Math.min(stratMinPct, strategyReturnPct);
       const stratRangeHigh = Math.max(stratMaxPct, strategyReturnPct);
-
-      // BH range (% from equity extremes or ±30%)
-      const bhRangeLow = Math.min(bhReturnPct * (bhReturnPct < 0 ? 1.3 : 0.7), bhReturnPct);
-      const bhRangeHigh = Math.max(bhReturnPct * (bhReturnPct < 0 ? 0.7 : 1.3), bhReturnPct);
+      // Ensure BH current value is within its range
+      bhRangeLow  = Math.min(bhRangeLow,  bhCurrentPct);
+      bhRangeHigh = Math.max(bhRangeHigh, bhCurrentPct);
 
       benchmarkingChart.data.datasets = [
         {
@@ -3365,7 +3387,7 @@ function updateCharts(backtest) {
           label: 'Текущ. значение',
           // Thin bar (width = 1% of range) centred on current value
           data: [
-            [bhReturnPct - 0.3, bhReturnPct + 0.3],
+            [bhCurrentPct - 0.3, bhCurrentPct + 0.3],
             [strategyReturnPct - 0.3, strategyReturnPct + 0.3]
           ],
           backgroundColor: ['#8d6e63', '#26a69a'],
