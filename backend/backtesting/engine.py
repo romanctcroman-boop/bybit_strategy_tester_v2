@@ -301,59 +301,62 @@ def _build_performance_metrics(
         frequency=TimeFrequency.HOURLY,  # Default for crypto
     )
 
-    # ─── TV-parity Sortino: monthly returns, no annualization ────────────────────
-    # Formula: (mean_monthly - rfr_monthly) / sqrt(sum(min(0, r-rfr)^2) / (N-1))
-    # Uses N+1 equity points: initial_capital + N month-end equity values.
-    # RFR = 2% annual = 0.1667% monthly. NO annualization factor.
-    # Calibrated on ETHUSDT 30m 2025-01-01→2026-02-28: gives 0.5677 vs TV 0.572 (0.75% diff).
+    # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
+    # KEY: TradingView uses TRADE-CLOSE equity (not bar-level / unrealized PnL).
+    # Steps:
+    #   1. Build equity series at each trade-close timestamp.
+    #   2. Prepend initial_capital as month-0 anchor (MonthEnd before first trade).
+    #   3. Resample to month-end (last trade-close equity in that month, or carry forward).
+    #   4. Compute monthly returns via pct_change().
+    # Sharpe: (mean - rfr) / std(ddof=0)   — population std, RFR=2%/yr
+    # Sortino: (mean - rfr) / sqrt(sum(min(0,r-rfr)^2) / N)  — N denominator, RFR=2%/yr
+    # Calibrated: ETHUSDT 15m 2025-01-01→2026-02-23: Sharpe=0.9336 (TV=0.934), Sortino=4.190 (TV=4.19)
     sortino_tv = calc_metrics.get("sortino_ratio", 0.0)
-    try:
-        if len(equity_arr) > 10 and len(timestamps) > 10:
-            _ts_idx = pd.DatetimeIndex(timestamps)
-            _eq_aligned = equity_arr[-len(_ts_idx) :]
-            _ec_series = pd.Series(_eq_aligned, index=_ts_idx)
-            # Prepend initial capital as the "month-0" anchor point
-            _first_ts = _ec_series.index[0]
-            _anchor = pd.Series([initial_capital], index=[_first_ts - pd.offsets.MonthEnd(1)])
-            _ec_with_anchor = pd.concat([_anchor, _ec_series])
-            _monthly_eq = _ec_with_anchor.resample("ME").last().ffill()
-            _monthly_r = _monthly_eq.pct_change().dropna().values
-            if len(_monthly_r) >= 3:
-                _rfr_m = 0.02 / 12  # 2% annual risk-free rate
-                _sm = float(np.mean(_monthly_r))
-                _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
-                _N = len(_monthly_r)
-                _sdd = float(np.sqrt(np.sum(_sneg**2) / (_N - 1))) if _N > 1 else 0.0
-                if _sdd > 1e-10:
-                    sortino_tv = float(np.clip((_sm - _rfr_m) / _sdd, -100, 100))
-    except Exception:
-        pass  # Fall back to MetricsCalculator Sortino
-
-    # ─── TV-parity Sharpe: monthly returns, with RFR, no annualization ────────────
-    # Formula: (mean_monthly - rfr_monthly) / std_monthly(ddof=1)
-    # Uses N+1 equity points: initial_capital + N month-end equity values.
-    # RFR = 2% annual = 0.1667% monthly. NO annualization factor.
-    # Calibrated on ETHUSDT 30m 2025-01-01→2026-02-28: gives 0.3392 vs TV 0.344 (1.4% diff).
     sharpe_tv = calc_metrics.get("sharpe_ratio", 0.0)
     try:
-        if len(equity_arr) > 10 and len(timestamps) > 10:
-            _ts_idx_s = pd.DatetimeIndex(timestamps)
-            _eq_aligned_s = equity_arr[-len(_ts_idx_s) :]
-            _ec_series_s = pd.Series(_eq_aligned_s, index=_ts_idx_s)
-            # Prepend initial capital as the "month-0" anchor point
-            _first_ts_s = _ec_series_s.index[0]
-            _anchor_s = pd.Series([initial_capital], index=[_first_ts_s - pd.offsets.MonthEnd(1)])
-            _ec_with_anchor_s = pd.concat([_anchor_s, _ec_series_s])
-            _monthly_eq_s = _ec_with_anchor_s.resample("ME").last().ffill()
-            _monthly_r_s = _monthly_eq_s.pct_change().dropna().values
-            if len(_monthly_r_s) >= 3:
-                _rfr_m_s = 0.02 / 12
-                _bm_s = float(np.mean(_monthly_r_s))
-                _bs_s = float(np.std(_monthly_r_s, ddof=1))
-                if _bs_s > 1e-10:
-                    sharpe_tv = float(np.clip((_bm_s - _rfr_m_s) / _bs_s, -100, 100))
+        _closed = [t for t in trades if not getattr(t, "is_open", False)]
+        if len(_closed) >= 3:
+            # Build trade-close equity series
+            _tc_times = []
+            _tc_equity = []
+            _cum_pnl = 0.0
+            for _t in _closed:
+                _cum_pnl += float(getattr(_t, "pnl", 0.0))
+                _exit_ts = getattr(_t, "exit_time", None)
+                if _exit_ts is not None:
+                    _tc_times.append(pd.Timestamp(_exit_ts))
+                    _tc_equity.append(initial_capital + _cum_pnl)
+
+            if len(_tc_times) >= 3:
+                _tc_series = pd.Series(_tc_equity, index=pd.DatetimeIndex(_tc_times))
+                # Normalize timezone to tz-naive
+                if _tc_series.index.tz is not None:
+                    _tc_series.index = _tc_series.index.tz_localize(None)
+                # Prepend initial capital as month-0 anchor
+                _first_tc = _tc_series.index[0]
+                _anchor_tc = pd.Series(
+                    [initial_capital],
+                    index=[_first_tc - pd.offsets.MonthEnd(1)],
+                )
+                _monthly_eq = pd.concat([_anchor_tc, _tc_series]).resample("ME").last().ffill()
+                _monthly_r = _monthly_eq.pct_change().dropna().values
+                _rfr_m = 0.02 / 12  # 2% annual risk-free rate
+                _N = len(_monthly_r)
+                _mean = float(np.mean(_monthly_r))
+
+                if _N >= 3:
+                    # Sharpe: population std (ddof=0)
+                    _std0 = float(np.std(_monthly_r, ddof=0))
+                    if _std0 > 1e-10:
+                        sharpe_tv = float(np.clip((_mean - _rfr_m) / _std0, -100, 100))
+
+                    # Sortino: N denominator (not N-1)
+                    _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
+                    _sdd = float(np.sqrt(np.sum(_sneg**2) / _N))
+                    if _sdd > 1e-10:
+                        sortino_tv = float(np.clip((_mean - _rfr_m) / _sdd, -100, 100))
     except Exception:
-        pass  # Fall back to MetricsCalculator Sharpe
+        pass  # Fall back to MetricsCalculator Sharpe/Sortino
 
     # Buy & Hold calculations (not in MetricsCalculator as it's context-specific)
     if len(close) > 1:
@@ -2326,11 +2329,16 @@ class BacktestEngine:
                     #    so gross - exit_fee = net_pnl + entry_fee)
                     cash += margin_used + pnl + entry_fees_paid
 
-                    # Calculate P&L percentage relative to position notional (TV style)
-                    # TV shows pnl_pct = pnl / position_value (e.g. $13.61/$1000 = 1.36%)
-                    position_value_at_entry = entry_size * entry_price  # notional
-                    if position_value_at_entry > 0:
-                        pnl_pct = pnl / position_value_at_entry
+                    # Calculate P&L percentage (TradingView style)
+                    # TV formula: P&L% = ((exit_price - entry_price) / entry_price) × 100 × sign
+                    # This is the PRICE CHANGE %, not pnl / margin
+                    # For long: (exit - entry) / entry * 100
+                    # For short: (entry - exit) / entry * 100
+                    if entry_price > 0:
+                        if is_long:
+                            pnl_pct = (exit_price - entry_price) / entry_price
+                        else:
+                            pnl_pct = (entry_price - exit_price) / entry_price
                         pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
                     else:
                         pnl_pct = 0.0
@@ -2527,10 +2535,14 @@ class BacktestEngine:
             # (entry_fee was deducted at open; add it back so cash is correct)
             cash += margin_used + pnl + entry_fees_paid
 
-            # Calculate P&L percentage relative to position notional (TV style)
-            position_value_at_entry = entry_size * entry_price  # notional
-            if position_value_at_entry > 0:
-                pnl_pct = pnl / position_value_at_entry
+            # Calculate P&L percentage (TradingView style)
+            # TV formula: P&L% = ((exit_price - entry_price) / entry_price) × 100 × sign
+            # This is the PRICE CHANGE %, not pnl / margin
+            if entry_price > 0:
+                if is_long:
+                    pnl_pct = (exit_price - entry_price) / entry_price
+                else:
+                    pnl_pct = (entry_price - exit_price) / entry_price
                 pnl_pct = pnl_pct if (pnl_pct == pnl_pct and abs(pnl_pct) != float("inf")) else 0.0
             else:
                 pnl_pct = 0.0
