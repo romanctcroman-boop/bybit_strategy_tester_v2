@@ -265,72 +265,8 @@ const equityTradeMarkersPlugin = {
   }
 };
 
-// Thin bottom lane with alternating equity regimes: growth / drawdown
-// Visually mimics TradingView "Рост средств / Просадка средств" scale.
-const equityGrowthDrawdownOverlayPlugin = {
-  id: 'equityGrowthDrawdownOverlay',
-  afterDatasetsDraw(chart, _args, pluginOptions) {
-    try {
-      if (pluginOptions?.enabled === false) return;
-      if (!chart || chart.config?.type !== 'line') return;
-      if (chart.canvas?.id !== 'equityChart') return;
-
-      const segments = chart._equityCycles;
-      if (!segments || !segments.length) return;
-
-      const xScale = chart.scales?.x;
-      const chartArea = chart.chartArea;
-      if (!xScale || !chartArea) return;
-
-      const ctx = chart.ctx;
-      ctx.save();
-
-      const barHeight = pluginOptions.barHeight ?? 6;
-      const yBottom = chartArea.bottom - 1;
-      const yTop = yBottom - barHeight;
-
-      const getPixel = (idx) => {
-        if (typeof xScale.getPixelForValue === 'function') {
-          return xScale.getPixelForValue(idx);
-        }
-        if (typeof xScale.getPixelForTick === 'function') {
-          return xScale.getPixelForTick(idx);
-        }
-        return NaN;
-      };
-
-      for (const seg of segments) {
-        const startIndex = seg.startIndex;
-        const endIndex = seg.endIndex;
-        if (!Number.isFinite(startIndex) || !Number.isFinite(endIndex)) continue;
-        if (endIndex < startIndex) continue;
-
-        const x1 = getPixel(startIndex);
-        const x2 = getPixel(endIndex);
-        if (!Number.isFinite(x1) || !Number.isFinite(x2)) continue;
-
-        const left = Math.max(chartArea.left, Math.min(x1, x2));
-        const right = Math.min(chartArea.right, Math.max(x1, x2));
-        if (right <= left) continue;
-
-        ctx.fillStyle =
-          seg.kind === 'growth'
-            ? (pluginOptions.growthColor || 'rgba(16, 185, 129, 0.9)')
-            : (pluginOptions.drawdownColor || 'rgba(248, 113, 113, 0.9)');
-
-        ctx.fillRect(left, yTop, right - left, yBottom - yTop);
-      }
-
-      ctx.restore();
-    } catch (e) {
-      console.warn('[equityGrowthDrawdownOverlay] error:', e?.message || e);
-    }
-  }
-};
-
 if (typeof Chart !== 'undefined') {
   Chart.register(equityTradeMarkersPlugin);
-  Chart.register(equityGrowthDrawdownOverlayPlugin);
 }
 
 // ============================
@@ -1283,54 +1219,139 @@ function initCharts() {
   // Benchmarking Chart (in Dynamics tab) — TV "Сравнение" style
   const benchmarkingCanvas = document.getElementById('benchmarkingChart');
   if (benchmarkingCanvas) {
+    // Custom plugin: draws TV-style "funnel" connectors + zero axis + current-price tick
+    const tvBenchPlugin = {
+      id: 'tvBench',
+      afterDraw(chart) {
+        const info = chart._tvBenchInfo;
+        if (!info) return;
+        const ctx = chart.ctx;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        if (!xScale || !yScale) return;
+
+        const x0 = xScale.getPixelForValue(0);   // pixel position of 0%
+
+        // ── Zero axis ──────────────────────────────────────────────────
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x0, chart.chartArea.top);
+        ctx.lineTo(x0, chart.chartArea.bottom);
+        ctx.strokeStyle = 'rgba(200,200,200,0.35)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Per-row: funnel connectors + current-price tick ────────────
+        info.forEach((row, rowIdx) => {
+          const yMid  = yScale.getPixelForValue(rowIdx);
+          const barH  = yScale.width ? 0 : (yScale.getPixelForValue(0) - yScale.getPixelForValue(1)) * 0.65;
+          const halfH = Math.abs(barH) / 2;
+
+          const xMin = xScale.getPixelForValue(row.min);
+          const xMax = xScale.getPixelForValue(row.max);
+          const xCur = xScale.getPixelForValue(row.cur);
+
+          // Get actual bar top/bottom from meta
+          const meta = chart.getDatasetMeta(rowIdx === 0 ? 0 : 2);
+          const bar  = meta?.data?.[rowIdx];
+          const top    = bar ? Math.min(bar.y, bar.base) : yMid - halfH;
+          const bottom = bar ? Math.max(bar.y, bar.base) : yMid + halfH;
+          const barTop    = Math.min(top, bottom);
+          const barBottom = Math.max(top, bottom);
+
+          // ── Funnel: triangle connecting bar edge → x0 center point ──
+          // Only draw if bar doesn't cross zero
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+          const color = rowIdx === 0 ? '#e6990a' : '#4299e1';
+          ctx.fillStyle = color;
+
+          if (rowIdx === 0) {
+            // BH: funnel from right edge of bar to x0
+            const xEdge = xMax; // right edge = max value
+            ctx.beginPath();
+            ctx.moveTo(xEdge, barTop);
+            ctx.lineTo(xEdge, barBottom);
+            ctx.lineTo(x0, yMid);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            // Strategy: funnel from left edge of bar to x0
+            const xEdge = xMin; // left edge = min value
+            ctx.beginPath();
+            ctx.moveTo(xEdge, barTop);
+            ctx.lineTo(xEdge, barBottom);
+            ctx.lineTo(x0, yMid);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+
+          // ── Centre dot at x0 ─────────────────────────────────────────
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x0, yMid, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#8b949e';
+          ctx.fill();
+          ctx.restore();
+
+          // ── Current-price tick (vertical line inside bar) ─────────────
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(xCur, barTop  + 2);
+          ctx.lineTo(xCur, barBottom - 2);
+          ctx.strokeStyle = rowIdx === 0 ? 'rgba(80, 50, 0, 0.9)' : 'rgba(10, 60, 120, 0.9)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+    };
+
     benchmarkingChart = chartManager.init('benchmarking', benchmarkingCanvas, {
       type: 'bar',
       data: {
-        // One label per row (BH row + Strategy row)
         labels: ['Покупка и удержание', 'Прибыльность стратегии'],
         datasets: []
       },
+      plugins: [tvBenchPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: 'y',   // horizontal bars
+        indexAxis: 'y',
         plugins: {
           legend: {
             display: true,
             position: 'bottom',
             labels: {
-              color: '#ffffff',
+              color: '#e6edf3',
               usePointStyle: true,
               pointStyle: 'circle',
               padding: 20,
               font: { size: 12 },
-              // Show only range datasets (index 0 = BH range, index 2 = Strategy range)
-              filter: (item) => item.datasetIndex === 0 || item.datasetIndex === 2
+              filter: (item) => !item.text.startsWith('_')
             }
           },
           tooltip: {
             backgroundColor: 'rgba(22, 27, 34, 0.97)',
-            titleColor: '#c9d1d9',
+            titleColor: '#e6edf3',
             bodyColor: '#c9d1d9',
             borderColor: '#444c56',
             borderWidth: 1,
-            padding: 10,
+            padding: 12,
             callbacks: {
-              // Title = row label (BH or Strategy)
               title: (items) => items[0]?.label || '',
-              // Body: show Макс / Текущ. цена / Мин  (TV style)
               label: () => null,
-              afterBody: function (items) {
+              afterBody(items) {
                 if (!items.length) return [];
-                const chart = items[0].chart;
-                const rowIdx = items[0].dataIndex;   // 0=BH, 1=Strategy
-                // Extract values stored on chart instance during update
-                const info = chart._tvBenchInfo?.[rowIdx];
+                const info = items[0].chart._tvBenchInfo?.[items[0].dataIndex];
                 if (!info) return [];
+                // TV-style: right-aligned values
                 return [
-                  `  Макс           ${info.max.toFixed(2)}%`,
-                  `  Текущ. цена   ${info.cur.toFixed(2)}%`,
-                  `  Мин             ${info.min.toFixed(2)}%`
+                  `Макс            ${info.max.toFixed(2)}%`,
+                  `Текущ. цена  ${info.cur.toFixed(2)}%`,
+                  `Мин              ${info.min.toFixed(2)}%`
                 ];
               }
             }
@@ -1339,17 +1360,13 @@ function initCharts() {
         },
         scales: {
           x: {
-            title: {
-              display: true,
-              text: 'Доходность (%)',
-              color: '#8b949e',
-              font: { size: 11 }
-            },
-            grid: { color: 'rgba(48,54,61,0.6)' },
+            grid: { color: 'rgba(48,54,61,0.5)' },
             ticks: {
               color: '#8b949e',
+              font: { size: 11 },
               callback: (v) => v.toFixed(0) + '%'
-            }
+            },
+            title: { display: false }
           },
           y: {
             grid: { display: false },
@@ -1463,215 +1480,6 @@ function clearRegimeOverlay() {
   Object.keys(ann).forEach((k) => {
     if (k.startsWith('regime_')) delete ann[k];
   });
-  innerChart.update('none');
-}
-
-// ============================
-// Equity growth / drawdown cycles (TV-like "Рост средств / Просадка средств")
-// ============================
-
-function computeEquityGrowthDrawdownSegments(timestamps, equityArr) {
-  if (!Array.isArray(timestamps) || !Array.isArray(equityArr)) return [];
-  const n = Math.min(timestamps.length, equityArr.length);
-  if (n < 2) return [];
-
-  const segments = [];
-  let regime = 'growth';
-  let segStart = 0;
-  let hwm = Number(equityArr[0] ?? 0);
-  let ddMin = hwm;
-  let ddMinIdx = 0;
-
-  const num = (v) => {
-    const x = Number(v);
-    return Number.isFinite(x) ? x : 0;
-  };
-
-  for (let i = 1; i < n; i += 1) {
-    const v = num(equityArr[i]);
-    if (regime === 'growth') {
-      if (v >= hwm) {
-        hwm = v;
-      } else {
-        const start = segStart;
-        const end = i - 1;
-        if (end > start) {
-          const startV = num(equityArr[start]);
-          const endV = num(equityArr[end]);
-          const absChange = endV - startV;
-          const pctChange = startV !== 0 ? absChange / startV : 0;
-          segments.push({
-            kind: 'growth',
-            startIndex: start,
-            endIndex: end,
-            startTime: timestamps[start],
-            endTime: timestamps[end],
-            absChange,
-            pctChange
-          });
-        }
-        regime = 'drawdown';
-        segStart = end;
-        ddMin = v;
-        ddMinIdx = i;
-      }
-    } else {
-      if (v <= ddMin) {
-        ddMin = v;
-        ddMinIdx = i;
-      }
-      if (v >= hwm) {
-        const start = segStart;
-        const end = ddMinIdx;
-        if (end > start) {
-          const startV = num(equityArr[start]);
-          const endV = num(equityArr[end]);
-          const absChange = startV - endV;
-          const pctChange = startV !== 0 ? absChange / startV : 0;
-          segments.push({
-            kind: 'drawdown',
-            startIndex: start,
-            endIndex: end,
-            startTime: timestamps[start],
-            endTime: timestamps[end],
-            absChange,
-            pctChange
-          });
-        }
-        regime = 'growth';
-        segStart = end;
-        hwm = v;
-      }
-    }
-  }
-
-  const lastIdx = n - 1;
-  if (segStart < lastIdx) {
-    const start = segStart;
-    const end = lastIdx;
-    const startV = num(equityArr[start]);
-    const endV = num(equityArr[end]);
-    if (end > start) {
-      if (regime === 'growth') {
-        const absChange = endV - startV;
-        const pctChange = startV !== 0 ? absChange / startV : 0;
-        segments.push({
-          kind: 'growth',
-          startIndex: start,
-          endIndex: end,
-          startTime: timestamps[start],
-          endTime: timestamps[end],
-          absChange,
-          pctChange
-        });
-      } else {
-        let minV = startV;
-        let minIdx = start;
-        for (let j = start; j <= end; j += 1) {
-          const vj = num(equityArr[j]);
-          if (vj <= minV) {
-            minV = vj;
-            minIdx = j;
-          }
-        }
-        const absChange = startV - minV;
-        const pctChange = startV !== 0 ? absChange / startV : 0;
-        segments.push({
-          kind: 'drawdown',
-          startIndex: start,
-          endIndex: minIdx,
-          startTime: timestamps[start],
-          endTime: timestamps[minIdx],
-          absChange,
-          pctChange
-        });
-      }
-    }
-  }
-
-  return segments;
-}
-
-function clearEquityGrowthDrawdownOverlay() {
-  const innerChart = _brTVEquityChart?.chart;
-  if (!innerChart) return;
-
-  innerChart._equityCycles = [];
-
-  const tooltip = innerChart.options?.plugins?.tooltip;
-  if (tooltip && tooltip._equityCyclesOriginalAfterBody) {
-    tooltip.afterBody = tooltip._equityCyclesOriginalAfterBody;
-    delete tooltip._equityCyclesOriginalAfterBody;
-  }
-
-  if (typeof innerChart.update === 'function') {
-    innerChart.update('none');
-  }
-}
-
-function applyEquityGrowthDrawdownOverlay() {
-  const innerChart = _brTVEquityChart?.chart;
-  const tvData = _brTVEquityChart?.data;
-  if (!innerChart || !tvData?.timestamps?.length || !tvData?.equity?.length) {
-    clearEquityGrowthDrawdownOverlay();
-    return;
-  }
-
-  const timestamps = tvData.timestamps;
-  const equityArr = tvData.equity;
-  const segments = computeEquityGrowthDrawdownSegments(timestamps, equityArr);
-  if (!segments.length) {
-    clearEquityGrowthDrawdownOverlay();
-    return;
-  }
-
-  innerChart._equityCycles = segments;
-
-  innerChart.options.plugins = innerChart.options.plugins || {};
-  innerChart.options.plugins.tooltip = innerChart.options.plugins.tooltip || {};
-  const tooltip = innerChart.options.plugins.tooltip;
-
-  if (!tooltip._equityCyclesOriginalAfterBody) {
-    tooltip._equityCyclesOriginalAfterBody = tooltip.afterBody;
-  }
-
-  const baseAfterBody = tooltip._equityCyclesOriginalAfterBody;
-
-  tooltip.afterBody = (ctxItems) => {
-    const baseLines = typeof baseAfterBody === 'function' ? baseAfterBody(ctxItems) : [];
-    const items = Array.isArray(ctxItems) ? ctxItems : [];
-    const first = items[0];
-    if (!first || !segments.length) return baseLines;
-
-    const idx = first.dataIndex;
-    const seg = segments.find((s) => s.startIndex <= idx && idx <= s.endIndex);
-    if (!seg) return baseLines;
-
-    const isGrowth = seg.kind === 'growth';
-    const label = isGrowth ? 'Рост средств' : 'Просадка средств';
-    const amountAbs = Math.abs(seg.absChange);
-    const pctAbs = Math.abs(seg.pctChange * 100);
-    const sign = isGrowth ? '+' : '-';
-
-    const amountStr = amountAbs.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-    const pctStr = pctAbs.toFixed(2);
-
-    const startDate = new Date(seg.startTime);
-    const endDate = new Date(seg.endTime);
-    const rangeStr = `${startDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })} — ${endDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })}`;
-
-    const extraLines = [
-      `${label}: ${sign}$${amountStr} (${pctStr}%)`,
-      rangeStr
-    ];
-
-    if (!baseLines || baseLines.length === 0) return extraLines;
-    return [...baseLines, ...extraLines];
-  };
-
   innerChart.update('none');
 }
 
@@ -2214,7 +2022,6 @@ function clearAllDisplayData() {
   if (_brTVEquityChart) {
     // Re-render with empty data to clear the chart visually
     _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
-    clearEquityGrowthDrawdownOverlay();
   }
 
   // --- Drawdown / Returns / Monthly / Trade Analysis Charts (Chart.js) ---
@@ -2387,7 +2194,6 @@ async function deleteSelectedBacktests() {
     setCurrentBacktest(null);
     if (_brTVEquityChart) {
       _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
-      clearEquityGrowthDrawdownOverlay();
     }
   }
 
@@ -2478,7 +2284,6 @@ async function deleteBacktest(backtestId) {
         // Clear charts and show empty state
         if (_brTVEquityChart) {
           _brTVEquityChart.render({ timestamps: [], equity: [], bh_equity: [], trades: [], initial_capital: 10000 });
-          clearEquityGrowthDrawdownOverlay();
         }
       }
 
@@ -3015,9 +2820,6 @@ function updateCharts(backtest) {
         trades,
         initial_capital: initialCapital
       });
-
-      // Growth / drawdown cycles overlay + tooltip enrichment
-      applyEquityGrowthDrawdownOverlay();
 
       console.log('[updateCharts] _brTVEquityChart.render() called,',
         timestamps.length, 'points,', trades.length, 'trades');
@@ -3667,79 +3469,57 @@ function updateCharts(backtest) {
       bhRangeHigh = Math.max(bhRangeHigh, bhCurrentPct);
 
       benchmarkingChart.data.datasets = [
-        // ── Row 0: Buy & Hold ──────────────────────────────────────────────
+        // ── Row 0: Buy & Hold range ───────────────────────────────────────────
         {
-          // BH range rectangle — wide, transparent orange fill
           label: 'Прибыль при покупке и удержании',
-          data: [
-            [bhRangeLow, bhRangeHigh],  // row 0 = BH
-            null                         // row 1 = Strategy (empty)
-          ],
-          backgroundColor: 'rgba(230, 153, 2, 0.55)',
-          borderColor: 'rgba(0,0,0,0)',
+          data: [[bhRangeLow, bhRangeHigh], null],
+          backgroundColor: '#e6990a',     // TV orange — solid, saturated
           borderWidth: 0,
-          barPercentage: 0.65,
+          barPercentage: 0.55,
           categoryPercentage: 1.0,
           grouped: false
         },
+        // ── Row 0: BH current-price marker ────────────────────────────────────
         {
-          // BH current-value marker — thin darker bar at bhCurrentPct
           label: '_bh_cur',
-          data: [
-            [bhCurrentPct - 0.25, bhCurrentPct + 0.25],
-            null
-          ],
-          backgroundColor: 'rgba(160, 100, 0, 0.95)',
-          borderColor: 'rgba(0,0,0,0)',
+          data: [[bhCurrentPct - 0.2, bhCurrentPct + 0.2], null],
+          backgroundColor: 'rgba(30, 18, 0, 0.7)',
           borderWidth: 0,
-          barPercentage: 0.65,
+          barPercentage: 0.55,
           categoryPercentage: 1.0,
           grouped: false
         },
-        // ── Row 1: Strategy ───────────────────────────────────────────────
+        // ── Row 1: Strategy range ─────────────────────────────────────────────
         {
-          // Strategy range rectangle — wide, transparent blue fill
           label: 'Прибыльность стратегии',
-          data: [
-            null,                                   // row 0 = BH (empty)
-            [stratRangeLow, stratRangeHigh]         // row 1 = Strategy
-          ],
-          backgroundColor: 'rgba(66, 165, 245, 0.55)',
-          borderColor: 'rgba(0,0,0,0)',
+          data: [null, [stratRangeLow, stratRangeHigh]],
+          backgroundColor: '#4299e1',     // TV blue — solid, saturated
           borderWidth: 0,
-          barPercentage: 0.65,
+          barPercentage: 0.55,
           categoryPercentage: 1.0,
           grouped: false
         },
+        // ── Row 1: Strategy current-price marker ──────────────────────────────
         {
-          // Strategy current-value marker — thin darker bar at strategyReturnPct
           label: '_strat_cur',
-          data: [
-            null,
-            [strategyReturnPct - 0.25, strategyReturnPct + 0.25]
-          ],
-          backgroundColor: 'rgba(30, 120, 180, 0.95)',
-          borderColor: 'rgba(0,0,0,0)',
+          data: [null, [strategyReturnPct - 0.2, strategyReturnPct + 0.2]],
+          backgroundColor: 'rgba(0, 20, 50, 0.7)',
           borderWidth: 0,
-          barPercentage: 0.65,
+          barPercentage: 0.55,
           categoryPercentage: 1.0,
           grouped: false
         }
       ];
 
-      // Store tooltip info (Макс / Текущ. цена / Мин) on chart instance
+      // Store tooltip info + funnel data on chart instance
       benchmarkingChart._tvBenchInfo = [
-        { max: bhRangeHigh,    cur: bhCurrentPct,       min: bhRangeLow    }, // row 0 = BH
-        { max: stratRangeHigh, cur: strategyReturnPct,  min: stratRangeLow } // row 1 = Strategy
+        { max: bhRangeHigh,    cur: bhCurrentPct,      min: bhRangeLow    },
+        { max: stratRangeHigh, cur: strategyReturnPct, min: stratRangeLow }
       ];
 
-      // Disable grouping so both BH datasets stack on row 0 at full width
-      benchmarkingChart.options.datasets = benchmarkingChart.options.datasets || {};
+      // Disable grouping
+      if (!benchmarkingChart.options.datasets) benchmarkingChart.options.datasets = {};
       benchmarkingChart.options.datasets.bar = { grouped: false };
-
-      // Hide current-value markers from legend
-      benchmarkingChart.options.plugins.legend.labels.filter =
-        (item) => !item.text.startsWith('_');
 
       benchmarkingChart.update('none');
     } catch (e) {
