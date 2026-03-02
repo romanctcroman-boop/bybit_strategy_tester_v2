@@ -3312,6 +3312,12 @@ async def run_backtest_from_builder(
             "short_trades": int(getattr(_m, "short_trades", 0) or 0) if _m else 0,
             "long_win_rate": _sf(getattr(_m, "long_win_rate", None) if _m else None),
             "short_win_rate": _sf(getattr(_m, "short_win_rate", None) if _m else None),
+            "long_net_profit": _sf(getattr(_m, "long_pnl", None) if _m else None),
+            "long_net_profit_pct": _sf(getattr(_m, "long_pnl_pct", None) if _m else None),
+            "long_pnl_pct": _sf(getattr(_m, "long_pnl_pct", None) if _m else None),
+            "short_net_profit": _sf(getattr(_m, "short_pnl", None) if _m else None),
+            "short_net_profit_pct": _sf(getattr(_m, "short_pnl_pct", None) if _m else None),
+            "short_pnl_pct": _sf(getattr(_m, "short_pnl_pct", None) if _m else None),
             "exposure_time": _sf(getattr(_m, "exposure_time", None) if _m else None),
             "initial_capital": float(backtest_config.initial_capital),
         }
