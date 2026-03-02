@@ -428,6 +428,8 @@ async def create_backtest(request: BacktestCreateRequest):
                 "short_profit_factor": getattr(m, "short_profit_factor", 0),
                 "short_avg_win": getattr(m, "short_avg_win", 0),
                 "short_avg_loss": getattr(m, "short_avg_loss", 0),
+                "long_commission": getattr(m, "long_commission", 0),
+                "short_commission": getattr(m, "short_commission", 0),
                 # Long/Short consecutive wins/losses (TradingView)
                 "long_max_consec_wins": getattr(m, "long_max_consec_wins", 0),
                 "long_max_consec_losses": getattr(m, "long_max_consec_losses", 0),
@@ -857,8 +859,11 @@ async def list_backtests(
                     bt.long_pnl if bt.long_pnl is not None else opt_metrics.get("long_net_profit", 0)
                 ),
                 long_pnl_pct=_safe_float(
-                    getattr(bt, "long_pnl_pct", None) or opt_metrics.get("long_pnl_pct",
-                        (bt.long_pnl / float(bt.initial_capital) * 100) if bt.long_pnl and bt.initial_capital else 0)
+                    getattr(bt, "long_pnl_pct", None)
+                    or opt_metrics.get(
+                        "long_pnl_pct",
+                        (bt.long_pnl / float(bt.initial_capital) * 100) if bt.long_pnl and bt.initial_capital else 0,
+                    )
                 ),
                 long_profit_factor=_safe_float(opt_metrics.get("long_profit_factor", 0)),
                 long_avg_win=_safe_float(opt_metrics.get("long_avg_win", 0)),
@@ -879,12 +884,17 @@ async def list_backtests(
                     bt.short_pnl if bt.short_pnl is not None else opt_metrics.get("short_net_profit", 0)
                 ),
                 short_pnl_pct=_safe_float(
-                    getattr(bt, "short_pnl_pct", None) or opt_metrics.get("short_pnl_pct",
-                        (bt.short_pnl / float(bt.initial_capital) * 100) if bt.short_pnl and bt.initial_capital else 0)
+                    getattr(bt, "short_pnl_pct", None)
+                    or opt_metrics.get(
+                        "short_pnl_pct",
+                        (bt.short_pnl / float(bt.initial_capital) * 100) if bt.short_pnl and bt.initial_capital else 0,
+                    )
                 ),
                 short_profit_factor=_safe_float(opt_metrics.get("short_profit_factor", 0)),
                 short_avg_win=_safe_float(opt_metrics.get("short_avg_win", 0)),
                 short_avg_loss=_safe_float(opt_metrics.get("short_avg_loss", 0)),
+                long_commission=_safe_float(opt_metrics.get("long_commission", 0)),
+                short_commission=_safe_float(opt_metrics.get("short_commission", 0)),
                 # Additional metrics
                 avg_bars_in_trade=_safe_float(opt_metrics.get("avg_bars_in_trade", 0)),
                 avg_bars_in_winning=_safe_float(opt_metrics.get("avg_bars_in_winning", 0)),
@@ -1176,8 +1186,11 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 bt.long_pnl if bt.long_pnl is not None else opt_metrics.get("long_net_profit", 0)
             ),
             long_pnl_pct=_safe_float(
-                getattr(bt, "long_pnl_pct", None) or opt_metrics.get("long_pnl_pct",
-                    (bt.long_pnl / float(bt.initial_capital) * 100) if bt.long_pnl and bt.initial_capital else 0)
+                getattr(bt, "long_pnl_pct", None)
+                or opt_metrics.get(
+                    "long_pnl_pct",
+                    (bt.long_pnl / float(bt.initial_capital) * 100) if bt.long_pnl and bt.initial_capital else 0,
+                )
             ),
             long_profit_factor=_safe_float(opt_metrics.get("long_profit_factor", 0)),
             long_avg_win=_safe_float(opt_metrics.get("long_avg_win_pct", 0)),
@@ -1198,12 +1211,17 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 bt.short_pnl if bt.short_pnl is not None else opt_metrics.get("short_net_profit", 0)
             ),
             short_pnl_pct=_safe_float(
-                getattr(bt, "short_pnl_pct", None) or opt_metrics.get("short_pnl_pct",
-                    (bt.short_pnl / float(bt.initial_capital) * 100) if bt.short_pnl and bt.initial_capital else 0)
+                getattr(bt, "short_pnl_pct", None)
+                or opt_metrics.get(
+                    "short_pnl_pct",
+                    (bt.short_pnl / float(bt.initial_capital) * 100) if bt.short_pnl and bt.initial_capital else 0,
+                )
             ),
             short_profit_factor=_safe_float(opt_metrics.get("short_profit_factor", 0)),
             short_avg_win=_safe_float(opt_metrics.get("short_avg_win_pct", 0)),
             short_avg_loss=_safe_float(opt_metrics.get("short_avg_loss_pct", 0)),
+            long_commission=_safe_float(opt_metrics.get("long_commission", 0)),
+            short_commission=_safe_float(opt_metrics.get("short_commission", 0)),
             recovery_long=_safe_float(opt_metrics.get("recovery_long", 0)),
             recovery_short=_safe_float(opt_metrics.get("recovery_short", 0)),
             long_avg_win_value=_safe_float(opt_metrics.get("long_avg_win", 0)),

@@ -3318,6 +3318,8 @@ async def run_backtest_from_builder(
             "short_net_profit": _sf(getattr(_m, "short_pnl", None) if _m else None),
             "short_net_profit_pct": _sf(getattr(_m, "short_pnl_pct", None) if _m else None),
             "short_pnl_pct": _sf(getattr(_m, "short_pnl_pct", None) if _m else None),
+            "long_commission": _sf(getattr(_m, "long_commission", None) if _m else None),
+            "short_commission": _sf(getattr(_m, "short_commission", None) if _m else None),
             "exposure_time": _sf(getattr(_m, "exposure_time", None) if _m else None),
             "initial_capital": float(backtest_config.initial_capital),
         }

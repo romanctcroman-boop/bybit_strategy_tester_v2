@@ -1157,7 +1157,12 @@ function initCharts() {
             callbacks: {
               label: function (context) {
                 const val = context.raw;
-                if (!val || val === 0) return null;
+                if (val === null || val === undefined || val === 0) return null;
+                // Floating bar: val is [min, max]
+                if (Array.isArray(val)) {
+                  const amount = Math.abs(val[1] - val[0]);
+                  return `${context.dataset.label}: ${amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+                }
                 return `${context.dataset.label}: ${val.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
               }
             }
