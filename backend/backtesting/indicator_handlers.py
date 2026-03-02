@@ -35,6 +35,7 @@ def _require_vbt() -> None:
 from backend.backtesting.strategy_builder_adapter import _clamp_period, _param
 from backend.core.indicators import (
     calculate_ad_line,
+    calculate_adx,
     calculate_aroon,
     calculate_atr,
     calculate_atr_smoothed,
@@ -937,8 +938,12 @@ def _handle_bollinger(
 ) -> dict[str, pd.Series]:
     period = _clamp_period(params.get("period", 20))
     std_dev = _param(params, 2.0, "std_dev", "stdDev")
-    bb = vbt.BBANDS.run(close, window=period, num_std=std_dev)
-    return {"upper": bb.upper, "middle": bb.middle, "lower": bb.lower}
+    middle, upper, lower = calculate_bollinger(close.values, period, std_dev)
+    return {
+        "upper": pd.Series(upper, index=close.index),
+        "middle": pd.Series(middle, index=close.index),
+        "lower": pd.Series(lower, index=close.index),
+    }
 
 
 def _handle_keltner(
@@ -1040,7 +1045,8 @@ def _handle_adx(
     adapter: StrategyBuilderAdapter,
 ) -> dict[str, pd.Series]:
     period = _clamp_period(params.get("period", 14))
-    adx = vbt.ADX.run(ohlcv["high"], ohlcv["low"], close, window=period).adx
+    adx_result = calculate_adx(ohlcv["high"].values, ohlcv["low"].values, close.values, period)
+    adx = pd.Series(adx_result.adx, index=ohlcv.index)
     return {"value": adx}
 
 

@@ -1180,6 +1180,24 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "minus_di": pd.Series(minus_di, index=ohlcv.index),
             }
 
+        # ========== ADX Filter ==========
+        elif filter_type == "adx_filter":
+            period = params.get("period", 14)
+            threshold = _param(params, 25, "threshold", "adxThreshold")
+
+            adx_result = calculate_adx(high, low, close, period)
+            adx = adx_result.adx
+
+            # True when ADX > threshold (trending market)
+            trending = adx > threshold
+
+            return {
+                "buy": pd.Series(trending, index=ohlcv.index),
+                "sell": pd.Series(trending, index=ohlcv.index),
+                "pass": pd.Series(trending, index=ohlcv.index),
+                "value": pd.Series(adx, index=ohlcv.index),
+            }
+
         # ========== ATR Filter ==========
         elif filter_type == "atr_filter":
             period = params.get("period", 14)
