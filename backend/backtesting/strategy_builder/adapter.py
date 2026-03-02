@@ -524,7 +524,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Exit blocks
         "trailing_stop_exit": "exit",
         "atr_exit": "exit",  # Fix: route to _execute_exit, not empty stub
-        "multi_tp_exit": "multiple_tp",
+        "multi_tp_exit": "multiple_tp",  # Config-only block; data collected by extract_dca_config()
         # Position sizing
         "fixed_size": "sizing",
         "percent_balance": "sizing",
@@ -1892,17 +1892,28 @@ class StrategyBuilderAdapter(BaseStrategy):
             result["trail_type"] = params.get("trail_type", "percent")
 
         elif exit_type == "atr_stop":
-            # ATR-based stop loss
-            period = params.get("period", 14)
-            multiplier = params.get("multiplier", 2.0)
+            # ATR-based stop loss — wire as use_atr_sl so engine picks it up via extra_data
+            period = max(1, min(150, int(params.get("period", 14))))
+            multiplier = max(0.1, min(4.0, float(params.get("multiplier", 2.0))))
+            smoothing = params.get("smoothing", "RMA")
+            if smoothing not in ("WMA", "RMA", "SMA", "EMA"):
+                smoothing = "RMA"
+            on_wicks = params.get("on_wicks", False)
             atr = pd.Series(
-                calculate_atr(ohlcv["high"].values, ohlcv["low"].values, ohlcv["close"].values, period),
+                calculate_atr_smoothed(
+                    ohlcv["high"].values,
+                    ohlcv["low"].values,
+                    ohlcv["close"].values,
+                    period=period,
+                    method=smoothing,
+                ),
                 index=ohlcv.index,
             )
-            # Exit signal: price breaks below entry - ATR*multiplier
-            # This needs position tracking, return empty for now
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
-            result["atr"] = atr
+            result["use_atr_sl"] = True
+            result["atr_sl"] = atr
+            result["atr_sl_mult"] = multiplier
+            result["atr_sl_on_wicks"] = on_wicks
 
         elif exit_type == "time_exit":
             # Exit after N bars - needs position tracking
@@ -1999,11 +2010,34 @@ class StrategyBuilderAdapter(BaseStrategy):
             indicator = params.get("indicator", "rsi")
             threshold = params.get("threshold", 50)
             mode = params.get("mode", "above")  # above, below, cross_above, cross_below
+            period = _clamp_period(params.get("period", 14))
+
+            close = ohlcv["close"].values
+            high = ohlcv["high"].values
+            low = ohlcv["low"].values
+            volume = ohlcv["volume"].values if "volume" in ohlcv.columns else np.ones(len(close))
 
             if indicator == "rsi":
-                ind_val = pd.Series(calculate_rsi(ohlcv["close"].values, 14), index=ohlcv.index)
+                ind_val = pd.Series(calculate_rsi(close, period), index=ohlcv.index)
+            elif indicator == "cci":
+                ind_val = pd.Series(calculate_cci(high, low, close, period), index=ohlcv.index)
+            elif indicator == "mfi":
+                ind_val = pd.Series(calculate_mfi(high, low, close, volume, period), index=ohlcv.index)
+            elif indicator == "roc":
+                ind_val = pd.Series(calculate_roc(close, period), index=ohlcv.index)
+            elif indicator == "obv":
+                ind_val = pd.Series(calculate_obv(close, volume), index=ohlcv.index)
+            elif indicator == "macd":
+                # Use MACD histogram for threshold comparisons
+                _m = calculate_macd(close, 12, 26, 9)
+                ind_val = pd.Series(_m[2], index=ohlcv.index)  # histogram
+            elif indicator == "stochastic":
+                _s = calculate_stochastic(high, low, close, period, 3)
+                ind_val = pd.Series(_s[0], index=ohlcv.index)  # %K
             else:
-                ind_val = pd.Series(calculate_rsi(ohlcv["close"].values, 14), index=ohlcv.index)
+                # Fallback to RSI for unknown indicators
+                logger.warning("indicator_exit: unknown indicator '{}', falling back to RSI", indicator)
+                ind_val = pd.Series(calculate_rsi(close, period), index=ohlcv.index)
 
             if mode == "above":
                 exit_signal = ind_val > threshold
@@ -3525,7 +3559,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         # ========== Collect ATR exit data for engine ==========
         extra_data: dict = {}
         for block_id, block in self.blocks.items():
-            if block.get("type") == "atr_exit" and block_id in self._value_cache:
+            block_type_ex = block.get("type", "")
+            if block_type_ex in ("atr_exit", "atr_stop") and block_id in self._value_cache:
                 cached = self._value_cache[block_id]
                 if cached.get("use_atr_sl"):
                     extra_data["use_atr_sl"] = True
@@ -3537,7 +3572,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                     extra_data["atr_tp"] = cached["atr_tp"]  # pd.Series
                     extra_data["atr_tp_mult"] = cached["atr_tp_mult"]
                     extra_data["atr_tp_on_wicks"] = cached.get("atr_tp_on_wicks", False)
-                break  # Only one atr_exit block expected
+                break  # Only one atr_exit/atr_stop block expected
 
         # ========== Collect trailing_stop_exit data for engine ==========
         for block_id, block in self.blocks.items():
@@ -3551,6 +3586,39 @@ class StrategyBuilderAdapter(BaseStrategy):
                     extra_data["trailing_percent"] = float(trail_dist)
                     extra_data["trail_type"] = cached.get("trail_type", "percent")
                 break  # Only one trailing_stop_exit block expected
+
+        # ========== Collect time_exit data for engine ==========
+        for block_id, block in self.blocks.items():
+            if block.get("type") == "time_exit" and block_id in self._value_cache:
+                cached = self._value_cache[block_id]
+                max_b = cached.get("max_bars")
+                if max_b is not None:
+                    # max_bars stored as pd.Series (all same value) or scalar
+                    val = int(max_b.iloc[0]) if hasattr(max_b, "iloc") else int(max_b)
+                    if val > 0:
+                        extra_data["max_bars_in_trade"] = val
+                break
+
+        # ========== Collect breakeven_exit data for engine ==========
+        for block_id, block in self.blocks.items():
+            if block.get("type") in ("breakeven_exit", "break_even_exit") and block_id in self._value_cache:
+                cached = self._value_cache[block_id]
+                trigger = cached.get("breakeven_trigger")
+                if trigger is not None:
+                    # trigger is in percent (1.0 = 1%) — convert to decimal for engine
+                    extra_data["breakeven_enabled"] = True
+                    extra_data["breakeven_activation_pct"] = float(trigger) / 100.0
+                    extra_data["breakeven_offset"] = 0.0  # move to exact entry price
+                break
+
+        # ========== Collect partial_close data for engine ==========
+        for block_id, block in self.blocks.items():
+            if block.get("type") == "partial_close" and block_id in self._value_cache:
+                cached = self._value_cache[block_id]
+                targets = cached.get("partial_targets")
+                if targets:
+                    extra_data["partial_close_targets"] = targets
+                break
 
         # ========== Collect profit_only exit data for engine (Feature 1) ==========
         # Only write to extra_data when at least one close_cond block activated

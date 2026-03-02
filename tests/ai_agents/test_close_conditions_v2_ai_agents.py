@@ -910,30 +910,29 @@ class TestCloseMACrossHandler:
 class TestCategoryDispatch:
     """
     AI Prompt: "How do close condition blocks get dispatched to handlers?"
-    AI Response: "Frontend sets category='close_conditions' when dragging blocks
-      from the close_conditions menu group. The adapter's _execute_block() method
-      dispatches to _execute_close_condition(). close_channel and close_ma_cross
-      are NOT in _BLOCK_CATEGORY_MAP — without the frontend category field,
-      _infer_category() falls back to 'indicator' (wrong dispatch)."
+    AI Response: "All close condition blocks are in _BLOCK_CATEGORY_MAP mapped to
+      'close_conditions'. The adapter's _execute_block() dispatches to
+      _execute_close_condition(). Frontend category field is still used when present,
+      but the map ensures fallback works correctly too."
     """
 
     def test_close_channel_not_in_category_map(self):
-        """close_channel is NOT in _BLOCK_CATEGORY_MAP."""
-        assert "close_channel" not in StrategyBuilderAdapter._BLOCK_CATEGORY_MAP
+        """close_channel IS in _BLOCK_CATEGORY_MAP mapped to 'close_conditions'."""
+        assert StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_channel") == "close_conditions"
 
     def test_close_ma_cross_not_in_category_map(self):
-        """close_ma_cross is NOT in _BLOCK_CATEGORY_MAP."""
-        assert "close_ma_cross" not in StrategyBuilderAdapter._BLOCK_CATEGORY_MAP
+        """close_ma_cross IS in _BLOCK_CATEGORY_MAP mapped to 'close_conditions'."""
+        assert StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_ma_cross") == "close_conditions"
 
     def test_infer_category_fallback_for_close_channel(self):
-        """Without frontend category, _infer_category('close_channel') → 'indicator'."""
+        """_infer_category('close_channel') → 'close_conditions' (from _BLOCK_CATEGORY_MAP)."""
         inferred = StrategyBuilderAdapter._infer_category("close_channel")
-        assert inferred == "indicator"  # Falls back, NOT correct
+        assert inferred == "close_conditions"
 
     def test_infer_category_fallback_for_close_ma_cross(self):
-        """Without frontend category, _infer_category('close_ma_cross') → 'indicator'."""
+        """_infer_category('close_ma_cross') → 'close_conditions' (from _BLOCK_CATEGORY_MAP)."""
         inferred = StrategyBuilderAdapter._infer_category("close_ma_cross")
-        assert inferred == "indicator"
+        assert inferred == "close_conditions"
 
     def test_frontend_category_overrides_inference(self, sample_ohlcv):
         """With category='close_conditions' from frontend, handler is correct."""

@@ -1733,6 +1733,21 @@ class BacktestEngine:
         po_exit_arr = _po_exit_series.values if _po_exit_series is not None else None
         po_sexit_arr = _po_sexit_series.values if _po_sexit_series is not None else None
 
+        # ========== TIME-BASED EXIT (time_exit block via extra_data) ==========
+        # max_bars_in_trade: set from BacktestConfig (via close_by_time block in router)
+        # OR from extra_data (via time_exit block in strategy graph).
+        # extra_data takes priority when present.
+        max_bars_in_trade = getattr(config, "max_bars_in_trade", 0) or 0
+        if extra_data.get("max_bars_in_trade", 0) > 0:
+            max_bars_in_trade = int(extra_data["max_bars_in_trade"])
+
+        # ========== BREAKEVEN via extra_data (breakeven_exit block) ==========
+        # Override config breakeven settings when the block is wired in graph.
+        if extra_data.get("breakeven_enabled"):
+            breakeven_enabled = True
+            breakeven_activation_pct = float(extra_data.get("breakeven_activation_pct", breakeven_activation_pct))
+            breakeven_offset = float(extra_data.get("breakeven_offset", 0.0))
+
         # ========== UNIVERSAL BAR MAGNIFIER INITIALIZATION ==========
         # If enabled, load 1m data for precise intrabar order execution
         # Uses new architecture: IntrabarEngine + configurable OHLC path
@@ -2223,6 +2238,16 @@ class BacktestEngine:
                                     exit_price = max(current_low, min(current_high, trailing_stop_price))
                                     apply_slippage = True
 
+                    # === TIME-BASED EXIT (time_exit block / close_by_time block) ===
+                    # Close position after max_bars_in_trade bars regardless of PnL.
+                    if not should_exit and max_bars_in_trade > 0 and entry_idx is not None:
+                        bars_held = i - entry_idx
+                        if bars_held >= max_bars_in_trade:
+                            should_exit = True
+                            exit_reason = "time_exit"
+                            exit_price = price
+                            apply_slippage = False
+
                     # Check Stop Loss using worst price within bar (TradingView style)
                     # SL/TP = % price movement, matches FallbackEngineV4
                     # TradingView: limit/stop orders (TP/SL) do NOT fill on the entry bar or
@@ -2390,7 +2415,7 @@ class BacktestEngine:
                             pnl_pct=pnl_pct * 100,  # Convert to percentage
                             fees=total_trade_fees,
                             duration_hours=(timestamps[i] - entry_time).total_seconds() / 3600,
-                            bars_in_trade=i - entry_idx if entry_idx is not None else 0,
+                            bars_in_trade=(i - entry_idx + 1) if entry_idx is not None else 0,
                             entry_bar_index=entry_idx if entry_idx is not None else 0,
                             exit_bar_index=i,
                             mfe=mfe_value,  # Absolute value in USDT

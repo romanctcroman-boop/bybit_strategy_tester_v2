@@ -1,8 +1,7 @@
 """
 Encrypt and save new API keys using backend's KeyManager.
 
-Keys are loaded from environment variables or .env file — never hardcoded.
-Usage: set PERPLEXITY_API_KEY and DEEPSEEK_API_KEY env vars, then run this script.
+Keys are loaded from environment variables (set in .env file).
 """
 
 import os
@@ -21,47 +20,66 @@ def main():
 
     km = get_key_manager()
 
-    # Load keys from environment variables (set in .env or shell)
-    keys_to_encrypt = {}
-
+    # PERPLEXITY KEY (loaded from environment)
     perplexity_key = os.environ.get("PERPLEXITY_API_KEY", "")
-    if perplexity_key:
-        keys_to_encrypt["PERPLEXITY_API_KEY"] = perplexity_key
-    else:
-        print("  ⚠️  PERPLEXITY_API_KEY not set in environment — skipping")
-
-    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if deepseek_key:
-        keys_to_encrypt["DEEPSEEK_API_KEY"] = deepseek_key
-    else:
-        print("  ⚠️  DEEPSEEK_API_KEY not set in environment — skipping")
-
-    if not keys_to_encrypt:
-        print("\n❌ No API keys found in environment. Set them first:")
-        print("   $env:PERPLEXITY_API_KEY = 'pplx-...'")
-        print("   $env:DEEPSEEK_API_KEY = 'sk-...'")
+    if not perplexity_key:
+        print("  ❌ PERPLEXITY_API_KEY not set in environment. Set it in .env file.")
         return
 
-    # Encrypt and store keys
-    print(f"\n📦 Encrypting {len(keys_to_encrypt)} key(s)...")
-    for key_name, key_value in keys_to_encrypt.items():
+    perplexity_keys = {
+        "PERPLEXITY_API_KEY": perplexity_key,
+    }
+
+    # DEEPSEEK KEY (loaded from environment)
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not deepseek_key:
+        print("  ❌ DEEPSEEK_API_KEY not set in environment. Set it in .env file.")
+        return
+
+    deepseek_keys = {
+        "DEEPSEEK_API_KEY": deepseek_key,
+    }
+
+    # Encrypt and store Perplexity keys
+    print("\n📦 Encrypting Perplexity keys...")
+    for key_name, key_value in perplexity_keys.items():
         try:
             km.store_encrypted_key(key_name, key_value)
-            print(f"  ✅ {key_name}: {key_value[:8]}***")
+            print(f"  ✅ {key_name}: {key_value[:15]}...")
         except Exception as e:
             print(f"  ❌ {key_name}: {e}")
 
-    # Verify stored keys
-    print("\n🔍 Verification...")
-    for key_name in keys_to_encrypt:
+    # Encrypt and store DeepSeek keys
+    print("\n📦 Encrypting DeepSeek keys...")
+    for key_name, key_value in deepseek_keys.items():
         try:
-            test_key = km.get_decrypted_key(key_name)
-            if test_key:
-                print(f"  ✅ {key_name} works: {test_key[:8]}***")
-            else:
-                print(f"  ❌ {key_name} verification failed")
+            km.store_encrypted_key(key_name, key_value)
+            print(f"  ✅ {key_name}: {key_value[:15]}...")
         except Exception as e:
-            print(f"  ❌ Verification error: {e}")
+            print(f"  ❌ {key_name}: {e}")
+
+    # Verify
+    print("\n🔍 Verification...")
+
+    # Test Perplexity
+    try:
+        test_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
+        if test_key and test_key.startswith("pplx-"):
+            print(f"  ✅ PERPLEXITY_API_KEY works: {test_key[:15]}...")
+        else:
+            print("  ❌ PERPLEXITY_API_KEY verification failed")
+    except Exception as e:
+        print(f"  ❌ Verification error: {e}")
+
+    # Test DeepSeek
+    try:
+        test_key = km.get_decrypted_key("DEEPSEEK_API_KEY")
+        if test_key and test_key.startswith("sk-"):
+            print(f"  ✅ DEEPSEEK_API_KEY works: {test_key[:15]}...")
+        else:
+            print("  ❌ DEEPSEEK_API_KEY verification failed")
+    except Exception as e:
+        print(f"  ❌ Verification error: {e}")
 
     print("\n" + "=" * 70)
     print("✅ DONE!")

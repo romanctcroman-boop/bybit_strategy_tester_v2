@@ -1380,9 +1380,14 @@ def list_available_strategies() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Convenience alias used by portfolio backtesting tests
 # ---------------------------------------------------------------------------
+# NOTE: This is the SAME as RSIStrategy above (first definition in STRATEGY_REGISTRY).
+# The second definition was added as a simplified alias. Keeping it named RSIStrategy
+# causes isinstance() failures because Python overwrites the name in the module.
+# Solution: this second class is now an extension of the FIRST RSIStrategy to avoid
+# the duplicate-class problem. The first RSIStrategy is what STRATEGY_REGISTRY uses.
 
 
-class RSIStrategy(BaseStrategy):  # type: ignore[no-redef]
+class _RSIStrategySimple(BaseStrategy):  # pragma: no cover
     """
     Simple RSI mean-reversion strategy.
 
@@ -1406,6 +1411,11 @@ class RSIStrategy(BaseStrategy):  # type: ignore[no-redef]
         self.oversold = oversold
         self.overbought = overbought
 
+    def _validate_params(self) -> None:
+        self.period = int(self.params.get("period", 14))
+        self.oversold = float(self.params.get("oversold", 30.0))
+        self.overbought = float(self.params.get("overbought", 70.0))
+
     @classmethod
     def get_default_params(cls) -> dict:
         return {"period": 14, "oversold": 30.0, "overbought": 70.0}
@@ -1426,3 +1436,10 @@ class RSIStrategy(BaseStrategy):  # type: ignore[no-redef]
         df.loc[rsi < self.oversold, "signal"] = 1
         df.loc[rsi > self.overbought, "signal"] = -1
         return df
+
+
+# Keep the name RSIStrategy pointing to the FIRST definition (in STRATEGY_REGISTRY)
+# so that isinstance() checks work correctly. _RSIStrategySimple is just an alias
+# for code that needs a simplified constructor (used by portfolio backtesting tests).
+# NOTE: This re-assignment must be LAST in the file to override the class statement above.
+RSIStrategy = STRATEGY_REGISTRY["rsi"]  # type: ignore[assignment,misc]

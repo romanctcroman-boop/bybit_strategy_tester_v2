@@ -865,19 +865,18 @@ class TestClosePSARHandler:
 class TestCategoryDispatchRSP:
     """
     AI Prompt: "How are close_rsi, close_stochastic, close_psar dispatched?"
-    AI Response: "All three are NOT in _BLOCK_CATEGORY_MAP. They require
-      the frontend to set category='close_conditions'. The adapter dispatches
-      them to _execute_close_condition()."
+    AI Response: "All three ARE in _BLOCK_CATEGORY_MAP mapped to 'close_conditions'.
+      The adapter dispatches them to _execute_close_condition()."
     """
 
     def test_close_rsi_not_in_map(self):
-        assert "close_rsi" not in StrategyBuilderAdapter._BLOCK_CATEGORY_MAP
+        assert StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_rsi") == "close_conditions"
 
     def test_close_stochastic_not_in_map(self):
-        assert "close_stochastic" not in StrategyBuilderAdapter._BLOCK_CATEGORY_MAP
+        assert StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_stochastic") == "close_conditions"
 
     def test_close_psar_not_in_map(self):
-        assert "close_psar" not in StrategyBuilderAdapter._BLOCK_CATEGORY_MAP
+        assert StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_psar") == "close_conditions"
 
     def test_frontend_category_dispatches_rsi(self, sample_ohlcv):
         """With category='close_conditions', close_rsi is handled correctly."""

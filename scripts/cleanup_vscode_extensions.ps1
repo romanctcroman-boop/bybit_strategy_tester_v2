@@ -84,7 +84,7 @@ $safeToRemove = @(
     # Tkinter/CustomTkinter (no GUI code in project)
     "ashhaddevlab.customtkinter-snippets",
     "nikolapaunovic.tkinter-snippets",
-    "REMOVED.ttk",
+    # NOTE: ttk extension ID removed — resembles a token and triggers GitHub push protection
 
     # PineScript (not used — project has its OWN strategy engine)
     "tradesdontlie.pinescript-v6-vscode",

@@ -492,6 +492,13 @@ def _handle_rsi(
     else:
         short_signal = short_cross_condition
 
+    # Legacy overbought/oversold mode: when no new modes are active, use oversold/overbought thresholds
+    overbought = float(params.get("overbought", 0))
+    oversold = float(params.get("oversold", 0))
+    if overbought > 0 and oversold > 0 and not use_long_range and not use_short_range and not use_cross_level:
+        long_signal = (rsi <= oversold).fillna(False)
+        short_signal = (rsi >= overbought).fillna(False)
+
     # Apply memory in range-only mode (cross_level branch handles its own memory above)
     if params.get("use_cross_memory", False) and not use_cross_level:
         memory_bars = int(params.get("cross_memory_bars", 5))
@@ -533,8 +540,10 @@ def _handle_macd(
     use_histogram = params.get("use_histogram", False)
     use_zero_cross = params.get("use_macd_cross_zero", params.get("use_zero_cross", False))
 
-    long_signal = pd.Series(True, index=ohlcv.index)
-    short_signal = pd.Series(True, index=ohlcv.index)
+    # MACD uses OR logic: signals from ANY active mode are combined with |
+    # When no mode is active → data-only mode (all False)
+    long_signal = pd.Series(False, index=ohlcv.index)
+    short_signal = pd.Series(False, index=ohlcv.index)
 
     if use_cross:
         macd_prev = macd_line.shift(1)
@@ -561,13 +570,13 @@ def _handle_macd(
             cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
             cross_short = adapter._apply_signal_memory(cross_short, memory_bars)
 
-        long_signal = long_signal & cross_long.fillna(False)
-        short_signal = short_signal & cross_short.fillna(False)
+        long_signal = long_signal | cross_long.fillna(False)
+        short_signal = short_signal | cross_short.fillna(False)
 
     if use_histogram:
         hist_threshold = float(params.get("histogram_threshold", 0))
-        long_signal = long_signal & (histogram > hist_threshold)
-        short_signal = short_signal & (histogram < -hist_threshold)
+        long_signal = long_signal | (histogram > hist_threshold)
+        short_signal = short_signal | (histogram < -hist_threshold)
 
     if use_zero_cross:
         zero_level = float(params.get("macd_cross_zero_level", params.get("zero_level", 0.0)))
@@ -584,8 +593,8 @@ def _handle_macd(
             zero_cross_long = adapter._apply_signal_memory(zero_cross_long, memory_bars)
             zero_cross_short = adapter._apply_signal_memory(zero_cross_short, memory_bars)
 
-        long_signal = long_signal & zero_cross_long.fillna(False)
-        short_signal = short_signal & zero_cross_short.fillna(False)
+        long_signal = long_signal | zero_cross_long.fillna(False)
+        short_signal = short_signal | zero_cross_short.fillna(False)
 
     logger.debug(
         "MACD node | fast={} slow={} signal={} | cross={} hist={} zero={} | long={} short={}",
@@ -626,72 +635,110 @@ def _handle_stochastic(
     if k_smooth > 1:
         k_line = k_line.rolling(k_smooth).mean()
 
-    use_long_range = params.get("use_long_range", False)
-    use_short_range = params.get("use_short_range", False)
-    use_cross_level = params.get("use_cross_level", False)
-    use_kd_cross = params.get("use_kd_cross", False)
+    # Support both old and new param names
+    use_long_range = params.get("use_long_range", params.get("use_stoch_range_filter", False))
+    use_short_range = params.get("use_short_range", params.get("use_stoch_range_filter", False))
+    use_cross_level = params.get("use_cross_level", params.get("use_stoch_cross_level", False))
+    use_kd_cross = params.get("use_kd_cross", params.get("use_stoch_kd_cross", False))
 
     long_signal = pd.Series(True, index=ohlcv.index)
     short_signal = pd.Series(True, index=ohlcv.index)
 
-    if use_long_range:
-        long_more = float(params.get("long_stoch_more", params.get("long_more", 20)))
-        long_less = float(params.get("long_stoch_less", params.get("long_less", 80)))
-        if long_more > long_less:
-            logger.warning(
-                "Stochastic range inversion: long swapping {} > {}",
-                long_more,
-                long_less,
+    # Legacy overbought/oversold mode: treat as range filter
+    overbought = float(params.get("overbought", 0))
+    oversold = float(params.get("oversold", 0))
+    if (
+        overbought > 0
+        and oversold > 0
+        and not use_long_range
+        and not use_short_range
+        and not use_cross_level
+        and not use_kd_cross
+    ):
+        # Legacy: use %D for range (oversold = entry for long, overbought = entry for short)
+        long_signal = long_signal & (d_line <= oversold).fillna(False)
+        short_signal = short_signal & (d_line >= overbought).fillna(False)
+    else:
+        if use_long_range:
+            # Support both old (long_stoch_more) and new (long_stoch_d_more) param names
+            # When param names contain "_d_" (e.g. long_stoch_d_more), filter by %D line
+            long_more = float(
+                params.get("long_stoch_d_more", params.get("long_stoch_more", params.get("long_more", 20)))
             )
-            long_more, long_less = long_less, long_more
-        long_signal = long_signal & (k_line >= long_more) & (k_line <= long_less)
-
-    if use_short_range:
-        short_more = float(params.get("short_stoch_more", params.get("short_more", 20)))
-        short_less = float(params.get("short_stoch_less", params.get("short_less", 80)))
-        if short_more > short_less:
-            logger.warning(
-                "Stochastic range inversion: short swapping {} > {}",
-                short_more,
-                short_less,
+            long_less = float(
+                params.get("long_stoch_d_less", params.get("long_stoch_less", params.get("long_less", 80)))
             )
-            short_more, short_less = short_less, short_more
-        short_signal = short_signal & (k_line <= short_less) & (k_line >= short_more)
+            if long_more > long_less:
+                logger.warning(
+                    "Stochastic range inversion: long swapping {} > {}",
+                    long_more,
+                    long_less,
+                )
+                long_more, long_less = long_less, long_more
+            # Use d_line when params explicitly reference %D (e.g. long_stoch_d_more/long_stoch_d_less)
+            use_d_for_long = "long_stoch_d_more" in params or "long_stoch_d_less" in params
+            filter_line_long = d_line if use_d_for_long else k_line
+            long_signal = long_signal & (filter_line_long >= long_more) & (filter_line_long <= long_less)
 
-    if use_cross_level:
-        cross_long_level = float(params.get("cross_long_level", 20))
-        cross_short_level = float(params.get("cross_short_level", 80))
-        k_prev = k_line.shift(1)
-        cross_long = (k_prev <= cross_long_level) & (k_line > cross_long_level)
-        cross_short = (k_prev >= cross_short_level) & (k_line < cross_short_level)
+        if use_short_range:
+            short_more = float(
+                params.get("short_stoch_d_more", params.get("short_stoch_more", params.get("short_more", 20)))
+            )
+            short_less = float(
+                params.get("short_stoch_d_less", params.get("short_stoch_less", params.get("short_less", 80)))
+            )
+            if short_more > short_less:
+                logger.warning(
+                    "Stochastic range inversion: short swapping {} > {}",
+                    short_more,
+                    short_less,
+                )
+                short_more, short_less = short_less, short_more
+            # Use d_line when params explicitly reference %D (e.g. short_stoch_d_more/short_stoch_d_less)
+            use_d_for_short = "short_stoch_d_more" in params or "short_stoch_d_less" in params
+            filter_line_short = d_line if use_d_for_short else k_line
+            short_signal = short_signal & (filter_line_short <= short_less) & (filter_line_short >= short_more)
 
-        if params.get("opposite_signal", False):
-            cross_long, cross_short = cross_short, cross_long
+        if use_cross_level:
+            # Support both old (cross_long_level) and new (stoch_cross_level_long) param names
+            cross_long_level = float(params.get("stoch_cross_level_long", params.get("cross_long_level", 20)))
+            cross_short_level = float(params.get("stoch_cross_level_short", params.get("cross_short_level", 80)))
+            k_prev = k_line.shift(1)
+            cross_long = (k_prev <= cross_long_level) & (k_line > cross_long_level)
+            cross_short = (k_prev >= cross_short_level) & (k_line < cross_short_level)
 
-        if params.get("use_cross_memory", False):
-            memory_bars = int(params.get("cross_memory_bars", 5))
-            cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
-            cross_short = adapter._apply_signal_memory(cross_short, memory_bars)
+            if params.get("opposite_signal", False):
+                cross_long, cross_short = cross_short, cross_long
 
-        long_signal = long_signal & cross_long.fillna(False)
-        short_signal = short_signal & cross_short.fillna(False)
+            # Support both old (use_cross_memory) and new (activate_stoch_cross_memory) param names
+            use_cross_mem = params.get("use_cross_memory", params.get("activate_stoch_cross_memory", False))
+            if use_cross_mem:
+                memory_bars = int(params.get("stoch_cross_memory_bars", params.get("cross_memory_bars", 5)))
+                cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
+                cross_short = adapter._apply_signal_memory(cross_short, memory_bars)
 
-    if use_kd_cross:
-        k_prev = k_line.shift(1)
-        d_prev = d_line.shift(1)
-        kd_cross_long = (k_prev <= d_prev) & (k_line > d_line)
-        kd_cross_short = (k_prev >= d_prev) & (k_line < d_line)
+            long_signal = long_signal & cross_long.fillna(False)
+            short_signal = short_signal & cross_short.fillna(False)
 
-        if params.get("opposite_kd_cross", False):
-            kd_cross_long, kd_cross_short = kd_cross_short, kd_cross_long
+        if use_kd_cross:
+            k_prev = k_line.shift(1)
+            d_prev = d_line.shift(1)
+            kd_cross_long = (k_prev <= d_prev) & (k_line > d_line)
+            kd_cross_short = (k_prev >= d_prev) & (k_line < d_line)
 
-        if params.get("use_kd_cross_memory", False):
-            memory_bars = int(params.get("kd_cross_memory_bars", 5))
-            kd_cross_long = adapter._apply_signal_memory(kd_cross_long, memory_bars)
-            kd_cross_short = adapter._apply_signal_memory(kd_cross_short, memory_bars)
+            # Support both old (opposite_kd_cross) and new (opposite_stoch_kd) param names
+            if params.get("opposite_stoch_kd", params.get("opposite_kd_cross", False)):
+                kd_cross_long, kd_cross_short = kd_cross_short, kd_cross_long
 
-        long_signal = long_signal & kd_cross_long.fillna(False)
-        short_signal = short_signal & kd_cross_short.fillna(False)
+            # Support both old (use_kd_cross_memory) and new (activate_stoch_kd_memory) param names
+            use_kd_mem = params.get("use_kd_cross_memory", params.get("activate_stoch_kd_memory", False))
+            if use_kd_mem:
+                memory_bars = int(params.get("stoch_kd_memory_bars", params.get("kd_cross_memory_bars", 5)))
+                kd_cross_long = adapter._apply_signal_memory(kd_cross_long, memory_bars)
+                kd_cross_short = adapter._apply_signal_memory(kd_cross_short, memory_bars)
+
+            long_signal = long_signal & kd_cross_long.fillna(False)
+            short_signal = short_signal & kd_cross_short.fillna(False)
 
     long_signal = long_signal.fillna(False)
     short_signal = short_signal.fillna(False)
@@ -1832,7 +1879,7 @@ def _handle_mfi_filter(
 
     # Determine working OHLCV: main, HTF-resampled, or BTCUSDT proxy
     working_ohlcv = ohlcv
-    main_tf = str(adapter.main_interval)
+    main_tf = str(getattr(adapter, "main_interval", ""))
     resolved_tf = main_tf if str(mfi_tf).lower() == "chart" else str(mfi_tf)
 
     # Feature 3: use BTCUSDT as MFI source (market dominance proxy)
@@ -1909,7 +1956,7 @@ def _handle_cci_filter(
 
     # Determine working OHLCV: main or HTF-resampled
     working_ohlcv = ohlcv
-    main_tf = str(adapter.main_interval)
+    main_tf = str(getattr(adapter, "main_interval", ""))
     resolved_tf = main_tf if str(cci_tf).lower() == "chart" else str(cci_tf)
 
     if resolved_tf != main_tf:

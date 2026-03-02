@@ -393,16 +393,15 @@ class TestCloseByTimeCategoryDispatch:
     """AI agents must understand how close_by_time is dispatched."""
 
     def test_not_in_block_category_map(self):
-        """Block type 'close_by_time' is NOT in _BLOCK_CATEGORY_MAP."""
+        """Block type 'close_by_time' IS in _BLOCK_CATEGORY_MAP as 'close_conditions'."""
         cat = StrategyBuilderAdapter._BLOCK_CATEGORY_MAP.get("close_by_time")
-        assert cat is None, f"Expected None (not in map), got '{cat}'"
+        assert cat == "close_conditions", f"Expected 'close_conditions', got '{cat}'"
 
     def test_infer_category_falls_back_to_indicator(self):
-        """Without frontend category, _infer_category falls back to 'indicator' (wrong!)."""
+        """close_by_time is in _BLOCK_CATEGORY_MAP → _infer_category returns 'close_conditions'."""
         inferred = StrategyBuilderAdapter._infer_category("close_by_time")
-        assert inferred == "indicator", (
-            f"Expected fallback to 'indicator', got '{inferred}'. "
-            "close_by_time is NOT in _BLOCK_CATEGORY_MAP and has no matching prefix."
+        assert inferred == "close_conditions", (
+            f"Expected 'close_conditions' (from _BLOCK_CATEGORY_MAP), got '{inferred}'."
         )
 
     def test_frontend_category_used_for_dispatch(self, sample_ohlcv):
@@ -420,8 +419,8 @@ class TestCloseByTimeCategoryDispatch:
 
     def test_without_category_wrong_dispatch(self, sample_ohlcv):
         """
-        Without explicit category, close_by_time falls back to 'indicator' dispatch
-        (via _infer_category). This is a KNOWN ISSUE — frontend always sends category.
+        Without explicit frontend category, close_by_time now resolves from _BLOCK_CATEGORY_MAP
+        to 'close_conditions'. The old fallback to 'indicator' is fixed.
         """
         graph = _make_close_by_time_only({"enabled": True, "bars_since_entry": 10})
         # Remove the explicit category
@@ -431,9 +430,9 @@ class TestCloseByTimeCategoryDispatch:
         result = _run_adapter(graph, sample_ohlcv)
 
         adapter = result["adapter"]
-        # Falls back to "indicator" since close_by_time is not in _BLOCK_CATEGORY_MAP
-        assert adapter.blocks["cbt_1"]["category"] == "indicator", (
-            "Without frontend category, _infer_category defaults to 'indicator'"
+        # Now resolves from _BLOCK_CATEGORY_MAP → 'close_conditions'
+        assert adapter.blocks["cbt_1"]["category"] == "close_conditions", (
+            "close_by_time is in _BLOCK_CATEGORY_MAP → resolves to 'close_conditions'"
         )
 
     def test_close_conditions_dispatch_path(self, sample_ohlcv):
@@ -483,7 +482,7 @@ class TestCloseByTimeHandlerOutput:
         assert cache["exit"].sum() == 0, "exit series should be all False"
 
     def test_max_bars_series_constant(self, sample_ohlcv):
-        """Handler returns max_bars=pd.Series([bars]*n) — constant value across all rows."""
+        """Handler returns max_bars=pd.Series([bars]*n) using 'bars_since_entry' param."""
         graph = _make_close_by_time_only({"bars_since_entry": 20})
         result = _run_adapter(graph, sample_ohlcv)
 
@@ -491,10 +490,9 @@ class TestCloseByTimeHandlerOutput:
         max_bars = cache["max_bars"]
         assert isinstance(max_bars, pd.Series)
         assert len(max_bars) == len(sample_ohlcv)
-        # NOTE: handler reads params.get("bars", 10), NOT "bars_since_entry"
-        # Since frontend sends "bars_since_entry" but handler reads "bars",
-        # the handler uses default value 10 (param name mismatch)
-        assert max_bars.iloc[0] == 10, "Param mismatch: handler reads 'bars' (default 10), not 'bars_since_entry'"
+        # Handler now reads params.get("bars_since_entry", params.get("bars", 10))
+        # So frontend's "bars_since_entry": 20 is used correctly
+        assert max_bars.iloc[0] == 20, f"Handler should read 'bars_since_entry'=20, got {max_bars.iloc[0]}"
 
     def test_max_bars_with_correct_param_name(self, sample_ohlcv):
         """When using the handler's expected param name 'bars', value is used correctly."""
@@ -539,16 +537,15 @@ class TestCloseByTimeHandlerOutput:
 
 # ============================================================
 #
-#  PART 4 — PARAM NAME MISMATCH
+#  PART 4 — PARAM NAME (FIXED)
 #
-#  AI Knowledge: "What is the param name mismatch?"
+#  AI Knowledge: "What param name does the handler use?"
 #
 #  Frontend blockDefaults key: "bars_since_entry" (value 10)
-#  Handler reads: params.get("bars", 10)
+#  Handler reads: params.get("bars_since_entry", params.get("bars", 10))
 #
-#  This means when frontend sends {bars_since_entry: 30}, the handler
-#  ignores it and uses default 10 instead. The engine may read
-#  "bars_since_entry" directly from block params, bypassing the handler.
+#  The param name mismatch is FIXED: handler now checks "bars_since_entry" first
+#  with fallback to legacy "bars" key.
 #
 #  TradingView original name: "Close order after XX bars"
 #
@@ -556,19 +553,21 @@ class TestCloseByTimeHandlerOutput:
 
 
 class TestParamNameMismatch:
-    """AI agents must understand the param name mismatch between frontend and handler."""
+    """AI agents must understand the param names for close_by_time handler."""
 
     def test_frontend_param_name_ignored_by_handler(self, sample_ohlcv):
         """
-        KNOWN MISMATCH: Frontend sends 'bars_since_entry' but handler reads 'bars'.
-        The handler falls back to default value 10.
+        Handler reads 'bars_since_entry' (with fallback to 'bars').
+        Frontend sends 'bars_since_entry': 50 → handler uses value 50.
         """
         graph = _make_close_by_time_only({"bars_since_entry": 50})
         result = _run_adapter(graph, sample_ohlcv)
 
         cache = result["_value_cache"]["cbt_1"]
-        # Handler uses params.get("bars", 10) → falls to default 10
-        assert cache["max_bars"].iloc[0] == 10, "Handler reads 'bars' not 'bars_since_entry', so default 10 is used"
+        # Handler reads params.get("bars_since_entry", params.get("bars", 10)) → 50
+        assert cache["max_bars"].iloc[0] == 50, (
+            f"Handler should read 'bars_since_entry'=50, got {cache['max_bars'].iloc[0]}"
+        )
 
     def test_handler_param_name_works(self, sample_ohlcv):
         """When using the handler's expected param name 'bars', it works."""
@@ -579,12 +578,12 @@ class TestParamNameMismatch:
         assert cache["max_bars"].iloc[0] == 75
 
     def test_both_param_names_sent(self, sample_ohlcv):
-        """When both 'bars' and 'bars_since_entry' are sent, handler uses 'bars'."""
+        """When both 'bars' and 'bars_since_entry' are sent, handler prefers 'bars_since_entry'."""
         graph = _make_close_by_time_only({"bars": 30, "bars_since_entry": 50})
         result = _run_adapter(graph, sample_ohlcv)
 
         cache = result["_value_cache"]["cbt_1"]
-        assert cache["max_bars"].iloc[0] == 30, "Handler reads 'bars', ignoring 'bars_since_entry'"
+        assert cache["max_bars"].iloc[0] == 50, "Handler prefers 'bars_since_entry' over 'bars'"
 
     def test_frontend_param_still_in_block_params(self, sample_ohlcv):
         """Frontend's 'bars_since_entry' is stored in block params (engine can read it directly)."""
