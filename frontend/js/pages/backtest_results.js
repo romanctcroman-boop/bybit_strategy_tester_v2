@@ -3076,7 +3076,7 @@ function updateCharts(backtest) {
         // 5 columns with Open P&L - TradingView waterfall using FLOATING BARS
         labels = [
           'Итого прибыль',
-          'Открытые ПР/УБ',
+          'Нереализованные ПР/УБ',
           'Итого убыток',
           'Комиссия',
           'Общие ПР/УБ'
@@ -3098,7 +3098,7 @@ function updateCharts(backtest) {
             categoryPercentage: 0.95
           },
           {
-            label: 'Открытые ПР/УБ',
+            label: 'Нереализованные ПР/УБ',
             data: [
               null,
               openPnL >= 0 ? [level1, level2] : [level2, level1],
@@ -3219,7 +3219,7 @@ function updateCharts(backtest) {
       // Legend: hide Open P&L if not present (no more _base to filter)
       waterfallChart.options.plugins.legend.display = true;
       waterfallChart.options.plugins.legend.labels.filter = (item) =>
-        hasOpenPnL || item.text !== 'Открытые ПР/УБ';
+        hasOpenPnL || item.text !== 'Нереализованные ПР/УБ';
 
       // Add datalabels plugin for values on bars - handle floating bars [min, max]
       waterfallChart.options.plugins.datalabels = {
@@ -4768,13 +4768,13 @@ function renderMetricsHeatmap(metrics) {
   if (missingKeys.length > 0) {
     console.warn('[Heatmap] Missing metrics:', missingKeys);
     console.log('[Heatmap] Available metrics keys:', Object.keys(metrics).filter(k => !k.startsWith('_')).sort());
-    
+
     // Show which metrics have zero values
     const zeroKeys = allKeys.filter(key => metrics[key] === 0 || metrics[key] === 0.0);
     if (zeroKeys.length > 0) {
       console.warn('[Heatmap] Metrics with ZERO value (may indicate no trades):', zeroKeys);
     }
-    
+
     // Debug: show specific values for problematic metrics
     console.log('[Heatmap] Debug - avg_trade_pct:', metrics.avg_trade_pct, 'type:', typeof metrics.avg_trade_pct);
     console.log('[Heatmap] Debug - payoff_ratio:', metrics.payoff_ratio, 'type:', typeof metrics.payoff_ratio);
@@ -4788,12 +4788,12 @@ function renderMetricsHeatmap(metrics) {
       const value = raw !== undefined && raw !== null ? parseFloat(raw) : null;
       const colorClass = getHeatmapColor(m.key, value, m.goodWhen);
       const formatted = formatHeatmapValue(value, m.format);
-      
+
       // Debug for problematic metrics
       if (['avg_trade_pct', 'payoff_ratio'].includes(m.key)) {
         console.log(`[Heatmap] ${m.key}: raw=${raw}, value=${value}, formatted=${formatted}`);
       }
-      
+
       return `<div class="hm-cell ${colorClass}" title="${m.label}: ${formatted}">
         <div class="hm-cell-label">${m.label}</div>
         <div class="hm-cell-value">${formatted}</div>
