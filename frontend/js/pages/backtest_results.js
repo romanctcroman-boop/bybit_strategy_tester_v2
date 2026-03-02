@@ -1219,7 +1219,7 @@ function initCharts() {
   // Benchmarking Chart (in Dynamics tab) — TV "Сравнение" style
   const benchmarkingCanvas = document.getElementById('benchmarkingChart');
   if (benchmarkingCanvas) {
-    // Custom plugin: draws TV-style "funnel" connectors + zero axis + current-price tick
+    // Custom plugin: draws TV-style zero axis, current-price tick, and funnel connector
     const tvBenchPlugin = {
       id: 'tvBench',
       afterDraw(chart) {
@@ -1231,62 +1231,62 @@ function initCharts() {
         if (!xScale || !yScale) return;
 
         const x0 = xScale.getPixelForValue(0);   // pixel position of 0%
+        const area = chart.chartArea;
 
-        // ── Zero axis ──────────────────────────────────────────────────
+        // ── Zero axis vertical line ────────────────────────────────────
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(x0, chart.chartArea.top);
-        ctx.lineTo(x0, chart.chartArea.bottom);
-        ctx.strokeStyle = 'rgba(200,200,200,0.35)';
+        ctx.moveTo(x0, area.top);
+        ctx.lineTo(x0, area.bottom);
+        ctx.strokeStyle = 'rgba(200,200,200,0.4)';
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
 
-        // ── Per-row: funnel connectors + current-price tick ────────────
+        // ── Per-row: current-price tick + funnel (only if bar on one side) ─
         info.forEach((row, rowIdx) => {
-          const yMid  = yScale.getPixelForValue(rowIdx);
-          const barH  = yScale.width ? 0 : (yScale.getPixelForValue(0) - yScale.getPixelForValue(1)) * 0.65;
-          const halfH = Math.abs(barH) / 2;
+          // Dataset index: BH=0, Strategy=1 (2 datasets total)
+          const dsIdx = rowIdx === 0 ? 0 : 1;
+          const meta = chart.getDatasetMeta(dsIdx);
+          const bar = meta?.data?.[rowIdx];
+          if (!bar) return;
 
+          const barTop = Math.min(bar.y, bar.base) + 1;
+          const barBottom = Math.max(bar.y, bar.base) - 1;
+          const yMid = (barTop + barBottom) / 2;
+          const xCur = xScale.getPixelForValue(row.cur);
           const xMin = xScale.getPixelForValue(row.min);
           const xMax = xScale.getPixelForValue(row.max);
-          const xCur = xScale.getPixelForValue(row.cur);
-
-          // Get actual bar top/bottom from meta
-          const meta = chart.getDatasetMeta(rowIdx === 0 ? 0 : 2);
-          const bar  = meta?.data?.[rowIdx];
-          const top    = bar ? Math.min(bar.y, bar.base) : yMid - halfH;
-          const bottom = bar ? Math.max(bar.y, bar.base) : yMid + halfH;
-          const barTop    = Math.min(top, bottom);
-          const barBottom = Math.max(top, bottom);
-
-          // ── Funnel: triangle connecting bar edge → x0 center point ──
-          // Only draw if bar doesn't cross zero
-          ctx.save();
-          ctx.globalAlpha = 0.35;
           const color = rowIdx === 0 ? '#e6990a' : '#4299e1';
-          ctx.fillStyle = color;
 
-          if (rowIdx === 0) {
-            // BH: funnel from right edge of bar to x0
-            const xEdge = xMax; // right edge = max value
+          // ── Funnel triangle: only when bar is fully on one side of zero ──
+          // BH: bar goes from min to max; funnel tip at x0 if max > 0 and bar doesn't cross 0
+          // Strategy: funnel from left edge (min) to x0 if min > 0 (all profit), else from right (max) if max < 0
+          const barCrossesZero = row.min < 0 && row.max > 0;
+          if (!barCrossesZero) {
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.moveTo(xEdge, barTop);
-            ctx.lineTo(xEdge, barBottom);
-            ctx.lineTo(x0, yMid);
+            if (rowIdx === 0) {
+              // BH fully negative: funnel from left edge toward x0
+              // BH fully positive: funnel from right edge toward x0
+              const xEdge = row.max <= 0 ? xMin : xMax;
+              ctx.moveTo(xEdge, barTop);
+              ctx.lineTo(xEdge, barBottom);
+              ctx.lineTo(x0, yMid);
+            } else {
+              // Strategy fully positive: funnel from left edge toward x0
+              // Strategy fully negative: funnel from right edge toward x0
+              const xEdge = row.min >= 0 ? xMin : xMax;
+              ctx.moveTo(xEdge, barTop);
+              ctx.lineTo(xEdge, barBottom);
+              ctx.lineTo(x0, yMid);
+            }
             ctx.closePath();
             ctx.fill();
-          } else {
-            // Strategy: funnel from left edge of bar to x0
-            const xEdge = xMin; // left edge = min value
-            ctx.beginPath();
-            ctx.moveTo(xEdge, barTop);
-            ctx.lineTo(xEdge, barBottom);
-            ctx.lineTo(x0, yMid);
-            ctx.closePath();
-            ctx.fill();
+            ctx.restore();
           }
-          ctx.restore();
 
           // ── Centre dot at x0 ─────────────────────────────────────────
           ctx.save();
@@ -1296,13 +1296,14 @@ function initCharts() {
           ctx.fill();
           ctx.restore();
 
-          // ── Current-price tick (vertical line inside bar) ─────────────
+          // ── Current-price tick: thin bright vertical line inside bar ──
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(xCur, barTop  + 2);
-          ctx.lineTo(xCur, barBottom - 2);
-          ctx.strokeStyle = rowIdx === 0 ? 'rgba(80, 50, 0, 0.9)' : 'rgba(10, 60, 120, 0.9)';
+          ctx.moveTo(xCur, barTop);
+          ctx.lineTo(xCur, barBottom);
+          ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.85;
           ctx.stroke();
           ctx.restore();
         });
@@ -3479,16 +3480,6 @@ function updateCharts(backtest) {
           categoryPercentage: 1.0,
           grouped: false
         },
-        // ── Row 0: BH current-price marker ────────────────────────────────────
-        {
-          label: '_bh_cur',
-          data: [[bhCurrentPct - 0.2, bhCurrentPct + 0.2], null],
-          backgroundColor: 'rgba(30, 18, 0, 0.7)',
-          borderWidth: 0,
-          barPercentage: 0.55,
-          categoryPercentage: 1.0,
-          grouped: false
-        },
         // ── Row 1: Strategy range ─────────────────────────────────────────────
         {
           label: 'Прибыльность стратегии',
@@ -3498,22 +3489,12 @@ function updateCharts(backtest) {
           barPercentage: 0.55,
           categoryPercentage: 1.0,
           grouped: false
-        },
-        // ── Row 1: Strategy current-price marker ──────────────────────────────
-        {
-          label: '_strat_cur',
-          data: [null, [strategyReturnPct - 0.2, strategyReturnPct + 0.2]],
-          backgroundColor: 'rgba(0, 20, 50, 0.7)',
-          borderWidth: 0,
-          barPercentage: 0.55,
-          categoryPercentage: 1.0,
-          grouped: false
         }
       ];
 
       // Store tooltip info + funnel data on chart instance
       benchmarkingChart._tvBenchInfo = [
-        { max: bhRangeHigh,    cur: bhCurrentPct,      min: bhRangeLow    },
+        { max: bhRangeHigh, cur: bhCurrentPct, min: bhRangeLow },
         { max: stratRangeHigh, cur: strategyReturnPct, min: stratRangeLow }
       ];
 
