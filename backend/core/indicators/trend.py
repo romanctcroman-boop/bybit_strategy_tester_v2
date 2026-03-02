@@ -262,7 +262,7 @@ def calculate_supertrend(
     from backend.core.indicators.volatility import calculate_atr
 
     n = len(close)
-    supertrend = np.zeros(n)
+    supertrend = np.full(n, np.nan)
     direction = np.zeros(n)
 
     # Calculate ATR
@@ -277,7 +277,12 @@ def calculate_supertrend(
     final_upper = np.copy(basic_upper)
     final_lower = np.copy(basic_lower)
 
+    # Find the first bar where ATR is valid (not NaN)
     for i in range(1, n):
+        if np.isnan(basic_upper[i]) or np.isnan(basic_upper[i - 1]):
+            final_upper[i] = basic_upper[i]
+            final_lower[i] = basic_lower[i]
+            continue
         # Final upper band
         if basic_upper[i] < final_upper[i - 1] or close[i - 1] > final_upper[i - 1]:
             final_upper[i] = basic_upper[i]
@@ -290,29 +295,33 @@ def calculate_supertrend(
         else:
             final_lower[i] = final_lower[i - 1]
 
-    # Calculate Supertrend
+    # Calculate Supertrend — start from first valid ATR bar
     for i in range(1, n):
-        if i == 1:
+        if np.isnan(final_upper[i]) or np.isnan(final_lower[i]):
+            direction[i] = 0
+            continue
+
+        if direction[i - 1] == 0:
+            # Bootstrap: no prior trend — determine from close vs bands
             if close[i] <= final_upper[i]:
                 supertrend[i] = final_upper[i]
                 direction[i] = -1
             else:
                 supertrend[i] = final_lower[i]
                 direction[i] = 1
-        else:
-            if direction[i - 1] == -1:  # Previous was downtrend
-                if close[i] > final_upper[i]:
-                    supertrend[i] = final_lower[i]
-                    direction[i] = 1
-                else:
-                    supertrend[i] = final_upper[i]
-                    direction[i] = -1
-            else:  # Previous was uptrend
-                if close[i] < final_lower[i]:
-                    supertrend[i] = final_upper[i]
-                    direction[i] = -1
-                else:
-                    supertrend[i] = final_lower[i]
-                    direction[i] = 1
+        elif direction[i - 1] == -1:  # Previous was downtrend
+            if close[i] > final_upper[i]:
+                supertrend[i] = final_lower[i]
+                direction[i] = 1
+            else:
+                supertrend[i] = final_upper[i]
+                direction[i] = -1
+        else:  # Previous was uptrend (direction == 1)
+            if close[i] < final_lower[i]:
+                supertrend[i] = final_upper[i]
+                direction[i] = -1
+            else:
+                supertrend[i] = final_lower[i]
+                direction[i] = 1
 
     return supertrend, direction
