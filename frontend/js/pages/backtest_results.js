@@ -1219,9 +1219,50 @@ function initCharts() {
   // Benchmarking Chart (in Dynamics tab) — TV "Сравнение" style
   const benchmarkingCanvas = document.getElementById('benchmarkingChart');
   if (benchmarkingCanvas) {
-    // Custom plugin: draws TV-style zero axis, current-price tick, and funnel connector
+    // ─────────────────────────────────────────────────────────────────────────
+    // Custom plugin: replicates TV "Сравнение" visual style:
+    //   • BH bar split into dark (loss zone, left of 0) + bright (gain zone, right of 0)
+    //   • Funnel trapezoid: from BH bar right-edge → Strategy bar left-edge, tip at x=0
+    //   • Grey dot at x=0 between the two bars
+    //   • White current-price tick inside each bar
+    //   • Zero-axis vertical line
+    // ─────────────────────────────────────────────────────────────────────────
     const tvBenchPlugin = {
       id: 'tvBench',
+      // Run BEFORE Chart.js draws bars so we can draw the dark BH loss zone first,
+      // then Chart.js draws the bright range bar on top
+      beforeDatasetsDraw(chart) {
+        const info = chart._tvBenchInfo;
+        if (!info) return;
+        const bh = info[0];
+        if (!bh || bh.min >= 0) return;   // only needed if BH bar crosses zero or is all negative
+
+        const ctx = chart.ctx;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        if (!xScale || !yScale) return;
+
+        // Get bar pixel bounds from yScale band size
+        const x0 = xScale.getPixelForValue(0);
+        const xMin = xScale.getPixelForValue(bh.min);
+
+        // Estimate bar height from scale band
+        const bandHeight = yScale.height / (yScale.ticks?.length || 2);
+        const barH = bandHeight * 0.55;  // matches barPercentage: 0.55
+        const yCentre = yScale.getPixelForValue(0);  // category index 0 = BH row
+        const barTop = yCentre - barH / 2;
+        const barBottom = yCentre + barH / 2;
+
+        // ── Paint the loss zone (min → 0) in dark orange ──────────────
+        if (bh.max > 0) {
+          // BH crosses zero: dark zone from xMin to x0
+          ctx.save();
+          ctx.fillStyle = 'rgba(110, 60, 0, 0.88)';
+          ctx.fillRect(xMin, barTop, x0 - xMin, barBottom - barTop);
+          ctx.restore();
+        }
+      },
+
       afterDraw(chart) {
         const info = chart._tvBenchInfo;
         if (!info) return;
@@ -1230,7 +1271,7 @@ function initCharts() {
         const yScale = chart.scales.y;
         if (!xScale || !yScale) return;
 
-        const x0 = xScale.getPixelForValue(0);   // pixel position of 0%
+        const x0 = xScale.getPixelForValue(0);
         const area = chart.chartArea;
 
         // ── Zero axis vertical line ────────────────────────────────────
@@ -1243,67 +1284,113 @@ function initCharts() {
         ctx.stroke();
         ctx.restore();
 
-        // ── Per-row: current-price tick + funnel (only if bar on one side) ─
-        info.forEach((row, rowIdx) => {
-          // Dataset index: BH=0, Strategy=1 (2 datasets total)
-          const dsIdx = rowIdx === 0 ? 0 : 1;
-          const meta = chart.getDatasetMeta(dsIdx);
+        // Collect bar geometry for both rows
+        const bars = [0, 1].map((rowIdx) => {
+          const meta = chart.getDatasetMeta(rowIdx);
           const bar = meta?.data?.[rowIdx];
-          if (!bar) return;
+          if (!bar) return null;
+          const top = Math.min(bar.y, bar.base);
+          const bottom = Math.max(bar.y, bar.base);
+          return { top, bottom, mid: (top + bottom) / 2 };
+        });
 
-          const barTop = Math.min(bar.y, bar.base) + 1;
-          const barBottom = Math.max(bar.y, bar.base) - 1;
-          const yMid = (barTop + barBottom) / 2;
-          const xCur = xScale.getPixelForValue(row.cur);
-          const xMin = xScale.getPixelForValue(row.min);
-          const xMax = xScale.getPixelForValue(row.max);
-          const color = rowIdx === 0 ? '#e6990a' : '#4299e1';
+        const bhBar = bars[0];
+        const stBar = bars[1];
+        const bh = info[0];
+        const st = info[1];
 
-          // ── Funnel triangle: only when bar is fully on one side of zero ──
-          // BH: bar goes from min to max; funnel tip at x0 if max > 0 and bar doesn't cross 0
-          // Strategy: funnel from left edge (min) to x0 if min > 0 (all profit), else from right (max) if max < 0
-          const barCrossesZero = row.min < 0 && row.max > 0;
-          if (!barCrossesZero) {
-            ctx.save();
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = color;
+        // ── Funnel trapezoid: BH right-edge → Strategy left-edge, tip at x0 ──
+        // TV draws a filled semi-transparent trapezoid between the two bars
+        // connecting BH's max edge to Strategy's min edge, tapering to a point at x0
+        if (bhBar && stBar && bh && st) {
+          const xBhRight = xScale.getPixelForValue(bh.max);   // right edge of BH bar
+          const xStLeft  = xScale.getPixelForValue(st.min);   // left edge of Strategy bar
+          const yBhTop    = bhBar.top;
+          const yBhBottom = bhBar.bottom;
+          const yStTop    = stBar.top;
+          const yStBottom = stBar.bottom;
+          const yTip = (bhBar.mid + stBar.mid) / 2;  // midpoint between two bars
+
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          ctx.fillStyle = '#b07010';  // dark amber for funnel
+
+          // Trapezoid shape:
+          // Left side: full height of BH bar at xBhRight
+          // Right side: full height of Strategy bar at xStLeft
+          // They taper to a point at (x0, yTip) if bars don't overlap horizontally
+          if (xBhRight <= x0 && xStLeft >= x0) {
+            // BH right edge is left of 0, Strategy left edge is right of 0 — draw two triangles
+            // Left triangle: BH right edge → x0 tip
             ctx.beginPath();
-            if (rowIdx === 0) {
-              // BH fully negative: funnel from left edge toward x0
-              // BH fully positive: funnel from right edge toward x0
-              const xEdge = row.max <= 0 ? xMin : xMax;
-              ctx.moveTo(xEdge, barTop);
-              ctx.lineTo(xEdge, barBottom);
-              ctx.lineTo(x0, yMid);
-            } else {
-              // Strategy fully positive: funnel from left edge toward x0
-              // Strategy fully negative: funnel from right edge toward x0
-              const xEdge = row.min >= 0 ? xMin : xMax;
-              ctx.moveTo(xEdge, barTop);
-              ctx.lineTo(xEdge, barBottom);
-              ctx.lineTo(x0, yMid);
-            }
+            ctx.moveTo(xBhRight, yBhTop);
+            ctx.lineTo(xBhRight, yBhBottom);
+            ctx.lineTo(x0, yTip);
             ctx.closePath();
             ctx.fill();
-            ctx.restore();
-          }
 
-          // ── Centre dot at x0 ─────────────────────────────────────────
+            ctx.beginPath();
+            ctx.moveTo(xStLeft, yStTop);
+            ctx.lineTo(xStLeft, yStBottom);
+            ctx.lineTo(x0, yTip);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            // Bars overlap at x0 — draw full trapezoid
+            ctx.beginPath();
+            ctx.moveTo(xBhRight, yBhTop);
+            ctx.lineTo(xBhRight, yBhBottom);
+            ctx.lineTo(xStLeft, yStBottom);
+            ctx.lineTo(xStLeft, yStTop);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+
+          // ── Dashed border on funnel ──────────────────────────────────
+          ctx.save();
+          ctx.globalAlpha = 0.7;
+          ctx.strokeStyle = '#d4890d';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          if (xBhRight <= x0 && xStLeft >= x0) {
+            ctx.beginPath();
+            ctx.moveTo(xBhRight, yBhTop);    ctx.lineTo(x0, yTip);
+            ctx.moveTo(xBhRight, yBhBottom); ctx.lineTo(x0, yTip);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(xStLeft, yStTop);    ctx.lineTo(x0, yTip);
+            ctx.moveTo(xStLeft, yStBottom); ctx.lineTo(x0, yTip);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // ── Grey dot at x=0, between the two bars ─────────────────────
+        if (bhBar && stBar) {
+          const yDot = (bhBar.mid + stBar.mid) / 2;
           ctx.save();
           ctx.beginPath();
-          ctx.arc(x0, yMid, 4, 0, Math.PI * 2);
+          ctx.arc(x0, yDot, 5, 0, Math.PI * 2);
           ctx.fillStyle = '#8b949e';
           ctx.fill();
           ctx.restore();
+        }
 
-          // ── Current-price tick: thin bright vertical line inside bar ──
+        // ── Per-bar: current-price tick (white vertical line) ─────────
+        [0, 1].forEach((rowIdx) => {
+          const row = info[rowIdx];
+          const bar = bars[rowIdx];
+          if (!row || !bar) return;
+          const xCur = xScale.getPixelForValue(row.cur);
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(xCur, barTop);
-          ctx.lineTo(xCur, barBottom);
+          ctx.moveTo(xCur, bar.top + 1);
+          ctx.lineTo(xCur, bar.bottom - 1);
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
-          ctx.globalAlpha = 0.85;
+          ctx.globalAlpha = 0.9;
           ctx.stroke();
           ctx.restore();
         });
@@ -1330,8 +1417,7 @@ function initCharts() {
               usePointStyle: true,
               pointStyle: 'circle',
               padding: 20,
-              font: { size: 12 },
-              filter: (item) => !item.text.startsWith('_')
+              font: { size: 12 }
             }
           },
           tooltip: {
@@ -1348,7 +1434,6 @@ function initCharts() {
                 if (!items.length) return [];
                 const info = items[0].chart._tvBenchInfo?.[items[0].dataIndex];
                 if (!info) return [];
-                // TV-style: right-aligned values
                 return [
                   `Макс            ${info.max.toFixed(2)}%`,
                   `Текущ. цена  ${info.cur.toFixed(2)}%`,
