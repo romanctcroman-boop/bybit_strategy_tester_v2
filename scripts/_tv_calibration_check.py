@@ -192,9 +192,17 @@ print("─" * 70)
 
 our_net = float(m.get("net_profit", 0))
 our_net_pct = float(m.get("net_profit_pct", 0) or m.get("total_return", 0))
+our_gp = float(m.get("gross_profit", 0))
+our_gl = float(m.get("gross_loss", 0))
+our_tc = float(m.get("total_commission", 0))
 
 print(check("Net profit (USDT)", our_net, TV["net_profit"]))
 print(check("Net profit (%)", our_net_pct, TV["net_profit_pct"]))
+
+# P&L identity check: gross_profit - gross_loss - commission = net_profit
+identity = our_gp - our_gl - our_tc - our_net
+identity_ok = "✅" if abs(identity) < 0.01 else "❌"
+print(f"{identity_ok}   P&L identity: gp({our_gp:.2f}) - gl({our_gl:.2f}) - comm({our_tc:.2f}) = {our_gp - our_gl - our_tc:.2f} (net={our_net:.2f}, diff={identity:+.4f})")
 
 # ─── SECTION 3: Win Rate ──────────────────────────────────────────────────────
 print("\n" + "─" * 70)

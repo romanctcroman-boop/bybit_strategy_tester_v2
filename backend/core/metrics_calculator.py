@@ -850,10 +850,12 @@ class MetricsCalculator:
 
                 logger.debug(f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}")
 
-            # Gross profit/loss — TV definition: sum of net trade PnL (fees already deducted in pnl).
-            # Do NOT add fees back: that would inflate gross_profit by double-counting commissions.
-            # TV: gross_profit = sum(t.pnl for winning trades), gross_loss = sum(abs(t.pnl) for losing trades)
-            gross_pnl = pnl
+            # Gross profit/loss — TV definition: pre-fee price-move PnL.
+            # TV gross_profit = sum of (pnl + fees) for winning trades (price move before commission).
+            # TV gross_loss   = sum of |pnl + fees| for losing trades.
+            # Our TradeRecord.pnl is already net-of-fees, so restore: gross = pnl + fees.
+            # Identity: gross_profit - gross_loss - total_commission = net_profit  (matches TV)
+            gross_pnl = pnl + fees
 
             if pnl > 0:
                 metrics.winning_trades += 1
@@ -883,7 +885,11 @@ class MetricsCalculator:
         # Derived metrics (win rate excludes breakeven trades from denominator)
         meaningful_trades = metrics.winning_trades + metrics.losing_trades
         metrics.win_rate = calculate_win_rate(metrics.winning_trades, meaningful_trades)
-        metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
+        # Profit factor — TV definition: sum(net_wins) / sum(|net_losses|)
+        # (uses net PnL, not pre-fee gross — confirmed by TV calibration: 2390.34/666.91=3.584)
+        net_gross_profit = sum(p for p in pnl_list if p > 0)
+        net_gross_loss = sum(abs(p) for p in pnl_list if p < 0)
+        metrics.profit_factor = calculate_profit_factor(net_gross_profit, net_gross_loss)
 
         # Averages
         metrics.avg_win = float(np.mean(win_pnl)) if win_pnl else 0.0
