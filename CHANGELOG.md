@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
+
+    **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+    instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+    **price-change percentage** (6.6%), not the USDT amount.
+
+    **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+    `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+    m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
+
+    **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+    (no fallback chain) for all four long/short largest fields.
+
+    **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+    TradingView within 0.02%. Section 8 (avg_bars) has a known ~+19 bar discrepancy for short
+    trades (bar-counting convention difference vs TV, does not affect PnL metrics).
+
+    **File:** `scripts/_tv_calibration_check.py`
+
+### Fixed
+
 - **[ENGINE] TV-parity Sharpe/Sortino using trade-close equity** (`8712a7e26`, 2026-03-02)
 
     **Problem:** `sharpe_ratio` = 0.807 (DB) vs 0.934 (TV); `sortino_ratio` = 3.53 (DB) vs 4.19 (TV).
