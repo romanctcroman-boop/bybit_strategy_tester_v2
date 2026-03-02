@@ -83,8 +83,7 @@ class RegimeDetectionResult:
             "current_regime": self.current_regime_name,
             "regime_stats": self.regime_stats,
             "regime_distribution": {
-                name: float(np.mean(self.regimes == i))
-                for i, name in enumerate(self.regime_names)
+                name: float(np.mean(self.regimes == i)) for i, name in enumerate(self.regime_names)
             },
         }
 
@@ -102,9 +101,7 @@ class HMMRegimeDetector:
     - Provides transition probabilities
     """
 
-    def __init__(
-        self, n_regimes: int = 3, n_iter: int = 100, covariance_type: str = "full"
-    ):
+    def __init__(self, n_regimes: int = 3, n_iter: int = 100, covariance_type: str = "full"):
         """
         Initialize HMM regime detector.
 
@@ -114,9 +111,7 @@ class HMMRegimeDetector:
             covariance_type: 'full', 'diag', 'spherical', 'tied'
         """
         if not HMM_AVAILABLE:
-            raise ImportError(
-                "hmmlearn is not installed. Install with: pip install hmmlearn"
-            )
+            raise ImportError("hmmlearn is not installed. Install with: pip install hmmlearn")
 
         self.n_regimes = n_regimes
         self.n_iter = n_iter
@@ -124,9 +119,7 @@ class HMMRegimeDetector:
         self.model = None
         self.scaler = StandardScaler() if SKLEARN_AVAILABLE else None
 
-    def fit_predict(
-        self, data: pd.DataFrame, features: list[str] | None = None
-    ) -> RegimeDetectionResult:
+    def fit_predict(self, data: pd.DataFrame, features: list[str] | None = None) -> RegimeDetectionResult:
         """
         Fit HMM and predict regimes.
 
@@ -188,9 +181,7 @@ class HMMRegimeDetector:
             current_regime_name=regime_names[int(full_regimes[-1])],
         )
 
-    def predict_next_regime(
-        self, current_regime: int, n_steps: int = 1
-    ) -> list[tuple[int, float]]:
+    def predict_next_regime(self, current_regime: int, n_steps: int = 1) -> list[tuple[int, float]]:
         """
         Predict most likely next regime(s).
 
@@ -214,9 +205,7 @@ class HMMRegimeDetector:
         predictions = [(i, prob) for i, prob in enumerate(current_probs)]
         return sorted(predictions, key=lambda x: x[1], reverse=True)
 
-    def _prepare_features(
-        self, data: pd.DataFrame, features: list[str] | None
-    ) -> np.ndarray:
+    def _prepare_features(self, data: pd.DataFrame, features: list[str] | None) -> np.ndarray:
         """Prepare features for regime detection"""
         close = data["close"].values
 
@@ -240,9 +229,7 @@ class HMMRegimeDetector:
 
         return X
 
-    def _analyze_regimes(
-        self, data: pd.DataFrame, regimes: np.ndarray
-    ) -> dict[int, dict[str, float]]:
+    def _analyze_regimes(self, data: pd.DataFrame, regimes: np.ndarray) -> dict[int, dict[str, float]]:
         """Analyze statistics for each regime"""
         close = data["close"].values
         returns = np.diff(close) / close[:-1]
@@ -257,9 +244,7 @@ class HMMRegimeDetector:
                     "mean_return": float(np.mean(regime_returns)),
                     "volatility": float(np.std(regime_returns)),
                     "frequency": float(np.mean(mask)),
-                    "sharpe": float(
-                        np.mean(regime_returns) / np.std(regime_returns) * np.sqrt(8760)
-                    )
+                    "sharpe": float(np.mean(regime_returns) / np.std(regime_returns) * np.sqrt(8760))
                     if np.std(regime_returns) > 0
                     else 0,
                 }
@@ -309,9 +294,7 @@ class HMMRegimeDetector:
             regimes=np.zeros(n_bars, dtype=int),
             n_regimes=1,
             regime_names=["Unknown"],
-            regime_stats={
-                0: {"mean_return": 0, "volatility": 0, "frequency": 1.0, "sharpe": 0}
-            },
+            regime_stats={0: {"mean_return": 0, "volatility": 0, "frequency": 1.0, "sharpe": 0}},
             current_regime=0,
             current_regime_name="Unknown",
         )
@@ -332,9 +315,7 @@ class KMeansRegimeDetector:
         self.model = None
         self.scaler = StandardScaler()
 
-    def fit_predict(
-        self, data: pd.DataFrame, lookback: int = 20
-    ) -> RegimeDetectionResult:
+    def fit_predict(self, data: pd.DataFrame, lookback: int = 20) -> RegimeDetectionResult:
         """
         Fit K-Means and predict regimes.
 
@@ -353,9 +334,7 @@ class KMeansRegimeDetector:
         momentum = pd.Series(close).pct_change(lookback)
 
         # Combine features
-        features = pd.DataFrame(
-            {"returns": returns, "volatility": volatility, "momentum": momentum}
-        ).dropna()
+        features = pd.DataFrame({"returns": returns, "volatility": volatility, "momentum": momentum}).dropna()
 
         if len(features) < 50:
             return self._empty_result(len(data))
@@ -439,9 +418,7 @@ class GMMRegimeDetector:
 
         X = self.scaler.fit_transform(features.values)
 
-        self.model = GaussianMixture(
-            n_components=self.n_regimes, random_state=42, n_init=5
-        )
+        self.model = GaussianMixture(n_components=self.n_regimes, random_state=42, n_init=5)
         regimes = self.model.fit_predict(X)
 
         # Pad
@@ -488,9 +465,7 @@ class RegimeAdaptiveStrategy:
 
     def get_strategy_params(self, current_regime: int) -> dict[str, Any]:
         """Get strategy parameters for current regime"""
-        return self.regime_strategies.get(
-            current_regime, self.regime_strategies.get(0, {})
-        )
+        return self.regime_strategies.get(current_regime, self.regime_strategies.get(0, {}))
 
     def should_trade(self, current_regime: int) -> bool:
         """Check if trading is allowed in current regime"""

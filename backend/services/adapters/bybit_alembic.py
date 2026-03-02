@@ -103,9 +103,7 @@ class BybitAdapter:
             )
             # Build a mapping of symbol -> instrument metadata for smarter selection
             available_meta: dict[str, dict] = {
-                str(itm.get("symbol")): itm
-                for itm in instruments
-                if isinstance(itm, dict) and itm.get("symbol")
+                str(itm.get("symbol")): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
             }
             available = set(available_meta.keys())
         except Exception:
@@ -656,9 +654,7 @@ class BybitAdapter:
                 else info.get("result") or []
             )
             self._instruments_cache = {
-                str(sym): itm
-                for itm in instruments
-                if isinstance(itm, dict) and (sym := itm.get("symbol"))
+                str(sym): itm for itm in instruments if isinstance(itm, dict) and (sym := itm.get("symbol"))
             }
             self._instruments_cache_at = now
         except Exception:

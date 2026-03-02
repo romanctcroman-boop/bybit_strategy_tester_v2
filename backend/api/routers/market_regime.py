@@ -37,20 +37,12 @@ class RegimeDetectionRequest(BaseModel):
 
     symbol: str = Field(default="BTCUSDT", description="Trading pair symbol")
     interval: str = Field(default="1h", description="Candlestick interval")
-    lookback_bars: int = Field(
-        default=200, ge=50, le=1000, description="Number of bars to analyze"
-    )
+    lookback_bars: int = Field(default=200, ge=50, le=1000, description="Number of bars to analyze")
 
     # Optional custom thresholds
-    adx_trending_threshold: float | None = Field(
-        default=None, ge=10, le=50, description="ADX threshold for trending"
-    )
-    adx_weak_threshold: float | None = Field(
-        default=None, ge=5, le=25, description="ADX threshold for ranging"
-    )
-    bandwidth_squeeze: float | None = Field(
-        default=None, ge=1, le=10, description="BB bandwidth squeeze threshold"
-    )
+    adx_trending_threshold: float | None = Field(default=None, ge=10, le=50, description="ADX threshold for trending")
+    adx_weak_threshold: float | None = Field(default=None, ge=5, le=25, description="ADX threshold for ranging")
+    bandwidth_squeeze: float | None = Field(default=None, ge=1, le=10, description="BB bandwidth squeeze threshold")
 
 
 class RegimeIndicators(BaseModel):
@@ -347,7 +339,7 @@ async def get_regime_stats(
                 current_duration = 1
 
         # Finalize stats
-        for regime_name, stats in regime_stats.items():
+        for _regime_name, stats in regime_stats.items():
             if stats["adx_values"]:
                 stats["avg_adx"] = round(np.mean(stats["adx_values"]), 2)
                 stats["avg_confidence"] = round(np.mean(stats["confidence_values"]), 3)
@@ -367,7 +359,7 @@ async def get_regime_stats(
             analysis_period_days=days,
             regime_stats=regime_stats,
             current_regime=current_state.regime.value,
-            avg_regime_duration_bars=round(avg_duration, 2),
+            avg_regime_duration_bars=round(float(avg_duration), 2),
             dominant_regime=dominant[0],
         )
 

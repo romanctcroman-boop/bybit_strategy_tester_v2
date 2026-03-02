@@ -290,9 +290,7 @@ class ExtendedMetricsCalculator:
 
         return gross_profit / gross_loss
 
-    def calculate_recovery_factor(
-        self, equity_curve: np.ndarray, trades: list
-    ) -> float:
+    def calculate_recovery_factor(self, equity_curve: np.ndarray, trades: list) -> float:
         """
         Calculate Recovery Factor - Net Profit / Max Drawdown.
 
@@ -399,9 +397,7 @@ class ExtendedMetricsCalculator:
 
         return total_return / pain
 
-    def calculate_information_ratio(
-        self, returns: np.ndarray, benchmark_returns: np.ndarray
-    ) -> float:
+    def calculate_information_ratio(self, returns: np.ndarray, benchmark_returns: np.ndarray) -> float:
         """
         Calculate Information Ratio - excess return / tracking error.
 
@@ -453,7 +449,5 @@ def calculate_extended_metrics(
     Returns:
         ExtendedMetricsResult with all metrics
     """
-    calculator = ExtendedMetricsCalculator(
-        risk_free_rate=risk_free_rate, periods_per_year=periods_per_year
-    )
+    calculator = ExtendedMetricsCalculator(risk_free_rate=risk_free_rate, periods_per_year=periods_per_year)
     return calculator.calculate_all(equity_curve, trades)

@@ -204,16 +204,12 @@ async def get_trace_spans(trace_id: str):
                 break
 
         if not memory_exporter:
-            raise HTTPException(
-                status_code=404, detail="No in-memory exporter configured"
-            )
+            raise HTTPException(status_code=404, detail="No in-memory exporter configured")
 
         spans_data = memory_exporter.get_spans(trace_id=trace_id)
 
         if not spans_data:
-            raise HTTPException(
-                status_code=404, detail=f"No spans found for trace {trace_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No spans found for trace {trace_id}")
 
         return [SpanInfo(**span) for span in spans_data]
     except HTTPException:
@@ -226,9 +222,7 @@ async def get_trace_spans(trace_id: str):
 @router.post("/config")
 async def update_tracing_config(
     enabled: bool | None = Query(None, description="Enable/disable tracing"),
-    sampling_rate: float | None = Query(
-        None, ge=0.0, le=1.0, description="Sampling rate (0.0 to 1.0)"
-    ),
+    sampling_rate: float | None = Query(None, ge=0.0, le=1.0, description="Sampling rate (0.0 to 1.0)"),
 ):
     """
     Update tracing configuration.

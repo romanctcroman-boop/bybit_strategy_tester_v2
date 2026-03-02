@@ -1,4 +1,4 @@
-﻿"""
+"""
 Optimization Router — Sync Grid Search and Optuna Search endpoints.
 
 Covers:

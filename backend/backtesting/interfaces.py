@@ -160,6 +160,8 @@ class TradeRecord:
     # MFE/MAE (Maximum Favorable/Adverse Excursion)
     mfe: float = 0.0  # Максимальная прибыль во время сделки
     mae: float = 0.0  # Максимальный убыток во время сделки
+    mfe_pct: float = 0.0  # MFE в % от стоимости позиции
+    mae_pct: float = 0.0  # MAE в % от стоимости позиции
 
 
 @dataclass
@@ -301,7 +303,7 @@ class BacktestInput:
     # market: немедленное исполнение по рынку
     # limit: лимитный ордер с отступом
     # stop: стоп-ордер (вход на пробой)
-    entry_on_next_bar_open: bool = False  # TradingView parity: enter at open of bar after signal
+    entry_on_next_bar_open: bool = True  # TradingView parity: enter at open of bar after signal
     # When True, a signal on bar i causes entry at open_prices[i+1] (next bar open).
     # This matches TradingView's default calc_on_every_tick=false / process_orders_on_close
     # behaviour where market orders fill at the next bar's open.
@@ -322,6 +324,10 @@ class BacktestInput:
     # === PORTFOLIO & CORRELATION (Портфель и корреляция) ===
     # =========================================================================
     hedge_mode: bool = False  # Разрешить одновременные long и short
+    tv_position_reversal: bool = False  # TradingView strategy.entry() reversal: when a signal
+    # in the opposite direction fires, the current position is closed immediately and the
+    # new position opens at the same bar (same price). Mirrors TV's default behaviour where
+    # strategy.entry("Long") auto-closes an open short before opening the long.
     max_open_positions: int = 1  # Максимум открытых позиций (для multi-symbol)
     max_correlated_positions: int = 0  # Лимит коррелирующих позиций (0 = без лимита)
     portfolio_heat_limit: float = 0.0  # Макс. риск портфеля (0 = без лимита)
@@ -715,6 +721,8 @@ class BacktestMetrics:
 
     # === ПРОСАДКА ===
     max_drawdown: float = 0.0  # в процентах
+    max_drawdown_pct: float = 0.0  # alias for max_drawdown (percentage)
+    max_drawdown_usdt: float = 0.0  # absolute drawdown in USDT
     max_drawdown_duration: int = 0  # в барах
     avg_drawdown: float = 0.0
 
@@ -969,61 +977,51 @@ def get_engine(engine_type: str = "fallback", pyramiding: int = 1) -> BaseBackte
     """
     Фабрика для создания движков.
 
+    .. deprecated::
+        Используйте ``backend.backtesting.engine_selector.get_engine`` напрямую.
+        Эта функция — тонкая обёртка для обратной совместимости.
+
     Args:
-        engine_type: "fallback", "fallback_v3", "numba", "gpu"
-        pyramiding: Если > 1, автоматически использует FallbackEngineV3
+        engine_type: "auto", "single", "fallback", "fallback_v4", "optimization", "numba", "dca"
+        pyramiding: Если > 1, передаётся в engine_selector для корректного выбора
 
     Returns:
         Инстанс движка
     """
-    from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-    from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
-    from backend.backtesting.engines.gpu_engine_v2 import GPUEngineV2
-    from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+    import warnings
 
-    # Если включён пирамидинг (> 1), используем FallbackEngineV3
-    # который поддерживает множественные позиции
-    if pyramiding > 1:
-        return FallbackEngineV3()
+    warnings.warn(
+        "interfaces.get_engine() is deprecated. Use backend.backtesting.engine_selector.get_engine() directly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from backend.backtesting.engine_selector import get_engine as _selector_get_engine
 
-    engines = {
-        "fallback": FallbackEngineV2,
-        "fallback_v3": FallbackEngineV3,
-        "numba": NumbaEngineV2,
-        "gpu": GPUEngineV2,
-    }
-
-    if engine_type not in engines:
-        raise ValueError(f"Unknown engine type: {engine_type}. Available: {list(engines.keys())}")
-
-    return engines[engine_type]()  # type: ignore[abstract]
+    return _selector_get_engine(engine_type=engine_type, pyramiding=pyramiding)
 
 
 def get_engine_for_config(config: BacktestInput) -> BaseBacktestEngine:
     """
     Выбор оптимального движка на основе конфигурации бэктеста.
 
-    Автоматически выбирает FallbackEngineV3 если нужен пирамидинг.
+    .. deprecated::
+        Используйте ``backend.backtesting.engine_selector.get_engine`` напрямую.
 
     Args:
         config: Конфигурация бэктеста
 
     Returns:
-        Оптимальный движок для данной конфигурации
+        Оптимальный движок для данной конфигурации (FallbackEngineV4 или NumbaEngineV2)
     """
-    from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-    from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
-    from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+    import warnings
+
+    warnings.warn(
+        "interfaces.get_engine_for_config() is deprecated. "
+        "Use backend.backtesting.engine_selector.get_engine() directly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from backend.backtesting.engine_selector import get_engine as _selector_get_engine
 
     pyramiding = getattr(config, "pyramiding", 1)
-
-    # Пирамидинг > 1 требует FallbackEngineV3
-    if pyramiding > 1:
-        return FallbackEngineV3()
-
-    # Для обычных случаев - пробуем Numba, потом Fallback
-    try:
-        engine = NumbaEngineV2()
-        return engine
-    except Exception:
-        return FallbackEngineV2()
+    return _selector_get_engine(engine_type="auto", pyramiding=pyramiding)

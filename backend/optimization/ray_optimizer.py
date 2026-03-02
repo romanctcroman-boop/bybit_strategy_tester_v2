@@ -105,9 +105,7 @@ class RayParallelOptimizer:
                     ignore_reinit_error=True,
                     logging_level="warning",
                 )
-                logger.info(
-                    f"Ray initialized with {self.num_cpus} CPUs, {self.num_gpus} GPUs"
-                )
+                logger.info(f"Ray initialized with {self.num_cpus} CPUs, {self.num_gpus} GPUs")
             self._initialized = True
 
     def shutdown(self):
@@ -220,15 +218,11 @@ class RayParallelOptimizer:
             )
 
         # Sort by value (descending for maximize)
-        sorted_results = sorted(
-            successful_results, key=lambda x: x["value"], reverse=True
-        )
+        sorted_results = sorted(successful_results, key=lambda x: x["value"], reverse=True)
         best = sorted_results[0]
 
         # Top N results
-        top_results = [
-            {"params": r["config"], "value": r["value"]} for r in sorted_results[:10]
-        ]
+        top_results = [{"params": r["config"], "value": r["value"]} for r in sorted_results[:10]]
 
         logger.info(f"Optimization complete in {execution_time:.1f}s")
         logger.info(f"Best {metric}: {best['value']:.6f}")
@@ -333,9 +327,7 @@ class RayParallelOptimizer:
 
         # Submit all periods in parallel
         futures = [
-            process_period.remote(
-                p, data_ref, param_space_ref, strategy_class, optimizer_fn, backtest_fn
-            )
+            process_period.remote(p, data_ref, param_space_ref, strategy_class, optimizer_fn, backtest_fn)
             for p in periods
         ]
 
@@ -350,9 +342,7 @@ class RayParallelOptimizer:
             "avg_is_sharpe": np.mean(is_sharpes),
             "avg_oos_sharpe": np.mean(oos_sharpes),
             "avg_degradation": np.mean(is_sharpes) - np.mean(oos_sharpes),
-            "profitable_pct": sum(1 for r in results if r["oos_return"] > 0)
-            / len(results)
-            * 100,
+            "profitable_pct": sum(1 for r in results if r["oos_return"] > 0) / len(results) * 100,
             "periods": results,
         }
 
@@ -399,9 +389,7 @@ class MultiprocessingOptimizer:
         start_time = datetime.now()
         total = len(configs)
 
-        logger.info(
-            f"Starting multiprocessing optimization: {total} configs, {self.n_workers} workers"
-        )
+        logger.info(f"Starting multiprocessing optimization: {total} configs, {self.n_workers} workers")
 
         # Create worker function
         def worker(config):
@@ -453,10 +441,7 @@ class MultiprocessingOptimizer:
             failed_combinations=failed,
             execution_time_seconds=execution_time,
             all_results=results,
-            top_results=[
-                {"params": r["config"], "value": r["value"]}
-                for r in sorted_results[:10]
-            ],
+            top_results=[{"params": r["config"], "value": r["value"]} for r in sorted_results[:10]],
         )
 
 
@@ -474,7 +459,5 @@ def get_parallel_optimizer(prefer_ray: bool = True) -> Any:
         logger.info("Using Ray for parallel optimization")
         return RayParallelOptimizer()
     else:
-        logger.info(
-            "Using multiprocessing for parallel optimization (Ray not available)"
-        )
+        logger.info("Using multiprocessing for parallel optimization (Ray not available)")
         return MultiprocessingOptimizer()

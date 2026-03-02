@@ -317,9 +317,7 @@ class SyntheticMonitor:
         if metrics.avg_latency_ms == 0:
             metrics.avg_latency_ms = result.latency_ms
         else:
-            metrics.avg_latency_ms = (
-                alpha * result.latency_ms + (1 - alpha) * metrics.avg_latency_ms
-            )
+            metrics.avg_latency_ms = alpha * result.latency_ms + (1 - alpha) * metrics.avg_latency_ms
 
         # Calculate percentiles from history
         history = self._results_history.get(probe_id, [])
@@ -327,12 +325,8 @@ class SyntheticMonitor:
             latencies = sorted([r.latency_ms for r in history[-100:]])
             p95_idx = int(len(latencies) * 0.95)
             p99_idx = int(len(latencies) * 0.99)
-            metrics.p95_latency_ms = (
-                latencies[p95_idx] if p95_idx < len(latencies) else latencies[-1]
-            )
-            metrics.p99_latency_ms = (
-                latencies[p99_idx] if p99_idx < len(latencies) else latencies[-1]
-            )
+            metrics.p95_latency_ms = latencies[p95_idx] if p95_idx < len(latencies) else latencies[-1]
+            metrics.p99_latency_ms = latencies[p99_idx] if p99_idx < len(latencies) else latencies[-1]
 
         # Update status and uptime
         metrics.current_status = result.status
@@ -347,9 +341,7 @@ class SyntheticMonitor:
             except Exception as e:
                 logger.error(f"Alert callback error: {e}")
 
-        logger.warning(
-            f"ALERT: Probe {result.probe_name} is {result.status.value} - {result.error_message}"
-        )
+        logger.warning(f"ALERT: Probe {result.probe_name} is {result.status.value} - {result.error_message}")
 
     def register_alert_callback(self, callback: Callable[[ProbeResult], None]) -> None:
         """Register callback for probe alerts."""
@@ -400,9 +392,7 @@ class SyntheticMonitor:
             import httpx
 
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "http://localhost:8000/api/v1/health", timeout=10.0
-                )
+                response = await client.get("http://localhost:8000/api/v1/health", timeout=10.0)
                 return response.status_code == 200
         except Exception:
             # If httpx not available, just return True (probe is informational)
@@ -473,10 +463,7 @@ class SyntheticMonitor:
         critical_probes = [
             m
             for pid, m in self._metrics.items()
-            if "critical"
-            in self._probes.get(
-                pid, ProbeConfig(probe_id="", name="", probe_type=ProbeType.CUSTOM)
-            ).tags
+            if "critical" in self._probes.get(pid, ProbeConfig(probe_id="", name="", probe_type=ProbeType.CUSTOM)).tags
         ]
 
         if not critical_probes:
@@ -500,17 +487,13 @@ class SyntheticMonitor:
         max_p99 = max(m.p99_latency_ms for m in critical_probes)
 
         uptime_breach = avg_uptime < sla.target_uptime_pct
-        latency_breach = (
-            max_p95 > sla.target_latency_p95_ms or max_p99 > sla.target_latency_p99_ms
-        )
+        latency_breach = max_p95 > sla.target_latency_p95_ms or max_p99 > sla.target_latency_p99_ms
 
         # Calculate error budget
         allowed_downtime_pct = 100.0 - sla.target_uptime_pct
         actual_downtime_pct = 100.0 - avg_uptime
         if allowed_downtime_pct > 0:
-            error_budget_remaining = max(
-                0, 100 - (actual_downtime_pct / allowed_downtime_pct * 100)
-            )
+            error_budget_remaining = max(0, 100 - (actual_downtime_pct / allowed_downtime_pct * 100))
         else:
             error_budget_remaining = 100.0 if actual_downtime_pct == 0 else 0.0
 
@@ -531,9 +514,7 @@ class SyntheticMonitor:
 
         status_counts = {}
         for m in all_metrics:
-            status_counts[m.current_status.value] = (
-                status_counts.get(m.current_status.value, 0) + 1
-            )
+            status_counts[m.current_status.value] = status_counts.get(m.current_status.value, 0) + 1
 
         # Determine overall health
         unhealthy_count = status_counts.get(ProbeStatus.UNHEALTHY.value, 0)
@@ -585,9 +566,7 @@ class SyntheticMonitor:
             "sla": {
                 "name": sla_status.name if sla_status else None,
                 "uptime_pct": sla_status.uptime_pct if sla_status else None,
-                "error_budget_remaining_pct": sla_status.error_budget_remaining_pct
-                if sla_status
-                else None,
+                "error_budget_remaining_pct": sla_status.error_budget_remaining_pct if sla_status else None,
                 "breaches": {
                     "uptime": sla_status.uptime_breach if sla_status else False,
                     "latency": sla_status.latency_breach if sla_status else False,

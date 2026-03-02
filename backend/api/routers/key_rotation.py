@@ -30,9 +30,7 @@ class RegisterKeyRequest(BaseModel):
 
     key_id: str = Field(..., description="Unique identifier for the key")
     key_value: str = Field(..., description="The actual API key value")
-    provider: str = Field(
-        ..., description="Key provider (deepseek, perplexity, bybit, etc.)"
-    )
+    provider: str = Field(..., description="Key provider (deepseek, perplexity, bybit, etc.)")
     description: str = Field(default="", description="Key description")
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
@@ -120,10 +118,7 @@ async def get_service_status():
         by_status=status["by_status"],
         by_provider=status["by_provider"],
         total_rotations=status["total_rotations"],
-        registered_fetchers=[
-            p.value if hasattr(p, "value") else str(p)
-            for p in status["registered_fetchers"]
-        ],
+        registered_fetchers=[p.value if hasattr(p, "value") else str(p) for p in status["registered_fetchers"]],
     )
 
 

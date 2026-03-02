@@ -102,7 +102,9 @@ class OptimizationConfigPanel {
     getBacktestEndDate() {
         const el = document.getElementById('backtestEndDate');
         const val = el?.value || this.getDefaultEndDate();
-        const today = new Date().toISOString().slice(0, 10);
+        // Use local date (not UTC) to avoid off-by-one at midnight in UTC+N timezones
+        const _now = new Date();
+        const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
         return val > today ? today : val;
     }
 

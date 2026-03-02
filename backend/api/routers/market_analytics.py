@@ -52,9 +52,7 @@ async def get_open_interest(
     """
     try:
         service = get_analytics_service()
-        data = service.get_open_interest(
-            symbol=symbol, category=category, interval=interval, limit=limit
-        )
+        data = service.get_open_interest(symbol=symbol, category=category, interval=interval, limit=limit)
 
         return {
             "success": True,
@@ -62,10 +60,7 @@ async def get_open_interest(
             "category": category,
             "interval": interval,
             "count": len(data),
-            "data": [
-                {"timestamp": d.timestamp, "open_interest": d.open_interest}
-                for d in data
-            ],
+            "data": [{"timestamp": d.timestamp, "open_interest": d.open_interest} for d in data],
         }
     except Exception as e:
         logger.error(f"Open Interest error: {e}")
@@ -85,9 +80,7 @@ async def get_open_interest_analysis(
     """
     try:
         service = get_analytics_service()
-        result = service.get_open_interest_change(
-            symbol=symbol, category=category, hours=hours
-        )
+        result = service.get_open_interest_change(symbol=symbol, category=category, hours=hours)
 
         return {"success": True, **result}
     except Exception as e:
@@ -115,9 +108,7 @@ async def get_long_short_ratio(
     """
     try:
         service = get_analytics_service()
-        data = service.get_long_short_ratio(
-            symbol=symbol, category=category, period=period, limit=limit
-        )
+        data = service.get_long_short_ratio(symbol=symbol, category=category, period=period, limit=limit)
 
         return {
             "success": True,
@@ -140,9 +131,7 @@ async def get_long_short_ratio(
 
 
 @router.get("/long-short/{symbol}/signal")
-async def get_contrarian_signal(
-    symbol: str, category: str = Query("linear", description="Market category")
-):
+async def get_contrarian_signal(symbol: str, category: str = Query("linear", description="Market category")):
     """
     📈 Get contrarian trading signal based on Long/Short ratio.
 
@@ -178,9 +167,7 @@ async def get_funding_rate_history(
     """
     try:
         service = get_analytics_service()
-        data = service.get_funding_rate_history(
-            symbol=symbol, category=category, limit=limit
-        )
+        data = service.get_funding_rate_history(symbol=symbol, category=category, limit=limit)
 
         return {
             "success": True,
@@ -213,9 +200,7 @@ async def get_funding_analysis(
     """
     try:
         service = get_analytics_service()
-        result = service.get_funding_analysis(
-            symbol=symbol, category=category, days=days
-        )
+        result = service.get_funding_analysis(symbol=symbol, category=category, days=days)
 
         return {"success": True, **result}
     except Exception as e:
@@ -260,9 +245,7 @@ async def get_full_market_analysis(
 
 @router.get("/analysis/batch")
 async def get_batch_market_analysis(
-    symbols: str = Query(
-        ..., description="Comma-separated symbols (e.g., BTCUSDT,ETHUSDT)"
-    ),
+    symbols: str = Query(..., description="Comma-separated symbols (e.g., BTCUSDT,ETHUSDT)"),
     category: str = Query("linear", description="Market category"),
 ):
     """
@@ -275,9 +258,7 @@ async def get_batch_market_analysis(
         results = {}
         for symbol in symbol_list[:10]:  # Limit to 10 symbols
             try:
-                results[symbol] = service.get_full_market_analysis(
-                    symbol=symbol, category=category
-                )
+                results[symbol] = service.get_full_market_analysis(symbol=symbol, category=category)
             except Exception as e:
                 results[symbol] = {"error": str(e)}
 

@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 class APIMixin:
     """Mixin providing API URL/header helpers, content extraction, and streaming."""
 
+    # Declared here so Mypy recognises the attribute on the mixin class.
+    # The concrete class (UnifiedAgentInterface) sets this in __init__.
+    key_manager: Any  # type: ignore[misc]
+
     # ------------------------------------------------------------------
     # URL / Header helpers
     # ------------------------------------------------------------------
@@ -124,36 +128,38 @@ class APIMixin:
         full_content = ""
 
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    response.raise_for_status()
+            async with (
+                httpx.AsyncClient(timeout=300.0) as client,
+                client.stream("POST", url, headers=headers, json=payload) as response,
+            ):
+                response.raise_for_status()
 
-                    async for line in response.aiter_lines():
-                        if not line or not line.startswith("data: "):
-                            continue
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
 
-                        data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        break
 
-                        try:
-                            data = json.loads(data_str)
-                            delta = data.get("choices", [{}])[0].get("delta", {})
+                    try:
+                        data = json.loads(data_str)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
 
-                            reasoning_chunk = delta.get("reasoning_content", "")
-                            if reasoning_chunk:
-                                full_reasoning += reasoning_chunk
-                                if on_reasoning_chunk:
-                                    await on_reasoning_chunk(reasoning_chunk)
+                        reasoning_chunk = delta.get("reasoning_content", "")
+                        if reasoning_chunk:
+                            full_reasoning += reasoning_chunk
+                            if on_reasoning_chunk:
+                                await on_reasoning_chunk(reasoning_chunk)
 
-                            content_chunk = delta.get("content", "")
-                            if content_chunk:
-                                full_content += content_chunk
-                                if on_content_chunk:
-                                    await on_content_chunk(content_chunk)
+                        content_chunk = delta.get("content", "")
+                        if content_chunk:
+                            full_content += content_chunk
+                            if on_content_chunk:
+                                await on_content_chunk(content_chunk)
 
-                        except json.JSONDecodeError:
-                            continue
+                    except json.JSONDecodeError:
+                        continue
 
             latency = (time.time() - start_time) * 1000
             self.key_manager.mark_success(key)

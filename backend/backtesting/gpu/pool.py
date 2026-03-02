@@ -1,4 +1,4 @@
-﻿"""
+"""
 WarmProcessPool and worker functions for GPU optimizer.
 
 Extracted from gpu_optimizer.py (lines 1843-2107).
@@ -291,4 +291,3 @@ def _cleanup_shared_memory():
 
 # Register cleanup on exit
 atexit.register(_cleanup_shared_memory)
-

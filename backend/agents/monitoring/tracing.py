@@ -203,16 +203,9 @@ class ConsoleExporter(TraceExporter):
 
     async def export(self, spans: list[Span]) -> bool:
         for span in spans:
-            status_icon = (
-                "✅"
-                if span.status == SpanStatus.OK
-                else "❌"
-                if span.status == SpanStatus.ERROR
-                else "⏳"
-            )
+            status_icon = "✅" if span.status == SpanStatus.OK else "❌" if span.status == SpanStatus.ERROR else "⏳"
             logger.info(
-                f"{status_icon} [{span.context.trace_id[:8]}] {span.name} "
-                f"({span.duration_ms:.1f}ms) {span.attributes}"
+                f"{status_icon} [{span.context.trace_id[:8]}] {span.name} ({span.duration_ms:.1f}ms) {span.attributes}"
             )
         return True
 
@@ -476,9 +469,7 @@ class DistributedTracer:
         """Get recent traces"""
         traces = list(self._traces.values())
         traces.sort(
-            key=lambda t: t.spans[0].start_time
-            if t.spans
-            else datetime.min.replace(tzinfo=UTC),
+            key=lambda t: t.spans[0].start_time if t.spans else datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         return traces[:limit]
@@ -493,11 +484,7 @@ class DistributedTracer:
             return 0
 
         traces = list(self._traces.items())
-        traces.sort(
-            key=lambda t: t[1].spans[0].start_time
-            if t[1].spans
-            else datetime.min.replace(tzinfo=UTC)
-        )
+        traces.sort(key=lambda t: t[1].spans[0].start_time if t[1].spans else datetime.min.replace(tzinfo=UTC))
 
         to_remove = len(traces) - max_traces
         for trace_id, _ in traces[:to_remove]:

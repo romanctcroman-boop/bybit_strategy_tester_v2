@@ -179,9 +179,7 @@ class IsolationTree:
         self.split_value = random.uniform(min_val, max_val)
 
         left_data = [row for row in data if row[self.split_feature] < self.split_value]
-        right_data = [
-            row for row in data if row[self.split_feature] >= self.split_value
-        ]
+        right_data = [row for row in data if row[self.split_feature] >= self.split_value]
 
         if left_data:
             self.left = IsolationTree(self.height_limit)
@@ -245,9 +243,7 @@ class IsolationForest:
 
         self.trees = []
         for _ in range(self.n_trees):
-            sample = (
-                random.sample(data, sample_size) if len(data) > sample_size else data
-            )
+            sample = random.sample(data, sample_size) if len(data) > sample_size else data
             tree = IsolationTree(height_limit)
             tree.fit(sample)
             self.trees.append(tree)
@@ -259,9 +255,7 @@ class IsolationForest:
         self.threshold = scores[threshold_idx] if threshold_idx < len(scores) else 0.5
         self._fitted = True
 
-        logger.info(
-            f"IsolationForest fitted with {self.n_trees} trees, threshold={self.threshold:.4f}"
-        )
+        logger.info(f"IsolationForest fitted with {self.n_trees} trees, threshold={self.threshold:.4f}")
         return self
 
     def anomaly_score(self, point: list[float]) -> float:
@@ -269,9 +263,7 @@ class IsolationForest:
         if not self.trees:
             return 0.0
 
-        avg_path_length = sum(tree.path_length(point) for tree in self.trees) / len(
-            self.trees
-        )
+        avg_path_length = sum(tree.path_length(point) for tree in self.trees) / len(self.trees)
         c = IsolationTree._c(self.sample_size)
 
         if c == 0:
@@ -359,9 +351,7 @@ class MLAnomalyDetector:
         stats.add(point.value)
 
         # Add to multivariate buffer
-        self._multivariate_buffer.append(
-            [point.value, point.timestamp, len(self._multivariate_buffer)]
-        )
+        self._multivariate_buffer.append([point.value, point.timestamp, len(self._multivariate_buffer)])
         if len(self._multivariate_buffer) > self.history_limit:
             self._multivariate_buffer.pop(0)
 
@@ -411,9 +401,7 @@ class MLAnomalyDetector:
             z_score=z_score,
             symbol=point.symbol,
             metric_type=point.metric_type,
-            description=self._generate_description(
-                point, stats, z_score, anomaly_type, severity
-            ),
+            description=self._generate_description(point, stats, z_score, anomaly_type, severity),
             metadata=point.metadata,
         )
 
@@ -462,23 +450,15 @@ class MLAnomalyDetector:
 
         # Update statistics
         self._stats.total_detections += 1
-        self._stats.by_type[anomaly.anomaly_type.value] = (
-            self._stats.by_type.get(anomaly.anomaly_type.value, 0) + 1
-        )
-        self._stats.by_severity[anomaly.severity.value] = (
-            self._stats.by_severity.get(anomaly.severity.value, 0) + 1
-        )
-        self._stats.by_symbol[anomaly.symbol] = (
-            self._stats.by_symbol.get(anomaly.symbol, 0) + 1
-        )
+        self._stats.by_type[anomaly.anomaly_type.value] = self._stats.by_type.get(anomaly.anomaly_type.value, 0) + 1
+        self._stats.by_severity[anomaly.severity.value] = self._stats.by_severity.get(anomaly.severity.value, 0) + 1
+        self._stats.by_symbol[anomaly.symbol] = self._stats.by_symbol.get(anomaly.symbol, 0) + 1
         self._stats.last_detection = anomaly.timestamp
 
         # Calculate detection rate
         elapsed_hours = (time.time() - self._start_time) / 3600
         if elapsed_hours > 0:
-            self._stats.detection_rate_per_hour = (
-                self._stats.total_detections / elapsed_hours
-            )
+            self._stats.detection_rate_per_hour = self._stats.total_detections / elapsed_hours
 
         # Trigger callbacks
         for callback in self._callbacks:
@@ -540,9 +520,7 @@ class MLAnomalyDetector:
         """Get anomaly detection statistics."""
         return self._stats
 
-    def get_rolling_stats(
-        self, symbol: str, metric_type: str
-    ) -> dict[str, float] | None:
+    def get_rolling_stats(self, symbol: str, metric_type: str) -> dict[str, float] | None:
         """Get rolling statistics for a metric."""
         stats = self._rolling_stats.get(self._get_metric_key(symbol, metric_type))
         if not stats:
@@ -573,9 +551,7 @@ class MLAnomalyDetector:
             "multivariate_samples": len(self._multivariate_buffer),
             "isolation_forest_fitted": self._isolation_forest._fitted,
             "total_anomalies": len(self._anomalies),
-            "unacknowledged_anomalies": sum(
-                1 for a in self._anomalies if not a.acknowledged
-            ),
+            "unacknowledged_anomalies": sum(1 for a in self._anomalies if not a.acknowledged),
             "uptime_hours": (time.time() - self._start_time) / 3600,
         }
 

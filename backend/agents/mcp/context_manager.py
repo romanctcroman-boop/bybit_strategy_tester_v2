@@ -127,9 +127,7 @@ class Context:
             "metadata": {
                 "created_at": self.metadata.created_at.isoformat(),
                 "created_by": self.metadata.created_by,
-                "expires_at": self.metadata.expires_at.isoformat()
-                if self.metadata.expires_at
-                else None,
+                "expires_at": self.metadata.expires_at.isoformat() if self.metadata.expires_at else None,
                 "tags": self.metadata.tags,
             },
         }
@@ -149,18 +147,14 @@ class Context:
                 if metadata.get("created_at")
                 else datetime.now(UTC),
                 created_by=metadata.get("created_by"),
-                expires_at=datetime.fromisoformat(metadata["expires_at"])
-                if metadata.get("expires_at")
-                else None,
+                expires_at=datetime.fromisoformat(metadata["expires_at"]) if metadata.get("expires_at") else None,
                 tags=metadata.get("tags", []),
             ),
         )
 
 
 # Context variable for async context propagation
-_current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar(
-    "current_context", default=None
-)
+_current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar("current_context", default=None)
 
 
 class ContextManager:
@@ -251,11 +245,7 @@ class ContextManager:
 
     def cleanup_expired(self) -> int:
         """Clean up expired contexts"""
-        expired = [
-            ctx_id
-            for ctx_id, ctx in self._contexts.items()
-            if ctx.metadata.is_expired() and ctx_id != "global"
-        ]
+        expired = [ctx_id for ctx_id, ctx in self._contexts.items() if ctx.metadata.is_expired() and ctx_id != "global"]
 
         for ctx_id in expired:
             del self._contexts[ctx_id]

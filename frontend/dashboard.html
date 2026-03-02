@@ -16,17 +16,9 @@
         <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon" />
         <!-- Production Init (must load before all other scripts) -->
         <script src="js/init-production.js"></script>
-        <!-- Chart.js -->
-        <script
-            src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-            integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
-            crossorigin="anonymous"
-        ></script>
-        <script
-            src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"
-            integrity="sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws"
-            crossorigin="anonymous"
-        ></script>
+        <!-- Chart.js — served locally to avoid CDN/SRI issues -->
+        <script src="./js/vendor/chart.umd.min.js"></script>
+        <script src="./js/vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
         <!-- Bootstrap Icons -->
         <link
             rel="stylesheet"
@@ -673,6 +665,45 @@
         </div>
 
         <script type="module" src="./js/pages/dashboard.js"></script>
+        <!-- Fallback: if metric cards still show '--' after 3s, force a direct fetch -->
+        <script>
+            window.addEventListener('load', function () {
+                setTimeout(function () {
+                    var el = document.getElementById('totalBacktests');
+                    if (el && (el.textContent === '--' || el.textContent === '')) {
+                        console.warn('[Fallback] Cards still empty after 3s, forcing direct fetch...');
+                        fetch('/api/v1/dashboard/metrics/summary?period=24h')
+                            .then(function (r) {
+                                return r.json();
+                            })
+                            .then(function (data) {
+                                document.getElementById('totalBacktests').textContent = data.backtests.total;
+                                document.getElementById('runningBacktests').textContent = data.backtests.running;
+                                document.getElementById('completedBacktests').textContent = data.backtests.completed;
+                                document.getElementById('failedBacktests').textContent =
+                                    data.backtests.failed + ' failed';
+                                document.getElementById('successRate').textContent =
+                                    (data.backtests.success_rate * 100).toFixed(1) + '%';
+                                document.getElementById('activeStrategies').textContent = data.strategies.active;
+                                document.getElementById('totalStrategies').textContent = data.strategies.total;
+                                document.getElementById('totalOptimizations').textContent = data.optimizations.total;
+                                document.getElementById('runningOptimizations').textContent =
+                                    data.optimizations.running;
+                                document.getElementById('totalTrades').textContent =
+                                    data.performance.total_trades_analyzed.toLocaleString();
+                                document.getElementById('avgDuration').textContent =
+                                    data.performance.avg_backtest_duration_sec.toFixed(1) + 's';
+                                console.log('[Fallback] Cards populated directly');
+                            })
+                            .catch(function (e) {
+                                console.error('[Fallback] Direct fetch failed:', e);
+                            });
+                    } else {
+                        console.log('[Fallback] Cards OK, no action needed');
+                    }
+                }, 3000);
+            });
+        </script>
         <!-- AI Assistant -->
         <script src="./js/ai-assistant.js"></script>
     </body>

@@ -293,9 +293,8 @@ class MCPFastAPIBridge:
         if name == "_tools" and isinstance(value, dict) and value:
             if getattr(self, "circuit_manager", None) is not None:
                 self._register_per_tool_breakers()
-        elif name == "circuit_manager" and value is not None:
-            if getattr(self, "_tools", None):
-                self._register_per_tool_breakers()
+        elif name == "circuit_manager" and value is not None and getattr(self, "_tools", None):
+            self._register_per_tool_breakers()
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -375,7 +374,7 @@ class MCPFastAPIBridge:
             return
 
         registered_count = 0
-        for tool_name in self._tools.keys():
+        for tool_name in self._tools:
             try:
                 # Get category and threshold
                 category = self._get_tool_category(tool_name)
@@ -469,16 +468,16 @@ class MCPFastAPIBridge:
 
         # ✅ FIX: Progressive timeout configuration
         PROGRESSIVE_TIMEOUTS = [60, 120, 300, 600]  # 1m, 2m, 5m, 10m
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt, timeout in enumerate(PROGRESSIVE_TIMEOUTS, 1):
             try:
                 logger.info(f"🔄 MCP tool '{name}' attempt {attempt}/{len(PROGRESSIVE_TIMEOUTS)} (timeout: {timeout}s)")
 
-                async def _attempt_call():
+                async def _attempt_call(t: int = timeout) -> object:
                     return await asyncio.wait_for(
                         self._execute_tool_call(name, arguments),
-                        timeout=timeout,
+                        timeout=t,
                     )
 
                 # P0-4: Pass tool_name for per-tool breaker
@@ -706,7 +705,7 @@ class MCPFastAPIBridge:
                 from fastmcp.tools.tool import ToolResult  # type: ignore
             except Exception:
 
-                class ToolResult:  # fallback stub
+                class ToolResult:  # type: ignore[no-redef]  # fallback stub
                     pass
 
             if isinstance(result, ToolResult):
@@ -846,7 +845,7 @@ class MCPFastAPIBridge:
             }
 
         # Return status for all tools
-        return {name: self.get_breaker_status(name) for name in self._tools.keys()}
+        return {name: self.get_breaker_status(name) for name in self._tools}
 
 
 _bridge_instance: MCPFastAPIBridge | None = None

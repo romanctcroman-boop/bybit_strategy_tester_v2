@@ -54,9 +54,7 @@ class PositionSizeRequest(BaseModel):
     entry_price: float = Field(..., gt=0, description="Entry price")
     stop_loss: float | None = Field(None, description="Stop loss price")
     method: str = Field("fixed_percent", description="Sizing method")
-    risk_per_trade_pct: float = Field(
-        1.0, ge=0.1, le=10.0, description="Risk per trade %"
-    )
+    risk_per_trade_pct: float = Field(1.0, ge=0.1, le=10.0, description="Risk per trade %")
     volatility: float | None = Field(None, description="Symbol volatility")
     atr: float | None = Field(None, description="ATR value")
     win_rate: float = Field(0.5, ge=0, le=1, description="Historical win rate")
@@ -188,13 +186,9 @@ class StopLossConfigRequest(BaseModel):
 
     stop_type: str = Field("trailing", description="Stop loss type")
     stop_loss_pct: float = Field(2.0, ge=0.1, le=50.0, description="Stop loss %")
-    trailing_offset_pct: float = Field(
-        0.5, ge=0, le=10.0, description="Trailing offset %"
-    )
+    trailing_offset_pct: float = Field(0.5, ge=0, le=10.0, description="Trailing offset %")
     enable_breakeven: bool = Field(True, description="Enable breakeven")
-    breakeven_trigger_pct: float = Field(
-        2.0, ge=0, le=50.0, description="Breakeven trigger %"
-    )
+    breakeven_trigger_pct: float = Field(2.0, ge=0, le=50.0, description="Breakeven trigger %")
 
 
 class RiskLimitsRequest(BaseModel):
@@ -337,8 +331,7 @@ async def validate_trade(request: TradeValidationRequest):
         # Build account state from engine
         account_state = AccountState(
             total_equity=engine.exposure_controller.equity,
-            available_balance=engine.exposure_controller.equity
-            - engine.exposure_controller.used_margin,
+            available_balance=engine.exposure_controller.equity - engine.exposure_controller.used_margin,
             used_margin=engine.exposure_controller.used_margin,
             total_pnl=engine.exposure_controller.total_pnl,
             daily_pnl=engine.exposure_controller.daily_pnl,
@@ -440,9 +433,7 @@ async def get_exposure_status():
             positions_count=len(engine.exposure_controller.positions),
             active_stops_count=len(engine.stop_loss_manager.active_stops),
             is_trading_allowed=engine.is_trading_allowed(),
-            violations=[
-                v.to_dict() for v in engine.exposure_controller.violations_today
-            ],
+            violations=[v.to_dict() for v in engine.exposure_controller.violations_today],
         )
 
     except Exception as e:
@@ -676,17 +667,11 @@ async def update_risk_limits(request: RiskLimitsRequest):
         engine = get_risk_engine()
 
         # Update exposure limits
-        engine.exposure_controller.limits.max_position_size_pct = (
-            request.max_position_size_pct
-        )
-        engine.exposure_controller.limits.max_total_exposure_pct = (
-            request.max_total_exposure_pct
-        )
+        engine.exposure_controller.limits.max_position_size_pct = request.max_position_size_pct
+        engine.exposure_controller.limits.max_total_exposure_pct = request.max_total_exposure_pct
         engine.exposure_controller.limits.max_leverage = request.max_leverage
         engine.exposure_controller.limits.max_drawdown_pct = request.max_drawdown_pct
-        engine.exposure_controller.limits.daily_loss_limit_pct = (
-            request.daily_loss_limit_pct
-        )
+        engine.exposure_controller.limits.daily_loss_limit_pct = request.daily_loss_limit_pct
 
         # Update config
         engine.config.max_position_size_pct = request.max_position_size_pct

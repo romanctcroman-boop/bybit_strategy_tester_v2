@@ -189,9 +189,7 @@ class SecureConfigHandler:
     _instance: Optional["SecureConfigHandler"] = None
 
     def __init__(self):
-        self._variables: dict[str, ConfigVariable] = {
-            v.name: v for v in DEFAULT_VARIABLES
-        }
+        self._variables: dict[str, ConfigVariable] = {v.name: v for v in DEFAULT_VARIABLES}
         self._config_values: dict[str, str] = {}
         self._issues: list[ConfigIssue] = []
         self._issue_count = 0
@@ -222,11 +220,7 @@ class SecureConfigHandler:
         """Mask a sensitive value."""
         if len(value) <= visible_chars * 2:
             return "*" * len(value)
-        return (
-            value[:visible_chars]
-            + "*" * (len(value) - visible_chars * 2)
-            + value[-visible_chars:]
-        )
+        return value[:visible_chars] + "*" * (len(value) - visible_chars * 2) + value[-visible_chars:]
 
     def check_file_permissions(self, file_path: Path) -> list[ConfigIssue]:
         """Check file permissions for security issues."""
@@ -296,9 +290,7 @@ class SecureConfigHandler:
     def set_secure_permissions(self, file_path: Path) -> bool:
         """Set secure permissions on a file (Unix only)."""
         if os.name == "nt":
-            logger.info(
-                f"Windows: Secure permissions require manual setup for {file_path}"
-            )
+            logger.info(f"Windows: Secure permissions require manual setup for {file_path}")
             return True
 
         try:
@@ -333,7 +325,9 @@ class SecureConfigHandler:
                         value = value.strip()
 
                         # Remove quotes
-                        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                        if (value.startswith('"') and value.endswith('"')) or (
+                            value.startswith("'") and value.endswith("'")
+                        ):
                             value = value[1:-1]
 
                         values[key] = value
@@ -438,9 +432,7 @@ class SecureConfigHandler:
 
         self._issues.extend(issues)
 
-        is_valid = not any(
-            i.severity in [ConfigSeverity.CRITICAL, ConfigSeverity.HIGH] for i in issues
-        )
+        is_valid = not any(i.severity in [ConfigSeverity.CRITICAL, ConfigSeverity.HIGH] for i in issues)
 
         return ConfigValidationResult(
             is_valid=is_valid,

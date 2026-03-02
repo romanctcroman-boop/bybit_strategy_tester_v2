@@ -118,9 +118,7 @@ class ReportExportService:
 
                 return self._generate_excel_openpyxl(data)
             except ImportError:
-                raise RuntimeError(
-                    "No Excel library available. Install xlsxwriter or openpyxl."
-                )
+                raise RuntimeError("No Excel library available. Install xlsxwriter or openpyxl.")
 
         return self._generate_excel_xlsxwriter(data)
 
@@ -143,12 +141,8 @@ class ReportExportService:
         number_format = workbook.add_format({"num_format": "#,##0.00"})
         pct_format = workbook.add_format({"num_format": "0.00%"})
         currency_format = workbook.add_format({"num_format": "$#,##0.00"})
-        positive_format = workbook.add_format(
-            {"num_format": "$#,##0.00", "font_color": "green"}
-        )
-        negative_format = workbook.add_format(
-            {"num_format": "$#,##0.00", "font_color": "red"}
-        )
+        positive_format = workbook.add_format({"num_format": "$#,##0.00", "font_color": "green"})
+        negative_format = workbook.add_format({"num_format": "$#,##0.00", "font_color": "red"})
         date_format = workbook.add_format({"num_format": "yyyy-mm-dd hh:mm"})  # noqa: F841
 
         # --- Summary Sheet ---
@@ -157,9 +151,7 @@ class ReportExportService:
         summary.set_column("B:B", 20)
 
         summary.write("A1", "Backtest Report", header_format)
-        summary.write(
-            "B1", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), header_format
-        )
+        summary.write("B1", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), header_format)
 
         row = 3
         summary_data = [
@@ -246,9 +238,7 @@ class ReportExportService:
             trades_sheet.write(row, 3, trade.get("exit_time", ""))
             trades_sheet.write(row, 4, trade.get("entry_price", 0), number_format)
             trades_sheet.write(row, 5, trade.get("exit_price", 0), number_format)
-            trades_sheet.write(
-                row, 6, trade.get("qty", trade.get("size", 0)), number_format
-            )
+            trades_sheet.write(row, 6, trade.get("qty", trade.get("size", 0)), number_format)
 
             pnl = trade.get("pnl", trade.get("profit", 0))
             fmt = positive_format if pnl >= 0 else negative_format
@@ -270,12 +260,8 @@ class ReportExportService:
             equity_sheet.set_column("B:C", 15)
 
             for row, point in enumerate(data.equity_curve, start=1):
-                equity_sheet.write(
-                    row, 0, point.get("timestamp", point.get("time", ""))
-                )
-                equity_sheet.write(
-                    row, 1, point.get("equity", point.get("value", 0)), currency_format
-                )
+                equity_sheet.write(row, 0, point.get("timestamp", point.get("time", "")))
+                equity_sheet.write(row, 1, point.get("equity", point.get("value", 0)), currency_format)
                 equity_sheet.write(row, 2, point.get("drawdown", 0), pct_format)
 
             # Add equity chart
@@ -324,9 +310,7 @@ class ReportExportService:
         ws.title = "Summary"
 
         # Header style
-        header_fill = PatternFill(
-            start_color="1a1a2e", end_color="1a1a2e", fill_type="solid"
-        )
+        header_fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
 
         # Summary data
@@ -467,9 +451,7 @@ class ReportExportService:
                 f"${data.final_capital:,.2f}",
             ],
         ]
-        overview_table = Table(
-            overview_data, colWidths=[1.5 * inch, 2 * inch, 1.5 * inch, 2 * inch]
-        )
+        overview_table = Table(overview_data, colWidths=[1.5 * inch, 2 * inch, 1.5 * inch, 2 * inch])
         overview_table.setStyle(
             TableStyle(
                 [
@@ -523,9 +505,7 @@ class ReportExportService:
                 f"${data.avg_trade_pnl:,.2f}",
             ],
         ]
-        metrics_table = Table(
-            metrics_data, colWidths=[1.5 * inch, 1.5 * inch, 1.5 * inch, 1.5 * inch]
-        )
+        metrics_table = Table(metrics_data, colWidths=[1.5 * inch, 1.5 * inch, 1.5 * inch, 1.5 * inch])
         metrics_table.setStyle(
             TableStyle(
                 [
@@ -639,9 +619,7 @@ class ReportExportService:
         elements.append(trades_table)
 
         if len(data.trades) > 50:
-            elements.append(
-                Paragraph(f"... and {len(data.trades) - 50} more trades", normal_style)
-            )
+            elements.append(Paragraph(f"... and {len(data.trades) - 50} more trades", normal_style))
 
         doc.build(elements)
         output.seek(0)

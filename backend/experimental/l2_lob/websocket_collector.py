@@ -74,7 +74,7 @@ async def run_websocket_collector(
 
     bids: dict[float, float] = {}
     asks: dict[float, float] = {}
-    fp = open(output_path, "a", encoding="utf-8") if output_path else None
+    fp = open(output_path, "a", encoding="utf-8") if output_path else None  # noqa: SIM115
 
     def _emit(ts: int, u: int | None, seq: int | None) -> None:
         nonlocal bids, asks
@@ -94,8 +94,8 @@ async def run_websocket_collector(
             d = {
                 "ts": ts,
                 "symbol": symbol,
-                "bids": [[l.price, l.size] for l in snap.bids],
-                "asks": [[l.price, l.size] for l in snap.asks],
+                "bids": [[lvl.price, lvl.size] for lvl in snap.bids],
+                "asks": [[lvl.price, lvl.size] for lvl in snap.asks],
                 "u": u,
                 "seq": seq,
             }

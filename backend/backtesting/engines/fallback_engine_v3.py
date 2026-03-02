@@ -25,6 +25,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from backend.backtesting.formulas import (
+    calc_sharpe_monthly_tv,
+    calc_sortino_monthly_tv,
+)
 from backend.backtesting.interfaces import (
     BacktestInput,
     BacktestMetrics,
@@ -449,35 +453,33 @@ class FallbackEngineV3(BaseBacktestEngine):
                         so_trigger_price = base_price * (1 - deviation)
 
                         # Проверяем достигла ли low цена уровня SO
-                        if low_price <= so_trigger_price:
-                            # Можем добавить ещё одну позицию?
-                            if pyramid_mgr.can_add_entry("long"):
-                                # Размер SO
-                                if use_fixed_amount and fixed_amount > 0:
-                                    so_allocated = min(fixed_amount * so_volume, cash)
-                                else:
-                                    so_allocated = cash * so_volume
+                        if low_price <= so_trigger_price and pyramid_mgr.can_add_entry("long"):
+                            # Размер SO
+                            if use_fixed_amount and fixed_amount > 0:
+                                so_allocated = min(fixed_amount * so_volume, cash)
+                            else:
+                                so_allocated = cash * so_volume
 
-                                if so_allocated >= 1.0:
-                                    so_notional = so_allocated * leverage
-                                    so_size = so_notional / so_trigger_price
+                            if so_allocated >= 1.0:
+                                so_notional = so_allocated * leverage
+                                so_size = so_notional / so_trigger_price
 
-                                    cash -= so_allocated
+                                cash -= so_allocated
 
-                                    so_entry_time = (
-                                        pd.Timestamp(timestamps[i]).to_pydatetime()
-                                        if hasattr(timestamps[i], "to_pydatetime")
-                                        else timestamps[i]
-                                    )
-                                    pyramid_mgr.add_entry(
-                                        direction="long",
-                                        entry_price=so_trigger_price,
-                                        size=so_size,
-                                        allocated_capital=so_allocated,
-                                        entry_bar_idx=i,
-                                        entry_time=so_entry_time,
-                                    )
-                                    dca_state["filled"][so_idx] = True
+                                so_entry_time = (
+                                    pd.Timestamp(timestamps[i]).to_pydatetime()
+                                    if hasattr(timestamps[i], "to_pydatetime")
+                                    else timestamps[i]
+                                )
+                                pyramid_mgr.add_entry(
+                                    direction="long",
+                                    entry_price=so_trigger_price,
+                                    size=so_size,
+                                    allocated_capital=so_allocated,
+                                    entry_bar_idx=i,
+                                    entry_time=so_entry_time,
+                                )
+                                dca_state["filled"][so_idx] = True
 
                 # === DCA SHORT: проверяем рост цены до SO уровней ===
                 elif pyramid_mgr.has_position("short") and not pending_short_exit:
@@ -500,35 +502,33 @@ class FallbackEngineV3(BaseBacktestEngine):
                         so_trigger_price = base_price * (1 + deviation)
 
                         # Проверяем достигла ли high цена уровня SO
-                        if high_price >= so_trigger_price:
-                            # Можем добавить ещё одну позицию?
-                            if pyramid_mgr.can_add_entry("short"):
-                                # Размер SO
-                                if use_fixed_amount and fixed_amount > 0:
-                                    so_allocated = min(fixed_amount * so_volume, cash)
-                                else:
-                                    so_allocated = cash * so_volume
+                        if high_price >= so_trigger_price and pyramid_mgr.can_add_entry("short"):
+                            # Размер SO
+                            if use_fixed_amount and fixed_amount > 0:
+                                so_allocated = min(fixed_amount * so_volume, cash)
+                            else:
+                                so_allocated = cash * so_volume
 
-                                if so_allocated >= 1.0:
-                                    so_notional = so_allocated * leverage
-                                    so_size = so_notional / so_trigger_price
+                            if so_allocated >= 1.0:
+                                so_notional = so_allocated * leverage
+                                so_size = so_notional / so_trigger_price
 
-                                    cash -= so_allocated
+                                cash -= so_allocated
 
-                                    so_entry_time = (
-                                        pd.Timestamp(timestamps[i]).to_pydatetime()
-                                        if hasattr(timestamps[i], "to_pydatetime")
-                                        else timestamps[i]
-                                    )
-                                    pyramid_mgr.add_entry(
-                                        direction="short",
-                                        entry_price=so_trigger_price,
-                                        size=so_size,
-                                        allocated_capital=so_allocated,
-                                        entry_bar_idx=i,
-                                        entry_time=so_entry_time,
-                                    )
-                                    dca_state["filled"][so_idx] = True
+                                so_entry_time = (
+                                    pd.Timestamp(timestamps[i]).to_pydatetime()
+                                    if hasattr(timestamps[i], "to_pydatetime")
+                                    else timestamps[i]
+                                )
+                                pyramid_mgr.add_entry(
+                                    direction="short",
+                                    entry_price=so_trigger_price,
+                                    size=so_size,
+                                    allocated_capital=so_allocated,
+                                    entry_bar_idx=i,
+                                    entry_time=so_entry_time,
+                                )
+                                dca_state["filled"][so_idx] = True
 
                 # Сброс DCA состояния при закрытии позиции
                 if not pyramid_mgr.has_position("long") and not pyramid_mgr.has_position("short"):
@@ -617,7 +617,7 @@ class FallbackEngineV3(BaseBacktestEngine):
                 )
 
         # === РАСЧЁТ МЕТРИК ===
-        metrics = self._calculate_metrics(trades, equity_curve, capital)
+        metrics = self._calculate_metrics(trades, equity_curve, capital, candles_index=candles.index)
 
         execution_time = time.time() - start_time
 
@@ -689,6 +689,7 @@ class FallbackEngineV3(BaseBacktestEngine):
         trades: list[TradeRecord],
         equity_curve: list[float],
         initial_capital: float,
+        candles_index=None,
     ) -> BacktestMetrics:
         """Calculate backtest metrics"""
         metrics = BacktestMetrics()
@@ -753,11 +754,12 @@ class FallbackEngineV3(BaseBacktestEngine):
             metrics.short_win_rate = metrics.short_winning_trades / metrics.short_trades
             metrics.short_profit = sum(t.pnl for t in short_trades)
 
-        # Sharpe ratio (simplified)
-        if len(pnls) > 1:
-            returns = np.array(pnls) / initial_capital
-            if np.std(returns) > 0:
-                metrics.sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252)
+        # Sharpe / Sortino (TradingView monthly formula — trade PnL bucketed by entry month)
+        equity_arr_metrics = np.array(equity_curve)
+        metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_arr_metrics, candles_index, initial_capital, trades=trades)
+        metrics.sortino_ratio = calc_sortino_monthly_tv(
+            equity_arr_metrics, candles_index, initial_capital, trades=trades
+        )
 
         # Expectancy
         if metrics.total_trades > 0:

@@ -205,9 +205,7 @@ class PositionManager:
         self._running = False
         self._task: asyncio.Task | None = None
 
-        logger.info(
-            f"PositionManager initialized (testnet={testnet}, quote={quote_currency})"
-        )
+        logger.info(f"PositionManager initialized (testnet={testnet}, quote={quote_currency})")
 
     async def start(self):
         """Start position tracking."""
@@ -264,10 +262,7 @@ class PositionManager:
         wallet = await self._executor.get_wallet_balance()
         self._update_wallet_from_api(wallet)
 
-        logger.info(
-            f"Loaded {len(self._positions)} positions, "
-            f"{len(self._wallets)} wallet entries"
-        )
+        logger.info(f"Loaded {len(self._positions)} positions, {len(self._wallets)} wallet entries")
 
     async def _process_messages(self):
         """Process incoming WebSocket messages."""
@@ -324,9 +319,7 @@ class PositionManager:
 
                 # Calculate ROE
                 if snapshot.margin > 0:
-                    snapshot.roe_percent = (
-                        snapshot.unrealized_pnl / snapshot.margin * 100
-                    )
+                    snapshot.roe_percent = snapshot.unrealized_pnl / snapshot.margin * 100
 
                 self._positions[symbol] = snapshot
 
@@ -362,15 +355,9 @@ class PositionManager:
             realized_pnl=float(data.get("cumRealisedPnl", 0) or 0),
             leverage=float(data.get("leverage", 1) or 1),
             margin=float(data.get("positionIM", 0) or 0),
-            liquidation_price=float(data.get("liqPrice", 0) or 0)
-            if data.get("liqPrice")
-            else None,
-            take_profit=float(data.get("takeProfit", 0) or 0)
-            if data.get("takeProfit")
-            else None,
-            stop_loss=float(data.get("stopLoss", 0) or 0)
-            if data.get("stopLoss")
-            else None,
+            liquidation_price=float(data.get("liqPrice", 0) or 0) if data.get("liqPrice") else None,
+            take_profit=float(data.get("takeProfit", 0) or 0) if data.get("takeProfit") else None,
+            stop_loss=float(data.get("stopLoss", 0) or 0) if data.get("stopLoss") else None,
             position_value=float(data.get("positionValue", 0) or 0),
         )
 
@@ -448,9 +435,7 @@ class PositionManager:
                 value=exec_data["exec_value"],
                 fee=exec_data["exec_fee"],
                 is_maker=exec_data["is_maker"],
-                exec_time=datetime.fromtimestamp(
-                    exec_data["exec_time"] / 1000, tz=UTC
-                ),
+                exec_time=datetime.fromtimestamp(exec_data["exec_time"] / 1000, tz=UTC),
             )
 
             self._executions.append(execution)
@@ -494,9 +479,7 @@ class PositionManager:
         # Determine side for closing
         from backend.services.trading_engine_interface import OrderSide
 
-        close_side = (
-            OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
-        )
+        close_side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
 
         result = await self._executor.place_market_order(
             symbol=symbol,
@@ -544,9 +527,7 @@ class PositionManager:
         if take_profit is not None:
             params["takeProfit"] = str(take_profit)
 
-        response = await self._executor._signed_request(
-            "POST", "/v5/position/trading-stop", params
-        )
+        response = await self._executor._signed_request("POST", "/v5/position/trading-stop", params)
 
         success = response.get("retCode") == 0
         if success:

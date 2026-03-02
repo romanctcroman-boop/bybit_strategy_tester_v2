@@ -108,9 +108,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                         "symbol": symbol,
                         "interval": interval,
                         "open_time": open_time,
-                        "open_time_dt": datetime.fromtimestamp(
-                            open_time / 1000, tz=UTC
-                        ),
+                        "open_time_dt": datetime.fromtimestamp(open_time / 1000, tz=UTC),
                         "open_price": float(c.get("open", 0)),
                         "high_price": float(c.get("high", 0)),
                         "low_price": float(c.get("low", 0)),
@@ -244,9 +242,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         Get klines as dictionaries (for API responses).
         Results are ordered oldest-first for charting.
         """
-        rows = self.get_klines(
-            symbol, interval, limit, start_time, end_time, ascending=False
-        )
+        rows = self.get_klines(symbol, interval, limit, start_time, end_time, ascending=False)
 
         # Reverse to oldest-first for charting
         candles = []
@@ -347,12 +343,8 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                 "count": result.count,
                 "oldest": result.oldest,
                 "newest": result.newest,
-                "oldest_dt": datetime.fromtimestamp(
-                    result.oldest / 1000, tz=UTC
-                ),
-                "newest_dt": datetime.fromtimestamp(
-                    result.newest / 1000, tz=UTC
-                ),
+                "oldest_dt": datetime.fromtimestamp(result.oldest / 1000, tz=UTC),
+                "newest_dt": datetime.fromtimestamp(result.newest / 1000, tz=UTC),
                 "expected": expected,
                 "completeness_pct": round(completeness, 2),
             }
@@ -368,25 +360,18 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
             return [r[0] for r in result]
         except SQLAlchemyError as e:
             logger.error(f"get_all_symbols failed: {e}")
-            raise classify_sqlalchemy_error(
-                e, "get_all_symbols", "BybitKlineAudit"
-            ) from e
+            raise classify_sqlalchemy_error(e, "get_all_symbols", "BybitKlineAudit") from e
 
     def get_intervals_for_symbol(self, symbol: str) -> list[str]:
         """Get list of intervals available for a symbol."""
         try:
             result = (
-                self.session.query(BybitKlineAudit.interval)
-                .filter(BybitKlineAudit.symbol == symbol)
-                .distinct()
-                .all()
+                self.session.query(BybitKlineAudit.interval).filter(BybitKlineAudit.symbol == symbol).distinct().all()
             )
             return [r[0] for r in result]
         except SQLAlchemyError as e:
             logger.error(f"get_intervals_for_symbol failed for {symbol}: {e}")
-            raise classify_sqlalchemy_error(
-                e, "get_intervals_for_symbol", "BybitKlineAudit"
-            ) from e
+            raise classify_sqlalchemy_error(e, "get_intervals_for_symbol", "BybitKlineAudit") from e
 
     # =========================================================================
     # GAP DETECTION
@@ -454,12 +439,8 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                 row_dict = dict(row._mapping)
 
                 # Add datetime versions for readability
-                row_dict["gap_start_dt"] = datetime.fromtimestamp(
-                    row_dict["gap_start"] / 1000, tz=UTC
-                )
-                row_dict["gap_end_dt"] = datetime.fromtimestamp(
-                    row_dict["gap_end"] / 1000, tz=UTC
-                )
+                row_dict["gap_start_dt"] = datetime.fromtimestamp(row_dict["gap_start"] / 1000, tz=UTC)
+                row_dict["gap_end_dt"] = datetime.fromtimestamp(row_dict["gap_end"] / 1000, tz=UTC)
 
                 # Check if weekend gap
                 start_weekday = row_dict["gap_start_dt"].weekday()

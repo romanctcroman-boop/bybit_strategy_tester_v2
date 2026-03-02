@@ -126,14 +126,8 @@ class KellyCalculator:
         losses = np.abs(adjusted_pnls[losses_mask])
 
         # Normalize weights for each group
-        win_weights_norm = (
-            win_weights / win_weights.sum() if win_weights.sum() > 0 else win_weights
-        )
-        loss_weights_norm = (
-            loss_weights / loss_weights.sum()
-            if loss_weights.sum() > 0
-            else loss_weights
-        )
+        win_weights_norm = win_weights / win_weights.sum() if win_weights.sum() > 0 else win_weights
+        loss_weights_norm = loss_weights / loss_weights.sum() if loss_weights.sum() > 0 else loss_weights
 
         avg_win = np.sum(wins * win_weights_norm)
         avg_loss = np.sum(losses * loss_weights_norm)
@@ -206,9 +200,7 @@ class KellyCalculator:
                 "kelly_fraction": 0,
                 "full_kelly": 0,
                 "half_kelly": 0,
-                "win_rate": len(wins) / len(adjusted_pnls)
-                if len(adjusted_pnls) > 0
-                else 0,
+                "win_rate": len(wins) / len(adjusted_pnls) if len(adjusted_pnls) > 0 else 0,
                 "win_loss_ratio": None,
                 "trades_analyzed": len(recent_trades),
                 "sufficient_data": False,
@@ -376,9 +368,7 @@ class MonteCarloAnalyzer:
             "risk_of_ruin": float(np.mean(max_drawdowns >= max_drawdown_limit)),
             # VaR and CVaR
             "var_95": float(np.percentile(final_returns, 5)),
-            "cvar_95": float(
-                np.mean(final_returns[final_returns <= np.percentile(final_returns, 5)])
-            ),
+            "cvar_95": float(np.mean(final_returns[final_returns <= np.percentile(final_returns, 5)])),
         }
 
     def run_path_simulation(

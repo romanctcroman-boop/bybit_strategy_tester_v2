@@ -1,18 +1,20 @@
 /**
  * 📋 TradesTable — Компонент таблицы сделок
  *
- * Инкапсулирует логику рендеринга, сортировки и пагинации
- * таблицы сделок в backtest_results.html (вкладка "Список сделок").
+ * Инкапсулирует логику рендеринга, сортировки таблицы сделок
+ * в backtest_results.html (вкладка "Список сделок").
  *
  * Extracted from backtest_results.js as part of P0-2 Phase 2 refactoring.
  *
  * @module TradesTable
- * @version 1.0.0
- * @date 2026-02-26
+ * @version 1.1.0
+ * @date 2026-02-28
  * @migration P0-2 Phase 2: Extract TradesTable
+ * @change 1.1.0: Removed pagination - show all trades in single scrollable list
  */
 
-export const TRADES_PAGE_SIZE = 25;
+// Pagination disabled - show all trades in one scrollable list
+export const TRADES_PAGE_SIZE = 100000; // Large enough to show all trades
 
 /**
  * Build a display row object from trade data.
@@ -146,22 +148,22 @@ export function sortRows(rows, key, sortAsc) {
 }
 
 /**
- * Render a page of rows into a tbody element.
+ * Render all trades into a tbody element (no pagination).
  *
  * @param {HTMLElement} tbody       - Target <tbody> element
  * @param {object[]}    cachedRows  - All rows (from buildTradeRows)
- * @param {number}      currentPage - 0-based page index
- * @param {number}      [pageSize]  - Rows per page (default TRADES_PAGE_SIZE)
+ * @param {number}      currentPage - Ignored (no pagination)
+ * @param {number}      [pageSize]  - Ignored (show all)
  */
 export function renderPage(tbody, cachedRows, currentPage, pageSize = TRADES_PAGE_SIZE) {
     if (!tbody) return;
-    const start = currentPage * pageSize;
-    const pageRows = cachedRows.slice(start, start + pageSize);
-    tbody.innerHTML = pageRows.map((r) => r.html).join('');
+    // Render all trades at once (no pagination)
+    tbody.innerHTML = cachedRows.map((r) => r.html).join('');
 }
 
 /**
  * Render or update the pagination controls element.
+ * DISABLED: Show all trades in single scrollable list (no pagination).
  *
  * @param {HTMLElement|null} container  - Element to insert pagination after
  * @param {number}           totalTrades
@@ -169,66 +171,20 @@ export function renderPage(tbody, cachedRows, currentPage, pageSize = TRADES_PAG
  * @param {number}           [pageSize]
  */
 export function renderPagination(container, totalTrades, currentPage, pageSize = TRADES_PAGE_SIZE) {
-    if (!container) return;
-
-    const totalPages = Math.ceil(totalTrades / pageSize);
-    if (totalPages <= 1) {
-        removePagination();
-        return;
-    }
-
-    let paginationEl = document.getElementById('tradesPagination');
-    if (!paginationEl) {
-        paginationEl = document.createElement('div');
-        paginationEl.id = 'tradesPagination';
-        paginationEl.className = 'trades-pagination';
-        container.after(paginationEl);
-    }
-
-    const firstTrade = currentPage * pageSize + 1;
-    const lastTrade = Math.min((currentPage + 1) * pageSize, totalTrades);
-
-    paginationEl.innerHTML = `
-    <div class="d-flex align-items-center justify-content-center gap-2 py-2">
-      <button class="btn btn-sm btn-outline-secondary" id="tradesPrevBtn"
-              onclick="tradesPrevPage()" ${currentPage === 0 ? 'disabled' : ''}>
-        <i class="bi bi-chevron-left"></i>
-      </button>
-      <span class="text-secondary" id="tradesPageInfo">
-        Стр. ${currentPage + 1} / ${totalPages}
-        <small class="ms-1">(сделки ${firstTrade}–${lastTrade} из ${totalTrades})</small>
-      </span>
-      <button class="btn btn-sm btn-outline-secondary" id="tradesNextBtn"
-              onclick="tradesNextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>
-        <i class="bi bi-chevron-right"></i>
-      </button>
-    </div>`;
+    // Pagination disabled - always remove pagination controls
+    removePagination();
 }
 
 /**
  * Update only the pagination control state (buttons + info text) without rebuilding.
+ * DISABLED: Show all trades in single scrollable list (no pagination).
  *
  * @param {number} totalRows
  * @param {number} currentPage
  * @param {number} [pageSize]
  */
 export function updatePaginationControls(totalRows, currentPage, pageSize = TRADES_PAGE_SIZE) {
-    const paginationEl = document.getElementById('tradesPagination');
-    if (!paginationEl) return;
-
-    const totalPages = Math.ceil(totalRows / pageSize);
-    const infoEl = document.getElementById('tradesPageInfo');
-    if (infoEl) {
-        const first = currentPage * pageSize + 1;
-        const last = Math.min((currentPage + 1) * pageSize, totalRows);
-        infoEl.innerHTML = `Стр. ${currentPage + 1} / ${totalPages}
-      <small class="ms-1">(сделки ${first}–${last} из ${totalRows})</small>`;
-    }
-
-    const prev = document.getElementById('tradesPrevBtn');
-    const next = document.getElementById('tradesNextBtn');
-    if (prev) prev.disabled = currentPage === 0;
-    if (next) next.disabled = currentPage >= totalPages - 1;
+    // Pagination disabled - no-op
 }
 
 /**
@@ -276,12 +232,19 @@ function _isLongTrade(t) {
 
 /**
  * Format date string like TradingView: "Nov 17, 2025, 21:15"
+ * Backend returns UTC timestamps without timezone suffix (e.g. "2026-02-28T08:00:00").
+ * Appending "Z" ensures new Date() treats it as UTC and toLocaleString() converts
+ * it to the user's local timezone — matching TradingView's UTC+local display.
  * @param {string|null} dateStr
  * @returns {string}
  */
 function _formatTradeDate(dateStr) {
     if (!dateStr) return '--';
-    const d = new Date(dateStr);
+    // Ensure UTC interpretation: append Z if no timezone info present
+    const normalized = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && dateStr.includes('T'))
+        ? dateStr + 'Z'
+        : dateStr;
+    const d = new Date(normalized);
     return d.toLocaleString('en-US', {
         month: 'short',
         day: '2-digit',

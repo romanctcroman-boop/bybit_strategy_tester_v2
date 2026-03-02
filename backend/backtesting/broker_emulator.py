@@ -180,7 +180,7 @@ class BrokerEmulator:
         4. Обновление trailing stops
     """
 
-    def __init__(self, config: BrokerConfig = None, initial_capital: float = 10000.0):
+    def __init__(self, config: BrokerConfig | None = None, initial_capital: float = 10000.0):
         self.config = config or BrokerConfig()
         self.state = BrokerState(
             cash=initial_capital,
@@ -192,10 +192,7 @@ class BrokerEmulator:
         self.on_fill: Callable[[Fill], None] | None = None
         self.on_liquidation: Callable[[Position], None] | None = None
 
-        logger.info(
-            f"[BROKER_EMULATOR] Initialized with capital={initial_capital}, "
-            f"leverage={self.config.leverage}x"
-        )
+        logger.info(f"[BROKER_EMULATOR] Initialized with capital={initial_capital}, leverage={self.config.leverage}x")
 
     def reset(self, initial_capital: float | None = None) -> None:
         """Сбросить состояние брокера."""
@@ -278,9 +275,7 @@ class BrokerEmulator:
         # Ликвидировать
         for pos_id in to_liquidate:
             pos = self.state.positions[pos_id]
-            logger.warning(
-                f"[BROKER_EMULATOR] LIQUIDATION: {pos_id} at {self.state.current_price}"
-            )
+            logger.warning(f"[BROKER_EMULATOR] LIQUIDATION: {pos_id} at {self.state.current_price}")
             self._close_position(pos_id, self.state.current_price, "liquidation")
 
             if self.on_liquidation:
@@ -329,44 +324,44 @@ class BrokerEmulator:
             tp_triggered = False
 
             # Проверить SL
-            if pos.stop_loss_price is not None:
-                if (pos.side == PositionSide.LONG and price <= pos.stop_loss_price) or (pos.side == PositionSide.SHORT and price >= pos.stop_loss_price):
-                    sl_triggered = True
+            if pos.stop_loss_price is not None and (
+                (pos.side == PositionSide.LONG and price <= pos.stop_loss_price)
+                or (pos.side == PositionSide.SHORT and price >= pos.stop_loss_price)
+            ):
+                sl_triggered = True
 
             # Проверить TP
-            if pos.take_profit_price is not None:
-                if (pos.side == PositionSide.LONG and price >= pos.take_profit_price) or (pos.side == PositionSide.SHORT and price <= pos.take_profit_price):
-                    tp_triggered = True
+            if pos.take_profit_price is not None and (
+                (pos.side == PositionSide.LONG and price >= pos.take_profit_price)
+                or (pos.side == PositionSide.SHORT and price <= pos.take_profit_price)
+            ):
+                tp_triggered = True
 
             # Проверить Trailing Stop
-            if pos.trailing_stop_price is not None:
-                if (pos.side == PositionSide.LONG and price <= pos.trailing_stop_price) or (
-                    pos.side == PositionSide.SHORT and price >= pos.trailing_stop_price
-                ):
-                    sl_triggered = True
+            if pos.trailing_stop_price is not None and (
+                (pos.side == PositionSide.LONG and price <= pos.trailing_stop_price)
+                or (pos.side == PositionSide.SHORT and price >= pos.trailing_stop_price)
+            ):
+                sl_triggered = True
 
             # Определить что сработало
             if sl_triggered and tp_triggered:
                 # Оба сработали - используем приоритет
                 if self.config.sl_priority:
-                    fill = self._close_position(
-                        pos.id, pos.stop_loss_price, "stop_loss"
-                    )
+                    fill = self._close_position(pos.id, pos.stop_loss_price or self.state.current_price, "stop_loss")
                 else:
                     fill = self._close_position(
-                        pos.id, pos.take_profit_price, "take_profit"
+                        pos.id, pos.take_profit_price or self.state.current_price, "take_profit"
                     )
                 if fill:
                     fills.append(fill)
             elif sl_triggered:
                 exit_price = pos.trailing_stop_price or pos.stop_loss_price
-                fill = self._close_position(pos.id, exit_price, "stop_loss")
+                fill = self._close_position(pos.id, exit_price or self.state.current_price, "stop_loss")
                 if fill:
                     fills.append(fill)
             elif tp_triggered:
-                fill = self._close_position(
-                    pos.id, pos.take_profit_price, "take_profit"
-                )
+                fill = self._close_position(pos.id, pos.take_profit_price or self.state.current_price, "take_profit")
                 if fill:
                     fills.append(fill)
 
@@ -386,9 +381,7 @@ class BrokerEmulator:
 
         return fills
 
-    def _try_fill_order(
-        self, order: Order, price: float, timestamp_ms: int
-    ) -> Fill | None:
+    def _try_fill_order(self, order: Order, price: float, timestamp_ms: int) -> Fill | None:
         """Попытаться исполнить ордер."""
         should_fill = False
         fill_price = price
@@ -412,23 +405,17 @@ class BrokerEmulator:
         elif order.order_type == OrderType.STOP:
             if order.side == OrderSide.BUY and price >= order.price:
                 should_fill = True
-                fill_price = max(price, order.price) * (
-                    1 + self.config.slippage_percent
-                )
+                fill_price = max(price, order.price) * (1 + self.config.slippage_percent)
             elif order.side == OrderSide.SELL and price <= order.price:
                 should_fill = True
-                fill_price = min(price, order.price) * (
-                    1 - self.config.slippage_percent
-                )
+                fill_price = min(price, order.price) * (1 - self.config.slippage_percent)
 
         if should_fill:
             return self._execute_order(order, fill_price, timestamp_ms)
 
         return None
 
-    def _execute_order(
-        self, order: Order, fill_price: float, timestamp_ms: int
-    ) -> Fill:
+    def _execute_order(self, order: Order, fill_price: float, timestamp_ms: int) -> Fill:
         """Исполнить ордер."""
         # Рассчитать комиссию
         fee = abs(order.size * fill_price * self.config.taker_fee)
@@ -452,9 +439,7 @@ class BrokerEmulator:
         # Обновить позицию или создать новую
         if order.is_reduce_only and order.position_id:
             # Закрытие позиции
-            fill.pnl = self._close_position_partial(
-                order.position_id, order.size, fill_price
-            )
+            fill.pnl = self._close_position_partial(order.position_id, order.size, fill_price)
         else:
             # Открытие/увеличение позиции
             self._open_or_increase_position(order, fill_price, timestamp_ms)
@@ -473,8 +458,7 @@ class BrokerEmulator:
             self.on_fill(fill)
 
         logger.debug(
-            f"[BROKER_EMULATOR] Filled {order.id}: {order.side.value} "
-            f"{order.size} @ {fill_price:.2f}, fee={fee:.4f}"
+            f"[BROKER_EMULATOR] Filled {order.id}: {order.side.value} {order.size} @ {fill_price:.2f}, fee={fee:.4f}"
         )
 
         return fill
@@ -488,19 +472,13 @@ class BrokerEmulator:
             if pos.side == PositionSide.LONG:
                 # Trailing stop движется вверх за ценой
                 new_trail = price * (1 - pos.trailing_stop_offset)
-                if (
-                    pos.trailing_stop_price is None
-                    or new_trail > pos.trailing_stop_price
-                ):
+                if pos.trailing_stop_price is None or new_trail > pos.trailing_stop_price:
                     pos.trailing_stop_price = new_trail
 
             elif pos.side == PositionSide.SHORT:
                 # Trailing stop движется вниз за ценой
                 new_trail = price * (1 + pos.trailing_stop_offset)
-                if (
-                    pos.trailing_stop_price is None
-                    or new_trail < pos.trailing_stop_price
-                ):
+                if pos.trailing_stop_price is None or new_trail < pos.trailing_stop_price:
                     pos.trailing_stop_price = new_trail
 
     def _update_equity(self, price: float) -> None:
@@ -519,9 +497,7 @@ class BrokerEmulator:
     # POSITION MANAGEMENT
     # =========================================================================
 
-    def _open_or_increase_position(
-        self, order: Order, fill_price: float, timestamp_ms: int
-    ) -> Position:
+    def _open_or_increase_position(self, order: Order, fill_price: float, timestamp_ms: int) -> Position:
         """Открыть новую или увеличить существующую позицию."""
         side = PositionSide.LONG if order.side == OrderSide.BUY else PositionSide.SHORT
 
@@ -535,9 +511,7 @@ class BrokerEmulator:
         if existing:
             # Усреднить entry price
             total_size = existing.size + order.size
-            existing.entry_price = (
-                existing.entry_price * existing.size + fill_price * order.size
-            ) / total_size
+            existing.entry_price = (existing.entry_price * existing.size + fill_price * order.size) / total_size
             existing.size = total_size
             return existing
         else:
@@ -558,9 +532,7 @@ class BrokerEmulator:
             self.state.positions[pos_id] = pos
             return pos
 
-    def _close_position(
-        self, position_id: str, exit_price: float, reason: str
-    ) -> Fill | None:
+    def _close_position(self, position_id: str, exit_price: float, reason: str) -> Fill | None:
         """Полностью закрыть позицию."""
         if position_id not in self.state.positions:
             return None
@@ -600,16 +572,11 @@ class BrokerEmulator:
         # Сохранить fill
         self.state.fills.append(fill)
 
-        logger.debug(
-            f"[BROKER_EMULATOR] Closed {position_id}: {reason} @ {exit_price:.2f}, "
-            f"PnL={pnl:.2f}"
-        )
+        logger.debug(f"[BROKER_EMULATOR] Closed {position_id}: {reason} @ {exit_price:.2f}, PnL={pnl:.2f}")
 
         return fill
 
-    def _close_position_partial(
-        self, position_id: str, size: float, exit_price: float
-    ) -> float:
+    def _close_position_partial(self, position_id: str, size: float, exit_price: float) -> float:
         """Частично закрыть позицию. Возвращает realized PnL."""
         if position_id not in self.state.positions:
             return 0.0
@@ -664,10 +631,7 @@ class BrokerEmulator:
 
         self.state.orders[order_id] = order
 
-        logger.debug(
-            f"[BROKER_EMULATOR] Submitted {order_id}: {order_type.value} "
-            f"{side.value} {size} @ {price}"
-        )
+        logger.debug(f"[BROKER_EMULATOR] Submitted {order_id}: {order_type.value} {side.value} {size} @ {price}")
 
         return order
 
@@ -709,7 +673,7 @@ class BrokerEmulator:
     # GETTERS
     # =========================================================================
 
-    def get_position(self, side: PositionSide = None) -> Position | None:
+    def get_position(self, side: PositionSide | None = None) -> Position | None:
         """Получить позицию."""
         for pos in self.state.positions.values():
             if side is None or pos.side == side:

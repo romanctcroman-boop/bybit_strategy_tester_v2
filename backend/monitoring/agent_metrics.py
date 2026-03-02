@@ -123,9 +123,7 @@ class AgentMetricsCollector:
 
             logger.debug(f"📝 Writing to Redis: key={key}")
 
-            result = await redis_client.zadd(
-                key, {json.dumps(metric.to_dict()): metric.timestamp.timestamp()}
-            )
+            result = await redis_client.zadd(key, {json.dumps(metric.to_dict()): metric.timestamp.timestamp()})
 
             logger.debug(f"✅ Redis zadd result: {result}")
 
@@ -137,13 +135,9 @@ class AgentMetricsCollector:
 
             # Trim cache if too large
             if len(self._metrics_cache[metric.agent_name]) > self._cache_max_size:
-                self._metrics_cache[metric.agent_name] = self._metrics_cache[
-                    metric.agent_name
-                ][-self._cache_max_size :]
+                self._metrics_cache[metric.agent_name] = self._metrics_cache[metric.agent_name][-self._cache_max_size :]
 
-            logger.debug(
-                f"📊 Recorded metric: {metric.agent_name} - {metric.metric_type.value} = {metric.value}"
-            )
+            logger.debug(f"📊 Recorded metric: {metric.agent_name} - {metric.metric_type.value} = {metric.value}")
 
         except Exception as e:
             logger.error(
@@ -222,9 +216,7 @@ class AgentMetricsCollector:
             )
         )
 
-    async def get_performance_summary(
-        self, agent_name: str, period_hours: int = 24
-    ) -> AgentPerformance:
+    async def get_performance_summary(self, agent_name: str, period_hours: int = 24) -> AgentPerformance:
         """
         Получить сводку производительности агента за период
 
@@ -241,14 +233,10 @@ class AgentMetricsCollector:
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=period_hours)
 
-        performance = AgentPerformance(
-            agent_name=agent_name, period_start=start_time, period_end=end_time
-        )
+        performance = AgentPerformance(agent_name=agent_name, period_start=start_time, period_end=end_time)
 
         # Get response time metrics
-        response_times = await self._get_metrics_in_period(
-            agent_name, MetricType.RESPONSE_TIME, start_time, end_time
-        )
+        response_times = await self._get_metrics_in_period(agent_name, MetricType.RESPONSE_TIME, start_time, end_time)
 
         if response_times:
             values = [m.value for m in response_times]
@@ -257,39 +245,25 @@ class AgentMetricsCollector:
             performance.avg_response_time_ms = sum(values) / len(values)
             performance.min_response_time_ms = min(values)
             performance.max_response_time_ms = max(values)
-            performance.p95_response_time_ms = (
-                values[int(len(values) * 0.95)] if len(values) > 0 else 0.0
-            )
+            performance.p95_response_time_ms = values[int(len(values) * 0.95)] if len(values) > 0 else 0.0
 
         # Get success metrics
-        success_metrics = await self._get_metrics_in_period(
-            agent_name, MetricType.SUCCESS_RATE, start_time, end_time
-        )
+        success_metrics = await self._get_metrics_in_period(agent_name, MetricType.SUCCESS_RATE, start_time, end_time)
 
         if success_metrics:
             performance.total_requests = len(success_metrics)
-            performance.successful_requests = sum(
-                1 for m in success_metrics if m.value > 0.5
-            )
-            performance.failed_requests = (
-                performance.total_requests - performance.successful_requests
-            )
+            performance.successful_requests = sum(1 for m in success_metrics if m.value > 0.5)
+            performance.failed_requests = performance.total_requests - performance.successful_requests
             performance.success_rate = (
-                performance.successful_requests / performance.total_requests
-                if performance.total_requests > 0
-                else 0.0
+                performance.successful_requests / performance.total_requests if performance.total_requests > 0 else 0.0
             )
 
         # Get tool calling metrics
-        tool_metrics = await self._get_metrics_in_period(
-            agent_name, MetricType.TOOL_CALLING, start_time, end_time
-        )
+        tool_metrics = await self._get_metrics_in_period(agent_name, MetricType.TOOL_CALLING, start_time, end_time)
 
         if tool_metrics:
             performance.tool_calls_made = len(tool_metrics)
-            performance.tool_calls_successful = sum(
-                1 for m in tool_metrics if m.context.get("success", False)
-            )
+            performance.tool_calls_successful = sum(1 for m in tool_metrics if m.context.get("success", False))
             performance.tool_call_success_rate = (
                 performance.tool_calls_successful / performance.tool_calls_made
                 if performance.tool_calls_made > 0
@@ -297,14 +271,10 @@ class AgentMetricsCollector:
             )
 
             iterations = [m.context.get("iterations", 1) for m in tool_metrics]
-            performance.avg_iterations_per_request = (
-                sum(iterations) / len(iterations) if iterations else 0.0
-            )
+            performance.avg_iterations_per_request = sum(iterations) / len(iterations) if iterations else 0.0
 
         # Get error metrics
-        error_metrics = await self._get_metrics_in_period(
-            agent_name, MetricType.ERROR_RATE, start_time, end_time
-        )
+        error_metrics = await self._get_metrics_in_period(agent_name, MetricType.ERROR_RATE, start_time, end_time)
 
         if error_metrics:
             error_types = defaultdict(int)
@@ -313,9 +283,7 @@ class AgentMetricsCollector:
                 error_types[error_type] += 1
 
             performance.error_breakdown = dict(error_types)
-            performance.most_common_error = (
-                max(error_types, key=error_types.get) if error_types else None
-            )
+            performance.most_common_error = max(error_types, key=error_types.get) if error_types else None
 
         return performance
 
@@ -331,9 +299,7 @@ class AgentMetricsCollector:
         key = f"metrics:{agent_name}:{metric_type.value}"
 
         # Query Redis with time range
-        results = await redis_client.zrangebyscore(
-            key, start_time.timestamp(), end_time.timestamp()
-        )
+        results = await redis_client.zrangebyscore(key, start_time.timestamp(), end_time.timestamp())
 
         metrics = []
         for result in results:
@@ -345,9 +311,7 @@ class AgentMetricsCollector:
 
         return metrics
 
-    async def get_all_agents_summary(
-        self, period_hours: int = 24
-    ) -> dict[str, AgentPerformance]:
+    async def get_all_agents_summary(self, period_hours: int = 24) -> dict[str, AgentPerformance]:
         """Получить сводку по всем агентам"""
         redis_client = await self._get_redis()
 
@@ -363,9 +327,7 @@ class AgentMetricsCollector:
 
         summaries = {}
         for agent_name in agent_names:
-            summaries[agent_name] = await self.get_performance_summary(
-                agent_name, period_hours
-            )
+            summaries[agent_name] = await self.get_performance_summary(agent_name, period_hours)
 
         return summaries
 
@@ -413,9 +375,7 @@ async def record_agent_call(
         iterations: Количество итераций (если есть)
         context: Дополнительный контекст
     """
-    logger.info(
-        f"📊 Recording metrics: agent={agent_name}, success={success}, time={response_time_ms:.2f}ms"
-    )
+    logger.info(f"📊 Recording metrics: agent={agent_name}, success={success}, time={response_time_ms:.2f}ms")
 
     try:
         collector = get_metrics_collector()
@@ -430,9 +390,7 @@ async def record_agent_call(
         )
         logger.info(f"✅ Metrics recorded successfully for {agent_name}")
     except Exception as e:
-        logger.error(
-            f"❌ Failed to record metrics: {type(e).__name__}: {e}", exc_info=True
-        )
+        logger.error(f"❌ Failed to record metrics: {type(e).__name__}: {e}", exc_info=True)
 
     # Record tool calling if applicable
     if tool_calls and iterations:
@@ -448,9 +406,7 @@ async def record_agent_call(
     if not success and error:
         await collector.record_error(
             agent_name=agent_name,
-            error_type=type(error).__name__
-            if isinstance(error, Exception)
-            else "error",
+            error_type=type(error).__name__ if isinstance(error, Exception) else "error",
             error_message=str(error),
             context=context,
         )

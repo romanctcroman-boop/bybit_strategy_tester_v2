@@ -152,9 +152,7 @@ class MarketRegimeDetector:
         self.config = config or RegimeConfig()
         self._cache: dict[str, np.ndarray] = {}
 
-        logger.debug(
-            f"MarketRegimeDetector initialized: ADX threshold={self.config.adx_trending_threshold}"
-        )
+        logger.debug(f"MarketRegimeDetector initialized: ADX threshold={self.config.adx_trending_threshold}")
 
     def precompute_indicators(
         self,
@@ -189,9 +187,7 @@ class MarketRegimeDetector:
             self._cache["atr_pct"] = np.where(close > 0, atr / close, 0)
 
         # Bollinger Bands
-        bb_middle, bb_upper, bb_lower = calculate_bollinger_bands(
-            close, self.config.bb_period, self.config.bb_std_dev
-        )
+        bb_middle, bb_upper, bb_lower = calculate_bollinger_bands(close, self.config.bb_period, self.config.bb_std_dev)
         self._cache["bb_middle"] = bb_middle
         self._cache["bb_upper"] = bb_upper
         self._cache["bb_lower"] = bb_lower
@@ -229,9 +225,7 @@ class MarketRegimeDetector:
             self.precompute_indicators(high, low, close)
 
         if "adx" not in self._cache:
-            return RegimeState(
-                regime=RegimeType.UNKNOWN, confidence=0.0, reason="No data"
-            )
+            return RegimeState(regime=RegimeType.UNKNOWN, confidence=0.0, reason="No data")
 
         # Get indicator values at index
         adx = self._cache["adx"][idx]
@@ -258,9 +252,7 @@ class MarketRegimeDetector:
         )
 
         # Determine allowed directions and position sizing
-        allow_long, allow_short = self._get_allowed_directions(
-            regime, plus_di, minus_di
-        )
+        allow_long, allow_short = self._get_allowed_directions(regime, plus_di, minus_di)
         position_mult = self._get_position_multiplier(regime, adx, atr_pct)
 
         # Trend strength (normalized ADX to 0-1)
@@ -386,9 +378,7 @@ class MarketRegimeDetector:
             f"Uncertain: ADX={adx:.1f}, DI±≈equal",
         )
 
-    def _get_allowed_directions(
-        self, regime: RegimeType, plus_di: float, minus_di: float
-    ) -> tuple[bool, bool]:
+    def _get_allowed_directions(self, regime: RegimeType, plus_di: float, minus_di: float) -> tuple[bool, bool]:
         """
         Get allowed trade directions based on regime.
 
@@ -404,9 +394,7 @@ class MarketRegimeDetector:
         else:  # RANGING or UNKNOWN
             return True, True  # Both allowed (mean reversion)
 
-    def _get_position_multiplier(
-        self, regime: RegimeType, adx: float, atr_pct: float
-    ) -> float:
+    def _get_position_multiplier(self, regime: RegimeType, adx: float, atr_pct: float) -> float:
         """
         Calculate position size multiplier based on regime.
 

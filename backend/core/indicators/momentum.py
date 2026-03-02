@@ -8,7 +8,6 @@ All functions accept numpy arrays and return numpy arrays.
 Optimized for performance with optional Numba JIT compilation.
 """
 
-
 import numpy as np
 
 # Try to import numba for JIT compilation

@@ -154,15 +154,9 @@ class MLOptimizer:
             timeout_seconds: Maximum optimization time
             seed: Random seed for reproducibility
         """
-        self.objective = (
-            ObjectiveMetric(objective) if isinstance(objective, str) else objective
-        )
+        self.objective = ObjectiveMetric(objective) if isinstance(objective, str) else objective
         self.n_trials = n_trials
-        self.algorithm = (
-            OptimizationAlgorithm(algorithm)
-            if isinstance(algorithm, str)
-            else algorithm
-        )
+        self.algorithm = OptimizationAlgorithm(algorithm) if isinstance(algorithm, str) else algorithm
         self.n_jobs = n_jobs
         self.timeout_seconds = timeout_seconds
         self.seed = seed
@@ -199,17 +193,11 @@ class MLOptimizer:
         spaces = self._parse_param_space(param_space)
 
         if self.algorithm == OptimizationAlgorithm.BAYESIAN:
-            result = self._optimize_bayesian(
-                backtest_func, spaces, data, **backtest_kwargs
-            )
+            result = self._optimize_bayesian(backtest_func, spaces, data, **backtest_kwargs)
         elif self.algorithm == OptimizationAlgorithm.GENETIC:
-            result = self._optimize_genetic(
-                backtest_func, spaces, data, **backtest_kwargs
-            )
+            result = self._optimize_genetic(backtest_func, spaces, data, **backtest_kwargs)
         elif self.algorithm == OptimizationAlgorithm.RANDOM:
-            result = self._optimize_random(
-                backtest_func, spaces, data, **backtest_kwargs
-            )
+            result = self._optimize_random(backtest_func, spaces, data, **backtest_kwargs)
         else:
             raise ValueError(f"Unknown algorithm: {self.algorithm}")
 
@@ -226,19 +214,11 @@ class MLOptimizer:
             elif isinstance(spec, tuple) and len(spec) == 2:
                 low, high = spec
                 if isinstance(low, int) and isinstance(high, int):
-                    spaces.append(
-                        ParameterSpace(name=name, param_type="int", low=low, high=high)
-                    )
+                    spaces.append(ParameterSpace(name=name, param_type="int", low=low, high=high))
                 else:
-                    spaces.append(
-                        ParameterSpace(
-                            name=name, param_type="float", low=low, high=high
-                        )
-                    )
+                    spaces.append(ParameterSpace(name=name, param_type="float", low=low, high=high))
             elif isinstance(spec, list):
-                spaces.append(
-                    ParameterSpace(name=name, param_type="categorical", choices=spec)
-                )
+                spaces.append(ParameterSpace(name=name, param_type="categorical", choices=spec))
             else:
                 raise ValueError(f"Invalid param spec for {name}: {spec}")
 
@@ -262,9 +242,7 @@ class MLOptimizer:
             return self._optimize_random(backtest_func, spaces, data, **kwargs)
 
         # Determine direction
-        direction = (
-            "minimize" if self.objective == ObjectiveMetric.MAX_DRAWDOWN else "maximize"
-        )
+        direction = "minimize" if self.objective == ObjectiveMetric.MAX_DRAWDOWN else "maximize"
 
         # Create study
         sampler = TPESampler(seed=self.seed)
@@ -336,10 +314,7 @@ class MLOptimizer:
         population = [self._random_individual(spaces) for _ in range(population_size)]
 
         # Evaluate initial population
-        fitness = [
-            self._evaluate_individual(ind, backtest_func, spaces, data, **kwargs)
-            for ind in population
-        ]
+        fitness = [self._evaluate_individual(ind, backtest_func, spaces, data, **kwargs) for ind in population]
 
         best_individual = population[np.argmax(fitness)]
         best_fitness = max(fitness)
@@ -363,10 +338,7 @@ class MLOptimizer:
                     self._mutate(child, spaces)
 
             # Evaluate children
-            child_fitness = [
-                self._evaluate_individual(ind, backtest_func, spaces, data, **kwargs)
-                for ind in children
-            ]
+            child_fitness = [self._evaluate_individual(ind, backtest_func, spaces, data, **kwargs) for ind in children]
 
             # Replace population
             combined = list(zip(population + children, fitness + child_fitness, strict=False))
@@ -379,9 +351,7 @@ class MLOptimizer:
                 best_fitness = fitness[0]
                 best_individual = population[0]
 
-            logger.debug(
-                f"Generation {generation + 1}/{n_generations}: Best={best_fitness:.4f}"
-            )
+            logger.debug(f"Generation {generation + 1}/{n_generations}: Best={best_fitness:.4f}")
 
         # Convert best individual to params dict
         best_params = {space.name: best_individual[i] for i, space in enumerate(spaces)}
@@ -412,14 +382,10 @@ class MLOptimizer:
             params = {}
             for space in spaces:
                 if space.param_type == "int":
-                    params[space.name] = np.random.randint(
-                        int(space.low), int(space.high) + 1
-                    )
+                    params[space.name] = np.random.randint(int(space.low), int(space.high) + 1)
                 elif space.param_type == "float":
                     if space.log_scale:
-                        params[space.name] = np.exp(
-                            np.random.uniform(np.log(space.low), np.log(space.high))
-                        )
+                        params[space.name] = np.exp(np.random.uniform(np.log(space.low), np.log(space.high)))
                     else:
                         params[space.name] = np.random.uniform(space.low, space.high)
                 elif space.param_type == "categorical":
@@ -484,9 +450,7 @@ class MLOptimizer:
         individual = []
         for space in spaces:
             if space.param_type == "int":
-                individual.append(
-                    np.random.randint(int(space.low), int(space.high) + 1)
-                )
+                individual.append(np.random.randint(int(space.low), int(space.high) + 1))
             elif space.param_type == "float":
                 individual.append(np.random.uniform(space.low, space.high))
             elif space.param_type == "categorical":
@@ -522,9 +486,7 @@ class MLOptimizer:
             logger.warning(f"Individual evaluation failed: {e}")
             return float("-inf")
 
-    def _tournament_selection(
-        self, population: list, fitness: list, k: int = 3
-    ) -> list:
+    def _tournament_selection(self, population: list, fitness: list, k: int = 3) -> list:
         """Tournament selection for GA."""
         selected = []
         for _ in range(len(population)):
@@ -533,9 +495,7 @@ class MLOptimizer:
             selected.append(population[winner].copy())
         return selected
 
-    def _crossover(
-        self, parent1: list, parent2: list, spaces: list[ParameterSpace]
-    ) -> tuple[list, list]:
+    def _crossover(self, parent1: list, parent2: list, spaces: list[ParameterSpace]) -> tuple[list, list]:
         """Crossover for GA (blend crossover for numeric, swap for categorical)."""
         child1, child2 = parent1.copy(), parent2.copy()
 
@@ -567,14 +527,10 @@ class MLOptimizer:
             if np.random.random() < 0.3:  # Gene mutation probability
                 if space.param_type == "int":
                     delta = np.random.randint(-2, 3)
-                    individual[i] = int(
-                        max(space.low, min(space.high, individual[i] + delta))
-                    )
+                    individual[i] = int(max(space.low, min(space.high, individual[i] + delta)))
                 elif space.param_type == "float":
                     delta = np.random.normal(0, (space.high - space.low) * 0.1)
-                    individual[i] = max(
-                        space.low, min(space.high, individual[i] + delta)
-                    )
+                    individual[i] = max(space.low, min(space.high, individual[i] + delta))
                 elif space.param_type == "categorical":
                     individual[i] = np.random.choice(space.choices)
 
@@ -593,9 +549,7 @@ class MultiObjectiveOptimizer(MLOptimizer):
         seed: int = 42,
     ):
         super().__init__(n_trials=n_trials, seed=seed)
-        self.objectives = [
-            ObjectiveMetric(obj) if isinstance(obj, str) else obj for obj in objectives
-        ]
+        self.objectives = [ObjectiveMetric(obj) if isinstance(obj, str) else obj for obj in objectives]
 
     def optimize(
         self,
@@ -654,10 +608,7 @@ class MultiObjectiveOptimizer(MLOptimizer):
 
             except Exception as e:
                 logger.warning(f"Trial {trial.number} failed: {e}")
-                return tuple(
-                    float("-inf") if d == "maximize" else float("inf")
-                    for d in directions
-                )
+                return tuple(float("-inf") if d == "maximize" else float("inf") for d in directions)
 
         self._study.optimize(
             objective,
@@ -670,9 +621,7 @@ class MultiObjectiveOptimizer(MLOptimizer):
         pareto_front = [
             {
                 "params": trial.params,
-                "values": {
-                    obj.value: trial.values[i] for i, obj in enumerate(self.objectives)
-                },
+                "values": {obj.value: trial.values[i] for i, obj in enumerate(self.objectives)},
             }
             for trial in pareto_trials
         ]

@@ -321,6 +321,44 @@ complete_*.py
 collaborative_*.py
 deep_*.py
 
+# Investigation/debug one-off scripts in scripts/ (underscore-prefixed)
+scripts/_investigate_*.py
+scripts/_debug_*.py
+scripts/_check_*.py
+scripts/_compare_*.py
+scripts/_test_*.py
+scripts/_trace_*.py
+scripts/_inspect_*.py
+scripts/_find_*.py
+scripts/_fix_*.py
+scripts/_dump_*.py
+scripts/_diff_*.py
+scripts/_diag_*.py
+scripts/_tmp_*.py
+scripts/_macd_debug.py
+scripts/_quick_trade_cmp.py
+scripts/_rsi_threshold_analysis.py
+scripts/_schema_check.py
+scripts/_sharpe_monthly14.py
+scripts/_show_strat.py
+scripts/_simulate_trades.py
+scripts/_verify_cross_range.py
+scripts/_deep_compare_out.txt
+scripts/_eth15m_2025.json
+scripts/_btc_spot_vs_linear.py
+scripts/_db_contents.py
+scripts/_db_inspect.py
+scripts/_deep_compare_trades.py
+scripts/_deep_dive_jan28.py
+scripts/debug_*.py
+scripts/compare_macd_tv.py
+scripts/inspect_last_backtest_mfe_mae.py
+scripts/list_tables.py
+scripts/test_api_equity_alignment.py
+scripts/test_equity_trades_alignment.py
+scripts/test_mfe_fix*.py
+scripts/trace_missing_long.py
+
 # Temporary JSON files
 analysis_*.json
 COLLABORATIVE_*.json

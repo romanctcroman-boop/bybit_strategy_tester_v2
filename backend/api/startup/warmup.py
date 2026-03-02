@@ -73,9 +73,7 @@ def warmup_cache(
             try:
                 future.result(timeout=timeout_seconds)
             except concurrent.futures.TimeoutError:
-                logger.info(
-                    f"SmartKline cache warmup timed out ({timeout_seconds}s), continuing..."
-                )
+                logger.info(f"SmartKline cache warmup timed out ({timeout_seconds}s), continuing...")
 
         return True
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Optimization Router — VectorBT high-performance grid search endpoints.
 
 Covers:

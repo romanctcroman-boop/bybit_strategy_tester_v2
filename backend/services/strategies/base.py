@@ -119,12 +119,8 @@ class StrategyInfo:
 
     # Requirements
     min_candles: int = 50  # Minimum candles needed
-    recommended_timeframes: list[str] = field(
-        default_factory=lambda: ["15", "60", "240"]
-    )
-    suitable_markets: list[str] = field(
-        default_factory=lambda: ["crypto", "forex", "stocks"]
-    )
+    recommended_timeframes: list[str] = field(default_factory=lambda: ["15", "60", "240"])
+    suitable_markets: list[str] = field(default_factory=lambda: ["crypto", "forex", "stocks"])
 
     # Performance characteristics
     avg_trades_per_day: float = 1.0
@@ -247,9 +243,7 @@ class LibraryStrategy(BaseStrategy):
     def record_signal(self, signal: TradingSignal):
         """Record a generated signal."""
         self._signals_total += 1
-        self._signals_by_type[signal.signal_type] = (
-            self._signals_by_type.get(signal.signal_type, 0) + 1
-        )
+        self._signals_by_type[signal.signal_type] = self._signals_by_type.get(signal.signal_type, 0) + 1
 
         self._signal_history.append(signal)
         if len(self._signal_history) > self._max_signal_history:
@@ -374,9 +368,7 @@ class StrategyRegistry:
             # Filter by query
             if query:
                 query_lower = query.lower()
-                searchable = (
-                    f"{info.name} {info.description} {' '.join(info.tags)}"
-                ).lower()
+                searchable = (f"{info.name} {info.description} {' '.join(info.tags)}").lower()
                 if query_lower not in searchable:
                     continue
 
@@ -385,9 +377,7 @@ class StrategyRegistry:
         return results
 
     @classmethod
-    def create(
-        cls, strategy_id: str, config: StrategyConfig, **params
-    ) -> LibraryStrategy | None:
+    def create(cls, strategy_id: str, config: StrategyConfig, **params) -> LibraryStrategy | None:
         """Create strategy instance by ID."""
         strategy_class = cls.get(strategy_id)
         if not strategy_class:
@@ -416,9 +406,7 @@ def register_strategy(strategy_class: type[LibraryStrategy]):
 
 
 # Helper functions for creating signals with common patterns
-def calculate_stop_loss(
-    entry_price: float, side: str, atr: float, multiplier: float = 2.0
-) -> float:
+def calculate_stop_loss(entry_price: float, side: str, atr: float, multiplier: float = 2.0) -> float:
     """Calculate stop loss based on ATR."""
     if side.lower() == "buy":
         return entry_price - (atr * multiplier)
@@ -426,9 +414,7 @@ def calculate_stop_loss(
         return entry_price + (atr * multiplier)
 
 
-def calculate_take_profit(
-    entry_price: float, stop_loss: float, risk_reward: float = 2.0
-) -> float:
+def calculate_take_profit(entry_price: float, stop_loss: float, risk_reward: float = 2.0) -> float:
     """Calculate take profit based on risk/reward ratio."""
     risk = abs(entry_price - stop_loss)
     if entry_price > stop_loss:  # Long

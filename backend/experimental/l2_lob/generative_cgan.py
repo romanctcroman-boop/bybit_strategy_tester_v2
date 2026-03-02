@@ -123,12 +123,8 @@ if _HAS_TORCH:
                 cond_dim=cond_dim,
             ).to(self.device)
 
-            self.optimizer_g = torch.optim.Adam(
-                self.generator.parameters(), lr=lr, betas=(0.5, 0.999)
-            )
-            self.optimizer_d = torch.optim.Adam(
-                self.discriminator.parameters(), lr=lr, betas=(0.5, 0.999)
-            )
+            self.optimizer_g = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+            self.optimizer_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
             self.criterion = nn.BCELoss()
 
             # Normalization stats (set during fit)
@@ -176,9 +172,7 @@ if _HAS_TORCH:
                 bids.append((mid + p_rel * spread, s))
             for i in range(self.num_levels):
                 p_rel = np.clip(vec[self.num_levels * 2 + i], 0, 5)
-                s = np.expm1(
-                    np.clip(vec[self.num_levels * 3 + i], -1, 1) * np.log1p(self._size_scale)
-                )
+                s = np.expm1(np.clip(vec[self.num_levels * 3 + i], -1, 1) * np.log1p(self._size_scale))
                 s = max(0, float(s))
                 asks.append((mid + p_rel * spread, s))
             return bids, asks

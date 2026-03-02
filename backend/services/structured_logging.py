@@ -24,14 +24,10 @@ from functools import wraps
 from typing import Any
 
 # Context variable for correlation ID
-correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "correlation_id", default=None
-)
+correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("correlation_id", default=None)
 
 # Context variable for additional context
-log_context_var: contextvars.ContextVar[dict] = contextvars.ContextVar(
-    "log_context", default={}
-)
+log_context_var: contextvars.ContextVar[dict[Any, Any] | None] = contextvars.ContextVar("log_context", default=None)
 
 
 class LogLevel(str, Enum):
@@ -87,7 +83,7 @@ class StructuredFormatter(logging.Formatter):
         context = log_context_var.get()
 
         # Build log entry
-        log_entry = {
+        log_entry: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
@@ -195,6 +191,7 @@ class StructuredLoggingService:
         root_logger.handlers = []
 
         # Create formatter
+        formatter: logging.Formatter
         if json_output:
             formatter = StructuredFormatter(service_name=self.service_name)
         else:
@@ -251,14 +248,14 @@ class StructuredLoggingService:
     @staticmethod
     def set_context(**kwargs: Any) -> None:
         """Set additional context for logging."""
-        current = log_context_var.get()
+        current = log_context_var.get() or {}
         updated = {**current, **kwargs}
         log_context_var.set(updated)
 
     @staticmethod
     def get_context() -> dict:
         """Get current logging context."""
-        return log_context_var.get()
+        return log_context_var.get() or {}
 
     @staticmethod
     def clear_context() -> None:
@@ -268,7 +265,7 @@ class StructuredLoggingService:
     @staticmethod
     def add_to_context(key: str, value: Any) -> None:
         """Add a single key-value pair to context."""
-        current = log_context_var.get()
+        current = log_context_var.get() or {}
         current[key] = value
         log_context_var.set(current)
 
@@ -299,7 +296,7 @@ class StructuredLoggingService:
         logger = logging.getLogger(component or self.service_name)
 
         # Build extra dict
-        log_extra = {}
+        log_extra: dict[str, Any] = {}
         if component:
             log_extra["component"] = component
         if operation:

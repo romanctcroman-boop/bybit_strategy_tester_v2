@@ -205,10 +205,7 @@ class IPWhitelistService:
         )
 
         self._rules[rule_id] = rule
-        logger.info(
-            f"Added {'whitelist' if is_whitelist else 'blacklist'} rule: "
-            f"{ip_pattern} ({rule_id})"
-        )
+        logger.info(f"Added {'whitelist' if is_whitelist else 'blacklist'} rule: {ip_pattern} ({rule_id})")
 
         return rule
 
@@ -318,10 +315,7 @@ class IPWhitelistService:
                 continue
 
             # Check if action type matches
-            if (
-                ActionType.ALL not in rule.action_types
-                and action_type not in rule.action_types
-            ):
+            if ActionType.ALL not in rule.action_types and action_type not in rule.action_types:
                 continue
 
             # Check IP match
@@ -347,9 +341,7 @@ class IPWhitelistService:
         window_start = now - timedelta(seconds=self.config.rate_limit_window_seconds)
 
         # Clean old entries
-        self._rate_limit_counters[ip_address] = [
-            t for t in self._rate_limit_counters[ip_address] if t > window_start
-        ]
+        self._rate_limit_counters[ip_address] = [t for t in self._rate_limit_counters[ip_address] if t > window_start]
 
         # Check count
         request_count = len(self._rate_limit_counters[ip_address])
@@ -427,9 +419,7 @@ class IPWhitelistService:
 
         if self._failed_attempts[ip_address] >= self.config.auto_block_threshold:
             # Auto-block
-            block_until = datetime.now() + timedelta(
-                minutes=self.config.auto_block_duration_minutes
-            )
+            block_until = datetime.now() + timedelta(minutes=self.config.auto_block_duration_minutes)
             self._auto_blocked[ip_address] = block_until
             logger.warning(
                 f"Auto-blocked {ip_address} until {block_until.isoformat()} "
@@ -458,11 +448,7 @@ class IPWhitelistService:
             rules = [r for r in rules if r.is_whitelist == is_whitelist]
 
         if action_type:
-            rules = [
-                r
-                for r in rules
-                if ActionType.ALL in r.action_types or action_type in r.action_types
-            ]
+            rules = [r for r in rules if ActionType.ALL in r.action_types or action_type in r.action_types]
 
         if enabled_only:
             rules = [r for r in rules if r.is_enabled]
@@ -502,9 +488,7 @@ class IPWhitelistService:
         """Get auto-blocked IPs."""
         now = datetime.now()
         # Clean expired
-        self._auto_blocked = {
-            ip: until for ip, until in self._auto_blocked.items() if until > now
-        }
+        self._auto_blocked = {ip: until for ip, until in self._auto_blocked.items() if until > now}
         return dict(self._auto_blocked)
 
     def get_summary(self) -> dict:
@@ -515,23 +499,17 @@ class IPWhitelistService:
         active_whitelist = sum(
             1
             for r in self._rules.values()
-            if r.is_enabled
-            and r.is_whitelist
-            and (not r.expires_at or r.expires_at > now)
+            if r.is_enabled and r.is_whitelist and (not r.expires_at or r.expires_at > now)
         )
         active_blacklist = sum(
             1
             for r in self._rules.values()
-            if r.is_enabled
-            and not r.is_whitelist
-            and (not r.expires_at or r.expires_at > now)
+            if r.is_enabled and not r.is_whitelist and (not r.expires_at or r.expires_at > now)
         )
 
         # Recent blocked
         hour_ago = now - timedelta(hours=1)
-        recent_blocked = sum(
-            1 for r in self._blocked_requests if r.timestamp > hour_ago
-        )
+        recent_blocked = sum(1 for r in self._blocked_requests if r.timestamp > hour_ago)
 
         return {
             "enabled": self.config.enabled,

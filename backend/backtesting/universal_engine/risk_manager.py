@@ -97,13 +97,9 @@ class UniversalRiskManager:
     def __init__(self, config: RiskConfig, initial_capital: float = 10000.0):
         self.config = config
         self.initial_capital = initial_capital
-        self.state = RiskState(
-            peak_equity=initial_capital, current_equity=initial_capital
-        )
+        self.state = RiskState(peak_equity=initial_capital, current_equity=initial_capital)
 
-    def can_trade(
-        self, current_bar: int, current_time: datetime | None = None
-    ) -> tuple:
+    def can_trade(self, current_bar: int, current_time: datetime | None = None) -> tuple:
         """
         Check if trading is allowed based on all risk rules.
 
@@ -122,19 +118,13 @@ class UniversalRiskManager:
             return False, f"Trading halted: {state.halt_reason}"
 
         # Check max drawdown
-        if (
-            cfg.max_drawdown_limit > 0
-            and state.current_drawdown >= cfg.max_drawdown_limit
-        ):
+        if cfg.max_drawdown_limit > 0 and state.current_drawdown >= cfg.max_drawdown_limit:
             state.trading_halted = True
             state.halt_reason = f"Max drawdown reached: {state.current_drawdown:.2%}"
             return False, state.halt_reason
 
         # Check consecutive losses
-        if (
-            cfg.max_consecutive_losses > 0
-            and state.consecutive_losses >= cfg.max_consecutive_losses
-        ):
+        if cfg.max_consecutive_losses > 0 and state.consecutive_losses >= cfg.max_consecutive_losses:
             return False, f"Max consecutive losses reached: {state.consecutive_losses}"
 
         # Check cooldown
@@ -142,27 +132,24 @@ class UniversalRiskManager:
             return False, f"In cooldown until bar {state.cooldown_until_bar}"
 
         # Check re-entry delay
-        if cfg.re_entry_delay_bars > 0 and state.last_exit_bar >= 0:
-            if current_bar < state.last_exit_bar + cfg.re_entry_delay_bars:
-                return (
-                    False,
-                    f"Re-entry delay: {cfg.re_entry_delay_bars - (current_bar - state.last_exit_bar)} bars remaining",
-                )
+        if (
+            cfg.re_entry_delay_bars > 0
+            and state.last_exit_bar >= 0
+            and current_bar < state.last_exit_bar + cfg.re_entry_delay_bars
+        ):
+            return (
+                False,
+                f"Re-entry delay: {cfg.re_entry_delay_bars - (current_bar - state.last_exit_bar)} bars remaining",
+            )
 
         # Check daily/weekly limits
         if current_time:
             self._update_time_tracking(current_time)
 
-            if (
-                cfg.max_trades_per_day > 0
-                and state.trades_today >= cfg.max_trades_per_day
-            ):
+            if cfg.max_trades_per_day > 0 and state.trades_today >= cfg.max_trades_per_day:
                 return False, f"Max daily trades reached: {state.trades_today}"
 
-            if (
-                cfg.max_trades_per_week > 0
-                and state.trades_this_week >= cfg.max_trades_per_week
-            ):
+            if cfg.max_trades_per_week > 0 and state.trades_this_week >= cfg.max_trades_per_week:
                 return False, f"Max weekly trades reached: {state.trades_this_week}"
 
         return True, "OK"
@@ -221,9 +208,7 @@ class UniversalRiskManager:
 
         # Calculate drawdown
         if state.peak_equity > 0:
-            state.current_drawdown = (
-                state.peak_equity - new_equity
-            ) / state.peak_equity
+            state.current_drawdown = (state.peak_equity - new_equity) / state.peak_equity
 
     def _update_time_tracking(self, current_time: datetime):
         """Update day/week tracking for trade limits."""
@@ -262,9 +247,7 @@ class UniversalRiskManager:
 
     def reset(self):
         """Reset risk manager to initial state."""
-        self.state = RiskState(
-            peak_equity=self.initial_capital, current_equity=self.initial_capital
-        )
+        self.state = RiskState(peak_equity=self.initial_capital, current_equity=self.initial_capital)
 
     def get_risk_stats(self) -> dict:
         """Get current risk statistics."""
@@ -291,9 +274,7 @@ class UniversalRiskManager:
         }
 
     @staticmethod
-    def from_backtest_input(
-        input_data, initial_capital: float
-    ) -> "UniversalRiskManager":
+    def from_backtest_input(input_data, initial_capital: float) -> "UniversalRiskManager":
         """
         Create RiskManager from BacktestInput.
 

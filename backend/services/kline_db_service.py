@@ -134,9 +134,7 @@ class KlineDBService:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
-            self._connection = sqlite3.connect(
-                self.db_path, check_same_thread=False, timeout=30.0
-            )
+            self._connection = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
             self._connection.row_factory = sqlite3.Row
             # Enable WAL mode for better concurrency
             self._connection.execute("PRAGMA journal_mode=WAL")
@@ -169,13 +167,11 @@ class KlineDBService:
         """)
 
         # Ensure unique index on (symbol, interval, open_time)
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS uix_symbol_interval_open_time
                 ON bybit_kline_audit(symbol, interval, open_time)
             """)
-        except sqlite3.OperationalError:
-            pass  # Index may already exist
 
         # Drop old index if exists
         with contextlib.suppress(sqlite3.OperationalError):
@@ -203,9 +199,7 @@ class KlineDBService:
 
                 # Flush if batch is full or timeout
                 current_time = time.time()
-                if len(batch) >= batch_size or (
-                    batch and current_time - last_flush > flush_interval
-                ):
+                if len(batch) >= batch_size or (batch and current_time - last_flush > flush_interval):
                     self._flush_batch(batch)
                     batch = []
                     last_flush = current_time
@@ -255,9 +249,7 @@ class KlineDBService:
                         record.symbol,
                         record.interval,
                         record.open_time,
-                        record.open_time_dt.isoformat()
-                        if record.open_time_dt
-                        else None,
+                        record.open_time_dt.isoformat() if record.open_time_dt else None,
                         record.open_price,
                         record.high_price,
                         record.low_price,
@@ -305,9 +297,7 @@ class KlineDBService:
                     symbol=symbol,
                     interval=interval,
                     open_time=open_time,
-                    open_time_dt=datetime.fromtimestamp(
-                        open_time / 1000, tz=UTC
-                    ),
+                    open_time_dt=datetime.fromtimestamp(open_time / 1000, tz=UTC),
                     open_price=float(candle.get("open", 0)),
                     high_price=float(candle.get("high", 0)),
                     low_price=float(candle.get("low", 0)),
@@ -396,9 +386,7 @@ class KlineDBService:
                 self._stats["errors"] += 1
                 return []
 
-    def get_coverage(
-        self, symbol: str, interval: str
-    ) -> tuple[int, int, int] | None:
+    def get_coverage(self, symbol: str, interval: str) -> tuple[int, int, int] | None:
         """
         Get database coverage for a symbol/interval.
 

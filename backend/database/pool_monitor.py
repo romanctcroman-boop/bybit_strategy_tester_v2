@@ -98,9 +98,7 @@ class ConnectionPoolMonitor:
 
             # Calculate utilization
             total_capacity = size + getattr(pool, "_max_overflow", 0)
-            utilization = (
-                (checked_out / total_capacity * 100) if total_capacity > 0 else 0
-            )
+            utilization = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
 
             # Determine health status
             if utilization >= 90:
@@ -124,9 +122,7 @@ class ConnectionPoolMonitor:
                 "total_checkouts": self._checkout_count,
                 "total_checkins": self._checkin_count,
                 "active_connections": len(self._connection_times),
-                "uptime_seconds": (
-                    datetime.now(UTC) - self._initialized_at
-                ).total_seconds(),
+                "uptime_seconds": (datetime.now(UTC) - self._initialized_at).total_seconds(),
             }
 
         except Exception as e:
@@ -149,9 +145,7 @@ class ConnectionPoolMonitor:
             "total_checkouts": self._checkout_count,
             "total_checkins": self._checkin_count,
             "active_connections": len(self._connection_times),
-            "uptime_seconds": (
-                datetime.now(UTC) - self._initialized_at
-            ).total_seconds(),
+            "uptime_seconds": (datetime.now(UTC) - self._initialized_at).total_seconds(),
             "note": "Using SQLite or StaticPool - limited pool statistics available",
         }
 
@@ -182,39 +176,25 @@ class ConnectionPoolMonitor:
         stats = self.get_pool_statistics()
 
         if stats.get("health") == "critical":
-            recommendations.append(
-                "CRITICAL: Pool utilization is very high. Consider increasing pool size."
-            )
+            recommendations.append("CRITICAL: Pool utilization is very high. Consider increasing pool size.")
 
         if stats.get("utilization", 0) > 50:
-            recommendations.append(
-                f"Pool utilization at {stats['utilization']}%. Monitor for potential bottlenecks."
-            )
+            recommendations.append(f"Pool utilization at {stats['utilization']}%. Monitor for potential bottlenecks.")
 
         active = stats.get("active_connections", 0)
         if active > 5:
-            recommendations.append(
-                f"{active} connections currently active. Check for connection leaks."
-            )
+            recommendations.append(f"{active} connections currently active. Check for connection leaks.")
 
         # Check for long-held connections
-        long_held = sum(
-            1 for t in self._connection_times.values() if time.time() - t > 60
-        )
+        long_held = sum(1 for t in self._connection_times.values() if time.time() - t > 60)
         if long_held > 0:
-            recommendations.append(
-                f"{long_held} connection(s) held for over 60 seconds. Possible leak detected."
-            )
+            recommendations.append(f"{long_held} connection(s) held for over 60 seconds. Possible leak detected.")
 
         if stats.get("recycle", -1) == -1:
-            recommendations.append(
-                "Connection recycling is disabled. Consider enabling for long-running apps."
-            )
+            recommendations.append("Connection recycling is disabled. Consider enabling for long-running apps.")
 
         if not stats.get("pre_ping", False):
-            recommendations.append(
-                "Pre-ping is disabled. Enable to detect stale connections."
-            )
+            recommendations.append("Pre-ping is disabled. Enable to detect stale connections.")
 
         if not recommendations:
             recommendations.append("Pool is healthy. No immediate actions required.")
@@ -270,17 +250,13 @@ class ConnectionPoolMonitor:
             return {
                 "success": True,
                 "latency_ms": round(latency, 2),
-                "timestamp": datetime.now(UTC)
-                .isoformat()
-                .replace("+00:00", "Z"),
+                "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             }
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.now(UTC)
-                .isoformat()
-                .replace("+00:00", "Z"),
+                "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             }
 
 

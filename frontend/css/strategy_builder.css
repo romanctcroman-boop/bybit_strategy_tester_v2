@@ -2078,7 +2078,7 @@ body {
 
 .block-params-popup:has(.tv-params-container) .popup-body {
     padding: 0;
-    max-height: 650px;
+    max-height: min(650px, calc(100vh - 120px));
 }
 
 /* =============================================
@@ -8005,4 +8005,22 @@ body.floating-window-open .zoom-controls {
 .ai-build-modal-content.has-agents {
     width: min(98vw, 1100px);
     max-height: 95vh;
+}
+
+/* ── End Date label with Reset button ──────────────────────────────────────── */
+.date-label-with-reset {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-reset-date {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.btn-reset-date i {
+    font-size: 11px;
 }

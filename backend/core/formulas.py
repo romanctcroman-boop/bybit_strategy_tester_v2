@@ -11,7 +11,6 @@ to ensure consistency between MetricsCalculator and Numba engine.
 """
 
 import warnings
-from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -24,7 +23,7 @@ warnings.filterwarnings("ignore")
 # ============================================================================
 
 
-def calculate_total_return(equity_curve: Union[pd.Series, List[float]]) -> float:
+def calculate_total_return(equity_curve: pd.Series | list[float]) -> float:
     """
     Calculate total return.
 
@@ -49,7 +48,7 @@ def calculate_total_return(equity_curve: Union[pd.Series, List[float]]) -> float
     return (final - initial) / initial
 
 
-def calculate_cagr(equity_curve: Union[pd.Series, List[float]], periods_per_year: int = 252) -> float:
+def calculate_cagr(equity_curve: pd.Series | list[float], periods_per_year: int = 252) -> float:
     """
     Calculate Compound Annual Growth Rate.
 
@@ -74,7 +73,7 @@ def calculate_cagr(equity_curve: Union[pd.Series, List[float]], periods_per_year
     return (1 + total_return) ** (1 / years) - 1
 
 
-def calculate_volatility(returns: Union[pd.Series, List[float]], periods_per_year: int = 252) -> float:
+def calculate_volatility(returns: pd.Series | list[float], periods_per_year: int = 252) -> float:
     """
     Calculate annualized volatility.
 
@@ -95,7 +94,7 @@ def calculate_volatility(returns: Union[pd.Series, List[float]], periods_per_yea
 
 
 def calculate_sharpe_ratio(
-    returns: Union[pd.Series, List[float]], risk_free_rate: float = 0.0, periods_per_year: int = 252
+    returns: pd.Series | list[float], risk_free_rate: float = 0.0, periods_per_year: int = 252
 ) -> float:
     """
     Calculate Sharpe ratio.
@@ -154,7 +153,7 @@ def calculate_sharpe_ratio(
 
 
 def calculate_sortino_ratio(
-    returns: Union[pd.Series, List[float]],
+    returns: pd.Series | list[float],
     risk_free_rate: float = 0.0,
     periods_per_year: int = 252,
     target_return: float = 0.0,
@@ -212,7 +211,7 @@ def calculate_sortino_ratio(
     return sortino
 
 
-def calculate_calmar_ratio(equity_curve: Union[pd.Series, List[float]], periods_per_year: int = 252) -> float:
+def calculate_calmar_ratio(equity_curve: pd.Series | list[float], periods_per_year: int = 252) -> float:
     """
     Calculate Calmar ratio.
 
@@ -243,7 +242,7 @@ def calculate_calmar_ratio(equity_curve: Union[pd.Series, List[float]], periods_
 # ============================================================================
 
 
-def calculate_max_drawdown(equity_curve: Union[pd.Series, List[float]]) -> float:
+def calculate_max_drawdown(equity_curve: pd.Series | list[float]) -> float:
     """
     Calculate maximum drawdown.
 
@@ -276,7 +275,7 @@ def calculate_max_drawdown(equity_curve: Union[pd.Series, List[float]]) -> float
     return max_dd
 
 
-def calculate_avg_drawdown(equity_curve: Union[pd.Series, List[float]]) -> float:
+def calculate_avg_drawdown(equity_curve: pd.Series | list[float]) -> float:
     """
     Calculate average drawdown.
 
@@ -306,7 +305,7 @@ def calculate_avg_drawdown(equity_curve: Union[pd.Series, List[float]]) -> float
     return drawdown_periods.mean()
 
 
-def calculate_drawdown_duration(equity_curve: Union[pd.Series, List[float]]) -> int:
+def calculate_drawdown_duration(equity_curve: pd.Series | list[float]) -> int:
     """
     Calculate longest drawdown duration.
 
@@ -356,7 +355,7 @@ def calculate_drawdown_duration(equity_curve: Union[pd.Series, List[float]]) -> 
 # ============================================================================
 
 
-def calculate_win_rate(trades: List[Dict]) -> float:
+def calculate_win_rate(trades: list[dict]) -> float:
     """
     Calculate win rate.
 
@@ -376,7 +375,7 @@ def calculate_win_rate(trades: List[Dict]) -> float:
     return len(winning_trades) / len(trades)
 
 
-def calculate_profit_factor(trades: List[Dict]) -> float:
+def calculate_profit_factor(trades: list[dict]) -> float:
     """
     Calculate profit factor.
 
@@ -403,7 +402,7 @@ def calculate_profit_factor(trades: List[Dict]) -> float:
     return gross_profit / gross_loss
 
 
-def calculate_avg_win(trades: List[Dict]) -> float:
+def calculate_avg_win(trades: list[dict]) -> float:
     """
     Calculate average winning trade.
 
@@ -421,7 +420,7 @@ def calculate_avg_win(trades: List[Dict]) -> float:
     return np.mean(winning_trades)
 
 
-def calculate_avg_loss(trades: List[Dict]) -> float:
+def calculate_avg_loss(trades: list[dict]) -> float:
     """
     Calculate average losing trade.
 
@@ -439,7 +438,7 @@ def calculate_avg_loss(trades: List[Dict]) -> float:
     return np.mean(losing_trades)
 
 
-def calculate_expectancy(trades: List[Dict]) -> float:
+def calculate_expectancy(trades: list[dict]) -> float:
     """
     Calculate trade expectancy.
 
@@ -467,7 +466,7 @@ def calculate_expectancy(trades: List[Dict]) -> float:
     return expectancy
 
 
-def calculate_avg_trade_duration(trades: List[Dict]) -> float:
+def calculate_avg_trade_duration(trades: list[dict]) -> float:
     """
     Calculate average trade duration.
 
@@ -496,7 +495,7 @@ def calculate_avg_trade_duration(trades: List[Dict]) -> float:
 # ============================================================================
 
 
-def calculate_var(returns: Union[pd.Series, List[float]], confidence_level: float = 0.95) -> float:
+def calculate_var(returns: pd.Series | list[float], confidence_level: float = 0.95) -> float:
     """
     Calculate Value at Risk (VaR).
 
@@ -525,7 +524,7 @@ def calculate_var(returns: Union[pd.Series, List[float]], confidence_level: floa
     return var
 
 
-def calculate_cvar(returns: Union[pd.Series, List[float]], confidence_level: float = 0.95) -> float:
+def calculate_cvar(returns: pd.Series | list[float], confidence_level: float = 0.95) -> float:
     """
     Calculate Conditional Value at Risk (CVaR / Expected Shortfall).
 
@@ -562,7 +561,7 @@ def calculate_cvar(returns: Union[pd.Series, List[float]], confidence_level: flo
     return cvar
 
 
-def calculate_beta(returns: Union[pd.Series, List[float]], benchmark_returns: Union[pd.Series, List[float]]) -> float:
+def calculate_beta(returns: pd.Series | list[float], benchmark_returns: pd.Series | list[float]) -> float:
     """
     Calculate beta (market sensitivity).
 
@@ -600,8 +599,8 @@ def calculate_beta(returns: Union[pd.Series, List[float]], benchmark_returns: Un
 
 
 def calculate_alpha(
-    returns: Union[pd.Series, List[float]],
-    benchmark_returns: Union[pd.Series, List[float]],
+    returns: pd.Series | list[float],
+    benchmark_returns: pd.Series | list[float],
     risk_free_rate: float = 0.0,
 ) -> float:
     """
@@ -729,7 +728,7 @@ def get_all_formulas() -> dict:
     return formulas
 
 
-def validate_returns(returns: Union[pd.Series, List[float]], min_length: int = 2) -> bool:
+def validate_returns(returns: pd.Series | list[float], min_length: int = 2) -> bool:
     """
     Validate returns series.
 
@@ -746,7 +745,4 @@ def validate_returns(returns: Union[pd.Series, List[float]], min_length: int = 2
     if isinstance(returns, (list, np.ndarray)):
         returns = pd.Series(returns)
 
-    if returns.isnull().all():
-        return False
-
-    return True
+    return not returns.isnull().all()

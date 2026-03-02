@@ -212,7 +212,9 @@ class GridTradingStrategy(LibraryStrategy):
             if level.filled:
                 continue
 
-            if (direction == "down" and level.type == "buy" and level.price < price) or (direction == "up" and level.type == "sell" and level.price > price):
+            if (direction == "down" and level.type == "buy" and level.price < price) or (
+                direction == "up" and level.type == "sell" and level.price > price
+            ):
                 candidates.append(level)
 
         if not candidates:
@@ -255,11 +257,7 @@ class GridTradingStrategy(LibraryStrategy):
                     continue
 
                 # Avoid repeated signals at same level
-                if (
-                    self._last_signal_price
-                    and abs(self._last_signal_price - level.price)
-                    < self._grid_step * 0.5
-                ):
+                if self._last_signal_price and abs(self._last_signal_price - level.price) < self._grid_step * 0.5:
                     continue
 
                 if level.type == "buy":

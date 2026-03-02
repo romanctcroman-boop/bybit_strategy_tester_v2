@@ -557,9 +557,7 @@ class ExperimentManager:
 
         return exp.get_results()
 
-    def get_variant_for_request(
-        self, symbol: str, user_id: str | None = None
-    ) -> tuple[str | None, Variant | None]:
+    def get_variant_for_request(self, symbol: str, user_id: str | None = None) -> tuple[str | None, Variant | None]:
         """
         Get the variant for a trading request.
 

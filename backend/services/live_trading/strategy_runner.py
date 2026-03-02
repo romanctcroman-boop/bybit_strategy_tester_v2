@@ -154,13 +154,11 @@ class BaseStrategy(ABC):
         """
         return None
 
-    def on_start(self):
+    def on_start(self) -> None:  # noqa: B027
         """Called when strategy starts. Override to initialize."""
-        pass
 
-    def on_stop(self):
+    def on_stop(self) -> None:  # noqa: B027
         """Called when strategy stops. Override to cleanup."""
-        pass
 
     def add_candle(self, candle: dict):
         """Add a candle to history."""
@@ -373,9 +371,7 @@ class LiveStrategyRunner:
         self._paper_positions: dict[str, dict] = {}
         self._paper_balance: float = 10000.0  # Starting balance
 
-        logger.info(
-            f"LiveStrategyRunner initialized (testnet={testnet}, paper={paper_trading})"
-        )
+        logger.info(f"LiveStrategyRunner initialized (testnet={testnet}, paper={paper_trading})")
 
     def add_strategy(self, strategy: BaseStrategy):
         """Add a strategy to run."""
@@ -427,9 +423,7 @@ class LiveStrategyRunner:
         # Start processing loop
         self._tasks.append(asyncio.create_task(self._process_market_data()))
 
-        logger.info(
-            f"✅ LiveStrategyRunner started with {len(self._strategies)} strategies"
-        )
+        logger.info(f"✅ LiveStrategyRunner started with {len(self._strategies)} strategies")
 
     async def stop(self):
         """Stop all strategies."""
@@ -503,10 +497,7 @@ class LiveStrategyRunner:
 
             # Run matching strategies
             for _key, strategy in self._strategies.items():
-                if (
-                    strategy.config.symbol == symbol
-                    and strategy.config.timeframe == interval
-                ):
+                if strategy.config.symbol == symbol and strategy.config.timeframe == interval:
                     # Add candle to history
                     strategy.add_candle(candle)
 
@@ -568,9 +559,7 @@ class LiveStrategyRunner:
 
         # Check cooldown
         if state.last_trade_time:
-            elapsed = (
-                datetime.now(UTC) - state.last_trade_time
-            ).total_seconds()
+            elapsed = (datetime.now(UTC) - state.last_trade_time).total_seconds()
             if elapsed < config.cooldown_seconds:
                 logger.debug("Cooldown active, skipping signal")
                 return
@@ -614,12 +603,10 @@ class LiveStrategyRunner:
                 "side": "long",
                 "entry_price": signal.price,
                 "qty": qty,
-                "sl": signal.stop_loss
-                or (signal.price * (1 - config.stop_loss_percent / 100))
+                "sl": signal.stop_loss or (signal.price * (1 - config.stop_loss_percent / 100))
                 if config.stop_loss_percent
                 else None,
-                "tp": signal.take_profit
-                or (signal.price * (1 + config.take_profit_percent / 100))
+                "tp": signal.take_profit or (signal.price * (1 + config.take_profit_percent / 100))
                 if config.take_profit_percent
                 else None,
             }
@@ -640,12 +627,10 @@ class LiveStrategyRunner:
                 "side": "short",
                 "entry_price": signal.price,
                 "qty": qty,
-                "sl": signal.stop_loss
-                or (signal.price * (1 + config.stop_loss_percent / 100))
+                "sl": signal.stop_loss or (signal.price * (1 + config.stop_loss_percent / 100))
                 if config.stop_loss_percent
                 else None,
-                "tp": signal.take_profit
-                or (signal.price * (1 - config.take_profit_percent / 100))
+                "tp": signal.take_profit or (signal.price * (1 - config.take_profit_percent / 100))
                 if config.take_profit_percent
                 else None,
             }
@@ -679,10 +664,7 @@ class LiveStrategyRunner:
             else:
                 state.loss_count += 1
 
-            logger.info(
-                f"📝 Paper CLOSE: {symbol} PnL: {pnl:+.2f} "
-                f"(Balance: {self._paper_balance:.2f})"
-            )
+            logger.info(f"📝 Paper CLOSE: {symbol} PnL: {pnl:+.2f} (Balance: {self._paper_balance:.2f})")
 
             del self._paper_positions[symbol]
 
@@ -785,14 +767,9 @@ class LiveStrategyRunner:
             state.trades_executed += 1
             state.last_trade_time = datetime.now(UTC)
 
-            logger.info(
-                f"✅ Trade executed: {signal.signal_type.value} {symbol} "
-                f"{qty:.4f} @ {signal.price:.2f}"
-            )
+            logger.info(f"✅ Trade executed: {signal.signal_type.value} {symbol} {qty:.4f} @ {signal.price:.2f}")
         elif result:
-            logger.error(
-                f"❌ Trade failed: {getattr(result, 'error_message', 'Unknown error')}"
-            )
+            logger.error(f"❌ Trade failed: {getattr(result, 'error_message', 'Unknown error')}")
 
     # ==========================================================================
     # Callbacks
@@ -821,12 +798,8 @@ class LiveStrategyRunner:
                 "daily_pnl": strategy.state.daily_pnl,
                 "total_pnl": strategy.state.total_pnl,
                 "win_rate": strategy.state.win_rate,
-                "last_signal": strategy.state.last_signal_time.isoformat()
-                if strategy.state.last_signal_time
-                else None,
-                "last_trade": strategy.state.last_trade_time.isoformat()
-                if strategy.state.last_trade_time
-                else None,
+                "last_signal": strategy.state.last_signal_time.isoformat() if strategy.state.last_signal_time else None,
+                "last_trade": strategy.state.last_trade_time.isoformat() if strategy.state.last_trade_time else None,
             }
 
         return {

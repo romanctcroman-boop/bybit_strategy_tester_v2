@@ -81,9 +81,7 @@ async def refresh_daily_data_background(
 
                 await asyncio.sleep(rate_limit_delay)  # Rate limiting
 
-            logger.info(
-                f"[VOLATILITY] Daily data refresh: {updated}/{len(symbols)} symbols updated"
-            )
+            logger.info(f"[VOLATILITY] Daily data refresh: {updated}/{len(symbols)} symbols updated")
         finally:
             db.close()
 

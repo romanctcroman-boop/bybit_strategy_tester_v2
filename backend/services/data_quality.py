@@ -198,11 +198,7 @@ class MarketDataValidator:
         issues = []
 
         # High should be >= Open, Close, Low
-        if (
-            candle.high < candle.open
-            or candle.high < candle.close
-            or candle.high < candle.low
-        ):
+        if candle.high < candle.open or candle.high < candle.close or candle.high < candle.low:
             issues.append(
                 DataQualityIssue(
                     issue_type=DataIssueType.INVALID_OHLC,
@@ -211,18 +207,12 @@ class MarketDataValidator:
                     timestamp=datetime.fromtimestamp(candle.timestamp / 1000),
                     severity=0.8,
                     description=f"High ({candle.high}) is not the highest price",
-                    raw_data={
-                        "ohlc": [candle.open, candle.high, candle.low, candle.close]
-                    },
+                    raw_data={"ohlc": [candle.open, candle.high, candle.low, candle.close]},
                 )
             )
 
         # Low should be <= Open, Close, High
-        if (
-            candle.low > candle.open
-            or candle.low > candle.close
-            or candle.low > candle.high
-        ):
+        if candle.low > candle.open or candle.low > candle.close or candle.low > candle.high:
             issues.append(
                 DataQualityIssue(
                     issue_type=DataIssueType.INVALID_OHLC,
@@ -231,9 +221,7 @@ class MarketDataValidator:
                     timestamp=datetime.fromtimestamp(candle.timestamp / 1000),
                     severity=0.8,
                     description=f"Low ({candle.low}) is not the lowest price",
-                    raw_data={
-                        "ohlc": [candle.open, candle.high, candle.low, candle.close]
-                    },
+                    raw_data={"ohlc": [candle.open, candle.high, candle.low, candle.close]},
                 )
             )
 
@@ -247,17 +235,13 @@ class MarketDataValidator:
                     timestamp=datetime.fromtimestamp(candle.timestamp / 1000),
                     severity=1.0,
                     description="Zero or negative price detected",
-                    raw_data={
-                        "ohlc": [candle.open, candle.high, candle.low, candle.close]
-                    },
+                    raw_data={"ohlc": [candle.open, candle.high, candle.low, candle.close]},
                 )
             )
 
         return issues
 
-    def _check_price_spike(
-        self, candle: CandleData, previous: CandleData
-    ) -> DataQualityIssue | None:
+    def _check_price_spike(self, candle: CandleData, previous: CandleData) -> DataQualityIssue | None:
         """Check for abnormal price changes."""
         if previous.close == 0:
             return None
@@ -281,9 +265,7 @@ class MarketDataValidator:
 
         return None
 
-    def _check_price_gap(
-        self, candle: CandleData, previous: CandleData
-    ) -> DataQualityIssue | None:
+    def _check_price_gap(self, candle: CandleData, previous: CandleData) -> DataQualityIssue | None:
         """Check for gap between previous close and current open."""
         if previous.close == 0:
             return None
@@ -325,10 +307,7 @@ class MarketDataValidator:
         key = self._get_key(candle.symbol, candle.interval)
         if key in self._volume_history and len(self._volume_history[key]) >= 10:
             avg_volume = sum(self._volume_history[key]) / len(self._volume_history[key])
-            if (
-                avg_volume > 0
-                and candle.volume > avg_volume * self.max_volume_multiplier
-            ):
+            if avg_volume > 0 and candle.volume > avg_volume * self.max_volume_multiplier:
                 return DataQualityIssue(
                     issue_type=DataIssueType.VOLUME_ANOMALY,
                     symbol=candle.symbol,
@@ -341,9 +320,7 @@ class MarketDataValidator:
 
         return None
 
-    def _check_timestamp_gap(
-        self, candle: CandleData, previous: CandleData
-    ) -> DataQualityIssue | None:
+    def _check_timestamp_gap(self, candle: CandleData, previous: CandleData) -> DataQualityIssue | None:
         """Check for timestamp gaps."""
         # Calculate expected interval in milliseconds
         interval_ms = self._interval_to_ms(candle.interval)
@@ -403,9 +380,7 @@ class MarketDataValidator:
         self._volume_history[key].append(candle.volume)
         self._timestamp_history[key] = candle.timestamp
 
-    def _attempt_correction(
-        self, candle: CandleData, issues: list[DataQualityIssue]
-    ) -> CandleData | None:
+    def _attempt_correction(self, candle: CandleData, issues: list[DataQualityIssue]) -> CandleData | None:
         """Attempt to correct data issues."""
         # Only attempt correction for OHLC issues
         ohlc_issues = [i for i in issues if i.issue_type == DataIssueType.INVALID_OHLC]
@@ -445,9 +420,7 @@ class MarketDataValidator:
                 symbol=symbol,
                 interval=interval,
                 timestamp=datetime.now(),
-                severity=min(
-                    1.0, staleness_seconds / (self.staleness_threshold_seconds * 5)
-                ),
+                severity=min(1.0, staleness_seconds / (self.staleness_threshold_seconds * 5)),
                 description=f"Data is {staleness_seconds:.0f}s old (threshold: {self.staleness_threshold_seconds}s)",
                 raw_data={"staleness_seconds": staleness_seconds},
             )
@@ -502,9 +475,7 @@ class DataQualityMonitor:
 
         return result
 
-    def process_batch(
-        self, candles: list[CandleData]
-    ) -> tuple[list[ValidationResult], DataQualityMetrics]:
+    def process_batch(self, candles: list[CandleData]) -> tuple[list[ValidationResult], DataQualityMetrics]:
         """Process a batch of candles."""
         results = []
 
@@ -557,9 +528,7 @@ class DataQualityMonitor:
 
         # Update quality score (exponential moving average)
         alpha = 0.1
-        metrics.quality_score = (
-            alpha * result.quality_score + (1 - alpha) * metrics.quality_score
-        )
+        metrics.quality_score = alpha * result.quality_score + (1 - alpha) * metrics.quality_score
 
         metrics.last_update = datetime.now()
 

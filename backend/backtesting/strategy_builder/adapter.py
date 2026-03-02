@@ -1,4 +1,4 @@
-﻿"""
+"""
 Strategy Builder Adapter
 
 Converts Strategy Builder visual graphs (blocks + connections) into executable
@@ -101,6 +101,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         "result": ["signal", "output"],
         "signal": ["result", "output"],
         "input": ["value", "close"],
+        # MACD histogram port: frontend used 'hist', backend returns 'histogram'
+        "hist": ["histogram"],
+        "histogram": ["hist"],
     }
 
     _SIGNAL_PORT_ALIASES: dict[str, list[str]] = {

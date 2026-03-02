@@ -1,4 +1,4 @@
-﻿"""
+"""
 Parallel worker function and GPU RSI/backtest helpers.
 
 Extracted from gpu_optimizer.py (lines 2108-2528).

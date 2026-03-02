@@ -81,15 +81,11 @@ class IncrementalModel:
     is_fitted: bool = False
     sample_count: int = 0
 
-    def partial_fit(
-        self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None
-    ) -> None:
+    def partial_fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None) -> None:
         """Incrementally fit the model"""
         if self.supports_partial_fit:
             if self.classes is not None:
-                self.model.partial_fit(
-                    X, y, classes=self.classes, sample_weight=sample_weight
-                )
+                self.model.partial_fit(X, y, classes=self.classes, sample_weight=sample_weight)
             else:
                 self.model.partial_fit(X, y, sample_weight=sample_weight)
         else:
@@ -184,9 +180,7 @@ class OnlineLearner:
         # Drift detector (optional integration)
         self.drift_detector = None
 
-    def _wrap_model(
-        self, model: Any, classes: np.ndarray | None
-    ) -> IncrementalModel:
+    def _wrap_model(self, model: Any, classes: np.ndarray | None) -> IncrementalModel:
         """Wrap model for incremental learning"""
         # Check if model supports partial_fit
         supports_partial_fit = hasattr(model, "partial_fit")
@@ -310,16 +304,11 @@ class OnlineLearner:
 
         return buffer_size >= self.batch_size
 
-    def _do_update(
-        self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None
-    ) -> None:
+    def _do_update(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None) -> None:
         """Perform model update"""
         try:
             self.incremental_model.partial_fit(X, y, sample_weight)
-            logger.info(
-                f"Model updated with {len(X)} samples "
-                f"(total: {self.stats.total_samples})"
-            )
+            logger.info(f"Model updated with {len(X)} samples (total: {self.stats.total_samples})")
         except Exception as e:
             logger.error(f"Model update failed: {e}")
 
@@ -330,9 +319,7 @@ class OnlineLearner:
 
         # Simple drift detection: compare recent vs historical accuracy
         recent = self.actual_buffer[-50:]
-        historical = (
-            self.actual_buffer[-200:-50] if len(self.actual_buffer) > 200 else []
-        )
+        historical = self.actual_buffer[-200:-50] if len(self.actual_buffer) > 200 else []
 
         if not historical:
             return False
@@ -356,8 +343,7 @@ class OnlineLearner:
                 )
 
             logger.warning(
-                f"Concept drift detected: accuracy dropped from "
-                f"{historical_accuracy:.2f} to {recent_accuracy:.2f}"
+                f"Concept drift detected: accuracy dropped from {historical_accuracy:.2f} to {recent_accuracy:.2f}"
             )
 
         return drift_detected
@@ -390,9 +376,7 @@ class OnlineLearner:
             Predictions
         """
         if not self.incremental_model.is_fitted:
-            raise ValueError(
-                "Model not fitted. Call update() first with training data."
-            )
+            raise ValueError("Model not fitted. Call update() first with training data.")
 
         return self.incremental_model.predict(np.atleast_2d(X))
 
@@ -400,9 +384,7 @@ class OnlineLearner:
         """Predict probabilities (classifiers only)"""
         return self.incremental_model.predict_proba(np.atleast_2d(X))
 
-    def record_outcome(
-        self, predictions: np.ndarray, actuals: np.ndarray
-    ) -> dict[str, float]:
+    def record_outcome(self, predictions: np.ndarray, actuals: np.ndarray) -> dict[str, float]:
         """
         Record prediction outcomes for accuracy tracking
 
@@ -434,9 +416,7 @@ class OnlineLearner:
 
         # Calculate accuracies
         cumulative_accuracy = sum(self.actual_buffer) / len(self.actual_buffer)
-        recent_accuracy = sum(self.actual_buffer[-100:]) / min(
-            len(self.actual_buffer), 100
-        )
+        recent_accuracy = sum(self.actual_buffer[-100:]) / min(len(self.actual_buffer), 100)
 
         self.stats.cumulative_accuracy = cumulative_accuracy
         self.stats.recent_accuracy = recent_accuracy

@@ -177,9 +177,7 @@ class StrategyPortfolioBacktester:
                 continue
 
             # Create symbol-specific config
-            symbol_config = self._create_symbol_config(
-                symbol, candles, symbol_capital, strategy_config
-            )
+            symbol_config = self._create_symbol_config(symbol, candles, symbol_capital, strategy_config)
 
             # Run backtest
             try:
@@ -238,9 +236,7 @@ class StrategyPortfolioBacktester:
     ) -> BacktestInput:
         """Create configuration for specific symbol."""
         # Generate signals based on template strategy
-        long_entries, long_exits, short_entries, short_exits = self._generate_signals(
-            candles, template
-        )
+        long_entries, long_exits, short_entries, short_exits = self._generate_signals(candles, template)
 
         # Create new config with symbol-specific values
         return BacktestInput(
@@ -347,10 +343,7 @@ class StrategyPortfolioBacktester:
                 volatilities[symbol] = np.std(returns) if len(returns) > 0 else 0.02
 
             total_inv_vol = sum(1 / v for v in volatilities.values() if v > 0)
-            weights = {
-                s: (1 / v) / total_inv_vol if v > 0 else 0
-                for s, v in volatilities.items()
-            }
+            weights = {s: (1 / v) / total_inv_vol if v > 0 else 0 for s, v in volatilities.items()}
 
         elif method == AllocationMethod.MOMENTUM:
             # Lookback momentum
@@ -413,11 +406,7 @@ class StrategyPortfolioBacktester:
         if not self.per_asset_results:
             return metrics
 
-        equity = (
-            self.portfolio_equity_curve
-            if hasattr(self, "portfolio_equity_curve")
-            else []
-        )
+        equity = self.portfolio_equity_curve if hasattr(self, "portfolio_equity_curve") else []
         if not equity:
             equity = self._aggregate_equity_curves(allocation)
 
@@ -468,9 +457,7 @@ class StrategyPortfolioBacktester:
         total_pnl = sum(r.metrics.net_profit for r in self.per_asset_results.values())
         if total_pnl != 0:
             for symbol, result in self.per_asset_results.items():
-                metrics.asset_contributions[symbol] = (
-                    result.metrics.net_profit / total_pnl
-                )
+                metrics.asset_contributions[symbol] = result.metrics.net_profit / total_pnl
 
         # Concentration (Herfindahl index)
         weights = list(allocation.weights.values())

@@ -167,9 +167,7 @@ class SecretShare:
         threshold = int(hex_string[2:4], 16)
         total_shares = int(hex_string[4:6], 16)
         data = bytes.fromhex(hex_string[6:])
-        return cls(
-            index=index, data=data, threshold=threshold, total_shares=total_shares
-        )
+        return cls(index=index, data=data, threshold=threshold, total_shares=total_shares)
 
     def __repr__(self) -> str:
         return f"SecretShare(index={self.index}, threshold={self.threshold}/{self.total_shares}, size={len(self.data)})"
@@ -204,9 +202,7 @@ class ShamirSecretSharing:
         """Initialize Shamir's Secret Sharing."""
         pass
 
-    def split(
-        self, secret: bytes, threshold: int, num_shares: int
-    ) -> list[SecretShare]:
+    def split(self, secret: bytes, threshold: int, num_shares: int) -> list[SecretShare]:
         """
         Split a secret into shares using Shamir's scheme.
 
@@ -324,7 +320,7 @@ class ShamirSecretSharing:
 
         # Reconstruct with the share and check consistency
         try:
-            test_shares = [share, *other_shares[:share.threshold - 1]]
+            test_shares = [share, *other_shares[: share.threshold - 1]]
             secret1 = self.combine(test_shares)
 
             # Reconstruct without this share

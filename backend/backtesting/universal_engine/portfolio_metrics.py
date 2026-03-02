@@ -87,9 +87,7 @@ class PortfolioConfig:
 
     # Rebalancing
     rebalance_threshold: float = 0.1  # Порог для ребалансировки
-    rebalance_frequency: int = (
-        0  # Баров между ребалансировками (0 = без частотного ограничения)
-    )
+    rebalance_frequency: int = 0  # Баров между ребалансировками (0 = без частотного ограничения)
 
 
 @dataclass
@@ -247,9 +245,7 @@ class MetricsCalculator:
 
         # Find max drawdown period
         max_dd_end = np.argmax(drawdown)
-        max_dd_start = (
-            np.argmax(equity_curve[: max_dd_end + 1]) if max_dd_end > 0 else 0
-        )
+        max_dd_start = np.argmax(equity_curve[: max_dd_end + 1]) if max_dd_end > 0 else 0
         max_dd_duration = max_dd_end - max_dd_start
 
         # Average drawdown
@@ -293,14 +289,10 @@ class MetricsCalculator:
         periods_per_year = 365  # Can be adjusted
 
         total_return = (equity_curve[-1] - initial_capital) / initial_capital
-        annualized_return = (1 + total_return) ** (
-            periods_per_year / max(n_periods, 1)
-        ) - 1
+        annualized_return = (1 + total_return) ** (periods_per_year / max(n_periods, 1)) - 1
 
         # Volatility
-        volatility = (
-            np.std(returns) * np.sqrt(periods_per_year) if len(returns) > 1 else 0
-        )
+        volatility = np.std(returns) * np.sqrt(periods_per_year) if len(returns) > 1 else 0
 
         # Sharpe Ratio
         risk_free_rate = self.config.risk_free_rate
@@ -309,11 +301,7 @@ class MetricsCalculator:
 
         # Sortino Ratio
         downside_returns = returns[returns < 0]
-        downside_std = (
-            np.std(downside_returns) * np.sqrt(periods_per_year)
-            if len(downside_returns) > 0
-            else 0
-        )
+        downside_std = np.std(downside_returns) * np.sqrt(periods_per_year) if len(downside_returns) > 0 else 0
         sortino_ratio = excess_return / downside_std if downside_std > 0 else 0
 
         # Max Drawdown
@@ -329,11 +317,7 @@ class MetricsCalculator:
         var_99 = np.percentile(returns, 1) if len(returns) > 0 else 0
 
         # CVaR (Expected Shortfall)
-        cvar_95 = (
-            np.mean(returns[returns <= var_95])
-            if len(returns[returns <= var_95]) > 0
-            else 0
-        )
+        cvar_95 = np.mean(returns[returns <= var_95]) if len(returns[returns <= var_95]) > 0 else 0
 
         return {
             "annualized_return": annualized_return,
@@ -393,14 +377,8 @@ class MetricsCalculator:
         long_pnl = sum(t.get("pnl", 0) for t in longs)
         short_pnl = sum(t.get("pnl", 0) for t in shorts)
 
-        long_win_rate = (
-            len([t for t in longs if t.get("pnl", 0) > 0]) / len(longs) if longs else 0
-        )
-        short_win_rate = (
-            len([t for t in shorts if t.get("pnl", 0) > 0]) / len(shorts)
-            if shorts
-            else 0
-        )
+        long_win_rate = len([t for t in longs if t.get("pnl", 0) > 0]) / len(longs) if longs else 0
+        short_win_rate = len([t for t in shorts if t.get("pnl", 0) > 0]) / len(shorts) if shorts else 0
 
         return {
             "expectancy": expectancy,
@@ -465,9 +443,7 @@ class MetricsCalculator:
                 max_loss_streak = max(max_loss_streak, current_loss)
 
         return {
-            "current_streak": current_streak
-            if streak_type == "win"
-            else -current_streak,
+            "current_streak": current_streak if streak_type == "win" else -current_streak,
             "max_win_streak": max_win_streak,
             "max_loss_streak": max_loss_streak,
         }
@@ -497,17 +473,13 @@ class MetricsCalculator:
 
         # Local calculations
         if self.config.calculate_basic:
-            metrics.update(
-                self.calculate_basic_metrics(equity_curve, trades, initial_capital)
-            )
+            metrics.update(self.calculate_basic_metrics(equity_curve, trades, initial_capital))
 
         if self.config.calculate_drawdown:
             metrics.update(self.calculate_drawdown_metrics(equity_curve))
 
         if self.config.calculate_risk:
-            metrics.update(
-                self.calculate_risk_metrics(equity_curve, trades, initial_capital)
-            )
+            metrics.update(self.calculate_risk_metrics(equity_curve, trades, initial_capital))
 
         if self.config.calculate_trade_stats:
             metrics.update(self.calculate_trade_stats(trades))
@@ -584,9 +556,7 @@ class CorrelationManager:
 
         # Trim to lookback
         if len(self.returns_history[symbol]) > self.lookback:
-            self.returns_history[symbol] = self.returns_history[symbol][
-                -self.lookback :
-            ]
+            self.returns_history[symbol] = self.returns_history[symbol][-self.lookback :]
 
         if symbol not in self.symbols:
             self.symbols.append(symbol)
@@ -779,9 +749,7 @@ class PortfolioManager:
             return False
 
         # Check total exposure
-        current_exposure = sum(
-            pos.size * pos.entry_price for pos in self.state.positions.values()
-        )
+        current_exposure = sum(pos.size * pos.entry_price for pos in self.state.positions.values())
         new_exposure = current_exposure + size * price
 
         # Check if we have enough equity for exposure
@@ -889,13 +857,9 @@ class PortfolioManager:
 
                 # Update unrealized PnL
                 if position.direction == 1:
-                    position.unrealized_pnl = (
-                        current_price - position.entry_price
-                    ) * position.size
+                    position.unrealized_pnl = (current_price - position.entry_price) * position.size
                 else:
-                    position.unrealized_pnl = (
-                        position.entry_price - current_price
-                    ) * position.size
+                    position.unrealized_pnl = (position.entry_price - current_price) * position.size
 
         self.state.total_equity = self.state.cash + position_value
 
@@ -916,16 +880,9 @@ class PortfolioManager:
             if symbol in self.state.positions and symbol in prices:
                 position = self.state.positions[symbol]
                 current_value = position.size * prices[symbol]
-                current_weight = (
-                    current_value / self.state.total_equity
-                    if self.state.total_equity > 0
-                    else 0
-                )
+                current_weight = current_value / self.state.total_equity if self.state.total_equity > 0 else 0
 
-                if (
-                    abs(current_weight - target_weight)
-                    > self.config.rebalance_threshold
-                ):
+                if abs(current_weight - target_weight) > self.config.rebalance_threshold:
                     return True
 
         return False

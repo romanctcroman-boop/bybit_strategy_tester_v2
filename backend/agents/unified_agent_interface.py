@@ -181,6 +181,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         # Health check if needed
         if time.time() - self.last_health_check > self.health_check_interval:
             task = asyncio.create_task(self._health_check())
+
             def _log_health_check_result(t: asyncio.Task) -> None:
                 if t.cancelled():
                     return

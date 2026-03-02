@@ -101,7 +101,7 @@ describe('Analytics Page — StateManager Integration (P0-3)', () => {
     describe('Shim sync — store → shim direction', () => {
         it('shim.equityChart updates when store changes', () => {
             const shim = buildShimSync(store);
-            const fakeChart = { id: 'equity', resize: () => {} };
+            const fakeChart = { id: 'equity', resize: () => { } };
             store.set('analytics.charts.equityChart', fakeChart);
             expect(shim.equityChart).toStrictEqual(fakeChart);
         });
@@ -137,7 +137,7 @@ describe('Analytics Page — StateManager Integration (P0-3)', () => {
 
     describe('State mutations', () => {
         it('can store equity chart object', () => {
-            const chart = { type: 'line', render: () => {} };
+            const chart = { type: 'line', render: () => { } };
             store.set('analytics.charts.equityChart', chart);
             // StateManager may clone objects; use toStrictEqual for structural equality
             expect(store.get('analytics.charts.equityChart')).toStrictEqual(chart);

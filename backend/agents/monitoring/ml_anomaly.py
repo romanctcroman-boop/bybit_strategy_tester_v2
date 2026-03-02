@@ -263,10 +263,7 @@ class IsolationForestDetector(AnomalyDetector):
             return (predictions == -1).tolist()
         elif self._fallback:
             flat = data.flatten()
-            return (
-                (flat < self._fallback["threshold_low"])
-                | (flat > self._fallback["threshold_high"])
-            ).tolist()
+            return ((flat < self._fallback["threshold_low"]) | (flat > self._fallback["threshold_high"])).tolist()
         else:
             self.fit(data)
             return self.detect(data)
@@ -312,9 +309,7 @@ class MovingAverageDetector(AnomalyDetector):
             return
 
         # Calculate rolling stats
-        self._baseline = np.convolve(
-            data, np.ones(self.window_size) / self.window_size, mode="valid"
-        )
+        self._baseline = np.convolve(data, np.ones(self.window_size) / self.window_size, mode="valid")
 
         # Pad to match original length
         pad_size = len(data) - len(self._baseline)
@@ -616,9 +611,7 @@ class MLAnomalyDetector:
         return {
             "metrics_tracked": len(self._history),
             "total_anomalies": sum(len(h) for h in self._anomaly_history.values()),
-            "by_metric": {
-                name: len(hist) for name, hist in self._anomaly_history.items()
-            },
+            "by_metric": {name: len(hist) for name, hist in self._anomaly_history.items()},
         }
 
 

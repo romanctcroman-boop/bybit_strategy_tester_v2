@@ -184,9 +184,7 @@ class MetricsCollector:
                 query_stats[key] = {
                     "count": histogram.count,
                     "sum_ms": histogram.sum,
-                    "avg_ms": histogram.sum / histogram.count
-                    if histogram.count > 0
-                    else 0,
+                    "avg_ms": histogram.sum / histogram.count if histogram.count > 0 else 0,
                 }
 
             return {
@@ -197,8 +195,7 @@ class MetricsCollector:
                     "count": self._connection_wait_histogram.count,
                     "sum_ms": self._connection_wait_histogram.sum,
                     "avg_ms": (
-                        self._connection_wait_histogram.sum
-                        / self._connection_wait_histogram.count
+                        self._connection_wait_histogram.sum / self._connection_wait_histogram.count
                         if self._connection_wait_histogram.count > 0
                         else 0
                     ),
@@ -213,9 +210,7 @@ class MetricsCollector:
 
         with self._lock:
             # Query duration histograms
-            lines.append(
-                "# HELP db_query_duration_seconds Database query duration in seconds"
-            )
+            lines.append("# HELP db_query_duration_seconds Database query duration in seconds")
             lines.append("# TYPE db_query_duration_seconds histogram")
 
             for (op, table), histogram in self._query_histograms.items():
@@ -224,28 +219,16 @@ class MetricsCollector:
                 cumulative = 0
                 for bucket in histogram.buckets:
                     cumulative += bucket.count
-                    le = (
-                        "+Inf"
-                        if bucket.le == float("inf")
-                        else f"{bucket.le / 1000:.3f}"
-                    )
-                    lines.append(
-                        f'db_query_duration_seconds_bucket{{{labels},le="{le}"}} {cumulative}'
-                    )
+                    le = "+Inf" if bucket.le == float("inf") else f"{bucket.le / 1000:.3f}"
+                    lines.append(f'db_query_duration_seconds_bucket{{{labels},le="{le}"}} {cumulative}')
 
-                lines.append(
-                    f"db_query_duration_seconds_sum{{{labels}}} {histogram.sum / 1000:.6f}"
-                )
-                lines.append(
-                    f"db_query_duration_seconds_count{{{labels}}} {histogram.count}"
-                )
+                lines.append(f"db_query_duration_seconds_sum{{{labels}}} {histogram.sum / 1000:.6f}")
+                lines.append(f"db_query_duration_seconds_count{{{labels}}} {histogram.count}")
 
             lines.append("")
 
             # Connection wait histogram
-            lines.append(
-                "# HELP db_connection_wait_seconds Time spent waiting for database connection"
-            )
+            lines.append("# HELP db_connection_wait_seconds Time spent waiting for database connection")
             lines.append("# TYPE db_connection_wait_seconds histogram")
 
             hist = self._connection_wait_histogram
@@ -253,9 +236,7 @@ class MetricsCollector:
             for bucket in hist.buckets:
                 cumulative += bucket.count
                 le = "+Inf" if bucket.le == float("inf") else f"{bucket.le / 1000:.3f}"
-                lines.append(
-                    f'db_connection_wait_seconds_bucket{{le="{le}"}} {cumulative}'
-                )
+                lines.append(f'db_connection_wait_seconds_bucket{{le="{le}"}} {cumulative}')
 
             lines.append(f"db_connection_wait_seconds_sum {hist.sum / 1000:.6f}")
             lines.append(f"db_connection_wait_seconds_count {hist.count}")
@@ -265,9 +246,7 @@ class MetricsCollector:
             lines.append("# HELP db_operations_total Total database operations by type")
             lines.append("# TYPE db_operations_total counter")
             for (op, table), count in self._operation_counts.items():
-                lines.append(
-                    f'db_operations_total{{operation="{op}",table="{table}"}} {count}'
-                )
+                lines.append(f'db_operations_total{{operation="{op}",table="{table}"}} {count}')
             lines.append("")
 
             # Error counts
@@ -275,15 +254,11 @@ class MetricsCollector:
             lines.append("# TYPE db_errors_total counter")
             for (op, table), count in self._error_counts.items():
                 if count > 0:
-                    lines.append(
-                        f'db_errors_total{{operation="{op}",table="{table}"}} {count}'
-                    )
+                    lines.append(f'db_errors_total{{operation="{op}",table="{table}"}} {count}')
             lines.append("")
 
             # Archive sizes
-            lines.append(
-                "# HELP db_archive_table_size_bytes Size of archive tables in bytes"
-            )
+            lines.append("# HELP db_archive_table_size_bytes Size of archive tables in bytes")
             lines.append("# TYPE db_archive_table_size_bytes gauge")
             for table, size in self._archive_sizes.items():
                 lines.append(f'db_archive_table_size_bytes{{table="{table}"}} {size}')

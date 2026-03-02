@@ -173,9 +173,7 @@ class OptimizationTimeoutError(OptimizerError):
         if total_combinations is not None:
             details["total_combinations"] = total_combinations
             if combinations_completed:
-                details["progress_pct"] = round(
-                    100 * combinations_completed / total_combinations, 1
-                )
+                details["progress_pct"] = round(100 * combinations_completed / total_combinations, 1)
         super().__init__(message, details)
 
 

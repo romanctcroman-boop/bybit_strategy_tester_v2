@@ -236,21 +236,13 @@ async def update_position(request: PositionRiskRequest):
     """
     try:
         dashboard = get_risk_dashboard()
-        total_equity = (
-            dashboard.equity_history[-1] if dashboard.equity_history else 10000.0
-        )
+        total_equity = dashboard.equity_history[-1] if dashboard.equity_history else 10000.0
 
         # Calculate metrics
         pnl_multiplier = 1 if request.side == "long" else -1
-        unrealized_pnl = (
-            (request.current_price - request.entry_price)
-            * request.size
-            * pnl_multiplier
-        )
+        unrealized_pnl = (request.current_price - request.entry_price) * request.size * pnl_multiplier
         unrealized_pnl_pct = (
-            (unrealized_pnl / (request.entry_price * request.size) * 100)
-            if request.entry_price > 0
-            else 0
+            (unrealized_pnl / (request.entry_price * request.size) * 100) if request.entry_price > 0 else 0
         )
         exposure = request.current_price * request.size * request.leverage
         exposure_pct = (exposure / total_equity * 100) if total_equity > 0 else 0

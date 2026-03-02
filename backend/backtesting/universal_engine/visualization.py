@@ -30,8 +30,8 @@ try:
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
-    Figure = Any
-    Axes = Any
+    Figure = Any  # type: ignore[misc,assignment]
+    Axes = Any  # type: ignore[misc,assignment]
 
 try:
     import plotly.graph_objects as go
@@ -165,9 +165,7 @@ class EquityData:
     peak_equity: np.ndarray
 
     @classmethod
-    def from_equity_series(
-        cls, timestamps: np.ndarray, equity: np.ndarray
-    ) -> "EquityData":
+    def from_equity_series(cls, timestamps: np.ndarray, equity: np.ndarray) -> "EquityData":
         """Create EquityData from raw equity series."""
         peak_equity = np.maximum.accumulate(equity)
         drawdown = peak_equity - equity
@@ -280,6 +278,8 @@ class MatplotlibChart(BaseChart):
         """Render and return Matplotlib figure."""
         if not HAS_MATPLOTLIB:
             raise ImportError("Matplotlib is required for this chart type")
+        if self._fig is None:
+            raise RuntimeError("Figure has not been initialized")
         return self._fig
 
     def save(self, filepath: str, dpi: int = 150) -> None:
@@ -463,11 +463,7 @@ class TradeScatterChart(PlotlyChart):
 
         # Separate winning and losing trades
         for trade in self.trades:
-            color = (
-                self.style.positive_color
-                if trade.is_profitable
-                else self.style.negative_color
-            )
+            color = self.style.positive_color if trade.is_profitable else self.style.negative_color
             symbol = "triangle-up" if trade.direction == "long" else "triangle-down"
 
             # Entry marker
@@ -585,9 +581,7 @@ class PerformanceHeatmap(PlotlyChart):
                 colorscale="RdYlGn",
                 colorbar={"title": self.z_label},
                 hovertemplate=(
-                    f"{self.x_label}: %{{x}}<br>"
-                    f"{self.y_label}: %{{y}}<br>"
-                    f"{self.z_label}: %{{z:.4f}}<extra></extra>"
+                    f"{self.x_label}: %{{x}}<br>{self.y_label}: %{{y}}<br>{self.z_label}: %{{z:.4f}}<extra></extra>"
                 ),
             )
         )
@@ -821,18 +815,9 @@ class TradeDistributionChart(PlotlyChart):
         mean_pnl = np.mean(self.pnl_values)
         std_pnl = np.std(self.pnl_values)
         x_range = np.linspace(min(self.pnl_values), max(self.pnl_values), 100)
-        normal_pdf = (
-            1
-            / (std_pnl * np.sqrt(2 * np.pi))
-            * np.exp(-0.5 * ((x_range - mean_pnl) / std_pnl) ** 2)
-        )
+        normal_pdf = 1 / (std_pnl * np.sqrt(2 * np.pi)) * np.exp(-0.5 * ((x_range - mean_pnl) / std_pnl) ** 2)
         # Scale to histogram
-        normal_pdf = (
-            normal_pdf
-            * len(self.pnl_values)
-            * (max(self.pnl_values) - min(self.pnl_values))
-            / 50
-        )
+        normal_pdf = normal_pdf * len(self.pnl_values) * (max(self.pnl_values) - min(self.pnl_values)) / 50
 
         self._fig.add_trace(
             go.Scatter(
@@ -875,10 +860,7 @@ class TradeDistributionChart(PlotlyChart):
         )
 
         # P&L by trade number
-        colors = [
-            self.style.positive_color if pnl > 0 else self.style.negative_color
-            for pnl in self.pnl_values
-        ]
+        colors = [self.style.positive_color if pnl > 0 else self.style.negative_color for pnl in self.pnl_values]
         self._fig.add_trace(
             go.Bar(
                 x=list(range(len(self.pnl_values))),
@@ -971,13 +953,13 @@ class MonthlyReturnsHeatmap(PlotlyChart):
                 row.append(value)
             z_data.append(row)
 
-        z_data = np.array(z_data)
+        z_matrix = np.array(z_data)
 
         # Create annotations
         annotations = []
         for i, year in enumerate(years):
-            for j, month in enumerate(months):
-                value = z_data[i, j]
+            for j, _month in enumerate(months):
+                value = z_matrix[i, j]
                 if not np.isnan(value):
                     annotations.append(
                         {
@@ -985,9 +967,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
                             "y": str(year),
                             "text": f"{value:.1f}%",
                             "showarrow": False,
-                            "font": {
-                                "color": "white" if abs(value) > 5 else "black", "size": 10
-                            },
+                            "font": {"color": "white" if abs(value) > 5 else "black", "size": 10},
                         }
                     )
 
@@ -997,7 +977,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
             go.Heatmap(
                 x=month_names,
                 y=[str(y) for y in years],
-                z=z_data,
+                z=z_matrix,
                 colorscale="RdYlGn",
                 zmid=0,
                 colorbar={"title": "Return %"},
@@ -1033,9 +1013,7 @@ class DashboardPanel:
 class TradingDashboard:
     """Comprehensive trading dashboard builder."""
 
-    def __init__(
-        self, title: str = "Trading Dashboard", style: ChartStyle | None = None
-    ):
+    def __init__(self, title: str = "Trading Dashboard", style: ChartStyle | None = None):
         """
         Initialize trading dashboard.
 
@@ -1049,9 +1027,7 @@ class TradingDashboard:
         self._rows = 1
         self._cols = 1
 
-    def add_panel(
-        self, chart: BaseChart, row: int, col: int, rowspan: int = 1, colspan: int = 1
-    ) -> "TradingDashboard":
+    def add_panel(self, chart: BaseChart, row: int, col: int, rowspan: int = 1, colspan: int = 1) -> "TradingDashboard":
         """
         Add a chart panel to the dashboard.
 
@@ -1065,11 +1041,7 @@ class TradingDashboard:
         Returns:
             Self for chaining
         """
-        self._panels.append(
-            DashboardPanel(
-                chart=chart, row=row, col=col, rowspan=rowspan, colspan=colspan
-            )
-        )
+        self._panels.append(DashboardPanel(chart=chart, row=row, col=col, rowspan=rowspan, colspan=colspan))
 
         self._rows = max(self._rows, row + rowspan - 1)
         self._cols = max(self._cols, col + colspan - 1)
@@ -1082,9 +1054,9 @@ class TradingDashboard:
             raise ImportError("Plotly is required for dashboards")
 
         # Create subplot grid
-        specs = []
+        specs: list[list[dict[str, Any]]] = []
         for _ in range(self._rows):
-            row_specs = []
+            row_specs: list[dict[str, Any]] = []
             for _ in range(self._cols):
                 row_specs.append({})
             specs.append(row_specs)
@@ -1099,16 +1071,13 @@ class TradingDashboard:
             for r in range(panel.row - 1, panel.row - 1 + panel.rowspan):
                 for c in range(panel.col - 1, panel.col - 1 + panel.colspan):
                     if r != panel.row - 1 or c != panel.col - 1:
-                        specs[r][c] = None
+                        specs[r][c] = None  # type: ignore[call-overload]
 
         fig = make_subplots(
             rows=self._rows,
             cols=self._cols,
             specs=specs,
-            subplot_titles=[
-                panel.chart._title or f"Panel {i + 1}"
-                for i, panel in enumerate(self._panels)
-            ],
+            subplot_titles=[panel.chart._title or f"Panel {i + 1}" for i, panel in enumerate(self._panels)],
         )
 
         # Add traces from each panel
@@ -1315,9 +1284,7 @@ def create_backtest_report(
 # =============================================================================
 
 
-def export_charts_to_html(
-    charts: list[BaseChart], filepath: str, title: str = "Trading Charts"
-) -> None:
+def export_charts_to_html(charts: list[BaseChart], filepath: str, title: str = "Trading Charts") -> None:
     """
     Export multiple charts to a single HTML file.
 

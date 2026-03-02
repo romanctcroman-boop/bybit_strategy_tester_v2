@@ -256,9 +256,7 @@ def ingest_upload(
     }
 
 
-def _parse_csv(
-    src: Path, symbol: str, interval: str
-) -> tuple[list[dict], int | None, int | None]:
+def _parse_csv(src: Path, symbol: str, interval: str) -> tuple[list[dict], int | None, int | None]:
     """Parse CSV file."""
     rows = []
     earliest_ms = None
@@ -295,9 +293,7 @@ def _parse_csv(
     return rows, earliest_ms, latest_ms
 
 
-def _parse_jsonl(
-    src: Path, symbol: str, interval: str
-) -> tuple[list[dict], int | None, int | None]:
+def _parse_jsonl(src: Path, symbol: str, interval: str) -> tuple[list[dict], int | None, int | None]:
     """Parse JSONL file."""
     rows = []
     earliest_ms = None

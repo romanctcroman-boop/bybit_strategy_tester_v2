@@ -130,6 +130,7 @@ class UniversalOptimizer:
 
     def __init__(self, backend: Literal["auto", "gpu", "cpu"] = "auto"):
         import warnings
+
         warnings.warn(
             "UniversalOptimizer is deprecated (RSI-only). "
             "Use NumbaEngineV2 with BacktestInput for full V4 support "
@@ -148,18 +149,12 @@ class UniversalOptimizer:
                 logger.info("🚀 UniversalOptimizer: Using GPU backend (auto-detected)")
             elif _NUMBA_OPTIMIZER_AVAILABLE:
                 self._use_gpu = False
-                logger.info(
-                    "⚡ UniversalOptimizer: Using CPU/Numba backend (GPU not available)"
-                )
+                logger.info("⚡ UniversalOptimizer: Using CPU/Numba backend (GPU not available)")
             else:
-                raise RuntimeError(
-                    "No optimizer backend available! Install CuPy or Numba."
-                )
+                raise RuntimeError("No optimizer backend available! Install CuPy or Numba.")
         elif backend == "gpu":
             if not _GPU_OPTIMIZER_AVAILABLE or not GPU_AVAILABLE:
-                raise RuntimeError(
-                    "GPU backend requested but not available. Check CUDA/CuPy installation."
-                )
+                raise RuntimeError("GPU backend requested but not available. Check CUDA/CuPy installation.")
             self._use_gpu = True
             logger.info("🚀 UniversalOptimizer: Using GPU backend (forced)")
         elif backend == "cpu":
@@ -168,9 +163,7 @@ class UniversalOptimizer:
             self._use_gpu = False
             logger.info("⚡ UniversalOptimizer: Using CPU/Numba backend (forced)")
         else:
-            raise ValueError(
-                f"Invalid backend: {backend}. Use 'auto', 'gpu', or 'cpu'."
-            )
+            raise ValueError(f"Invalid backend: {backend}. Use 'auto', 'gpu', or 'cpu'.")
 
     def _get_gpu_optimizer(self) -> "GPUGridOptimizer":
         """Lazy-load GPU optimizer"""

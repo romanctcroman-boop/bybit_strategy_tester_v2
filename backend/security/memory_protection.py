@@ -96,9 +96,7 @@ class SecureString:
             return False
 
         try:
-            addr = ctypes.addressof(
-                (ctypes.c_char * len(self._data)).from_buffer(self._data)
-            )
+            addr = ctypes.addressof((ctypes.c_char * len(self._data)).from_buffer(self._data))
             size = len(self._data)
 
             if IS_WINDOWS and VIRTUAL_LOCK:
@@ -117,9 +115,7 @@ class SecureString:
             return
 
         try:
-            addr = ctypes.addressof(
-                (ctypes.c_char * len(self._data)).from_buffer(self._data)
-            )
+            addr = ctypes.addressof((ctypes.c_char * len(self._data)).from_buffer(self._data))
             size = len(self._data)
 
             if IS_WINDOWS and VIRTUAL_UNLOCK:

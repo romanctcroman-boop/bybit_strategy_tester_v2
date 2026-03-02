@@ -230,9 +230,7 @@ class TournamentOrchestrator:
 
         logger.info(f"Starting tournament: {tournament_id}")
         logger.info(f"Participants: {len(strategies)}")
-        logger.info(
-            f"Optimization: {'enabled' if config.enable_optimization else 'disabled'}"
-        )
+        logger.info(f"Optimization: {'enabled' if config.enable_optimization else 'disabled'}")
 
         # Initialize result
         result = TournamentResult(
@@ -253,9 +251,7 @@ class TournamentOrchestrator:
                 regime_result = self.regime_detector.detect_regime(data)
                 result.market_regime = regime_result.regime.value
                 result.market_regime_confidence = regime_result.confidence
-                logger.info(
-                    f"Market regime: {regime_result.regime.value} ({regime_result.confidence:.2%})"
-                )
+                logger.info(f"Market regime: {regime_result.regime.value} ({regime_result.confidence:.2%})")
 
             # Step 2: Strategy Optimization
             if config.enable_optimization and self.optimizer:
@@ -269,9 +265,7 @@ class TournamentOrchestrator:
                 result.optimization_time = (datetime.now() - opt_start).total_seconds()
                 logger.info(f"Optimization complete: {result.optimization_time:.1f}s")
                 if self.latency_tuner:
-                    self.latency_tuner.record_optimizer_latency(
-                        result.optimization_time
-                    )
+                    self.latency_tuner.record_optimizer_latency(result.optimization_time)
 
             # Step 3: Strategy Execution
             logger.info("Starting strategy execution phase...")
@@ -294,21 +288,13 @@ class TournamentOrchestrator:
             result.top_3 = strategies[:3]
 
             # Count successes/failures
-            result.successful_backtests = sum(
-                1 for s in strategies if s.backtest_result and not s.errors
-            )
-            result.failed_backtests = (
-                result.total_participants - result.successful_backtests
-            )
+            result.successful_backtests = sum(1 for s in strategies if s.backtest_result and not s.errors)
+            result.failed_backtests = result.total_participants - result.successful_backtests
 
             if self.latency_tuner:
-                result.metadata["latency_auto_tuner"] = (
-                    self.latency_tuner.export_metrics()
-                )
+                result.metadata["latency_auto_tuner"] = self.latency_tuner.export_metrics()
 
-            result.drift_snapshot = self._build_drift_snapshot(
-                strategies, result, config
-            )
+            result.drift_snapshot = self._build_drift_snapshot(strategies, result, config)
             await self._publish_self_learning_snapshot(result.drift_snapshot)
 
             # Complete
@@ -317,12 +303,8 @@ class TournamentOrchestrator:
             result.total_duration = (result.completed_at - started_at).total_seconds()
 
             logger.info("Tournament complete!")
-            logger.info(
-                f"Winner: {result.winner.strategy_name if result.winner else 'None'}"
-            )
-            logger.info(
-                f"Score: {result.winner.final_score:.4f}" if result.winner else ""
-            )
+            logger.info(f"Winner: {result.winner.strategy_name if result.winner else 'None'}")
+            logger.info(f"Score: {result.winner.final_score:.4f}" if result.winner else "")
 
             # Step 6: Store in Knowledge Base
             if config.enable_kb_logging and self.reasoning_storage:
@@ -358,9 +340,7 @@ class TournamentOrchestrator:
         async def optimize_one(strategy: StrategyEntry):
             """Optimize single strategy"""
             if not strategy.param_space:
-                logger.warning(
-                    f"No param space for {strategy.strategy_name}, skipping optimization"
-                )
+                logger.warning(f"No param space for {strategy.strategy_name}, skipping optimization")
                 return
 
             try:
@@ -375,9 +355,7 @@ class TournamentOrchestrator:
                 )
 
                 strategy.optimized_params = opt_result.best_params
-                logger.info(
-                    f"Optimized {strategy.strategy_name}: {opt_result.best_params}"
-                )
+                logger.info(f"Optimized {strategy.strategy_name}: {opt_result.best_params}")
 
             except Exception as e:
                 logger.error(f"Optimization failed for {strategy.strategy_name}: {e}")
@@ -427,20 +405,14 @@ class TournamentOrchestrator:
                     else:
                         error_msg = result.get("error", "Unknown error")
                         strategy.errors.append(f"Execution error: {error_msg}")
-                        logger.error(
-                            f"Execution failed for {strategy.strategy_name}: {error_msg}"
-                        )
+                        logger.error(f"Execution failed for {strategy.strategy_name}: {error_msg}")
                 else:
                     # Fallback: mock execution (for testing without sandbox)
-                    logger.warning(
-                        f"No sandbox, using mock execution for {strategy.strategy_name}"
-                    )
+                    logger.warning(f"No sandbox, using mock execution for {strategy.strategy_name}")
                     strategy.backtest_result = self._mock_backtest_result()
 
                 strategy.execution_time = (datetime.now() - exec_start).total_seconds()
-                logger.info(
-                    f"Executed {strategy.strategy_name} in {strategy.execution_time:.1f}s"
-                )
+                logger.info(f"Executed {strategy.strategy_name} in {strategy.execution_time:.1f}s")
                 if self.latency_tuner:
                     self.latency_tuner.record_execution_latency(strategy.execution_time)
 
@@ -491,11 +463,7 @@ class TournamentOrchestrator:
             )
 
         models_needing_retrain = (
-            self.drift_monitor.get_models_needing_retrain(
-                config.drift_retrain_threshold
-            )
-            if self.drift_monitor
-            else []
+            self.drift_monitor.get_models_needing_retrain(config.drift_retrain_threshold) if self.drift_monitor else []
         )
 
         return {
@@ -507,9 +475,7 @@ class TournamentOrchestrator:
             "total_drift_events": total_drift_events,
             "models_needing_retrain": models_needing_retrain,
             "strategies": snapshot_strategies,
-            "latency_auto_tuner": self.latency_tuner.export_metrics()
-            if self.latency_tuner
-            else None,
+            "latency_auto_tuner": self.latency_tuner.export_metrics() if self.latency_tuner else None,
         }
 
     async def _publish_self_learning_snapshot(self, snapshot: dict[str, Any]) -> None:
@@ -548,11 +514,7 @@ class TournamentOrchestrator:
     ) -> None:
         """Update drift detector with latest metrics and act on alerts."""
 
-        if not (
-            config.enable_drift_monitoring
-            and self.drift_monitor
-            and strategy.backtest_result
-        ):
+        if not (config.enable_drift_monitoring and self.drift_monitor and strategy.backtest_result):
             return
 
         actual_return = strategy.backtest_result.get("total_return")
@@ -568,9 +530,7 @@ class TournamentOrchestrator:
         )
 
         alpha = max(0.05, min(config.drift_baseline_alpha, 0.9))
-        self._performance_baseline[strategy.strategy_id] = (
-            1 - alpha
-        ) * baseline + alpha * actual_return
+        self._performance_baseline[strategy.strategy_id] = (1 - alpha) * baseline + alpha * actual_return
 
         status = self.drift_monitor.get_status(strategy.strategy_id)
         strategy.drift_status = status
@@ -643,14 +603,10 @@ class TournamentOrchestrator:
                 )
 
                 if retrain_exec.get("success"):
-                    strategy.backtest_result = retrain_exec.get(
-                        "metrics", strategy.backtest_result
-                    )
+                    strategy.backtest_result = retrain_exec.get("metrics", strategy.backtest_result)
                     strategy.errors = []
                 else:
-                    strategy.errors.append(
-                        f"Emergency retrain execution failed: {retrain_exec.get('error')}"
-                    )
+                    strategy.errors.append(f"Emergency retrain execution failed: {retrain_exec.get('error')}")
             else:
                 strategy.backtest_result = self._mock_backtest_result()
 
@@ -680,13 +636,9 @@ class TournamentOrchestrator:
             await self.reasoning_storage.store_reasoning_trace(
                 agent_type="tournament_orchestrator",
                 task_type="drift_monitoring",
-                input_prompt=(
-                    f"Monitor drift for {strategy.strategy_name} during tournament"
-                ),
+                input_prompt=(f"Monitor drift for {strategy.strategy_name} during tournament"),
                 reasoning_chain=payload,
-                final_conclusion=(
-                    f"Drift count={payload['status'].get('drift_detected_count', 0)}"
-                ),
+                final_conclusion=(f"Drift count={payload['status'].get('drift_detected_count', 0)}"),
                 processing_time=strategy.execution_time,
             )
         except Exception as exc:
@@ -741,9 +693,7 @@ class TournamentOrchestrator:
             strategy.final_score = score
             logger.debug(f"{strategy.strategy_name}: score = {score:.4f}")
 
-    def _adjust_score_for_regime(
-        self, score: float, result: dict[str, Any], market_regime: str
-    ) -> float:
+    def _adjust_score_for_regime(self, score: float, result: dict[str, Any], market_regime: str) -> float:
         """Adjust score based on market regime"""
         # Bonus/penalty based on strategy performance in current regime
 
@@ -757,10 +707,9 @@ class TournamentOrchestrator:
             if result.get("mean_reversion_score", 0) > 0.5:
                 score *= 1.1
 
-        elif market_regime == "volatile":
+        elif market_regime == "volatile" and result.get("trade_frequency", 0) > 10:
             # Penalty for high-frequency strategies
-            if result.get("trade_frequency", 0) > 10:
-                score *= 0.9
+            score *= 0.9
 
         return score
 
@@ -785,9 +734,7 @@ class TournamentOrchestrator:
             "profit_factor": np.random.uniform(0.5, 2.5),
         }
 
-    async def _store_tournament_trace(
-        self, result: TournamentResult, config: TournamentConfig
-    ):
+    async def _store_tournament_trace(self, result: TournamentResult, config: TournamentConfig):
         """Store tournament in Knowledge Base"""
         if not self.reasoning_storage:
             return
@@ -804,8 +751,7 @@ class TournamentOrchestrator:
                 "winner": {
                     "strategy_name": result.winner.strategy_name,
                     "final_score": result.winner.final_score,
-                    "params": result.winner.optimized_params
-                    or result.winner.initial_params,
+                    "params": result.winner.optimized_params or result.winner.initial_params,
                 }
                 if result.winner
                 else None,
@@ -871,9 +817,7 @@ if __name__ == "__main__":
         from backend.ml import MarketRegimeDetector, StrategyOptimizer
 
         # Initialize orchestrator
-        orchestrator = TournamentOrchestrator(
-            optimizer=StrategyOptimizer(), regime_detector=MarketRegimeDetector()
-        )
+        orchestrator = TournamentOrchestrator(optimizer=StrategyOptimizer(), regime_detector=MarketRegimeDetector())
 
         # Mock data
         data = pd.DataFrame(
@@ -924,8 +868,6 @@ if __name__ == "__main__":
 
         print("\n📊 Rankings:")
         for strategy in result.participants[:5]:
-            print(
-                f"  #{strategy.rank}: {strategy.strategy_name} - {strategy.final_score:.4f}"
-            )
+            print(f"  #{strategy.rank}: {strategy.strategy_name} - {strategy.final_score:.4f}")
 
     asyncio.run(example())

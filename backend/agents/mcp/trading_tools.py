@@ -1,4 +1,4 @@
-﻿"""Trading-Specific MCP Tools - Re-export Facade.
+"""Trading-Specific MCP Tools - Re-export Facade.
 
 All tool implementations live in backend.agents.mcp.tools sub-modules.
 This file re-exports every public symbol so existing imports work unchanged.

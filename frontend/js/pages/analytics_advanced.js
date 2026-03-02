@@ -9,207 +9,208 @@
  */
 
 // Import shared utilities
-import { apiClient, API_CONFIG } from "../api.js";
+import { apiClient, API_CONFIG } from '../api.js';
 import {
   formatNumber,
   formatCurrency,
   formatDate,
-  debounce,
-} from "../utils.js";
+  debounce
+} from '../utils.js';
+import { localDateStr } from '../utils/dateUtils.js';
 
 // Chart.js defaults
-Chart.defaults.color = "#8b949e";
-Chart.defaults.borderColor = "#30363d";
+Chart.defaults.color = '#8b949e';
+Chart.defaults.borderColor = '#30363d';
 
 // Equity Curve Chart
-const equityCtx = document.getElementById("equityCurveChart").getContext("2d");
+const equityCtx = document.getElementById('equityCurveChart').getContext('2d');
 const equityData = {
   labels: Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`),
   datasets: [
     {
-      label: "Portfolio Value",
+      label: 'Portfolio Value',
       data: [
         10000, 10250, 10180, 10420, 10650, 10580, 10820, 11050, 10980, 11200,
         11450, 11380, 11620, 11850, 11780, 12020, 12250, 12180, 12420, 12650,
-        12580, 12820, 13050, 12980, 13200, 13450, 13380, 13620, 13850, 14782,
+        12580, 12820, 13050, 12980, 13200, 13450, 13380, 13620, 13850, 14782
       ],
-      borderColor: "#58a6ff",
-      backgroundColor: "rgba(88, 166, 255, 0.1)",
+      borderColor: '#58a6ff',
+      backgroundColor: 'rgba(88, 166, 255, 0.1)',
       fill: true,
       tension: 0.4,
       pointRadius: 0,
-      pointHoverRadius: 6,
+      pointHoverRadius: 6
     },
     {
-      label: "Benchmark (Buy & Hold)",
+      label: 'Benchmark (Buy & Hold)',
       data: [
         10000, 10100, 10050, 10200, 10350, 10300, 10450, 10600, 10550, 10700,
         10850, 10800, 10950, 11100, 11050, 11200, 11350, 11300, 11450, 11600,
-        11550, 11700, 11850, 11800, 11950, 12100, 12050, 12200, 12350, 12500,
+        11550, 11700, 11850, 11800, 11950, 12100, 12050, 12200, 12350, 12500
       ],
-      borderColor: "#8b949e",
+      borderColor: '#8b949e',
       borderDash: [5, 5],
       fill: false,
       tension: 0.4,
-      pointRadius: 0,
-    },
-  ],
+      pointRadius: 0
+    }
+  ]
 };
 new Chart(equityCtx, {
-  type: "line",
+  type: 'line',
   data: equityData,
   options: {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
       intersect: false,
-      mode: "index",
+      mode: 'index'
     },
     plugins: {
       legend: {
-        position: "top",
-        align: "end",
-      },
+        position: 'top',
+        align: 'end'
+      }
     },
     scales: {
       y: {
         beginAtZero: false,
         grid: {
-          color: "rgba(48, 54, 61, 0.5)",
-        },
+          color: 'rgba(48, 54, 61, 0.5)'
+        }
       },
       x: {
         grid: {
-          display: false,
-        },
-      },
-    },
-  },
+          display: false
+        }
+      }
+    }
+  }
 });
 
 // Returns Distribution Chart
-const returnsCtx = document.getElementById("returnsDistChart").getContext("2d");
+const returnsCtx = document.getElementById('returnsDistChart').getContext('2d');
 new Chart(returnsCtx, {
-  type: "bar",
+  type: 'bar',
   data: {
     labels: [
-      "<-5%",
-      "-5% to -3%",
-      "-3% to -1%",
-      "-1% to 0%",
-      "0% to 1%",
-      "1% to 3%",
-      "3% to 5%",
-      ">5%",
+      '<-5%',
+      '-5% to -3%',
+      '-3% to -1%',
+      '-1% to 0%',
+      '0% to 1%',
+      '1% to 3%',
+      '3% to 5%',
+      '>5%'
     ],
     datasets: [
       {
-        label: "Trade Count",
+        label: 'Trade Count',
         data: [12, 45, 128, 234, 312, 287, 156, 42],
         backgroundColor: [
-          "rgba(248, 81, 73, 0.8)",
-          "rgba(248, 81, 73, 0.6)",
-          "rgba(248, 81, 73, 0.4)",
-          "rgba(248, 81, 73, 0.2)",
-          "rgba(63, 185, 80, 0.2)",
-          "rgba(63, 185, 80, 0.4)",
-          "rgba(63, 185, 80, 0.6)",
-          "rgba(63, 185, 80, 0.8)",
+          'rgba(248, 81, 73, 0.8)',
+          'rgba(248, 81, 73, 0.6)',
+          'rgba(248, 81, 73, 0.4)',
+          'rgba(248, 81, 73, 0.2)',
+          'rgba(63, 185, 80, 0.2)',
+          'rgba(63, 185, 80, 0.4)',
+          'rgba(63, 185, 80, 0.6)',
+          'rgba(63, 185, 80, 0.8)'
         ],
-        borderRadius: 4,
-      },
-    ],
+        borderRadius: 4
+      }
+    ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
-      },
+        display: false
+      }
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
-          color: "rgba(48, 54, 61, 0.5)",
-        },
+          color: 'rgba(48, 54, 61, 0.5)'
+        }
       },
       x: {
         grid: {
-          display: false,
-        },
-      },
-    },
-  },
+          display: false
+        }
+      }
+    }
+  }
 });
 
 // Drawdown Chart
-const ddCtx = document.getElementById("drawdownChart").getContext("2d");
+const ddCtx = document.getElementById('drawdownChart').getContext('2d');
 const drawdownData = [
   0, -0.5, -1.2, -0.8, -0.3, -1.5, -2.1, -1.8, -0.9, -0.4, -2.5, -3.2, -4.1,
   -5.2, -6.8, -8.4, -7.2, -5.8, -4.2, -3.1, -2.4, -1.8, -1.2, -0.6, -1.4, -2.1,
-  -1.5, -0.8, -0.3, -2.1,
+  -1.5, -0.8, -0.3, -2.1
 ];
 new Chart(ddCtx, {
-  type: "line",
+  type: 'line',
   data: {
     labels: Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`),
     datasets: [
       {
-        label: "Drawdown %",
+        label: 'Drawdown %',
         data: drawdownData,
-        borderColor: "#f85149",
-        backgroundColor: "rgba(248, 81, 73, 0.2)",
+        borderColor: '#f85149',
+        backgroundColor: 'rgba(248, 81, 73, 0.2)',
         fill: true,
         tension: 0.4,
-        pointRadius: 0,
-      },
-    ],
+        pointRadius: 0
+      }
+    ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
-      },
+        display: false
+      }
     },
     scales: {
       y: {
         max: 0,
         grid: {
-          color: "rgba(48, 54, 61, 0.5)",
+          color: 'rgba(48, 54, 61, 0.5)'
         },
         ticks: {
           callback: function (value) {
-            return value + "%";
-          },
-        },
+            return value + '%';
+          }
+        }
       },
       x: {
         grid: {
-          display: false,
-        },
-      },
-    },
-  },
+          display: false
+        }
+      }
+    }
+  }
 });
 
 // Hourly Distribution Chart
-const hourlyCtx = document.getElementById("hourlyChart").getContext("2d");
+const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
 new Chart(hourlyCtx, {
-  type: "bar",
+  type: 'bar',
   data: {
-    labels: ["0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22"],
+    labels: ['0', '2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22'],
     datasets: [
       {
-        label: "Trades",
+        label: 'Trades',
         data: [45, 32, 28, 52, 78, 125, 156, 142, 168, 134, 89, 56],
-        backgroundColor: "rgba(88, 166, 255, 0.6)",
-        borderRadius: 4,
-      },
-    ],
+        backgroundColor: 'rgba(88, 166, 255, 0.6)',
+        borderRadius: 4
+      }
+    ]
   },
   options: {
     responsive: true,
@@ -217,29 +218,29 @@ new Chart(hourlyCtx, {
     plugins: { legend: { display: false } },
     scales: {
       y: { display: false },
-      x: { grid: { display: false } },
-    },
-  },
+      x: { grid: { display: false } }
+    }
+  }
 });
 
 // Daily Distribution Chart
-const dailyCtx = document.getElementById("dailyChart").getContext("2d");
+const dailyCtx = document.getElementById('dailyChart').getContext('2d');
 new Chart(dailyCtx, {
-  type: "bar",
+  type: 'bar',
   data: {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
-        label: "P&L",
+        label: 'P&L',
         data: [2450, 1820, 3120, -580, 1950, 890, 1240],
         backgroundColor: function (context) {
           return context.raw >= 0
-            ? "rgba(63, 185, 80, 0.6)"
-            : "rgba(248, 81, 73, 0.6)";
+            ? 'rgba(63, 185, 80, 0.6)'
+            : 'rgba(248, 81, 73, 0.6)';
         },
-        borderRadius: 4,
-      },
-    ],
+        borderRadius: 4
+      }
+    ]
   },
   options: {
     responsive: true,
@@ -247,45 +248,45 @@ new Chart(dailyCtx, {
     plugins: { legend: { display: false } },
     scales: {
       y: { display: false },
-      x: { grid: { display: false } },
-    },
-  },
+      x: { grid: { display: false } }
+    }
+  }
 });
 
 // Symbol Distribution Chart
-const symbolCtx = document.getElementById("symbolChart").getContext("2d");
+const symbolCtx = document.getElementById('symbolChart').getContext('2d');
 new Chart(symbolCtx, {
-  type: "doughnut",
+  type: 'doughnut',
   data: {
-    labels: ["BTC", "ETH", "SOL", "XRP", "Others"],
+    labels: ['BTC', 'ETH', 'SOL', 'XRP', 'Others'],
     datasets: [
       {
         data: [35, 28, 18, 12, 7],
         backgroundColor: [
-          "#f7931a",
-          "#627eea",
-          "#00ffa3",
-          "#23292f",
-          "#8b949e",
+          '#f7931a',
+          '#627eea',
+          '#00ffa3',
+          '#23292f',
+          '#8b949e'
         ],
-        borderWidth: 0,
-      },
-    ],
+        borderWidth: 0
+      }
+    ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: "right",
+        position: 'right',
         labels: {
           boxWidth: 12,
-          padding: 8,
-        },
-      },
+          padding: 8
+        }
+      }
     },
-    cutout: "60%",
-  },
+    cutout: '60%'
+  }
 });
 
 // Mini Charts for Strategy Comparison
@@ -293,7 +294,7 @@ function createMiniChart(canvasId, data, color) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
   new Chart(ctx, {
-    type: "line",
+    type: 'line',
     data: {
       labels: data,
       datasets: [
@@ -303,9 +304,9 @@ function createMiniChart(canvasId, data, color) {
           borderWidth: 2,
           fill: false,
           tension: 0.4,
-          pointRadius: 0,
-        },
-      ],
+          pointRadius: 0
+        }
+      ]
     },
     options: {
       responsive: true,
@@ -313,104 +314,104 @@ function createMiniChart(canvasId, data, color) {
       plugins: { legend: { display: false } },
       scales: {
         x: { display: false },
-        y: { display: false },
-      },
-    },
+        y: { display: false }
+      }
+    }
   });
 }
 
 createMiniChart(
-  "miniChart1",
+  'miniChart1',
   [10, 12, 11, 14, 13, 16, 18, 17, 20, 22, 24],
-  "#58a6ff",
+  '#58a6ff'
 );
 createMiniChart(
-  "miniChart2",
+  'miniChart2',
   [10, 11, 10, 12, 11, 13, 12, 14, 15, 17, 18],
-  "#a371f7",
+  '#a371f7'
 );
 createMiniChart(
-  "miniChart3",
+  'miniChart3',
   [10, 13, 12, 15, 18, 17, 20, 19, 22, 28, 31],
-  "#3fb950",
+  '#3fb950'
 );
 createMiniChart(
-  "miniChart4",
+  'miniChart4',
   [10, 10, 11, 11, 11, 12, 12, 11, 12, 12, 12],
-  "#f0883e",
+  '#f0883e'
 );
 
 // Generate Heatmap
 function generateHeatmap() {
-  const grid = document.getElementById("heatmapGrid");
+  const grid = document.getElementById('heatmapGrid');
   const months = [
-    "",
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
+    '',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
   ];
-  const years = ["2024", "2025"];
+  const years = ['2024', '2025'];
 
   const performanceData = {
     2024: [4.2, -1.5, 2.8, 5.1, -2.3, 3.7, 6.2, -0.8, 4.5, 7.1, 3.2, 5.8],
-    2025: [6.4, 4.8, -1.2, 3.5, 2.9, 5.2, 0, 0, 0, 0, 0, 0],
+    2025: [6.4, 4.8, -1.2, 3.5, 2.9, 5.2, 0, 0, 0, 0, 0, 0]
   };
 
   // Header row
   months.forEach((month) => {
-    const cell = document.createElement("div");
-    cell.className = "heatmap-label";
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-label';
     cell.textContent = month;
-    cell.style.justifyContent = month ? "center" : "flex-end";
-    cell.style.paddingRight = month ? "0" : "8px";
+    cell.style.justifyContent = month ? 'center' : 'flex-end';
+    cell.style.paddingRight = month ? '0' : '8px';
     grid.appendChild(cell);
   });
 
   // Data rows
   years.forEach((year) => {
-    const yearLabel = document.createElement("div");
-    yearLabel.className = "heatmap-label";
+    const yearLabel = document.createElement('div');
+    yearLabel.className = 'heatmap-label';
     yearLabel.textContent = year;
-    yearLabel.style.justifyContent = "flex-end";
-    yearLabel.style.paddingRight = "8px";
+    yearLabel.style.justifyContent = 'flex-end';
+    yearLabel.style.paddingRight = '8px';
     grid.appendChild(yearLabel);
 
     performanceData[year].forEach((value, idx) => {
-      const cell = document.createElement("div");
-      cell.className = "heatmap-cell";
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
 
       if (value === 0) {
-        cell.classList.add("neutral");
+        cell.classList.add('neutral');
       } else if (value > 5) {
-        cell.classList.add("profit-high");
+        cell.classList.add('profit-high');
         cell.textContent = `+${value}%`;
       } else if (value > 2) {
-        cell.classList.add("profit-medium");
+        cell.classList.add('profit-medium');
         cell.textContent = `+${value}%`;
       } else if (value > 0) {
-        cell.classList.add("profit-low");
+        cell.classList.add('profit-low');
         cell.textContent = `+${value}%`;
       } else if (value > -2) {
-        cell.classList.add("loss-low");
+        cell.classList.add('loss-low');
         cell.textContent = `${value}%`;
       } else if (value > -5) {
-        cell.classList.add("loss-medium");
+        cell.classList.add('loss-medium');
         cell.textContent = `${value}%`;
       } else {
-        cell.classList.add("loss-high");
+        cell.classList.add('loss-high');
         cell.textContent = `${value}%`;
       }
 
-      cell.title = `${months[idx + 1]} ${year}: ${value > 0 ? "+" : ""}${value}%`;
+      cell.title = `${months[idx + 1]} ${year}: ${value > 0 ? '+' : ''}${value}%`;
       grid.appendChild(cell);
     });
   });
@@ -419,36 +420,36 @@ function generateHeatmap() {
 generateHeatmap();
 
 // Tab switching
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", function () {
-    document.querySelectorAll(".tab").forEach((t) => {
-      t.classList.remove("active");
-      t.setAttribute("aria-selected", "false");
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach((t) => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
     });
-    this.classList.add("active");
-    this.setAttribute("aria-selected", "true");
+    this.classList.add('active');
+    this.setAttribute('aria-selected', 'true');
   });
 });
 
 // Chart period buttons
-document.querySelectorAll(".chart-controls").forEach((controls) => {
-  controls.querySelectorAll(".chart-btn").forEach((btn) => {
-    btn.addEventListener("click", function () {
+document.querySelectorAll('.chart-controls').forEach((controls) => {
+  controls.querySelectorAll('.chart-btn').forEach((btn) => {
+    btn.addEventListener('click', function () {
       controls
-        .querySelectorAll(".chart-btn")
-        .forEach((b) => b.classList.remove("active"));
-      this.classList.add("active");
+        .querySelectorAll('.chart-btn')
+        .forEach((b) => b.classList.remove('active'));
+      this.classList.add('active');
     });
   });
 });
 
 // Keyboard shortcuts
-document.addEventListener("keydown", function (e) {
-  if (e.key === "r" && !e.ctrlKey && !e.metaKey) {
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
     // Refresh data
-    console.log("Refreshing data...");
+    console.log('Refreshing data...');
   }
-  if (e.key === "Escape") {
+  if (e.key === 'Escape') {
     // Close any open modals
   }
 });
@@ -463,9 +464,9 @@ let mcDistributionChart = null;
 // Load backtests for Monte Carlo dropdown
 async function loadBacktestsForMonteCarlo() {
   try {
-    const response = await fetch("/api/v1/backtests/?limit=20");
+    const response = await fetch('/api/v1/backtests/?limit=20');
     const data = await response.json();
-    const select = document.getElementById("mcBacktestSelect");
+    const select = document.getElementById('mcBacktestSelect');
 
     if (!select) return;
 
@@ -473,36 +474,36 @@ async function loadBacktestsForMonteCarlo() {
 
     const backtests = data.backtests || data || [];
     backtests.forEach((bt) => {
-      const option = document.createElement("option");
+      const option = document.createElement('option');
       option.value = bt.id;
-      option.textContent = `${bt.symbol || "Unknown"} - ${bt.strategy_type || "Strategy"} (${bt.created_at?.split("T")[0] || ""})`;
+      option.textContent = `${bt.symbol || 'Unknown'} - ${bt.strategy_type || 'Strategy'} (${bt.created_at?.split('T')[0] || ''})`;
       select.appendChild(option);
     });
   } catch (error) {
-    console.error("Failed to load backtests:", error);
+    console.error('Failed to load backtests:', error);
   }
 }
 
 // Run Monte Carlo Simulation
 async function runMonteCarloSimulation() {
-  const backtestId = document.getElementById("mcBacktestSelect")?.value;
+  const backtestId = document.getElementById('mcBacktestSelect')?.value;
   const simulations =
-    parseInt(document.getElementById("mcSimulations")?.value) || 1000;
+    parseInt(document.getElementById('mcSimulations')?.value) || 1000;
   const capital =
-    parseFloat(document.getElementById("mcCapital")?.value) || 10000;
-  const method = document.getElementById("mcMethod")?.value || "bootstrap";
+    parseFloat(document.getElementById('mcCapital')?.value) || 10000;
+  const method = document.getElementById('mcMethod')?.value || 'bootstrap';
   const confidence =
-    parseFloat(document.getElementById("mcConfidence")?.value) || 0.95;
+    parseFloat(document.getElementById('mcConfidence')?.value) || 0.95;
 
   if (!backtestId) {
-    alert("Please select a backtest first");
+    alert('Please select a backtest first');
     return;
   }
 
   // Show loading
-  document.getElementById("mcLoading").style.display = "block";
-  document.getElementById("mcResults").style.display = "none";
-  document.getElementById("mcEmpty").style.display = "none";
+  document.getElementById('mcLoading').style.display = 'block';
+  document.getElementById('mcResults').style.display = 'none';
+  document.getElementById('mcEmpty').style.display = 'none';
 
   try {
     // Get backtest data first
@@ -510,20 +511,20 @@ async function runMonteCarloSimulation() {
     const backtest = await btResponse.json();
 
     // Run Monte Carlo analysis
-    const mcResponse = await fetch("/api/v1/monte-carlo/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const mcResponse = await fetch('/api/v1/monte-carlo/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         backtest_results: backtest,
         n_simulations: simulations,
         initial_capital: capital,
         method: method,
-        confidence_level: confidence,
-      }),
+        confidence_level: confidence
+      })
     });
 
     if (!mcResponse.ok) {
-      throw new Error("Monte Carlo analysis failed");
+      throw new Error('Monte Carlo analysis failed');
     }
 
     const results = await mcResponse.json();
@@ -531,34 +532,34 @@ async function runMonteCarloSimulation() {
     // Display results
     displayMonteCarloResults(results, confidence);
   } catch (error) {
-    console.error("Monte Carlo simulation failed:", error);
-    document.getElementById("mcEmpty").style.display = "block";
-    document.getElementById("mcEmpty").innerHTML = `
+    console.error('Monte Carlo simulation failed:', error);
+    document.getElementById('mcEmpty').style.display = 'block';
+    document.getElementById('mcEmpty').innerHTML = `
             <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
             <p class="text-danger">Simulation failed: ${error.message}</p>
         `;
   } finally {
-    document.getElementById("mcLoading").style.display = "none";
+    document.getElementById('mcLoading').style.display = 'none';
   }
 }
 
 function displayMonteCarloResults(results, confidence) {
   // Update stats
-  document.getElementById("mcProbProfit").textContent =
+  document.getElementById('mcProbProfit').textContent =
     `${((results.probability_of_profit || 0) * 100).toFixed(1)}%`;
-  document.getElementById("mcMedianReturn").textContent =
+  document.getElementById('mcMedianReturn').textContent =
     `${((results.median_return || 0) * 100).toFixed(1)}%`;
-  document.getElementById("mcVaR").textContent =
+  document.getElementById('mcVaR').textContent =
     `${((results.var || results.value_at_risk || 0) * 100).toFixed(1)}%`;
-  document.getElementById("mcCVaR").textContent =
+  document.getElementById('mcCVaR').textContent =
     `${((results.cvar || results.expected_shortfall || 0) * 100).toFixed(1)}%`;
-  document.getElementById("mcMaxDD").textContent =
+  document.getElementById('mcMaxDD').textContent =
     `${((results.expected_max_drawdown || results.max_drawdown?.mean || 0) * 100).toFixed(1)}%`;
-  document.getElementById("mcKelly").textContent =
+  document.getElementById('mcKelly').textContent =
     `${((results.kelly_fraction || results.kelly || 0) * 100).toFixed(1)}%`;
 
   // Show results section
-  document.getElementById("mcResults").style.display = "block";
+  document.getElementById('mcResults').style.display = 'block';
 
   // Draw equity curves chart
   drawMonteCarloEquityCurves(results);
@@ -568,7 +569,7 @@ function displayMonteCarloResults(results, confidence) {
 }
 
 function drawMonteCarloEquityCurves(results) {
-  const ctx = document.getElementById("mcEquityCurves")?.getContext("2d");
+  const ctx = document.getElementById('mcEquityCurves')?.getContext('2d');
   if (!ctx) return;
 
   if (mcEquityCurvesChart) {
@@ -584,60 +585,60 @@ function drawMonteCarloEquityCurves(results) {
   // 95th percentile band
   if (bands.p95 && bands.p5) {
     datasets.push({
-      label: "95% Confidence",
+      label: '95% Confidence',
       data: bands.p95,
-      borderColor: "rgba(63, 185, 80, 0.3)",
-      backgroundColor: "rgba(63, 185, 80, 0.1)",
-      fill: "+1",
+      borderColor: 'rgba(63, 185, 80, 0.3)',
+      backgroundColor: 'rgba(63, 185, 80, 0.1)',
+      fill: '+1',
       pointRadius: 0,
-      tension: 0.4,
+      tension: 0.4
     });
     datasets.push({
-      label: "5th Percentile",
+      label: '5th Percentile',
       data: bands.p5,
-      borderColor: "rgba(248, 81, 73, 0.3)",
-      backgroundColor: "transparent",
+      borderColor: 'rgba(248, 81, 73, 0.3)',
+      backgroundColor: 'transparent',
       fill: false,
       pointRadius: 0,
-      tension: 0.4,
+      tension: 0.4
     });
   }
 
   // Median line
   if (bands.median) {
     datasets.push({
-      label: "Median",
+      label: 'Median',
       data: bands.median,
-      borderColor: "#58a6ff",
-      backgroundColor: "transparent",
+      borderColor: '#58a6ff',
+      backgroundColor: 'transparent',
       fill: false,
       pointRadius: 0,
       borderWidth: 2,
-      tension: 0.4,
+      tension: 0.4
     });
   }
 
   mcEquityCurvesChart = new Chart(ctx, {
-    type: "line",
+    type: 'line',
     data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { intersect: false, mode: "index" },
+      interaction: { intersect: false, mode: 'index' },
       plugins: {
-        legend: { position: "top", align: "end" },
-        title: { display: true, text: "Monte Carlo Equity Curves" },
+        legend: { position: 'top', align: 'end' },
+        title: { display: true, text: 'Monte Carlo Equity Curves' }
       },
       scales: {
         y: { beginAtZero: false },
-        x: { display: false },
-      },
-    },
+        x: { display: false }
+      }
+    }
   });
 }
 
 function drawMonteCarloDistribution(results) {
-  const ctx = document.getElementById("mcDistribution")?.getContext("2d");
+  const ctx = document.getElementById('mcDistribution')?.getContext('2d');
   if (!ctx) return;
 
   if (mcDistributionChart) {
@@ -659,51 +660,51 @@ function drawMonteCarloDistribution(results) {
     const binWidth = (maxVal - minVal) / binCount;
 
     for (let i = 0; i < binCount; i++) {
-      bins.push(((minVal + i * binWidth) * 100).toFixed(0) + "%");
+      bins.push(((minVal + i * binWidth) * 100).toFixed(0) + '%');
       counts.push(
         returns.filter(
-          (r) => r >= minVal + i * binWidth && r < minVal + (i + 1) * binWidth,
-        ).length,
+          (r) => r >= minVal + i * binWidth && r < minVal + (i + 1) * binWidth
+        ).length
       );
     }
   }
 
   mcDistributionChart = new Chart(ctx, {
-    type: "bar",
+    type: 'bar',
     data: {
       labels: bins.map((b) =>
-        typeof b === "number" ? `${(b * 100).toFixed(0)}%` : b,
+        typeof b === 'number' ? `${(b * 100).toFixed(0)}%` : b
       ),
       datasets: [
         {
-          label: "Frequency",
+          label: 'Frequency',
           data: counts,
           backgroundColor: counts.map((_, i) =>
             i < counts.length / 2
-              ? "rgba(248, 81, 73, 0.6)"
-              : "rgba(63, 185, 80, 0.6)",
+              ? 'rgba(248, 81, 73, 0.6)'
+              : 'rgba(63, 185, 80, 0.6)'
           ),
-          borderRadius: 2,
-        },
-      ],
+          borderRadius: 2
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: "Return Distribution" },
+        title: { display: true, text: 'Return Distribution' }
       },
       scales: {
         y: { beginAtZero: true },
-        x: { display: true },
-      },
-    },
+        x: { display: true }
+      }
+    }
   });
 }
 
 // Initialize Monte Carlo on page load
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   loadBacktestsForMonteCarlo();
 });
 
@@ -717,23 +718,23 @@ let regimeHistoryChart = null;
  * Detect market regime for selected symbol
  */
 async function detectMarketRegime() {
-  const symbol = document.getElementById("regimeSymbol")?.value || "BTCUSDT";
-  const interval = document.getElementById("regimeInterval")?.value || "1h";
+  const symbol = document.getElementById('regimeSymbol')?.value || 'BTCUSDT';
+  const interval = document.getElementById('regimeInterval')?.value || '1h';
 
   // Show loading, hide others
-  document.getElementById("regimeLoading").style.display = "block";
-  document.getElementById("regimeResults").style.display = "none";
-  document.getElementById("regimeEmpty").style.display = "none";
+  document.getElementById('regimeLoading').style.display = 'block';
+  document.getElementById('regimeResults').style.display = 'none';
+  document.getElementById('regimeEmpty').style.display = 'none';
 
   try {
-    const response = await fetch("/api/v1/market-regime/detect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/api/v1/market-regime/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         symbol: symbol,
         interval: interval,
-        lookback_bars: 200,
-      }),
+        lookback_bars: 200
+      })
     });
 
     if (!response.ok) {
@@ -746,11 +747,11 @@ async function detectMarketRegime() {
     // Also fetch history for chart
     await loadRegimeHistory(symbol, interval);
   } catch (error) {
-    console.error("Regime detection failed:", error);
-    alert("Failed to detect market regime: " + error.message);
-    document.getElementById("regimeEmpty").style.display = "block";
+    console.error('Regime detection failed:', error);
+    alert('Failed to detect market regime: ' + error.message);
+    document.getElementById('regimeEmpty').style.display = 'block';
   } finally {
-    document.getElementById("regimeLoading").style.display = "none";
+    document.getElementById('regimeLoading').style.display = 'none';
   }
 }
 
@@ -758,51 +759,51 @@ async function detectMarketRegime() {
  * Display regime detection results
  */
 function displayRegimeResults(data) {
-  document.getElementById("regimeResults").style.display = "block";
+  document.getElementById('regimeResults').style.display = 'block';
 
   // Regime type with color
   const regimeColors = {
-    trending_up: "#26a69a",
-    trending_down: "#ef5350",
-    ranging: "#78909c",
-    volatile: "#ffa726",
-    breakout_up: "#66bb6a",
-    breakout_down: "#f44336",
-    unknown: "#9e9e9e",
+    trending_up: '#26a69a',
+    trending_down: '#ef5350',
+    ranging: '#78909c',
+    volatile: '#ffa726',
+    breakout_up: '#66bb6a',
+    breakout_down: '#f44336',
+    unknown: '#9e9e9e'
   };
 
-  const regimeEl = document.getElementById("regimeType");
-  regimeEl.textContent = data.regime.replace("_", " ").toUpperCase();
-  regimeEl.style.color = regimeColors[data.regime] || "#fff";
+  const regimeEl = document.getElementById('regimeType');
+  regimeEl.textContent = data.regime.replace('_', ' ').toUpperCase();
+  regimeEl.style.color = regimeColors[data.regime] || '#fff';
 
   // Indicators
-  document.getElementById("regimeConfidence").textContent =
-    (data.confidence * 100).toFixed(1) + "%";
-  document.getElementById("regimeADX").textContent =
+  document.getElementById('regimeConfidence').textContent =
+    (data.confidence * 100).toFixed(1) + '%';
+  document.getElementById('regimeADX').textContent =
     data.indicators.adx.toFixed(1);
-  document.getElementById("regimePlusDI").textContent =
+  document.getElementById('regimePlusDI').textContent =
     data.indicators.plus_di.toFixed(1);
-  document.getElementById("regimeMinusDI").textContent =
+  document.getElementById('regimeMinusDI').textContent =
     data.indicators.minus_di.toFixed(1);
-  document.getElementById("regimeBandwidth").textContent =
+  document.getElementById('regimeBandwidth').textContent =
     data.indicators.bandwidth.toFixed(1);
 
   // Trading signals
   const signals = data.trading_signals;
-  const longEl = document.getElementById("regimeAllowLong");
-  const shortEl = document.getElementById("regimeAllowShort");
+  const longEl = document.getElementById('regimeAllowLong');
+  const shortEl = document.getElementById('regimeAllowShort');
 
-  longEl.textContent = "LONG: " + (signals.allow_long ? "✓" : "✗");
+  longEl.textContent = 'LONG: ' + (signals.allow_long ? '✓' : '✗');
   longEl.className =
-    "badge " + (signals.allow_long ? "bg-success" : "bg-danger");
+    'badge ' + (signals.allow_long ? 'bg-success' : 'bg-danger');
 
-  shortEl.textContent = "SHORT: " + (signals.allow_short ? "✓" : "✗");
+  shortEl.textContent = 'SHORT: ' + (signals.allow_short ? '✓' : '✗');
   shortEl.className =
-    "badge " + (signals.allow_short ? "bg-success" : "bg-danger");
+    'badge ' + (signals.allow_short ? 'bg-success' : 'bg-danger');
 
-  document.getElementById("regimePositionSize").textContent =
-    (signals.recommended_position_size * 100).toFixed(0) + "%";
-  document.getElementById("regimeDescription").textContent =
+  document.getElementById('regimePositionSize').textContent =
+    (signals.recommended_position_size * 100).toFixed(0) + '%';
+  document.getElementById('regimeDescription').textContent =
     signals.regime_description || data.reason;
 }
 
@@ -812,14 +813,14 @@ function displayRegimeResults(data) {
 async function loadRegimeHistory(symbol, interval) {
   try {
     const response = await fetch(
-      `/api/v1/market-regime/history/${symbol}?interval=${interval}&days=14`,
+      `/api/v1/market-regime/history/${symbol}?interval=${interval}&days=14`
     );
     if (!response.ok) return;
 
     const data = await response.json();
     drawRegimeHistoryChart(data);
   } catch (error) {
-    console.error("Failed to load regime history:", error);
+    console.error('Failed to load regime history:', error);
   }
 }
 
@@ -827,7 +828,7 @@ async function loadRegimeHistory(symbol, interval) {
  * Draw regime history chart
  */
 function drawRegimeHistoryChart(data) {
-  const ctx = document.getElementById("regimeHistoryChart");
+  const ctx = document.getElementById('regimeHistoryChart');
   if (!ctx) return;
 
   if (regimeHistoryChart) {
@@ -835,44 +836,44 @@ function drawRegimeHistoryChart(data) {
   }
 
   const regimeColors = {
-    trending_up: "#26a69a",
-    trending_down: "#ef5350",
-    ranging: "#78909c",
-    volatile: "#ffa726",
-    breakout_up: "#66bb6a",
-    breakout_down: "#f44336",
-    unknown: "#9e9e9e",
+    trending_up: '#26a69a',
+    trending_down: '#ef5350',
+    ranging: '#78909c',
+    volatile: '#ffa726',
+    breakout_up: '#66bb6a',
+    breakout_down: '#f44336',
+    unknown: '#9e9e9e'
   };
 
-  const labels = data.history.map((h) => h.timestamp.split("T")[0]);
+  const labels = data.history.map((h) => h.timestamp.split('T')[0]);
   const adxValues = data.history.map((h) => h.adx);
-  const bgColors = data.history.map((h) => regimeColors[h.regime] || "#9e9e9e");
+  const bgColors = data.history.map((h) => regimeColors[h.regime] || '#9e9e9e');
 
   regimeHistoryChart = new Chart(ctx, {
-    type: "bar",
+    type: 'bar',
     data: {
       labels: labels,
       datasets: [
         {
-          label: "ADX (colored by regime)",
+          label: 'ADX (colored by regime)',
           data: adxValues,
           backgroundColor: bgColors,
-          borderRadius: 2,
-        },
-      ],
+          borderRadius: 2
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: "Regime History (ADX)" },
+        title: { display: true, text: 'Regime History (ADX)' }
       },
       scales: {
         y: { beginAtZero: true, max: 60 },
-        x: { display: true },
-      },
-    },
+        x: { display: true }
+      }
+    }
   });
 }
 
@@ -887,29 +888,29 @@ let portfolioAllocationChart = null;
  * Run portfolio backtest
  */
 async function runPortfolioBacktest() {
-  const assetsSelect = document.getElementById("portfolioAssets");
+  const assetsSelect = document.getElementById('portfolioAssets');
   const selectedAssets = Array.from(assetsSelect.selectedOptions).map(
-    (o) => o.value,
+    (o) => o.value
   );
 
   if (selectedAssets.length < 2) {
-    alert("Please select at least 2 assets for portfolio backtest");
+    alert('Please select at least 2 assets for portfolio backtest');
     return;
   }
 
   const allocation =
-    document.getElementById("portfolioAllocation")?.value || "equal_weight";
+    document.getElementById('portfolioAllocation')?.value || 'equal_weight';
   const rebalance =
-    document.getElementById("portfolioRebalance")?.value || "weekly";
+    document.getElementById('portfolioRebalance')?.value || 'weekly';
   const capital =
-    parseFloat(document.getElementById("portfolioCapital")?.value) || 100000;
+    parseFloat(document.getElementById('portfolioCapital')?.value) || 100000;
   const days =
-    parseInt(document.getElementById("portfolioPeriod")?.value) || 90;
+    parseInt(document.getElementById('portfolioPeriod')?.value) || 90;
 
   // Show loading
-  document.getElementById("portfolioLoading").style.display = "block";
-  document.getElementById("portfolioResults").style.display = "none";
-  document.getElementById("portfolioEmpty").style.display = "none";
+  document.getElementById('portfolioLoading').style.display = 'block';
+  document.getElementById('portfolioResults').style.display = 'none';
+  document.getElementById('portfolioEmpty').style.display = 'none';
 
   try {
     // Calculate dates
@@ -917,18 +918,18 @@ async function runPortfolioBacktest() {
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - days);
 
-    const formatDateStr = (d) => d.toISOString().split("T")[0];
+    const formatDateStr = (d) => localDateStr(d);
 
     // Build asset_data - this is required by the API
     // For now, we'll use a simplified approach
-    const response = await fetch("/api/v1/advanced-backtest/portfolio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/api/v1/advanced-backtest/portfolio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         asset_data: selectedAssets.reduce((acc, symbol) => {
           acc[symbol] = {
             symbol: symbol,
-            weight: 1 / selectedAssets.length,
+            weight: 1 / selectedAssets.length
           };
           return acc;
         }, {}),
@@ -937,8 +938,8 @@ async function runPortfolioBacktest() {
         initial_capital: capital,
         start_date: formatDateStr(startDate),
         end_date: formatDateStr(endDate),
-        interval: "1h",
-      }),
+        interval: '1h'
+      })
     });
 
     if (!response.ok) {
@@ -949,11 +950,11 @@ async function runPortfolioBacktest() {
     const data = await response.json();
     displayPortfolioResults(data, selectedAssets);
   } catch (error) {
-    console.error("Portfolio backtest failed:", error);
-    alert("Portfolio backtest failed: " + error.message);
-    document.getElementById("portfolioEmpty").style.display = "block";
+    console.error('Portfolio backtest failed:', error);
+    alert('Portfolio backtest failed: ' + error.message);
+    document.getElementById('portfolioEmpty').style.display = 'block';
   } finally {
-    document.getElementById("portfolioLoading").style.display = "none";
+    document.getElementById('portfolioLoading').style.display = 'none';
   }
 }
 
@@ -961,26 +962,26 @@ async function runPortfolioBacktest() {
  * Display portfolio backtest results
  */
 function displayPortfolioResults(data, assets) {
-  document.getElementById("portfolioResults").style.display = "block";
+  document.getElementById('portfolioResults').style.display = 'block';
 
   // Metrics
   const totalReturn = data.total_return || 0;
-  document.getElementById("portfolioReturn").textContent =
-    (totalReturn >= 0 ? "+" : "") + (totalReturn * 100).toFixed(2) + "%";
-  document.getElementById("portfolioReturn").className =
-    "stat-value " + (totalReturn >= 0 ? "text-success" : "text-danger");
+  document.getElementById('portfolioReturn').textContent =
+    (totalReturn >= 0 ? '+' : '') + (totalReturn * 100).toFixed(2) + '%';
+  document.getElementById('portfolioReturn').className =
+    'stat-value ' + (totalReturn >= 0 ? 'text-success' : 'text-danger');
 
-  document.getElementById("portfolioSharpe").textContent = (
+  document.getElementById('portfolioSharpe').textContent = (
     data.sharpe_ratio || 0
   ).toFixed(2);
-  document.getElementById("portfolioMaxDD").textContent =
-    ((data.max_drawdown || 0) * 100).toFixed(2) + "%";
-  document.getElementById("portfolioVolatility").textContent =
-    ((data.volatility || 0) * 100).toFixed(2) + "%";
-  document.getElementById("portfolioSortino").textContent = (
+  document.getElementById('portfolioMaxDD').textContent =
+    ((data.max_drawdown || 0) * 100).toFixed(2) + '%';
+  document.getElementById('portfolioVolatility').textContent =
+    ((data.volatility || 0) * 100).toFixed(2) + '%';
+  document.getElementById('portfolioSortino').textContent = (
     data.sortino_ratio || 0
   ).toFixed(2);
-  document.getElementById("portfolioTrades").textContent =
+  document.getElementById('portfolioTrades').textContent =
     data.total_trades || 0;
 
   // Equity Chart
@@ -994,7 +995,7 @@ function displayPortfolioResults(data, assets) {
  * Draw portfolio equity chart
  */
 function drawPortfolioEquityChart(equityCurve) {
-  const ctx = document.getElementById("portfolioEquityChart");
+  const ctx = document.getElementById('portfolioEquityChart');
   if (!ctx) return;
 
   if (portfolioEquityChart) {
@@ -1004,33 +1005,33 @@ function drawPortfolioEquityChart(equityCurve) {
   const labels = equityCurve.map((_, i) => `Day ${i + 1}`);
 
   portfolioEquityChart = new Chart(ctx, {
-    type: "line",
+    type: 'line',
     data: {
       labels: labels,
       datasets: [
         {
-          label: "Portfolio Value",
+          label: 'Portfolio Value',
           data: equityCurve,
-          borderColor: "#58a6ff",
-          backgroundColor: "rgba(88, 166, 255, 0.1)",
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88, 166, 255, 0.1)',
           fill: true,
           tension: 0.4,
-          pointRadius: 0,
-        },
-      ],
+          pointRadius: 0
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        title: { display: true, text: "Portfolio Equity Curve" },
+        title: { display: true, text: 'Portfolio Equity Curve' }
       },
       scales: {
         y: { beginAtZero: false },
-        x: { display: false },
-      },
-    },
+        x: { display: false }
+      }
+    }
   });
 }
 
@@ -1038,7 +1039,7 @@ function drawPortfolioEquityChart(equityCurve) {
  * Draw portfolio allocation pie chart
  */
 function drawPortfolioAllocationChart(allocations, assets) {
-  const ctx = document.getElementById("portfolioAllocationChart");
+  const ctx = document.getElementById('portfolioAllocationChart');
   if (!ctx) return;
 
   if (portfolioAllocationChart) {
@@ -1046,14 +1047,14 @@ function drawPortfolioAllocationChart(allocations, assets) {
   }
 
   const colors = [
-    "#58a6ff",
-    "#3fb950",
-    "#f0883e",
-    "#a371f7",
-    "#f85149",
-    "#8b949e",
-    "#79c0ff",
-    "#56d364",
+    '#58a6ff',
+    '#3fb950',
+    '#f0883e',
+    '#a371f7',
+    '#f85149',
+    '#8b949e',
+    '#79c0ff',
+    '#56d364'
   ];
 
   // Use allocations if available, otherwise equal weight
@@ -1065,25 +1066,25 @@ function drawPortfolioAllocationChart(allocations, assets) {
       : assets.map(() => 1 / assets.length);
 
   portfolioAllocationChart = new Chart(ctx, {
-    type: "doughnut",
+    type: 'doughnut',
     data: {
       labels: labels,
       datasets: [
         {
           data: weights.map((w) => (w * 100).toFixed(1)),
           backgroundColor: colors.slice(0, labels.length),
-          borderWidth: 0,
-        },
-      ],
+          borderWidth: 0
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "right", labels: { boxWidth: 12 } },
-        title: { display: true, text: "Asset Allocation" },
-      },
-    },
+        legend: { position: 'right', labels: { boxWidth: 12 } },
+        title: { display: true, text: 'Asset Allocation' }
+      }
+    }
   });
 }
 
@@ -1095,12 +1096,12 @@ function drawPortfolioAllocationChart(allocations, assets) {
 // Exported functions: createMiniChart, generateHeatmap, runMonteCarloSimulation
 
 // Attach to window for backwards compatibility
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.analyticsadvancedPage = {
     runMonteCarloSimulation,
     loadBacktestsForMonteCarlo,
     detectMarketRegime,
-    runPortfolioBacktest,
+    runPortfolioBacktest
   };
   // Also expose globally for onclick handlers
   window.runMonteCarloSimulation = runMonteCarloSimulation;

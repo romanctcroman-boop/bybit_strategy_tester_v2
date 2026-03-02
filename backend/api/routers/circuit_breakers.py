@@ -128,11 +128,7 @@ async def get_circuit_breakers_status():
 
         for name, data in status.items():
             total_calls = data["failure_count"] + data["success_count"]
-            success_rate = (
-                (data["success_count"] / total_calls * 100)
-                if total_calls > 0
-                else 100.0
-            )
+            success_rate = (data["success_count"] / total_calls * 100) if total_calls > 0 else 100.0
             is_healthy = data["state"] == CircuitState.CLOSED.value
 
             if is_healthy:
@@ -201,21 +197,13 @@ async def get_circuit_breaker_metrics():
         prometheus_lines = []
 
         # Add help and type headers
-        prometheus_lines.append(
-            "# HELP circuit_breaker_state Circuit breaker state (0=closed, 1=open, 2=half_open)"
-        )
+        prometheus_lines.append("# HELP circuit_breaker_state Circuit breaker state (0=closed, 1=open, 2=half_open)")
         prometheus_lines.append("# TYPE circuit_breaker_state gauge")
-        prometheus_lines.append(
-            "# HELP circuit_breaker_failures_total Total number of failures"
-        )
+        prometheus_lines.append("# HELP circuit_breaker_failures_total Total number of failures")
         prometheus_lines.append("# TYPE circuit_breaker_failures_total counter")
-        prometheus_lines.append(
-            "# HELP circuit_breaker_successes_total Total number of successes"
-        )
+        prometheus_lines.append("# HELP circuit_breaker_successes_total Total number of successes")
         prometheus_lines.append("# TYPE circuit_breaker_successes_total counter")
-        prometheus_lines.append(
-            "# HELP circuit_breaker_success_rate Current success rate percentage"
-        )
+        prometheus_lines.append("# HELP circuit_breaker_success_rate Current success rate percentage")
         prometheus_lines.append("# TYPE circuit_breaker_success_rate gauge")
 
         state_map = {
@@ -229,11 +217,7 @@ async def get_circuit_breaker_metrics():
             _ = name.replace("-", "_").replace(".", "_")
 
             total_calls = data["failure_count"] + data["success_count"]
-            success_rate = (
-                (data["success_count"] / total_calls * 100)
-                if total_calls > 0
-                else 100.0
-            )
+            success_rate = (data["success_count"] / total_calls * 100) if total_calls > 0 else 100.0
 
             metrics[name] = {
                 "state": data["state"],
@@ -244,18 +228,10 @@ async def get_circuit_breaker_metrics():
             }
 
             # Prometheus format
-            prometheus_lines.append(
-                f'circuit_breaker_state{{name="{name}"}} {state_map.get(data["state"], -1)}'
-            )
-            prometheus_lines.append(
-                f'circuit_breaker_failures_total{{name="{name}"}} {data["failure_count"]}'
-            )
-            prometheus_lines.append(
-                f'circuit_breaker_successes_total{{name="{name}"}} {data["success_count"]}'
-            )
-            prometheus_lines.append(
-                f'circuit_breaker_success_rate{{name="{name}"}} {success_rate:.2f}'
-            )
+            prometheus_lines.append(f'circuit_breaker_state{{name="{name}"}} {state_map.get(data["state"], -1)}')
+            prometheus_lines.append(f'circuit_breaker_failures_total{{name="{name}"}} {data["failure_count"]}')
+            prometheus_lines.append(f'circuit_breaker_successes_total{{name="{name}"}} {data["success_count"]}')
+            prometheus_lines.append(f'circuit_breaker_success_rate{{name="{name}"}} {success_rate:.2f}')
 
         return CircuitBreakerMetrics(
             metrics=metrics,
@@ -283,11 +259,7 @@ async def get_extended_circuit_breaker_status():
 
         for name, breaker in manager.breakers.items():
             total_calls = breaker.failure_count + breaker.success_count
-            success_rate = (
-                (breaker.success_count / total_calls * 100)
-                if total_calls > 0
-                else 100.0
-            )
+            success_rate = (breaker.success_count / total_calls * 100) if total_calls > 0 else 100.0
 
             # Check if breaker has extended metrics (AdaptiveCircuitBreaker)
             extended_metrics = {}
@@ -308,17 +280,13 @@ async def get_extended_circuit_breaker_status():
                 total_calls=total_calls,
                 success_rate=round(success_rate, 2),
                 is_healthy=breaker.state == CircuitState.CLOSED,
-                last_failure=breaker.last_failure_time.isoformat()
-                if breaker.last_failure_time
-                else None,
+                last_failure=breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
                 # Extended adaptive metrics
                 avg_latency_ms=extended_metrics.get("avg_latency_ms"),
                 p95_latency_ms=extended_metrics.get("p95_latency_ms"),
                 p99_latency_ms=extended_metrics.get("p99_latency_ms"),
                 is_adaptive=is_adaptive,
-                current_threshold=extended_metrics.get(
-                    "current_threshold", breaker.failure_threshold
-                ),
+                current_threshold=extended_metrics.get("current_threshold", breaker.failure_threshold),
                 threshold_adjustments=extended_metrics.get("threshold_adjustments", 0),
                 last_threshold_change=extended_metrics.get("last_threshold_change"),
                 fallback_available=extended_metrics.get("fallback_available", False),
@@ -353,9 +321,7 @@ async def get_circuit_breaker_by_name(name: str):
 
         breaker = manager.breakers[name]
         total_calls = breaker.failure_count + breaker.success_count
-        success_rate = (
-            (breaker.success_count / total_calls * 100) if total_calls > 0 else 100.0
-        )
+        success_rate = (breaker.success_count / total_calls * 100) if total_calls > 0 else 100.0
 
         return {
             "name": name,
@@ -367,12 +333,8 @@ async def get_circuit_breaker_by_name(name: str):
             "failure_threshold": breaker.failure_threshold,
             "recovery_timeout": breaker.recovery_timeout,
             "is_healthy": breaker.state == CircuitState.CLOSED,
-            "last_failure": breaker.last_failure_time.isoformat()
-            if breaker.last_failure_time
-            else None,
-            "can_retry": breaker._should_attempt_reset()
-            if breaker.state == CircuitState.OPEN
-            else True,
+            "last_failure": breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
+            "can_retry": breaker._should_attempt_reset() if breaker.state == CircuitState.OPEN else True,
         }
     except HTTPException:
         raise
@@ -418,9 +380,7 @@ async def reset_circuit_breaker(name: str):
         manager = get_circuit_manager()
 
         if name not in manager.breakers:
-            raise HTTPException(
-                status_code=404, detail=f"Circuit breaker '{name}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Circuit breaker '{name}' not found")
 
         breaker = manager.breakers[name]
         old_state = breaker.state.value
@@ -458,9 +418,7 @@ def get_circuit_breakers_health() -> dict[str, Any]:
         manager = get_circuit_manager()
         status = manager.get_status()
 
-        healthy_count = sum(
-            1 for data in status.values() if data["state"] == CircuitState.CLOSED.value
-        )
+        healthy_count = sum(1 for data in status.values() if data["state"] == CircuitState.CLOSED.value)
         total = len(status)
 
         return {

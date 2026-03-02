@@ -129,9 +129,7 @@ class DomainAgent(ABC):
         pass
 
     @abstractmethod
-    async def validate(
-        self, proposal: str, context: dict[str, Any] | None = None
-    ) -> ValidationResult:
+    async def validate(self, proposal: str, context: dict[str, Any] | None = None) -> ValidationResult:
         """
         Validate a proposal against domain rules
 
@@ -154,20 +152,14 @@ class DomainAgent(ABC):
                 from backend.agents.models import AgentType
                 from backend.agents.unified_agent_interface import AgentRequest
 
-                at = (
-                    AgentType.DEEPSEEK
-                    if "deepseek" in agent_type.lower()
-                    else AgentType.PERPLEXITY
-                )
+                at = AgentType.DEEPSEEK if "deepseek" in agent_type.lower() else AgentType.PERPLEXITY
                 request = AgentRequest(
                     task_type="domain_analysis",
                     agent_type=at,
                     prompt=prompt,
                 )
                 response = await self.agent_interface.send_request(request)
-                return (
-                    response.content if response.success else f"Error: {response.error}"
-                )
+                return response.content if response.success else f"Error: {response.error}"
             except Exception as e:
                 logger.warning(f"Agent request failed: {e}")
                 return f"Error: {e}"
@@ -213,9 +205,7 @@ class DomainAgent(ABC):
             if "recommendation" in line.lower():
                 in_recommendations = True
                 continue
-            if in_recommendations and (
-                line.startswith("-") or line.startswith("*") or line.startswith("1")
-            ):
+            if in_recommendations and (line.startswith("-") or line.startswith("*") or line.startswith("1")):
                 recommendations.append(line.lstrip("-*0123456789. "))
 
         return recommendations or [
@@ -284,9 +274,7 @@ SUGGESTIONS:
 VALIDATION_SCORE: [0.0-1.0]
 """
 
-    def __init__(
-        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
-    ):
+    def __init__(self, agent_interface: Any | None = None, ask_fn: Callable | None = None):
         super().__init__(
             name="Trading Strategy Expert",
             expertise=[AgentExpertise.TRADING_STRATEGY, AgentExpertise.RISK_MANAGEMENT],
@@ -324,21 +312,15 @@ VALIDATION_SCORE: [0.0-1.0]
             findings=findings,
             recommendations=recommendations,
             confidence=confidence,
-            risk_level=risk_level
-            if risk_level in ["low", "medium", "high", "critical"]
-            else "medium",
+            risk_level=risk_level if risk_level in ["low", "medium", "high", "critical"] else "medium",
             score=score,
-            metadata={
-                "strategy_type": context.get("strategy", {}).get("type", "unknown")
-            },
+            metadata={"strategy_type": context.get("strategy", {}).get("type", "unknown")},
         )
 
         self.analysis_history.append(result)
         return result
 
-    async def validate(
-        self, proposal: str, context: dict[str, Any] | None = None
-    ) -> ValidationResult:
+    async def validate(self, proposal: str, context: dict[str, Any] | None = None) -> ValidationResult:
         """Validate strategy proposal"""
         context_str = json.dumps(context or {}, indent=2)
 
@@ -472,9 +454,7 @@ SUGGESTED_STOP_LOSS: [percentage]
 CONFIDENCE: [0.0-1.0]
 """
 
-    def __init__(
-        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
-    ):
+    def __init__(self, agent_interface: Any | None = None, ask_fn: Callable | None = None):
         super().__init__(
             name="Risk Management Expert",
             expertise=[AgentExpertise.RISK_MANAGEMENT],
@@ -499,9 +479,7 @@ CONFIDENCE: [0.0-1.0]
         findings = []
         for line in response.split("\n"):
             if line.strip().startswith("-"):
-                findings.append(
-                    {"description": line.strip()[1:].strip(), "type": "risk"}
-                )
+                findings.append({"description": line.strip()[1:].strip(), "type": "risk"})
 
         recommendations = self._parse_recommendations(response)
 
@@ -513,22 +491,14 @@ CONFIDENCE: [0.0-1.0]
             findings=findings,
             recommendations=recommendations,
             confidence=min(1.0, max(0.0, confidence)),
-            risk_level=risk_level
-            if risk_level in ["low", "medium", "high", "critical"]
-            else "medium",
+            risk_level=risk_level if risk_level in ["low", "medium", "high", "critical"] else "medium",
             metadata={
-                "max_position_size": self._extract_value(
-                    response, "MAX_RECOMMENDED_POSITION_SIZE"
-                ),
-                "suggested_stop_loss": self._extract_value(
-                    response, "SUGGESTED_STOP_LOSS"
-                ),
+                "max_position_size": self._extract_value(response, "MAX_RECOMMENDED_POSITION_SIZE"),
+                "suggested_stop_loss": self._extract_value(response, "SUGGESTED_STOP_LOSS"),
             },
         )
 
-    async def validate(
-        self, proposal: str, context: dict[str, Any] | None = None
-    ) -> ValidationResult:
+    async def validate(self, proposal: str, context: dict[str, Any] | None = None) -> ValidationResult:
         """Validate risk parameters"""
         # Check against risk rules
         issues = []
@@ -571,8 +541,7 @@ CONFIDENCE: [0.0-1.0]
             is_valid=is_valid,
             issues=issues,
             warnings=warnings,
-            suggestions=suggestions
-            or ["Consider reducing position sizes", "Add stop losses"],
+            suggestions=suggestions or ["Consider reducing position sizes", "Add stop losses"],
             validation_score=max(0.0, validation_score),
         )
 
@@ -625,9 +594,7 @@ CODE_QUALITY_SCORE: [0-100]
 CONFIDENCE: [0.0-1.0]
 """
 
-    def __init__(
-        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
-    ):
+    def __init__(self, agent_interface: Any | None = None, ask_fn: Callable | None = None):
         super().__init__(
             name="Code Audit Expert",
             expertise=[
@@ -664,16 +631,12 @@ CONFIDENCE: [0.0-1.0]
             findings=findings,
             recommendations=recommendations,
             confidence=confidence,
-            risk_level=risk_level
-            if risk_level in ["low", "medium", "high", "critical"]
-            else "low",
+            risk_level=risk_level if risk_level in ["low", "medium", "high", "critical"] else "low",
             score=score,
             metadata={"language": context.get("language", "python")},
         )
 
-    async def validate(
-        self, proposal: str, context: dict[str, Any] | None = None
-    ) -> ValidationResult:
+    async def validate(self, proposal: str, context: dict[str, Any] | None = None) -> ValidationResult:
         """Validate code changes"""
         issues = []
         warnings = []
@@ -749,9 +712,7 @@ RECOMMENDATIONS:
 CONFIDENCE: [0.0-1.0]
 """
 
-    def __init__(
-        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
-    ):
+    def __init__(self, agent_interface: Any | None = None, ask_fn: Callable | None = None):
         super().__init__(
             name="Market Research Expert",
             expertise=[AgentExpertise.MARKET_RESEARCH, AgentExpertise.DATA_ANALYSIS],
@@ -791,9 +752,7 @@ CONFIDENCE: [0.0-1.0]
             },
         )
 
-    async def validate(
-        self, proposal: str, context: dict[str, Any] | None = None
-    ) -> ValidationResult:
+    async def validate(self, proposal: str, context: dict[str, Any] | None = None) -> ValidationResult:
         """Validate market-based decision"""
         return ValidationResult(
             is_valid=True,
@@ -827,9 +786,7 @@ class DomainAgentRegistry:
         self.register("code", CodeAuditAgent(agent_interface))
         self.register("market", MarketResearchAgent(agent_interface))
 
-        logger.info(
-            f"🎯 Domain Agent Registry initialized with {len(self._agents)} agents"
-        )
+        logger.info(f"🎯 Domain Agent Registry initialized with {len(self._agents)} agents")
 
     def register(self, name: str, agent: DomainAgent) -> None:
         """Register a domain agent"""
@@ -845,13 +802,9 @@ class DomainAgentRegistry:
 
     def get_by_expertise(self, expertise: AgentExpertise) -> list[DomainAgent]:
         """Get agents with specific expertise"""
-        return [
-            agent for agent in self._agents.values() if expertise in agent.expertise
-        ]
+        return [agent for agent in self._agents.values() if expertise in agent.expertise]
 
-    async def analyze_with_all(
-        self, context: dict[str, Any]
-    ) -> dict[str, AnalysisResult]:
+    async def analyze_with_all(self, context: dict[str, Any]) -> dict[str, AnalysisResult]:
         """Run analysis with all relevant agents"""
         results = {}
 

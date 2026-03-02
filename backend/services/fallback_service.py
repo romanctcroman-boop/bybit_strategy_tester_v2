@@ -358,9 +358,7 @@ Please retry when services are restored for personalized risk analysis.
             return ServiceHealth.DEGRADED
         return ServiceHealth.UNKNOWN
 
-    def register_degraded_handler(
-        self, pattern: str, handler: Callable[[str], str]
-    ) -> None:
+    def register_degraded_handler(self, pattern: str, handler: Callable[[str], str]) -> None:
         """Register a degraded mode handler for a pattern"""
         self._degraded_handlers[pattern] = handler
         logger.debug(f"Registered degraded handler for pattern: {pattern}")
@@ -412,9 +410,7 @@ Please retry when services are restored for personalized risk analysis.
 
         return None
 
-    def _match_static_key(
-        self, prompt: str, agent_type: str, task_type: str | None
-    ) -> str | None:
+    def _match_static_key(self, prompt: str, agent_type: str, task_type: str | None) -> str | None:
         """Match prompt to static response key"""
         prompt_lower = prompt.lower()
 
@@ -430,8 +426,10 @@ Please retry when services are restored for personalized risk analysis.
                 return "strategy:mean_reversion"
 
         # Market research patterns
-        if agent_type == "perplexity" and "market" in prompt_lower and (
-            "overview" in prompt_lower or "analysis" in prompt_lower
+        if (
+            agent_type == "perplexity"
+            and "market" in prompt_lower
+            and ("overview" in prompt_lower or "analysis" in prompt_lower)
         ):
             return "research:market_overview"
 
@@ -452,9 +450,7 @@ Please retry when services are restored for personalized risk analysis.
         self.cache.set(prompt, agent_type, content, ttl)
         logger.debug(f"Cached response for {agent_type} (TTL: {ttl or 'default'}s)")
 
-    def get_degraded_response(
-        self, prompt: str, agent_type: str, error: str | None = None
-    ) -> FallbackResponse:
+    def get_degraded_response(self, prompt: str, agent_type: str, error: str | None = None) -> FallbackResponse:
         """
         Generate a degraded mode response when all else fails.
         This is the last resort before returning an error.
@@ -489,9 +485,7 @@ This is a degraded response. The system will automatically recover when the serv
         """Get fallback service statistics"""
         return {
             "cache": self.cache.stats(),
-            "services": {
-                name: status.to_dict() for name, status in self._services.items()
-            },
+            "services": {name: status.to_dict() for name, status in self._services.items()},
             "overall_health": self.get_overall_health().value,
             "static_responses_count": len(self._static_responses),
             "degraded_handlers_count": len(self._degraded_handlers),
@@ -540,9 +534,7 @@ def with_fallback(
 
                 # Cache successful response
                 if cache_successful and result:
-                    fallback_svc.cache_response(
-                        prompt, agent_type, result, ttl=cache_ttl
-                    )
+                    fallback_svc.cache_response(prompt, agent_type, result, ttl=cache_ttl)
 
                 return result
 
@@ -556,9 +548,7 @@ def with_fallback(
                     return fallback.content
 
                 # Last resort: degraded response
-                degraded = fallback_svc.get_degraded_response(
-                    prompt, agent_type, str(e)
-                )
+                degraded = fallback_svc.get_degraded_response(prompt, agent_type, str(e))
                 return degraded.content
 
         return wrapper

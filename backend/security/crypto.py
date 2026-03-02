@@ -115,15 +115,11 @@ class CryptoManager:
         self._key: SecureBytes | None = None
 
         if not raw_key:
-            logger.warning(
-                "⚠️ CryptoManager: No encryption key available, encryption disabled"
-            )
+            logger.warning("⚠️ CryptoManager: No encryption key available, encryption disabled")
             return
 
         if not CRYPTO_AVAILABLE:
-            logger.warning(
-                "⚠️ CryptoManager: cryptography not installed, encryption disabled"
-            )
+            logger.warning("⚠️ CryptoManager: cryptography not installed, encryption disabled")
             return
 
         # Derive or decode the key
@@ -255,9 +251,7 @@ class CryptoManager:
 
         except Exception as e:
             logger.error(f"Decryption failed: {e}")
-            raise ValueError(
-                "Decryption failed - data may be corrupted or tampered"
-            ) from e
+            raise ValueError("Decryption failed - data may be corrupted or tampered") from e
 
     def is_encrypted(self, data: str) -> bool:
         """

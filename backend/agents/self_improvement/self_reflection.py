@@ -46,9 +46,7 @@ class ReflectionResult:
         return {
             "id": self.id,
             "task": self.task,
-            "solution": self.solution[:500] + "..."
-            if len(self.solution) > 500
-            else self.solution,
+            "solution": self.solution[:500] + "..." if len(self.solution) > 500 else self.solution,
             "outcome": self.outcome,
             "reflections": self.reflections,
             "quality_score": self.quality_score,
@@ -103,31 +101,16 @@ class SelfReflectionEngine:
 
     # Structured reflection prompts
     REFLECTION_PROMPTS = {
-        "task_analysis": (
-            "Analyze the task: What was the main challenge? "
-            "What skills/knowledge did it require?"
-        ),
-        "solution_quality": (
-            "Rate the solution quality (1-10). What are its strengths and weaknesses?"
-        ),
-        "what_worked": (
-            "What approaches/strategies worked well in this task? "
-            "What should be repeated?"
-        ),
-        "what_didnt_work": (
-            "What didn't work as expected? What caused difficulties or errors?"
-        ),
-        "improvement": (
-            "What would I do differently next time? "
-            "What specific changes would improve the outcome?"
-        ),
+        "task_analysis": ("Analyze the task: What was the main challenge? What skills/knowledge did it require?"),
+        "solution_quality": ("Rate the solution quality (1-10). What are its strengths and weaknesses?"),
+        "what_worked": ("What approaches/strategies worked well in this task? What should be repeated?"),
+        "what_didnt_work": ("What didn't work as expected? What caused difficulties or errors?"),
+        "improvement": ("What would I do differently next time? What specific changes would improve the outcome?"),
         "knowledge_gap": (
-            "What knowledge or skills were missing that would have helped? "
-            "What should be learned or practiced?"
+            "What knowledge or skills were missing that would have helped? What should be learned or practiced?"
         ),
         "transferable_lessons": (
-            "What lessons from this task apply to other situations? "
-            "What patterns should be remembered?"
+            "What lessons from this task apply to other situations? What patterns should be remembered?"
         ),
     }
 
@@ -198,9 +181,7 @@ class SelfReflectionEngine:
             reflections[key] = reflection
 
         # Extract quality score from solution_quality reflection
-        quality_score = self._extract_quality_score(
-            reflections.get("solution_quality", "")
-        )
+        quality_score = self._extract_quality_score(reflections.get("solution_quality", ""))
 
         # Extract structured lessons
         lessons_learned = self._extract_lessons(reflections)
@@ -296,9 +277,7 @@ class SelfReflectionEngine:
 
         self.stats["patterns_extracted"] = len(self.patterns)
 
-        logger.info(
-            f"🔍 Extracted {len(new_patterns)} patterns from {len(recent)} reflections"
-        )
+        logger.info(f"🔍 Extracted {len(new_patterns)} patterns from {len(recent)} reflections")
         return new_patterns
 
     async def get_recommendations(
@@ -372,9 +351,7 @@ class SelfReflectionEngine:
                         "quality": reflection.quality_score,
                         "lessons": reflection.lessons_learned,
                         "context": {
-                            "what_worked": reflection.reflections.get(
-                                "what_worked", ""
-                            ),
+                            "what_worked": reflection.reflections.get("what_worked", ""),
                         },
                     }
                 )
@@ -426,9 +403,7 @@ class SelfReflectionEngine:
 
         if "didnt" in prompt.lower() or "didn't" in prompt.lower():
             if errors:
-                return (
-                    f"Issues encountered: {', '.join(str(e)[:50] for e in errors[:3])}"
-                )
+                return f"Issues encountered: {', '.join(str(e)[:50] for e in errors[:3])}"
             return "No major issues identified."
 
         if "improvement" in prompt.lower():
@@ -584,9 +559,7 @@ class SelfReflectionEngine:
             scores = [r.quality_score for r in self.reflection_history]
             self.stats["avg_quality_score"] = statistics.mean(scores)
 
-        self.stats["lessons_accumulated"] = sum(
-            len(r.lessons_learned) for r in self.reflection_history
-        )
+        self.stats["lessons_accumulated"] = sum(len(r.lessons_learned) for r in self.reflection_history)
 
     def _persist_reflection(self, reflection: ReflectionResult) -> None:
         """Persist reflection to disk"""

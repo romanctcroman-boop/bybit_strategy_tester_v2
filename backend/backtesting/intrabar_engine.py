@@ -141,9 +141,7 @@ class IntrabarEngine:
         mask = (self.m1_timestamps >= bar_start_ms) & (self.m1_timestamps < bar_end_ms)
         return self.m1_data.iloc[mask]
 
-    def generate_ticks_for_m1_bar(
-        self, m1_bar: pd.Series, bar_index: int
-    ) -> Generator[PseudoTick]:
+    def generate_ticks_for_m1_bar(self, m1_bar: pd.Series, bar_index: int) -> Generator[PseudoTick]:
         """
         Сгенерировать последовательность псевдотиков из одного 1m бара.
 
@@ -185,13 +183,9 @@ class IntrabarEngine:
             # Если нужны промежуточные тики (subticks)
             if self.config.subticks_per_segment > 0 and i < len(path) - 1:
                 next_price = path[i + 1][0]
-                yield from self._generate_subticks(
-                    price, next_price, tick_time, ts, bar_index
-                )
+                yield from self._generate_subticks(price, next_price, tick_time, ts, bar_index)
 
-    def _get_ohlc_path(
-        self, o: float, h: float, low_val: float, c: float
-    ) -> list[tuple[float, str]]:
+    def _get_ohlc_path(self, o: float, h: float, low_val: float, c: float) -> list[tuple[float, str]]:
         """
         Определить порядок обхода OHLC.
 
@@ -256,9 +250,7 @@ class IntrabarEngine:
         else:
             return [0.0] * n_ticks
 
-    def generate_ticks(
-        self, bar_start_ms: int, bar_end_ms: int
-    ) -> Generator[PseudoTick]:
+    def generate_ticks(self, bar_start_ms: int, bar_end_ms: int) -> Generator[PseudoTick]:
         """
         Генерировать все псевдотики для бара старшего ТФ.
 
@@ -273,9 +265,7 @@ class IntrabarEngine:
 
         if len(m1_bars) == 0:
             # Нет 1m данных - возвращаем пустой генератор
-            logger.debug(
-                f"[INTRABAR_ENGINE] No 1m bars for {bar_start_ms}-{bar_end_ms}"
-            )
+            logger.debug(f"[INTRABAR_ENGINE] No 1m bars for {bar_start_ms}-{bar_end_ms}")
             return
 
         for idx, (_, m1_bar) in enumerate(m1_bars.iterrows()):

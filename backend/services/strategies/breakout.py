@@ -200,10 +200,7 @@ class ATRBreakoutStrategy(LibraryStrategy):
             # Bullish breakout
             if high >= breakout_up and volume_ok:
                 # Check it's a fresh breakout
-                if (
-                    self._prev_breakout_level_up is None
-                    or self._prev_breakout_level_up < breakout_up * 0.99
-                ):
+                if self._prev_breakout_level_up is None or self._prev_breakout_level_up < breakout_up * 0.99:
                     stop_loss = close - (current_atr * stop_mult)
                     take_profit = calculate_take_profit(close, stop_loss, rr)
 
@@ -220,9 +217,10 @@ class ATRBreakoutStrategy(LibraryStrategy):
                     self._in_position = "long"
 
             # Bearish breakout
-            elif low <= breakout_down and volume_ok and (
-                self._prev_breakout_level_down is None
-                or self._prev_breakout_level_down > breakout_down * 1.01
+            elif (
+                low <= breakout_down
+                and volume_ok
+                and (self._prev_breakout_level_down is None or self._prev_breakout_level_down > breakout_down * 1.01)
             ):
                 stop_loss = close + (current_atr * stop_mult)
                 take_profit = calculate_take_profit(close, stop_loss, rr)

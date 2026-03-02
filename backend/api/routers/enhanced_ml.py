@@ -157,9 +157,7 @@ async def detect_drift(request: DriftDetectionRequest) -> dict[str, Any]:
 
     from backend.ml.enhanced.concept_drift import ConceptDriftDetector
 
-    detector = ConceptDriftDetector(
-        methods=request.methods, significance_level=request.significance_level
-    )
+    detector = ConceptDriftDetector(methods=request.methods, significance_level=request.significance_level)
 
     reference = np.array(request.reference_data)
     current = np.array(request.current_data)
@@ -312,14 +310,10 @@ async def promote_model(request: ModelPromotionRequest) -> dict[str, Any]:
     registry = _get_registry()
 
     try:
-        registry.promote_model(
-            request.name, request.version, demote_current=request.demote_current
-        )
+        registry.promote_model(request.name, request.version, demote_current=request.demote_current)
         return {
             "message": f"Promoted {request.name}:{request.version} to production",
-            "previous_production": "archived"
-            if request.demote_current
-            else "unchanged",
+            "previous_production": "archived" if request.demote_current else "unchanged",
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -368,9 +362,7 @@ async def get_ab_test_results(test_id: str) -> dict[str, Any]:
 
 
 @router.get("/registry/degradation/{name}")
-async def check_model_degradation(
-    name: str, threshold: float = Query(default=0.1, ge=0.01, le=0.5)
-) -> dict[str, Any]:
+async def check_model_degradation(name: str, threshold: float = Query(default=0.1, ge=0.01, le=0.5)) -> dict[str, Any]:
     """Check if production model has degraded"""
     registry = _get_registry()
 
@@ -472,9 +464,7 @@ async def create_online_learner(
 
     strategy = UpdateStrategy(update_strategy)
 
-    learner = OnlineLearner(
-        model=model, update_strategy=strategy, batch_size=batch_size
-    )
+    learner = OnlineLearner(model=model, update_strategy=strategy, batch_size=batch_size)
 
     _online_learners[model_id] = learner
 
@@ -493,9 +483,7 @@ async def update_online_model(request: OnlineLearningUpdateRequest) -> dict[str,
     import numpy as np
 
     if request.model_id not in _online_learners:
-        raise HTTPException(
-            status_code=404, detail=f"Learner {request.model_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Learner {request.model_id} not found")
 
     learner = _online_learners[request.model_id]
 
@@ -590,9 +578,7 @@ async def register_feature(request: FeatureDefinitionRequest) -> dict[str, Any]:
 
 
 @router.get("/features")
-async def list_features(
-    tags: str | None = None, feature_type: str | None = None
-) -> dict[str, Any]:
+async def list_features(tags: str | None = None, feature_type: str | None = None) -> dict[str, Any]:
     """List all registered features"""
     from backend.ml.enhanced.feature_store import FeatureType
 
@@ -721,9 +707,7 @@ class EnsembleCreateRequest(BaseModel):
 
     name: str
     models: list[str] = Field(..., description="List of model_name:version")
-    ensemble_type: str = Field(
-        default="voting", description="voting, stacking, bagging, boosting"
-    )
+    ensemble_type: str = Field(default="voting", description="voting, stacking, bagging, boosting")
     weights: list[float] | None = None
     meta_learner: str | None = None
 
@@ -752,9 +736,7 @@ async def create_ensemble(request: EnsembleCreateRequest) -> dict[str, Any]:
         if not model:
             raise HTTPException(status_code=404, detail=f"Model {model_ref} not found")
 
-    ensemble_id = (
-        f"ensemble_{request.name}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
-    )
+    ensemble_id = f"ensemble_{request.name}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
 
     return {
         "ensemble_id": ensemble_id,
@@ -841,9 +823,7 @@ async def compare_models(request: ModelCompareRequest) -> dict[str, Any]:
     comparison = {}
 
     for model_ref in request.models:
-        comparison[model_ref] = {
-            metric: round(np.random.uniform(0.6, 0.95), 4) for metric in request.metrics
-        }
+        comparison[model_ref] = {metric: round(np.random.uniform(0.6, 0.95), 4) for metric in request.metrics}
 
     # Find best model for each metric
     best_by_metric = {}
@@ -885,17 +865,13 @@ async def statistical_significance_test(
 
 
 @router.get("/models/{name}/learning-curve")
-async def get_learning_curve(
-    name: str, version: str | None = None, cv_folds: int = 5
-) -> dict[str, Any]:
+async def get_learning_curve(name: str, version: str | None = None, cv_folds: int = 5) -> dict[str, Any]:
     """Get learning curve data for a model"""
     import numpy as np
 
     train_sizes = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
-    train_scores = [
-        0.7 + 0.25 * s + np.random.uniform(-0.02, 0.02) for s in train_sizes
-    ]
+    train_scores = [0.7 + 0.25 * s + np.random.uniform(-0.02, 0.02) for s in train_sizes]
     test_scores = [0.6 + 0.2 * s + np.random.uniform(-0.03, 0.03) for s in train_sizes]
 
     return {
@@ -933,9 +909,7 @@ class HyperparameterScheduleRequest(BaseModel):
 
     schedule_name: str
     model_name: str
-    schedule_type: str = Field(
-        default="step", description="step, exponential, cosine, cyclic"
-    )
+    schedule_type: str = Field(default="step", description="step, exponential, cosine, cyclic")
     initial_value: float
     final_value: float
     steps: int
@@ -955,13 +929,9 @@ async def hyperparameter_search(request: HyperparameterSearchRequest) -> dict[st
             best_params[param] = space[np.random.randint(len(space))]
         elif isinstance(space, dict):
             if space.get("type") == "int":
-                best_params[param] = np.random.randint(
-                    space.get("low", 1), space.get("high", 100)
-                )
+                best_params[param] = np.random.randint(space.get("low", 1), space.get("high", 100))
             else:
-                best_params[param] = np.random.uniform(
-                    space.get("low", 0), space.get("high", 1)
-                )
+                best_params[param] = np.random.uniform(space.get("low", 0), space.get("high", 1))
 
     return {
         "search_id": search_id,
@@ -990,9 +960,7 @@ async def get_search_status(search_id: str) -> dict[str, Any]:
 
 
 @router.get("/hyperparameters/search/{search_id}/trials")
-async def get_search_trials(
-    search_id: str, limit: int = Query(default=50, ge=1, le=500)
-) -> dict[str, Any]:
+async def get_search_trials(search_id: str, limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
     """Get trials from hyperparameter search"""
     import numpy as np
 
@@ -1027,24 +995,13 @@ async def create_hyperparameter_schedule(
         t = step / max(1, request.steps - 1)
 
         if request.schedule_type == "step":
-            value = (
-                request.initial_value
-                if step < request.steps // 2
-                else request.final_value
-            )
+            value = request.initial_value if step < request.steps // 2 else request.final_value
         elif request.schedule_type == "exponential":
-            value = (
-                request.initial_value
-                * (request.final_value / request.initial_value) ** t
-            )
+            value = request.initial_value * (request.final_value / request.initial_value) ** t
         elif request.schedule_type == "cosine":
-            value = request.final_value + 0.5 * (
-                request.initial_value - request.final_value
-            ) * (1 + np.cos(np.pi * t))
+            value = request.final_value + 0.5 * (request.initial_value - request.final_value) * (1 + np.cos(np.pi * t))
         else:  # cyclic
-            value = request.final_value + (
-                request.initial_value - request.final_value
-            ) * abs(np.sin(np.pi * t * 2))
+            value = request.final_value + (request.initial_value - request.final_value) * abs(np.sin(np.pi * t * 2))
 
         schedule_values.append(round(value, 6))
 
@@ -1067,9 +1024,7 @@ class FeatureImportanceRequest(BaseModel):
 
     model_name: str
     version: str | None = None
-    method: str = Field(
-        default="permutation", description="permutation, shap, gain, split"
-    )
+    method: str = Field(default="permutation", description="permutation, shap, gain, split")
     X: list[list[float]] | None = None
     feature_names: list[str] | None = None
 
@@ -1137,8 +1092,7 @@ async def compute_shap_values(request: SHAPRequest) -> dict[str, Any]:
         "base_value": round(base_value, 4),
         "feature_names": feature_names,
         "mean_abs_shap": {
-            name: round(val, 4)
-            for name, val in zip(feature_names, mean_abs_shap.tolist(), strict=False)
+            name: round(val, 4) for name, val in zip(feature_names, mean_abs_shap.tolist(), strict=False)
         },
         "shap_values_sample": shap_values[:5].tolist() if n_samples > 0 else [],
     }
@@ -1197,10 +1151,7 @@ async def get_partial_dependence(
     grid_values = np.linspace(0, 1, grid_resolution).tolist()
 
     # Generate PDP values (sigmoid-like curve)
-    pdp_values = [
-        1 / (1 + np.exp(-5 * (x - 0.5))) + np.random.uniform(-0.02, 0.02)
-        for x in grid_values
-    ]
+    pdp_values = [1 / (1 + np.exp(-5 * (x - 0.5))) + np.random.uniform(-0.02, 0.02) for x in grid_values]
 
     return {
         "model_name": model_name,

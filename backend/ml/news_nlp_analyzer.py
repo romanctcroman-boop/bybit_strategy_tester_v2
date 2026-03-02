@@ -751,9 +751,7 @@ class SentimentAggregator:
         symbol_activity = []
 
         for symbol, results in self._results.items():
-            recent_results = [
-                r for r in results if (datetime.now(UTC) - r.analyzed_at).total_seconds() < 86400
-            ]
+            recent_results = [r for r in results if (datetime.now(UTC) - r.analyzed_at).total_seconds() < 86400]
 
             if recent_results:
                 avg_impact = sum(r.impact_score for r in recent_results) / len(recent_results)

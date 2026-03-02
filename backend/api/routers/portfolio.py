@@ -25,8 +25,9 @@ Example request:
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -35,22 +36,27 @@ from backend.services.data_service import DataService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/portfolio", tags=["Portfolio Optimization"])
+router = APIRouter(tags=["Portfolio Optimization"])
+
+# Configuration constants
+MAX_SYMBOLS = 20
+MAX_DATE_RANGE_DAYS = 365
+MAX_EFFICIENT_FRONTIER_POINTS = 100
 
 
 class PortfolioOptimizationRequest(BaseModel):
     """Request for portfolio optimization"""
 
-    symbols: List[str] = Field(..., description="List of symbols")
+    symbols: list[str] = Field(..., description="List of symbols", max_length=MAX_SYMBOLS)
     timeframe: str = Field(default="1h", description="Candlestick timeframe")
     start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
 
     strategy_type: str = Field(default="rsi", description="Strategy type")
-    strategy_params: Dict[str, Any] = Field(default_factory=dict)
+    strategy_params: dict[str, Any] = Field(default_factory=dict)
 
     # Portfolio config
-    weights: Optional[Dict[str, float]] = Field(default=None)
+    weights: dict[str, float] | None = Field(default=None)
     rebalance_frequency: str = Field(default="monthly")
     initial_capital: float = Field(default=10000.0)
     commission: float = Field(default=0.0007)
@@ -58,15 +64,27 @@ class PortfolioOptimizationRequest(BaseModel):
     # Optimization method
     method: str = Field(default="risk_parity", description="risk_parity, sharpe, min_volatility")
 
+    @classmethod
+    def validate_dates(cls, values):
+        """Validate date range"""
+        start = values.get('start_date')
+        end = values.get('end_date')
+        if start and end:
+            start_date = datetime.strptime(start, '%Y-%m-%d')
+            end_date = datetime.strptime(end, '%Y-%m-%d')
+            if (end_date - start_date).days > MAX_DATE_RANGE_DAYS:
+                raise ValueError(f"Date range cannot exceed {MAX_DATE_RANGE_DAYS} days")
+        return values
+
 
 class PortfolioOptimizationResponse(BaseModel):
     """Response for portfolio optimization"""
 
     success: bool
-    metrics: Dict[str, float]
-    weights: Dict[str, float]
-    symbol_results: Dict[str, Dict[str, Any]]
-    correlation_matrix: Dict[str, Dict[str, float]]
+    metrics: dict[str, float]
+    weights: dict[str, float]
+    symbol_results: dict[str, dict[str, Any]]
+    correlation_matrix: dict[str, dict[str, float]]
     diversification_ratio: float
     execution_time: float
 
@@ -74,7 +92,7 @@ class PortfolioOptimizationResponse(BaseModel):
 class CorrelationRequest(BaseModel):
     """Request for correlation analysis"""
 
-    symbols: List[str] = Field(..., description="List of symbols")
+    symbols: list[str] = Field(..., description="List of symbols", max_length=MAX_SYMBOLS)
     timeframe: str = Field(default="1h")
     start_date: str
     end_date: str
@@ -84,18 +102,18 @@ class CorrelationRequest(BaseModel):
 class CorrelationResponse(BaseModel):
     """Correlation analysis response"""
 
-    correlation_matrix: Dict[str, Dict[str, float]]
-    rolling_correlations: Dict[str, List[float]]
-    cointegration_pairs: List[Dict[str, Any]]
+    correlation_matrix: dict[str, dict[str, float]]
+    rolling_correlations: dict[str, list[float]]
+    cointegration_pairs: list[dict[str, Any]]
     diversification_ratio: float
-    low_corr_pairs: List[Dict[str, Any]]
-    high_corr_pairs: List[Dict[str, Any]]
+    low_corr_pairs: list[dict[str, Any]]
+    high_corr_pairs: list[dict[str, Any]]
 
 
 class RiskParityRequest(BaseModel):
     """Risk parity allocation request"""
 
-    symbols: List[str]
+    symbols: list[str] = Field(..., max_length=MAX_SYMBOLS)
     timeframe: str = Field(default="1h")
     start_date: str
     end_date: str
@@ -107,8 +125,8 @@ class RiskParityRequest(BaseModel):
 class RiskParityResponse(BaseModel):
     """Risk parity allocation response"""
 
-    weights: Dict[str, float]
-    risk_contributions: Dict[str, float]
+    weights: dict[str, float]
+    risk_contributions: dict[str, float]
     total_risk: float
     diversification_ratio: float
     method: str
@@ -117,20 +135,20 @@ class RiskParityResponse(BaseModel):
 class EfficientFrontierRequest(BaseModel):
     """Efficient frontier request"""
 
-    symbols: List[str]
+    symbols: list[str] = Field(..., max_length=MAX_SYMBOLS)
     timeframe: str = Field(default="1h")
     start_date: str
     end_date: str
-    n_points: int = Field(default=50)
+    n_points: int = Field(default=50, le=MAX_EFFICIENT_FRONTIER_POINTS)
 
 
 class EfficientFrontierResponse(BaseModel):
     """Efficient frontier response"""
 
-    volatilities: List[float]
-    returns: List[float]
-    sharpe_ratios: List[float]
-    weights: List[Dict[str, float]]
+    volatilities: list[float]
+    returns: list[float]
+    sharpe_ratios: list[float]
+    weights: list[dict[str, float]]
 
 
 @router.post("/optimize", response_model=PortfolioOptimizationResponse)
@@ -181,8 +199,8 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest):
             commission=request.commission,
         )
 
-        # Get strategy class
-        strategy_class = RSIStrategy if request.strategy_type == "rsi" else RSIStrategy
+        # Get strategy class (currently only RSIStrategy is supported)
+        strategy_class = RSIStrategy
 
         result = engine.run(
             strategy_class=strategy_class,
@@ -380,7 +398,9 @@ async def get_efficient_frontier(request: EfficientFrontierRequest):
 
         # Sharpe ratios
         risk_free_rate = 0.0
-        sharpe_ratios = [(ret - risk_free_rate) / vol if vol > 0 else 0 for ret, vol in zip(returns, volatilities)]
+        sharpe_ratios = [
+            (ret - risk_free_rate) / vol if vol > 0 else 0 for ret, vol in zip(returns, volatilities, strict=False)
+        ]
 
         return EfficientFrontierResponse(
             volatilities=volatilities,
@@ -392,7 +412,3 @@ async def get_efficient_frontier(request: EfficientFrontierRequest):
     except Exception as e:
         logger.error(f"Efficient frontier failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Import pandas at module level
-import pandas as pd

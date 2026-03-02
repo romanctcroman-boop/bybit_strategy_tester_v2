@@ -166,9 +166,7 @@ Be specific about entry/exit conditions.""",
             "errors": 0,
         }
 
-        logger.info(
-            f"🧠 LocalReasonerEngine created (backend={self.config.backend.value})"
-        )
+        logger.info(f"🧠 LocalReasonerEngine created (backend={self.config.backend.value})")
 
     async def initialize(self) -> bool:
         """
@@ -197,9 +195,7 @@ Be specific about entry/exit conditions.""",
 
         except ImportError as e:
             logger.warning(f"Missing dependency for local inference: {e}")
-            logger.info(
-                "Install with: pip install llama-cpp-python or pip install transformers"
-            )
+            logger.info("Install with: pip install llama-cpp-python or pip install transformers")
             return False
         except Exception as e:
             logger.error(f"Failed to initialize local model: {e}")
@@ -223,9 +219,7 @@ Be specific about entry/exit conditions.""",
             self._model = await asyncio.to_thread(load_model)
 
         except ImportError:
-            raise ImportError(
-                "llama-cpp-python not installed. Run: pip install llama-cpp-python"
-            )
+            raise ImportError("llama-cpp-python not installed. Run: pip install llama-cpp-python")
 
     async def _init_transformers(self) -> None:
         """Initialize Hugging Face transformers backend"""
@@ -255,9 +249,7 @@ Be specific about entry/exit conditions.""",
             self._model, self._tokenizer = await asyncio.to_thread(load_model)
 
         except ImportError:
-            raise ImportError(
-                "transformers not installed. Run: pip install transformers torch"
-            )
+            raise ImportError("transformers not installed. Run: pip install transformers torch")
 
     async def _init_ollama(self) -> None:
         """Initialize Ollama backend (uses HTTP API)"""
@@ -309,15 +301,11 @@ Be specific about entry/exit conditions.""",
         start_time = time.time()
 
         # Build full prompt with system message
-        system_prompt = self.SYSTEM_PROMPTS.get(
-            task_type, self.SYSTEM_PROMPTS["reasoning"]
-        )
+        system_prompt = self.SYSTEM_PROMPTS.get(task_type, self.SYSTEM_PROMPTS["reasoning"])
 
         if context:
             context_str = json.dumps(context, indent=2)
-            full_prompt = (
-                f"{system_prompt}\n\nContext:\n{context_str}\n\nQuestion: {prompt}"
-            )
+            full_prompt = f"{system_prompt}\n\nContext:\n{context_str}\n\nQuestion: {prompt}"
         else:
             full_prompt = f"{system_prompt}\n\nQuestion: {prompt}"
 
@@ -364,9 +352,9 @@ Be specific about entry/exit conditions.""",
         self.stats["total_inferences"] += 1
         self.stats["total_tokens"] += tokens
         prev_avg = self.stats["avg_latency_ms"]
-        self.stats["avg_latency_ms"] = (
-            prev_avg * (self.stats["total_inferences"] - 1) + latency
-        ) / self.stats["total_inferences"]
+        self.stats["avg_latency_ms"] = (prev_avg * (self.stats["total_inferences"] - 1) + latency) / self.stats[
+            "total_inferences"
+        ]
 
         result = ReasoningResult(
             content=content,
@@ -374,15 +362,10 @@ Be specific about entry/exit conditions.""",
             confidence=confidence,
             tokens_used=tokens,
             latency_ms=latency,
-            model_name=Path(self.config.model_path).name
-            if self.config.model_path
-            else "unknown",
+            model_name=Path(self.config.model_path).name if self.config.model_path else "unknown",
         )
 
-        logger.debug(
-            f"🧠 Local reasoning: {tokens} tokens, {latency:.0f}ms, "
-            f"confidence={confidence:.2f}"
-        )
+        logger.debug(f"🧠 Local reasoning: {tokens} tokens, {latency:.0f}ms, confidence={confidence:.2f}")
 
         return result
 

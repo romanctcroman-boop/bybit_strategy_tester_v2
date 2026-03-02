@@ -114,9 +114,7 @@ class FaultInjector:
     def inject_fault(self, config: FaultConfig):
         """Activate a fault injection."""
         self.active_faults[config.target_service] = config
-        logger.info(
-            f"Fault injected: {config.fault_type.value} on {config.target_service}"
-        )
+        logger.info(f"Fault injected: {config.fault_type.value} on {config.target_service}")
 
     def remove_fault(self, target_service: str):
         """Remove a fault injection."""
@@ -332,9 +330,7 @@ class ChaosEngineeringService:
     ) -> ChaosExperiment:
         """Create experiment from a pre-defined template."""
         if template_name not in self.templates:
-            raise ValueError(
-                f"Template '{template_name}' not found. Available: {list(self.templates.keys())}"
-            )
+            raise ValueError(f"Template '{template_name}' not found. Available: {list(self.templates.keys())}")
 
         config = self.templates[template_name]
         name = experiment_name or f"{template_name}_experiment"
@@ -398,13 +394,7 @@ class ChaosEngineeringService:
             "completed_experiments": len(completed),
             "failed_experiments": len(failed),
             "available_templates": list(self.templates.keys()),
-            "pending_experiments": len(
-                [
-                    e
-                    for e in self.experiments.values()
-                    if e.status == ExperimentStatus.PENDING
-                ]
-            ),
+            "pending_experiments": len([e for e in self.experiments.values() if e.status == ExperimentStatus.PENDING]),
         }
 
 

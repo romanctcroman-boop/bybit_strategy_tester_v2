@@ -149,16 +149,10 @@ async def get_metrics():
             skipped_warms=metrics.skipped_warms,
             total_candles_loaded=metrics.total_candles_loaded,
             total_warm_time_ms=metrics.total_warm_time_ms,
-            avg_warm_time_ms=(
-                metrics.total_warm_time_ms / metrics.total_warms
-                if metrics.total_warms > 0
-                else 0
-            ),
+            avg_warm_time_ms=(metrics.total_warm_time_ms / metrics.total_warms if metrics.total_warms > 0 else 0),
             cache_hit_rate=metrics.cache_hit_rate,
             target_hit_rate=95.0,
-            last_full_warm=metrics.last_full_warm.isoformat()
-            if metrics.last_full_warm
-            else None,
+            last_full_warm=metrics.last_full_warm.isoformat() if metrics.last_full_warm else None,
             warm_queue_size=metrics.warm_queue_size,
             active_warming=metrics.active_warming,
         )
@@ -237,9 +231,7 @@ async def remove_target(symbol: str, interval: str):
         service = get_cache_warming_service()
         removed = service.remove_target(symbol, interval)
         if not removed:
-            raise HTTPException(
-                status_code=404, detail=f"Target {symbol}:{interval} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Target {symbol}:{interval} not found")
         return {"message": f"Target {symbol}:{interval} removed"}
     except HTTPException:
         raise
@@ -255,9 +247,7 @@ async def enable_target(symbol: str, interval: str):
         service = get_cache_warming_service()
         enabled = service.enable_target(symbol, interval, enabled=True)
         if not enabled:
-            raise HTTPException(
-                status_code=404, detail=f"Target {symbol}:{interval} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Target {symbol}:{interval} not found")
         return {"message": f"Target {symbol}:{interval} enabled"}
     except HTTPException:
         raise
@@ -273,9 +263,7 @@ async def disable_target(symbol: str, interval: str):
         service = get_cache_warming_service()
         disabled = service.enable_target(symbol, interval, enabled=False)
         if not disabled:
-            raise HTTPException(
-                status_code=404, detail=f"Target {symbol}:{interval} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Target {symbol}:{interval} not found")
         return {"message": f"Target {symbol}:{interval} disabled"}
     except HTTPException:
         raise

@@ -252,12 +252,9 @@ class CircuitBreaker:
             if self.consecutive_successes >= required_successes:
                 self.state = CircuitState.CLOSED
                 # Reduce backoff on successful recovery
-                self._current_backoff_multiplier = max(
-                    1.0, self._current_backoff_multiplier / 2
-                )
+                self._current_backoff_multiplier = max(1.0, self._current_backoff_multiplier / 2)
                 logger.info(
-                    f"Circuit breaker '{self.name}' recovered and CLOSED "
-                    f"(after {self.consecutive_successes} successes)"
+                    f"Circuit breaker '{self.name}' recovered and CLOSED (after {self.consecutive_successes} successes)"
                 )
 
     def _on_failure(self):
@@ -271,9 +268,7 @@ class CircuitBreaker:
             self.state = CircuitState.OPEN
             self.trip_count += 1
             # Increase backoff on each trip
-            self._current_backoff_multiplier = min(
-                self._current_backoff_multiplier * 1.5, self._max_backoff_multiplier
-            )
+            self._current_backoff_multiplier = min(self._current_backoff_multiplier * 1.5, self._max_backoff_multiplier)
             backoff = self._current_backoff_multiplier
             logger.warning(
                 f"Circuit breaker '{self.name}' is now OPEN "
@@ -286,9 +281,7 @@ class CircuitBreaker:
         if self.last_failure_time is None:
             return True
 
-        timeout_elapsed = (
-            datetime.now(UTC) - self.last_failure_time
-        ).total_seconds() >= self.recovery_timeout
+        timeout_elapsed = (datetime.now(UTC) - self.last_failure_time).total_seconds() >= self.recovery_timeout
 
         return timeout_elapsed
 
@@ -386,9 +379,7 @@ class CircuitBreakerManager:
         """Return a list of registered breaker names."""
         return list(self.breakers.keys())
 
-    async def enable_persistence(
-        self, redis_url: str, autosave_interval: int = 60
-    ) -> bool:
+    async def enable_persistence(self, redis_url: str, autosave_interval: int = 60) -> bool:
         """Attempt to enable persistence of circuit-breaker state into Redis.
 
         Returns True if persistence was successfully enabled, False otherwise.
@@ -431,9 +422,7 @@ class CircuitBreakerManager:
                     # schedule background autosave task
                     loop = _asyncio.get_event_loop()
                     if self._persistence_task is None or self._persistence_task.done():
-                        self._persistence_task = loop.create_task(
-                            self._autosave_loop(autosave_interval)
-                        )
+                        self._persistence_task = loop.create_task(self._autosave_loop(autosave_interval))
             except Exception:
                 # ignore background scheduling failures; persistence still enabled
                 pass
@@ -461,9 +450,7 @@ class CircuitBreakerManager:
                             "state": b.state.value,
                             "failure_count": b.failure_count,
                             "success_count": b.success_count,
-                            "last_failure_time": b.last_failure_time.isoformat()
-                            if b.last_failure_time
-                            else None,
+                            "last_failure_time": b.last_failure_time.isoformat() if b.last_failure_time else None,
                         }
                         for name, b in self.breakers.items()
                     }
@@ -474,9 +461,7 @@ class CircuitBreakerManager:
                         key = "circuit_breakers_state"
                         if hasattr(self._persistence_redis, "set"):
                             # aioredis or sync redis
-                            await self._persistence_redis.set(
-                                key, _json.dumps(snapshot)
-                            )
+                            await self._persistence_redis.set(key, _json.dumps(snapshot))
                     except Exception:
                         # ignore write errors
                         pass
@@ -513,9 +498,7 @@ class CircuitBreakerManager:
             return None
 
         total_calls = breaker.success_count + breaker.failure_count
-        error_rate = (
-            (breaker.failure_count / total_calls * 100) if total_calls > 0 else 0.0
-        )
+        error_rate = (breaker.failure_count / total_calls * 100) if total_calls > 0 else 0.0
 
         return {
             "state": breaker.state.value,
@@ -587,11 +570,7 @@ class CircuitBreakerManager:
                 "total_trips": getattr(breaker, "trip_count", 0),
                 "current_state": breaker.state.value,
                 "success_rate_24h": round(
-                    (
-                        breaker.success_count
-                        / (breaker.success_count + breaker.failure_count)
-                        * 100
-                    )
+                    (breaker.success_count / (breaker.success_count + breaker.failure_count) * 100)
                     if (breaker.success_count + breaker.failure_count) > 0
                     else 100.0,
                     2,
@@ -602,9 +581,7 @@ class CircuitBreakerManager:
 
         return _Metrics(data, breakers_dict)
 
-    def maybe_adapt_breakers(
-        self, force: bool = False, min_interval_seconds: int = 300
-    ) -> dict[str, Any]:
+    def maybe_adapt_breakers(self, force: bool = False, min_interval_seconds: int = 300) -> dict[str, Any]:
         """Adaptive tuning hook.
 
         Currently a safe, idempotent no-op that records last adapt time and returns any

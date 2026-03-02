@@ -87,9 +87,7 @@ class CircuitBreakerOpenError(Exception):
     def __init__(self, circuit_name: str, recovery_in: float):
         self.circuit_name = circuit_name
         self.recovery_in = recovery_in
-        super().__init__(
-            f"Circuit '{circuit_name}' is OPEN. Recovery in {recovery_in:.1f}s"
-        )
+        super().__init__(f"Circuit '{circuit_name}' is OPEN. Recovery in {recovery_in:.1f}s")
 
 
 class CircuitBreaker:
@@ -178,9 +176,7 @@ class CircuitBreaker:
         if len(self._stats.state_changes) > 100:
             self._stats.state_changes = self._stats.state_changes[-100:]
 
-        logger.warning(
-            f"CircuitBreaker '{self.config.name}': {old_state.value} -> {new_state.value}"
-        )
+        logger.warning(f"CircuitBreaker '{self.config.name}': {old_state.value} -> {new_state.value}")
 
     def _record_success(self) -> None:
         """Record a successful call."""
@@ -192,9 +188,11 @@ class CircuitBreaker:
             self._stats.consecutive_successes += 1
 
             # In HALF_OPEN, check if we can close the circuit
-            if self._state == CircuitState.HALF_OPEN:
-                if self._stats.consecutive_successes >= self.config.success_threshold:
-                    self._transition_to(CircuitState.CLOSED)
+            if (
+                self._state == CircuitState.HALF_OPEN
+                and self._stats.consecutive_successes >= self.config.success_threshold
+            ):
+                self._transition_to(CircuitState.CLOSED)
 
     def _record_failure(self, error: Exception) -> None:
         """Record a failed call."""

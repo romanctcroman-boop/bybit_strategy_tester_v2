@@ -163,9 +163,7 @@ def calculate_sma_numba(data: np.ndarray, period: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def calculate_atr_numba(
-    high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int
-) -> np.ndarray:
+def calculate_atr_numba(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
     """Calculate ATR using Numba."""
     n = len(close)
     atr = np.zeros(n, dtype=np.float64)
@@ -412,13 +410,9 @@ def generate_macd_signals_numba(
 
     for i in range(1, n):
         # Bullish crossover: MACD crosses above signal
-        bullish_cross = (
-            macd_line[i - 1] <= signal_line[i - 1] and macd_line[i] > signal_line[i]
-        )
+        bullish_cross = macd_line[i - 1] <= signal_line[i - 1] and macd_line[i] > signal_line[i]
         # Bearish crossover: MACD crosses below signal
-        bearish_cross = (
-            macd_line[i - 1] >= signal_line[i - 1] and macd_line[i] < signal_line[i]
-        )
+        bearish_cross = macd_line[i - 1] >= signal_line[i - 1] and macd_line[i] < signal_line[i]
 
         if direction == 0 or direction == 2:
             if bullish_cross:
@@ -695,17 +689,15 @@ class UniversalSignalGenerator:
                 f"Available: {list(self.STRATEGY_TYPES.keys())} + {list(self._custom_generators.keys())}"
             )
 
-    def _generate_rsi(
-        self, close: np.ndarray, params: dict, direction: int
-    ) -> SignalOutput:
+    def _generate_rsi(self, close: np.ndarray, params: dict, direction: int) -> SignalOutput:
         """Generate RSI signals."""
         period = int(params.get("period", 14))
         overbought = float(params.get("overbought", 70))
         oversold = float(params.get("oversold", 30))
 
         rsi = calculate_rsi_numba(close, period)
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_rsi_signals_numba(rsi, oversold, overbought, direction)
+        long_entries, long_exits, short_entries, short_exits = generate_rsi_signals_numba(
+            rsi, oversold, overbought, direction
         )
 
         return SignalOutput(
@@ -716,19 +708,15 @@ class UniversalSignalGenerator:
             indicator_values={"rsi": rsi},
         )
 
-    def _generate_macd(
-        self, close: np.ndarray, params: dict, direction: int
-    ) -> SignalOutput:
+    def _generate_macd(self, close: np.ndarray, params: dict, direction: int) -> SignalOutput:
         """Generate MACD signals."""
         fast = int(params.get("fast_period", 12))
         slow = int(params.get("slow_period", 26))
         signal = int(params.get("signal_period", 9))
 
-        macd_line, signal_line, histogram = calculate_macd_numba(
-            close, fast, slow, signal
-        )
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_macd_signals_numba(macd_line, signal_line, histogram, direction)
+        macd_line, signal_line, histogram = calculate_macd_numba(close, fast, slow, signal)
+        long_entries, long_exits, short_entries, short_exits = generate_macd_signals_numba(
+            macd_line, signal_line, histogram, direction
         )
 
         return SignalOutput(
@@ -743,17 +731,13 @@ class UniversalSignalGenerator:
             },
         )
 
-    def _generate_bollinger(
-        self, close: np.ndarray, params: dict, direction: int
-    ) -> SignalOutput:
+    def _generate_bollinger(self, close: np.ndarray, params: dict, direction: int) -> SignalOutput:
         """Generate Bollinger Bands signals."""
         period = int(params.get("period", 20))
         std_dev = float(params.get("std_dev", 2.0))
 
         upper, middle, lower = calculate_bollinger_numba(close, period, std_dev)
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_bb_signals_numba(close, upper, lower, direction)
-        )
+        long_entries, long_exits, short_entries, short_exits = generate_bb_signals_numba(close, upper, lower, direction)
 
         return SignalOutput(
             long_entries=long_entries,
@@ -783,8 +767,8 @@ class UniversalSignalGenerator:
         oversold = float(params.get("oversold", 20))
 
         k, d = calculate_stochastic_numba(high, low, close, k_period, d_period, smooth)
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_stoch_signals_numba(k, d, oversold, overbought, direction)
+        long_entries, long_exits, short_entries, short_exits = generate_stoch_signals_numba(
+            k, d, oversold, overbought, direction
         )
 
         return SignalOutput(
@@ -795,9 +779,7 @@ class UniversalSignalGenerator:
             indicator_values={"stoch_k": k, "stoch_d": d},
         )
 
-    def _generate_ma_crossover(
-        self, close: np.ndarray, params: dict, direction: int
-    ) -> SignalOutput:
+    def _generate_ma_crossover(self, close: np.ndarray, params: dict, direction: int) -> SignalOutput:
         """Generate MA crossover signals."""
         fast_period = int(params.get("fast_period", 10))
         slow_period = int(params.get("slow_period", 50))
@@ -810,8 +792,8 @@ class UniversalSignalGenerator:
             fast_ma = calculate_sma_numba(close, fast_period)
             slow_ma = calculate_sma_numba(close, slow_period)
 
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_ma_crossover_signals_numba(fast_ma, slow_ma, direction)
+        long_entries, long_exits, short_entries, short_exits = generate_ma_crossover_signals_numba(
+            fast_ma, slow_ma, direction
         )
 
         return SignalOutput(
@@ -834,11 +816,9 @@ class UniversalSignalGenerator:
         atr_period = int(params.get("atr_period", 10))
         multiplier = float(params.get("multiplier", 3.0))
 
-        supertrend, trend_direction = calculate_supertrend_numba(
-            high, low, close, atr_period, multiplier
-        )
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_supertrend_signals_numba(trend_direction, direction)
+        supertrend, trend_direction = calculate_supertrend_numba(high, low, close, atr_period, multiplier)
+        long_entries, long_exits, short_entries, short_exits = generate_supertrend_signals_numba(
+            trend_direction, direction
         )
 
         return SignalOutput(

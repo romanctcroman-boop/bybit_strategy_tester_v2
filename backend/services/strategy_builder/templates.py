@@ -241,9 +241,7 @@ class StrategyTemplateManager:
 
         # Add blocks
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 14}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 14})
 
         # Oversold condition (RSI < 30)
         oversold = self.builder.add_block(
@@ -443,18 +441,12 @@ class StrategyTemplateManager:
 
     def _create_ema_crossover_template(self) -> StrategyTemplate:
         """Create EMA crossover template"""
-        graph = self.builder.create_strategy(
-            name="EMA Crossover", description="Trade EMA crossovers", timeframe="4h"
-        )
+        graph = self.builder.create_strategy(name="EMA Crossover", description="Trade EMA crossovers", timeframe="4h")
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        fast_ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 9}
-        )
-        slow_ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 21}
-        )
+        fast_ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 9})
+        slow_ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 21})
 
         cross = self.builder.add_block(graph, BlockType.CONDITION_CROSS, x=500, y=200)
 
@@ -502,15 +494,9 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        ema_fast = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 8}
-        )
-        ema_mid = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=200, parameters={"period": 21}
-        )
-        ema_slow = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 55}
-        )
+        ema_fast = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 8})
+        ema_mid = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=200, parameters={"period": 21})
+        ema_slow = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 55})
 
         # Fast > Mid
         cond1 = self.builder.add_block(
@@ -582,9 +568,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=100, parameters={"period": 14}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=100, parameters={"period": 14})
         macd = self.builder.add_block(
             graph,
             BlockType.INDICATOR_MACD,
@@ -603,9 +587,7 @@ class StrategyTemplateManager:
         )
 
         # MACD crossover
-        macd_cross = self.builder.add_block(
-            graph, BlockType.CONDITION_CROSS, x=500, y=300
-        )
+        macd_cross = self.builder.add_block(graph, BlockType.CONDITION_CROSS, x=500, y=300)
 
         # Both conditions
         and_cond = self.builder.add_block(graph, BlockType.CONDITION_AND, x=700, y=200)
@@ -618,9 +600,7 @@ class StrategyTemplateManager:
         self.builder.connect(graph, macd.id, "macd_line", macd_cross.id, "fast")
         self.builder.connect(graph, macd.id, "signal_line", macd_cross.id, "slow")
         self.builder.connect(graph, rsi_cond.id, "below", and_cond.id, "condition1")
-        self.builder.connect(
-            graph, macd_cross.id, "cross_above", and_cond.id, "condition2"
-        )
+        self.builder.connect(graph, macd_cross.id, "cross_above", and_cond.id, "condition2")
         self.builder.connect(graph, and_cond.id, "result", buy.id, "trigger")
 
         return StrategyTemplate(
@@ -661,12 +641,8 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 50}
-        )
-        atr = self.builder.add_block(
-            graph, BlockType.INDICATOR_ATR, x=300, y=300, parameters={"period": 14}
-        )
+        ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 50})
+        atr = self.builder.add_block(graph, BlockType.INDICATOR_ATR, x=300, y=300, parameters={"period": 14})
 
         # Price > EMA
         trend_cond = self.builder.add_block(
@@ -803,9 +779,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        sma = self.builder.add_block(
-            graph, BlockType.INDICATOR_SMA, x=300, y=100, parameters={"period": 20}
-        )
+        sma = self.builder.add_block(graph, BlockType.INDICATOR_SMA, x=300, y=100, parameters={"period": 20})
         bb = self.builder.add_block(
             graph,
             BlockType.INDICATOR_BOLLINGER,
@@ -875,9 +849,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 7}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 7})
 
         # RSI < 20 (very oversold)
         oversold = self.builder.add_block(
@@ -897,12 +869,8 @@ class StrategyTemplateManager:
             parameters={"threshold": 80},
         )
 
-        buy = self.builder.add_block(
-            graph, BlockType.ACTION_BUY, x=700, y=100, parameters={"size_pct": 50}
-        )
-        sell = self.builder.add_block(
-            graph, BlockType.ACTION_SELL, x=700, y=300, parameters={"size_pct": 100}
-        )
+        buy = self.builder.add_block(graph, BlockType.ACTION_BUY, x=700, y=100, parameters={"size_pct": 50})
+        sell = self.builder.add_block(graph, BlockType.ACTION_SELL, x=700, y=300, parameters={"size_pct": 100})
 
         sl = self.builder.add_block(
             graph,

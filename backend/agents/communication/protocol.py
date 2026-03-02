@@ -117,9 +117,7 @@ class Message:
             payload=data.get("payload"),
             priority=MessagePriority(data.get("priority", 2)),
             correlation_id=data.get("correlation_id"),
-            timestamp=datetime.fromisoformat(data["timestamp"])
-            if data.get("timestamp")
-            else datetime.now(UTC),
+            timestamp=datetime.fromisoformat(data["timestamp"]) if data.get("timestamp") else datetime.now(UTC),
             ttl_seconds=data.get("ttl_seconds"),
             metadata=data.get("metadata", {}),
         )
@@ -239,9 +237,7 @@ class MessageBroker:
         """Register an agent"""
         self._agents[agent_info.agent_id] = agent_info
         self._queues[agent_info.agent_id] = asyncio.PriorityQueue(self._max_queue_size)
-        logger.info(
-            f"📥 Registered agent: {agent_info.agent_id} [{agent_info.agent_type}]"
-        )
+        logger.info(f"📥 Registered agent: {agent_info.agent_id} [{agent_info.agent_type}]")
 
     def unregister_agent(self, agent_id: str) -> None:
         """Unregister an agent"""
@@ -264,9 +260,7 @@ class MessageBroker:
 
     def find_agents_by_capability(self, capability: str) -> list[AgentInfo]:
         """Find agents with specific capability"""
-        return [
-            agent for agent in self._agents.values() if capability in agent.capabilities
-        ]
+        return [agent for agent in self._agents.values() if capability in agent.capabilities]
 
     def subscribe(
         self,
@@ -425,9 +419,7 @@ class MessageBroker:
 
         try:
             if timeout_seconds:
-                _, _, message = await asyncio.wait_for(
-                    queue.get(), timeout=timeout_seconds
-                )
+                _, _, message = await asyncio.wait_for(queue.get(), timeout=timeout_seconds)
             else:
                 _, _, message = await queue.get()
 
@@ -463,9 +455,7 @@ class MessageBroker:
             "registered_agents": len(self._agents),
             "active_subscriptions": sum(len(s) for s in self._subscriptions.values()),
             "pending_requests": len(self._pending_requests),
-            "queue_sizes": {
-                agent_id: queue.qsize() for agent_id, queue in self._queues.items()
-            },
+            "queue_sizes": {agent_id: queue.qsize() for agent_id, queue in self._queues.items()},
         }
 
 

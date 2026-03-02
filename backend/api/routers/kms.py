@@ -175,9 +175,7 @@ async def shutdown_service():
     return {"message": "KMS service shutdown"}
 
 
-@router.post(
-    "/keys", response_model=KeyInfoResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/keys", response_model=KeyInfoResponse, status_code=status.HTTP_201_CREATED)
 async def create_key(request: CreateKeyRequest):
     """Create a new encryption key."""
     service = get_kms_service()
@@ -340,9 +338,7 @@ async def encrypt_api_key(request: EncryptApiKeyRequest):
     service = get_kms_service()
 
     try:
-        key_id, encrypted_key = await service.encrypt_api_key(
-            request.api_key, request.provider_name
-        )
+        key_id, encrypted_key = await service.encrypt_api_key(request.api_key, request.provider_name)
 
         return EncryptApiKeyResponse(
             key_id=key_id,

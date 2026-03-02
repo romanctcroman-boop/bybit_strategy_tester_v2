@@ -12,6 +12,8 @@ Example request:
 {
   "symbol": "BTCUSDT",
   "timeframe": "1h",
+  "start_date": "2025-01-01",
+  "end_date": "2025-01-15",
   "strategy_type": "rsi",
   "param_ranges": {
     "period": [5, 30],
@@ -31,24 +33,31 @@ Example request:
 # mypy: disable-error-code="arg-type, assignment, var-annotated, return-value, union-attr, operator, attr-defined, misc, dict-item"
 
 import logging
+import threading
 import uuid
-from concurrent.futures import Future, ThreadPoolExecutor
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field, validator
+from sqlalchemy.orm import Session
 
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.strategies import RSIStrategy
+from backend.database import get_db
+from backend.database.models.genetic_job import GeneticJob, GeneticJobStatus
 from backend.services.data_service import DataService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/genetic", tags=["Genetic Optimization"])
 
-# Store for optimization jobs (in production, use Redis/DB)
-_jobs: Dict[str, Dict[str, Any]] = {}
+# Global store for cancel events (in-memory, indexed by job_uuid)
+_cancel_events: dict[str, threading.Event] = {}
+
+# Configuration constants
+MAX_ACTIVE_JOBS = 10
+MAX_GENERATIONS = 500
+MAX_POPULATION_SIZE = 200
 
 
 class GeneticOptimizationRequest(BaseModel):
@@ -60,12 +69,12 @@ class GeneticOptimizationRequest(BaseModel):
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
 
     strategy_type: str = Field(default="rsi", description="Strategy type")
-    param_ranges: Dict[str, List[float]] = Field(..., description="Parameter ranges {name: [min, max]}")
+    param_ranges: dict[str, list[float]] = Field(..., description="Parameter ranges {name: [min, max]}")
 
     # Genetic algorithm parameters
     fitness_function: str = Field(default="sharpe", description="Fitness function: sharpe, sortino, multi_objective")
-    population_size: int = Field(default=50, ge=10, le=200)
-    n_generations: int = Field(default=100, ge=10, le=500)
+    population_size: int = Field(default=50, ge=10, le=MAX_POPULATION_SIZE)
+    n_generations: int = Field(default=100, ge=10, le=MAX_GENERATIONS)
     selection: str = Field(default="tournament", description="Selection strategy")
     crossover: str = Field(default="arithmetic", description="Crossover operator")
     mutation: str = Field(default="gaussian", description="Mutation operator")
@@ -74,13 +83,23 @@ class GeneticOptimizationRequest(BaseModel):
     mutation_rate: float = Field(default=0.1, ge=0.0, le=1.0)
 
     # Multi-objective weights
-    multi_objective_weights: Optional[Dict[str, float]] = Field(
+    multi_objective_weights: dict[str, float] | None = Field(
         default=None, description="Weights for multi-objective optimization"
     )
 
     # Execution
     n_workers: int = Field(default=1, ge=1, le=8)
-    random_state: Optional[int] = Field(default=None)
+    random_state: int | None = Field(default=None)
+
+    @validator("param_ranges")
+    def validate_param_ranges(cls, v):
+        """Validate parameter ranges"""
+        for name, range_vals in v.items():
+            if not isinstance(range_vals, list) or len(range_vals) != 2:
+                raise ValueError(f"Parameter '{name}' must have [min, max] range")
+            if range_vals[0] >= range_vals[1]:
+                raise ValueError(f"Parameter '{name}': min must be less than max")
+        return v
 
 
 class GeneticOptimizationResponse(BaseModel):
@@ -89,38 +108,38 @@ class GeneticOptimizationResponse(BaseModel):
     job_id: str
     status: str
     message: str
-    estimated_time: Optional[float] = None
+    estimated_time: float | None = None
 
 
-class GeneticJobStatus(BaseModel):
-    """Job status model"""
+class GeneticJobStatusResponse(BaseModel):
+    """Job status model for API response"""
 
     job_id: str
     status: str  # running, completed, failed, cancelled
     progress: float = 0.0  # 0-100
     current_generation: int = 0
-    best_fitness: Optional[float] = None
-    best_params: Optional[Dict[str, float]] = None
-    message: Optional[str] = None
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    execution_time: Optional[float] = None
+    best_fitness: float | None = None
+    best_params: dict[str, float] | None = None
+    message: str | None = None
+    created_at: str
+    completed_at: str | None = None
+    execution_time: float | None = None
 
 
-class GeneticJobResult(BaseModel):
-    """Job result model"""
+class GeneticJobResultResponse(BaseModel):
+    """Job result model for API response"""
 
     job_id: str
     status: str
     best_fitness: float
-    best_params: Dict[str, float]
+    best_params: dict[str, float]
     n_evaluations: int
     execution_time: float
     generations: int
     improvement_percent: float
-    history: Dict[str, List[float]]
-    pareto_front: Optional[List[Dict[str, Any]]] = None
-    metrics: Dict[str, float]
+    history: dict[str, list[float]]
+    pareto_front: list[dict[str, Any]] | None = None
+    metrics: dict[str, float]
 
 
 def _get_strategy_class(strategy_type: str):
@@ -136,10 +155,22 @@ def _get_strategy_class(strategy_type: str):
     return strategies[strategy_type]
 
 
-def _run_genetic_optimization(job_id: str, request: GeneticOptimizationRequest):
+def _run_genetic_optimization(job_uuid: str, request: GeneticOptimizationRequest, db: Session):
     """Run genetic optimization in background"""
+    cancel_event = threading.Event()
+    _cancel_events[job_uuid] = cancel_event
+
     try:
-        logger.info(f"[{job_id}] Starting genetic optimization")
+        logger.info(f"[{job_uuid}] Starting genetic optimization")
+
+        # Get job from DB and mark as running
+        job = db.query(GeneticJob).filter(GeneticJob.job_uuid == job_uuid).first()
+        if not job:
+            logger.error(f"[{job_uuid}] Job not found in database")
+            return
+
+        job.mark_running()
+        db.commit()
 
         # Import genetic optimizer
         from backend.backtesting.genetic import (
@@ -186,6 +217,7 @@ def _run_genetic_optimization(job_id: str, request: GeneticOptimizationRequest):
             mutation_rate=request.mutation_rate,
             n_workers=request.n_workers,
             random_state=request.random_state,
+            cancel_event=cancel_event,  # Pass cancel event
         )
 
         # Get strategy class
@@ -206,138 +238,211 @@ def _run_genetic_optimization(job_id: str, request: GeneticOptimizationRequest):
             },
         )
 
-        # Store results
-        _jobs[job_id].update(
-            {
-                "status": "completed",
-                "progress": 100.0,
-                "result": result.to_dict(),
-                "completed_at": datetime.now(),
-                "execution_time": result.execution_time,
-            }
-        )
+        # Check if cancelled
+        if cancel_event.is_set():
+            job.mark_cancelled()
+            db.commit()
+            logger.info(f"[{job_uuid}] Optimization cancelled by user")
+            return
 
-        logger.info(f"[{job_id}] Optimization completed: {result.best_individual.fitness:.4f}")
+        # Store results
+        result_dict = result.to_dict()
+        job.mark_completed(
+            best_fitness=result_dict.get("best_fitness", 0.0),
+            best_params=result_dict.get("best_params", {}),
+            n_evaluations=result_dict.get("n_evaluations", 0),
+            execution_time=result_dict.get("execution_time", 0.0),
+            generations=result_dict.get("generations", 0),
+            improvement_percent=result_dict.get("improvement_percent", 0.0),
+            history=result_dict.get("history", {}),
+            pareto_front=result_dict.get("pareto_front"),
+            metrics=result_dict.get("best_individual", {}).get("backtest_results", {}).get("metrics", {}),
+        )
+        db.commit()
+
+        logger.info(f"[{job_uuid}] Optimization completed: {result.best_individual.fitness:.4f}")
 
     except Exception as e:
-        logger.error(f"[{job_id}] Optimization failed: {e}", exc_info=True)
-        _jobs[job_id].update(
-            {
-                "status": "failed",
-                "message": str(e),
-                "completed_at": datetime.now(),
-            }
-        )
+        logger.error(f"[{job_uuid}] Optimization failed: {e}", exc_info=True)
+
+        # Update job in DB
+        job = db.query(GeneticJob).filter(GeneticJob.job_uuid == job_uuid).first()
+        if job:
+            job.mark_failed(str(e))
+            db.commit()
 
 
 @router.post("/optimize", response_model=GeneticOptimizationResponse)
-async def create_genetic_optimization(request: GeneticOptimizationRequest, background_tasks: BackgroundTasks):
+async def create_genetic_optimization(
+    request: GeneticOptimizationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     Create a new genetic optimization job.
 
     Runs genetic algorithm optimization in the background.
     Use GET /genetic/jobs/{job_id} to check status and retrieve results.
     """
-    job_id = str(uuid.uuid4())
+    # Check active jobs limit
+    active_jobs = db.query(GeneticJob).filter(GeneticJob.status == GeneticJobStatus.RUNNING).count()
+
+    if active_jobs >= MAX_ACTIVE_JOBS:
+        raise HTTPException(
+            status_code=429, detail=f"Too many active jobs (max: {MAX_ACTIVE_JOBS}). Please wait or cancel some jobs."
+        )
+
+    job_uuid = str(uuid.uuid4())
 
     # Estimate execution time (rough estimate: 0.1s per evaluation)
     n_evaluations = request.population_size * request.n_generations
-    estimated_time = n_evaluations * 0.1 * request.n_workers
+    estimated_time = n_evaluations * 0.1 / request.n_workers
 
-    # Create job record
-    _jobs[job_id] = {
-        "status": "running",
-        "progress": 0.0,
-        "request": request.dict(),
-        "created_at": datetime.now(),
-        "current_generation": 0,
-    }
+    # Create job record in DB
+    db_job = GeneticJob(
+        id=str(uuid.uuid4()),  # Internal ID
+        job_uuid=job_uuid,
+        status=GeneticJobStatus.PENDING,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        strategy_type=request.strategy_type,
+        param_ranges=request.param_ranges,
+        fitness_function=request.fitness_function,
+        population_size=request.population_size,
+        n_generations=request.n_generations,
+        selection_strategy=request.selection,
+        crossover_operator=request.crossover,
+        mutation_operator=request.mutation,
+        elitism_rate=request.elitism_rate,
+        crossover_rate=request.crossover_rate,
+        mutation_rate=request.mutation_rate,
+        multi_objective_weights=request.multi_objective_weights,
+        n_workers=request.n_workers,
+        random_state=request.random_state,
+    )
+    db.add(db_job)
+    db.commit()
 
     # Run in background
-    background_tasks.add_task(_run_genetic_optimization, job_id, request)
+    background_tasks.add_task(_run_genetic_optimization, job_uuid, request, db)
 
     return GeneticOptimizationResponse(
-        job_id=job_id,
-        status="running",
-        message="Optimization started",
+        job_id=job_uuid,
+        status="pending",
+        message="Optimization job created and queued",
         estimated_time=estimated_time,
     )
 
 
-@router.get("/jobs", response_model=List[GeneticJobStatus])
-async def list_genetic_jobs(status: Optional[str] = None, limit: int = 20):
-    """List all genetic optimization jobs"""
-    jobs = []
+@router.get("/jobs", response_model=list[GeneticJobStatusResponse])
+async def list_genetic_jobs(
+    status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """List all genetic optimization jobs with pagination"""
+    query = db.query(GeneticJob)
 
-    for job_id, job_data in _jobs.items():
-        if status and job_data.get("status") != status:
-            continue
+    if status:
+        try:
+            status_enum = GeneticJobStatus(status)
+            query = query.filter(GeneticJob.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-        result = job_data.get("result", {})
+    # Order by created_at descending (newest first)
+    query = query.order_by(GeneticJob.created_at.desc())
 
-        jobs.append(
-            GeneticJobStatus(
-                job_id=job_id,
-                status=job_data.get("status", "unknown"),
-                progress=job_data.get("progress", 0.0),
-                current_generation=job_data.get("current_generation", 0),
-                best_fitness=result.get("best_fitness"),
-                best_params=result.get("best_params"),
-                message=job_data.get("message"),
-                created_at=job_data.get("created_at"),
-                completed_at=job_data.get("completed_at"),
-                execution_time=job_data.get("execution_time"),
-            )
+    # Pagination
+    jobs = query.offset(offset).limit(limit).all()
+
+    return [
+        GeneticJobStatusResponse(
+            job_id=job.job_uuid,
+            status=job.status.value,
+            progress=job.progress,
+            current_generation=job.current_generation,
+            best_fitness=job.best_fitness,
+            best_params=job.best_params,
+            message=job.error_message,
+            created_at=job.created_at.isoformat() if job.created_at else "",
+            completed_at=job.completed_at.isoformat() if job.completed_at else None,
+            execution_time=job.execution_time,
         )
-
-        if len(jobs) >= limit:
-            break
-
-    return jobs
+        for job in jobs
+    ]
 
 
-@router.get("/jobs/{job_id}", response_model=GeneticJobResult)
-async def get_genetic_job_result(job_id: str):
+@router.get("/jobs/{job_id}", response_model=GeneticJobResultResponse)
+async def get_genetic_job_result(job_id: str, db: Session = Depends(get_db)):
     """Get genetic optimization job result"""
-    if job_id not in _jobs:
+    job = db.query(GeneticJob).filter(GeneticJob.job_uuid == job_id).first()
+
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    job_data = _jobs[job_id]
+    if job.status != GeneticJobStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail=f"Job not completed (status: {job.status.value})")
 
-    if job_data["status"] != "completed":
-        raise HTTPException(status_code=400, detail=f"Job not completed (status: {job_data['status']})")
-
-    result = job_data.get("result", {})
-
-    return GeneticJobResult(
-        job_id=job_id,
-        status="completed",
-        best_fitness=result.get("best_fitness", 0.0),
-        best_params=result.get("best_params", {}),
-        n_evaluations=result.get("n_evaluations", 0),
-        execution_time=result.get("execution_time", 0.0),
-        generations=result.get("generations", 0),
-        improvement_percent=result.get("improvement_percent", 0.0),
-        history=result.get("history", {}),
-        pareto_front=result.get("pareto_front"),
-        metrics=result.get("best_individual", {}).get("backtest_results", {}).get("metrics", {}),
+    return GeneticJobResultResponse(
+        job_id=job.job_uuid,
+        status=job.status.value,
+        best_fitness=job.best_fitness or 0.0,
+        best_params=job.best_params or {},
+        n_evaluations=job.n_evaluations,
+        execution_time=job.execution_time or 0.0,
+        generations=job.generations_completed,
+        improvement_percent=job.improvement_percent or 0.0,
+        history=job.history or {},
+        pareto_front=job.pareto_front,
+        metrics=job.metrics or {},
     )
 
 
-@router.delete("/jobs/{job_id}")
-async def cancel_genetic_job(job_id: str):
-    """Cancel a running genetic optimization job"""
-    if job_id not in _jobs:
+@router.get("/jobs/{job_id}/status")
+async def get_genetic_job_status(job_id: str, db: Session = Depends(get_db)):
+    """Get genetic optimization job status (lightweight endpoint)"""
+    job = db.query(GeneticJob).filter(GeneticJob.job_uuid == job_id).first()
+
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    job_data = _jobs[job_id]
+    return {
+        "job_id": job.job_uuid,
+        "status": job.status.value,
+        "progress": job.progress,
+        "current_generation": job.current_generation,
+        "best_fitness": job.best_fitness,
+        "message": job.error_message,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+    }
 
-    if job_data["status"] in ["completed", "failed", "cancelled"]:
+
+@router.delete("/jobs/{job_id}")
+async def cancel_genetic_job(job_id: str, db: Session = Depends(get_db)):
+    """Cancel a running genetic optimization job"""
+    job = db.query(GeneticJob).filter(GeneticJob.job_uuid == job_id).first()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status in [GeneticJobStatus.COMPLETED, GeneticJobStatus.FAILED, GeneticJobStatus.CANCELLED]:
         raise HTTPException(status_code=400, detail="Job already finished")
 
-    # Mark as cancelled (in production, would need to stop the actual task)
-    job_data["status"] = "cancelled"
-    job_data["message"] = "Cancelled by user"
-    job_data["completed_at"] = datetime.now()
+    # Mark as cancelled in DB
+    job.request_cancel()
+    db.commit()
 
-    return {"message": f"Job {job_id} cancelled"}
+    # Signal cancel event
+    if job_id in _cancel_events:
+        _cancel_events[job_id].set()
+        del _cancel_events[job_id]
+
+    logger.info(f"[{job_id}] Cancellation requested by user")
+
+    return {"message": f"Job {job_id} cancellation requested"}

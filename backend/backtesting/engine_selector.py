@@ -86,36 +86,26 @@ def get_engine(
 
     Args:
         engine_type: Engine preference:
-            - "auto": Automatically select best available (GPU > Numba > Fallback)
-            - "fallback": FallbackEngineV2 (reference implementation)
-            - "fallback_v3": FallbackEngineV3 (with pyramiding support)
-            - "fallback_v4": FallbackEngineV4 (with Multi-level TP + ATR support)
-            - "numba": NumbaEngineV2 (JIT-compiled)
-            - "gpu": GPUEngineV2 (CUDA-accelerated)
-        require_bar_magnifier: If True, only engines supporting Bar Magnifier are valid
-        pyramiding: Max concurrent positions (if > 1, uses FallbackEngineV3)
-        strategy_type: Optional strategy name ('dca', 'grid', 'martingale') for validation
-        max_entries: Optional max entries for DCA/Grid strategies (for pyramiding validation)
+            - "auto" / "single" / "fallback" / "fallback_v4" / "v4":
+                  FallbackEngineV4 — эталон, одиночный бэктест
+            - "optimization" / "numba":
+                  NumbaEngineV2 — JIT-compiled, ~20-40x быстрее, 100% паритет с V4
+            - "dca" / "grid" / "dca_grid":
+                  DCAEngine — специализированный движок для DCA/Grid стратегий
+            - "fallback_v3" / "fallback_v2" / "gpu":
+                  ⚠️ DEPRECATED — только для обратной совместимости
+        require_bar_magnifier: Зарезервировано (все актуальные движки поддерживают Bar Magnifier)
+        pyramiding: Максимум одновременных позиций (передаётся в движок)
+        strategy_type: Тип стратегии ('dca', 'grid', 'martingale') — для валидации
+        max_entries: Максимум входов для DCA/Grid — для валидации pyramiding
+        dca_enabled: Если True, принудительно использует DCAEngine
 
     Returns:
-        Instantiated engine ready for use
+        Инстанс движка, готового к запуску
 
     Note:
-        All engines produce 100% identical results (147-metric parity verified).
-        The choice affects performance only, not accuracy.
-
-    Pyramiding:
-        When pyramiding > 1, FallbackEngineV3 is automatically used regardless
-        of engine_type selection, as it's the only engine with full pyramiding
-        support (multiple entries, weighted average price, FIFO/LIFO/ALL close).
-
-    Multi-level TP:
-        FallbackEngineV4 supports Multi-level TP (TP1-TP4 partial closes) and
-        ATR-based dynamic TP/SL. Use engine_type="fallback_v4" explicitly.
-
-    DCA/Grid Validation:
-        For 'dca', 'grid', or 'martingale' strategies, pyramiding should be >= max_entries.
-        If pyramiding=1 for these strategies, a warning is logged as accumulation won't work.
+        FallbackEngineV4 и NumbaEngineV2 дают 100% идентичные результаты.
+        Выбор влияет только на скорость, не на точность.
     """
     engine_type = engine_type.lower()
 
@@ -239,24 +229,18 @@ def get_available_engines() -> dict:
     engines = {
         "fallback": {
             "available": True,
-            "name": "FallbackEngineV2",
-            "description": "Pure Python reference implementation, 100% accurate",
-            "supports_bar_magnifier": True,
-            "supports_pyramiding": False,
-            "acceleration": "None (CPU)",
-        },
-        "fallback_v3": {
-            "available": True,
-            "name": "FallbackEngineV3",
-            "description": "Pyramiding-enabled (Grid/DCA/Martingale strategies)",
+            "name": "FallbackEngineV4",
+            "description": "Эталонный движок: Multi-TP, ATR SL/TP, Trailing, DCA, Pyramiding",
             "supports_bar_magnifier": True,
             "supports_pyramiding": True,
+            "supports_multi_tp": True,
+            "supports_atr_sltp": True,
             "acceleration": "None (CPU)",
         },
         "fallback_v4": {
             "available": True,
             "name": "FallbackEngineV4",
-            "description": "Full: Multi-TP, ATR SL/TP, Trailing, DCA (reference for 'universal' contract)",
+            "description": "Эталонный движок: Multi-TP, ATR SL/TP, Trailing, DCA, Pyramiding",
             "supports_bar_magnifier": True,
             "supports_pyramiding": True,
             "supports_multi_tp": True,

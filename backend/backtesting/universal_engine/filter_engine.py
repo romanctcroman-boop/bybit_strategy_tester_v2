@@ -81,9 +81,7 @@ def calculate_ema_filter(data: np.ndarray, period: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def calculate_atr_filter(
-    high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int
-) -> np.ndarray:
+def calculate_atr_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
     """Calculate ATR for volatility filtering."""
     n = len(close)
     atr = np.zeros(n, dtype=np.float64)
@@ -552,9 +550,7 @@ class FilterConfig:
 
     # Market Regime Filter
     market_regime_enabled: bool = False
-    market_regime_filter: str = (
-        "not_volatile"  # "all", "trending", "ranging", "volatile", "not_volatile"
-    )
+    market_regime_filter: str = "not_volatile"  # "all", "trending", "ranging", "volatile", "not_volatile"
     market_regime_lookback: int = 50
 
     # Time Filter
@@ -637,18 +633,10 @@ class UniversalFilterEngine:
         close = candles["close"].values.astype(np.float64)
         high = candles["high"].values.astype(np.float64) if "high" in candles else close
         low = candles["low"].values.astype(np.float64) if "low" in candles else close
-        volume = (
-            candles["volume"].values.astype(np.float64)
-            if "volume" in candles
-            else np.ones_like(close)
-        )
+        volume = candles["volume"].values.astype(np.float64) if "volume" in candles else np.ones_like(close)
 
         # 1. MTF HTF Filter
-        if (
-            config.mtf_enabled
-            and config.mtf_htf_candles is not None
-            and config.mtf_htf_index_map is not None
-        ):
+        if config.mtf_enabled and config.mtf_htf_candles is not None and config.mtf_htf_index_map is not None:
             htf_close = config.mtf_htf_candles["close"].values.astype(np.float64)
             if config.mtf_filter_type == "ema":
                 htf_ma = calculate_ema_filter(htf_close, config.mtf_filter_period)
@@ -670,11 +658,7 @@ class UniversalFilterEngine:
             }
 
         # 2. BTC Correlation Filter
-        if (
-            config.btc_filter_enabled
-            and config.btc_candles is not None
-            and config.btc_index_map is not None
-        ):
+        if config.btc_filter_enabled and config.btc_candles is not None and config.btc_index_map is not None:
             btc_close = config.btc_candles["close"].values.astype(np.float64)
             btc_ma = calculate_sma_filter(btc_close, config.btc_filter_period)
 
@@ -704,9 +688,7 @@ class UniversalFilterEngine:
 
         # 4. Volume Filter
         if config.volume_filter_enabled:
-            volume_percentile = calculate_percentile_rank(
-                volume, config.volume_lookback
-            )
+            volume_percentile = calculate_percentile_rank(volume, config.volume_lookback)
 
             filtered_long, filtered_short = apply_volume_filter(
                 filtered_long,
@@ -722,9 +704,7 @@ class UniversalFilterEngine:
             trend_ma = calculate_sma_filter(close, config.trend_filter_period)
             mode = 0 if config.trend_filter_mode == "with" else 1
 
-            filtered_long, filtered_short = apply_trend_filter(
-                filtered_long, filtered_short, close, trend_ma, mode
-            )
+            filtered_long, filtered_short = apply_trend_filter(filtered_long, filtered_short, close, trend_ma, mode)
             filters_applied.append("trend")
             filter_stats["trend"] = {
                 "period": config.trend_filter_period,
@@ -754,9 +734,7 @@ class UniversalFilterEngine:
             hurst = calculate_hurst_exponent(close, config.market_regime_lookback)
             regime_int = self.REGIME_MAP.get(config.market_regime_filter, 0)
 
-            filtered_long, filtered_short = apply_market_regime_filter(
-                filtered_long, filtered_short, hurst, regime_int
-            )
+            filtered_long, filtered_short = apply_market_regime_filter(filtered_long, filtered_short, hurst, regime_int)
             filters_applied.append("market_regime")
             filter_stats["market_regime"] = {
                 "filter": config.market_regime_filter,
@@ -835,15 +813,9 @@ class UniversalFilterEngine:
             btc_index_map=getattr(input_data, "mtf_btc_index_map", None),
             btc_filter_period=getattr(input_data, "mtf_btc_filter_period", 50),
             # Volatility
-            volatility_filter_enabled=getattr(
-                input_data, "volatility_filter_enabled", False
-            ),
-            min_volatility_percentile=getattr(
-                input_data, "min_volatility_percentile", 10.0
-            ),
-            max_volatility_percentile=getattr(
-                input_data, "max_volatility_percentile", 90.0
-            ),
+            volatility_filter_enabled=getattr(input_data, "volatility_filter_enabled", False),
+            min_volatility_percentile=getattr(input_data, "min_volatility_percentile", 10.0),
+            max_volatility_percentile=getattr(input_data, "max_volatility_percentile", 90.0),
             volatility_lookback=getattr(input_data, "volatility_lookback", 100),
             # Volume
             volume_filter_enabled=getattr(input_data, "volume_filter_enabled", False),
@@ -854,17 +826,13 @@ class UniversalFilterEngine:
             trend_filter_period=getattr(input_data, "trend_filter_period", 200),
             trend_filter_mode=getattr(input_data, "trend_filter_mode", "with"),
             # Momentum
-            momentum_filter_enabled=getattr(
-                input_data, "momentum_filter_enabled", False
-            ),
+            momentum_filter_enabled=getattr(input_data, "momentum_filter_enabled", False),
             momentum_oversold=getattr(input_data, "momentum_oversold", 30.0),
             momentum_overbought=getattr(input_data, "momentum_overbought", 70.0),
             momentum_period=getattr(input_data, "momentum_period", 14),
             # Market Regime
             market_regime_enabled=getattr(input_data, "market_regime_enabled", False),
-            market_regime_filter=getattr(
-                input_data, "market_regime_filter", "not_volatile"
-            ),
+            market_regime_filter=getattr(input_data, "market_regime_filter", "not_volatile"),
             market_regime_lookback=getattr(input_data, "market_regime_lookback", 50),
             # Time
             time_filter_enabled=getattr(input_data, "exit_on_session_close", False)

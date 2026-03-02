@@ -64,6 +64,10 @@ let riskDistributionChart = null;
 // eslint-disable-next-line no-unused-vars
 let refreshInterval = null;
 
+// Demo mode flag - set to true to show sample data when no real positions exist
+// Access via window.DEMO_MODE for global access
+window.DEMO_MODE = false;
+
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
     initializeAnalyticsState();
@@ -179,6 +183,15 @@ async function refreshData() {
         const summaryResponse = await fetch(`${RISK_API}/summary`);
         if (summaryResponse.ok) {
             const summary = await summaryResponse.json();
+            
+            // If demo mode enabled or no real data, show mock data
+            const hasRealData = summary.risk_score > 0 || summary.positions_count > 0;
+            if (window.DEMO_MODE || !hasRealData) {
+                console.log('[Analytics] No real data detected, showing demo data');
+                showMockData();
+                return;
+            }
+            
             updateRiskSummary(summary);
         }
 
@@ -411,6 +424,18 @@ function showPositionDetails(symbol) {
 // eslint-disable-next-line no-unused-vars
 function exportReport() {
     alert('Generating PDF report...\n\nThis feature will export a comprehensive risk report.');
+}
+
+// eslint-disable-next-line no-unused-vars
+function toggleDemoMode() {
+    window.DEMO_MODE = !window.DEMO_MODE;
+    const btn = document.getElementById('btnDemoMode');
+    if (btn) {
+        btn.textContent = `🎭 Demo: ${window.DEMO_MODE ? 'ON' : 'OFF'}`;
+        btn.className = window.DEMO_MODE ? 'btn btn-warning' : 'btn btn-outline-secondary';
+    }
+    console.log('[Analytics] Demo mode:', window.DEMO_MODE ? 'ON' : 'OFF');
+    refreshData();
 }
 
 // Utility functions - using imported versions from utils.js

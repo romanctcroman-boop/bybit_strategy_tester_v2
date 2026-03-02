@@ -257,17 +257,13 @@ class MaintenanceDB:
     def get_tasks(self) -> list[ScheduledTask]:
         """Get all scheduled tasks."""
         with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM scheduled_tasks ORDER BY name"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM scheduled_tasks ORDER BY name").fetchall()
             return [self._row_to_task(row) for row in rows]
 
     def get_task(self, task_id: str) -> ScheduledTask | None:
         """Get a specific task by ID."""
         with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM scheduled_tasks WHERE id = ?", (task_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM scheduled_tasks WHERE id = ?", (task_id,)).fetchone()
             return self._row_to_task(row) if row else None
 
     def _row_to_task(self, row: sqlite3.Row) -> ScheduledTask:
@@ -278,12 +274,8 @@ class MaintenanceDB:
             task_type=TaskType(row["task_type"]),
             interval_seconds=row["interval_seconds"],
             enabled=bool(row["enabled"]),
-            last_run=datetime.fromisoformat(row["last_run"])
-            if row["last_run"]
-            else None,
-            next_run=datetime.fromisoformat(row["next_run"])
-            if row["next_run"]
-            else None,
+            last_run=datetime.fromisoformat(row["last_run"]) if row["last_run"] else None,
+            next_run=datetime.fromisoformat(row["next_run"]) if row["next_run"] else None,
             run_count=row["run_count"],
             error_count=row["error_count"],
             config=json.loads(row["config"]) if row["config"] else {},
@@ -355,9 +347,7 @@ class MaintenanceDB:
         """Delete history older than N days."""
         cutoff = datetime.now(UTC) - timedelta(days=days)
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM action_history WHERE timestamp < ?", (cutoff.isoformat(),)
-            )
+            cursor = conn.execute("DELETE FROM action_history WHERE timestamp < ?", (cutoff.isoformat(),))
             conn.commit()
             return cursor.rowcount
 
@@ -388,9 +378,15 @@ class TaskExecutors:
     def _get_interval_ms(self, interval: str) -> int:
         """Get interval duration in milliseconds."""
         mapping = {
-            "1": 60_000, "5": 300_000, "15": 900_000, "30": 1_800_000,
-            "60": 3_600_000, "240": 14_400_000,
-            "D": 86_400_000, "W": 604_800_000, "M": 30 * 86_400_000,
+            "1": 60_000,
+            "5": 300_000,
+            "15": 900_000,
+            "30": 1_800_000,
+            "60": 3_600_000,
+            "240": 14_400_000,
+            "D": 86_400_000,
+            "W": 604_800_000,
+            "M": 30 * 86_400_000,
         }
         return mapping.get(interval, 60_000)
 
@@ -403,9 +399,7 @@ class TaskExecutors:
         """Check data freshness and AUTO-UPDATE stale data."""
         symbols = config.get("symbols", ["BTCUSDT", "ETHUSDT"])
         intervals = config.get("intervals", ["1", "5", "15", "30", "60", "240", "D", "W", "M"])
-        max_age_minutes = config.get(
-            "max_age_minutes", {"1": 5, "5": 10, "15": 20, "default": 60}
-        )
+        max_age_minutes = config.get("max_age_minutes", {"1": 5, "5": 10, "15": 20, "default": 60})
 
         results = {
             "checked": 0,
@@ -430,6 +424,7 @@ class TaskExecutors:
             blocked = set()
             try:
                 from backend.services.blocked_tickers import get_blocked
+
                 blocked = get_blocked()
             except Exception:
                 pass
@@ -457,9 +452,7 @@ class TaskExecutors:
                         age_minutes = (now_ts - newest_ts) / 60000
 
                         # Get max age for this interval
-                        max_age = max_age_minutes.get(
-                            interval, max_age_minutes.get("default", 60)
-                        )
+                        max_age = max_age_minutes.get(interval, max_age_minutes.get("default", 60))
 
                         if age_minutes > max_age:
                             results["stale"] += 1
@@ -499,9 +492,7 @@ class TaskExecutors:
                                     )
                             except Exception as e:
                                 results["errors"] += 1
-                                logger.warning(
-                                    f"Auto-update failed for {symbol}:{interval}: {e}"
-                                )
+                                logger.warning(f"Auto-update failed for {symbol}:{interval}: {e}")
                                 results["details"].append(
                                     {
                                         "symbol": symbol,
@@ -514,9 +505,7 @@ class TaskExecutors:
 
                     except Exception as e:
                         results["errors"] += 1
-                        logger.warning(
-                            f"Freshness check failed for {symbol}:{interval}: {e}"
-                        )
+                        logger.warning(f"Freshness check failed for {symbol}:{interval}: {e}")
 
             conn.close()
 
@@ -525,9 +514,7 @@ class TaskExecutors:
             logger.error(f"Freshness check failed: {e}")
 
         if results["candles_added"] > 0:
-            logger.info(
-                f"✅ Auto-updated {results['updated']} intervals, added {results['candles_added']} candles"
-            )
+            logger.info(f"✅ Auto-updated {results['updated']} intervals, added {results['candles_added']} candles")
 
         return results
 
@@ -585,9 +572,7 @@ class TaskExecutors:
         market_type = "linear"
         for candle in all_candles:
             try:
-                open_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=UTC
-                )
+                open_dt = datetime.fromtimestamp(candle["open_time"] / 1000, tz=UTC)
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO bybit_kline_audit
@@ -607,12 +592,7 @@ class TaskExecutors:
                         candle["close"],
                         candle["volume"],
                         candle["turnover"],
-                        json.dumps(
-                            {
-                                k: (v.isoformat() if isinstance(v, datetime) else v)
-                                for k, v in candle.items()
-                            }
-                        ),
+                        json.dumps({k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in candle.items()}),
                     ),
                 )
                 inserted += cursor.rowcount
@@ -646,9 +626,7 @@ class TaskExecutors:
                             results["gaps_found"] += gaps
 
                             # Attempt repair
-                            repaired = repair_service.repair_all_gaps(
-                                symbol, interval, max_gaps=max_gaps_per_run
-                            )
+                            repaired = repair_service.repair_all_gaps(symbol, interval, max_gaps=max_gaps_per_run)
                             results["gaps_repaired"] += repaired
 
                             results["details"].append(
@@ -662,9 +640,7 @@ class TaskExecutors:
 
                     except Exception as e:
                         results["errors"] += 1
-                        logger.warning(
-                            f"Gap repair failed for {symbol}:{interval}: {e}"
-                        )
+                        logger.warning(f"Gap repair failed for {symbol}:{interval}: {e}")
 
         except ImportError:
             results["errors"] += 1
@@ -750,9 +726,7 @@ class TaskExecutors:
 
         try:
             # Get size before
-            results["size_before_mb"] = round(
-                self.data_db_path.stat().st_size / (1024 * 1024), 2
-            )
+            results["size_before_mb"] = round(self.data_db_path.stat().st_size / (1024 * 1024), 2)
 
             conn = sqlite3.connect(str(self.data_db_path))
             c = conn.cursor()
@@ -779,17 +753,10 @@ class TaskExecutors:
             conn.close()
 
             # Get size after
-            results["size_after_mb"] = round(
-                self.data_db_path.stat().st_size / (1024 * 1024), 2
-            )
-            results["space_freed_mb"] = round(
-                results["size_before_mb"] - results["size_after_mb"], 2
-            )
+            results["size_after_mb"] = round(self.data_db_path.stat().st_size / (1024 * 1024), 2)
+            results["space_freed_mb"] = round(results["size_before_mb"] - results["size_after_mb"], 2)
 
-            logger.info(
-                f"DB optimization complete: VACUUM={results['vacuum']}, "
-                f"freed {results['space_freed_mb']} MB"
-            )
+            logger.info(f"DB optimization complete: VACUUM={results['vacuum']}, freed {results['space_freed_mb']} MB")
 
         except Exception as e:
             results["errors"] += 1
@@ -1062,9 +1029,7 @@ class DBMaintenanceServer:
         data_db_path: Path | None = None,
         api_port: int = 8001,
     ):
-        self.maintenance_db_path = (
-            maintenance_db_path or PROJECT_ROOT / "data" / "maintenance.sqlite3"
-        )
+        self.maintenance_db_path = maintenance_db_path or PROJECT_ROOT / "data" / "maintenance.sqlite3"
         self.data_db_path = data_db_path or PROJECT_ROOT / "data.sqlite3"
         self.api_port = api_port
 
@@ -1155,9 +1120,7 @@ class DBMaintenanceServer:
             try:
                 import uvicorn
 
-                uvicorn.run(
-                    app, host="0.0.0.0", port=self.api_port, log_level="warning"
-                )
+                uvicorn.run(app, host="0.0.0.0", port=self.api_port, log_level="warning")
             except Exception as e:
                 logger.error(f"API server error: {e}")
 
@@ -1219,13 +1182,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="DB Maintenance Server")
-    parser.add_argument(
-        "--port", type=int, default=8001, help="API port (default: 8001)"
-    )
+    parser.add_argument("--port", type=int, default=8001, help="API port (default: 8001)")
     parser.add_argument("--data-db", type=str, help="Path to data database")
-    parser.add_argument(
-        "--maintenance-db", type=str, help="Path to maintenance database"
-    )
+    parser.add_argument("--maintenance-db", type=str, help="Path to maintenance database")
 
     args = parser.parse_args()
 

@@ -275,18 +275,10 @@ CONFIDENCE: [0.0-1.0]
 
         # Parse response
         config = RewardShapingConfig(
-            profit_weight=float(
-                self._extract_value(response, "PROFIT_WEIGHT") or "1.0"
-            ),
-            drawdown_penalty=float(
-                self._extract_value(response, "DRAWDOWN_PENALTY") or "1.5"
-            ),
-            holding_penalty=float(
-                self._extract_value(response, "HOLDING_PENALTY") or "0.01"
-            ),
-            overtrading_penalty=float(
-                self._extract_value(response, "OVERTRADING_PENALTY") or "0.5"
-            ),
+            profit_weight=float(self._extract_value(response, "PROFIT_WEIGHT") or "1.0"),
+            drawdown_penalty=float(self._extract_value(response, "DRAWDOWN_PENALTY") or "1.5"),
+            holding_penalty=float(self._extract_value(response, "HOLDING_PENALTY") or "0.01"),
+            overtrading_penalty=float(self._extract_value(response, "OVERTRADING_PENALTY") or "0.5"),
         )
 
         # Add regime-specific bonus
@@ -406,9 +398,7 @@ CONFIDENCE: [0.0-1.0]
                 confidence = np.random.uniform(0.4, 0.9)
 
                 # Validate with AI
-                validation = await self.validate_decision(
-                    current_state, action, confidence
-                )
+                validation = await self.validate_decision(current_state, action, confidence)
 
                 ai_queries_this_episode += 1
 
@@ -632,13 +622,8 @@ CONFIDENCE: 0.75
         """Get integration statistics"""
         return {
             **self.stats,
-            "current_regime": self.current_regime.value
-            if self.current_regime
-            else None,
-            "approval_rate": (
-                self.stats["decisions_approved"]
-                / max(self.stats["decisions_validated"], 1)
-            ),
+            "current_regime": self.current_regime.value if self.current_regime else None,
+            "approval_rate": (self.stats["decisions_approved"] / max(self.stats["decisions_validated"], 1)),
             "training_episodes": len(self.training_history),
         }
 

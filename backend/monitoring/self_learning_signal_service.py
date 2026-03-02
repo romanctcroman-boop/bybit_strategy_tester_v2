@@ -252,10 +252,7 @@ class SelfLearningSignalPublisher:
             )
 
         # Check concept drift
-        if (
-            snapshot.concept_drift_score
-            and snapshot.concept_drift_score > self.drift_threshold
-        ):
+        if snapshot.concept_drift_score and snapshot.concept_drift_score > self.drift_threshold:
             alerts.append(
                 DriftAlert(
                     timestamp=snapshot.timestamp,
@@ -263,9 +260,7 @@ class SelfLearningSignalPublisher:
                     severity="high",
                     metric_name="concept_drift_score",
                     current_value=snapshot.concept_drift_score,
-                    baseline_value=self.baseline_metrics.get(
-                        "concept_drift_score", 0.0
-                    ),
+                    baseline_value=self.baseline_metrics.get("concept_drift_score", 0.0),
                     threshold=self.drift_threshold,
                     recommendation="Trigger model retraining, update training data",
                 )
@@ -289,9 +284,7 @@ class SelfLearningSignalPublisher:
 
         for alert in alerts:
             # Log alert
-            log_level = (
-                logging.ERROR if alert.severity == "critical" else logging.WARNING
-            )
+            log_level = logging.ERROR if alert.severity == "critical" else logging.WARNING
             logger.log(
                 log_level,
                 f"🚨 {alert.alert_type.upper()}: {alert.metric_name}={alert.current_value:.3f} "
@@ -352,9 +345,7 @@ class SelfLearningSignalPublisher:
             "timestamp": datetime.now(UTC).isoformat(),
             "reason": reason,
             "baseline_metrics": self.baseline_metrics,
-            "recent_drift_alerts": [
-                asdict(a) for a in self.alerts[-5:] if a.alert_type == "concept_drift"
-            ],
+            "recent_drift_alerts": [asdict(a) for a in self.alerts[-5:] if a.alert_type == "concept_drift"],
         }
 
         file_path = self.output_dir / "retraining_triggers.jsonl"

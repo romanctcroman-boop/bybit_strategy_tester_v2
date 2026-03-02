@@ -54,8 +54,8 @@ def snapshot_to_orderbook_simulator(
     )
 
     sim = OrderBookSimulator(config or OrderBookConfig())
-    sim.bids = [OrderBookLevel(price=l.price, size=l.size) for l in snap.bids]
-    sim.asks = [OrderBookLevel(price=l.price, size=l.size) for l in snap.asks]
+    sim.bids = [OrderBookLevel(price=lvl.price, size=lvl.size) for lvl in snap.bids]
+    sim.asks = [OrderBookLevel(price=lvl.price, size=lvl.size) for lvl in snap.asks]
     sim.last_mid_price = snap.mid_price or 0.0
     sim.timestamp = snap.timestamp
     return sim

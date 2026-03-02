@@ -187,11 +187,7 @@ class MarginCallSimulator:
             )
 
         # Margin level = equity / used_margin × 100
-        margin_level = (
-            (current_equity / margin_required) * 100
-            if margin_required > 0
-            else float("inf")
-        )
+        margin_level = (current_equity / margin_required) * 100 if margin_required > 0 else float("inf")
         # used_margin_pct for logging/debugging
         _ = (margin_required / current_equity) * 100
         available_margin = current_equity - margin_required
@@ -206,9 +202,7 @@ class MarginCallSimulator:
             margin_call_type = MarginCallType.LIQUIDATION
             loss = abs(min(0, unrealized_pnl))
             cover_amount = loss * 4  # TradingView formula
-            cover_amount = min(
-                cover_amount, position_value
-            )  # Can't cover more than position
+            cover_amount = min(cover_amount, position_value)  # Can't cover more than position
             message = f"Margin call: level {margin_level:.1f}% <= maintenance {self.maintenance}%"
             logger.warning(f"MARGIN CALL: {message}, cover={cover_amount:.2f}")
 

@@ -31,9 +31,7 @@ class ExecutionRequest(BaseModel):
 
     graph_name: str = Field(..., description="Name of the graph to execute")
     input_message: str | None = Field(None, description="Initial input message")
-    context: dict[str, Any] | None = Field(
-        default_factory=dict, description="Additional context"
-    )
+    context: dict[str, Any] | None = Field(default_factory=dict, description="Additional context")
 
 
 class ExecutionResult(BaseModel):

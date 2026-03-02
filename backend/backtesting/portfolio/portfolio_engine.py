@@ -6,8 +6,7 @@ Multi-symbol portfolio backtesting engine.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -28,8 +27,8 @@ class PortfolioConfig:
         commission: Комиссия
     """
 
-    symbols: List[str]
-    weights: Optional[Dict[str, float]] = None
+    symbols: list[str]
+    weights: dict[str, float] | None = None
     rebalance_frequency: str = "monthly"
     initial_capital: float = 10000.0
     commission: float = 0.0007
@@ -49,8 +48,8 @@ class SymbolResult:
 
     symbol: str
     equity_curve: pd.Series
-    trades: List[Dict]
-    metrics: Dict[str, float]
+    trades: list[dict]
+    metrics: dict[str, float]
 
 
 @dataclass
@@ -67,13 +66,13 @@ class PortfolioResult:
     """
 
     portfolio_equity: pd.Series
-    symbol_results: Dict[str, SymbolResult]
-    metrics: Dict[str, float]
+    symbol_results: dict[str, SymbolResult]
+    metrics: dict[str, float]
     correlation_matrix: pd.DataFrame
     weights_history: pd.DataFrame
-    trades: List[Dict] = field(default_factory=list)
+    trades: list[dict] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Конвертация в словарь"""
         return {
             "portfolio_equity": self.portfolio_equity.to_dict(),
@@ -127,7 +126,7 @@ class PortfolioBacktestEngine:
         else:
             self.single_engine = single_engine
 
-    def _normalize_weights(self, weights: Optional[Dict[str, float]], symbols: List[str]) -> Dict[str, float]:
+    def _normalize_weights(self, weights: dict[str, float] | None, symbols: list[str]) -> dict[str, float]:
         """Нормализация весов"""
         if weights is None:
             # Равные веса
@@ -146,7 +145,7 @@ class PortfolioBacktestEngine:
         symbol: str,
         data: pd.DataFrame,
         strategy_class: Any,
-        strategy_params: Dict[str, Any],
+        strategy_params: dict[str, Any],
         config: PortfolioConfig,
     ) -> SymbolResult:
         """
@@ -200,7 +199,7 @@ class PortfolioBacktestEngine:
                 metrics={"sharpe_ratio": 0, "total_return": 0},
             )
 
-    def _aggregate_equity_curves(self, symbol_results: Dict[str, SymbolResult], weights: Dict[str, float]) -> pd.Series:
+    def _aggregate_equity_curves(self, symbol_results: dict[str, SymbolResult], weights: dict[str, float]) -> pd.Series:
         """
         Агрегация кривых доходности в портфель.
 
@@ -214,8 +213,8 @@ class PortfolioBacktestEngine:
         # Объединение equity curves
         equity_df = pd.DataFrame({symbol: result.equity_curve for symbol, result in symbol_results.items()})
 
-        # Заполнение пропусков
-        equity_df = equity_df.fillna(method="ffill").fillna(1.0)
+        # Заполнение пропусков (forward fill затем backward fill)
+        equity_df = equity_df.ffill().bfill().fillna(1.0)
 
         # Взвешенная сумма
         portfolio_equity = pd.Series(0.0, index=equity_df.index)
@@ -227,8 +226,8 @@ class PortfolioBacktestEngine:
         return portfolio_equity
 
     def _calculate_portfolio_metrics(
-        self, portfolio_equity: pd.Series, symbol_results: Dict[str, SymbolResult], weights: Dict[str, float]
-    ) -> Dict[str, float]:
+        self, portfolio_equity: pd.Series, symbol_results: dict[str, SymbolResult], weights: dict[str, float]
+    ) -> dict[str, float]:
         """
         Вычисление метрик портфеля.
 
@@ -257,10 +256,7 @@ class PortfolioBacktestEngine:
         volatility = returns.std() * np.sqrt(365)
 
         # Sharpe ratio
-        if volatility > 0:
-            sharpe_ratio = annual_return / volatility
-        else:
-            sharpe_ratio = 0
+        sharpe_ratio = annual_return / volatility if volatility > 0 else 0
 
         # Max drawdown
         rolling_max = portfolio_equity.cummax()
@@ -282,16 +278,23 @@ class PortfolioBacktestEngine:
         }
 
     def _calculate_diversification_ratio(
-        self, symbol_results: Dict[str, SymbolResult], weights: Dict[str, float]
+        self, symbol_results: dict[str, SymbolResult], weights: dict[str, float]
     ) -> float:
         """
         Вычисление коэффициента диверсификации.
 
+        Формула: DR = (w' * σ) / σ_p
+        где w — веса, σ — волатильности активов, σ_p — волатильность портфеля
+
         Returns:
-            Diversification ratio
+            Diversification ratio (>1 = диверсификация есть)
         """
+        if not symbol_results:
+            return 1.0
+
         # Средневзвешенная волатильность
         avg_volatility = 0.0
+        portfolio_returns_list = []
 
         for symbol, weight in weights.items():
             if symbol in symbol_results:
@@ -299,8 +302,27 @@ class PortfolioBacktestEngine:
                 vol = metrics.get("volatility", 0.2)
                 avg_volatility += weight * vol
 
-        # Волатильность портфеля (упрощённо)
-        portfolio_volatility = 0.15  # Заглушка
+                # Собрать returns для портфеля
+                equity = symbol_results[symbol].equity_curve
+                if isinstance(equity, pd.Series) and len(equity) > 0:
+                    returns = equity.pct_change().dropna()
+                    portfolio_returns_list.append(returns * weight)
+
+        # Волатильность портфеля (корректно через взвешенную сумму returns)
+        if portfolio_returns_list:
+            # Найти общий индекс
+            common_index = portfolio_returns_list[0].index
+            for _i, returns in enumerate(portfolio_returns_list):
+                common_index = common_index.intersection(returns.index)
+
+            # Сумма взвешенных returns
+            portfolio_total_returns = pd.Series(0.0, index=common_index)
+            for returns in portfolio_returns_list:
+                portfolio_total_returns += returns.reindex(common_index, fill_value=0)
+
+            portfolio_volatility = portfolio_total_returns.std() * np.sqrt(252)
+        else:
+            portfolio_volatility = 0.15
 
         if portfolio_volatility > 0:
             return avg_volatility / portfolio_volatility
@@ -310,9 +332,9 @@ class PortfolioBacktestEngine:
     def run(
         self,
         strategy_class: Any,
-        data_dict: Dict[str, pd.DataFrame],
+        data_dict: dict[str, pd.DataFrame],
         config: PortfolioConfig,
-        strategy_params: Optional[Dict[str, Any]] = None,
+        strategy_params: dict[str, Any] | None = None,
     ) -> PortfolioResult:
         """
         Запуск портфельного бэктеста.
@@ -392,7 +414,7 @@ class PortfolioBacktestEngine:
 
         return portfolio_result
 
-    def _calculate_correlation(self, symbol_results: Dict[str, SymbolResult]) -> pd.DataFrame:
+    def _calculate_correlation(self, symbol_results: dict[str, SymbolResult]) -> pd.DataFrame:
         """Вычисление корреляционной матрицы"""
         # Извлечение returns
         returns_dict = {}

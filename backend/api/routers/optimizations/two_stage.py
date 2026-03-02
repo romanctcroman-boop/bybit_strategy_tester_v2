@@ -1,4 +1,4 @@
-﻿"""
+"""
 Optimization Router — VectorBT streaming and Two-Stage optimization endpoints.
 
 Covers:

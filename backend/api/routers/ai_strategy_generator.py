@@ -8,6 +8,7 @@ Endpoints for AI-powered trading strategy generation:
 - Manage generated strategies
 """
 
+import contextlib
 import logging
 from datetime import datetime
 from typing import Any
@@ -44,9 +45,7 @@ class GenerateStrategyRequest(BaseModel):
     """Request to generate a new trading strategy."""
 
     name: str = Field(..., min_length=1, max_length=100, description="Strategy name")
-    description: str = Field(
-        default="", max_length=1000, description="Strategy description"
-    )
+    description: str = Field(default="", max_length=1000, description="Strategy description")
 
     # Pattern
     pattern_type: str = Field(
@@ -64,34 +63,18 @@ class GenerateStrategyRequest(BaseModel):
         default_factory=lambda: ["rsi", "atr"],
         description="List of indicators to use",
     )
-    custom_conditions: str = Field(
-        default="", max_length=2000, description="Additional custom conditions"
-    )
+    custom_conditions: str = Field(default="", max_length=2000, description="Additional custom conditions")
 
     # Risk parameters
-    max_drawdown: float = Field(
-        default=0.15, ge=0.01, le=0.50, description="Max drawdown target (0.01-0.50)"
-    )
-    risk_per_trade: float = Field(
-        default=0.02, ge=0.005, le=0.10, description="Risk per trade (0.5%-10%)"
-    )
-    target_win_rate: float = Field(
-        default=0.50, ge=0.30, le=0.80, description="Target win rate (30%-80%)"
-    )
-    target_risk_reward: float = Field(
-        default=2.0, ge=1.0, le=5.0, description="Risk/reward ratio"
-    )
+    max_drawdown: float = Field(default=0.15, ge=0.01, le=0.50, description="Max drawdown target (0.01-0.50)")
+    risk_per_trade: float = Field(default=0.02, ge=0.005, le=0.10, description="Risk per trade (0.5%-10%)")
+    target_win_rate: float = Field(default=0.50, ge=0.30, le=0.80, description="Target win rate (30%-80%)")
+    target_risk_reward: float = Field(default=2.0, ge=1.0, le=5.0, description="Risk/reward ratio")
 
     # Backtesting
-    symbols: list[str] = Field(
-        default_factory=lambda: ["BTCUSDT"], description="Symbols to backtest"
-    )
-    timeframes: list[str] = Field(
-        default_factory=lambda: ["60", "240"], description="Timeframes to use"
-    )
-    min_backtest_period_days: int = Field(
-        default=30, ge=7, le=365, description="Backtest period in days"
-    )
+    symbols: list[str] = Field(default_factory=lambda: ["BTCUSDT"], description="Symbols to backtest")
+    timeframes: list[str] = Field(default_factory=lambda: ["60", "240"], description="Timeframes to use")
+    min_backtest_period_days: int = Field(default=30, ge=7, le=365, description="Backtest period in days")
 
     # Advanced
     use_ml_features: bool = Field(default=False, description="Use ML features")
@@ -196,9 +179,7 @@ class IndicatorsResponse(BaseModel):
 class ValidationRequest(BaseModel):
     """Request to validate strategy code."""
 
-    code: str = Field(
-        ..., min_length=100, description="Python strategy code to validate"
-    )
+    code: str = Field(..., min_length=100, description="Python strategy code to validate")
 
 
 class ValidationResponse(BaseModel):
@@ -222,10 +203,7 @@ async def get_pattern_types():
 
     Returns list of pattern types with descriptions.
     """
-    patterns = [
-        {"id": pt.value, "name": pt.value.replace("_", " ").title()}
-        for pt in PatternType
-    ]
+    patterns = [{"id": pt.value, "name": pt.value.replace("_", " ").title()} for pt in PatternType]
     return PatternTypesResponse(pattern_types=patterns)
 
 
@@ -236,10 +214,7 @@ async def get_indicators():
 
     Returns list of indicators that can be used in strategies.
     """
-    indicators = [
-        {"id": ind.value, "name": ind.value.replace("_", " ").upper()}
-        for ind in IndicatorType
-    ]
+    indicators = [{"id": ind.value, "name": ind.value.replace("_", " ").upper()} for ind in IndicatorType]
     return IndicatorsResponse(indicators=indicators)
 
 
@@ -281,10 +256,8 @@ async def generate_strategy(
 
     indicators = []
     for ind_str in request.indicators:
-        try:
+        with contextlib.suppress(ValueError):
             indicators.append(IndicatorType(ind_str.lower()))
-        except ValueError:
-            pass  # Skip unknown indicators
 
     gen_request = GenerationRequest(
         name=request.name,
@@ -307,9 +280,7 @@ async def generate_strategy(
 
     # Start generation in background
     async def run_generation():
-        await generator.generate_strategy(
-            gen_request, auto_backtest=request.auto_backtest
-        )
+        await generator.generate_strategy(gen_request, auto_backtest=request.auto_backtest)
 
     background_tasks.add_task(run_generation)
 
@@ -348,13 +319,9 @@ async def get_strategy(strategy_id: str):
 
 @router.get("/", response_model=StrategyListResponse)
 async def list_strategies(
-    limit: int = Query(
-        default=50, ge=1, le=200, description="Maximum strategies to return"
-    ),
+    limit: int = Query(default=50, ge=1, le=200, description="Maximum strategies to return"),
     status_filter: str | None = Query(default=None, description="Filter by status"),
-    pattern_filter: str | None = Query(
-        default=None, description="Filter by pattern type"
-    ),
+    pattern_filter: str | None = Query(default=None, description="Filter by pattern type"),
 ):
     """
     List all generated strategies.
@@ -423,9 +390,7 @@ async def validate_strategy_code(request: ValidationRequest):
 
     if "@register_strategy" not in request.code:
         warnings.append("Strategy not registered with @register_strategy decorator")
-        suggestions.append(
-            "Add @register_strategy decorator for automatic registration"
-        )
+        suggestions.append("Add @register_strategy decorator for automatic registration")
 
     return ValidationResponse(
         is_valid=True,
@@ -490,9 +455,7 @@ async def save_strategy_to_library(strategy_id: str):
     filename = f"ai_{safe_name}_{strategy.id[:8]}.py"
 
     # Save to generated strategies folder
-    generated_dir = os.path.join(
-        os.path.dirname(__file__), "..", "..", "services", "strategies", "generated"
-    )
+    generated_dir = os.path.join(os.path.dirname(__file__), "..", "..", "services", "strategies", "generated")
     os.makedirs(generated_dir, exist_ok=True)
 
     filepath = os.path.join(generated_dir, filename)

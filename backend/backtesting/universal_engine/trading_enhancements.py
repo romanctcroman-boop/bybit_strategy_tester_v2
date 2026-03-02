@@ -295,35 +295,47 @@ class OrderManager:
     ) -> float | None:
         """Check if order should be filled, return fill price if so."""
         if order.order_type == OrderType.LIMIT:
-            if (order.side == OrderSide.BUY and low <= order.price) or (order.side == OrderSide.SELL and high >= order.price):
+            if (order.side == OrderSide.BUY and low <= order.price) or (
+                order.side == OrderSide.SELL and high >= order.price
+            ):
                 return order.price
 
         elif order.order_type in (OrderType.STOP_MARKET, OrderType.STOP_LIMIT):
             triggered = False
-            if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
+            if (order.side == OrderSide.SELL and low <= order.stop_price) or (
+                order.side == OrderSide.BUY and high >= order.stop_price
+            ):
                 triggered = True
 
             if triggered:
                 if order.order_type == OrderType.STOP_LIMIT:
                     # Check if limit price also reachable
-                    if (order.side == OrderSide.SELL and low <= order.price) or (order.side == OrderSide.BUY and high >= order.price):
+                    if (order.side == OrderSide.SELL and low <= order.price) or (
+                        order.side == OrderSide.BUY and high >= order.price
+                    ):
                         return order.price
                 else:
                     return order.stop_price
 
         elif order.order_type == OrderType.TRAILING_STOP:
-            if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
+            if (order.side == OrderSide.SELL and low <= order.stop_price) or (
+                order.side == OrderSide.BUY and high >= order.stop_price
+            ):
                 return order.stop_price
 
         elif order.order_type == OrderType.OCO:
             # Check as limit for TP side
-            if order.price:
-                if (order.side == OrderSide.SELL and high >= order.price) or (order.side == OrderSide.BUY and low <= order.price):
-                    return order.price
+            if order.price and (
+                (order.side == OrderSide.SELL and high >= order.price)
+                or (order.side == OrderSide.BUY and low <= order.price)
+            ):
+                return order.price
             # Check as stop for SL side
-            if order.stop_price:
-                if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
-                    return order.stop_price
+            if order.stop_price and (
+                (order.side == OrderSide.SELL and low <= order.stop_price)
+                or (order.side == OrderSide.BUY and high >= order.stop_price)
+            ):
+                return order.stop_price
 
         return None
 
@@ -345,9 +357,7 @@ class OrderManager:
         oco_filled_ids = {o.order_id for o in filled if o.order_type == OrderType.OCO}
         if oco_filled_ids:
             # Simple approach: cancel all remaining OCO orders
-            self.pending_orders = [
-                o for o in self.pending_orders if o.order_type != OrderType.OCO
-            ]
+            self.pending_orders = [o for o in self.pending_orders if o.order_type != OrderType.OCO]
 
     def cancel_order(self, order_id: str) -> bool:
         """Cancel a pending order."""
@@ -518,10 +528,7 @@ class RiskManagement:
         if margin_ratio >= self.anti_liq.trigger_margin_ratio:
             reduce_size = position_size * self.anti_liq.reduce_percent
 
-            if (
-                self.anti_liq.enable_add_margin
-                and unrealized_pnl > -self.anti_liq.margin_add_amount
-            ):
+            if self.anti_liq.enable_add_margin and unrealized_pnl > -self.anti_liq.margin_add_amount:
                 return RiskAction(
                     "add_margin",
                     f"Margin ratio {margin_ratio:.1%} - adding margin",
@@ -712,9 +719,7 @@ class RiskManagement:
 
         # Check daily loss limit
         if self.daily_start_equity > 0:
-            daily_loss = (
-                self.daily_start_equity - current_equity
-            ) / self.daily_start_equity
+            daily_loss = (self.daily_start_equity - current_equity) / self.daily_start_equity
             if daily_loss >= self.drawdown_guard.daily_loss_limit:
                 return RiskAction(
                     "pause",
@@ -765,9 +770,7 @@ class SessionFilterConfig:
     """Configuration for session-based trading filter."""
 
     # Sessions to allow trading
-    allowed_sessions: list[TradingSession] = field(
-        default_factory=lambda: [TradingSession.EUROPE, TradingSession.US]
-    )
+    allowed_sessions: list[TradingSession] = field(default_factory=lambda: [TradingSession.EUROPE, TradingSession.US])
 
     # Custom session times (hour in UTC)
     asia_start: int = 0
@@ -890,9 +893,12 @@ class TradingFilters:
         elif self.session.europe_start <= hour < self.session.europe_end:
             current_session = TradingSession.EUROPE
             # Check overlap
-            if hour >= 12 and hour < self.session.europe_end:
-                if TradingSession.OVERLAP_EU_US in self.session.allowed_sessions:
-                    return True, "EU/US overlap session"
+            if (
+                hour >= 12
+                and hour < self.session.europe_end
+                and TradingSession.OVERLAP_EU_US in self.session.allowed_sessions
+            ):
+                return True, "EU/US overlap session"
         elif self.session.us_start <= hour < self.session.us_end:
             current_session = TradingSession.US
 

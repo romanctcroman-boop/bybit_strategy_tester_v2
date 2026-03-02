@@ -168,9 +168,7 @@ class KeyUsageAuditService:
     ) -> KeyAccessEvent:
         """Log a key access event."""
         self._event_count += 1
-        event_id = (
-            f"evt-{self._event_count}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-        )
+        event_id = f"evt-{self._event_count}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
 
         event = KeyAccessEvent(
             event_id=event_id,
@@ -209,10 +207,7 @@ class KeyUsageAuditService:
         if self.config.log_file_path:
             self._write_to_file(event)
 
-        logger.debug(
-            f"Key access logged: {key_id} ({access_type.value}) - "
-            f"{'success' if success else 'failed'}"
-        )
+        logger.debug(f"Key access logged: {key_id} ({access_type.value}) - {'success' if success else 'failed'}")
 
         return event
 
@@ -238,9 +233,7 @@ class KeyUsageAuditService:
 
         # Track access type
         access_type = event.access_type.value
-        stats.accesses_by_type[access_type] = (
-            stats.accesses_by_type.get(access_type, 0) + 1
-        )
+        stats.accesses_by_type[access_type] = stats.accesses_by_type.get(access_type, 0) + 1
 
         # Track hourly access
         hour = event.timestamp.hour
@@ -257,9 +250,7 @@ class KeyUsageAuditService:
 
         # Update average latency
         total = stats.total_accesses
-        stats.avg_latency_ms = (
-            stats.avg_latency_ms * (total - 1) + event.latency_ms
-        ) / total
+        stats.avg_latency_ms = (stats.avg_latency_ms * (total - 1) + event.latency_ms) / total
 
     def _track_for_anomalies(self, event: KeyAccessEvent) -> None:
         """Track event for anomaly detection."""
@@ -271,9 +262,7 @@ class KeyUsageAuditService:
 
         # Remove events older than 1 hour
         cutoff = now - timedelta(hours=1)
-        self._recent_events[key_id] = [
-            t for t in self._recent_events[key_id] if t > cutoff
-        ]
+        self._recent_events[key_id] = [t for t in self._recent_events[key_id] if t > cutoff]
 
     def _check_anomalies(self, event: KeyAccessEvent) -> None:
         """Check for usage anomalies."""
@@ -521,19 +510,13 @@ class KeyUsageAuditService:
                     "total_accesses": len(key_events),
                     "successful": successful,
                     "failed": failed,
-                    "unique_users": len(
-                        {e.user_id for e in key_events if e.user_id}
-                    ),
-                    "unique_ips": len(
-                        {e.ip_address for e in key_events if e.ip_address}
-                    ),
+                    "unique_users": len({e.user_id for e in key_events if e.user_id}),
+                    "unique_ips": len({e.ip_address for e in key_events if e.ip_address}),
                 }
             )
 
         # Anomalies in period
-        anomalies_in_period = [
-            a for a in self._anomalies if start_date <= a.detected_at <= end_date
-        ]
+        anomalies_in_period = [a for a in self._anomalies if start_date <= a.detected_at <= end_date]
 
         return {
             "report_period": {
@@ -567,9 +550,7 @@ class KeyUsageAuditService:
             "total_anomalies": len(self._anomalies),
             "tracked_keys": len(self._key_stats),
             "anomaly_detection": self.config.anomaly_detection_enabled,
-            "log_file": str(self.config.log_file_path)
-            if self.config.log_file_path
-            else None,
+            "log_file": str(self.config.log_file_path) if self.config.log_file_path else None,
         }
 
 

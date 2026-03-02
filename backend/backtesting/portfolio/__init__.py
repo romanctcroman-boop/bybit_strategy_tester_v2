@@ -13,16 +13,16 @@ from .rebalancing import PeriodicRebalancing, RebalancingStrategy
 from .risk_parity import RiskParityAllocator, RiskParityResult
 
 __all__ = [
+    # Correlation Analysis
+    "CorrelationAnalysis",
+    "PeriodicRebalancing",
     # Portfolio Engine
     "PortfolioBacktestEngine",
     "PortfolioConfig",
     "PortfolioResult",
-    # Correlation Analysis
-    "CorrelationAnalysis",
+    # Rebalancing
+    "RebalancingStrategy",
     # Risk Parity
     "RiskParityAllocator",
     "RiskParityResult",
-    # Rebalancing
-    "RebalancingStrategy",
-    "PeriodicRebalancing",
 ]

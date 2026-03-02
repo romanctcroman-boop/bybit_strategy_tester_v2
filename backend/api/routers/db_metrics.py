@@ -4,7 +4,6 @@ Database Metrics API Router.
 Provides REST API for database performance monitoring.
 """
 
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 

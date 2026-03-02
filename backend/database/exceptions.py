@@ -6,7 +6,6 @@ and classification for error handling strategies.
 """
 
 
-
 class DatabaseError(Exception):
     """
     Base exception for all database-related errors.

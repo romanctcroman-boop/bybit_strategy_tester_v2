@@ -150,9 +150,7 @@ class GPUBackend:
             cp.cuda.Device(self.config.device_id).use()
             if self.config.enable_memory_pool:
                 mempool = cp.get_default_memory_pool()
-                mempool.set_limit(
-                    size=int(cp.cuda.Device().mem_info[1] * self.config.memory_limit)
-                )
+                mempool.set_limit(size=int(cp.cuda.Device().mem_info[1] * self.config.memory_limit))
         self._initialized = True
 
     def get_info(self) -> GPUInfo:
@@ -325,9 +323,7 @@ class BatchBacktester:
             batch_params = params_gpu[batch_start:batch_end]
 
             # Generate signals for batch
-            signals = self._generate_signals_batch(
-                candles_gpu, batch_params, strategy_fn
-            )
+            signals = self._generate_signals_batch(candles_gpu, batch_params, strategy_fn)
 
             # Run backtests for batch
             batch_metrics = self._run_backtests_batch(
@@ -340,9 +336,7 @@ class BatchBacktester:
             metrics_gpu[batch_start:batch_end] = batch_metrics
 
             if equity_curves_gpu is not None:
-                batch_equity = self._calculate_equity_batch(
-                    candles_gpu, signals, initial_capital, commission
-                )
+                batch_equity = self._calculate_equity_batch(candles_gpu, signals, initial_capital, commission)
                 equity_curves_gpu[batch_start:batch_end] = batch_equity
 
         # Synchronize and transfer back
@@ -459,31 +453,18 @@ class BatchBacktester:
                 win_rate = float(xp.mean(wins)) if n_trades > 0 else 0
 
                 gross_profit = float(xp.sum(trades_arr[wins])) if xp.any(wins) else 0
-                gross_loss = (
-                    float(xp.abs(xp.sum(trades_arr[~wins])))
-                    if xp.any(~wins)
-                    else 0.0001
-                )
+                gross_loss = float(xp.abs(xp.sum(trades_arr[~wins]))) if xp.any(~wins) else 0.0001
                 profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
 
                 # Sharpe (simplified)
                 if n_trades > 1:
-                    sharpe = float(
-                        xp.mean(trades_arr)
-                        / (xp.std(trades_arr) + 1e-10)
-                        * xp.sqrt(252)
-                    )
+                    sharpe = float(xp.mean(trades_arr) / (xp.std(trades_arr) + 1e-10) * xp.sqrt(252))
                 else:
                     sharpe = 0.0
 
                 # Max drawdown
                 equity = initial_capital * (
-                    1
-                    + xp.cumsum(
-                        xp.array(
-                            [0] + trades_pnl + [0] * (n_bars - len(trades_pnl) - 1)
-                        )[:n_bars]
-                    )
+                    1 + xp.cumsum(xp.array([0] + trades_pnl + [0] * (n_bars - len(trades_pnl) - 1))[:n_bars])
                 )
                 peak = xp.maximum.accumulate(equity)
                 dd = (peak - equity) / peak
@@ -580,9 +561,7 @@ class VectorizedIndicators:
 
         # Cumsum approach
         cumsum = xp.cumsum(data)
-        result[period - 1 :] = (
-            cumsum[period - 1 :] - xp.concatenate([xp.array([0.0]), cumsum[:-period]])
-        ) / period
+        result[period - 1 :] = (cumsum[period - 1 :] - xp.concatenate([xp.array([0.0]), cumsum[:-period]])) / period
 
         return result
 
@@ -817,9 +796,7 @@ class GPUOptimizer:
 
         for gen in range(n_generations):
             # Evaluate fitness
-            fitness = self._evaluate_fitness(
-                candles_gpu, population, strategy_fn, fitness_fn
-            )
+            fitness = self._evaluate_fitness(candles_gpu, population, strategy_fn, fitness_fn)
 
             # Track best
             gen_best_idx = int(xp.argmax(fitness))
@@ -885,9 +862,7 @@ class GPUOptimizer:
         )
 
         # Apply fitness function to metrics
-        fitness = np.array(
-            [fitness_fn(result.metrics[i]) for i in range(len(population))]
-        )
+        fitness = np.array([fitness_fn(result.metrics[i]) for i in range(len(population))])
 
         return self.gpu.to_device(fitness)
 

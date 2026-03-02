@@ -141,9 +141,7 @@ class MTFWalkForward:
         if self.verbose:
             logger.info(f"🔄 Walk-Forward Analysis: {n_windows} windows")
             logger.info(f"   Data: {n_ltf} LTF bars, {n_htf} HTF bars")
-            logger.info(
-                f"   Train/Test split: {train_pct * 100:.0f}% / {(1 - train_pct) * 100:.0f}%"
-            )
+            logger.info(f"   Train/Test split: {train_pct * 100:.0f}% / {(1 - train_pct) * 100:.0f}%")
 
         # Create windows
         windows = self._create_windows(n_ltf, train_pct, n_windows, overlap_pct)
@@ -160,11 +158,7 @@ class MTFWalkForward:
                 logger.info(f"   Test:  bars {test_start}-{test_end}")
 
             # Extract training data
-            train_ltf = (
-                ltf_candles.iloc[train_start : train_end + 1]
-                .copy()
-                .reset_index(drop=True)
-            )
+            train_ltf = ltf_candles.iloc[train_start : train_end + 1].copy().reset_index(drop=True)
 
             # Get HTF indices for train window
             # Find first valid HTF index (skip -1 values)
@@ -186,27 +180,17 @@ class MTFWalkForward:
             if train_htf_end <= train_htf_start:
                 train_htf_end = min(train_htf_start + 100, len(htf_candles) - 1)
 
-            train_htf = (
-                htf_candles.iloc[train_htf_start : train_htf_end + 1]
-                .copy()
-                .reset_index(drop=True)
-            )
+            train_htf = htf_candles.iloc[train_htf_start : train_htf_end + 1].copy().reset_index(drop=True)
 
             if self.verbose:
-                logger.debug(
-                    f"   Train HTF: {train_htf_start}-{train_htf_end} ({len(train_htf)} bars)"
-                )
+                logger.debug(f"   Train HTF: {train_htf_start}-{train_htf_end} ({len(train_htf)} bars)")
 
             # Create training index map
-            train_htf_map = self._create_subset_map(
-                htf_index_map, train_start, train_end, train_htf_start
-            )
+            train_htf_map = self._create_subset_map(htf_index_map, train_start, train_end, train_htf_start)
 
             if len(train_ltf) < 200 or len(train_htf) < 50:
                 if self.verbose:
-                    logger.warning(
-                        f"   ⚠️ Window too small (LTF={len(train_ltf)}, HTF={len(train_htf)}), skipping"
-                    )
+                    logger.warning(f"   ⚠️ Window too small (LTF={len(train_ltf)}, HTF={len(train_htf)}), skipping")
                 continue
 
             # Optimize on training data
@@ -240,11 +224,7 @@ class MTFWalkForward:
                 logger.info(f"      Train score: {opt_result.best_score:.4f}")
 
             # Test on OOS data
-            test_ltf = (
-                ltf_candles.iloc[test_start : test_end + 1]
-                .copy()
-                .reset_index(drop=True)
-            )
+            test_ltf = ltf_candles.iloc[test_start : test_end + 1].copy().reset_index(drop=True)
 
             # Get HTF indices for test window
             # Get HTF indices for test window (skip -1 values)
@@ -265,27 +245,17 @@ class MTFWalkForward:
             if test_htf_end <= test_htf_start:
                 test_htf_end = min(test_htf_start + 50, len(htf_candles) - 1)
 
-            test_htf = (
-                htf_candles.iloc[test_htf_start : test_htf_end + 1]
-                .copy()
-                .reset_index(drop=True)
-            )
+            test_htf = htf_candles.iloc[test_htf_start : test_htf_end + 1].copy().reset_index(drop=True)
 
             if self.verbose:
-                logger.debug(
-                    f"   Test HTF: {test_htf_start}-{test_htf_end} ({len(test_htf)} bars)"
-                )
+                logger.debug(f"   Test HTF: {test_htf_start}-{test_htf_end} ({len(test_htf)} bars)")
 
             # Create test index map
-            test_htf_map = self._create_subset_map(
-                htf_index_map, test_start, test_end, test_htf_start
-            )
+            test_htf_map = self._create_subset_map(htf_index_map, test_start, test_end, test_htf_start)
 
             if len(test_ltf) < 50 or len(test_htf) < 10:
                 if self.verbose:
-                    logger.warning(
-                        f"   ⚠️ Test window too small (LTF={len(test_ltf)}, HTF={len(test_htf)}), skipping"
-                    )
+                    logger.warning(f"   ⚠️ Test window too small (LTF={len(test_ltf)}, HTF={len(test_htf)}), skipping")
                 continue
 
             # Run OOS backtest with best params
@@ -309,13 +279,9 @@ class MTFWalkForward:
             # Record window result
             window_result = WalkForwardWindow(
                 window_id=i + 1,
-                train_start=str(
-                    ltf_candles.iloc[train_start].get("open_time", train_start)
-                ),
+                train_start=str(ltf_candles.iloc[train_start].get("open_time", train_start)),
                 train_end=str(ltf_candles.iloc[train_end].get("open_time", train_end)),
-                test_start=str(
-                    ltf_candles.iloc[test_start].get("open_time", test_start)
-                ),
+                test_start=str(ltf_candles.iloc[test_start].get("open_time", test_start)),
                 test_end=str(ltf_candles.iloc[test_end].get("open_time", test_end)),
                 best_params=best_params,
                 train_score=opt_result.best_score,
@@ -366,15 +332,11 @@ class MTFWalkForward:
         )
 
         if self.verbose:
-            logger.info(
-                f"\n✅ Walk-Forward complete: {len(results)} windows in {elapsed:.2f}s"
-            )
+            logger.info(f"\n✅ Walk-Forward complete: {len(results)} windows in {elapsed:.2f}s")
             logger.info(f"   Avg OOS Return: {result.avg_oos_return:.2f}%")
             logger.info(f"   Total OOS Return: {result.total_oos_return:.2f}%")
             logger.info(f"   Avg OOS Sharpe: {result.avg_oos_sharpe:.2f}")
-            logger.info(
-                f"   Profitable Windows: {profitable_windows}/{len(results)} ({result.profitable_pct:.0f}%)"
-            )
+            logger.info(f"   Profitable Windows: {profitable_windows}/{len(results)} ({result.profitable_pct:.0f}%)")
 
         return result
 
@@ -413,9 +375,7 @@ class MTFWalkForward:
 
         return windows
 
-    def _create_subset_map(
-        self, full_map: np.ndarray, start: int, end: int, htf_offset: int
-    ) -> np.ndarray:
+    def _create_subset_map(self, full_map: np.ndarray, start: int, end: int, htf_offset: int) -> np.ndarray:
         """Create index map for data subset."""
         subset_len = end - start + 1
         subset_map = np.zeros(subset_len, dtype=np.int32)
@@ -443,18 +403,16 @@ class MTFWalkForward:
         """Run out-of-sample test with given params."""
         try:
             # Generate signals with best params
-            long_signals, long_exits, short_signals, short_exits = (
-                generate_mtf_rsi_signals(
-                    ltf_candles=ltf_candles,
-                    htf_candles=htf_candles,
-                    htf_index_map=htf_index_map,
-                    htf_filter_type=params.get("htf_filter_type", "sma"),
-                    htf_filter_period=params.get("htf_filter_period", 200),
-                    direction=direction,
-                    rsi_period=params.get("rsi_period", 14),
-                    overbought=params.get("overbought", 70),
-                    oversold=params.get("oversold", 30),
-                )
+            long_signals, long_exits, short_signals, short_exits = generate_mtf_rsi_signals(
+                ltf_candles=ltf_candles,
+                htf_candles=htf_candles,
+                htf_index_map=htf_index_map,
+                htf_filter_type=params.get("htf_filter_type", "sma"),
+                htf_filter_period=params.get("htf_filter_period", 200),
+                direction=direction,
+                rsi_period=params.get("rsi_period", 14),
+                overbought=params.get("overbought", 70),
+                oversold=params.get("oversold", 30),
             )
 
             # Run backtest

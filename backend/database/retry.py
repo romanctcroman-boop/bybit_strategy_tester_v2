@@ -121,9 +121,7 @@ class RetryMetrics:
             "total_attempts": self.total_attempts,
             "successful_retries": self.successful_retries,
             "failed_retries": self.failed_retries,
-            "avg_time_ms": self.total_retry_time_ms / self.total_attempts
-            if self.total_attempts > 0
-            else 0,
+            "avg_time_ms": self.total_retry_time_ms / self.total_attempts if self.total_attempts > 0 else 0,
         }
 
 
@@ -223,16 +221,12 @@ def with_db_retry(
                     try:
                         result = func(*args, **kwargs)
                         duration_ms = (time.perf_counter() - start_time) * 1000
-                        _retry_metrics.record_attempt(
-                            attempt, duration_ms, success=True
-                        )
+                        _retry_metrics.record_attempt(attempt, duration_ms, success=True)
                         return result
 
                     except config.retry_on as e:
                         duration_ms = (time.perf_counter() - start_time) * 1000
-                        _retry_metrics.record_attempt(
-                            attempt, duration_ms, success=False
-                        )
+                        _retry_metrics.record_attempt(attempt, duration_ms, success=False)
 
                         last_exception = e
 
@@ -241,9 +235,7 @@ def with_db_retry(
                             raise
 
                         if attempt < config.max_attempts:
-                            logger.warning(
-                                f"Retry {attempt}/{config.max_attempts} for {func.__name__}: {e}"
-                            )
+                            logger.warning(f"Retry {attempt}/{config.max_attempts} for {func.__name__}: {e}")
 
                             # Add jitter if enabled
                             actual_delay = delay
@@ -253,13 +245,9 @@ def with_db_retry(
                                 actual_delay = delay * (0.5 + random.random())
 
                             time.sleep(actual_delay)
-                            delay = min(
-                                delay * config.exponential_base, config.max_delay
-                            )
+                            delay = min(delay * config.exponential_base, config.max_delay)
                         else:
-                            logger.error(
-                                f"All {config.max_attempts} attempts failed for {func.__name__}: {e}"
-                            )
+                            logger.error(f"All {config.max_attempts} attempts failed for {func.__name__}: {e}")
 
                 raise last_exception  # type: ignore
 

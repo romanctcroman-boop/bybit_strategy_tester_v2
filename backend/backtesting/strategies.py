@@ -773,10 +773,7 @@ class DCAStrategy(BaseStrategy):
 
                     # SL: if enabled (stop_loss > 0) and trailing not active
                     if not trailing_active and self.stop_loss > 0:
-                        if self.stop_loss_type == "average":
-                            sl_reference = avg_price
-                        else:  # last_order
-                            sl_reference = last_entry_price
+                        sl_reference = avg_price if self.stop_loss_type == "average" else last_entry_price
 
                         sl_price = sl_reference * (1 - self.stop_loss)
                         if current_low <= sl_price:
@@ -921,10 +918,7 @@ class DCAStrategy(BaseStrategy):
 
                     # SL: if enabled (stop_loss > 0) and trailing not active
                     if not trailing_active and self.stop_loss > 0:
-                        if self.stop_loss_type == "average":
-                            sl_reference = avg_price
-                        else:  # last_order
-                            sl_reference = last_entry_price
+                        sl_reference = avg_price if self.stop_loss_type == "average" else last_entry_price
 
                         sl_price = sl_reference * (1 + self.stop_loss)
                         if current_high >= sl_price:
@@ -1091,11 +1085,249 @@ class MartingaleStrategy(BaseStrategy):
         )
 
 
+class AdvancedMACDStrategy(BaseStrategy):
+    """
+    Advanced MACD Strategy with TP/SL — TradingView Parity Implementation
+    ======================================================================
+    Exact Python port of the TradingView Pine Script v6 strategy
+    "Advanced MACD Strategy with TP/SL" (Strategy_MACD_01).
+
+    Matches TradingView behaviour:
+    - calc_on_every_tick = true BUT entries only on barstate.isConfirmed
+      (confirmed bar close). Our engine uses entry_on_next_bar_open=True
+      which fills at next-bar open — matching TV market order behaviour.
+    - Signal logic: OR/AND combinations of zero-line and signal-line
+      crossovers, with optional "opposite signal" inversion per source.
+    - Zero-line filter: LONG only when MACD > 0, SHORT only when MACD < 0.
+    - Signal memory: active N bars after a crossover (for external filters;
+      does NOT affect strategy entries — entries use raw cross only).
+
+    Pine Script signal conditions (with both sources active):
+        longSignal  = longCrossZeroCondition  AND longCrossSignalCondition
+        shortSignal = shortCrossZeroCondition AND shortCrossSignalCondition
+
+    With oppositeCrossZero=True:
+        longCrossZeroCondition  = crossUNDER(macd, 0)   (macd drops below zero)
+        shortCrossZeroCondition = crossOVER(macd, 0)    (macd rises above zero)
+
+    With oppositeCrossSignal=True:
+        longCrossSignalCondition  = crossUNDER(macd, signal)
+        shortCrossSignalCondition = crossOVER(macd, signal)
+
+    TV reference test parameters (ETHUSDT 30m, 2025-01-04 → 2026-03-01):
+        fast=14, slow=15, signal=9, cross_zero=True, cross_signal=True,
+        opposite_zero=True, opposite_signal=True, zero_filter=False,
+        TP=6.6%, SL=13.2%, leverage=10, base_cash=100 USDT (fixed),
+        initial_capital=10000, commission=0.07%
+
+    TV results (42 trades, 88.1% win rate, net profit +17.23%):
+        - 37 wins / 5 losses
+        - Profit factor: 3.584
+        - Sharpe: 0.934  Sortino: 4.19
+        - Max drawdown: 2.60% (intrabar)
+
+    Parameters
+    ----------
+    fast_period : int
+        Fast EMA period (default: 14). Pine: macdFastLength.
+    slow_period : int
+        Slow EMA period (default: 15). Pine: macdSlowLength.
+        NOTE: fast < slow is NOT enforced here because fast=14/slow=15
+        is the verified TV reference; override validation if needed.
+    signal_period : int
+        Signal line smoothing period (default: 9). Pine: macdSignalSmoothing.
+    use_cross_zero : bool
+        Enable zero-line crossover signals (default: True).
+    opposite_cross_zero : bool
+        Invert zero-line crossover direction (default: True).
+        True  → Long on crossUNDER zero, Short on crossOVER zero.
+        False → Long on crossOVER zero,  Short on crossUNDER zero.
+    use_cross_signal : bool
+        Enable signal-line crossover signals (default: True).
+    opposite_cross_signal : bool
+        Invert signal-line crossover direction (default: True).
+        True  → Long on crossUNDER signal, Short on crossOVER signal.
+        False → Long on crossOVER signal,  Short on crossUNDER signal.
+    zero_filter : bool
+        Enable zero-line filter (default: False).
+        True → LONG only when MACD > 0, SHORT only when MACD < 0.
+    """
+
+    name = "advanced_macd"
+    description = (
+        "Advanced MACD with TP/SL — TradingView parity (Strategy_MACD_01). "
+        "Supports zero-line and signal-line crossovers with optional inversion and zero filter."
+    )
+
+    def _validate_params(self) -> None:
+        self.fast_period = int(self.params.get("fast_period", 14))
+        self.slow_period = int(self.params.get("slow_period", 15))
+        self.signal_period = int(self.params.get("signal_period", 9))
+
+        # TV allows fast == slow or fast > slow (unusual but valid)
+        if self.fast_period < 1:
+            raise ValueError(f"fast_period must be >= 1, got {self.fast_period}")
+        if self.slow_period < 1:
+            raise ValueError(f"slow_period must be >= 1, got {self.slow_period}")
+        if self.signal_period < 1:
+            raise ValueError(f"signal_period must be >= 1, got {self.signal_period}")
+
+        # Signal source flags
+        self.use_cross_zero = bool(self.params.get("use_cross_zero", True))
+        self.opposite_cross_zero = bool(self.params.get("opposite_cross_zero", True))
+        self.use_cross_signal = bool(self.params.get("use_cross_signal", True))
+        self.opposite_cross_signal = bool(self.params.get("opposite_cross_signal", True))
+
+        # Zero-line filter (LONG if MACD > 0, SHORT if MACD < 0)
+        self.zero_filter = bool(self.params.get("zero_filter", False))
+
+    @classmethod
+    def get_default_params(cls) -> dict[str, Any]:
+        """Default params matching the TV reference test configuration."""
+        return {
+            "fast_period": 14,
+            "slow_period": 15,
+            "signal_period": 9,
+            "use_cross_zero": True,
+            "opposite_cross_zero": True,
+            "use_cross_signal": True,
+            "opposite_cross_signal": True,
+            "zero_filter": False,
+        }
+
+    def _calculate_macd(self, close: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
+        """
+        Calculate MACD line, signal line, and histogram.
+
+        Uses EWM with adjust=False to match TradingView's ta.ema() / ta.macd():
+            Pine: ta.ema(src, period) → Python: close.ewm(span=period, adjust=False).mean()
+        """
+        fast_ema = close.ewm(span=self.fast_period, adjust=False).mean()
+        slow_ema = close.ewm(span=self.slow_period, adjust=False).mean()
+        macd_line = fast_ema - slow_ema
+        signal_line = macd_line.ewm(span=self.signal_period, adjust=False).mean()
+        histogram = macd_line - signal_line
+        return macd_line, signal_line, histogram
+
+    def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
+        """
+        Generate entry/exit signals replicating the TV Pine Script logic.
+
+        TradingView crossover/crossunder definitions:
+            crossover(a, b)  : prev_a <= prev_b  AND  curr_a > curr_b
+            crossunder(a, b) : prev_a >= prev_b  AND  curr_a < curr_b
+
+        Entry timing:
+            Pine strategy.entry() with calc_on_every_tick=true and
+            confirmed bar fires on CLOSE of bar i.  In our engine,
+            entry_on_next_bar_open=True means the order fills at
+            OPEN of bar i+1 — matching TV market order behaviour.
+            Therefore we do NOT shift signals here; the engine shifts.
+        """
+        close = ohlcv["close"]
+        n = len(close)
+
+        macd_line, signal_line, _ = self._calculate_macd(close)
+
+        # Replace NaN with 0.0 (Pine: nz(macdLine, 0))
+        macd_safe = macd_line.fillna(0.0)
+        signal_safe = signal_line.fillna(0.0)
+
+        # dataValid: both macd and signal are not NaN
+        data_valid = (~macd_line.isna()) & (~signal_line.isna())
+
+        # Previous bar values (for crossover/crossunder)
+        macd_prev = macd_safe.shift(1)
+        signal_prev = signal_safe.shift(1)
+
+        # ── Zero-line crossovers ─────────────────────────────────────────
+        # Pine: ta.crossover(macdSafe, 0)  ↔  prev <= 0 AND curr > 0
+        cross_up_zero = (macd_prev <= 0) & (macd_safe > 0)
+        # Pine: ta.crossunder(macdSafe, 0) ↔  prev >= 0 AND curr < 0
+        cross_down_zero = (macd_prev >= 0) & (macd_safe < 0)
+
+        # ── Signal-line crossovers ───────────────────────────────────────
+        # Pine: ta.crossover(macdSafe, signalSafe)
+        cross_up_signal = (macd_prev <= signal_prev) & (macd_safe > signal_safe)
+        # Pine: ta.crossunder(macdSafe, signalSafe)
+        cross_down_signal = (macd_prev >= signal_prev) & (macd_safe < signal_safe)
+
+        # ── Long signal conditions ───────────────────────────────────────
+        # Pine: longCrossZeroCondition = oppositeCrossZero ? crossDownZero : crossUpZero
+        long_cross_zero_cond = cross_down_zero if self.opposite_cross_zero else cross_up_zero
+
+        # Pine: longCrossSignalCondition = oppositeCrossSignal ? crossDownSignal : crossUpSignal
+        long_cross_signal_cond = cross_down_signal if self.opposite_cross_signal else cross_up_signal
+
+        # Zero-line filter for LONG: MACD > 0
+        long_zero_filter = (macd_safe > 0) if self.zero_filter else pd.Series(True, index=close.index)
+
+        # Pine longSignal (both sources active — AND logic):
+        #   dataValid AND (useZero OR useSignal) AND
+        #   (NOT useZero   OR longZeroCond) AND
+        #   (NOT useSignal OR longSignalCond) AND zeroFilter
+        #
+        # NOTE: Use Python `not` (logical) not `~` (bitwise) on plain booleans.
+        #       `~True` returns -2 in Python, which causes incorrect Series math.
+        at_least_one = self.use_cross_zero or self.use_cross_signal
+        # "(NOT useZero) OR longZeroCond":
+        #   if use_cross_zero is False → always True (condition not required)
+        #   if use_cross_zero is True  → must satisfy longCrossZeroCond
+        zero_part = long_cross_zero_cond if self.use_cross_zero else pd.Series(True, index=close.index)
+        signal_part = long_cross_signal_cond if self.use_cross_signal else pd.Series(True, index=close.index)
+
+        long_entries_raw = data_valid & at_least_one & zero_part & signal_part & long_zero_filter
+
+        # ── Short signal conditions ──────────────────────────────────────
+        short_cross_zero_cond = cross_up_zero if self.opposite_cross_zero else cross_down_zero
+        short_cross_signal_cond = cross_up_signal if self.opposite_cross_signal else cross_down_signal
+        short_zero_filter = (macd_safe < 0) if self.zero_filter else pd.Series(True, index=close.index)
+
+        zero_part_s = short_cross_zero_cond if self.use_cross_zero else pd.Series(True, index=close.index)
+        signal_part_s = short_cross_signal_cond if self.use_cross_signal else pd.Series(True, index=close.index)
+
+        short_entries_raw = data_valid & at_least_one & zero_part_s & signal_part_s & short_zero_filter
+
+        # ── Conflict guard (both long and short on same bar — skip both) ─
+        # Pine: signalsConflict = longSignal and shortSignal → neither fires
+        conflict = long_entries_raw & short_entries_raw
+        long_entries_raw = long_entries_raw & (~conflict)
+        short_entries_raw = short_entries_raw & (~conflict)
+
+        # ── Safety: clear first bar (NaN from shift) ──────────────────────
+        long_entries_raw = long_entries_raw.copy()
+        short_entries_raw = short_entries_raw.copy()
+        if n > 0:
+            long_entries_raw.iloc[0] = False
+            short_entries_raw.iloc[0] = False
+
+        # ── Exit signals ──────────────────────────────────────────────────
+        # In the TV strategy exits are handled by strategy.exit() (TP/SL),
+        # NOT by opposing entry signals.  There is no explicit signal-based
+        # exit in the Pine code — positions are closed only by TP or SL.
+        #
+        # In our engine the TP/SL are set via BacktestInput.stop_loss /
+        # take_profit fields in the BacktestConfig (not from signals).
+        # The exit series here are kept empty so the engine's TP/SL logic
+        # handles all exits — exactly as in TradingView.
+        long_exits = pd.Series(False, index=close.index)
+        short_exits = pd.Series(False, index=close.index)
+
+        return SignalResult(
+            entries=long_entries_raw.astype(bool),
+            exits=long_exits,
+            short_entries=short_entries_raw.astype(bool),
+            short_exits=short_exits,
+        )
+
+
 # Strategy registry for dynamic loading
 STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
     "sma_crossover": SMAStrategy,
     "rsi": RSIStrategy,
     "macd": MACDStrategy,
+    "advanced_macd": AdvancedMACDStrategy,
+    "macd_01": AdvancedMACDStrategy,  # Alias: Strategy_MACD_01
     "bollinger_bands": BollingerBandsStrategy,
     "grid": GridStrategy,
     "dca": DCAStrategy,
@@ -1149,7 +1381,8 @@ def list_available_strategies() -> list[dict[str, Any]]:
 # Convenience alias used by portfolio backtesting tests
 # ---------------------------------------------------------------------------
 
-class RSIStrategy(BaseStrategy):
+
+class RSIStrategy(BaseStrategy):  # type: ignore[no-redef]
     """
     Simple RSI mean-reversion strategy.
 
@@ -1193,4 +1426,3 @@ class RSIStrategy(BaseStrategy):
         df.loc[rsi < self.oversold, "signal"] = 1
         df.loc[rsi > self.overbought, "signal"] = -1
         return df
-

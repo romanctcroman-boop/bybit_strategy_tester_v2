@@ -124,10 +124,7 @@ class TradePublisher:
                 )
 
             if self._running:
-                logger.info(
-                    f"Reconnecting in {self._reconnect_delay:.1f}s "
-                    f"(attempt #{self._stats['reconnects']})..."
-                )
+                logger.info(f"Reconnecting in {self._reconnect_delay:.1f}s (attempt #{self._stats['reconnects']})...")
                 await asyncio.sleep(self._reconnect_delay)
 
     async def _connect_and_listen(self):
@@ -145,9 +142,7 @@ class TradePublisher:
             # Subscribe to trade streams
             subscribe_msg = {
                 "op": "subscribe",
-                "args": [
-                    f"publicTrade.{symbol}" for symbol in self._subscribed_symbols
-                ],
+                "args": [f"publicTrade.{symbol}" for symbol in self._subscribed_symbols],
             }
             await ws.send(json.dumps(subscribe_msg))
             logger.info(f"Subscribed to: {subscribe_msg['args']}")

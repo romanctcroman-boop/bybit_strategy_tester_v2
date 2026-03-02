@@ -111,9 +111,7 @@ class SecureKeyStorage:
             self._encryption_key = hashlib.sha256(env_key.encode()).digest()
             logger.info("SecureKeyStorage: Encryption enabled")
         else:
-            logger.warning(
-                "SecureKeyStorage: ENCRYPTION_KEY not set, using obfuscation"
-            )
+            logger.warning("SecureKeyStorage: ENCRYPTION_KEY not set, using obfuscation")
 
     def _encrypt(self, plaintext: str) -> str:
         """Encrypt a string."""
@@ -182,9 +180,7 @@ class SecureKeyStorage:
                     "provider": metadata.provider.value,
                     "created_at": metadata.created_at.isoformat(),
                     "expires_at": metadata.expires_at.isoformat(),
-                    "last_used": metadata.last_used.isoformat()
-                    if metadata.last_used
-                    else None,
+                    "last_used": metadata.last_used.isoformat() if metadata.last_used else None,
                     "usage_count": metadata.usage_count,
                     "status": metadata.status.value,
                     "rotated_from": metadata.rotated_from,
@@ -218,9 +214,7 @@ class SecureKeyStorage:
                 provider=KeyProvider(meta["provider"]),
                 created_at=datetime.fromisoformat(meta["created_at"]),
                 expires_at=datetime.fromisoformat(meta["expires_at"]),
-                last_used=datetime.fromisoformat(meta["last_used"])
-                if meta["last_used"]
-                else None,
+                last_used=datetime.fromisoformat(meta["last_used"]) if meta["last_used"] else None,
                 usage_count=meta["usage_count"],
                 status=KeyStatus(meta["status"]),
                 rotated_from=meta.get("rotated_from"),
@@ -289,9 +283,7 @@ class SecureKeyStorage:
                         provider=key_provider,
                         created_at=datetime.fromisoformat(meta["created_at"]),
                         expires_at=datetime.fromisoformat(meta["expires_at"]),
-                        last_used=datetime.fromisoformat(meta["last_used"])
-                        if meta["last_used"]
-                        else None,
+                        last_used=datetime.fromisoformat(meta["last_used"]) if meta["last_used"] else None,
                         usage_count=meta["usage_count"],
                         status=KeyStatus(meta["status"]),
                         rotated_from=meta.get("rotated_from"),
@@ -353,9 +345,7 @@ class APIKeyRotationService:
         # Key fetchers for automatic rotation
         self._key_fetchers: dict[KeyProvider, Callable[[], str | None]] = {}
 
-        logger.info(
-            f"APIKeyRotationService initialized: rotation={rotation_days}d, warning={warning_days}d"
-        )
+        logger.info(f"APIKeyRotationService initialized: rotation={rotation_days}d, warning={warning_days}d")
 
     def register_key(
         self,
@@ -429,9 +419,7 @@ class APIKeyRotationService:
                 key.status = KeyStatus.PENDING_ROTATION
                 needs_rotation.append(key)
                 self._notify_warning(key)
-                logger.info(
-                    f"Key needs rotation soon: {key.key_id} ({days_until_expiry}d left)"
-                )
+                logger.info(f"Key needs rotation soon: {key.key_id} ({days_until_expiry}d left)")
 
         return needs_rotation
 
@@ -491,21 +479,15 @@ class APIKeyRotationService:
 
         return event
 
-    def register_rotation_callback(
-        self, callback: Callable[[RotationEvent], None]
-    ) -> None:
+    def register_rotation_callback(self, callback: Callable[[RotationEvent], None]) -> None:
         """Register callback for rotation events."""
         self._rotation_callbacks.append(callback)
 
-    def register_warning_callback(
-        self, callback: Callable[[KeyMetadata], None]
-    ) -> None:
+    def register_warning_callback(self, callback: Callable[[KeyMetadata], None]) -> None:
         """Register callback for expiry warnings."""
         self._warning_callbacks.append(callback)
 
-    def register_key_fetcher(
-        self, provider: KeyProvider, fetcher: Callable[[], str | None]
-    ) -> None:
+    def register_key_fetcher(self, provider: KeyProvider, fetcher: Callable[[], str | None]) -> None:
         """Register a function to fetch new keys for a provider."""
         self._key_fetchers[provider] = fetcher
 
@@ -532,9 +514,7 @@ class APIKeyRotationService:
         oldest_key = min(active_keys, key=lambda k: k.created_at)
         return self.rotate_key(oldest_key.key_id, new_key, "auto_rotation")
 
-    def get_rotation_history(
-        self, limit: int = 100, provider: KeyProvider | None = None
-    ) -> list[RotationEvent]:
+    def get_rotation_history(self, limit: int = 100, provider: KeyProvider | None = None) -> list[RotationEvent]:
         """Get rotation history."""
         history = self._rotation_history
 
@@ -561,9 +541,7 @@ class APIKeyRotationService:
 
         provider_counts = {}
         for key in keys:
-            provider_counts[key.provider.value] = (
-                provider_counts.get(key.provider.value, 0) + 1
-            )
+            provider_counts[key.provider.value] = provider_counts.get(key.provider.value, 0) + 1
 
         return {
             "enabled": True,
@@ -576,9 +554,7 @@ class APIKeyRotationService:
             "registered_fetchers": list(self._key_fetchers.keys()),
         }
 
-    def _record_usage(
-        self, key_id: str, success: bool, latency_ms: float = 0.0
-    ) -> None:
+    def _record_usage(self, key_id: str, success: bool, latency_ms: float = 0.0) -> None:
         """Record key usage."""
         if key_id not in self._usage_stats:
             self._usage_stats[key_id] = KeyUsageStats(key_id=key_id)
@@ -600,9 +576,7 @@ class APIKeyRotationService:
         # Update average latency (exponential moving average)
         if latency_ms > 0:
             alpha = 0.1
-            stats.avg_latency_ms = (
-                alpha * latency_ms + (1 - alpha) * stats.avg_latency_ms
-            )
+            stats.avg_latency_ms = alpha * latency_ms + (1 - alpha) * stats.avg_latency_ms
 
     def _notify_rotation(self, event: RotationEvent) -> None:
         """Notify callbacks about rotation."""

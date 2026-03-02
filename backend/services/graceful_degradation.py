@@ -156,18 +156,14 @@ class FallbackCache:
             return
 
         # Remove oldest entries
-        sorted_entries = sorted(
-            self._cache.items(), key=lambda x: x[1].last_accessed or x[1].created_at
-        )
+        sorted_entries = sorted(self._cache.items(), key=lambda x: x[1].last_accessed or x[1].created_at)
 
         to_remove = len(self._cache) - self.max_entries + 10  # Remove 10 extra
         for key, _ in sorted_entries[:to_remove]:
             del self._cache[key]
             self.evictions += 1
 
-    def set(
-        self, key: str, value: Any, ttl: int | None = None, source: str = "unknown"
-    ):
+    def set(self, key: str, value: Any, ttl: int | None = None, source: str = "unknown"):
         """Store a value in the cache."""
         self._cleanup_if_needed()
         self._ensure_capacity()
@@ -343,9 +339,7 @@ class GracefulDegradationManager:
 
         return None
 
-    def record_success(
-        self, service: str, key: str, response: Any, ttl: int | None = None
-    ):
+    def record_success(self, service: str, key: str, response: Any, ttl: int | None = None):
         """Record successful service call and cache response."""
         svc = self.register_service(service)
         svc.record_success()
@@ -385,9 +379,7 @@ class GracefulDegradationManager:
                     "success_rate": round(svc.success_rate, 2),
                     "failure_count": svc.failure_count,
                     "success_count": svc.success_count,
-                    "degraded_since": svc.degraded_since.isoformat()
-                    if svc.degraded_since
-                    else None,
+                    "degraded_since": svc.degraded_since.isoformat() if svc.degraded_since else None,
                     "error_message": svc.error_message,
                 }
                 for name, svc in self.services.items()
@@ -438,9 +430,7 @@ def with_fallback(
                 logger.warning(f"Service '{service_name}' failed: {e}")
                 manager.record_failure(service_name, str(e))
 
-                fallback = manager.get_fallback(
-                    cache_key, fallback_type, *args, **kwargs
-                )
+                fallback = manager.get_fallback(cache_key, fallback_type, *args, **kwargs)
                 if fallback is not None:
                     logger.info(f"Returning fallback for '{cache_key}'")
                     return fallback
@@ -459,9 +449,7 @@ def with_fallback(
                 logger.warning(f"Service '{service_name}' failed: {e}")
                 manager.record_failure(service_name, str(e))
 
-                fallback = manager.get_fallback(
-                    cache_key, fallback_type, *args, **kwargs
-                )
+                fallback = manager.get_fallback(cache_key, fallback_type, *args, **kwargs)
                 if fallback is not None:
                     logger.info(f"Returning fallback for '{cache_key}'")
                     return fallback

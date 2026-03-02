@@ -131,13 +131,11 @@ class ReasoningTrace:
             "final_conclusion": self.final_conclusion,
             "processing_time": self.processing_time,
             "chain_of_thought": [
-                step.to_dict() if hasattr(step, "to_dict") else step
-                for step in self.chain_of_thought
+                step.to_dict() if hasattr(step, "to_dict") else step for step in self.chain_of_thought
             ],
             "strategy_evolution": (
                 self.strategy_evolution.to_dict()
-                if self.strategy_evolution
-                and hasattr(self.strategy_evolution, "to_dict")
+                if self.strategy_evolution and hasattr(self.strategy_evolution, "to_dict")
                 else self.strategy_evolution
             ),
             "metadata": self.metadata,

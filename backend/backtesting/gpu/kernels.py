@@ -1,4 +1,4 @@
-﻿"""
+"""
 Numba JIT kernels for GPU optimizer.
 
 Extracted from gpu_optimizer.py (lines 152-1842).
@@ -1732,6 +1732,3 @@ else:
     def _backtest_all_v6_batch(*args, **kwargs):
         """Non-JIT fallback for V6"""
         return np.zeros((1, 11))
-
-
-

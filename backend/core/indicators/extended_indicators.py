@@ -18,8 +18,10 @@ import numpy as np
 # RVI - RELATIVE VOLATILITY INDEX
 # =============================================================================
 
-def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
-                  length: int = 10, ma_type: str = "WMA", ma_length: int = 14) -> np.ndarray:
+
+def calculate_rvi(
+    close: np.ndarray, high: np.ndarray, low: np.ndarray, length: int = 10, ma_type: str = "WMA", ma_length: int = 14
+) -> np.ndarray:
     """
     Calculate Relative Volatility Index (RVI).
 
@@ -41,7 +43,7 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
     # Calculate standard deviation
     std_dev = np.zeros_like(close)
     for i in range(length - 1, len(close)):
-        std_dev[i] = np.std(close[i - length + 1:i + 1])
+        std_dev[i] = np.std(close[i - length + 1 : i + 1])
 
     # Calculate up and down volatility
     up_vol = np.zeros_like(close)
@@ -83,8 +85,10 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
 # LINEAR REGRESSION CHANNEL
 # =============================================================================
 
-def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
-                                         deviation: float = 2.0) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+def calculate_linear_regression_channel(
+    close: np.ndarray, length: int = 100, deviation: float = 2.0
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculate Linear Regression Channel.
 
@@ -104,7 +108,7 @@ def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
 
     for i in range(length - 1, n):
         # Get window
-        y = close[i - length + 1:i + 1]
+        y = close[i - length + 1 : i + 1]
         x = np.arange(length)
 
         # Linear regression
@@ -147,10 +151,10 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarra
     Returns:
         Tuple of (long_signals, short_signals) boolean arrays
     """
-    length = config.get('linreg_length', 100)
-    deviation = config.get('channel_mult', 2.0)
-    breakout_rebound = config.get('linreg_breakout_rebound', 'Breakout')
-    slope_direction = config.get('linreg_slope_direction', 'Allow_Any')
+    length = config.get("linreg_length", 100)
+    deviation = config.get("channel_mult", 2.0)
+    breakout_rebound = config.get("linreg_breakout_rebound", "Breakout")
+    slope_direction = config.get("linreg_slope_direction", "Allow_Any")
 
     _middle, upper, lower, slope = calculate_linear_regression_channel(close, length, deviation)
 
@@ -160,14 +164,14 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarra
 
     for i in range(length, n):
         # Slope filter
-        if slope_direction == 'Follow':
+        if slope_direction == "Follow":
             if slope[i] <= 0:
                 continue  # Skip if slope not positive for longs
-        elif slope_direction == 'Opposite' and slope[i] >= 0:
+        elif slope_direction == "Opposite" and slope[i] >= 0:
             continue
 
         # Breakout or Rebound
-        if breakout_rebound == 'Breakout':
+        if breakout_rebound == "Breakout":
             if close[i] > upper[i]:
                 long_signals[i] = True
             elif close[i] < lower[i]:
@@ -185,17 +189,20 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarra
 # LEVELS BREAK (SUPPORT/RESISTANCE)
 # =============================================================================
 
+
 @dataclass
 class PivotLevel:
     """Represents a support/resistance level."""
+
     price: float
     type: str  # 'support' or 'resistance'
     strength: int  # Number of tests
     bar_index: int  # When it was formed
 
 
-def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                       pivot_bars: int = 10) -> tuple[np.ndarray, np.ndarray]:
+def find_pivot_points(
+    high: np.ndarray, low: np.ndarray, close: np.ndarray, pivot_bars: int = 10
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Find pivot highs and lows.
 
@@ -236,8 +243,9 @@ def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     return pivot_highs, pivot_lows
 
 
-def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                        config: dict) -> tuple[np.ndarray, np.ndarray]:
+def levels_break_filter(
+    high: np.ndarray, low: np.ndarray, close: np.ndarray, config: dict
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply Levels Break filter for S/R breakouts.
 
@@ -248,10 +256,10 @@ def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     Returns:
         Tuple of (long_signals, short_signals) boolean arrays
     """
-    pivot_bars = config.get('levels_pivot_bars', 10)
-    search_period = config.get('levels_search_period', 100)
-    channel_width = config.get('levels_channel_width', 0.5) / 100  # Convert to decimal
-    test_count = config.get('levels_test_count', 2)
+    pivot_bars = config.get("levels_pivot_bars", 10)
+    search_period = config.get("levels_search_period", 100)
+    channel_width = config.get("levels_channel_width", 0.5) / 100  # Convert to decimal
+    test_count = config.get("levels_test_count", 2)
 
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
@@ -299,8 +307,8 @@ def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
 # ACCUMULATION AREAS
 # =============================================================================
 
-def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
-                             config: dict) -> tuple[np.ndarray, np.ndarray]:
+
+def find_accumulation_areas(close: np.ndarray, volume: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Find accumulation/distribution areas.
 
@@ -315,10 +323,10 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
     Returns:
         Tuple of (long_signals, short_signals) on breakout from accumulation
     """
-    backtrack = config.get('acc_backtrack_interval', 50)
-    min_bars = config.get('acc_min_bars', 3)
-    volume_threshold = config.get('volume_threshold', 2.0)
-    price_range_pct = config.get('price_range_percent', 1.0) / 100
+    backtrack = config.get("acc_backtrack_interval", 50)
+    min_bars = config.get("acc_min_bars", 3)
+    volume_threshold = config.get("volume_threshold", 2.0)
+    price_range_pct = config.get("price_range_percent", 1.0) / 100
 
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
@@ -327,12 +335,12 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
     # Calculate average volume
     avg_volume = np.zeros(n)
     for i in range(20, n):
-        avg_volume[i] = np.mean(volume[i - 20:i])
+        avg_volume[i] = np.mean(volume[i - 20 : i])
 
     for i in range(backtrack, n):
         # Look for consolidation with high volume
-        window_close = close[i - backtrack:i]
-        window_volume = volume[i - backtrack:i]
+        window_close = close[i - backtrack : i]
+        window_volume = volume[i - backtrack : i]
 
         # Check for consolidation (price in range)
         high_price = np.max(window_close)
@@ -345,7 +353,7 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
         range_pct = (high_price - low_price) / mid_price
 
         # Check for high volume
-        high_vol_bars = np.sum(window_volume > volume_threshold * avg_volume[i - backtrack:i])
+        high_vol_bars = np.sum(window_volume > volume_threshold * avg_volume[i - backtrack : i])
 
         # If consolidation with high volume, check for breakout
         if range_pct <= price_range_pct and high_vol_bars >= min_bars:
@@ -362,11 +370,12 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
 # HELPER FUNCTIONS
 # =============================================================================
 
+
 def _sma(data: np.ndarray, period: int) -> np.ndarray:
     """Simple Moving Average."""
     result = np.zeros_like(data)
     for i in range(period - 1, len(data)):
-        result[i] = np.mean(data[i - period + 1:i + 1])
+        result[i] = np.mean(data[i - period + 1 : i + 1])
     return result
 
 
@@ -386,7 +395,7 @@ def _wma(data: np.ndarray, period: int) -> np.ndarray:
     weights = np.arange(1, period + 1)
     weight_sum = weights.sum()
     for i in range(period - 1, len(data)):
-        result[i] = np.sum(data[i - period + 1:i + 1] * weights) / weight_sum
+        result[i] = np.sum(data[i - period + 1 : i + 1] * weights) / weight_sum
     return result
 
 

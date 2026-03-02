@@ -198,17 +198,13 @@ class PropertyTestingService:
         )
 
         self._initialized = True
-        logger.info(
-            f"✅ Registered {len(self._properties)} trading properties for testing"
-        )
+        logger.info(f"✅ Registered {len(self._properties)} trading properties for testing")
 
     # ============================================================
     # Property Validators
     # ============================================================
 
-    def _validate_equity_non_negative(
-        self, initial_equity: float, trades: list[dict]
-    ) -> bool:
+    def _validate_equity_non_negative(self, initial_equity: float, trades: list[dict]) -> bool:
         """Validate that equity never goes negative during trades."""
         equity = initial_equity
         for trade in trades:
@@ -229,9 +225,7 @@ class PropertyTestingService:
             return True  # No position is valid
         return min_size <= abs(position_size) <= max_size
 
-    def _validate_pnl_consistency(
-        self, realized_pnl: float, unrealized_pnl: float, total_pnl: float
-    ) -> bool:
+    def _validate_pnl_consistency(self, realized_pnl: float, unrealized_pnl: float, total_pnl: float) -> bool:
         """Validate PnL calculation consistency."""
         epsilon = 1e-8
         return abs((realized_pnl + unrealized_pnl) - total_pnl) < epsilon
@@ -266,15 +260,11 @@ class PropertyTestingService:
         drawdown = (peak_equity - current_equity) / peak_equity
         return drawdown <= max_drawdown_pct
 
-    def _validate_execution_latency(
-        self, latency_ms: float, max_latency_ms: float = 1000.0
-    ) -> bool:
+    def _validate_execution_latency(self, latency_ms: float, max_latency_ms: float = 1000.0) -> bool:
         """Validate execution latency is within bounds."""
         return 0 <= latency_ms <= max_latency_ms
 
-    def _validate_spread_validity(
-        self, bid: float, ask: float, max_spread_pct: float = 0.01
-    ) -> bool:
+    def _validate_spread_validity(self, bid: float, ask: float, max_spread_pct: float = 0.01) -> bool:
         """Validate bid-ask spread is valid."""
         if bid <= 0 or ask <= 0:
             return False
@@ -444,10 +434,7 @@ class PropertyTestingService:
         )
 
         self._test_history.append(report)
-        logger.info(
-            f"✅ Property tests complete: {passed}/{len(self._properties)} passed "
-            f"({report.success_rate:.1f}%)"
-        )
+        logger.info(f"✅ Property tests complete: {passed}/{len(self._properties)} passed ({report.success_rate:.1f}%)")
 
         return report
 
@@ -635,9 +622,7 @@ class PropertyTestingService:
             "recent_failures": [
                 {
                     "property": f.property_name,
-                    "example": str(f.failing_example)[:100]
-                    if f.failing_example
-                    else None,
+                    "example": str(f.failing_example)[:100] if f.failing_example else None,
                     "timestamp": f.timestamp.isoformat(),
                 }
                 for f in failures[-10:]
@@ -650,18 +635,10 @@ class PropertyTestingService:
             "initialized": self._initialized,
             "registered_properties": len(self._properties),
             "total_tests_run": len(self._results),
-            "tests_passed": sum(
-                1 for r in self._results if r.result == TestResult.PASSED
-            ),
-            "tests_failed": sum(
-                1 for r in self._results if r.result == TestResult.FAILED
-            ),
+            "tests_passed": sum(1 for r in self._results if r.result == TestResult.PASSED),
+            "tests_failed": sum(1 for r in self._results if r.result == TestResult.FAILED),
             "test_reports": len(self._test_history),
-            "last_test": (
-                self._test_history[-1].timestamp.isoformat()
-                if self._test_history
-                else None
-            ),
+            "last_test": (self._test_history[-1].timestamp.isoformat() if self._test_history else None),
         }
 
 

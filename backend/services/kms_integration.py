@@ -160,9 +160,7 @@ class KMSProviderBase(ABC):
         pass
 
     @abstractmethod
-    async def create_key(
-        self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict
-    ) -> KeyInfo:
+    async def create_key(self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict) -> KeyInfo:
         """Create a new key."""
         pass
 
@@ -250,9 +248,7 @@ class AWSKMSProvider(KMSProviderBase):
 
         return self._simulate_decrypt(ciphertext, key_id)
 
-    async def create_key(
-        self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict
-    ) -> KeyInfo:
+    async def create_key(self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict) -> KeyInfo:
         """Create a new key in AWS KMS."""
         key_id = f"aws-kms-{secrets.token_hex(8)}"
 
@@ -395,9 +391,7 @@ class AzureKeyVaultProvider(KMSProviderBase):
 
         return self._simulate_decrypt(ciphertext, key_id)
 
-    async def create_key(
-        self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict
-    ) -> KeyInfo:
+    async def create_key(self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict) -> KeyInfo:
         """Create a new key in Azure Key Vault."""
         key_id = f"azure-kv-{secrets.token_hex(8)}"
 
@@ -519,9 +513,7 @@ class HashiCorpVaultProvider(KMSProviderBase):
 
         return self._simulate_decrypt(ciphertext, key_id)
 
-    async def create_key(
-        self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict
-    ) -> KeyInfo:
+    async def create_key(self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict) -> KeyInfo:
         """Create a new transit key."""
         key_id = f"vault-{secrets.token_hex(8)}"
 
@@ -615,9 +607,7 @@ class LocalHSMProvider(KMSProviderBase):
                 self._master_key = hashlib.sha256(master_key_env.encode()).digest()
             else:
                 self._master_key = secrets.token_bytes(32)
-                logger.warning(
-                    "Local HSM: Using random master key (set HSM_MASTER_KEY for persistence)"
-                )
+                logger.warning("Local HSM: Using random master key (set HSM_MASTER_KEY for persistence)")
 
             # Load existing keys
             await self._load_keys()
@@ -675,9 +665,7 @@ class LocalHSMProvider(KMSProviderBase):
         except ImportError:
             return bytes([b ^ key[i % len(key)] for i, b in enumerate(ciphertext)])
 
-    async def create_key(
-        self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict
-    ) -> KeyInfo:
+    async def create_key(self, key_type: KeyType, algorithm: KeyAlgorithm, metadata: dict) -> KeyInfo:
         """Create a new local key."""
         key_id = f"local-hsm-{secrets.token_hex(8)}"
         key_material = secrets.token_bytes(32)
@@ -748,12 +736,8 @@ class LocalHSMProvider(KMSProviderBase):
                     key_type=KeyType(info["key_type"]),
                     algorithm=KeyAlgorithm(info["algorithm"]),
                     created_at=datetime.fromisoformat(info["created_at"]),
-                    expires_at=datetime.fromisoformat(info["expires_at"])
-                    if info.get("expires_at")
-                    else None,
-                    rotated_at=datetime.fromisoformat(info["rotated_at"])
-                    if info.get("rotated_at")
-                    else None,
+                    expires_at=datetime.fromisoformat(info["expires_at"]) if info.get("expires_at") else None,
+                    rotated_at=datetime.fromisoformat(info["rotated_at"]) if info.get("rotated_at") else None,
                     version=info.get("version", 1),
                     is_enabled=info.get("is_enabled", True),
                     metadata=info.get("metadata", {}),
@@ -761,9 +745,7 @@ class LocalHSMProvider(KMSProviderBase):
 
                 # Decrypt key material
                 encrypted_material = base64.b64decode(info["encrypted_material"])
-                self._key_material[key_id] = self._decrypt_with_master(
-                    encrypted_material
-                )
+                self._key_material[key_id] = self._decrypt_with_master(encrypted_material)
 
         except Exception as e:
             logger.error(f"Failed to load keys: {e}")
@@ -776,20 +758,14 @@ class LocalHSMProvider(KMSProviderBase):
             data = {"keys": {}}
             for key_id, key_info in self._keys.items():
                 # Encrypt key material
-                encrypted_material = self._encrypt_with_master(
-                    self._key_material[key_id]
-                )
+                encrypted_material = self._encrypt_with_master(self._key_material[key_id])
 
                 data["keys"][key_id] = {
                     "key_type": key_info.key_type.value,
                     "algorithm": key_info.algorithm.value,
                     "created_at": key_info.created_at.isoformat(),
-                    "expires_at": key_info.expires_at.isoformat()
-                    if key_info.expires_at
-                    else None,
-                    "rotated_at": key_info.rotated_at.isoformat()
-                    if key_info.rotated_at
-                    else None,
+                    "expires_at": key_info.expires_at.isoformat() if key_info.expires_at else None,
+                    "rotated_at": key_info.rotated_at.isoformat() if key_info.rotated_at else None,
                     "version": key_info.version,
                     "is_enabled": key_info.is_enabled,
                     "metadata": key_info.metadata,
@@ -870,8 +846,7 @@ class KMSIntegrationService:
             azure_client_id=os.environ.get("AZURE_CLIENT_ID"),
             azure_client_secret=os.environ.get("AZURE_CLIENT_SECRET"),
             cache_ttl_seconds=int(os.environ.get("KMS_CACHE_TTL", "300")),
-            enable_audit_logging=os.environ.get("KMS_AUDIT_LOGGING", "true").lower()
-            == "true",
+            enable_audit_logging=os.environ.get("KMS_AUDIT_LOGGING", "true").lower() == "true",
         )
 
     async def initialize(self) -> bool:
@@ -896,9 +871,7 @@ class KMSIntegrationService:
                 return False
 
             self._initialized = True
-            logger.info(
-                f"KMS Service initialized with provider: {self.config.provider.value}"
-            )
+            logger.info(f"KMS Service initialized with provider: {self.config.provider.value}")
             return True
 
         except Exception as e:
@@ -940,9 +913,7 @@ class KMSIntegrationService:
         if len(self._audit_log) > 10000:
             self._audit_log = self._audit_log[-10000:]
 
-        logger.debug(
-            f"Audit: {action.value} for key {key_id} - {'success' if success else 'failed'}"
-        )
+        logger.debug(f"Audit: {action.value} for key {key_id} - {'success' if success else 'failed'}")
 
     async def create_key(
         self,
@@ -955,9 +926,7 @@ class KMSIntegrationService:
             await self.initialize()
 
         try:
-            key_info = await self._provider.create_key(
-                key_type, algorithm, metadata or {}
-            )
+            key_info = await self._provider.create_key(key_type, algorithm, metadata or {})
             self._log_audit(AuditAction.KEY_CREATE, key_info.key_id)
             return key_info
 
@@ -1004,9 +973,7 @@ class KMSIntegrationService:
             self._log_audit(AuditAction.KEY_DECRYPT, key_id, False, str(e))
             raise
 
-    async def encrypt_api_key(
-        self, api_key: str, provider_name: str
-    ) -> tuple[str, str]:
+    async def encrypt_api_key(self, api_key: str, provider_name: str) -> tuple[str, str]:
         """
         Encrypt an API key for secure storage.
 
@@ -1132,9 +1099,7 @@ class KMSIntegrationService:
             "cache_size": len(self._cache),
             "audit_log_size": len(self._audit_log),
             "cache_ttl_seconds": self.config.cache_ttl_seconds if self.config else 0,
-            "audit_logging_enabled": self.config.enable_audit_logging
-            if self.config
-            else False,
+            "audit_logging_enabled": self.config.enable_audit_logging if self.config else False,
         }
 
     def get_metrics(self) -> dict:

@@ -59,7 +59,7 @@ def load_lob_dataset(path: Path) -> list[dict[str, Any]]:
                         "spread_bps": spread_bps,
                     }
                 )
-            except (json.JSONDecodeError, (IndexError, TypeError, ValueError)):
+            except (json.JSONDecodeError, IndexError, TypeError, ValueError):
                 continue
     return data
 

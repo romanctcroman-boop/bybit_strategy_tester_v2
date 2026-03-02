@@ -216,9 +216,7 @@ class TradingHaltService:
         async with self._lock:
             resume_at = None
             if duration_minutes and self._config.auto_recovery_enabled:
-                resume_at = datetime.now(UTC) + timedelta(
-                    minutes=duration_minutes
-                )
+                resume_at = datetime.now(UTC) + timedelta(minutes=duration_minutes)
 
             event = self._create_halt_event(
                 reason=reason,
@@ -241,17 +239,13 @@ class TradingHaltService:
                 halted_at=event.timestamp,
                 halted_by=triggered_by,
                 resume_at=resume_at,
-                message=f"{reason.value}: {details.get('message', '')}"
-                if details
-                else reason.value,
+                message=f"{reason.value}: {details.get('message', '')}" if details else reason.value,
             )
 
             self._events.append(event)
             await self._notify_halt(event)
 
-            logger.warning(
-                f"⚠️ Trading halted [{level.value}]: {reason.value} by {triggered_by}"
-            )
+            logger.warning(f"⚠️ Trading halted [{level.value}]: {reason.value} by {triggered_by}")
 
             return event
 
@@ -276,13 +270,9 @@ class TradingHaltService:
 
             # Check cooldown
             if not force and self._state.halted_at:
-                cooldown_end = self._state.halted_at + timedelta(
-                    minutes=self._config.recovery_cooldown_minutes
-                )
+                cooldown_end = self._state.halted_at + timedelta(minutes=self._config.recovery_cooldown_minutes)
                 if datetime.now(UTC) < cooldown_end:
-                    logger.warning(
-                        f"⏳ Resume blocked - cooldown active until {cooldown_end}"
-                    )
+                    logger.warning(f"⏳ Resume blocked - cooldown active until {cooldown_end}")
                     return False
 
             # Mark last event as resolved
@@ -317,13 +307,15 @@ class TradingHaltService:
         if self._state.status == TradingStatus.CLOSING_ONLY:
             return False, "Only closing positions allowed"
 
-        if self._state.status == TradingStatus.LIMITED:
-            # Soft halt - check additional conditions
-            if self._risk_metrics.open_positions >= self._config.max_open_positions:
-                return (
-                    False,
-                    f"Position limit reached ({self._config.max_open_positions})",
-                )
+        if (
+            self._state.status == TradingStatus.LIMITED
+            and self._risk_metrics.open_positions >= self._config.max_open_positions
+        ):
+            # Soft halt - position limit reached
+            return (
+                False,
+                f"Position limit reached ({self._config.max_open_positions})",
+            )
 
         return True, "OK"
 
@@ -493,19 +485,11 @@ class TradingHaltService:
         """Get current trading halt status."""
         return {
             "trading_status": self._state.status.value,
-            "halt_level": self._state.halt_level.value
-            if self._state.halt_level
-            else None,
-            "halt_reason": self._state.halt_reason.value
-            if self._state.halt_reason
-            else None,
-            "halted_at": self._state.halted_at.isoformat()
-            if self._state.halted_at
-            else None,
+            "halt_level": self._state.halt_level.value if self._state.halt_level else None,
+            "halt_reason": self._state.halt_reason.value if self._state.halt_reason else None,
+            "halted_at": self._state.halted_at.isoformat() if self._state.halted_at else None,
             "halted_by": self._state.halted_by,
-            "resume_at": self._state.resume_at.isoformat()
-            if self._state.resume_at
-            else None,
+            "resume_at": self._state.resume_at.isoformat() if self._state.resume_at else None,
             "message": self._state.message,
             "can_open_positions": self.can_open_position()[0],
             "can_close_positions": self.can_close_position()[0],

@@ -28,8 +28,8 @@ try:
     GYM_VERSION = "gymnasium"
 except ImportError:
     try:
-        import gym
-        from gym import spaces
+        import gym  # type: ignore[no-redef]
+        from gym import spaces  # type: ignore[no-redef]
 
         GYM_AVAILABLE = True
         GYM_VERSION = "gym"
@@ -37,7 +37,7 @@ except ImportError:
         GYM_AVAILABLE = False
         gym = None  # type: ignore
         spaces = None  # type: ignore
-        GYM_VERSION = None
+        GYM_VERSION = None  # type: ignore[assignment]
 
 
 class TradingAction(IntEnum):
@@ -84,7 +84,7 @@ class TradingState:
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
-class TradingEnv(gym.Env if GYM_AVAILABLE else object):
+class TradingEnv(gym.Env if GYM_AVAILABLE else object):  # type: ignore[misc]
     """
     OpenAI Gym/Gymnasium-compatible trading environment.
 
@@ -165,11 +165,11 @@ class TradingEnv(gym.Env if GYM_AVAILABLE else object):
                 self.indicator_data = self.df[available].values
 
         # Define action and observation spaces
-        self.action_space = spaces.Discrete(4)  # HOLD, BUY, SELL, CLOSE
+        self.action_space: Any = spaces.Discrete(4)  # type: ignore[union-attr]  # HOLD, BUY, SELL, CLOSE
 
         # Calculate observation dimension
         obs_dim = self._calculate_obs_dim()
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
+        self.observation_space: Any = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)  # type: ignore[union-attr]
 
         # Initialize state
         self.state = TradingState(balance=self.config.initial_balance)
@@ -534,15 +534,7 @@ class TradingEnv(gym.Env if GYM_AVAILABLE else object):
 
     def _is_terminated(self) -> bool:
         """Check if episode should terminate."""
-        # Terminate if bankrupt
-        if self._get_equity() <= 0:
-            return True
-
-        # Terminate if max drawdown exceeded
-        if self.state.max_drawdown > 0.5:  # 50% drawdown
-            return True
-
-        return False
+        return self._get_equity() <= 0 or self.state.max_drawdown > 0.5  # 50% drawdown
 
     def render(self) -> str | None:
         """Render the environment."""

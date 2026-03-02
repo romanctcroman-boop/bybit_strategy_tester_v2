@@ -464,9 +464,7 @@ class AnomalyDetector:
 
         return anomaly
 
-    def _check_anomaly(
-        self, strategy_id: str, metric_name: str, value: float, window: MetricWindow
-    ) -> Anomaly | None:
+    def _check_anomaly(self, strategy_id: str, metric_name: str, value: float, window: MetricWindow) -> Anomaly | None:
         """Check if value is anomalous."""
 
         # Need enough data for statistics

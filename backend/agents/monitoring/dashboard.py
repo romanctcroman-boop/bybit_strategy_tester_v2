@@ -53,9 +53,7 @@ class DashboardWidget:
     widget_type: WidgetType
     data_source: str  # Metric name or query
     refresh_seconds: int = 30
-    position: dict[str, int] = field(
-        default_factory=lambda: {"x": 0, "y": 0, "w": 4, "h": 3}
-    )
+    position: dict[str, int] = field(default_factory=lambda: {"x": 0, "y": 0, "w": 4, "h": 3})
     options: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -245,10 +243,7 @@ class DashboardDataProvider:
 
     def list_dashboards(self) -> list[dict[str, Any]]:
         """List all dashboards"""
-        return [
-            {"id": d.id, "name": d.name, "widget_count": len(d.widgets)}
-            for d in self.dashboards.values()
-        ]
+        return [{"id": d.id, "name": d.name, "widget_count": len(d.widgets)} for d in self.dashboards.values()]
 
     async def get_widget_data(
         self,
@@ -310,9 +305,7 @@ class DashboardDataProvider:
     ) -> WidgetData:
         """Get data from metrics collector"""
         if not self.metrics_collector:
-            return WidgetData(
-                widget_id=widget.id, data=self._generate_mock_data(widget)
-            )
+            return WidgetData(widget_id=widget.id, data=self._generate_mock_data(widget))
 
         data = None
 
@@ -344,11 +337,7 @@ class DashboardDataProvider:
 
         for i in range(60):
             timestamp = now - timedelta(seconds=interval * (60 - i))
-            value = (
-                random.uniform(100, 2000)
-                if "latency" in widget.data_source
-                else random.uniform(0, 1)
-            )
+            value = random.uniform(100, 2000) if "latency" in widget.data_source else random.uniform(0, 1)
             points.append(
                 {
                     "timestamp": timestamp.isoformat(),
@@ -407,9 +396,7 @@ class DashboardDataProvider:
         # Check for issues
         if self.alert_manager:
             active_alerts = self.alert_manager.get_active_alerts()
-            critical_count = sum(
-                1 for a in active_alerts if a.severity.value == "critical"
-            )
+            critical_count = sum(1 for a in active_alerts if a.severity.value == "critical")
 
             if critical_count > 0:
                 health_status["overall"] = "critical"
@@ -439,12 +426,8 @@ class DashboardDataProvider:
         error_rate = 2.5  # Mock value
 
         if self.metrics_collector:
-            total = self.metrics_collector.get(
-                "agent_requests_total", window_seconds=window_seconds
-            )
-            errors = self.metrics_collector.get(
-                "agent_errors_total", window_seconds=window_seconds
-            )
+            total = self.metrics_collector.get("agent_requests_total", window_seconds=window_seconds)
+            errors = self.metrics_collector.get("agent_errors_total", window_seconds=window_seconds)
 
             if total > 0:
                 error_rate = (errors / total) * 100

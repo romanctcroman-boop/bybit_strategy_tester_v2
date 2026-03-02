@@ -167,9 +167,7 @@ class RiskCalculator:
         return ((peak - current) / peak * 100) if peak > 0 else 0.0
 
     @staticmethod
-    def calculate_sharpe_ratio(
-        returns: list[float], risk_free_rate: float = 0.0
-    ) -> float:
+    def calculate_sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
         """Calculate Sharpe ratio."""
         if not returns or len(returns) < 2:
             return 0.0
@@ -183,9 +181,7 @@ class RiskCalculator:
         return (avg_return - risk_free_rate) / std_dev * math.sqrt(252)
 
     @staticmethod
-    def calculate_sortino_ratio(
-        returns: list[float], risk_free_rate: float = 0.0
-    ) -> float:
+    def calculate_sortino_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
         """Calculate Sortino ratio (downside deviation only)."""
         if not returns or len(returns) < 2:
             return 0.0
@@ -317,14 +313,10 @@ class RiskDashboardService:
         # Calculate totals
         total_equity = self.equity_history[-1] if self.equity_history else 0.0
         total_exposure = sum(p.exposure for p in self.positions.values())
-        exposure_pct = (
-            (total_exposure / total_equity * 100) if total_equity > 0 else 0.0
-        )
+        exposure_pct = (total_exposure / total_equity * 100) if total_equity > 0 else 0.0
 
         unrealized_pnl = sum(p.unrealized_pnl for p in self.positions.values())
-        unrealized_pnl_pct = (
-            (unrealized_pnl / total_equity * 100) if total_equity > 0 else 0.0
-        )
+        unrealized_pnl_pct = (unrealized_pnl / total_equity * 100) if total_equity > 0 else 0.0
 
         # Calculate drawdown
         max_dd = self.calculator.calculate_max_drawdown(self.equity_history)
@@ -344,17 +336,11 @@ class RiskDashboardService:
 
         # Today's realized P&L
         today = datetime.now(UTC).date()
-        today_trades = [
-            t
-            for t in self.trades_history
-            if datetime.fromisoformat(t["timestamp"]).date() == today
-        ]
+        today_trades = [t for t in self.trades_history if datetime.fromisoformat(t["timestamp"]).date() == today]
         realized_today = sum(t.get("pnl", 0) for t in today_trades)
 
         # Risk score
-        risk_score = self.calculator.calculate_risk_score(
-            current_dd, exposure_pct, var_95, self.thresholds
-        )
+        risk_score = self.calculator.calculate_risk_score(current_dd, exposure_pct, var_95, self.thresholds)
 
         return PortfolioRisk(
             total_equity=total_equity,
@@ -381,15 +367,11 @@ class RiskDashboardService:
         total_equity = self.equity_history[-1] if self.equity_history else 1.0
 
         # Position size alert
-        position_pct = (
-            (position.exposure / total_equity * 100) if total_equity > 0 else 0
-        )
+        position_pct = (position.exposure / total_equity * 100) if total_equity > 0 else 0
         if position_pct > self.thresholds.max_position_size_pct:
             self._create_alert(
                 AlertType.POSITION_SIZE,
-                RiskLevel.HIGH
-                if position_pct > self.thresholds.max_position_size_pct * 1.5
-                else RiskLevel.MEDIUM,
+                RiskLevel.HIGH if position_pct > self.thresholds.max_position_size_pct * 1.5 else RiskLevel.MEDIUM,
                 f"Position size for {position.symbol} exceeds threshold",
                 position_pct,
                 self.thresholds.max_position_size_pct,
@@ -527,9 +509,7 @@ class RiskDashboardService:
             },
             "positions_count": portfolio.positions_count,
             "active_alerts": len(unack_alerts),
-            "critical_alerts": len(
-                [a for a in unack_alerts if a.level == RiskLevel.CRITICAL]
-            ),
+            "critical_alerts": len([a for a in unack_alerts if a.level == RiskLevel.CRITICAL]),
             "thresholds": {
                 "max_drawdown": self.thresholds.max_drawdown_pct,
                 "max_exposure": self.thresholds.max_exposure_pct,

@@ -217,10 +217,8 @@ class MarketDataStream(ABC):
     def _notify(self, data: Any) -> None:
         """Notify all callbacks of new data."""
         for callback in self._callbacks:
-            try:
+            with contextlib.suppress(Exception):
                 callback(data)
-            except Exception:
-                pass  # Silently ignore callback errors
 
     @abstractmethod
     async def connect(self) -> bool:
@@ -636,17 +634,13 @@ class CandleAggregator:
         # Initialize symbol data structures
         if symbol not in self._current:
             self._current[symbol] = {}
-            self._candles[symbol] = {
-                interval: deque(maxlen=self.max_candles) for interval in self.intervals
-            }
+            self._candles[symbol] = {interval: deque(maxlen=self.max_candles) for interval in self.intervals}
 
         for interval in self.intervals:
             interval_seconds = self.INTERVALS[interval]
 
             # Calculate candle open time
-            candle_time = (
-                trade.timestamp // 1000 // interval_seconds * interval_seconds * 1000
-            )
+            candle_time = trade.timestamp // 1000 // interval_seconds * interval_seconds * 1000
 
             current = self._current[symbol].get(interval)
 
@@ -773,9 +767,7 @@ class StreamManager:
         self.trade_stream: TradeStream | None = None
 
         # Candle aggregator
-        self.candle_aggregator = CandleAggregator(
-            intervals=self.config.candle_intervals
-        )
+        self.candle_aggregator = CandleAggregator(intervals=self.config.candle_intervals)
 
         # Subscribed symbols
         self._symbols: set[str] = set()
@@ -795,9 +787,7 @@ class StreamManager:
                 await self.ticker_stream.subscribe(symbols)
 
             if self.config.enable_orderbook:
-                self.orderbook_stream = OrderBookStream(
-                    depth=self.config.orderbook_depth
-                )
+                self.orderbook_stream = OrderBookStream(depth=self.config.orderbook_depth)
                 await self.orderbook_stream.connect()
                 await self.orderbook_stream.subscribe(symbols)
 
@@ -807,9 +797,7 @@ class StreamManager:
                 await self.trade_stream.subscribe(symbols)
 
                 # Connect trade stream to candle aggregator
-                self.trade_stream.add_callback(
-                    lambda t: self.candle_aggregator.process_trade(t)
-                )
+                self.trade_stream.add_callback(lambda t: self.candle_aggregator.process_trade(t))
 
             return True
 

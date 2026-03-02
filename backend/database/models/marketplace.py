@@ -60,9 +60,7 @@ class MarketplaceStrategy(Base):
     win_rate = Column(Float, nullable=True)
     profit_factor = Column(Float, nullable=True)
     total_trades = Column(Integer, nullable=True)
-    backtest_period = Column(
-        String(100), nullable=True
-    )  # e.g., "2024-01-01 to 2025-01-01"
+    backtest_period = Column(String(100), nullable=True)  # e.g., "2024-01-01 to 2025-01-01"
 
     # Marketplace metadata
     visibility = Column(String(20), default=StrategyVisibility.PUBLIC.value)
@@ -88,12 +86,8 @@ class MarketplaceStrategy(Base):
     is_active = Column(Boolean, default=True)
 
     # Relationships
-    reviews = relationship(
-        "StrategyReview", back_populates="strategy", cascade="all, delete-orphan"
-    )
-    downloads_log = relationship(
-        "StrategyDownload", back_populates="strategy", cascade="all, delete-orphan"
-    )
+    reviews = relationship("StrategyReview", back_populates="strategy", cascade="all, delete-orphan")
+    downloads_log = relationship("StrategyDownload", back_populates="strategy", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<MarketplaceStrategy(id={self.id}, name='{self.name}', by={self.username})>"
@@ -107,9 +101,7 @@ class StrategyReview(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # References
-    strategy_id = Column(
-        Integer, ForeignKey("marketplace_strategies.id"), nullable=False
-    )
+    strategy_id = Column(Integer, ForeignKey("marketplace_strategies.id"), nullable=False)
     user_id = Column(Integer, nullable=False)
     username = Column(String(100), nullable=False)
 
@@ -129,9 +121,7 @@ class StrategyReview(Base):
     strategy = relationship("MarketplaceStrategy", back_populates="reviews")
 
     # Constraints
-    __table_args__ = (
-        UniqueConstraint("strategy_id", "user_id", name="unique_strategy_review"),
-    )
+    __table_args__ = (UniqueConstraint("strategy_id", "user_id", name="unique_strategy_review"),)
 
     def __repr__(self):
         return f"<StrategyReview(strategy_id={self.strategy_id}, rating={self.rating})>"
@@ -145,9 +135,7 @@ class StrategyDownload(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # References
-    strategy_id = Column(
-        Integer, ForeignKey("marketplace_strategies.id"), nullable=False
-    )
+    strategy_id = Column(Integer, ForeignKey("marketplace_strategies.id"), nullable=False)
     user_id = Column(Integer, nullable=False)
 
     # Metadata
@@ -172,18 +160,14 @@ class StrategyLike(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # References
-    strategy_id = Column(
-        Integer, ForeignKey("marketplace_strategies.id"), nullable=False
-    )
+    strategy_id = Column(Integer, ForeignKey("marketplace_strategies.id"), nullable=False)
     user_id = Column(Integer, nullable=False)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Constraints
-    __table_args__ = (
-        UniqueConstraint("strategy_id", "user_id", name="unique_strategy_like"),
-    )
+    __table_args__ = (UniqueConstraint("strategy_id", "user_id", name="unique_strategy_like"),)
 
     def __repr__(self):
         return f"<StrategyLike(strategy_id={self.strategy_id}, user_id={self.user_id})>"

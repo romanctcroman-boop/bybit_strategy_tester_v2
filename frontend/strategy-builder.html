@@ -294,7 +294,13 @@
                     value="2025-01-01" min="2025-01-01" title="Данные в БД начинаются с 2025-01-01" />
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
-                  <label for="backtestEndDate" class="property-label">End Date</label>
+                  <label for="backtestEndDate" class="property-label date-label-with-reset">
+                    End Date
+                    <button type="button" id="resetEndDateBtn" class="btn-icon-sm btn-reset-date"
+                      title="Reset to today">
+                      <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                  </label>
                   <input type="date" class="property-input property-input-full" id="backtestEndDate"
                     value="2030-01-01" title="Если дата в будущем — бэктест автоматически ограничивается текущим временем" />
                 </div>

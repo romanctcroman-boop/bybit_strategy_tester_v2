@@ -8,7 +8,6 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple
 
 import numpy as np
 
@@ -19,7 +18,7 @@ class CrossoverOperator(ABC):
     """Базовый класс для операторов кроссовера"""
 
     @abstractmethod
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         """
         Создать потомков из двух родителей.
 
@@ -47,7 +46,7 @@ class SinglePointCrossover(CrossoverOperator):
     - Ограниченное разнообразие
     """
 
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         genes1 = parent1.chromosome.genes.copy()
         genes2 = parent2.chromosome.genes.copy()
 
@@ -69,13 +68,13 @@ class SinglePointCrossover(CrossoverOperator):
         child1 = Individual(
             chromosome=Chromosome(genes=genes1, param_ranges=parent1.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         child2 = Individual(
             chromosome=Chromosome(genes=genes2, param_ranges=parent2.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         return child1, child2
@@ -92,7 +91,7 @@ class TwoPointCrossover(CrossoverOperator):
     - Сохраняет блоки генов
     """
 
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         genes1 = parent1.chromosome.genes.copy()
         genes2 = parent2.chromosome.genes.copy()
 
@@ -115,13 +114,13 @@ class TwoPointCrossover(CrossoverOperator):
         child1 = Individual(
             chromosome=Chromosome(genes=genes1, param_ranges=parent1.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         child2 = Individual(
             chromosome=Chromosome(genes=genes2, param_ranges=parent2.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         return child1, child2
@@ -148,7 +147,7 @@ class UniformCrossover(CrossoverOperator):
         """
         self.exchange_probability = exchange_probability
 
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         genes1 = parent1.chromosome.genes.copy()
         genes2 = parent2.chromosome.genes.copy()
 
@@ -163,13 +162,13 @@ class UniformCrossover(CrossoverOperator):
         child1 = Individual(
             chromosome=Chromosome(genes=genes1, param_ranges=parent1.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         child2 = Individual(
             chromosome=Chromosome(genes=genes2, param_ranges=parent2.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         return child1, child2
@@ -193,16 +192,18 @@ class ArithmeticCrossover(CrossoverOperator):
     - Не работает с дискретными параметрами
     """
 
-    def __init__(self, alpha: float = 0.5):
+    def __init__(self, alpha: float = 0.5, preserve_integers: bool = True):
         """
         Args:
             alpha: Коэффициент смешивания (0.0-1.0)
                    0.5 = равный вклад родителей
                    alpha = фиксированный
+            preserve_integers: Сохранять целочисленные параметры
         """
         self.alpha = alpha
+        self.preserve_integers = preserve_integers
 
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         genes1 = {}
         genes2 = {}
 
@@ -220,17 +221,24 @@ class ArithmeticCrossover(CrossoverOperator):
             genes1[gene_name] = alpha * val1 + (1 - alpha) * val2
             genes2[gene_name] = (1 - alpha) * val1 + alpha * val2
 
+            # Округление для int параметров
+            if self.preserve_integers and gene_name in parent1.chromosome.param_ranges:
+                min_val, max_val = parent1.chromosome.param_ranges[gene_name]
+                if isinstance(min_val, int) and isinstance(max_val, int):
+                    genes1[gene_name] = round(genes1[gene_name])
+                    genes2[gene_name] = round(genes2[gene_name])
+
         # Создание потомков
         child1 = Individual(
             chromosome=Chromosome(genes=genes1, param_ranges=parent1.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         child2 = Individual(
             chromosome=Chromosome(genes=genes2, param_ranges=parent2.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         return child1, child2
@@ -258,7 +266,7 @@ class BlendCrossover(CrossoverOperator):
         """
         self.alpha = alpha
 
-    def crossover(self, parent1: Individual, parent2: Individual) -> Tuple[Individual, Individual]:
+    def crossover(self, parent1: Individual, parent2: Individual) -> tuple[Individual, Individual]:
         genes1 = {}
         genes2 = {}
 
@@ -281,13 +289,13 @@ class BlendCrossover(CrossoverOperator):
         child1 = Individual(
             chromosome=Chromosome(genes=genes1, param_ranges=parent1.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         child2 = Individual(
             chromosome=Chromosome(genes=genes2, param_ranges=parent2.chromosome.param_ranges),
             generation=max(parent1.generation, parent2.generation) + 1,
-            parents=(parent1.id, parent2.id),
+            parents=(str(parent1.id), str(parent2.id)),
         )
 
         return child1, child2

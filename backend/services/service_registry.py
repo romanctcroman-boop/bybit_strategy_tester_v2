@@ -107,9 +107,7 @@ class ServiceInstance:
                 datetime.fromisoformat(data["last_health_check"]) if data.get("last_health_check") else None
             ),
             registered_at=(
-                datetime.fromisoformat(data["registered_at"])
-                if data.get("registered_at")
-                else datetime.now(UTC)
+                datetime.fromisoformat(data["registered_at"]) if data.get("registered_at") else datetime.now(UTC)
             ),
             health_check_url=data.get("health_check_url", "/health"),
             tags=data.get("tags", []),

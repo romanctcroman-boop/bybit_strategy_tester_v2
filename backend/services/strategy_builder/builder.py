@@ -169,13 +169,8 @@ class StrategyBlock:
             "position_x": self.position_x,
             "position_y": self.position_y,
             "parameters": self.parameters,
-            "inputs": [
-                {"name": i.name, "data_type": i.data_type, "required": i.required}
-                for i in self.inputs
-            ],
-            "outputs": [
-                {"name": o.name, "data_type": o.data_type} for o in self.outputs
-            ],
+            "inputs": [{"name": i.name, "data_type": i.data_type, "required": i.required} for i in self.inputs],
+            "outputs": [{"name": o.name, "data_type": o.data_type} for o in self.outputs],
             "custom_code": self.custom_code,
             "color": self.color,
             "icon": self.icon,
@@ -270,9 +265,7 @@ class StrategyGraph:
 
         # Remove connections to/from this block
         self.connections = [
-            c
-            for c in self.connections
-            if c.source_block_id != block_id and c.target_block_id != block_id
+            c for c in self.connections if c.source_block_id != block_id and c.target_block_id != block_id
         ]
 
         self.updated_at = datetime.now(UTC)
@@ -357,10 +350,7 @@ class StrategyGraph:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "StrategyGraph":
         """Create from dictionary"""
-        blocks = {
-            bid: StrategyBlock.from_dict(bdata)
-            for bid, bdata in data.get("blocks", {}).items()
-        }
+        blocks = {bid: StrategyBlock.from_dict(bdata) for bid, bdata in data.get("blocks", {}).items()}
 
         connections = [
             BlockConnection(
@@ -381,12 +371,8 @@ class StrategyGraph:
             blocks=blocks,
             connections=connections,
             version=data.get("version", "1.0"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(UTC),
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if "updated_at" in data
-            else datetime.now(UTC),
+            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(UTC),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if "updated_at" in data else datetime.now(UTC),
             author=data.get("author", ""),
             tags=data.get("tags", []),
             timeframe=data.get("timeframe", "1h"),
@@ -866,9 +852,7 @@ class StrategyBuilder:
         ]
 
         # Default parameters
-        default_params = {
-            p["name"]: p["default"] for p in definition.get("parameters", [])
-        }
+        default_params = {p["name"]: p["default"] for p in definition.get("parameters", [])}
         if parameters:
             default_params.update(parameters)
 
@@ -914,16 +898,14 @@ class StrategyBuilder:
 
         # Check for data source
         has_data_source = any(
-            b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA]
-            for b in graph.blocks.values()
+            b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA] for b in graph.blocks.values()
         )
         if not has_data_source:
             errors.append("Strategy needs a data source block")
 
         # Check for output
         has_output = any(
-            b.block_type
-            in [BlockType.OUTPUT_SIGNAL, BlockType.ACTION_BUY, BlockType.ACTION_SELL]
+            b.block_type in [BlockType.OUTPUT_SIGNAL, BlockType.ACTION_BUY, BlockType.ACTION_SELL]
             for b in graph.blocks.values()
         )
         if not has_output:
@@ -934,15 +916,11 @@ class StrategyBuilder:
         for conn in graph.connections:
             # Check source exists
             if conn.source_block_id not in graph.blocks:
-                errors.append(
-                    f"Connection references non-existent source block: {conn.source_block_id}"
-                )
+                errors.append(f"Connection references non-existent source block: {conn.source_block_id}")
 
             # Check target exists
             if conn.target_block_id not in graph.blocks:
-                errors.append(
-                    f"Connection references non-existent target block: {conn.target_block_id}"
-                )
+                errors.append(f"Connection references non-existent target block: {conn.target_block_id}")
 
             connected_inputs.add((conn.target_block_id, conn.target_input))
 
@@ -950,9 +928,7 @@ class StrategyBuilder:
         for block_id, block in graph.blocks.items():
             for inp in block.inputs:
                 if inp.required and (block_id, inp.name) not in connected_inputs:
-                    errors.append(
-                        f"Block '{block.name}' has unconnected required input: {inp.name}"
-                    )
+                    errors.append(f"Block '{block.name}' has unconnected required input: {inp.name}")
 
         # Check for cycles
         try:

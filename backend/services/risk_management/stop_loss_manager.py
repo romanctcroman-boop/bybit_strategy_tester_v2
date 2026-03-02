@@ -93,9 +93,7 @@ class StopLossOrder:
             "state": self.state.value,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "triggered_at": self.triggered_at.isoformat()
-            if self.triggered_at
-            else None,
+            "triggered_at": self.triggered_at.isoformat() if self.triggered_at else None,
             "triggered_price": self.triggered_price,
             "trail_distance": self.trail_distance,
             "trail_percent": self.trail_percent,
@@ -248,8 +246,7 @@ class StopLossManager:
             trail_percent=trail_percent or self.config.trail_percent,
             highest_price=entry_price,
             lowest_price=entry_price,
-            breakeven_trigger_pct=breakeven_trigger_pct
-            or self.config.breakeven_trigger_pct,
+            breakeven_trigger_pct=breakeven_trigger_pct or self.config.breakeven_trigger_pct,
             breakeven_offset=self.config.breakeven_offset,
             time_limit=time_limit or self.config.max_hold_time,
             atr_multiplier=atr_multiplier or self.config.atr_multiplier,
@@ -262,8 +259,7 @@ class StopLossManager:
 
         self.stops[stop_id] = stop
         logger.info(
-            f"Created {stop_type.value} stop for {symbol} {side}: "
-            f"entry=${entry_price:.2f}, stop=${stop_price:.2f}"
+            f"Created {stop_type.value} stop for {symbol} {side}: entry=${entry_price:.2f}, stop=${stop_price:.2f}"
         )
 
         return stop
@@ -333,9 +329,7 @@ class StopLossManager:
         stop.triggered_price = price
 
         logger.warning(
-            f"Stop triggered for {stop.symbol}: "
-            f"reason={reason}, price=${price:.2f}, "
-            f"entry=${stop.entry_price:.2f}"
+            f"Stop triggered for {stop.symbol}: reason={reason}, price=${price:.2f}, entry=${stop.entry_price:.2f}"
         )
 
         # Callback
@@ -369,10 +363,7 @@ class StopLossManager:
 
         if stop.current_stop != old_stop:
             stop.updated_at = datetime.now(UTC)
-            logger.debug(
-                f"Trailing stop moved: {stop.symbol} "
-                f"${old_stop:.2f} -> ${stop.current_stop:.2f}"
-            )
+            logger.debug(f"Trailing stop moved: {stop.symbol} ${old_stop:.2f} -> ${stop.current_stop:.2f}")
             if self.on_stop_moved:
                 self.on_stop_moved(stop, old_stop)
 
@@ -460,10 +451,7 @@ class StopLossManager:
             if stop.is_at_breakeven:
                 stop.state = StopLossState.MOVED_TO_BREAKEVEN
                 stop.updated_at = datetime.now(UTC)
-                logger.info(
-                    f"Stop moved to breakeven for {stop.symbol}: "
-                    f"${old_stop:.2f} -> ${stop.current_stop:.2f}"
-                )
+                logger.info(f"Stop moved to breakeven for {stop.symbol}: ${old_stop:.2f} -> ${stop.current_stop:.2f}")
                 if self.on_stop_moved:
                     self.on_stop_moved(stop, old_stop)
 
@@ -477,11 +465,7 @@ class StopLossManager:
 
     def get_active_stops(self) -> list[StopLossOrder]:
         """Get all active stops."""
-        return [
-            s
-            for s in self.stops.values()
-            if s.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN)
-        ]
+        return [s for s in self.stops.values() if s.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN)]
 
     def cancel_stop(self, stop_id: str) -> bool:
         """Cancel a stop order."""
@@ -557,12 +541,7 @@ class StopLossManager:
         return {
             "total_stops": len(self.stops),
             "active_stops": len(active),
-            "stops_by_type": {
-                t.value: len([s for s in active if s.stop_type == t])
-                for t in StopLossType
-            },
+            "stops_by_type": {t.value: len([s for s in active if s.stop_type == t]) for t in StopLossType},
             "at_breakeven": len([s for s in active if s.is_at_breakeven]),
-            "triggered_count": len(
-                [s for s in self.stops.values() if s.state == StopLossState.TRIGGERED]
-            ),
+            "triggered_count": len([s for s in self.stops.values() if s.state == StopLossState.TRIGGERED]),
         }

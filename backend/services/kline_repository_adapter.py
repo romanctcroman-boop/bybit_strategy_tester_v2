@@ -59,17 +59,11 @@ class RepositoryMetrics:
         stats = self._stats.copy()
         # Calculate averages
         if stats["get_klines_calls"] > 0:
-            stats["get_klines_avg_ms"] = (
-                stats["get_klines_total_ms"] / stats["get_klines_calls"]
-            )
+            stats["get_klines_avg_ms"] = stats["get_klines_total_ms"] / stats["get_klines_calls"]
         if stats["get_coverage_calls"] > 0:
-            stats["get_coverage_avg_ms"] = (
-                stats["get_coverage_total_ms"] / stats["get_coverage_calls"]
-            )
+            stats["get_coverage_avg_ms"] = stats["get_coverage_total_ms"] / stats["get_coverage_calls"]
         if stats["bulk_upsert_calls"] > 0:
-            stats["bulk_upsert_avg_ms"] = (
-                stats["bulk_upsert_total_ms"] / stats["bulk_upsert_calls"]
-            )
+            stats["bulk_upsert_avg_ms"] = stats["bulk_upsert_total_ms"] / stats["bulk_upsert_calls"]
         return stats
 
 
@@ -115,9 +109,7 @@ class RepositoryAdapter:
     def session_factory(self):
         """Lazy session factory creation."""
         if self._session_factory is None:
-            self._session_factory = sessionmaker(
-                bind=self.engine, expire_on_commit=False
-            )
+            self._session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
         return self._session_factory
 
     @contextmanager
@@ -184,9 +176,7 @@ class RepositoryAdapter:
             duration_ms = (time.perf_counter() - start_time_perf) * 1000
             self._metrics.record_get_klines(duration_ms)
 
-    def get_coverage(
-        self, symbol: str, interval: str
-    ) -> tuple[int, int, int] | None:
+    def get_coverage(self, symbol: str, interval: str) -> tuple[int, int, int] | None:
         """
         Get database coverage using Repository pattern.
 
@@ -235,9 +225,7 @@ class RepositoryAdapter:
                 expected_interval_ms=expected_interval_ms,
             )
 
-    def bulk_upsert(
-        self, symbol: str, interval: str, candles: list[dict[str, Any]]
-    ) -> tuple[int, int]:
+    def bulk_upsert(self, symbol: str, interval: str, candles: list[dict[str, Any]]) -> tuple[int, int]:
         """
         Bulk upsert klines using Repository pattern.
 

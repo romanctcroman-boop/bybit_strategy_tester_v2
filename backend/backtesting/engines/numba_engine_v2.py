@@ -39,16 +39,14 @@ except ImportError:
     logger.warning("Numba not available, falling back to Python")
 
 from backend.backtesting.formulas import (
-    ANNUALIZATION_HOURLY,
     calc_calmar,
     calc_expectancy,
     calc_max_drawdown,
     calc_payoff_ratio,
     calc_profit_factor,
     calc_recovery_factor,
-    calc_returns_from_equity,
-    calc_sharpe,
-    calc_sortino,
+    calc_sharpe_monthly_tv,
+    calc_sortino_monthly_tv,
 )
 from backend.backtesting.interfaces import (
     BacktestInput,
@@ -3015,7 +3013,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         )
 
         # Calculate metrics
-        metrics = self._calculate_metrics(trades, equity_curve, input_data.initial_capital)
+        metrics = self._calculate_metrics(trades, equity_curve, input_data.initial_capital, candles_index=candles.index)
 
         execution_time = time.time() - start_time
 
@@ -3319,9 +3317,12 @@ class NumbaEngineV2(BaseBacktestEngine):
                 # Fallback estimate
                 pnl_pct = (pnl / (entry_price * 0.01)) if entry_price > 0 else 0.0
 
+            # entry_idxs stores the signal bar (i); execution is at open[i+1]
+            entry_exec_idx = min(int(entry_idxs[i]) + 1, len(timestamps) - 1)
+
             trades.append(
                 TradeRecord(
-                    entry_time=pd.Timestamp(timestamps[entry_idxs[i]]),
+                    entry_time=pd.Timestamp(timestamps[entry_exec_idx]),
                     exit_time=pd.Timestamp(timestamps[exit_idxs[i]]),
                     direction="long" if directions[i] == 1 else "short",
                     entry_price=entry_price,
@@ -3342,6 +3343,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         trades: list[TradeRecord],
         equity_curve: np.ndarray,
         initial_capital: float,
+        candles_index=None,
     ) -> BacktestMetrics:
         """Calculate metrics from results - FULL VERSION matching Fallback"""
         metrics = BacktestMetrics()
@@ -3397,12 +3399,8 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         metrics.long_trades = len(long_trades)
         metrics.short_trades = len(short_trades)
-        metrics.long_win_rate = (
-            sum(1 for t in long_trades if t.pnl > 0) / len(long_trades) if long_trades else 0.0
-        )
-        metrics.short_win_rate = (
-            sum(1 for t in short_trades if t.pnl > 0) / len(short_trades) if short_trades else 0.0
-        )
+        metrics.long_win_rate = sum(1 for t in long_trades if t.pnl > 0) / len(long_trades) if long_trades else 0.0
+        metrics.short_win_rate = sum(1 for t in short_trades if t.pnl > 0) / len(short_trades) if short_trades else 0.0
         metrics.long_profit = sum(t.pnl for t in long_trades)
         metrics.short_profit = sum(t.pnl for t in short_trades)
 
@@ -3416,10 +3414,9 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics.avg_losing_duration = float(np.mean(losing_durations)) if losing_durations else 0.0
 
         # === RISK-ADJUSTED RATIOS (via formulas.py — TV-parity) ===
-        returns = calc_returns_from_equity(equity_curve)
-
-        metrics.sharpe_ratio = calc_sharpe(returns, annualization_factor=ANNUALIZATION_HOURLY)
-        metrics.sortino_ratio = calc_sortino(returns, annualization_factor=ANNUALIZATION_HOURLY)
+        # TradingView uses MONTHLY returns bucketed by trade entry_time (not equity_curve).
+        metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
+        metrics.sortino_ratio = calc_sortino_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
 
         # Calmar: using total_return and max_drawdown
         bars_per_year = 365 * 24

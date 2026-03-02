@@ -480,9 +480,16 @@ class PyramidingManager:
         exit_fee = closed_size * exit_price * taker_fee
         fees = entry_fee + exit_fee
         net_pnl = gross_pnl - fees
-        # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
-        position_value = closed_size * avg_price
-        pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
+        
+        # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
+        # Formula: ((exit - entry) / entry) × sign
+        if avg_price > 0:
+            if direction == "long":
+                pnl_pct = (exit_price - avg_price) / avg_price
+            else:
+                pnl_pct = (avg_price - exit_price) / avg_price
+        else:
+            pnl_pct = 0.0
 
         return {
             "entry_time": first_time,
@@ -541,9 +548,16 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
-            # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
-            position_value = total_size * avg_price
-            pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
+            
+            # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
+            # Formula: ((exit - entry) / entry) × sign
+            if avg_price > 0:
+                if direction == "long":
+                    pnl_pct = (exit_price - avg_price) / avg_price
+                else:
+                    pnl_pct = (avg_price - exit_price) / avg_price
+            else:
+                pnl_pct = 0.0
 
             trades.append(
                 {
@@ -575,9 +589,16 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
-            # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
-            position_value = total_size * avg_price
-            pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
+            
+            # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
+            # Formula: ((exit - entry) / entry) × sign
+            if avg_price > 0:
+                if direction == "long":
+                    pnl_pct = (exit_price - avg_price) / avg_price
+                else:
+                    pnl_pct = (avg_price - exit_price) / avg_price
+            else:
+                pnl_pct = 0.0
 
             trades.append(
                 {
@@ -610,9 +631,16 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
-                # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
-                position_value = entry.size * entry.entry_price
-                pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
+                
+                # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
+                # Formula: ((exit - entry) / entry) × sign
+                if entry.entry_price > 0:
+                    if direction == "long":
+                        pnl_pct = (exit_price - entry.entry_price) / entry.entry_price
+                    else:
+                        pnl_pct = (entry.entry_price - exit_price) / entry.entry_price
+                else:
+                    pnl_pct = 0.0
 
                 trades.append(
                     {
@@ -645,9 +673,16 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
-                # TV-compatible pnl_pct = net_pnl / position_value (includes commission impact)
-                position_value = entry.size * entry.entry_price
-                pnl_pct = net_pnl / position_value if position_value != 0 else 0.0
+                
+                # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
+                # Formula: ((exit - entry) / entry) × sign
+                if entry.entry_price > 0:
+                    if direction == "long":
+                        pnl_pct = (exit_price - entry.entry_price) / entry.entry_price
+                    else:
+                        pnl_pct = (entry.entry_price - exit_price) / entry.entry_price
+                else:
+                    pnl_pct = 0.0
 
                 trades.append(
                     {

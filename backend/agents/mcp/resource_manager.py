@@ -157,9 +157,7 @@ class FileResourceProvider(ResourceProvider):
                         type=ResourceType.FILE,
                         mime_type=self._get_mime_type(path.suffix),
                         size_bytes=stat.st_size,
-                        modified_at=datetime.fromtimestamp(
-                            stat.st_mtime, tz=UTC
-                        ),
+                        modified_at=datetime.fromtimestamp(stat.st_mtime, tz=UTC),
                     )
                 )
 
@@ -344,9 +342,7 @@ class ResourceManager:
         self.providers.append(provider)
         logger.debug(f"Added provider: {type(provider).__name__}")
 
-    async def list_resources(
-        self, type_filter: ResourceType | None = None
-    ) -> list[Resource]:
+    async def list_resources(self, type_filter: ResourceType | None = None) -> list[Resource]:
         """List all resources from all providers"""
         all_resources = []
 

@@ -39,16 +39,12 @@ class ConnectionManager:
     async def connect(self, client_id: str, websocket: WebSocket):
         await websocket.accept()
         self.active_connections[client_id] = websocket
-        logger.info(
-            f"Client {client_id} connected. Total: {len(self.active_connections)}"
-        )
+        logger.info(f"Client {client_id} connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
             del self.active_connections[client_id]
-            logger.info(
-                f"Client {client_id} disconnected. Total: {len(self.active_connections)}"
-            )
+            logger.info(f"Client {client_id} disconnected. Total: {len(self.active_connections)}")
 
     async def send_personal_message(self, message: dict, client_id: str):
         if client_id in self.active_connections:
@@ -72,9 +68,7 @@ manager = ConnectionManager()
 
 # Pydantic models для API
 class AgentMessageRequest(BaseModel):
-    from_agent: str = Field(
-        ..., description="Отправитель (deepseek, perplexity, copilot)"
-    )
+    from_agent: str = Field(..., description="Отправитель (deepseek, perplexity, copilot)")
     to_agent: str = Field(..., description="Получатель")
     message_type: str = Field(default="query", description="Тип сообщения")
     content: str = Field(..., description="Содержимое сообщения")
@@ -140,9 +134,7 @@ communicator = AgentToAgentCommunicator()
 
 
 @router.post("/send", response_model=AgentMessageResponse)
-async def send_to_agent(
-    request: AgentMessageRequest, background_tasks: BackgroundTasks
-):
+async def send_to_agent(request: AgentMessageRequest, background_tasks: BackgroundTasks):
     """
     Отправить сообщение от одного агента к другому
 
@@ -171,9 +163,7 @@ async def send_to_agent(
             max_iterations=request.max_iterations,
         )
 
-        logger.info(
-            f"Routing message {message.message_id}: {request.from_agent} → {request.to_agent}"
-        )
+        logger.info(f"Routing message {message.message_id}: {request.from_agent} → {request.to_agent}")
 
         # Отправка через communicator
         response = await communicator.route_message(message)
@@ -375,9 +365,7 @@ async def get_multi_agent_consensus(request: ConsensusRequest):
         agent_types = [AgentType(agent) for agent in request.agents]
 
         # Получение консенсуса
-        result = await communicator.parallel_consensus(
-            question=request.question, agents=agent_types
-        )
+        result = await communicator.parallel_consensus(question=request.question, agents=agent_types)
 
         return {
             "consensus": result["consensus"],
@@ -409,9 +397,7 @@ async def iterative_code_improvement(request: IterativeImprovementRequest):
     ```
     """
     try:
-        logger.info(
-            f"Starting iterative improvement (max {request.max_iterations} iterations)"
-        )
+        logger.info(f"Starting iterative improvement (max {request.max_iterations} iterations)")
 
         result = await communicator.iterative_improvement(
             initial_task=request.initial_task,
@@ -430,9 +416,7 @@ async def iterative_code_improvement(request: IterativeImprovementRequest):
             "improvement_summary": {
                 "total_iterations": len(result["iterations"]),
                 "confidence_improvement": result["final_confidence"]
-                - (
-                    result["iterations"][0]["confidence"] if result["iterations"] else 0
-                ),
+                - (result["iterations"][0]["confidence"] if result["iterations"] else 0),
                 "achieved_target": result["final_confidence"] >= request.min_confidence,
             },
         }
@@ -530,9 +514,7 @@ async def get_statistics():
     return {
         "websocket_connections": len(manager.active_connections),
         "active_conversations": len(manager.conversation_subscribers),
-        "total_subscribers": sum(
-            len(subs) for subs in manager.conversation_subscribers.values()
-        ),
+        "total_subscribers": sum(len(subs) for subs in manager.conversation_subscribers.values()),
     }
 
 
@@ -626,13 +608,9 @@ async def get_all_metrics(hours: int = 24):
             "agents": result,
             "summary": {
                 "total_agents": len(result),
-                "total_requests": sum(
-                    p.total_requests for p in all_performance.values()
-                ),
+                "total_requests": sum(p.total_requests for p in all_performance.values()),
                 "avg_success_rate": round(
-                    sum(p.success_rate for p in all_performance.values())
-                    / len(all_performance)
-                    * 100
+                    sum(p.success_rate for p in all_performance.values()) / len(all_performance) * 100
                     if all_performance
                     else 0,
                     2,
@@ -654,15 +632,9 @@ async def get_all_metrics(hours: int = 24):
 class FileEditRequest(BaseModel):
     """Запрос на редактирование файла через AI Agent"""
 
-    file_path: str = Field(
-        ..., description="Путь к файлу (абсолютный или относительный)"
-    )
-    content: str | None = Field(
-        None, description="Новое содержимое (если None - прочитать)"
-    )
-    agent: str = Field(
-        "deepseek", description="AI агент для анализа (deepseek/perplexity)"
-    )
+    file_path: str = Field(..., description="Путь к файлу (абсолютный или относительный)")
+    content: str | None = Field(None, description="Новое содержимое (если None - прочитать)")
+    agent: str = Field("deepseek", description="AI агент для анализа (deepseek/perplexity)")
     instruction: str | None = Field(None, description="Инструкция для рефакторинга")
     mode: str = Field("read", description="Режим: read, write, refactor, analyze")
 
@@ -750,9 +722,7 @@ async def edit_file_with_agent(request: FileEditRequest):
                 success=True,
                 file_path=str(file_path),
                 mode="write",
-                content=request.content[:500] + "..."
-                if len(request.content) > 500
-                else request.content,
+                content=request.content[:500] + "..." if len(request.content) > 500 else request.content,
                 changes_applied=True,
             )
 
@@ -782,9 +752,7 @@ LINES: {len(current_content.splitlines())}
 
             agent_message = AgentMessage(
                 from_agent=AgentType.COPILOT,
-                to_agent=AgentType.DEEPSEEK
-                if request.agent == "deepseek"
-                else AgentType.PERPLEXITY,
+                to_agent=AgentType.DEEPSEEK if request.agent == "deepseek" else AgentType.PERPLEXITY,
                 message_type=MessageType.QUERY,
                 content=prompt,
             )
@@ -797,9 +765,7 @@ LINES: {len(current_content.splitlines())}
                 # Попытаться извлечь код из markdown code block
                 import re
 
-                code_match = re.search(
-                    r"```(?:python)?\n(.*?)\n```", agent_analysis, re.DOTALL
-                )
+                code_match = re.search(r"```(?:python)?\n(.*?)\n```", agent_analysis, re.DOTALL)
 
                 if code_match:
                     refactored_code = code_match.group(1)
@@ -840,6 +806,4 @@ LINES: {len(current_content.splitlines())}
 
     except Exception as e:
         logger.error(f"❌ File edit error: {e}", exc_info=True)
-        return FileEditResponse(
-            success=False, file_path=request.file_path, mode=request.mode, error=str(e)
-        )
+        return FileEditResponse(success=False, file_path=request.file_path, mode=request.mode, error=str(e))

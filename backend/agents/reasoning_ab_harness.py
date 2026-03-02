@@ -90,9 +90,7 @@ class ReasoningABHarness:
         Returns:
             Test ID
         """
-        test_id = (
-            f"abtest_{config.test_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
+        test_id = f"abtest_{config.test_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self._active_tests[test_id] = config
         self._results[test_id] = []
 
@@ -227,9 +225,7 @@ class ReasoningABHarness:
         # Calculate averages
         aggregated = {}
         for key in metric_keys:
-            values = [
-                r["metrics"].get(key, 0) for r in results if key in r.get("metrics", {})
-            ]
+            values = [r["metrics"].get(key, 0) for r in results if key in r.get("metrics", {})]
             if values:
                 aggregated[key] = sum(values) / len(values)
 
@@ -252,12 +248,8 @@ class ReasoningABHarness:
             del self._active_tests[test_id]
 
         logger.info(f"Stopped A/B test: {test_id}")
-        logger.info(
-            f"  Winner: {results.winner} (confidence: {results.confidence:.2%})"
-        )
-        logger.info(
-            f"  Sample sizes: A={results.sample_size_a}, B={results.sample_size_b}"
-        )
+        logger.info(f"  Winner: {results.winner} (confidence: {results.confidence:.2%})")
+        logger.info(f"  Sample sizes: A={results.sample_size_a}, B={results.sample_size_b}")
 
         return results
 

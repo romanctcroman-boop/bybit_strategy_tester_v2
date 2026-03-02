@@ -80,9 +80,7 @@ class TickAggregator:
     def __init__(self, ticks_per_bar: int = 100):
         self.ticks_per_bar = ticks_per_bar
         self.current_trades: list[Trade] = []
-        self.completed_candles: deque[TickCandle] = deque(
-            maxlen=500
-        )  # Reduced for memory
+        self.completed_candles: deque[TickCandle] = deque(maxlen=500)  # Reduced for memory
 
         # Cached incremental values
         self._current_high = 0.0
@@ -203,9 +201,7 @@ class TickAggregatorService:
             decode_responses=True,
         )
 
-        logger.info(
-            f"Started TickAggregator: {self.symbol}, {self.ticks_per_bar} ticks/bar"
-        )
+        logger.info(f"Started TickAggregator: {self.symbol}, {self.ticks_per_bar} ticks/bar")
 
         # Start listening
         self._task = asyncio.create_task(self._listen_loop())
@@ -273,8 +269,7 @@ class TickAggregatorService:
 
         if self._stats["candles_published"] % 10 == 0:
             logger.info(
-                f"Aggregator {self.symbol}/{self.ticks_per_bar}: "
-                f"{self._stats['candles_published']} candles published"
+                f"Aggregator {self.symbol}/{self.ticks_per_bar}: {self._stats['candles_published']} candles published"
             )
 
     def get_stats(self) -> dict:

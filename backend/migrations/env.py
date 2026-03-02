@@ -59,9 +59,7 @@ def run_migrations_offline():
         raw = None
         try:
             # config.file_config is a ConfigParser; use raw=True to disable interpolation
-            raw = config.file_config.get(
-                config.config_ini_section, "sqlalchemy.url", raw=True
-            )
+            raw = config.file_config.get(config.config_ini_section, "sqlalchemy.url", raw=True)
         except Exception:
             # Fall back to alembic's accessor which may attempt interpolation; guard it
             try:
@@ -72,10 +70,7 @@ def run_migrations_offline():
         if not raw:
             return None
         # If the ini contains a common placeholder token, treat as unset
-        if any(
-            tok in raw
-            for tok in ("%(DATABASE_URL)s", "${DATABASE_URL}", "driver://", "user:pass")
-        ):
+        if any(tok in raw for tok in ("%(DATABASE_URL)s", "${DATABASE_URL}", "driver://", "user:pass")):
             return None
         return raw
 
@@ -107,9 +102,7 @@ def run_migrations_online():
         # Read raw value from ini to avoid interpolation errors (same approach as offline)
         raw = None
         try:
-            raw = config.file_config.get(
-                config.config_ini_section, "sqlalchemy.url", raw=True
-            )
+            raw = config.file_config.get(config.config_ini_section, "sqlalchemy.url", raw=True)
         except Exception:
             try:
                 raw = config.get_main_option("sqlalchemy.url")
@@ -118,10 +111,7 @@ def run_migrations_online():
 
         if not raw:
             return None
-        if any(
-            tok in raw
-            for tok in ("%(DATABASE_URL)s", "${DATABASE_URL}", "driver://", "user:pass")
-        ):
+        if any(tok in raw for tok in ("%(DATABASE_URL)s", "${DATABASE_URL}", "driver://", "user:pass")):
             return None
         return raw
 

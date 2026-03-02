@@ -254,9 +254,7 @@ class FeatureEngineering:
                     try:
                         generated = generator(open_prices, high, low, close, volume)
                         for name, array in generated.items():
-                            features.append(
-                                Feature(name=name, feature_type=feature_type)
-                            )
+                            features.append(Feature(name=name, feature_type=feature_type))
                             feature_arrays.append(array)
                     except Exception:
                         continue
@@ -268,17 +266,13 @@ class FeatureEngineering:
             # Calculate feature importance if target provided
             importance = {}
             if target is not None:
-                importance = self._calculate_importance(
-                    feature_matrix, target, features
-                )
+                importance = self._calculate_importance(feature_matrix, target, features)
                 for feat in features:
                     feat.importance = importance.get(feat.name, 0.0)
 
             # Select top features
             if len(features) > self.config.max_features:
-                sorted_features = sorted(
-                    features, key=lambda f: f.importance, reverse=True
-                )
+                sorted_features = sorted(features, key=lambda f: f.importance, reverse=True)
                 features = sorted_features[: self.config.max_features]
                 indices = [i for i, f in enumerate(sorted_features) if f in features]
                 feature_matrix = feature_matrix[:, indices]
@@ -361,7 +355,7 @@ class FeatureEngineering:
             roc = np.full(len(close), np.nan)
             roc[period:] = (close[period:] - close[:-period]) / close[:-period] * 100
             features[f"roc_{period}"] = roc
-        return features
+        return features  # type: ignore[return-value]
 
     def _generate_momentum(
         self,
@@ -377,7 +371,7 @@ class FeatureEngineering:
             mom = np.full(len(close), np.nan)
             mom[period:] = close[period:] - close[:-period]
             features[f"momentum_{period}"] = mom
-        return features
+        return features  # type: ignore[return-value]
 
     def _generate_tsi(
         self,
@@ -392,9 +386,7 @@ class FeatureEngineering:
         double_smooth_pc = self._ewma(self._ewma(price_change, 25), 13)
         double_smooth_abs_pc = self._ewma(self._ewma(np.abs(price_change), 25), 13)
 
-        tsi = np.where(
-            double_smooth_abs_pc != 0, 100 * double_smooth_pc / double_smooth_abs_pc, 0
-        )
+        tsi = np.where(double_smooth_abs_pc != 0, 100 * double_smooth_pc / double_smooth_abs_pc, 0)
         tsi = np.insert(tsi, 0, np.nan)
 
         return {"tsi": tsi}
@@ -424,9 +416,7 @@ class FeatureEngineering:
         for fast, slow in pairs:
             if fast in smas and slow in smas:
                 features[f"sma_{fast}_{slow}_diff"] = smas[fast] - smas[slow]
-                features[f"sma_{fast}_{slow}_ratio"] = np.where(
-                    smas[slow] != 0, smas[fast] / smas[slow], 1
-                )
+                features[f"sma_{fast}_{slow}_ratio"] = np.where(smas[slow] != 0, smas[fast] / smas[slow], 1)
                 # Crossover signal
                 cross = np.zeros(len(close))
                 diff = smas[fast] - smas[slow]
@@ -736,9 +726,7 @@ class FeatureEngineering:
 
         for period in [10, 20, 50]:
             vol_sma = self._sma(volume, period)
-            features[f"vol_ratio_{period}"] = volume / np.where(
-                vol_sma != 0, vol_sma, 1
-            )
+            features[f"vol_ratio_{period}"] = volume / np.where(vol_sma != 0, vol_sma, 1)
 
         # Volume trend
         vol_change = np.diff(volume)
@@ -777,28 +765,26 @@ class FeatureEngineering:
         }
 
         # Doji detection
-        features["is_doji"] = (
-            np.abs(body) / np.where(total_range != 0, total_range, 1) < 0.1
-        ).astype(float)
+        features["is_doji"] = (np.abs(body) / np.where(total_range != 0, total_range, 1) < 0.1).astype(float)
 
         # Hammer/shooting star
-        features["is_hammer"] = (
-            (lower_wick > 2 * np.abs(body)) & (upper_wick < 0.5 * np.abs(body))
-        ).astype(float)
+        features["is_hammer"] = ((lower_wick > 2 * np.abs(body)) & (upper_wick < 0.5 * np.abs(body))).astype(float)
 
-        features["is_shooting_star"] = (
-            (upper_wick > 2 * np.abs(body)) & (lower_wick < 0.5 * np.abs(body))
-        ).astype(float)
+        features["is_shooting_star"] = ((upper_wick > 2 * np.abs(body)) & (lower_wick < 0.5 * np.abs(body))).astype(
+            float
+        )
 
         # Engulfing
         engulfing = np.zeros(n)
         for i in range(1, n):
-            if body[i] > 0 and body[i - 1] < 0:  # Bullish engulfing
-                if open_p[i] < close[i - 1] and close[i] > open_p[i - 1]:
-                    engulfing[i] = 1
-            elif body[i] < 0 and body[i - 1] > 0:  # Bearish engulfing
-                if open_p[i] > close[i - 1] and close[i] < open_p[i - 1]:
-                    engulfing[i] = -1
+            if (
+                body[i] > 0 and body[i - 1] < 0 and open_p[i] < close[i - 1] and close[i] > open_p[i - 1]
+            ):  # Bullish engulfing
+                engulfing[i] = 1
+            elif (
+                body[i] < 0 and body[i - 1] > 0 and open_p[i] > close[i - 1] and close[i] < open_p[i - 1]
+            ):  # Bearish engulfing
+                engulfing[i] = -1
 
         features["engulfing"] = engulfing
 
@@ -854,7 +840,7 @@ class FeatureEngineering:
             if rng > 0:
                 features["range_position"][i] = (close[i] - ll) / rng
 
-        return features
+        return features  # type: ignore[return-value]
 
     # -------------------------------------------------------------------------
     # STATISTICAL FEATURES
@@ -897,7 +883,7 @@ class FeatureEngineering:
                 pct_rank[i] = (np.sum(window < close[i]) / period) * 100
             features[f"pct_rank_{period}"] = pct_rank
 
-        return features
+        return features  # type: ignore[return-value]
 
     def _generate_skew_kurt(
         self,
@@ -1095,9 +1081,7 @@ class DecisionTreeModel(BaseModel):
                 var_before = np.var(y)
                 var_left = np.var(y[left_mask])
                 var_right = np.var(y[right_mask])
-                var_after = (
-                    left_mask.sum() * var_left + right_mask.sum() * var_right
-                ) / n_samples
+                var_after = (left_mask.sum() * var_left + right_mask.sum() * var_right) / n_samples
 
                 gain = var_before - var_after
 
@@ -1188,9 +1172,7 @@ class ModelSelector:
         self._best_model: BaseModel | None = None
         self._best_score: float = -np.inf
 
-    def select_model(
-        self, X_train: NDArray, y_train: NDArray, X_val: NDArray, y_val: NDArray
-    ) -> BaseModel:
+    def select_model(self, X_train: NDArray, y_train: NDArray, X_val: NDArray, y_val: NDArray) -> BaseModel:
         """
         Select best model from candidates.
 
@@ -1229,7 +1211,7 @@ class ModelSelector:
 
     def _generate_candidates(self) -> list[BaseModel]:
         """Generate model candidates with different hyperparameters."""
-        candidates = []
+        candidates: list[BaseModel] = []
 
         if ModelType.LINEAR in self.config.model_types:
             for reg in [0.001, 0.01, 0.1, 1.0]:
@@ -1238,11 +1220,7 @@ class ModelSelector:
         if ModelType.TREE in self.config.model_types:
             for depth in [3, 5, 7]:
                 for min_samples in [5, 10, 20]:
-                    candidates.append(
-                        DecisionTreeModel(
-                            max_depth=depth, min_samples_split=min_samples
-                        )
-                    )
+                    candidates.append(DecisionTreeModel(max_depth=depth, min_samples_split=min_samples))
 
         if ModelType.ENSEMBLE in self.config.model_types:
             for n_est in [5, 10, 20]:
@@ -1290,12 +1268,8 @@ class StrategyEvolver:
         entry_features = random.sample(self.feature_names, n_entry_features)
         exit_features = random.sample(self.feature_names, n_exit_features)
 
-        entry_thresholds = {
-            f: (random.uniform(-2, 0), random.uniform(0, 2)) for f in entry_features
-        }
-        exit_thresholds = {
-            f: (random.uniform(-2, 0), random.uniform(0, 2)) for f in exit_features
-        }
+        entry_thresholds = {f: (random.uniform(-2, 0), random.uniform(0, 2)) for f in entry_features}
+        exit_thresholds = {f: (random.uniform(-2, 0), random.uniform(0, 2)) for f in exit_features}
 
         return StrategyGenome(
             entry_features=entry_features,
@@ -1310,9 +1284,7 @@ class StrategyEvolver:
             strategy_id=f"gen0_{random.randint(1000, 9999)}",
         )
 
-    def evolve(
-        self, features: NDArray, prices: NDArray, n_generations: int | None = None
-    ) -> StrategyGenome:
+    def evolve(self, features: NDArray, prices: NDArray, n_generations: int | None = None) -> StrategyGenome:
         """
         Run genetic algorithm evolution.
 
@@ -1340,10 +1312,7 @@ class StrategyEvolver:
             self._population.sort(key=lambda g: g.fitness, reverse=True)
 
             # Update best
-            if (
-                self._best_genome is None
-                or self._population[0].fitness > self._best_genome.fitness
-            ):
+            if self._best_genome is None or self._population[0].fitness > self._best_genome.fitness:
                 self._best_genome = copy.deepcopy(self._population[0])
 
             # Selection and reproduction
@@ -1351,9 +1320,7 @@ class StrategyEvolver:
 
             # Elitism
             n_elite = int(self.config.elitism_ratio * self.config.population_size)
-            new_population.extend(
-                [copy.deepcopy(g) for g in self._population[:n_elite]]
-            )
+            new_population.extend([copy.deepcopy(g) for g in self._population[:n_elite]])
 
             # Crossover and mutation
             while len(new_population) < self.config.population_size:
@@ -1381,9 +1348,7 @@ class StrategyEvolver:
         for genome in self._population:
             genome.fitness = self._calculate_fitness(genome, features, prices)
 
-    def _calculate_fitness(
-        self, genome: StrategyGenome, features: NDArray, prices: NDArray
-    ) -> float:
+    def _calculate_fitness(self, genome: StrategyGenome, features: NDArray, prices: NDArray) -> float:
         """Calculate fitness score for a genome."""
         try:
             # Generate signals
@@ -1404,9 +1369,7 @@ class StrategyEvolver:
             elif self.config.fitness_metric == "sortino":
                 mean_ret = np.mean(returns) * 252
                 neg_returns = returns[returns < 0]
-                downside_std = (
-                    np.std(neg_returns) * np.sqrt(252) if len(neg_returns) > 0 else 0.01
-                )
+                downside_std = np.std(neg_returns) * np.sqrt(252) if len(neg_returns) > 0 else 0.01
                 return mean_ret / downside_std
 
             elif self.config.fitness_metric == "profit_factor":
@@ -1426,16 +1389,8 @@ class StrategyEvolver:
         signals = np.zeros(n)
 
         # Get feature indices
-        entry_indices = [
-            self.feature_names.index(f)
-            for f in genome.entry_features
-            if f in self.feature_names
-        ]
-        exit_indices = [
-            self.feature_names.index(f)
-            for f in genome.exit_features
-            if f in self.feature_names
-        ]
+        entry_indices = [self.feature_names.index(f) for f in genome.entry_features if f in self.feature_names]
+        exit_indices = [self.feature_names.index(f) for f in genome.exit_features if f in self.feature_names]
 
         for i in range(n):
             # Entry conditions
@@ -1470,9 +1425,7 @@ class StrategyEvolver:
 
         return signals
 
-    def _simulate_trading(
-        self, genome: StrategyGenome, signals: NDArray, prices: NDArray
-    ) -> NDArray:
+    def _simulate_trading(self, genome: StrategyGenome, signals: NDArray, prices: NDArray) -> NDArray:
         """Simple trading simulation."""
         returns = []
         position = 0
@@ -1488,11 +1441,7 @@ class StrategyEvolver:
                 # Check exit
                 pnl_pct = (prices[i] - entry_price) / entry_price
 
-                if (
-                    signals[i] == -1
-                    or pnl_pct <= -genome.stop_loss
-                    or pnl_pct >= genome.take_profit
-                ):
+                if signals[i] == -1 or pnl_pct <= -genome.stop_loss or pnl_pct >= genome.take_profit:
                     returns.append(pnl_pct * genome.position_size_factor)
                     position = 0
 
@@ -1503,17 +1452,13 @@ class StrategyEvolver:
         tournament = random.sample(self._population, self.config.tournament_size)
         return max(tournament, key=lambda g: g.fitness)
 
-    def _crossover(
-        self, parent1: StrategyGenome, parent2: StrategyGenome
-    ) -> StrategyGenome:
+    def _crossover(self, parent1: StrategyGenome, parent2: StrategyGenome) -> StrategyGenome:
         """Uniform crossover."""
         child = copy.deepcopy(parent1)
 
         # Mix entry features
         all_entry = list(set(parent1.entry_features) | set(parent2.entry_features))
-        child.entry_features = random.sample(
-            all_entry, min(len(all_entry), random.randint(1, 5))
-        )
+        child.entry_features = random.sample(all_entry, min(len(all_entry), random.randint(1, 5)))
 
         # Mix thresholds
         child.entry_thresholds = {}
@@ -1563,9 +1508,7 @@ class StrategyEvolver:
 
         if random.random() < 0.2:
             genome.position_size_factor *= random.uniform(0.9, 1.1)
-            genome.position_size_factor = max(
-                0.5, min(2.0, genome.position_size_factor)
-            )
+            genome.position_size_factor = max(0.5, min(2.0, genome.position_size_factor))
 
         # Mutate logic
         if random.random() < 0.1:
@@ -1586,13 +1529,9 @@ class SignalCombiner:
 
     def __init__(self, combination_method: str = "weighted_average"):
         self.combination_method = combination_method
-        self._signal_sources: dict[
-            str, tuple[NDArray, float]
-        ] = {}  # name -> (signals, weight)
+        self._signal_sources: dict[str, tuple[NDArray, float]] = {}  # name -> (signals, weight)
 
-    def add_signal_source(
-        self, name: str, signals: NDArray, weight: float = 1.0
-    ) -> None:
+    def add_signal_source(self, name: str, signals: NDArray, weight: float = 1.0) -> None:
         """Add a signal source."""
         self._signal_sources[name] = (signals, weight)
 
@@ -1719,7 +1658,7 @@ class WalkForwardValidator:
                         max_drawdown=test_metrics["max_drawdown"],
                         profit_factor=test_metrics["profit_factor"],
                         win_rate=test_metrics["win_rate"],
-                        total_trades=test_metrics["total_trades"],
+                        total_trades=int(test_metrics["total_trades"]),
                         is_overfit=is_overfit,
                         robustness_score=robustness,
                     )
@@ -1765,11 +1704,7 @@ class WalkForwardValidator:
         returns_arr = np.array(returns)
 
         # Sharpe ratio
-        sharpe = (
-            (np.mean(returns_arr) * 252) / (np.std(returns_arr) * np.sqrt(252))
-            if np.std(returns_arr) > 0
-            else 0
-        )
+        sharpe = (np.mean(returns_arr) * 252) / (np.std(returns_arr) * np.sqrt(252)) if np.std(returns_arr) > 0 else 0
 
         # Total return
         total_return = float(np.sum(returns_arr))
@@ -1842,9 +1777,7 @@ class AutoMLPipeline:
             target = np.zeros(len(close))
             target[:-1] = (close[1:] - close[:-1]) / close[:-1]
 
-        self._feature_set = self.feature_engineer.generate_features(
-            open_prices, high, low, close, volume, target
-        )
+        self._feature_set = self.feature_engineer.generate_features(open_prices, high, low, close, volume, target)
 
         if self._feature_set.feature_matrix is None:
             raise ValueError("No features generated")
@@ -1865,9 +1798,7 @@ class AutoMLPipeline:
         y_val = target_clean[train_end:val_end]
 
         # Select model
-        self._best_model = self.model_selector.select_model(
-            X_train, y_train, X_val, y_val
-        )
+        self._best_model = self.model_selector.select_model(X_train, y_train, X_val, y_val)
 
         # Evolve strategy
         feature_names = [f.name for f in self._feature_set.features]

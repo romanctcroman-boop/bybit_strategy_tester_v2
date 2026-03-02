@@ -196,10 +196,7 @@ class HealthMonitor:
             component=component, status=HealthStatus.UNKNOWN, message="Not yet checked"
         )
 
-        logger.info(
-            f"✅ Health check registered for '{component}' "
-            f"(recovery: {'yes' if recovery_func else 'no'})"
-        )
+        logger.info(f"✅ Health check registered for '{component}' (recovery: {'yes' if recovery_func else 'no'})")
 
     async def check_component_health(self, component: str) -> HealthCheckResult:
         """
@@ -246,9 +243,7 @@ class HealthMonitor:
             self._health_status[component] = result
             return result
 
-    async def execute_recovery(
-        self, component: str, action_type: RecoveryActionType
-    ) -> RecoveryAction:
+    async def execute_recovery(self, component: str, action_type: RecoveryActionType) -> RecoveryAction:
         """Execute recovery action for a component.
 
         Args:
@@ -275,9 +270,7 @@ class HealthMonitor:
             await recovery_func(action_type)
 
             recovery_action.success = True
-            logger.info(
-                f"✅ Recovery action '{action_type.value}' completed for '{component}'"
-            )
+            logger.info(f"✅ Recovery action '{action_type.value}' completed for '{component}'")
 
             # Recheck health after recovery
             await asyncio.sleep(5)  # Wait 5s for recovery to take effect
@@ -286,9 +279,7 @@ class HealthMonitor:
             if health_result.status == HealthStatus.HEALTHY:
                 logger.info(f"🎉 Component '{component}' recovered successfully!")
             else:
-                logger.warning(
-                    f"⚠️ Component '{component}' still unhealthy after recovery"
-                )
+                logger.warning(f"⚠️ Component '{component}' still unhealthy after recovery")
 
         except Exception as e:
             recovery_action.error = str(e)
@@ -313,17 +304,12 @@ class HealthMonitor:
                     result = await self.check_component_health(component)
 
                     # Trigger recovery if needed
-                    if (
-                        result.status == HealthStatus.UNHEALTHY
-                        and result.recovery_suggested
-                    ):
+                    if result.status == HealthStatus.UNHEALTHY and result.recovery_suggested:
                         logger.warning(
                             f"🚨 Component '{component}' unhealthy, "
                             f"triggering recovery: {result.recovery_suggested.value}"
                         )
-                        await self.execute_recovery(
-                            component, result.recovery_suggested
-                        )
+                        await self.execute_recovery(component, result.recovery_suggested)
 
                 # Wait for next cycle
                 await asyncio.sleep(interval_seconds)
@@ -348,9 +334,7 @@ class HealthMonitor:
             logger.warning("Health monitoring already running")
             return
 
-        self._monitoring_task = asyncio.create_task(
-            self._monitoring_loop(interval_seconds)
-        )
+        self._monitoring_task = asyncio.create_task(self._monitoring_loop(interval_seconds))
 
     async def stop_monitoring(self) -> None:
         """Stop background health monitoring"""
@@ -376,25 +360,11 @@ class HealthMonitor:
     def get_metrics(self) -> dict:
         """Get health monitoring metrics"""
         total_checks = len(self._health_checks)
-        healthy = sum(
-            1
-            for status in self._health_status.values()
-            if status.status == HealthStatus.HEALTHY
-        )
-        degraded = sum(
-            1
-            for status in self._health_status.values()
-            if status.status == HealthStatus.DEGRADED
-        )
-        unhealthy = sum(
-            1
-            for status in self._health_status.values()
-            if status.status == HealthStatus.UNHEALTHY
-        )
+        healthy = sum(1 for status in self._health_status.values() if status.status == HealthStatus.HEALTHY)
+        degraded = sum(1 for status in self._health_status.values() if status.status == HealthStatus.DEGRADED)
+        unhealthy = sum(1 for status in self._health_status.values() if status.status == HealthStatus.UNHEALTHY)
         decommissioned = sum(
-            1
-            for status in self._health_status.values()
-            if status.status == HealthStatus.DECOMMISSIONED
+            1 for status in self._health_status.values() if status.status == HealthStatus.DECOMMISSIONED
         )
 
         total_recoveries = len(self._recovery_history)
@@ -409,11 +379,7 @@ class HealthMonitor:
             "decommissioned_components": decommissioned,
             "total_recovery_attempts": total_recoveries,
             "successful_recoveries": successful_recoveries,
-            "recovery_success_rate": (
-                successful_recoveries / total_recoveries * 100
-                if total_recoveries > 0
-                else 0.0
-            ),
+            "recovery_success_rate": (successful_recoveries / total_recoveries * 100 if total_recoveries > 0 else 0.0),
             "components": {
                 name: {
                     "status": result.status.value,
@@ -436,9 +402,7 @@ class HealthMonitor:
             if response.headers.get("content-type", "").startswith("application/json"):
                 payload = response.json()
                 details["payload"] = payload
-                healthy = (
-                    response.status_code == 200 and payload.get("status") == "healthy"
-                )
+                healthy = response.status_code == 200 and payload.get("status") == "healthy"
             else:
                 healthy = response.status_code == 200
             return healthy, details
@@ -452,16 +416,12 @@ class HealthMonitor:
         try:
             transport = StreamableHttpTransport(self._mcp_transport_url)
             async with FastMcpClient(transport=transport) as client:
-                ok = await asyncio.wait_for(
-                    client.ping(), timeout=self._mcp_probe_timeout
-                )
+                ok = await asyncio.wait_for(client.ping(), timeout=self._mcp_probe_timeout)
             return bool(ok), None
         except Exception as exc:  # pragma: no cover - optional
             return False, str(exc)
 
-    def _build_decommissioned_result(
-        self, context: str | None = None
-    ) -> HealthCheckResult:
+    def _build_decommissioned_result(self, context: str | None = None) -> HealthCheckResult:
         details: dict[str, Any] = {"disabled": True}
         if context:
             details["context"] = context
@@ -476,9 +436,7 @@ class HealthMonitor:
         self._fallback_mode = False
         return result
 
-    def _update_fallback_state(
-        self, status: HealthStatus, reason: str, context: str | None = None
-    ) -> None:
+    def _update_fallback_state(self, status: HealthStatus, reason: str, context: str | None = None) -> None:
         degraded = status in {HealthStatus.DEGRADED, HealthStatus.UNHEALTHY}
         if degraded and not self._fallback_mode:
             self._fallback_mode = True
@@ -487,18 +445,14 @@ class HealthMonitor:
             self._fallback_mode = False
             self._end_degraded_period(reason)
 
-    def _start_degraded_period(
-        self, reason: str, context: str | None = None
-    ) -> None:
+    def _start_degraded_period(self, reason: str, context: str | None = None) -> None:
         entry = {
             "start": datetime.now(UTC).isoformat(),
             "reason": reason,
         }
         if context:
             entry["context"] = context
-        logger.warning(
-            f"📉 Entering MCP fallback mode: {reason} ({context or 'no-context'})"
-        )
+        logger.warning(f"📉 Entering MCP fallback mode: {reason} ({context or 'no-context'})")
         self._degraded_periods.append(entry)
 
     def _end_degraded_period(self, resolution: str) -> None:
@@ -511,9 +465,7 @@ class HealthMonitor:
         entry["resolution"] = resolution
         logger.info(f"📈 MCP returned to healthy mode: {resolution}")
 
-    async def probe_mcp_server(
-        self, context: str | None = None
-    ) -> HealthCheckResult:
+    async def probe_mcp_server(self, context: str | None = None) -> HealthCheckResult:
         if self._mcp_disabled:
             return self._build_decommissioned_result(context)
         http_ok, http_details = await self._http_probe()
@@ -555,8 +507,7 @@ class HealthMonitor:
         now = datetime.now(UTC)
         if (
             self._last_restart_attempt
-            and (now - self._last_restart_attempt).total_seconds()
-            < CONTROLLED_RESTART_COOLDOWN_SECONDS
+            and (now - self._last_restart_attempt).total_seconds() < CONTROLLED_RESTART_COOLDOWN_SECONDS
         ):
             return
         self._last_restart_attempt = now
@@ -573,9 +524,7 @@ class HealthMonitor:
                 )
                 logger.warning("🔄 Triggered controlled MCP restart")
                 await asyncio.sleep(5)
-                await self.execute_recovery(
-                    "mcp_server", RecoveryActionType.FORCE_HEALTH_CHECK
-                )
+                await self.execute_recovery("mcp_server", RecoveryActionType.FORCE_HEALTH_CHECK)
             except Exception as exc:  # pragma: no cover - best effort
                 logger.error(f"Failed to restart MCP server: {exc}")
 
@@ -601,10 +550,7 @@ class HealthMonitor:
                 context=context,
             )
 
-        if (
-            not status
-            or (now - status.checked_at).total_seconds() > self._probe_ttl_seconds
-        ):
+        if not status or (now - status.checked_at).total_seconds() > self._probe_ttl_seconds:
             status = await self.probe_mcp_server(context)
 
         if mcp_available and status.status == HealthStatus.HEALTHY:

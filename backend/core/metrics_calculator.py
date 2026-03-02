@@ -22,12 +22,17 @@ TradingView Compliance:
 
 Architecture (P0-5):
 - Pure math formulas (sharpe, sortino, calmar etc.) live in:
-      backend/backtesting/formulas.py  ← single source of truth
+      backend.core.formulas.py  ← single source of truth
 - This module is the "TV-gold-standard" implementation that:
   1. Orchestrates full metrics calculation (166 metrics)
   2. Provides legacy API (calculate_sharpe, calculate_win_rate, etc.)
+  3. Imports and re-exports formulas for backward compatibility
 - NumbaEngineV2 uses formulas.py directly (no duplication since P0-5).
 """
+
+# Note: All metric calculation functions are defined locally below.
+# formulas.py is the source of truth for pure math; this module provides
+# its own implementations tuned for TradingView-compatible results.
 
 import math
 from dataclasses import dataclass
@@ -171,6 +176,7 @@ class RiskMetrics:
     volatility: float = 0.0
 
     cagr: float = 0.0
+    net_profit_pct: float = 0.0  # Net profit as percentage of initial capital
 
     margin_efficiency: float = 0.0
     ulcer_index: float = 0.0
@@ -892,7 +898,8 @@ class MetricsCalculator:
         if metrics.avg_loss != 0:
             metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss)
         else:
-            metrics.payoff_ratio = float("inf") if metrics.avg_win > 0 else 0.0
+            # If no losing trades, payoff ratio is undefined (use large number instead of inf for JSON compatibility)
+            metrics.payoff_ratio = 999.99 if metrics.avg_win > 0 else 0.0
 
         # Bars
         metrics.avg_bars_held = np.mean(bars_list) if bars_list else 0.0
@@ -1013,6 +1020,9 @@ class MetricsCalculator:
 
         # CAGR
         metrics.cagr = calculate_cagr(initial_capital, final_capital, years)
+
+        # Net Profit %
+        metrics.net_profit_pct = total_return_pct
 
         # Stability R-squared
         metrics.stability = calculate_stability_r2(equity)
@@ -1354,6 +1364,7 @@ class MetricsCalculator:
             "largest_win_value": trade_m.largest_win,
             "largest_loss_value": trade_m.largest_loss,
             "avg_win_loss_ratio": trade_m.payoff_ratio,
+            "payoff_ratio": trade_m.payoff_ratio,  # Alias for frontend compatibility
             "max_consecutive_wins": trade_m.max_consec_wins,
             "max_consecutive_losses": trade_m.max_consec_losses,
             "avg_bars_in_trade": trade_m.avg_bars_held,
@@ -1386,6 +1397,7 @@ class MetricsCalculator:
             "expectancy_pct": expectancy_pct,
             "expectancy_pct_ratio": expectancy_pct_ratio,
             "cagr": risk_m.cagr,
+            "net_profit_pct": risk_m.net_profit_pct,
             "volatility": risk_m.volatility,
             # Long/Short metrics
             "long_trades": ls_m.long_trades,

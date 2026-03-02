@@ -153,9 +153,7 @@ class AgentNode(ABC):
                 start_time = time.time()
 
                 # Execute with timeout
-                result_state = await asyncio.wait_for(
-                    self.execute(state), timeout=self.timeout
-                )
+                result_state = await asyncio.wait_for(self.execute(state), timeout=self.timeout)
 
                 self.execution_time = time.time() - start_time
                 self.status = ExecutionStatus.COMPLETED
@@ -164,22 +162,16 @@ class AgentNode(ABC):
                 result_state.execution_path.append((self.name, self.execution_time))
                 result_state.visited_nodes.append(self.name)
 
-                logger.info(
-                    f"Agent '{self.name}' completed in {self.execution_time:.2f}s"
-                )
+                logger.info(f"Agent '{self.name}' completed in {self.execution_time:.2f}s")
                 return result_state
 
             except TimeoutError:
-                last_error = TimeoutError(
-                    f"Agent '{self.name}' timed out after {self.timeout}s"
-                )
+                last_error = TimeoutError(f"Agent '{self.name}' timed out after {self.timeout}s")
                 logger.warning(f"Agent '{self.name}' timeout (attempt {attempts + 1})")
 
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Agent '{self.name}' failed (attempt {attempts + 1}): {e}"
-                )
+                logger.warning(f"Agent '{self.name}' failed (attempt {attempts + 1}): {e}")
 
             attempts += 1
             if attempts <= self.retry_count:
@@ -335,9 +327,7 @@ class AgentGraph:
     Inspired by LangGraph patterns for multi-agent coordination.
     """
 
-    def __init__(
-        self, name: str = "agent_graph", description: str = "", max_iterations: int = 50
-    ):
+    def __init__(self, name: str = "agent_graph", description: str = "", max_iterations: int = 50):
         self.name = name
         self.description = description
         self.max_iterations = max_iterations
@@ -390,9 +380,7 @@ class AgentGraph:
         self.edges[source].sort(key=lambda e: e.priority, reverse=True)
         return self
 
-    def add_conditional_edges(
-        self, source: str, router: ConditionalRouter
-    ) -> "AgentGraph":
+    def add_conditional_edges(self, source: str, router: ConditionalRouter) -> "AgentGraph":
         """Add conditional routing from a node."""
         self.routers[source] = router
         return self
@@ -426,17 +414,13 @@ class AgentGraph:
                     else:
                         next_nodes.append(edge.target)
                 else:
-                    targets = (
-                        edge.target if isinstance(edge.target, list) else [edge.target]
-                    )
+                    targets = edge.target if isinstance(edge.target, list) else [edge.target]
                     next_nodes.extend(targets)
                     break  # Only follow first matching edge for non-parallel
 
         return [n for n in next_nodes if n != "END"]
 
-    async def _execute_parallel(
-        self, node_names: list[str], state: AgentState
-    ) -> AgentState:
+    async def _execute_parallel(self, node_names: list[str], state: AgentState) -> AgentState:
         """Execute multiple nodes in parallel."""
         tasks = []
         for name in node_names:
@@ -481,9 +465,7 @@ class AgentGraph:
 
         while current_nodes and iterations < self.max_iterations:
             iterations += 1
-            state.current_node = (
-                current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
-            )
+            state.current_node = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
 
             # Execute current nodes (including exit points)
             if len(current_nodes) == 1:
@@ -525,9 +507,7 @@ class AgentGraph:
             "total_executions": self.total_executions,
             "successful_executions": self.successful_executions,
             "failed_executions": self.failed_executions,
-            "success_rate": (
-                self.successful_executions / max(self.total_executions, 1) * 100
-            ),
+            "success_rate": (self.successful_executions / max(self.total_executions, 1) * 100),
         }
 
     def visualize(self) -> str:
@@ -541,11 +521,7 @@ class AgentGraph:
             lines.append(f"{prefix}{node_name}{suffix}")
 
             for edge in self.edges.get(node_name, []):
-                target = (
-                    edge.target
-                    if isinstance(edge.target, str)
-                    else " & ".join(edge.target)
-                )
+                target = edge.target if isinstance(edge.target, str) else " & ".join(edge.target)
                 edge_symbol = "──>" if edge.edge_type == EdgeType.DIRECT else "──?"
                 lines.append(f"    {edge_symbol} {target}")
 
@@ -604,10 +580,7 @@ class TradingAnalysisChain:
         strategy_rec = LLMAgent(
             name="strategy_recommendation",
             agent_type="perplexity",
-            system_prompt=(
-                "Based on the analysis, recommend optimal trading strategies "
-                "with entry/exit points."
-            ),
+            system_prompt=("Based on the analysis, recommend optimal trading strategies with entry/exit points."),
             description="Generate strategy recommendations",
         )
 
@@ -661,9 +634,7 @@ class TradingAnalysisChain:
             "errors": state.errors,
         }
         state.set_result("report_generation", report)
-        state.add_message(
-            "system", "Report generated successfully", "report_generation"
-        )
+        state.add_message("system", "Report generated successfully", "report_generation")
         return state
 
 

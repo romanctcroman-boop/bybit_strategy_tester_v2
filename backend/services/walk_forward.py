@@ -217,9 +217,7 @@ class WalkForwardOptimizer:
         total_len = len(sorted_data)
 
         if total_len < self.n_splits * 10:
-            raise ValueError(
-                f"Insufficient data: {total_len} candles for {self.n_splits} splits"
-            )
+            raise ValueError(f"Insufficient data: {total_len} candles for {self.n_splits} splits")
 
         # Calculate window sizes
         window_size = total_len // self.n_splits
@@ -231,9 +229,7 @@ class WalkForwardOptimizer:
         param_values = list(param_grid.values())
         param_combinations = list(product(*param_values))
 
-        logger.info(
-            f"Walk-forward: {self.n_splits} splits, {len(param_combinations)} param combos"
-        )
+        logger.info(f"Walk-forward: {self.n_splits} splits, {len(param_combinations)} param combos")
 
         windows: list[WalkForwardWindow] = []
         all_best_params: list[dict] = []
@@ -355,16 +351,12 @@ class WalkForwardOptimizer:
             1.0,
             max(
                 0.0,
-                0.5 * (1 - consistency_ratio)
-                + 0.3 * min(1.0, abs(avg_degradation))
-                + 0.2 * (1 - param_stability),
+                0.5 * (1 - consistency_ratio) + 0.3 * min(1.0, abs(avg_degradation)) + 0.2 * (1 - param_stability),
             ),
         )
 
         # Recommended params: most frequent or median values
-        recommended_params = self._calculate_recommended_params(
-            all_best_params, param_names
-        )
+        recommended_params = self._calculate_recommended_params(all_best_params, param_names)
 
         # Confidence level
         if overfit_score < 0.2 and consistency_ratio >= 0.8:

@@ -135,9 +135,7 @@ class EventBusBackend(ABC):
         pass
 
     @abstractmethod
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to event pattern, returns subscription ID."""
         pass
 
@@ -217,17 +215,11 @@ class InMemoryEventBus(EventBusBackend):
                 await asyncio.wait_for(sub.handler(event), timeout=sub.timeout_seconds)
                 return
             except TimeoutError:
-                last_error = TimeoutError(
-                    f"Handler timeout after {sub.timeout_seconds}s"
-                )
-                logger.warning(
-                    f"Handler timeout, attempt {attempt + 1}/{sub.max_retries}"
-                )
+                last_error = TimeoutError(f"Handler timeout after {sub.timeout_seconds}s")
+                logger.warning(f"Handler timeout, attempt {attempt + 1}/{sub.max_retries}")
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Handler error: {e}, attempt {attempt + 1}/{sub.max_retries}"
-                )
+                logger.warning(f"Handler error: {e}, attempt {attempt + 1}/{sub.max_retries}")
             await asyncio.sleep(0.1 * (attempt + 1))  # Backoff
 
         raise last_error or Exception("Unknown delivery error")
@@ -245,9 +237,7 @@ class InMemoryEventBus(EventBusBackend):
 
         return matching
 
-    def _pattern_matches(
-        self, pattern_parts: list[str], channel_parts: list[str]
-    ) -> bool:
+    def _pattern_matches(self, pattern_parts: list[str], channel_parts: list[str]) -> bool:
         """Check if pattern matches channel (supports * and ** wildcards)."""
         if len(pattern_parts) == 0 and len(channel_parts) == 0:
             return True
@@ -272,9 +262,7 @@ class InMemoryEventBus(EventBusBackend):
 
         return False
 
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to event pattern."""
         sub_id = str(uuid.uuid4())
         subscription = EventSubscription(
@@ -374,9 +362,7 @@ class RedisEventBus(EventBusBackend):
             logger.error(f"Failed to publish event: {e}")
             return False
 
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to Redis channel pattern."""
         sub_id = str(uuid.uuid4())
         subscription = EventSubscription(
@@ -404,9 +390,7 @@ class RedisEventBus(EventBusBackend):
 
         while self._running:
             try:
-                message = await self._pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                message = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if message and message["type"] == "pmessage":
                     self._stats["events_received"] += 1
                     await self._handle_message(message)
@@ -425,13 +409,9 @@ class RedisEventBus(EventBusBackend):
 
             # Find matching subscriptions
             for sub in self._subscriptions.values():
-                if sub.event_pattern == pattern or self._pattern_matches(
-                    sub.event_pattern, channel
-                ):
+                if sub.event_pattern == pattern or self._pattern_matches(sub.event_pattern, channel):
                     try:
-                        await asyncio.wait_for(
-                            sub.handler(event), timeout=sub.timeout_seconds
-                        )
+                        await asyncio.wait_for(sub.handler(event), timeout=sub.timeout_seconds)
                     except Exception as e:
                         logger.error(f"Handler error: {e}")
 
@@ -492,9 +472,7 @@ class EventBusService:
 
     def __init__(self, backend: EventBusBackend | None = None):
         self._backend = backend or InMemoryEventBus()
-        self._event_handlers: dict[
-            str, list[Callable[[Event], Coroutine[Any, Any, None]]]
-        ] = defaultdict(list)
+        self._event_handlers: dict[str, list[Callable[[Event], Coroutine[Any, Any, None]]]] = defaultdict(list)
         self._middleware: list[Callable[[Event], Event]] = []
         self._dead_letter_queue: list[Event] = []
         self._started = False

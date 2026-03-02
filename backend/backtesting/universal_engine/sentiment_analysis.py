@@ -179,77 +179,77 @@ class LexiconSentimentAnalyzer:
         """Build sentiment lexicon."""
         # Crypto-specific sentiment words
         self.positive_words = {
-                # General positive
-                "good",
-                "great",
-                "excellent",
-                "amazing",
-                "positive",
-                "bullish",
-                "strong",
-                "growth",
-                "profit",
-                "gain",
-                "success",
-                "win",
-                "up",
-                # Crypto specific
-                "moon",
-                "mooning",
-                "pump",
-                "pumping",
-                "rally",
-                "breakout",
-                "accumulate",
-                "hodl",
-                "hold",
-                "buy",
-                "long",
-                "support",
-                "adoption",
-                "institutional",
-                "partnership",
-                "upgrade",
-                "milestone",
-                "ath",
-                "new high",
-                "recovery",
-                "bounce",
-            }
+            # General positive
+            "good",
+            "great",
+            "excellent",
+            "amazing",
+            "positive",
+            "bullish",
+            "strong",
+            "growth",
+            "profit",
+            "gain",
+            "success",
+            "win",
+            "up",
+            # Crypto specific
+            "moon",
+            "mooning",
+            "pump",
+            "pumping",
+            "rally",
+            "breakout",
+            "accumulate",
+            "hodl",
+            "hold",
+            "buy",
+            "long",
+            "support",
+            "adoption",
+            "institutional",
+            "partnership",
+            "upgrade",
+            "milestone",
+            "ath",
+            "new high",
+            "recovery",
+            "bounce",
+        }
 
         self.negative_words = {
-                # General negative
-                "bad",
-                "terrible",
-                "awful",
-                "negative",
-                "bearish",
-                "weak",
-                "loss",
-                "fail",
-                "down",
-                "crash",
-                "fear",
-                "panic",
-                "worry",
-                # Crypto specific
-                "dump",
-                "dumping",
-                "correction",
-                "sell",
-                "short",
-                "resistance",
-                "breakdown",
-                "scam",
-                "hack",
-                "exploit",
-                "rug",
-                "fud",
-                "bear",
-                "capitulation",
-                "liquidation",
-                "rekt",
-            }
+            # General negative
+            "bad",
+            "terrible",
+            "awful",
+            "negative",
+            "bearish",
+            "weak",
+            "loss",
+            "fail",
+            "down",
+            "crash",
+            "fear",
+            "panic",
+            "worry",
+            # Crypto specific
+            "dump",
+            "dumping",
+            "correction",
+            "sell",
+            "short",
+            "resistance",
+            "breakdown",
+            "scam",
+            "hack",
+            "exploit",
+            "rug",
+            "fud",
+            "bear",
+            "capitulation",
+            "liquidation",
+            "rekt",
+        }
 
         # Intensifiers and negations
         self.intensifiers = {"very", "extremely", "highly", "super", "mega"}
@@ -272,8 +272,8 @@ class LexiconSentimentAnalyzer:
         if not words:
             return 0.0
 
-        positive_count = 0
-        negative_count = 0
+        positive_count: float = 0.0
+        negative_count: float = 0.0
         negation_active = False
 
         for i, word in enumerate(words):
@@ -409,10 +409,8 @@ class NewsSentimentAnalyzer:
             all_keywords.extend(result.keywords)
 
         # Weighted average
-        avg_score = np.mean(scores) if scores else 0.0
-        avg_confidence = (
-            len([s for s in scores if abs(s) > 0.1]) / len(scores) if scores else 0.0
-        )
+        avg_score = float(np.mean(scores)) if scores else 0.0
+        avg_confidence = len([s for s in scores if abs(s) > 0.1]) / len(scores) if scores else 0.0
 
         return SentimentData(
             source=SentimentSource.NEWS,
@@ -465,11 +463,7 @@ class SocialSentimentTracker:
             score = self.lexicon.analyze(text)
 
             # Weight by engagement
-            engagement = (
-                post.get("likes", 0)
-                + post.get("retweets", 0) * 2
-                + post.get("comments", 0) * 1.5
-            )
+            engagement = post.get("likes", 0) + post.get("retweets", 0) * 2 + post.get("comments", 0) * 1.5
             engagement = max(1, engagement)
 
             scores.append(score * np.log1p(engagement))
@@ -591,22 +585,16 @@ class FearGreedCalculator:
         components["social"] = social_score
 
         # 4. BTC Dominance (10%)
-        if btc_dominance is not None:
-            # Higher dominance = more fear (flight to safety)
-            dominance_score = 100 - btc_dominance
-        else:
-            dominance_score = 50
+        dominance_score = 100 - btc_dominance if btc_dominance is not None else 50
         components["dominance"] = dominance_score
 
         # 5. Trends (10%) - search volume simulation
-        trend_score = (
-            50 + (close[-1] / np.mean(close[-30:]) - 1) * 100 if len(close) > 30 else 50
-        )
+        trend_score: float = float(50 + (close[-1] / np.mean(close[-30:]) - 1) * 100) if len(close) > 30 else 50.0
         trend_score = max(0, min(100, trend_score))
         components["trends"] = trend_score
 
         # 6. Sentiment Survey (15%) - simulated based on other components
-        survey_score = np.mean([volatility_score, momentum_score, social_score])
+        survey_score: float = float(np.mean([volatility_score, momentum_score, social_score]))
         components["survey"] = survey_score
 
         # Weighted average
@@ -637,9 +625,7 @@ class FearGreedCalculator:
         current_vol = np.std(returns[-30:]) * np.sqrt(365)
 
         # 90-day average volatility for comparison
-        avg_vol = (
-            np.std(returns[-90:]) * np.sqrt(365) if len(returns) > 90 else current_vol
-        )
+        avg_vol = np.std(returns[-90:]) * np.sqrt(365) if len(returns) > 90 else current_vol
 
         # Lower volatility = higher score (more greed)
         vol_ratio = current_vol / (avg_vol + 1e-10)
@@ -718,9 +704,7 @@ class SentimentSignalGenerator:
 
         # Count agreeing sources
         sources_agree = sum(
-            1
-            for s in sentiment.source_scores.values()
-            if (s > 0 and score > 0) or (s < 0 and score < 0)
+            1 for s in sentiment.source_scores.values() if (s > 0 and score > 0) or (s < 0 and score < 0)
         )
 
         signal_type = "neutral"
@@ -749,9 +733,7 @@ class SentimentSignalGenerator:
                 reason = f"Bearish sentiment: {level.value}"
 
         # Reduce strength if sentiment conflicts with price trend
-        if (signal_type == "long" and price_trend < -0.02) or (
-            signal_type == "short" and price_trend > 0.02
-        ):
+        if (signal_type == "long" and price_trend < -0.02) or (signal_type == "short" and price_trend > 0.02):
             strength *= 0.5
             reason += " (conflicting with price trend)"
 
@@ -794,12 +776,12 @@ class SentimentSignalGenerator:
             all_keywords.extend(data.keywords)
 
         # Calculate weighted average
-        weighted_scores = []
-        total_weight = 0
+        weighted_scores: list[float] = []
+        total_weight: float = 0.0
 
         for source, scores in source_scores.items():
             weight = self.config.source_weights.get(source, 0.1)
-            avg_score = np.mean(scores) if scores else 0
+            avg_score = float(np.mean(scores)) if scores else 0.0
             weighted_scores.append(avg_score * weight)
             total_weight += weight
 
@@ -816,16 +798,14 @@ class SentimentSignalGenerator:
         keyword_counts: dict[str, int] = {}
         for kw in all_keywords:
             keyword_counts[kw] = keyword_counts.get(kw, 0) + 1
-        trending = sorted(
-            keyword_counts.keys(), key=lambda x: keyword_counts[x], reverse=True
-        )[:5]
+        trending = sorted(keyword_counts.keys(), key=lambda x: keyword_counts[x], reverse=True)[:5]
 
         return AggregateSentiment(
             timestamp=timestamp or datetime.now(),
             overall_score=overall_score,
             overall_confidence=overall_confidence,
             level=level,
-            source_scores={s: np.mean(v) for s, v in source_scores.items()},
+            source_scores={s: float(np.mean(v)) for s, v in source_scores.items()},
             source_volumes=source_volumes,
             trending_keywords=trending,
         )
@@ -970,9 +950,7 @@ class SentimentAnalyzer:
             # Process social if available
             if social_data:
                 social_tracker = SocialSentimentTracker(self.config)
-                social_result = social_tracker.analyze_posts(
-                    social_data, SentimentSource.TWITTER
-                )
+                social_result = social_tracker.analyze_posts(social_data, SentimentSource.TWITTER)
                 data_points.append(social_result)
 
             # Add fear/greed

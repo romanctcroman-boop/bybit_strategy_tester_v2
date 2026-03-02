@@ -72,12 +72,9 @@ class AlertConfig:
             slack_channel=os.getenv("SLACK_ALERT_CHANNEL", "#alerts"),
             slack_username=os.getenv("SLACK_USERNAME", "Bybit Strategy Tester"),
             slack_icon_emoji=os.getenv("SLACK_ICON_EMOJI", ":robot_face:"),
-            telegram_enabled=os.getenv("ALERT_TELEGRAM_ENABLED", "false").lower()
-            == "true",
+            telegram_enabled=os.getenv("ALERT_TELEGRAM_ENABLED", "false").lower() == "true",
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-            telegram_chat_ids=[
-                c.strip() for c in telegram_chats.split(",") if c.strip()
-            ],
+            telegram_chat_ids=[c.strip() for c in telegram_chats.split(",") if c.strip()],
             telegram_parse_mode=os.getenv("TELEGRAM_PARSE_MODE", "HTML"),
             email_enabled=os.getenv("ALERT_EMAIL_ENABLED", "false").lower() == "true",
             smtp_host=os.getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -144,10 +141,7 @@ class Alert:
                             "short": True,
                         },
                     ]
-                    + [
-                        {"title": k, "value": str(v), "short": True}
-                        for k, v in list(self.metadata.items())[:6]
-                    ],
+                    + [{"title": k, "value": str(v), "short": True} for k, v in list(self.metadata.items())[:6]],
                     "footer": "Bybit Strategy Tester",
                     "ts": int(self.timestamp.timestamp()),
                 }
@@ -356,9 +350,7 @@ class AlertingService:
             return False
 
         message = alert.to_telegram_message()
-        api_url = (
-            f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
-        )
+        api_url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -451,9 +443,7 @@ class AlertingService:
         metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Send WARNING level alert."""
-        return await self.send_alert(
-            AlertLevel.WARNING, title, message, source, metadata
-        )
+        return await self.send_alert(AlertLevel.WARNING, title, message, source, metadata)
 
     async def critical(
         self,
@@ -463,9 +453,7 @@ class AlertingService:
         metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Send CRITICAL level alert."""
-        return await self.send_alert(
-            AlertLevel.CRITICAL, title, message, source, metadata, skip_rate_limit=True
-        )
+        return await self.send_alert(AlertLevel.CRITICAL, title, message, source, metadata, skip_rate_limit=True)
 
 
 # Singleton instance for easy import
@@ -488,9 +476,7 @@ async def send_alert(
     metadata: dict[str, Any] | None = None,
 ) -> bool:
     """Convenience function to send alert using default service."""
-    return await get_alerting_service().send_alert(
-        level, title, message, source, metadata
-    )
+    return await get_alerting_service().send_alert(level, title, message, source, metadata)
 
 
 # Quick functions for common use cases

@@ -375,9 +375,7 @@ class CacheWarmingService:
                 duration_ms=duration_ms,
             )
 
-            logger.debug(
-                f"Warmed {key}: {candles_loaded} candles in {duration_ms:.1f}ms"
-            )
+            logger.debug(f"Warmed {key}: {candles_loaded} candles in {duration_ms:.1f}ms")
 
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
@@ -420,11 +418,7 @@ class CacheWarmingService:
 
         # Filter stale targets unless force
         if not force:
-            targets = [
-                t
-                for t in targets
-                if t.last_warmed is None or (now - t.last_warmed) > self.stale_threshold
-            ]
+            targets = [t for t in targets if t.last_warmed is None or (now - t.last_warmed) > self.stale_threshold]
 
         if not targets:
             logger.info("No stale targets to warm")
@@ -518,12 +512,7 @@ class CacheWarmingService:
             [
                 t
                 for t in self._targets.values()
-                if t.enabled
-                and (
-                    t.last_warmed is None
-                    or (datetime.now(UTC) - t.last_warmed)
-                    > self.stale_threshold
-                )
+                if t.enabled and (t.last_warmed is None or (datetime.now(UTC) - t.last_warmed) > self.stale_threshold)
             ]
         )
         return self.metrics
@@ -546,15 +535,11 @@ class CacheWarmingService:
                 "failed_warms": metrics.failed_warms,
                 "total_candles_loaded": metrics.total_candles_loaded,
                 "avg_warm_time_ms": (
-                    metrics.total_warm_time_ms / metrics.total_warms
-                    if metrics.total_warms > 0
-                    else 0
+                    metrics.total_warm_time_ms / metrics.total_warms if metrics.total_warms > 0 else 0
                 ),
                 "cache_hit_rate": metrics.cache_hit_rate,
                 "target_hit_rate": 95.0,
-                "last_full_warm": metrics.last_full_warm.isoformat()
-                if metrics.last_full_warm
-                else None,
+                "last_full_warm": metrics.last_full_warm.isoformat() if metrics.last_full_warm else None,
             },
             "cache_stats": self.get_cache_stats(),
         }
@@ -566,9 +551,7 @@ class CacheWarmingService:
         failures_ok = metrics.failed_warms < metrics.successful_warms * 0.1
 
         return {
-            "status": "healthy"
-            if (hit_rate_ok and failures_ok and self._running)
-            else "degraded",
+            "status": "healthy" if (hit_rate_ok and failures_ok and self._running) else "degraded",
             "running": self._running,
             "cache_hit_rate": metrics.cache_hit_rate,
             "target_hit_rate": 95.0,

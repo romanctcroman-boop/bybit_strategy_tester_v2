@@ -38,9 +38,7 @@ class PlaceOrderRequest(BaseModel):
     price: float | None = Field(None, description="Limit price")
     stop_price: float | None = Field(None, description="Stop trigger price")
     reduce_only: bool = Field(default=False, description="Only reduce position")
-    leverage: float | None = Field(
-        None, ge=1, le=100, description="Position leverage"
-    )
+    leverage: float | None = Field(None, ge=1, le=100, description="Position leverage")
 
 
 class OrderResponse(BaseModel):
@@ -222,19 +220,14 @@ async def place_order(request: PlaceOrderRequest):
     try:
         order_type = OrderType(request.order_type.lower())
     except ValueError:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid order type: {request.order_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid order type: {request.order_type}")
 
     # Validate limit orders have price
     if order_type == OrderType.LIMIT and not request.price:
         raise HTTPException(status_code=400, detail="Limit orders require price")
 
     # Validate stop orders have stop_price
-    if (
-        order_type in (OrderType.STOP_MARKET, OrderType.TAKE_PROFIT_MARKET)
-        and not request.stop_price
-    ):
+    if order_type in (OrderType.STOP_MARKET, OrderType.TAKE_PROFIT_MARKET) and not request.stop_price:
         raise HTTPException(status_code=400, detail="Stop orders require stop_price")
 
     order = engine.place_order(

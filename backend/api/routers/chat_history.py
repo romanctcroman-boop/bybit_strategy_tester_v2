@@ -112,9 +112,7 @@ class SyncRequest(BaseModel):
     """Bulk sync request from localStorage"""
 
     conversations: list[ConversationCreate]
-    clear_existing: bool = Field(
-        default=False, description="Clear server history before sync"
-    )
+    clear_existing: bool = Field(default=False, description="Clear server history before sync")
 
 
 class SyncResponse(BaseModel):
@@ -174,12 +172,7 @@ async def list_conversations(
 
         total = query.count()
         start = (page - 1) * per_page
-        items = (
-            query.order_by(ChatConversation.created_at.desc())
-            .offset(start)
-            .limit(per_page)
-            .all()
-        )
+        items = query.order_by(ChatConversation.created_at.desc()).offset(start).limit(per_page).all()
 
         return ConversationListResponse(
             conversations=[
@@ -209,9 +202,7 @@ async def list_conversations(
 
 
 @router.get("/history/{conversation_id}", response_model=ConversationResponse)
-async def get_conversation(
-    conversation_id: str, db: Session = Depends(get_db)
-) -> ConversationResponse:
+async def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> ConversationResponse:
     """Get specific conversation by ID (DB-backed)."""
     conversation = db.get(ChatConversation, conversation_id)
     if not conversation:
@@ -232,17 +223,11 @@ async def get_conversation(
 
 
 @router.post("/history", response_model=ConversationResponse, status_code=201)
-async def create_conversation(
-    data: ConversationCreate, db: Session = Depends(get_db)
-) -> ConversationResponse:
+async def create_conversation(data: ConversationCreate, db: Session = Depends(get_db)) -> ConversationResponse:
     """Save new conversation to persistent store."""
     try:
         now = datetime.now(UTC)
-        created_at = (
-            datetime.fromtimestamp(data.timestamp / 1000, tz=UTC)
-            if data.timestamp
-            else now
-        )
+        created_at = datetime.fromtimestamp(data.timestamp / 1000, tz=UTC) if data.timestamp else now
 
         conversation = ChatConversation(
             id=str(uuid.uuid4()),
@@ -261,9 +246,7 @@ async def create_conversation(
         db.commit()
         db.refresh(conversation)
 
-        logger.info(
-            "Created conversation %s for tab %s", conversation.id, data.tab.value
-        )
+        logger.info("Created conversation %s for tab %s", conversation.id, data.tab.value)
 
         return ConversationResponse(
             id=conversation.id,
@@ -338,9 +321,7 @@ async def clear_history(db: Session = Depends(get_db)) -> dict:
 
 
 @router.delete("/history/{conversation_id}", status_code=204)
-async def delete_conversation(
-    conversation_id: str, db: Session = Depends(get_db)
-) -> None:
+async def delete_conversation(conversation_id: str, db: Session = Depends(get_db)) -> None:
     """Delete a conversation."""
     conversation = db.get(ChatConversation, conversation_id)
     if not conversation:
@@ -352,9 +333,7 @@ async def delete_conversation(
 
 
 @router.post("/history/sync", response_model=SyncResponse)
-async def sync_conversations(
-    data: SyncRequest, db: Session = Depends(get_db)
-) -> SyncResponse:
+async def sync_conversations(data: SyncRequest, db: Session = Depends(get_db)) -> SyncResponse:
     """
     🔄 Bulk sync from localStorage
 
@@ -388,11 +367,7 @@ async def sync_conversations(
         for conv in data.conversations:
             try:
                 now = datetime.now(UTC)
-                created_at = (
-                    datetime.fromtimestamp(conv.timestamp / 1000, tz=UTC)
-                    if conv.timestamp
-                    else now
-                )
+                created_at = datetime.fromtimestamp(conv.timestamp / 1000, tz=UTC) if conv.timestamp else now
 
                 conversation = ChatConversation(
                     id=str(uuid.uuid4()),
@@ -438,35 +413,12 @@ async def get_history_stats(db: Session = Depends(get_db)) -> dict:
             "newest": None,
         }
 
-    by_tab_rows = (
-        db.query(ChatConversation.tab, func.count())
-        .group_by(ChatConversation.tab)
-        .all()
-    )
-    by_agent_rows = (
-        db.query(ChatConversation.agent, func.count())
-        .group_by(ChatConversation.agent)
-        .all()
-    )
-    starred = (
-        db.query(func.count())
-        .select_from(ChatConversation)
-        .filter(ChatConversation.starred.is_(True))
-        .scalar()
-    )
+    by_tab_rows = db.query(ChatConversation.tab, func.count()).group_by(ChatConversation.tab).all()
+    by_agent_rows = db.query(ChatConversation.agent, func.count()).group_by(ChatConversation.agent).all()
+    starred = db.query(func.count()).select_from(ChatConversation).filter(ChatConversation.starred.is_(True)).scalar()
 
-    oldest = (
-        db.query(ChatConversation.created_at)
-        .order_by(ChatConversation.created_at.asc())
-        .limit(1)
-        .scalar()
-    )
-    newest = (
-        db.query(ChatConversation.created_at)
-        .order_by(ChatConversation.created_at.desc())
-        .limit(1)
-        .scalar()
-    )
+    oldest = db.query(ChatConversation.created_at).order_by(ChatConversation.created_at.asc()).limit(1).scalar()
+    newest = db.query(ChatConversation.created_at).order_by(ChatConversation.created_at.desc()).limit(1).scalar()
 
     return {
         "total": total,

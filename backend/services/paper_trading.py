@@ -351,9 +351,7 @@ class PaperTradingEngine:
         else:
             # Add to pending orders
             self.pending_orders.append(order)
-            logger.info(
-                f"Pending order created: {order.id} {side.value} {qty} {symbol}"
-            )
+            logger.info(f"Pending order created: {order.id} {side.value} {qty} {symbol}")
 
         return order
 
@@ -372,9 +370,7 @@ class PaperTradingEngine:
         logger.info(f"Order cancelled: {order_id}")
         return True
 
-    def close_position(
-        self, symbol: str, qty: float | None = None
-    ) -> PaperOrder | None:
+    def close_position(self, symbol: str, qty: float | None = None) -> PaperOrder | None:
         """
         Close a position (fully or partially).
 
@@ -390,9 +386,7 @@ class PaperTradingEngine:
             return None
 
         close_qty = qty or position.size
-        close_side = (
-            OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
-        )
+        close_side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
 
         return self.place_order(
             symbol=symbol,
@@ -431,9 +425,7 @@ class PaperTradingEngine:
 
     def get_equity_curve(self) -> list[dict]:
         """Get equity curve data."""
-        return [
-            {"timestamp": ts.isoformat(), "equity": eq} for ts, eq in self.equity_curve
-        ]
+        return [{"timestamp": ts.isoformat(), "equity": eq} for ts, eq in self.equity_curve]
 
     def reset(self) -> None:
         """Reset the paper trading engine."""
@@ -541,16 +533,14 @@ class PaperTradingEngine:
 
         if existing:
             # Determine if adding to or closing position
-            is_same_direction = (
-                order.side == OrderSide.BUY and existing.side == PositionSide.LONG
-            ) or (order.side == OrderSide.SELL and existing.side == PositionSide.SHORT)
+            is_same_direction = (order.side == OrderSide.BUY and existing.side == PositionSide.LONG) or (
+                order.side == OrderSide.SELL and existing.side == PositionSide.SHORT
+            )
 
             if is_same_direction:
                 # Add to position (average entry)
                 total_size = existing.size + order.qty
-                existing.entry_price = (
-                    existing.entry_price * existing.size + price * order.qty
-                ) / total_size
+                existing.entry_price = (existing.entry_price * existing.size + price * order.qty) / total_size
                 existing.size = total_size
             else:
                 # Close/reduce position
@@ -558,9 +548,7 @@ class PaperTradingEngine:
                 pnl = existing.calculate_pnl(price) * (close_size / existing.size)
 
                 # Release margin
-                released_margin = (
-                    close_size * existing.entry_price
-                ) / existing.leverage
+                released_margin = (close_size * existing.entry_price) / existing.leverage
                 self.account.balance += released_margin + pnl
 
                 remaining = existing.size - close_size
@@ -644,14 +632,8 @@ class PaperTradingEngine:
             if order.order_type == OrderType.LIMIT:
                 # Limit buy: execute when price <= limit
                 # Limit sell: execute when price >= limit
-                if (
-                    order.side == OrderSide.BUY
-                    and order.price is not None
-                    and current_price <= order.price
-                ) or (
-                    order.side == OrderSide.SELL
-                    and order.price is not None
-                    and current_price >= order.price
+                if (order.side == OrderSide.BUY and order.price is not None and current_price <= order.price) or (
+                    order.side == OrderSide.SELL and order.price is not None and current_price >= order.price
                 ):
                     should_execute = True
                     exec_price = order.price
@@ -660,29 +642,19 @@ class PaperTradingEngine:
                 # Stop buy: execute when price >= stop
                 # Stop sell: execute when price <= stop
                 if (
-                    order.side == OrderSide.BUY
-                    and order.stop_price is not None
-                    and current_price >= order.stop_price
+                    order.side == OrderSide.BUY and order.stop_price is not None and current_price >= order.stop_price
                 ) or (
-                    order.side == OrderSide.SELL
-                    and order.stop_price is not None
-                    and current_price <= order.stop_price
+                    order.side == OrderSide.SELL and order.stop_price is not None and current_price <= order.stop_price
                 ):
                     should_execute = True
 
-            elif order.order_type == OrderType.TAKE_PROFIT_MARKET:
+            elif order.order_type == OrderType.TAKE_PROFIT_MARKET and (
+                (order.side == OrderSide.BUY and order.stop_price is not None and current_price <= order.stop_price)
+                or (order.side == OrderSide.SELL and order.stop_price is not None and current_price >= order.stop_price)
+            ):
                 # TP buy (short close): execute when price <= tp
                 # TP sell (long close): execute when price >= tp
-                if (
-                    order.side == OrderSide.BUY
-                    and order.stop_price is not None
-                    and current_price <= order.stop_price
-                ) or (
-                    order.side == OrderSide.SELL
-                    and order.stop_price is not None
-                    and current_price >= order.stop_price
-                ):
-                    should_execute = True
+                should_execute = True
 
             if should_execute:
                 self._execute_order(order, exec_price)
@@ -710,10 +682,7 @@ class PaperTradingEngine:
                 return
 
             # Check liquidation
-            if (
-                position.liquidation_price is not None
-                and price <= position.liquidation_price
-            ):
+            if position.liquidation_price is not None and price <= position.liquidation_price:
                 logger.warning(f"Liquidation triggered for {symbol} @ {price}")
                 self._liquidate_position(position)
 
@@ -731,10 +700,7 @@ class PaperTradingEngine:
                 return
 
             # Check liquidation
-            if (
-                position.liquidation_price is not None
-                and price >= position.liquidation_price
-            ):
+            if position.liquidation_price is not None and price >= position.liquidation_price:
                 logger.warning(f"Liquidation triggered for {symbol} @ {price}")
                 self._liquidate_position(position)
 
@@ -749,9 +715,7 @@ class PaperTradingEngine:
 
         del self.positions[position.symbol]
 
-        logger.warning(
-            f"Position liquidated: {position.symbol}, loss: {margin_lost:.2f}"
-        )
+        logger.warning(f"Position liquidated: {position.symbol}, loss: {margin_lost:.2f}")
 
     def _update_margin_used(self) -> None:
         """Update total margin used."""
@@ -761,9 +725,7 @@ class PaperTradingEngine:
         """Update account equity based on positions."""
         unrealized = sum(p.unrealized_pnl for p in self.positions.values())
         self.account.unrealized_pnl = unrealized
-        self.account.equity = (
-            self.account.balance + self.account.margin_used + unrealized
-        )
+        self.account.equity = self.account.balance + self.account.margin_used + unrealized
 
     def _record_equity(self) -> None:
         """Record current equity to curve."""

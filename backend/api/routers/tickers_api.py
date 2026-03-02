@@ -8,6 +8,7 @@ Tickers API — список тикеров Bybit для Strategy Builder (Prope
 См.: https://bybit-exchange.github.io/docs/v5/market/tickers
      https://bybit-exchange.github.io/docs/v5/market/instrument
 """
+
 import asyncio
 import logging
 import os
@@ -40,9 +41,7 @@ async def get_symbols_list(
             api_secret=os.environ.get("BYBIT_API_SECRET"),
         )
         loop = asyncio.get_event_loop()
-        symbols = await loop.run_in_executor(
-            None, lambda: adapter.get_symbols_list(category=category)
-        )
+        symbols = await loop.run_in_executor(None, lambda: adapter.get_symbols_list(category=category))
         if cache is not None and isinstance(cache, dict):
             cache[category] = symbols
         return {"symbols": symbols or [], "category": category}
@@ -82,9 +81,7 @@ async def refresh_tickers(request: Request):
         cache["linear"] = linear
 
     try:
-        spot = await loop.run_in_executor(
-            None, lambda: adapter.get_symbols_list(category="spot", trading_only=True)
-        )
+        spot = await loop.run_in_executor(None, lambda: adapter.get_symbols_list(category="spot", trading_only=True))
     except Exception as exc:
         logger.warning("refresh_tickers spot failed: %s", exc)
     if spot:

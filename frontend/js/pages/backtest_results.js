@@ -13,6 +13,7 @@
 
 // Import shared utilities
 import { formatDate as _formatDate } from '../utils.js';
+import { localDateStr } from '../utils/dateUtils.js';
 
 // Import StateManager and helpers
 import { getStore } from '../core/StateManager.js';
@@ -1533,21 +1534,14 @@ function renderTradesPage(tbody) {
 
 // eslint-disable-next-line no-unused-vars
 function tradesPrevPage() {
-  if (tradesCurrentPage > 0) {
-    tradesCurrentPage--;
-    setTradesCurrentPage(tradesCurrentPage);
-    renderTradesPage();
-  }
+  // Pagination disabled - all trades shown in single scrollable list
+  console.warn('tradesPrevPage: Pagination is disabled');
 }
 
 // eslint-disable-next-line no-unused-vars
 function tradesNextPage() {
-  const totalPages = Math.ceil(tradesCachedRows.length / TRADES_PAGE_SIZE);
-  if (tradesCurrentPage < totalPages - 1) {
-    tradesCurrentPage++;
-    setTradesCurrentPage(tradesCurrentPage);
-    renderTradesPage();
-  }
+  // Pagination disabled - all trades shown in single scrollable list
+  console.warn('tradesNextPage: Pagination is disabled');
 }
 
 /** Sort trades table by column key. Called from table header click handlers. */
@@ -1662,12 +1656,9 @@ function setDefaultDates() {
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 6);
 
-  document.getElementById('btEndDate').value = endDate
-    .toISOString()
-    .split('T')[0];
-  document.getElementById('btStartDate').value = startDate
-    .toISOString()
-    .split('T')[0];
+  // Use local date (not UTC) to avoid off-by-one at midnight in UTC+N timezones
+  document.getElementById('btEndDate').value = localDateStr(endDate);
+  document.getElementById('btStartDate').value = localDateStr(startDate);
 }
 
 function setupFilters() {
@@ -2376,6 +2367,12 @@ async function selectBacktest(backtestId) {
     // Update charts
     updateCharts(currentBacktest);
 
+    // P1-4: Metrics heatmap
+    renderMetricsHeatmap(currentBacktest.metrics);
+
+    // P1-5: Walk-Forward visualization (data may be absent)
+    renderWalkForwardViz(currentBacktest.walk_forward || null);
+
     // Update legacy metrics (for backward compatibility)
     updateMetrics(currentBacktest.metrics);
     updateAIAnalysis(currentBacktest);
@@ -2706,10 +2703,11 @@ function updateCharts(backtest) {
         exit_time: t.exit_time,
         side: t.side || 'long',
         pnl: Number(t.pnl || 0),
-        mfe_pct: Number(t.mfe_pct ?? t.mfe ?? 0),
-        mae_pct: Number(t.mae_pct ?? t.mae ?? 0),
-        mfe: Number(t.mfe ?? 0),
-        mae: Number(t.mae ?? 0)
+        mfe_pct: Number(t.mfe_pct ?? 0),
+        mae_pct: Number(t.mae_pct ?? 0),
+        mfe_percent: Number(t.mfe_pct ?? t.mfe ?? 0),  // Backward compat
+        mfe: Number(t.mfe ?? 0),  // MFE in USD
+        mae: Number(t.mae ?? 0)   // MAE in USD
       }));
 
       // Render via TradingViewEquityChart
@@ -3884,7 +3882,11 @@ function refreshData() {
 
 function formatDateTime(dateStr) {
   if (!dateStr) return '--';
-  const date = new Date(dateStr);
+  // Ensure UTC interpretation: append Z if no timezone info present
+  const normalized = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && dateStr.includes('T'))
+    ? dateStr + 'Z'
+    : dateStr;
+  const date = new Date(normalized);
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -4141,10 +4143,14 @@ async function updatePriceChart(backtest) {
     let endMs = null;
 
     if (backtest.config.start_date) {
+      // new Date("YYYY-MM-DD") parses as UTC midnight (00:00:00 UTC).
+      // That is correct for startMs — we want candles FROM the start of that day.
       startMs = new Date(backtest.config.start_date).getTime();
     }
     if (backtest.config.end_date) {
-      endMs = new Date(backtest.config.end_date).getTime();
+      // new Date("YYYY-MM-DD") = UTC 00:00:00 of that day — this EXCLUDES all candles
+      // on end_date itself! Add 86399999ms (23:59:59.999) to include the full last day.
+      endMs = new Date(backtest.config.end_date).getTime() + 86399999;
     }
 
     if (!startMs || !endMs) {
@@ -4233,6 +4239,19 @@ async function updatePriceChart(backtest) {
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 5
+      },
+      localization: {
+        timeFormatter: (unixSeconds) => {
+          // Convert UTC unix seconds → local browser time string
+          const d = new Date(unixSeconds * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        },
+        dateFormatter: (unixSeconds) => {
+          const d = new Date(unixSeconds * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
       }
     });
 
@@ -4606,3 +4625,341 @@ if (typeof window !== 'undefined') {
     refreshData
   };
 }
+
+// =============================================================================
+// P1-4: Metrics Heatmap
+// =============================================================================
+
+/**
+ * Metric groups for heatmap display.
+ * Each group has a label and a list of {key, label, format, goodWhen} entries.
+ * goodWhen: 'high' | 'low' | 'neutral'
+ */
+const HEATMAP_METRIC_GROUPS = [
+  {
+    label: 'Доходность',
+    metrics: [
+      { key: 'net_profit_pct', label: 'Net Profit %', format: 'pct', goodWhen: 'high' },
+      { key: 'total_return', label: 'Total Return', format: 'pct', goodWhen: 'high' },
+      { key: 'cagr', label: 'CAGR %', format: 'pct', goodWhen: 'high' },
+      { key: 'avg_trade_pct', label: 'Avg Trade', format: 'pct', goodWhen: 'high' }
+    ]
+  },
+  {
+    label: 'Риск',
+    metrics: [
+      { key: 'max_drawdown', label: 'Max DD %', format: 'pct', goodWhen: 'low' },
+      { key: 'avg_drawdown', label: 'Avg DD %', format: 'pct', goodWhen: 'low' },
+      { key: 'volatility', label: 'Volatility', format: 'num2', goodWhen: 'low' },
+      { key: 'ulcer_index', label: 'Ulcer Index', format: 'num2', goodWhen: 'low' }
+    ]
+  },
+  {
+    label: 'Качество',
+    metrics: [
+      { key: 'sharpe_ratio', label: 'Sharpe', format: 'num2', goodWhen: 'high' },
+      { key: 'sortino_ratio', label: 'Sortino', format: 'num2', goodWhen: 'high' },
+      { key: 'calmar_ratio', label: 'Calmar', format: 'num2', goodWhen: 'high' },
+      { key: 'sqn', label: 'SQN', format: 'num2', goodWhen: 'high' }
+    ]
+  },
+  {
+    label: 'Сделки',
+    metrics: [
+      { key: 'win_rate', label: 'Win Rate %', format: 'pct', goodWhen: 'high' },
+      { key: 'profit_factor', label: 'Profit Factor', format: 'num2', goodWhen: 'high' },
+      { key: 'payoff_ratio', label: 'Payoff Ratio', format: 'num2', goodWhen: 'high' },
+      { key: 'expectancy', label: 'Expectancy', format: 'num2', goodWhen: 'high' }
+    ]
+  }
+];
+
+/** Thresholds for heatmap coloring per metric type */
+const HEATMAP_THRESHOLDS = {
+  sharpe_ratio: { bad: 0, ok: 1, good: 2 },
+  sortino_ratio: { bad: 0, ok: 1, good: 2 },
+  calmar_ratio: { bad: 0, ok: 0.5, good: 1 },
+  sqn: { bad: 0, ok: 1.6, good: 2.5 },
+  win_rate: { bad: 40, ok: 50, good: 60 },
+  profit_factor: { bad: 1, ok: 1.3, good: 1.8 },
+  payoff_ratio: { bad: 0.8, ok: 1.2, good: 2 },
+  expectancy: { bad: 0, ok: 0.2, good: 0.5 },
+  net_profit_percent: { bad: 0, ok: 10, good: 50 },
+  total_return: { bad: 0, ok: 10, good: 50 },
+  cagr: { bad: 0, ok: 10, good: 30 },
+  avg_trade_pnl: { bad: 0, ok: 0.2, good: 1 },
+  max_drawdown: { bad: 30, ok: 20, good: 10 },   // inverted: low is good
+  avg_drawdown: { bad: 15, ok: 10, good: 5 },
+  volatility: { bad: 50, ok: 30, good: 15 },
+  ulcer_index: { bad: 20, ok: 10, good: 5 }
+};
+
+/**
+ * Get heatmap color class for a metric value.
+ * @param {string} key
+ * @param {number} value
+ * @param {'high'|'low'|'neutral'} goodWhen
+ * @returns {string} CSS class: hm-good | hm-ok | hm-bad | hm-neutral
+ */
+function getHeatmapColor(key, value, goodWhen) {
+  if (value === null || value === undefined || isNaN(value)) return 'hm-neutral';
+  const t = HEATMAP_THRESHOLDS[key];
+  if (!t) return 'hm-neutral';
+
+  if (goodWhen === 'high') {
+    if (value >= t.good) return 'hm-good';
+    if (value >= t.ok) return 'hm-ok';
+    return 'hm-bad';
+  } else if (goodWhen === 'low') {
+    // For low-is-good metrics, thresholds are reversed
+    if (value <= t.good) return 'hm-good';
+    if (value <= t.ok) return 'hm-ok';
+    return 'hm-bad';
+  }
+  return 'hm-neutral';
+}
+
+/**
+ * Format a metric value for heatmap display.
+ * @param {number} value
+ * @param {'pct'|'num2'|'int'} format
+ * @returns {string}
+ */
+function formatHeatmapValue(value, format) {
+  if (value === null || value === undefined || isNaN(value)) return '--';
+  // Treat 0 as valid value (not missing data)
+  if (value === 0 || value === 0.0) {
+    switch (format) {
+      case 'pct': return '0.0%';
+      case 'num2': return '0.00';
+      case 'int': return '0';
+      default: return '0.00';
+    }
+  }
+  switch (format) {
+    case 'pct': return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+    case 'num2': return value.toFixed(2);
+    case 'int': return Math.round(value).toString();
+    default: return value.toFixed(2);
+  }
+}
+
+/**
+ * P1-4: Render the metrics heatmap into #metricsHeatmapContainer.
+ * @param {Object|null} metrics
+ */
+function renderMetricsHeatmap(metrics) {
+  const container = document.getElementById('metricsHeatmapContainer');
+  if (!container) return;
+
+  if (!metrics) {
+    container.innerHTML = '<div class="text-center py-5 text-secondary">Нет данных для отображения</div>';
+    return;
+  }
+
+  // Debug: log missing metrics
+  const allKeys = HEATMAP_METRIC_GROUPS.flatMap(g => g.metrics.map(m => m.key));
+  const missingKeys = allKeys.filter(key => metrics[key] === undefined || metrics[key] === null || isNaN(parseFloat(metrics[key])));
+  if (missingKeys.length > 0) {
+    console.warn('[Heatmap] Missing metrics:', missingKeys);
+    console.log('[Heatmap] Available metrics keys:', Object.keys(metrics).filter(k => !k.startsWith('_')).sort());
+    
+    // Show which metrics have zero values
+    const zeroKeys = allKeys.filter(key => metrics[key] === 0 || metrics[key] === 0.0);
+    if (zeroKeys.length > 0) {
+      console.warn('[Heatmap] Metrics with ZERO value (may indicate no trades):', zeroKeys);
+    }
+    
+    // Debug: show specific values for problematic metrics
+    console.log('[Heatmap] Debug - avg_trade_pct:', metrics.avg_trade_pct, 'type:', typeof metrics.avg_trade_pct);
+    console.log('[Heatmap] Debug - payoff_ratio:', metrics.payoff_ratio, 'type:', typeof metrics.payoff_ratio);
+    console.log('[Heatmap] Debug - avg_win:', metrics.avg_win, 'avg_loss:', metrics.avg_loss);
+    console.log('[Heatmap] Debug - total_trades:', metrics.total_trades, 'winning_trades:', metrics.winning_trades, 'losing_trades:', metrics.losing_trades);
+  }
+
+  const groups = HEATMAP_METRIC_GROUPS.map((group) => {
+    const cells = group.metrics.map((m) => {
+      const raw = metrics[m.key];
+      const value = raw !== undefined && raw !== null ? parseFloat(raw) : null;
+      const colorClass = getHeatmapColor(m.key, value, m.goodWhen);
+      const formatted = formatHeatmapValue(value, m.format);
+      
+      // Debug for problematic metrics
+      if (['avg_trade_pct', 'payoff_ratio'].includes(m.key)) {
+        console.log(`[Heatmap] ${m.key}: raw=${raw}, value=${value}, formatted=${formatted}`);
+      }
+      
+      return `<div class="hm-cell ${colorClass}" title="${m.label}: ${formatted}">
+        <div class="hm-cell-label">${m.label}</div>
+        <div class="hm-cell-value">${formatted}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="hm-group">
+      <div class="hm-group-title">${group.label}</div>
+      <div class="hm-group-cells">${cells}</div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = groups;
+}
+
+// =============================================================================
+// P1-5: Walk-Forward Visualization
+// =============================================================================
+
+/** Chart.js instance for WF equity curve */
+let wfEquityChartInstance = null;
+
+/**
+ * P1-5: Render Walk-Forward results into the #tab-walk-forward tab.
+ * @param {Object|null} wfData - WalkForwardResult dict from API (or null if not available)
+ */
+function renderWalkForwardViz(wfData) {
+  const windowsContainer = document.getElementById('wfWindowsContainer');
+  const stabilityBadge = document.getElementById('wfStabilityBadge');
+  const stabilityScore = document.getElementById('wfStabilityScore');
+  const oosWinRate = document.getElementById('wfOosWinRate');
+  const paramContainer = document.getElementById('wfParamStabilityContainer');
+  const paramBody = document.getElementById('wfParamStabilityBody');
+  const canvas = document.getElementById('wfEquityChart');
+
+  if (!windowsContainer) return;
+
+  // Destroy previous chart instance
+  if (wfEquityChartInstance) {
+    wfEquityChartInstance.destroy();
+    wfEquityChartInstance = null;
+  }
+
+  if (!wfData || !wfData.windows || wfData.windows.length === 0) {
+    windowsContainer.innerHTML = `<div class="text-center py-5 text-secondary">
+      <i class="bi bi-arrow-repeat fs-2 mb-2 d-block"></i>
+      Запустите оптимизацию Walk-Forward для отображения результатов
+    </div>`;
+    if (stabilityBadge) stabilityBadge.classList.add('d-none');
+    if (paramContainer) paramContainer.classList.add('d-none');
+    return;
+  }
+
+  // --- Stability badges ---
+  if (stabilityBadge) stabilityBadge.classList.remove('d-none');
+  if (stabilityScore) {
+    const ps = wfData.parameter_stability ?? wfData.oos_win_rate ?? 0;
+    stabilityScore.textContent = `${(ps * 100).toFixed(1)}%`;
+  }
+  if (oosWinRate) {
+    oosWinRate.textContent = ((wfData.oos_win_rate ?? 0) * 100).toFixed(1);
+  }
+
+  // --- OOS Equity Chart ---
+  if (canvas && wfData.combined_oos_equity && wfData.combined_oos_equity.length > 0) {
+    // Lazy-load Chart.js if needed
+    const renderOosChart = (ChartLib) => {
+      const labels = wfData.combined_oos_equity.map((_, i) => i + 1);
+      const startVal = wfData.combined_oos_equity[0];
+      const data = wfData.combined_oos_equity.map((v) => ((v - startVal) / startVal) * 100);
+
+      wfEquityChartInstance = new ChartLib(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'OOS Equity (% от старта)',
+            data,
+            borderColor: '#2962ff',
+            backgroundColor: 'rgba(41,98,255,0.08)',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              ticks: { color: '#9e9e9e', callback: (v) => `${v.toFixed(1)}%` },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            }
+          }
+        }
+      });
+    };
+
+    if (typeof Chart !== 'undefined') {
+      renderOosChart(Chart);
+    } else {
+      // Chart.js not loaded — skip chart, show text summary
+      canvas.style.display = 'none';
+    }
+  }
+
+  // --- Windows table ---
+  const rows = wfData.windows.map((w, i) => {
+    const isSharpe = (w.is_metrics?.sharpe_ratio ?? 0).toFixed(2);
+    const oosSharpe = (w.oos_metrics?.sharpe_ratio ?? 0).toFixed(2);
+    const isRet = ((w.is_metrics?.total_return ?? 0)).toFixed(1);
+    const oosRet = ((w.oos_metrics?.total_return ?? 0)).toFixed(1);
+    const degrad = ((w.sharpe_degradation ?? 0) * 100).toFixed(1);
+    const degradClass = (w.sharpe_degradation ?? 0) < 0 ? 'text-danger' : 'text-success';
+    const bestParams = w.best_params
+      ? Object.entries(w.best_params).map(([k, v]) => `${k}=${v}`).join(', ')
+      : '--';
+
+    return `<tr>
+      <td>${i + 1}</td>
+      <td class="text-secondary">${w.train_start ? w.train_start.slice(0, 10) : '--'}</td>
+      <td class="text-secondary">${w.test_end ? w.test_end.slice(0, 10) : '--'}</td>
+      <td>${isSharpe}</td>
+      <td>${oosSharpe}</td>
+      <td class="${degradClass}">${degrad}%</td>
+      <td>${isRet}%</td>
+      <td>${oosRet}%</td>
+      <td class="text-secondary small">${bestParams}</td>
+    </tr>`;
+  }).join('');
+
+  windowsContainer.innerHTML = `
+    <div class="mb-2 d-flex gap-3 text-secondary small">
+      <span>Окон: <strong>${wfData.total_windows}</strong></span>
+      <span>Avg IS Sharpe: <strong>${(wfData.avg_is_sharpe ?? 0).toFixed(2)}</strong></span>
+      <span>Avg OOS Sharpe: <strong>${(wfData.avg_oos_sharpe ?? 0).toFixed(2)}</strong></span>
+      <span>Combined OOS Return: <strong>${((wfData.combined_oos_return ?? 0)).toFixed(1)}%</strong></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tv-data-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Train Start</th><th>Test End</th>
+            <th>IS Sharpe</th><th>OOS Sharpe</th><th>Degradation</th>
+            <th>IS Return</th><th>OOS Return</th><th>Best Params</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  // --- Parameter Stability ---
+  if (wfData.param_stability_report && Object.keys(wfData.param_stability_report).length > 0) {
+    if (paramContainer) paramContainer.classList.remove('d-none');
+    if (paramBody) {
+      paramBody.innerHTML = Object.entries(wfData.param_stability_report).map(([param, stats]) => {
+        const cv = (stats.cv_pct ?? 0).toFixed(1);
+        const stab = (stats.stability_pct ?? 0).toFixed(1);
+        const stabClass = parseFloat(stab) >= 70 ? 'text-success' : parseFloat(stab) >= 40 ? 'text-warning' : 'text-danger';
+        return `<tr>
+          <td>${param}</td>
+          <td>${(stats.mean ?? 0).toFixed(4)}</td>
+          <td>${(stats.std ?? 0).toFixed(4)}</td>
+          <td>${cv}%</td>
+          <td class="${stabClass} fw-bold">${stab}%</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+

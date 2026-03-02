@@ -54,9 +54,7 @@ class AIFeatureEngineer:
         Returns:
             Dict with suggested features, explanations, and code snippets
         """
-        logger.info(
-            f"🧠 Asking AI to suggest features for {objective} on {asset} ({timeframe})"
-        )
+        logger.info(f"🧠 Asking AI to suggest features for {objective} on {asset} ({timeframe})")
 
         prompt = f"""You are a quantitative trading expert. I need technical indicators for a trading strategy.
 
@@ -128,9 +126,7 @@ Respond ONLY with valid JSON, no additional text."""
             # Store in history
             self.feature_history.append(suggestions)
 
-            logger.info(
-                f"✅ AI suggested {len(suggestions.get('features', []))} features"
-            )
+            logger.info(f"✅ AI suggested {len(suggestions.get('features', []))} features")
             return suggestions
 
         except Exception as e:
@@ -258,9 +254,7 @@ Return ONLY Python code, ready to execute. Start with imports."""
         logger.info(f"🔍 Asking AI to validate {len(features)} features")
 
         # Sort features by performance
-        sorted_features = sorted(
-            performance_metrics.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_features = sorted(performance_metrics.items(), key=lambda x: x[1], reverse=True)
 
         prompt = f"""Analyze the performance of these technical indicators in a trading strategy:
 
@@ -386,9 +380,7 @@ Return as JSON:
                 "generated_at": result.get("latency_ms"),
             }
 
-            logger.info(
-                f"✅ Strategy '{strategy.get('strategy_name', 'Unknown')}' generated"
-            )
+            logger.info(f"✅ Strategy '{strategy.get('strategy_name', 'Unknown')}' generated")
             return strategy
 
         except Exception as e:

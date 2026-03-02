@@ -21,6 +21,7 @@ Version: 2.4.0
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -192,19 +193,13 @@ class RegimeFeatureEngine:
         features["price_vs_ma_long"] = (close - ma_long) / ma_long
 
         # MA alignment (trend strength)
-        features["ma_alignment"] = np.sign(ma_short - ma_medium) * np.sign(
-            ma_medium - ma_long
-        )
+        features["ma_alignment"] = np.sign(ma_short - ma_medium) * np.sign(ma_medium - ma_long)
 
         # === VOLATILITY FEATURES ===
 
         # Standard deviation
-        features["volatility_short"] = self._rolling_std(
-            close, self.config.short_period
-        )
-        features["volatility_medium"] = self._rolling_std(
-            close, self.config.medium_period
-        )
+        features["volatility_short"] = self._rolling_std(close, self.config.short_period)
+        features["volatility_medium"] = self._rolling_std(close, self.config.medium_period)
 
         # ATR (Average True Range)
         features["atr"] = self._atr(high, low, close, 14)
@@ -213,9 +208,7 @@ class RegimeFeatureEngine:
         # Volatility ratio (short/long)
         vol_long = self._rolling_std(close, self.config.long_period)
         with np.errstate(divide="ignore", invalid="ignore"):
-            features["volatility_ratio"] = np.where(
-                vol_long > 0, features["volatility_short"] / vol_long, 1.0
-            )
+            features["volatility_ratio"] = np.where(vol_long > 0, features["volatility_short"] / vol_long, 1.0)
 
         # Range
         features["range_percent"] = (high - low) / close
@@ -236,29 +229,21 @@ class RegimeFeatureEngine:
         # === VOLUME FEATURES (if available) ===
 
         if volume is not None:
-            features["volume_sma_ratio"] = volume / self._sma(
-                volume, self.config.medium_period
-            )
+            features["volume_sma_ratio"] = volume / self._sma(volume, self.config.medium_period)
             features["volume_trend"] = self._slope(self._sma(volume, 10), 5)
 
         # === DERIVED FEATURES ===
 
         # Trend strength indicator
-        features["trend_strength"] = np.abs(features["return_medium"]) / (
-            features["volatility_medium"] + 1e-10
-        )
+        features["trend_strength"] = np.abs(features["return_medium"]) / (features["volatility_medium"] + 1e-10)
 
         # Market efficiency ratio
         net_change = np.abs(close - np.roll(close, self.config.medium_period))
         total_change = np.zeros(n)
         for i in range(self.config.medium_period, n):
-            total_change[i] = np.sum(
-                np.abs(np.diff(close[i - self.config.medium_period : i + 1]))
-            )
+            total_change[i] = np.sum(np.abs(np.diff(close[i - self.config.medium_period : i + 1])))
         with np.errstate(divide="ignore", invalid="ignore"):
-            features["efficiency_ratio"] = np.where(
-                total_change > 0, net_change / total_change, 0
-            )
+            features["efficiency_ratio"] = np.where(total_change > 0, net_change / total_change, 0)
 
         # Fill NaN values
         for key in features:
@@ -427,11 +412,7 @@ class RuleBasedRegimeDetector:
             # Calculate volatility percentiles
             vol_window = features["volatility_medium"][max(0, i - 100) : i + 1]
             if len(vol_window) > 10:
-                current_vol_pct = (
-                    np.sum(vol_window <= features["volatility_medium"][i])
-                    / len(vol_window)
-                    * 100
-                )
+                current_vol_pct = np.sum(vol_window <= features["volatility_medium"][i]) / len(vol_window) * 100
             else:
                 current_vol_pct = 50
 
@@ -446,13 +427,7 @@ class RuleBasedRegimeDetector:
                 sideways_score += 0.3
 
             # Normalize scores
-            total = (
-                bull_score
-                + bear_score
-                + sideways_score
-                + high_vol_score
-                + low_vol_score
-            )
+            total = bull_score + bear_score + sideways_score + high_vol_score + low_vol_score
             if total > 0:
                 probs[i] = [
                     bull_score / total,
@@ -539,9 +514,7 @@ class ClusteringRegimeDetector:
 
         return regimes, probs
 
-    def _kmeans(
-        self, X: NDArray, k: int, max_iter: int = 100
-    ) -> tuple[NDArray, NDArray]:
+    def _kmeans(self, X: NDArray, k: int, max_iter: int = 100) -> tuple[NDArray, NDArray]:
         """Simple K-Means clustering."""
         n, _d = X.shape
 
@@ -619,7 +592,7 @@ class ClusteringRegimeDetector:
 
         # Map labels to regimes
         regimes = np.array(
-            [cluster_to_regime.get(l, MarketRegime.UNKNOWN) for l in labels],
+            [cluster_to_regime.get(lbl, MarketRegime.UNKNOWN) for lbl in labels],
             dtype=object,
         )
 
@@ -627,13 +600,7 @@ class ClusteringRegimeDetector:
         probs = np.zeros((n, 5))
         for i in range(n):
             distances = np.sum(
-                (
-                    centers
-                    - np.mean(
-                        [features[f][i] for f in ["return_medium", "volatility_medium"]]
-                    )
-                )
-                ** 2,
+                (centers - np.mean([features[f][i] for f in ["return_medium", "volatility_medium"]])) ** 2,
                 axis=1,
             )
             inv_distances = 1 / (distances + 1e-10)
@@ -668,7 +635,7 @@ class MLRegimeClassifier:
     def __init__(self, config: RegimeConfig):
         self.config = config
         self.feature_engine = RegimeFeatureEngine(config)
-        self.model = None
+        self.model: list[dict] | None = None
         self._is_trained = False
 
     def fit(
@@ -701,9 +668,7 @@ class MLRegimeClassifier:
         self.model = self._train_simple_forest(X, y)
         self._is_trained = True
 
-    def _train_simple_forest(
-        self, X: NDArray, y: NDArray, n_trees: int = 10
-    ) -> list[dict]:
+    def _train_simple_forest(self, X: NDArray, y: NDArray, n_trees: int = 10) -> list[dict]:
         """Train a simple random forest."""
         trees = []
         n_samples = len(X)
@@ -800,10 +765,7 @@ class MLRegimeClassifier:
 
         # Convert to regime enums
         regimes = np.array(
-            [
-                MarketRegime(p) if isinstance(p, str) else MarketRegime.UNKNOWN
-                for p in predictions
-            ],
+            [MarketRegime(p) if isinstance(p, str) else MarketRegime.UNKNOWN for p in predictions],
             dtype=object,
         )
 
@@ -838,7 +800,7 @@ class EnsembleRegimeDetector:
 
     def __init__(self, config: RegimeConfig):
         self.config = config
-        self.detectors = {
+        self.detectors: dict[str, Any] = {
             "rule_based": RuleBasedRegimeDetector(config),
             "clustering": ClusteringRegimeDetector(config),
         }
@@ -873,9 +835,7 @@ class EnsembleRegimeDetector:
             MarketRegime.HIGH_VOLATILITY,
             MarketRegime.LOW_VOLATILITY,
         ]
-        regimes = np.array(
-            [regime_map[np.argmax(combined_probs[i])] for i in range(n)], dtype=object
-        )
+        regimes = np.array([regime_map[np.argmax(combined_probs[i])] for i in range(n)], dtype=object)
 
         return regimes, combined_probs
 
@@ -894,6 +854,7 @@ class RegimeDetector:
 
     def __init__(self, config: RegimeConfig | None = None):
         self.config = config or RegimeConfig()
+        self.detector: RuleBasedRegimeDetector | ClusteringRegimeDetector | MLRegimeClassifier | EnsembleRegimeDetector
         self._init_detector()
 
     def _init_detector(self):
@@ -929,7 +890,7 @@ class RegimeDetector:
             RegimeOutput with detected regimes and metadata
         """
         # Run detection
-        regimes, probs = self.detector.detect(close, high, low, volume)
+        regimes, probs = self.detector.detect(close, high, low, volume)  # type: ignore[union-attr]
 
         # Apply smoothing
         if self.config.smoothing_window > 1:
@@ -1002,21 +963,13 @@ class RegimeDetector:
                         MarketRegime.BULL: float(np.mean(probs[start_bar:i, 0])),
                         MarketRegime.BEAR: float(np.mean(probs[start_bar:i, 1])),
                         MarketRegime.SIDEWAYS: float(np.mean(probs[start_bar:i, 2])),
-                        MarketRegime.HIGH_VOLATILITY: float(
-                            np.mean(probs[start_bar:i, 3])
-                        ),
-                        MarketRegime.LOW_VOLATILITY: float(
-                            np.mean(probs[start_bar:i, 4])
-                        ),
+                        MarketRegime.HIGH_VOLATILITY: float(np.mean(probs[start_bar:i, 3])),
+                        MarketRegime.LOW_VOLATILITY: float(np.mean(probs[start_bar:i, 4])),
                     },
-                    avg_return=float(
-                        np.mean(np.diff(close[start_bar : i + 1]) / close[start_bar:i])
-                    )
+                    avg_return=float(np.mean(np.diff(close[start_bar : i + 1]) / close[start_bar:i]))
                     if i > start_bar
                     else 0,
-                    volatility=float(
-                        np.std(np.diff(close[start_bar : i + 1]) / close[start_bar:i])
-                    )
+                    volatility=float(np.std(np.diff(close[start_bar : i + 1]) / close[start_bar:i]))
                     if i > start_bar + 1
                     else 0,
                 )
@@ -1053,9 +1006,7 @@ class RegimeDetector:
             counts[regime] = int(np.sum(regimes == regime))
         return counts
 
-    def _calculate_avg_duration(
-        self, states: list[RegimeState]
-    ) -> dict[MarketRegime, float]:
+    def _calculate_avg_duration(self, states: list[RegimeState]) -> dict[MarketRegime, float]:
         """Calculate average duration per regime."""
         durations: dict[MarketRegime, list[int]] = {}
         for state in states:
@@ -1063,9 +1014,7 @@ class RegimeDetector:
                 durations[state.regime] = []
             durations[state.regime].append(state.duration)
 
-        return {
-            regime: np.mean(durs) if durs else 0.0 for regime, durs in durations.items()
-        }
+        return {regime: float(np.mean(durs)) if durs else 0.0 for regime, durs in durations.items()}
 
     def _calculate_transition_matrix(
         self,

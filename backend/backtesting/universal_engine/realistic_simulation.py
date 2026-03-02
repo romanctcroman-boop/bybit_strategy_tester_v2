@@ -98,7 +98,7 @@ class RealisticBarSimulator:
             Array of tick prices from open to close
         """
         n_ticks = self.config.ticks_per_bar
-        path = np.zeros(n_ticks, dtype=np.float64)
+        path: NDArray[np.float64] = np.zeros(n_ticks, dtype=np.float64)
         path[0] = open_price
         path[-1] = close_price
 
@@ -110,17 +110,11 @@ class RealisticBarSimulator:
                 open_price, high_price, low_price, close_price, n_ticks, has_stop_hunt
             )
         elif self.config.path_type == BarPathType.TRENDING:
-            path = self._generate_trending_path(
-                open_price, high_price, low_price, close_price, n_ticks
-            )
+            path = self._generate_trending_path(open_price, high_price, low_price, close_price, n_ticks)
         elif self.config.path_type == BarPathType.MEAN_REVERTING:
-            path = self._generate_mean_reverting_path(
-                open_price, high_price, low_price, close_price, n_ticks
-            )
+            path = self._generate_mean_reverting_path(open_price, high_price, low_price, close_price, n_ticks)
         elif self.config.path_type == BarPathType.STOP_HUNT:
-            path = self._generate_stop_hunt_path(
-                open_price, high_price, low_price, close_price, n_ticks
-            )
+            path = self._generate_stop_hunt_path(open_price, high_price, low_price, close_price, n_ticks)
 
         return path
 
@@ -176,7 +170,7 @@ class RealisticBarSimulator:
 
         # Clip to high/low bounds (except stop-hunt)
         if not has_stop_hunt:
-            path = np.clip(path, low_p, high_p)
+            path = np.clip(path, low_p, high_p)  # type: ignore[assignment]
 
         return path
 
@@ -231,9 +225,7 @@ class RealisticBarSimulator:
         current_max = np.max(path)
         current_min = np.min(path)
         if current_max != current_min:
-            path = low_p + (path - current_min) * (high_p - low_p) / (
-                current_max - current_min
-            )
+            path = low_p + (path - current_min) * (high_p - low_p) / (current_max - current_min)  # type: ignore[assignment]
 
         path[0] = open_p
         path[-1] = close_p
@@ -249,9 +241,7 @@ class RealisticBarSimulator:
         n_ticks: int,
     ) -> NDArray[np.float64]:
         """Generate path with deliberate stop-hunt behavior."""
-        path = self._generate_random_walk_path(
-            open_p, high_p, low_p, close_p, n_ticks, has_stop_hunt=True
-        )
+        path = self._generate_random_walk_path(open_p, high_p, low_p, close_p, n_ticks, has_stop_hunt=True)
 
         # Add extra spikes at common stop levels
         hunt_depth = (high_p - low_p) * self.config.stop_hunt_depth * 2
@@ -285,12 +275,7 @@ class RealisticBarSimulator:
         Returns:
             Tuple of (triggered, tick_index, execution_price)
         """
-        if is_long:
-            # Long stop triggers when price goes below stop
-            trigger_mask = path <= stop_price
-        else:
-            # Short stop triggers when price goes above stop
-            trigger_mask = path >= stop_price
+        trigger_mask = path <= stop_price if is_long else path >= stop_price
 
         if np.any(trigger_mask):
             trigger_idx = np.argmax(trigger_mask)
@@ -377,9 +362,7 @@ class VolumeSlippageModel:
         aggression_factor = 1.5 if is_aggressive else 1.0
 
         # Calculate total slippage
-        slippage = (
-            self.config.base_slippage * size_impact * vol_factor * aggression_factor
-        )
+        slippage = self.config.base_slippage * size_impact * vol_factor * aggression_factor
 
         # Apply bounds
         slippage = np.clip(slippage, self.config.min_slippage, self.config.max_slippage)
@@ -436,19 +419,14 @@ class VolumeSlippageModel:
 
         # Split execution impact (TWAP-style)
         chunk_size = order_size_usd / n_bars_to_execute
-        chunk_slippages = [
-            self.calculate_slippage(chunk_size, average_volume_usd)
-            for _ in range(n_bars_to_execute)
-        ]
+        chunk_slippages = [self.calculate_slippage(chunk_size, average_volume_usd) for _ in range(n_bars_to_execute)]
         split_slippage = np.mean(chunk_slippages)
 
         return {
-            "single_execution_slippage": single_slippage,
-            "split_execution_slippage": split_slippage,
-            "savings_from_split": single_slippage - split_slippage,
-            "recommended_chunks": max(
-                1, int(order_size_usd / (average_volume_usd * 0.01))
-            ),
+            "single_execution_slippage": float(single_slippage),
+            "split_execution_slippage": float(split_slippage),
+            "savings_from_split": float(single_slippage - split_slippage),
+            "recommended_chunks": max(1, int(order_size_usd / (average_volume_usd * 0.01))),
         }
 
 
@@ -615,10 +593,7 @@ class DynamicFundingManager:
         for ft in funding_times:
             rate = self.get_funding_rate(symbol, ft)
             # Long pays positive rate, short pays negative rate
-            if is_long:
-                cost = -position_size * rate  # Long pays when rate > 0
-            else:
-                cost = position_size * rate  # Short receives when rate > 0
+            cost = -position_size * rate if is_long else position_size * rate  # Long pays, short receives
             total_cost += cost
 
         return total_cost
@@ -1035,9 +1010,7 @@ class LiquidationEngine:
         Returns:
             LiquidationResult with detailed info
         """
-        liq_price, bankruptcy_price = self.calculate_liquidation_price(
-            entry_price, leverage, is_long, position_size
-        )
+        liq_price, bankruptcy_price = self.calculate_liquidation_price(entry_price, leverage, is_long, position_size)
 
         # Calculate unrealized PnL
         if is_long:
@@ -1069,14 +1042,15 @@ class LiquidationEngine:
         is_liquidated = current_price <= liq_price if is_long else current_price >= liq_price
 
         # Check for partial liquidation
-        if not is_liquidated and self.config.enable_partial_liquidation:
-            if margin_ratio > self.config.partial_liquidation_threshold:
-                is_partial = True
-                # Liquidate enough to restore margin
-                target_margin_ratio = self.config.partial_liquidation_threshold * 0.8
-                liquidated_size = position_size * (
-                    1 - target_margin_ratio / margin_ratio
-                )
+        if (
+            not is_liquidated
+            and self.config.enable_partial_liquidation
+            and margin_ratio > self.config.partial_liquidation_threshold
+        ):
+            is_partial = True
+            # Liquidate enough to restore margin
+            target_margin_ratio = self.config.partial_liquidation_threshold * 0.8
+            liquidated_size = position_size * (1 - target_margin_ratio / margin_ratio)
 
         return LiquidationResult(
             is_liquidated=is_liquidated,
@@ -1185,7 +1159,7 @@ class FeatureEngineering:
             Dictionary of feature arrays
         """
         n = len(close)
-        features = {}
+        features: dict[str, NDArray[np.float64]] = {}
 
         # Returns
         features["return_1"] = np.zeros(n)
@@ -1196,17 +1170,13 @@ class FeatureEngineering:
             feat_name = f"return_{period}"
             features[feat_name] = np.zeros(n)
             if n > period:
-                features[feat_name][period:] = (
-                    close[period:] - close[:-period]
-                ) / close[:-period]
+                features[feat_name][period:] = (close[period:] - close[:-period]) / close[:-period]
 
         # Volatility (rolling std of returns)
         features["volatility"] = np.zeros(n)
         if n > lookback:
             for i in range(lookback, n):
-                features["volatility"][i] = np.std(
-                    features["return_1"][i - lookback : i]
-                )
+                features["volatility"][i] = np.std(features["return_1"][i - lookback : i])
 
         # RSI
         features["rsi"] = FeatureEngineering._calculate_rsi(close, 14)
@@ -1217,15 +1187,15 @@ class FeatureEngineering:
             features[feat_name] = np.zeros(n)
             if n > period:
                 ma = np.convolve(close, np.ones(period) / period, mode="valid")
-                features[feat_name][period - 1 :] = close[period - 1 :] / ma - 1
+                features[feat_name][period - 1 :] = (close[period - 1 :] / ma - 1).astype(np.float64)  # type: ignore[assignment]
 
         # Volume features
         features["volume_ma_ratio"] = np.zeros(n)
         if n > lookback:
             vol_ma = np.convolve(volume, np.ones(lookback) / lookback, mode="valid")
-            features["volume_ma_ratio"][lookback - 1 :] = (
-                volume[lookback - 1 :] / (vol_ma + 1e-10) - 1
-            )
+            features["volume_ma_ratio"][lookback - 1 :] = (volume[lookback - 1 :] / (vol_ma + 1e-10) - 1).astype(
+                np.float64
+            )  # type: ignore[assignment]
 
         # Range features
         features["range_ratio"] = (high - low) / (close + 1e-10)
@@ -1239,9 +1209,7 @@ class FeatureEngineering:
         return features
 
     @staticmethod
-    def _calculate_rsi(
-        close: NDArray[np.float64], period: int = 14
-    ) -> NDArray[np.float64]:
+    def _calculate_rsi(close: NDArray[np.float64], period: int = 14) -> NDArray[np.float64]:
         """Calculate RSI indicator."""
         n = len(close)
         rsi = np.full(n, 50.0)
@@ -1308,7 +1276,7 @@ class MLStrategyInterface:
         """
         self.model = model
         self.config = config or MLStrategyConfig()
-        self.scaler_params: dict[str, tuple[float, float]] | None = None
+        self.scaler_params: dict[int, tuple[float, float]] | None = None
         self.feature_engineer = FeatureEngineering()
 
     def set_model(self, model: Any) -> None:
@@ -1334,17 +1302,11 @@ class MLStrategyInterface:
         Returns:
             Feature matrix (n_samples, n_features)
         """
-        features_dict = self.feature_engineer.generate_features(
-            close, high, low, volume, self.config.lookback_period
-        )
+        features_dict = self.feature_engineer.generate_features(close, high, low, volume, self.config.lookback_period)
 
         # Select features
         if self.config.feature_columns:
-            selected = [
-                features_dict[col]
-                for col in self.config.feature_columns
-                if col in features_dict
-            ]
+            selected = [features_dict[col] for col in self.config.feature_columns if col in features_dict]
         else:
             selected = list(features_dict.values())
 
@@ -1366,15 +1328,15 @@ class MLStrategyInterface:
                 col = X[:, i]
                 if self.config.scaling_method == "standard":
                     mean, std = np.mean(col), np.std(col)
-                    self.scaler_params[i] = (mean, std if std > 0 else 1.0)
+                    self.scaler_params[i] = (float(mean), float(std) if std > 0 else 1.0)
                 elif self.config.scaling_method == "minmax":
                     min_val, max_val = np.min(col), np.max(col)
                     range_val = max_val - min_val if max_val > min_val else 1.0
-                    self.scaler_params[i] = (min_val, range_val)
+                    self.scaler_params[i] = (float(min_val), float(range_val))
                 else:  # robust
                     median = np.median(col)
                     iqr = np.percentile(col, 75) - np.percentile(col, 25)
-                    self.scaler_params[i] = (median, iqr if iqr > 0 else 1.0)
+                    self.scaler_params[i] = (float(median), float(iqr) if iqr > 0 else 1.0)
 
         # Apply scaling
         X_scaled = X.copy()
@@ -1459,9 +1421,7 @@ class MLStrategyInterface:
 
         # Forward returns
         forward_returns = np.zeros(n)
-        forward_returns[:-forward_period] = (
-            close[forward_period:] - close[:-forward_period]
-        ) / close[:-forward_period]
+        forward_returns[:-forward_period] = (close[forward_period:] - close[:-forward_period]) / close[:-forward_period]
 
         labels[forward_returns > threshold] = 1
         labels[forward_returns < -threshold] = -1

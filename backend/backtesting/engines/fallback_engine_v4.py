@@ -20,15 +20,12 @@ import pandas as pd
 
 from backend.backtesting.atr_calculator import calculate_atr_fast
 from backend.backtesting.formulas import (
-    ANNUALIZATION_HOURLY,
     calc_expectancy,
-    calc_max_drawdown,
     calc_payoff_ratio,
     calc_profit_factor,
     calc_recovery_factor,
-    calc_returns_from_equity,
-    calc_sharpe,
-    calc_sortino,
+    calc_sharpe_monthly_tv,
+    calc_sortino_monthly_tv,
 )
 from backend.backtesting.interfaces import (
     BacktestInput,
@@ -856,7 +853,15 @@ class FallbackEngineV4(BaseBacktestEngine):
         # Пирамидинг
         pyramiding = input_data.pyramiding
         close_entries_rule = getattr(input_data, "close_entries_rule", "ALL")
-        entry_on_next_bar_open = getattr(input_data, "entry_on_next_bar_open", False)
+        # TradingView parity: entry_on_next_bar_open means signal on bar N → fill at open[N+1].
+        # BacktestConfig has an explicit field (default True).
+        # BacktestInput only has entry_on_next_bar_open (default False — legacy).
+        # Fallback chain: explicit field → process_orders_on_close → False
+        _enbo_flag = getattr(input_data, "entry_on_next_bar_open", None)
+        if _enbo_flag is None:
+            # Derive from process_orders_on_close when field is absent (legacy BacktestInput)
+            _enbo_flag = getattr(input_data, "process_orders_on_close", False)
+        entry_on_next_bar_open = bool(_enbo_flag)
 
         # === РЕЖИМЫ ВЫХОДА (НОВАЯ СИСТЕМА) ===
         # Импортируем Enum'ы если доступны
@@ -997,6 +1002,7 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         # === PORTFOLIO ===
         hedge_mode = getattr(input_data, "hedge_mode", False)
+        tv_position_reversal = getattr(input_data, "tv_position_reversal", False)
 
         # === SLIPPAGE MODEL ===
         slippage_model = getattr(input_data, "slippage_model", "fixed")
@@ -1302,6 +1308,15 @@ class FallbackEngineV4(BaseBacktestEngine):
             high_price = high_prices[i]
             low_price = low_prices[i]
             close_price = close_prices[i]
+            # TV parity: track whether a pending exit was executed THIS bar (per direction).
+            # When entry_on_next_bar_open=True, a new entry reads signal[i-1]. But if a
+            # pending exit was triggered on bar i-1 and executes at bar i open, the position
+            # was still open when signal[i-1] fired — so a same-direction re-entry must be blocked.
+            # IMPORTANT: Only block same-direction re-entry. Opposite-direction entries (e.g.
+            # long entry after short exit) are allowed — TV opens the opposite side immediately.
+            # Example verified: Dec-17 short TP → long entry on same bar (TV trade #35→#36).
+            pending_long_exit_executed = False
+            pending_short_exit_executed = False
             # ATR используется если SL или TP в ATR-режиме
             current_atr = (
                 atr_values[i] if atr_values is not None and (sl_mode == SlMode.ATR or tp_mode == TpMode.ATR) else 0.0
@@ -1401,7 +1416,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     xp = trade_data["exit_price"]
                     sz = trade_data["size"]
                     price_move_long = abs(ep - xp) * sz  # max possible MAE = actual exit move
-                    capped_long_mfe = long_accumulated_mfe                        # MFE never capped
+                    capped_long_mfe = long_accumulated_mfe  # MFE never capped
                     capped_long_mae = min(long_accumulated_mae, price_move_long)  # MAE capped at exit move
 
                     # Calculate MFE/MAE percentages from USD values
@@ -1450,6 +1465,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # Сброс MFE/MAE для следующего трейда
                 long_accumulated_mfe = 0.0
                 long_accumulated_mae = 0.0
+                # TV parity: block same-direction (long) re-entry when signal[i-1] coincided
+                # with the exit bar. Opposite-direction entries (short) are still allowed.
+                pending_long_exit_executed = True
 
             if pending_short_exit and pyramid_mgr.has_position("short"):
                 exit_price = pending_short_exit_price
@@ -1494,7 +1512,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     xp = trade_data["exit_price"]
                     sz = trade_data["size"]
                     price_move_short = abs(xp - ep) * sz  # max possible MAE = actual exit move
-                    capped_short_mfe = short_accumulated_mfe                         # MFE never capped
+                    capped_short_mfe = short_accumulated_mfe  # MFE never capped
                     capped_short_mae = min(short_accumulated_mae, price_move_short)  # MAE capped at exit move
 
                     # Calculate MFE/MAE percentages from USD values
@@ -1542,6 +1560,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # Сброс MFE/MAE для следующего трейда
                 short_accumulated_mfe = 0.0
                 short_accumulated_mae = 0.0
+                # TV parity: block same-direction (short) re-entry when signal[i-1] coincided
+                # with the exit bar. Opposite-direction entries (long) are still allowed.
+                pending_short_exit_executed = True
 
             # === ОБРАБОТКА PENDING LIMIT/STOP ORDERS ===
             # Проверяем исполнение отложенных ордеров на вход
@@ -1735,11 +1756,19 @@ class FallbackEngineV4(BaseBacktestEngine):
                             # Get the position size before partial close to calculate the proportion
                             pos_before = pyramid_mgr.get_total_size("long")
                             partial_size = partial_result["size"]
-                            
+
                             # Scale MFE/MAE: only the portion that was closed
-                            mfe_proportional = long_accumulated_mfe * (partial_size / pos_before) if pos_before > 0 else long_accumulated_mfe
-                            mae_proportional = long_accumulated_mae * (partial_size / pos_before) if pos_before > 0 else long_accumulated_mae
-                            
+                            mfe_proportional = (
+                                long_accumulated_mfe * (partial_size / pos_before)
+                                if pos_before > 0
+                                else long_accumulated_mfe
+                            )
+                            mae_proportional = (
+                                long_accumulated_mae * (partial_size / pos_before)
+                                if pos_before > 0
+                                else long_accumulated_mae
+                            )
+
                             # Calculate MFE/MAE percentages from proportional USD values
                             entry_value = partial_result["entry_price"] * partial_result["size"]
                             mfe_pct = (mfe_proportional / entry_value * 100) if entry_value > 0 else 0.0
@@ -1808,11 +1837,19 @@ class FallbackEngineV4(BaseBacktestEngine):
                             # Get the position size before partial close to calculate the proportion
                             pos_before = pyramid_mgr.get_total_size("short")
                             partial_size = short_partial["size"]
-                            
+
                             # Scale MFE/MAE: only the portion that was closed
-                            mfe_proportional = short_accumulated_mfe * (partial_size / pos_before) if pos_before > 0 else short_accumulated_mfe
-                            mae_proportional = short_accumulated_mae * (partial_size / pos_before) if pos_before > 0 else short_accumulated_mae
-                            
+                            mfe_proportional = (
+                                short_accumulated_mfe * (partial_size / pos_before)
+                                if pos_before > 0
+                                else short_accumulated_mfe
+                            )
+                            mae_proportional = (
+                                short_accumulated_mae * (partial_size / pos_before)
+                                if pos_before > 0
+                                else short_accumulated_mae
+                            )
+
                             # Calculate MFE/MAE percentages from proportional USD values
                             entry_value = short_partial["entry_price"] * short_partial["size"]
                             mfe_pct = (mfe_proportional / entry_value * 100) if entry_value > 0 else 0.0
@@ -2313,6 +2350,113 @@ class FallbackEngineV4(BaseBacktestEngine):
             )
 
             # Проверка hedge_mode: если нет - нельзя открывать противоположную позицию
+            # TV Position Reversal (tv_position_reversal=True):
+            # When strategy.entry("Long") fires while a short is open, TV auto-closes the
+            # short at the same bar's price and opens the long immediately.
+            # This mirrors TradingView's default strategy.entry() behaviour.
+            if tv_position_reversal and not hedge_mode:
+                _reversal_price = open_prices[i] if entry_on_next_bar_open else close_price
+                _long_sig = long_entries[i - 1] if entry_on_next_bar_open and i > 0 else long_entries[i]
+                _short_sig = short_entries[i - 1] if entry_on_next_bar_open and i > 0 else short_entries[i]
+
+                # Long signal + open short → close short immediately, then allow long
+                if _long_sig and pyramid_mgr.has_position("short") and not pending_short_exit:
+                    closed_trades = pyramid_mgr.close_position(
+                        direction="short",
+                        exit_price=_reversal_price,
+                        exit_bar_idx=i,
+                        exit_time=current_time,
+                        exit_reason=ExitReason.SIGNAL.value,
+                        taker_fee=taker_fee,
+                    )
+                    for _td in closed_trades:
+                        cash += _td["allocated"] + _td["pnl"]
+                        _ep = _td["entry_price"]
+                        _xp = _td["exit_price"]
+                        _sz = _td["size"]
+                        _pm_short = abs(_xp - _ep) * _sz
+                        _capped_mae = min(short_accumulated_mae, _pm_short)
+                        _entry_val = _ep * _sz
+                        trades.append(
+                            TradeRecord(
+                                entry_time=_td["entry_time"],
+                                exit_time=_td["exit_time"],
+                                direction="short",
+                                entry_price=_ep,
+                                exit_price=_xp,
+                                size=_sz,
+                                pnl=_td["pnl"],
+                                pnl_pct=_td["pnl_pct"],
+                                fees=_td["fees"],
+                                exit_reason=ExitReason.SIGNAL,
+                                duration_bars=_td["duration_bars"],
+                                mfe=short_accumulated_mfe,
+                                mae=_capped_mae,
+                                mfe_pct=(short_accumulated_mfe / _entry_val * 100) if _entry_val > 0 else 0.0,
+                                mae_pct=(_capped_mae / _entry_val * 100) if _entry_val > 0 else 0.0,
+                            )
+                        )
+                        last_exit_bar = i
+                    # Reset short state
+                    pending_short_exit = False
+                    pending_short_exit_reason = None
+                    short_tp_state.reset()
+                    short_trailing.reset()
+                    short_breakeven.reset()
+                    dca_state = None
+                    scale_in_state_short = None
+                    short_accumulated_mfe = 0.0
+                    short_accumulated_mae = 0.0
+
+                # Short signal + open long → close long immediately, then allow short
+                if _short_sig and pyramid_mgr.has_position("long") and not pending_long_exit:
+                    closed_trades = pyramid_mgr.close_position(
+                        direction="long",
+                        exit_price=_reversal_price,
+                        exit_bar_idx=i,
+                        exit_time=current_time,
+                        exit_reason=ExitReason.SIGNAL.value,
+                        taker_fee=taker_fee,
+                    )
+                    for _td in closed_trades:
+                        cash += _td["allocated"] + _td["pnl"]
+                        _ep = _td["entry_price"]
+                        _xp = _td["exit_price"]
+                        _sz = _td["size"]
+                        _pm_long = abs(_ep - _xp) * _sz
+                        _capped_mae = min(long_accumulated_mae, _pm_long)
+                        _entry_val = _ep * _sz
+                        trades.append(
+                            TradeRecord(
+                                entry_time=_td["entry_time"],
+                                exit_time=_td["exit_time"],
+                                direction="long",
+                                entry_price=_ep,
+                                exit_price=_xp,
+                                size=_sz,
+                                pnl=_td["pnl"],
+                                pnl_pct=_td["pnl_pct"],
+                                fees=_td["fees"],
+                                exit_reason=ExitReason.SIGNAL,
+                                duration_bars=_td["duration_bars"],
+                                mfe=long_accumulated_mfe,
+                                mae=_capped_mae,
+                                mfe_pct=(long_accumulated_mfe / _entry_val * 100) if _entry_val > 0 else 0.0,
+                                mae_pct=(_capped_mae / _entry_val * 100) if _entry_val > 0 else 0.0,
+                            )
+                        )
+                        last_exit_bar = i
+                    # Reset long state
+                    pending_long_exit = False
+                    pending_long_exit_reason = None
+                    long_tp_state.reset()
+                    long_trailing.reset()
+                    long_breakeven.reset()
+                    dca_state = None
+                    scale_in_state_long = None
+                    long_accumulated_mfe = 0.0
+                    long_accumulated_mae = 0.0
+
             if not hedge_mode:
                 if pyramid_mgr.has_position("short"):
                     can_long = False
@@ -2326,11 +2470,15 @@ class FallbackEngineV4(BaseBacktestEngine):
             # NOTE: TradingView does NOT carry signals. When pyramiding is full or a pending
             # exit blocks re-entry, the signal is simply dropped. The next entry can only
             # happen when a fresh signal fires on a bar where the position is empty.
+            # NOTE: pending_long_exit_executed blocks LONG re-entries whose signal[i-1]
+            # coincided with the long exit bar — TV does not allow same-direction re-entry on
+            # the exit bar. Opposite-direction (short) entries remain unblocked.
             _long_raw_signal = long_entries[i - 1] if entry_on_next_bar_open and i > 0 else long_entries[i]
             if (
                 _long_raw_signal
                 and can_long
                 and not pending_long_exit
+                and not (entry_on_next_bar_open and pending_long_exit_executed)
                 and time_allows_entry
                 and reentry_allowed
                 and market_conditions_allow
@@ -2477,11 +2625,15 @@ class FallbackEngineV4(BaseBacktestEngine):
             # NOTE: TradingView does NOT carry signals. When pyramiding is full or a pending
             # exit blocks re-entry, the signal is simply dropped. The next entry can only
             # happen when a fresh signal fires on a bar where the position is empty.
+            # NOTE: pending_short_exit_executed blocks SHORT re-entries whose signal[i-1]
+            # coincided with the short exit bar — TV does not allow same-direction re-entry on
+            # the exit bar. Opposite-direction (long) entries remain unblocked.
             _short_raw_signal = short_entries[i - 1] if entry_on_next_bar_open and i > 0 else short_entries[i]
             if (
                 _short_raw_signal
                 and can_short
                 and not pending_short_exit
+                and not (entry_on_next_bar_open and pending_short_exit_executed)
                 and time_allows_entry
                 and reentry_allowed
                 and market_conditions_allow
@@ -2733,12 +2885,12 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                 for trade_data in closed:
                     cash += trade_data["allocated"] + trade_data["pnl"]
-                    
+
                     # Calculate MFE/MAE percentages from USD values
                     entry_value = trade_data["entry_price"] * trade_data["size"]
                     mfe_pct = (final_mfe / entry_value * 100) if entry_value > 0 else 0.0
                     mae_pct = (final_mae / entry_value * 100) if entry_value > 0 else 0.0
-                    
+
                     trades.append(
                         TradeRecord(
                             entry_time=trade_data["entry_time"],
@@ -2762,7 +2914,11 @@ class FallbackEngineV4(BaseBacktestEngine):
         equity_curve[-1] = cash
 
         # === РАСЧЁТ МЕТРИК ===
-        metrics = self._calculate_metrics(trades, equity_curve, capital)
+        # Pass candles.index so monthly Sharpe/Sortino can be computed (TV-parity).
+        # equity_curve has 1 + warmup_bars + n entries; candles.index has n entries.
+        # Trim equity to last n values so lengths match.
+        equity_for_metrics = equity_curve[len(equity_curve) - n :] if len(equity_curve) > n else equity_curve
+        metrics = self._calculate_metrics(trades, equity_for_metrics, capital, candles_index=candles.index)
 
         execution_time = time.time() - start_time
 
@@ -2862,6 +3018,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         trades: list[TradeRecord],
         equity_curve: list[float],
         initial_capital: float,
+        candles_index=None,
     ) -> BacktestMetrics:
         """Calculate backtest metrics via formulas.py (TV-parity gold standard)."""
         metrics = BacktestMetrics()
@@ -2913,15 +3070,37 @@ class FallbackEngineV4(BaseBacktestEngine):
             metrics.avg_winning_duration = float(np.mean(win_durations)) if win_durations else 0.0
             metrics.avg_losing_duration = float(np.mean(loss_durations)) if loss_durations else 0.0
 
-        # === DRAWDOWN (via formulas.py — TV-parity, safe peak=0) ===
-        equity_arr = np.asarray(equity_curve, dtype=np.float64)
-        max_dd_pct, _max_dd_val, _max_dd_dur = calc_max_drawdown(equity_arr)
+        # === DRAWDOWN (TV-parity: closed-trade equity, initial_capital denominator) ===
+        # TradingView "Max Drawdown %" = (peak − trough) / initial_capital * 100
+        # using the closed-trade equity curve (NOT bar-by-bar with unrealized PnL).
+        # Verified: TV close-to-close MaxDD 266.76 / 10000 = 2.67%
+        #           Our closed-trade MaxDD 266.80 / 10000 = 2.668% ≈ TV ✅
+        # Using bar-by-bar equity (unrealized PnL included) gives a higher peak
+        # during open trades, inflating the MaxDD to 3.04% — TV does NOT do this.
+        closed_equity = np.empty(len(trades) + 1, dtype=np.float64)
+        closed_equity[0] = initial_capital
+        for _i, _t in enumerate(trades):
+            closed_equity[_i + 1] = closed_equity[_i] + _t.pnl
+        _cp = np.maximum.accumulate(closed_equity)
+        _dd_init = np.where(_cp > 0, (_cp - closed_equity) / initial_capital, 0.0)
+        max_dd_pct = float(np.max(_dd_init)) * 100.0
+        _max_dd_idx = int(np.argmax(_dd_init))
+        _max_dd_val = float(_cp[_max_dd_idx] - closed_equity[_max_dd_idx])
+        # Duration in trades (not bars) — kept as bars count for API compatibility
+        _max_dd_peak_idx = _max_dd_idx
+        while _max_dd_peak_idx > 0 and closed_equity[_max_dd_peak_idx] < _cp[_max_dd_peak_idx]:
+            _max_dd_peak_idx -= 1
+        _max_dd_dur = _max_dd_idx - _max_dd_peak_idx
         metrics.max_drawdown = max_dd_pct
+        metrics.max_drawdown_pct = max_dd_pct  # alias — keep in sync
 
         # === RISK-ADJUSTED RATIOS (via formulas.py — TV-parity) ===
-        returns = calc_returns_from_equity(equity_arr)
-        metrics.sharpe_ratio = calc_sharpe(returns, annualization_factor=ANNUALIZATION_HOURLY)
-        metrics.sortino_ratio = calc_sortino(returns, annualization_factor=ANNUALIZATION_HOURLY)
+        # TradingView uses MONTHLY returns bucketed by trade entry_time.
+        # Using trades (not equity_curve) ensures parity across all engines,
+        # regardless of how equity is computed (margin vs notional).
+        equity_arr = np.asarray(equity_curve, dtype=np.float64)
+        metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_arr, candles_index, initial_capital, trades=trades)
+        metrics.sortino_ratio = calc_sortino_monthly_tv(equity_arr, candles_index, initial_capital, trades=trades)
 
         # Recovery factor
         metrics.recovery_factor = calc_recovery_factor(metrics.net_profit, initial_capital, metrics.max_drawdown)

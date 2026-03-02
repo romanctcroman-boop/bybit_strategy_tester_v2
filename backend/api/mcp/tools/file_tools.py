@@ -145,9 +145,7 @@ async def read_project_file(file_path: str, max_size_kb: int = 100) -> dict:
         }
 
 
-async def list_project_structure(
-    directory: str = ".", max_depth: int = 3, include_hidden: bool = False
-) -> dict:
+async def list_project_structure(directory: str = ".", max_depth: int = 3, include_hidden: bool = False) -> dict:
     """
     List project directory structure (read-only navigation).
 

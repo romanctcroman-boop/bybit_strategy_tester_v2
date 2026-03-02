@@ -18,7 +18,6 @@ Example:
     - lookahead_mode="allow": sees HTF Bar 1 (current, incomplete)
 """
 
-
 import numpy as np
 
 
@@ -80,9 +79,7 @@ def calculate_bars_ratio(ltf_interval: str, htf_interval: str) -> int:
     htf_minutes = interval_to_minutes(htf_interval)
 
     if ltf_minutes is None or htf_minutes is None:
-        raise ValueError(
-            f"Cannot parse intervals: LTF={ltf_interval}, HTF={htf_interval}"
-        )
+        raise ValueError(f"Cannot parse intervals: LTF={ltf_interval}, HTF={htf_interval}")
 
     if htf_minutes < ltf_minutes:
         raise ValueError(f"HTF ({htf_interval}) must be >= LTF ({ltf_interval})")
@@ -129,9 +126,7 @@ def _extract_timestamps(data) -> np.ndarray:
     return np.asarray(data, dtype=np.int64)
 
 
-def create_htf_index_map(
-    ltf_timestamps, htf_timestamps, lookahead_mode: str = "none"
-) -> np.ndarray:
+def create_htf_index_map(ltf_timestamps, htf_timestamps, lookahead_mode: str = "none") -> np.ndarray:
     """
     Create mapping from LTF bars to HTF bars with lookahead prevention.
 

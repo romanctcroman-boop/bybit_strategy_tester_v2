@@ -319,16 +319,12 @@ class ArbitrageDetector:
                 sell_ticker = tickers[sell_ex]
 
                 # Check buy on buy_ex, sell on sell_ex
-                opp1 = self._check_spatial_pair(
-                    buy_ticker, sell_ticker, buy_ex, sell_ex
-                )
+                opp1 = self._check_spatial_pair(buy_ticker, sell_ticker, buy_ex, sell_ex)
                 if opp1 and opp1.is_profitable:
                     opportunities.append(opp1)
 
                 # Check reverse direction
-                opp2 = self._check_spatial_pair(
-                    sell_ticker, buy_ticker, sell_ex, buy_ex
-                )
+                opp2 = self._check_spatial_pair(sell_ticker, buy_ticker, sell_ex, buy_ex)
                 if opp2 and opp2.is_profitable:
                     opportunities.append(opp2)
 
@@ -367,8 +363,7 @@ class ArbitrageDetector:
         # Confidence based on spread and liquidity
         confidence = min(
             1.0,
-            (net_spread * 10000 / self.config.min_net_spread_bps)
-            * (max_size / 1.0),  # Normalize by 1 BTC
+            (net_spread * 10000 / self.config.min_net_spread_bps) * (max_size / 1.0),  # Normalize by 1 BTC
         )
 
         return ArbitrageOpportunity(
@@ -758,15 +753,9 @@ class CrossExchangeTrader:
             "success_rate": len(successful) / len(self._executions),
             "total_profit": sum(e.net_profit for e in successful),
             "total_fees": sum(e.fees_paid for e in successful),
-            "avg_profit_per_trade": (
-                sum(e.net_profit for e in successful) / len(successful)
-                if successful
-                else 0
-            ),
+            "avg_profit_per_trade": (sum(e.net_profit for e in successful) / len(successful) if successful else 0),
             "avg_execution_time_ms": (
-                sum(e.execution_time_ms for e in successful) / len(successful)
-                if successful
-                else 0
+                sum(e.execution_time_ms for e in successful) / len(successful) if successful else 0
             ),
         }
 
@@ -840,7 +829,6 @@ class FeeCalculator:
         """Calculate fees for a single trade."""
         fees = self.exchange_fees.get(exchange, ExchangeFees())
 
-
         return FeeBreakdown(
             maker_fee=size_usd * fees.maker_fee if is_maker else 0,
             taker_fee=size_usd * fees.taker_fee if not is_maker else 0,
@@ -901,10 +889,7 @@ class FeeCalculator:
         size_usd: float = 10000.0,
     ) -> dict[ExchangeName, FeeBreakdown]:
         """Compare fees across all exchanges."""
-        return {
-            exchange: self.calculate_trade_fees(exchange, size_usd)
-            for exchange in self.exchange_fees
-        }
+        return {exchange: self.calculate_trade_fees(exchange, size_usd) for exchange in self.exchange_fees}
 
 
 # =============================================================================

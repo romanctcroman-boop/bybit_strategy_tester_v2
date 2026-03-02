@@ -154,6 +154,24 @@
   // Pylance / Pyright — Type Checking Configuration
   // ═══════════════════════════════════════════════════════════
   "python.analysis.typeCheckingMode": "basic",
+  // Exclude non-Python files and heavy directories from Pylance analysis
+  "python.analysis.exclude": [
+    "**/*.md",
+    "**/*.MD",
+    "mcp-server/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/.mypy_cache/**",
+    "test_e2e_test_*/**",
+    "test_eval_test_*/**",
+    "test_memory_test_*/**",
+    "**/agent_memory/**",
+    "**/journal/**",
+    "**/node_modules/**",
+    "**/logs/**",
+    "**/data/**",
+    "**/screenshots/**"
+  ],
   // Suppress SQLAlchemy 1.x Column[] type mismatches (pervasive false positives)
   "python.analysis.diagnosticSeverityOverrides": {
     "reportArgumentType": "none",

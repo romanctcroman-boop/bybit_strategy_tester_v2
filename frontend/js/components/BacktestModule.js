@@ -688,7 +688,7 @@ export function createBacktestModule(deps) {
         getDefaultParams,
         showNotification,
         saveStrategy,
-        autoSaveStrategy,
+        autoSaveStrategy: _autoSaveStrategy, // kept in deps API for compatibility; pre-backtest uses saveStrategy
         validateStrategyCompleteness,
         validateStrategy,
         getStrategyIdFromURL,
@@ -788,7 +788,9 @@ export function createBacktestModule(deps) {
             start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
             end_date: (() => {
                 const endVal = document.getElementById('backtestEndDate')?.value || '2030-01-01';
-                const today = new Date().toISOString().slice(0, 10);
+                // Use LOCAL date (not UTC toISOString) to avoid off-by-one at midnight UTC+N
+                const _n = new Date();
+                const today = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
                 // If end date is in the future, clamp silently to today.
                 // The user sets 2030-01-01 as a "run to latest available data" sentinel.
                 return endVal > today ? today : endVal;
@@ -1025,7 +1027,9 @@ export function createBacktestModule(deps) {
         // Validate date range before sending — avoids cryptic HTTP 422
         const DATA_START_DATE = '2025-01-01'; // Must match backend/config/database_policy.py
         const startDateVal = document.getElementById('backtestStartDate')?.value || DATA_START_DATE;
-        const nowDateStr = new Date().toISOString().slice(0, 10);
+        // Use LOCAL date (not UTC toISOString) to avoid off-by-one at midnight UTC+N
+        const _nowD = new Date();
+        const nowDateStr = `${_nowD.getFullYear()}-${String(_nowD.getMonth() + 1).padStart(2, '0')}-${String(_nowD.getDate()).padStart(2, '0')}`;
 
         // End date: if empty or in the future → auto-clamp to today (no error shown, just info)
         let endDateRaw = document.getElementById('backtestEndDate')?.value;
@@ -1053,8 +1057,11 @@ export function createBacktestModule(deps) {
             return;
         }
 
-        // Bug #5 fix: sync graph to DB before backtest so backend reads up-to-date state
-        await autoSaveStrategy();
+        // Bug #5 fix: sync graph to DB before backtest so backend reads up-to-date state.
+        // CRITICAL: Use saveStrategy (full PUT, no cache check) instead of autoSaveStrategy,
+        // which has a payload dedup cache that can silently skip saving when blocks haven't
+        // changed since the last autosave — causing backtest to run on stale DB blocks.
+        await saveStrategy();
 
         const backtestParams = buildBacktestRequest();
         backtestParams.strategy_id = strategyId;

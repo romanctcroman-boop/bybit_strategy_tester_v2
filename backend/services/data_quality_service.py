@@ -95,12 +95,10 @@ class DataQualityService:
 
     def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(DB_PATH)
-        self._executor = ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="DataQuality"
-        )
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="DataQuality")
         self._monitoring_task: asyncio.Task | None = None
         self._monitored_symbols: dict[str, set] = {}  # symbol -> set of intervals
-        self._repair_service = None
+        self._repair_service: Any = None
         self._adapter = None
 
     @classmethod
@@ -133,9 +131,7 @@ class DataQualityService:
     # LAYER 1: COMPLETENESS CHECK
     # =========================================================================
 
-    def check_completeness(
-        self, symbol: str, interval: str
-    ) -> tuple[float, list[AnomalyReport]]:
+    def check_completeness(self, symbol: str, interval: str) -> tuple[float, list[AnomalyReport]]:
         """
         Check data completeness - are all expected candles present?
 
@@ -229,9 +225,7 @@ class DataQualityService:
     # LAYER 2: FRESHNESS CHECK
     # =========================================================================
 
-    def check_freshness(
-        self, symbol: str, interval: str
-    ) -> tuple[bool, list[AnomalyReport]]:
+    def check_freshness(self, symbol: str, interval: str) -> tuple[bool, list[AnomalyReport]]:
         """
         Check if data is up-to-date.
 
@@ -304,9 +298,7 @@ class DataQualityService:
     # LAYER 3: CONTINUITY CHECK (Z-SCORE)
     # =========================================================================
 
-    def check_continuity(
-        self, symbol: str, interval: str, limit: int = 500
-    ) -> tuple[int, list[AnomalyReport]]:
+    def check_continuity(self, symbol: str, interval: str, limit: int = 500) -> tuple[int, list[AnomalyReport]]:
         """
         Check price continuity using Z-score to detect unusual jumps.
 
@@ -418,9 +410,7 @@ class DataQualityService:
     # LAYER 4: ML ANOMALY DETECTION (ISOLATION FOREST)
     # =========================================================================
 
-    def check_ml_anomalies(
-        self, symbol: str, interval: str, limit: int = 500
-    ) -> tuple[int, list[AnomalyReport]]:
+    def check_ml_anomalies(self, symbol: str, interval: str, limit: int = 500) -> tuple[int, list[AnomalyReport]]:
         """
         Use Isolation Forest to detect complex anomalies.
 
@@ -487,9 +477,7 @@ class DataQualityService:
             features_array = np.array(features)
 
             # Replace NaN/Inf with 0
-            features_array = np.nan_to_num(
-                features_array, nan=0.0, posinf=0.0, neginf=0.0
-            )
+            features_array = np.nan_to_num(features_array, nan=0.0, posinf=0.0, neginf=0.0)
 
             # Fit Isolation Forest
             clf = IsolationForest(
@@ -544,9 +532,7 @@ class DataQualityService:
         all_anomalies = []
 
         # Layer 1: Completeness
-        completeness_pct, completeness_anomalies = self.check_completeness(
-            symbol, interval
-        )
+        completeness_pct, completeness_anomalies = self.check_completeness(symbol, interval)
         all_anomalies.extend(completeness_anomalies)
 
         # Layer 2: Freshness
@@ -554,9 +540,7 @@ class DataQualityService:
         all_anomalies.extend(freshness_anomalies)
 
         # Layer 3: Continuity
-        continuity_issues, continuity_anomalies = self.check_continuity(
-            symbol, interval
-        )
+        continuity_issues, continuity_anomalies = self.check_continuity(symbol, interval)
         all_anomalies.extend(continuity_anomalies)
 
         # Layer 4: ML Anomalies
@@ -587,9 +571,7 @@ class DataQualityService:
     # AUTO-REPAIR
     # =========================================================================
 
-    async def auto_repair(
-        self, symbol: str, interval: str, result: QualityCheckResult
-    ) -> int:
+    async def auto_repair(self, symbol: str, interval: str, result: QualityCheckResult) -> int:
         """
         Automatically repair detected issues.
 
@@ -605,9 +587,7 @@ class DataQualityService:
 
         for anomaly in result.anomalies:
             try:
-                if anomaly.anomaly_type == "missing_data" and anomaly.details.get(
-                    "gap_start"
-                ):
+                if anomaly.anomaly_type == "missing_data" and anomaly.details.get("gap_start"):
                     # Repair timestamp gap
                     from backend.services.data_gap_repair import GapInfo
 
@@ -616,26 +596,21 @@ class DataQualityService:
                         interval=interval,
                         gap_start=anomaly.details["gap_start"],
                         gap_end=anomaly.details["gap_end"],
-                        gap_start_dt=datetime.fromtimestamp(
-                            anomaly.details["gap_start"] / 1000, tz=UTC
-                        ),
-                        gap_end_dt=datetime.fromtimestamp(
-                            anomaly.details["gap_end"] / 1000, tz=UTC
-                        ),
+                        gap_start_dt=datetime.fromtimestamp(anomaly.details["gap_start"] / 1000, tz=UTC),
+                        gap_end_dt=datetime.fromtimestamp(anomaly.details["gap_end"] / 1000, tz=UTC),
                         missing_candles=anomaly.details["missing_candles"],
                     )
 
                     loop = asyncio.get_event_loop()
                     repair_result = await loop.run_in_executor(
-                        self._executor, lambda: repair_service.repair_gap(gap)
+                        self._executor,
+                        lambda g=gap: repair_service.repair_gap(g),  # type: ignore[misc]
                     )
 
                     if repair_result.get("status") == "success":
                         anomaly.auto_repaired = True
                         repaired += 1
-                        logger.info(
-                            f"[DataQuality] Auto-repaired gap: {anomaly.description}"
-                        )
+                        logger.info(f"[DataQuality] Auto-repaired gap: {anomaly.description}")
 
                 elif anomaly.anomaly_type == "stale_data":
                     # Trigger fresh data fetch via SmartKlineService
@@ -647,21 +622,15 @@ class DataQualityService:
                         loop = asyncio.get_event_loop()
                         candles = await loop.run_in_executor(
                             self._executor,
-                            lambda: SMART_KLINE_SERVICE.get_candles(
-                                symbol, interval, 500, force_fresh=True
-                            ),
+                            lambda: SMART_KLINE_SERVICE.get_candles(symbol, interval, 500, force_fresh=True),
                         )
 
                         if candles and len(candles) > 0:
                             anomaly.auto_repaired = True
                             repaired += 1
-                            logger.info(
-                                f"[DataQuality] Refreshed stale data for {symbol}:{interval}"
-                            )
+                            logger.info(f"[DataQuality] Refreshed stale data for {symbol}:{interval}")
                     except Exception as e:
-                        logger.warning(
-                            f"[DataQuality] Could not refresh stale data: {e}"
-                        )
+                        logger.warning(f"[DataQuality] Could not refresh stale data: {e}")
 
                 elif anomaly.anomaly_type == "price_gap":
                     # Repair price gap by re-fetching candles around the gap
@@ -669,14 +638,12 @@ class DataQualityService:
                         repair_count = await self.repair_bad_candles(
                             symbol=symbol,
                             interval=interval,
-                            timestamps=[int(anomaly.timestamp)],
+                            timestamps=[int(anomaly.timestamp or 0)],
                         )
                         if repair_count > 0:
                             anomaly.auto_repaired = True
                             repaired += 1
-                            logger.info(
-                                f"[DataQuality] Repaired price gap at {anomaly.timestamp}"
-                            )
+                            logger.info(f"[DataQuality] Repaired price gap at {anomaly.timestamp}")
                     except Exception as e:
                         logger.warning(f"[DataQuality] Could not repair price gap: {e}")
 
@@ -686,14 +653,12 @@ class DataQualityService:
                         repair_count = await self.repair_bad_candles(
                             symbol=symbol,
                             interval=interval,
-                            timestamps=[int(anomaly.timestamp)],
+                            timestamps=[int(anomaly.timestamp or 0)],
                         )
                         if repair_count > 0:
                             anomaly.auto_repaired = True
                             repaired += 1
-                            logger.info(
-                                f"[DataQuality] Repaired outlier at {anomaly.timestamp}"
-                            )
+                            logger.info(f"[DataQuality] Repaired outlier at {anomaly.timestamp}")
                     except Exception as e:
                         logger.warning(f"[DataQuality] Could not repair outlier: {e}")
 
@@ -724,9 +689,7 @@ class DataQualityService:
         if not timestamps:
             return 0
 
-        logger.info(
-            f"[DataQuality] Repairing {len(timestamps)} bad candles for {symbol}:{interval}"
-        )
+        logger.info(f"[DataQuality] Repairing {len(timestamps)} bad candles for {symbol}:{interval}")
 
         # Get interval in ms
         interval_ms = {
@@ -784,18 +747,14 @@ class DataQualityService:
             logger.error(f"[DataQuality] Repair failed: {e}")
             return 0
 
-    async def _update_candles_in_db(
-        self, symbol: str, interval: str, candles: list[dict]
-    ) -> int:
+    async def _update_candles_in_db(self, symbol: str, interval: str, candles: list[dict]) -> int:
         """Update candles in database (INSERT OR REPLACE)."""
         conn = sqlite3.connect(self.db_path)
         updated = 0
 
         try:
             for candle in candles:
-                open_time_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=UTC
-                ).isoformat()
+                open_time_dt = datetime.fromtimestamp(candle["open_time"] / 1000, tz=UTC).isoformat()
 
                 conn.execute(
                     """
@@ -864,7 +823,7 @@ class DataQualityService:
                         try:
                             result = await asyncio.get_event_loop().run_in_executor(
                                 self._executor,
-                                lambda s=symbol, i=interval: self.run_all_checks(s, i),
+                                lambda s=symbol, i=interval: self.run_all_checks(s, i),  # type: ignore[misc]
                             )
 
                             if not result.is_healthy:
@@ -877,22 +836,16 @@ class DataQualityService:
                                 )
 
                                 # Auto-repair
-                                repaired = await self.auto_repair(
-                                    symbol, interval, result
-                                )
+                                repaired = await self.auto_repair(symbol, interval, result)
                                 if repaired > 0:
                                     logger.info(
                                         f"[DataQuality] Auto-repaired {repaired} issues for {symbol}:{interval}"
                                     )
                             else:
-                                logger.debug(
-                                    f"[DataQuality] {symbol}:{interval} is healthy"
-                                )
+                                logger.debug(f"[DataQuality] {symbol}:{interval} is healthy")
 
                         except Exception as e:
-                            logger.error(
-                                f"[DataQuality] Check failed for {symbol}:{interval}: {e}"
-                            )
+                            logger.error(f"[DataQuality] Check failed for {symbol}:{interval}: {e}")
 
             except asyncio.CancelledError:
                 logger.info("[DataQuality] Background monitoring stopped")

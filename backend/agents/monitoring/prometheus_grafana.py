@@ -122,8 +122,7 @@ class PrometheusExporter:
             await self._server.start()
 
             logger.info(
-                f"📊 Prometheus metrics available at "
-                f"http://{self.config.host}:{self.config.port}{self.config.endpoint}"
+                f"📊 Prometheus metrics available at http://{self.config.host}:{self.config.port}{self.config.endpoint}"
             )
 
         except ImportError:
@@ -389,9 +388,7 @@ class GrafanaClient:
         """Delete dashboard"""
         session = await self._get_session()
 
-        async with session.delete(
-            f"{self.config.url}/api/dashboards/uid/{uid}"
-        ) as resp:
+        async with session.delete(f"{self.config.url}/api/dashboards/uid/{uid}") as resp:
             return resp.status == 200
 
     async def list_datasources(self) -> list[dict[str, Any]]:

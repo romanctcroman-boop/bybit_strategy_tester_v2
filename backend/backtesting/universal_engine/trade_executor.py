@@ -110,6 +110,8 @@ class TradeRecord:
     # MFE/MAE
     mfe: float = 0.0  # Maximum Favorable Excursion
     mae: float = 0.0  # Maximum Adverse Excursion
+    mfe_pct: float = 0.0  # MFE as percentage
+    mae_pct: float = 0.0  # MAE as percentage
 
 
 @dataclass
@@ -723,8 +725,10 @@ class UniversalTradeExecutor:
                     fees=trade.total_fees,
                     exit_reason=exit_reason,
                     duration_bars=bar_index - trade.entry_bar,
-                    mfe=trade.mfe,
-                    mae=trade.mae,
+                    mfe=trade.mfe * trade.avg_entry_price * trade.size,  # MFE in $
+                    mae=trade.mae * trade.avg_entry_price * trade.size,  # MAE in $
+                    mfe_pct=trade.mfe * 100,  # MFE as percentage
+                    mae_pct=trade.mae * 100,  # MAE as percentage
                 )
 
                 closed_trades.append(record)
@@ -769,8 +773,10 @@ class UniversalTradeExecutor:
                 fees=trade.total_fees,
                 exit_reason=reason,
                 duration_bars=bar_index - trade.entry_bar,
-                mfe=trade.mfe,
-                mae=trade.mae,
+                mfe=trade.mfe * trade.avg_entry_price * trade.size,  # MFE in $
+                mae=trade.mae * trade.avg_entry_price * trade.size,  # MAE in $
+                mfe_pct=trade.mfe * 100,  # MFE as percentage
+                mae_pct=trade.mae * 100,  # MAE as percentage
             )
 
             closed.append(record)

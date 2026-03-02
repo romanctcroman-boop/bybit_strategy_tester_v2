@@ -148,6 +148,18 @@ class TradingViewEquityChart {
         timeVisible: true,
         secondsVisible: false
       },
+      localization: {
+        timeFormatter: (unixSeconds) => {
+          const d = new Date(unixSeconds * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        },
+        dateFormatter: (unixSeconds) => {
+          const d = new Date(unixSeconds * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+      },
       handleScroll: { mouseWheel: true, pressedMouseMove: true },
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true }
     });
@@ -260,8 +272,6 @@ class TradingViewEquityChart {
       }
     });
     // scaleMargins: reserve top 18% for MFE bars, bottom 18% for MAE bars.
-    // Equity curve lives in the middle 64%, zero line stays near the top of
-    // that zone when equity is deeply negative (typical losing strategy view).
     this._equitySeries.priceScale().applyOptions({
       scaleMargins: { top: 0.18, bottom: 0.18 }
     });
@@ -428,6 +438,27 @@ class TradingViewEquityChart {
     // In absolute mode use mfe/mae (USDT) — same units as equity axis.
     const isPercent = this.options.displayMode === 'percent';
 
+    // ── TEMPORARY DIAGNOSTIC (remove after diagnosis) ──
+    // Check in DevTools Console for the mfe/mae split distribution.
+    if (!this._dbgLogged) {
+      this._dbgLogged = true;
+      const mfes = this.trades.map((t, i) => ({
+        i: i + 1,
+        mfe: isPercent ? (t.mfe_pct ?? t.mfe_percent ?? 0) : (t.mfe ?? 0),
+        mae: isPercent ? (t.mae_pct ?? t.mae_percent ?? 0) : (t.mae ?? 0),
+      }));
+      const split = Math.min(62, mfes.length);
+      const avg = (arr, key) => arr.reduce((s, v) => s + Math.abs(v[key]), 0) / arr.length;
+      console.group('[TVEquityChart] MFE/MAE diagnostic');
+      console.log(`Mode: ${isPercent ? 'percent' : 'absolute'}, total trades: ${mfes.length}`);
+      console.log(`Trades 1-${split}:  avg MFE=${avg(mfes.slice(0, split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(0, split), 'mae').toFixed(3)}`);
+      console.log(`Trades ${split+1}-${mfes.length}: avg MFE=${avg(mfes.slice(split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(split), 'mae').toFixed(3)}`);
+      console.log('First 5:', mfes.slice(0, 5));
+      console.log('Around 62:', mfes.slice(59, 65));
+      console.log('Last 5:', mfes.slice(-5));
+      console.groupEnd();
+    }
+
     // CRITICAL: Always use the correct field for the mode — never mix units!
     // In absolute mode: use mfe/mae (USD values from backend)
     // In percent mode: use mfe_pct/mae_pct (percentage values from backend)
@@ -449,23 +480,35 @@ class TradingViewEquityChart {
     // Each bar occupies up to 20% of the full equity axis height.
     const maxBarHeight = equityRange * 0.20;
 
-    // ── Normalization: TV-style LINEAR scaling ──
-    // Largest MFE/MAE bar = maxBarHeight (20% of equity range).
-    // All others are proportional: a trade with half the max MFE gets half the bar.
-    // This matches TradingView Strategy Tester which uses linear proportional bars
-    // (large losses/wins → tall bars, small → short, visually intuitive).
-    // Minimum visible floor: 4% of maxBarHeight so very small values are still seen.
+    // ── Normalization: P95-based outlier-resistant LINEAR scaling ──
+    // Normalise against P95 instead of absolute max so a single outlier trade
+    // doesn't collapse all other bars to the same minimum floor.
+    // E.g. if one trade has MFE=1000 but most are 10-50, using max=1000 would
+    // force both a 37 USDT and a 0.27 USDT trade to render at identical 4% floor.
+    // With P95 normalisation each non-outlier trade retains its proportional height.
+    // Values above the P95 anchor (outliers) are clipped to 1.0 (full bar height).
+    // Minimum visible floor lowered to 1% — enough to see a bar without misleading.
     const allMfeRaw = this.trades.map(getMfe);
     const allMaeRaw = this.trades.map(getMae);
-    const maxMfe = Math.max(...allMfeRaw, 1e-9);
-    const maxMae = Math.max(...allMaeRaw, 1e-9);
-    const minFloor = 0.04; // 4% of maxBarHeight = minimum visible bar height
 
-    // Linear-scale a raw value to [minFloor..1] × maxBarHeight
-    const linearScale = (val, maxVal) => {
+    const getP95 = (arr) => {
+      const pos = arr.filter(v => v > 0).sort((a, b) => a - b);
+      if (!pos.length) return 1e-9;
+      return pos[Math.min(Math.floor(pos.length * 0.95), pos.length - 1)];
+    };
+    // SHARED reference: MFE and MAE normalised against the same anchor so their
+    // bars are directly comparable in height.  With separate maxMfe/maxMae the
+    // tallest MFE bar and tallest MAE bar always look equal even when one side
+    // is 10× larger than the other — a misleading visual.
+    const maxExcursion = Math.max(getP95(allMfeRaw), getP95(allMaeRaw), 1e-9);
+    const minFloor = 0.01; // 1% of maxBarHeight — minimal visibility hint
+
+    // Linear-scale a raw value to [minFloor..1] × maxBarHeight.
+    // Outliers above the P95 anchor are clipped to 1.0 (full bar, not overflow).
+    const linearScale = (val) => {
       if (val <= 0) return 0;
-      const ratio = val / maxVal;          // 0..1, linear
-      return Math.max(ratio, minFloor);    // never below 4% floor
+      const ratio = val / maxExcursion;
+      return Math.min(Math.max(ratio, minFloor), 1.0);
     };
 
     // Store for equity/BH autoscaleInfoProvider so they reserve the right gap.
@@ -529,8 +572,8 @@ class TradingViewEquityChart {
       const mfe = getMfe(trade);
       const mae = getMae(trade);
 
-      const scaledMfe = mfe > 0 ? linearScale(mfe, maxMfe) * maxBarHeight : 0;
-      const scaledMae = mae > 0 ? linearScale(mae, maxMae) * maxBarHeight : 0;
+      const scaledMfe = mfe > 0 ? linearScale(mfe) * maxBarHeight : 0;
+      const scaledMae = mae > 0 ? linearScale(mae) * maxBarHeight : 0;
 
       // TV uses a single uniform color for all MFE bars and a single color for
       // all MAE bars — no realized/unrealized tonal split.
@@ -651,7 +694,8 @@ class TradingViewEquityChart {
         let bestDiff = Infinity;
         this.trades.forEach((t) => {
           if (!t.exit_time) return;
-          const diff = Math.abs(new Date(t.exit_time).getTime() - ecMs);
+          const tMs = this._toEpochMs(t.exit_time);
+          const diff = Math.abs(tMs - ecMs);
           // Max window: 6 hours (covers ±1 bar on any supported timeframe up to 4h)
           if (diff < bestDiff && diff <= 6 * 3600 * 1000) {
             bestDiff = diff;
@@ -702,7 +746,8 @@ class TradingViewEquityChart {
       const tradeNum = tradeIdx >= 0 ? tradeIdx + 1 : '?';
 
       // Exit datetime in TV format: "Mon, Mar 10, 2025, 21:30"
-      const exitDate = trade.exit_time ? new Date(trade.exit_time) : null;
+      // Normalize to UTC before parsing (backend stores UTC without 'Z')
+      const exitDate = trade.exit_time ? new Date(this._toEpochMs(trade.exit_time)) : null;
       const exitDateStr = exitDate
         ? exitDate.toLocaleString('en-US', {
           weekday: 'short', month: 'short', day: 'numeric',
@@ -971,8 +1016,8 @@ class TradingViewEquityChart {
       ? (timestamp > 1e12 ? timestamp : timestamp * 1000)
       : new Date(timestamp).getTime();
     return this.trades.find((t) => {
-      const entry = new Date(t.entry_time).getTime();
-      const exit = t.exit_time ? new Date(t.exit_time).getTime() : entry;
+      const entry = this._toEpochMs(t.entry_time);
+      const exit = t.exit_time ? this._toEpochMs(t.exit_time) : entry;
       return ms >= entry && ms <= exit;
     }) || null;
   }

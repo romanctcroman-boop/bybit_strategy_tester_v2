@@ -193,42 +193,46 @@ class EMACrossoverStrategy(LibraryStrategy):
         signal = None
 
         # Bullish crossover: fast crosses above slow
-        if self._prev_fast_ema <= self._prev_slow_ema and fast_ema > slow_ema:
-            # Check trend confirmation
-            if not require_trend or (trend_ema and close > trend_ema):
-                stop_loss = calculate_stop_loss(close, "buy", current_atr, atr_mult)
-                take_profit = calculate_take_profit(close, stop_loss, rr)
+        if (
+            self._prev_fast_ema <= self._prev_slow_ema
+            and fast_ema > slow_ema
+            and (not require_trend or (trend_ema and close > trend_ema))
+        ):
+            stop_loss = calculate_stop_loss(close, "buy", current_atr, atr_mult)
+            take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                signal = self.create_signal(
-                    signal_type=SignalType.BUY,
-                    price=close,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    reason=f"Bullish EMA crossover (Fast: {fast_ema:.2f} > Slow: {slow_ema:.2f})",
-                    confidence=0.7 if require_trend else 0.6,
-                    fast_ema=fast_ema,
-                    slow_ema=slow_ema,
-                )
-                self._in_position = "long"
+            signal = self.create_signal(
+                signal_type=SignalType.BUY,
+                price=close,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                reason=f"Bullish EMA crossover (Fast: {fast_ema:.2f} > Slow: {slow_ema:.2f})",
+                confidence=0.7 if require_trend else 0.6,
+                fast_ema=fast_ema,
+                slow_ema=slow_ema,
+            )
+            self._in_position = "long"
 
         # Bearish crossover: fast crosses below slow
-        elif self._prev_fast_ema >= self._prev_slow_ema and fast_ema < slow_ema:
-            # Check trend confirmation
-            if not require_trend or (trend_ema and close < trend_ema):
-                stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
-                take_profit = calculate_take_profit(close, stop_loss, rr)
+        elif (
+            self._prev_fast_ema >= self._prev_slow_ema
+            and fast_ema < slow_ema
+            and (not require_trend or (trend_ema and close < trend_ema))
+        ):
+            stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
+            take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                signal = self.create_signal(
-                    signal_type=SignalType.SELL,
-                    price=close,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    reason=f"Bearish EMA crossover (Fast: {fast_ema:.2f} < Slow: {slow_ema:.2f})",
-                    confidence=0.7 if require_trend else 0.6,
-                    fast_ema=fast_ema,
-                    slow_ema=slow_ema,
-                )
-                self._in_position = "short"
+            signal = self.create_signal(
+                signal_type=SignalType.SELL,
+                price=close,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                reason=f"Bearish EMA crossover (Fast: {fast_ema:.2f} < Slow: {slow_ema:.2f})",
+                confidence=0.7 if require_trend else 0.6,
+                fast_ema=fast_ema,
+                slow_ema=slow_ema,
+            )
+            self._in_position = "short"
 
         # Update previous values
         self._prev_fast_ema = fast_ema
@@ -408,9 +412,7 @@ class MACDTrendStrategy(LibraryStrategy):
         # MACD history for proper calculation
         self._macd_values: list[float] = []
 
-    def _calculate_macd_proper(
-        self, fast: int, slow: int, signal_period: int
-    ) -> tuple[float, float, float]:
+    def _calculate_macd_proper(self, fast: int, slow: int, signal_period: int) -> tuple[float, float, float]:
         """Calculate MACD with proper signal line."""
         prices = self.get_closes()
         if len(prices) < slow + signal_period:
@@ -456,9 +458,7 @@ class MACDTrendStrategy(LibraryStrategy):
         require_hist = self.get_param("require_histogram_confirmation", True)
 
         # Calculate indicators
-        macd_line, signal_line, histogram = self._calculate_macd_proper(
-            fast, slow, signal_period
-        )
+        macd_line, signal_line, histogram = self._calculate_macd_proper(fast, slow, signal_period)
         current_atr = self.atr(atr_period)
         close = candle["close"]
 
@@ -472,41 +472,38 @@ class MACDTrendStrategy(LibraryStrategy):
         signal = None
 
         # Bullish crossover
-        if self._prev_macd <= self._prev_signal and macd_line > signal_line:
-            # Check histogram confirmation
-            if not require_hist or histogram > 0:
-                stop_loss = calculate_stop_loss(close, "buy", current_atr, atr_mult)
-                take_profit = calculate_take_profit(close, stop_loss, rr)
+        if self._prev_macd <= self._prev_signal and macd_line > signal_line and (not require_hist or histogram > 0):
+            stop_loss = calculate_stop_loss(close, "buy", current_atr, atr_mult)
+            take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                signal = self.create_signal(
-                    signal_type=SignalType.BUY,
-                    price=close,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    reason=f"Bullish MACD crossover (MACD: {macd_line:.4f} > Signal: {signal_line:.4f})",
-                    confidence=0.7,
-                    macd=macd_line,
-                    signal=signal_line,
-                    histogram=histogram,
-                )
+            signal = self.create_signal(
+                signal_type=SignalType.BUY,
+                price=close,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                reason=f"Bullish MACD crossover (MACD: {macd_line:.4f} > Signal: {signal_line:.4f})",
+                confidence=0.7,
+                macd=macd_line,
+                signal=signal_line,
+                histogram=histogram,
+            )
 
         # Bearish crossover
-        elif self._prev_macd >= self._prev_signal and macd_line < signal_line:
-            if not require_hist or histogram < 0:
-                stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
-                take_profit = calculate_take_profit(close, stop_loss, rr)
+        elif self._prev_macd >= self._prev_signal and macd_line < signal_line and (not require_hist or histogram < 0):
+            stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
+            take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                signal = self.create_signal(
-                    signal_type=SignalType.SELL,
-                    price=close,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    reason=f"Bearish MACD crossover (MACD: {macd_line:.4f} < Signal: {signal_line:.4f})",
-                    confidence=0.7,
-                    macd=macd_line,
-                    signal=signal_line,
-                    histogram=histogram,
-                )
+            signal = self.create_signal(
+                signal_type=SignalType.SELL,
+                price=close,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                reason=f"Bearish MACD crossover (MACD: {macd_line:.4f} < Signal: {signal_line:.4f})",
+                confidence=0.7,
+                macd=macd_line,
+                signal=signal_line,
+                histogram=histogram,
+            )
 
         # Update previous values
         self._prev_macd = macd_line

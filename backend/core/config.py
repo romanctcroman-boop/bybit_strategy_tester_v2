@@ -70,9 +70,7 @@ class BybitConfig(BaseSettings):
     AI_CACHE_TTL: int = 3600  # 1 hour default
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_prefix="BYBIT_", case_sensitive=False, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="BYBIT_", case_sensitive=False, extra="ignore")
 
     @property
     def persist_to_db(self) -> bool:

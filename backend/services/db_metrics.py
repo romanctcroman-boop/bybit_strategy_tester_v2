@@ -217,15 +217,10 @@ class DatabaseMetricsService:
 
             # Trim slow queries list
             if len(self._slow_queries) > self._config.max_slow_queries_stored:
-                self._slow_queries = self._slow_queries[
-                    -self._config.max_slow_queries_stored :
-                ]
+                self._slow_queries = self._slow_queries[-self._config.max_slow_queries_stored :]
 
             if self._config.log_slow_queries:
-                log_msg = (
-                    f"🐢 Slow query detected: {query_type.value} on {table or 'unknown'} "
-                    f"took {duration_ms:.2f}ms"
-                )
+                log_msg = f"🐢 Slow query detected: {query_type.value} on {table or 'unknown'} took {duration_ms:.2f}ms"
                 if is_very_slow:
                     logger.warning(log_msg)
                     self._stats["very_slow_queries"] += 1
@@ -399,11 +394,7 @@ class DatabaseMetricsService:
             "waiting_requests": self._pool_metrics.waiting_requests,
             "max_connections": self._pool_metrics.max_connections,
             "utilization_pct": (
-                (
-                    self._pool_metrics.active_connections
-                    / self._pool_metrics.max_connections
-                )
-                * 100
+                (self._pool_metrics.active_connections / self._pool_metrics.max_connections) * 100
                 if self._pool_metrics.max_connections > 0
                 else 0
             ),
@@ -469,14 +460,10 @@ class DatabaseMetricsService:
                 "total_duration_ms": round(p.total_duration_ms, 2),
                 "error_count": p.error_count,
                 "error_rate_pct": round(
-                    (p.error_count / p.execution_count) * 100
-                    if p.execution_count > 0
-                    else 0,
+                    (p.error_count / p.execution_count) * 100 if p.execution_count > 0 else 0,
                     2,
                 ),
-                "last_executed": p.last_executed.isoformat()
-                if p.last_executed
-                else None,
+                "last_executed": p.last_executed.isoformat() if p.last_executed else None,
             }
             for p in patterns[:limit]
         ]
@@ -499,9 +486,7 @@ class DatabaseMetricsService:
 
         # Check for high slow query rate
         if self._stats["total_queries"] > 100:
-            slow_rate = (
-                self._stats["slow_queries"] / self._stats["total_queries"]
-            ) * 100
+            slow_rate = (self._stats["slow_queries"] / self._stats["total_queries"]) * 100
             if slow_rate > 10:
                 recommendations.append(
                     {
@@ -550,9 +535,7 @@ class DatabaseMetricsService:
 
         # Check for high error rate
         if self._stats["total_queries"] > 50:
-            error_rate = (
-                self._stats["failed_queries"] / self._stats["total_queries"]
-            ) * 100
+            error_rate = (self._stats["failed_queries"] / self._stats["total_queries"]) * 100
             if error_rate > 5:
                 recommendations.append(
                     {
@@ -567,8 +550,7 @@ class DatabaseMetricsService:
         slow_patterns = [
             p
             for p in self._query_patterns.values()
-            if p.avg_duration_ms > self._config.slow_query_threshold_ms
-            and p.execution_count > 10
+            if p.avg_duration_ms > self._config.slow_query_threshold_ms and p.execution_count > 10
         ]
         if slow_patterns:
             recommendations.append(
@@ -590,9 +572,7 @@ class DatabaseMetricsService:
         """Get query statistics."""
         avg_duration = 0.0
         if self._query_metrics:
-            avg_duration = sum(q.duration_ms for q in self._query_metrics) / len(
-                self._query_metrics
-            )
+            avg_duration = sum(q.duration_ms for q in self._query_metrics) / len(self._query_metrics)
 
         return {
             "total_queries": self._stats["total_queries"],

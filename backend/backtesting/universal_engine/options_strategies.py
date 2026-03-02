@@ -170,27 +170,21 @@ class BlackScholes:
     """
 
     @staticmethod
-    def d1(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def d1(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """Calculate d1 parameter."""
         if T <= 0 or sigma <= 0:
             return 0.0
         return (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
 
     @staticmethod
-    def d2(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def d2(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """Calculate d2 parameter."""
         if T <= 0 or sigma <= 0:
             return 0.0
         return BlackScholes.d1(S, K, T, r, sigma, q) - sigma * np.sqrt(T)
 
     @staticmethod
-    def call_price(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def call_price(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """
         Calculate call option price.
 
@@ -215,9 +209,7 @@ class BlackScholes:
         return max(0, price)
 
     @staticmethod
-    def put_price(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def put_price(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """Calculate put option price."""
         if T <= 0:
             return max(0, K - S)
@@ -225,9 +217,7 @@ class BlackScholes:
         d_1 = BlackScholes.d1(S, K, T, r, sigma, q)
         d_2 = BlackScholes.d2(S, K, T, r, sigma, q)
 
-        price = K * np.exp(-r * T) * norm.cdf(-d_2) - S * np.exp(-q * T) * norm.cdf(
-            -d_1
-        )
+        price = K * np.exp(-r * T) * norm.cdf(-d_2) - S * np.exp(-q * T) * norm.cdf(-d_1)
         return max(0, price)
 
     @staticmethod
@@ -286,9 +276,7 @@ class GreeksCalculator:
             return np.exp(-q * T) * (norm.cdf(d_1) - 1)
 
     @staticmethod
-    def gamma(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def gamma(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """
         Calculate Gamma (delta sensitivity to underlying).
 
@@ -334,9 +322,7 @@ class GreeksCalculator:
         return annual_theta / 365  # Daily theta
 
     @staticmethod
-    def vega(
-        S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> float:
+    def vega(S: float, K: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
         """
         Calculate Vega (volatility sensitivity).
 
@@ -494,9 +480,7 @@ class MonteCarloPricer:
         if seed is not None:
             np.random.seed(seed)
 
-    def simulate_paths(
-        self, S: float, T: float, r: float, sigma: float, q: float = 0.0
-    ) -> NDArray:
+    def simulate_paths(self, S: float, T: float, r: float, sigma: float, q: float = 0.0) -> NDArray:
         """
         Simulate price paths using GBM.
 
@@ -603,10 +587,7 @@ class MonteCarloPricer:
         else:
             crossed = np.any(paths <= barrier, axis=1)
 
-        if barrier_type.endswith("out"):
-            alive = ~crossed
-        else:  # knock-in
-            alive = crossed
+        alive = ~crossed if barrier_type.endswith("out") else crossed
 
         payoffs = np.maximum(final_prices - K, 0) if option_type == OptionType.CALL else np.maximum(K - final_prices, 0)
 
@@ -754,9 +735,7 @@ class VolatilitySurface:
         for i, K in enumerate(strikes):
             for j, T in enumerate(expiries):
                 price = market_prices[i, j]
-                self.ivs[i, j] = ImpliedVolatility.calculate(
-                    price, spot, K, T, r, option_type, q
-                )
+                self.ivs[i, j] = ImpliedVolatility.calculate(price, spot, K, T, r, option_type, q)
 
     def get_iv(self, strike: float, expiry: float) -> float:
         """Interpolate IV for given strike and expiry."""
@@ -764,8 +743,8 @@ class VolatilitySurface:
             return 0.2
 
         # Simple bilinear interpolation
-        strike_idx = np.searchsorted(self.strikes, strike)
-        expiry_idx = np.searchsorted(self.expiries, expiry)
+        strike_idx = int(np.searchsorted(self.strikes, strike))
+        expiry_idx = int(np.searchsorted(self.expiries, expiry))
 
         strike_idx = max(0, min(strike_idx, len(self.strikes) - 1))
         expiry_idx = max(0, min(expiry_idx, len(self.expiries) - 1))
@@ -774,14 +753,14 @@ class VolatilitySurface:
 
     def get_smile(self, expiry: float) -> tuple[list[float], list[float]]:
         """Get volatility smile for given expiry."""
-        expiry_idx = np.searchsorted(self.expiries, expiry)
+        expiry_idx = int(np.searchsorted(self.expiries, expiry))
         expiry_idx = max(0, min(expiry_idx, len(self.expiries) - 1))
 
         return self.strikes, list(self.ivs[:, expiry_idx])
 
     def get_term_structure(self, strike: float) -> tuple[list[float], list[float]]:
         """Get term structure for given strike."""
-        strike_idx = np.searchsorted(self.strikes, strike)
+        strike_idx = int(np.searchsorted(self.strikes, strike))
         strike_idx = max(0, min(strike_idx, len(self.strikes) - 1))
 
         return self.expiries, list(self.ivs[strike_idx, :])
@@ -797,9 +776,7 @@ class OptionsStrategy:
     Build and analyze options strategies.
     """
 
-    def __init__(
-        self, spot: float, r: float = 0.05, sigma: float = 0.2, q: float = 0.0
-    ):
+    def __init__(self, spot: float, r: float = 0.05, sigma: float = 0.2, q: float = 0.0):
         self.spot = spot
         self.r = r
         self.sigma = sigma
@@ -827,9 +804,7 @@ class OptionsStrategy:
         T = expiry_days / 365
 
         if premium is None:
-            premium = BlackScholes.price(
-                self.spot, strike, T, self.r, self.sigma, option_type, self.q
-            )
+            premium = BlackScholes.price(self.spot, strike, T, self.r, self.sigma, option_type, self.q)
 
         option = Option(
             strike=strike,
@@ -894,9 +869,7 @@ class OptionsStrategy:
         for i in range(len(payoff) - 1):
             if payoff[i] * payoff[i + 1] < 0:
                 # Linear interpolation
-                x = prices[i] - payoff[i] * (prices[i + 1] - prices[i]) / (
-                    payoff[i + 1] - payoff[i]
-                )
+                x = prices[i] - payoff[i] * (prices[i + 1] - prices[i]) / (payoff[i + 1] - payoff[i])
                 breakevens.append(x)
 
         # Max profit and loss
@@ -905,15 +878,11 @@ class OptionsStrategy:
 
         # Probability of profit (assuming lognormal distribution)
         if len(breakevens) >= 2:
-            prob_profit = norm.cdf(
-                np.log(breakevens[1] / self.spot) / (self.sigma * np.sqrt(30 / 365))
-            ) - norm.cdf(
+            prob_profit = norm.cdf(np.log(breakevens[1] / self.spot) / (self.sigma * np.sqrt(30 / 365))) - norm.cdf(
                 np.log(breakevens[0] / self.spot) / (self.sigma * np.sqrt(30 / 365))
             )
         elif len(breakevens) == 1:
-            prob_profit = 1 - norm.cdf(
-                np.log(breakevens[0] / self.spot) / (self.sigma * np.sqrt(30 / 365))
-            )
+            prob_profit = 1 - norm.cdf(np.log(breakevens[0] / self.spot) / (self.sigma * np.sqrt(30 / 365)))
         else:
             prob_profit = 1.0 if max_loss >= 0 else 0.0
 
@@ -1032,13 +1001,9 @@ class StrategyFactory:
         elif strategy_type == StrategyType.IRON_CONDOR:
             # Bear call spread + bull put spread
             strategy.add_leg(atm_strike * (1 + width), expiry_days, OptionType.CALL, -1)
-            strategy.add_leg(
-                atm_strike * (1 + 2 * width), expiry_days, OptionType.CALL, 1
-            )
+            strategy.add_leg(atm_strike * (1 + 2 * width), expiry_days, OptionType.CALL, 1)
             strategy.add_leg(atm_strike * (1 - width), expiry_days, OptionType.PUT, -1)
-            strategy.add_leg(
-                atm_strike * (1 - 2 * width), expiry_days, OptionType.PUT, 1
-            )
+            strategy.add_leg(atm_strike * (1 - 2 * width), expiry_days, OptionType.PUT, 1)
 
         elif strategy_type == StrategyType.BUTTERFLY:
             strategy.add_leg(atm_strike * (1 - width), expiry_days, OptionType.CALL, 1)
@@ -1111,9 +1076,7 @@ class OptionsPortfolio:
 
     def total_value(self) -> float:
         """Calculate total portfolio value."""
-        return sum(
-            pos.current_price * pos.option.quantity * 100 for pos in self.positions
-        )
+        return sum(pos.current_price * pos.option.quantity * 100 for pos in self.positions)
 
     def total_unrealized_pnl(self) -> float:
         """Calculate total unrealized P&L."""

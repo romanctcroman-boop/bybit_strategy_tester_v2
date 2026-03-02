@@ -1,4 +1,4 @@
-﻿"""
+"""
 Strategy Builder Adapter - backward-compatibility stub.
 
 The implementation has been moved to:
@@ -11,7 +11,7 @@ All existing imports of the form:
 continue to work unchanged via this re-export stub.
 """
 
-from backend.backtesting.strategy_builder.adapter import (  # noqa: F401
+from backend.backtesting.strategy_builder.adapter import (
     StrategyBuilderAdapter,
     _clamp_period,
     _param,

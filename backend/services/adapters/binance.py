@@ -51,14 +51,10 @@ class BinanceAdapter:
         except Exception:
             return False
 
-    def get_klines(
-        self, symbol: str, interval: str = "1m", limit: int = 500
-    ) -> list[dict]:
+    def get_klines(self, symbol: str, interval: str = "1m", limit: int = 500) -> list[dict]:
         # Using /api/v3/klines for spot
         if self._client:
-            data = self._client.get_klines(
-                symbol=symbol, interval=interval, limit=limit
-            )
+            data = self._client.get_klines(symbol=symbol, interval=interval, limit=limit)
             return [self._normalize_kline_row(d) for d in data]
 
         url = self.BASE + "/api/v3/klines"

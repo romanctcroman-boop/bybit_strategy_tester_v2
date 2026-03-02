@@ -237,9 +237,7 @@ class PredictionEngine:
 
         # Calculate weighted probability
         total_weight = sum(w.weight for w in self.models.values())
-        probability = (
-            sum(model_probabilities) / total_weight if total_weight > 0 else 0.5
-        )
+        probability = sum(model_probabilities) / total_weight if total_weight > 0 else 0.5
         expected_return = sum(model_returns) / total_weight if total_weight > 0 else 0.0
 
         # Calculate uncertainty
@@ -262,10 +260,7 @@ class PredictionEngine:
         self.prediction_history.append(result)
         self._update_stats(result)
 
-        logger.debug(
-            f"📊 Prediction: {signal.value}, "
-            f"confidence={confidence:.2f}, uncertainty={uncertainty:.2f}"
-        )
+        logger.debug(f"📊 Prediction: {signal.value}, confidence={confidence:.2f}, uncertainty={uncertainty:.2f}")
 
         return result
 
@@ -408,9 +403,7 @@ class PredictionEngine:
 
         total = self.stats["total_predictions"]
         prev_avg = self.stats["avg_confidence"]
-        self.stats["avg_confidence"] = (
-            prev_avg * (total - 1) + result.confidence
-        ) / total
+        self.stats["avg_confidence"] = (prev_avg * (total - 1) + result.confidence) / total
 
     def update_model_performance(
         self,
@@ -461,9 +454,7 @@ class PredictionEngine:
         if total_accuracy > 0:
             for _name, model in self.models.items():
                 # Weight proportional to accuracy, with minimum floor
-                model.weight = max(
-                    0.2, model.accuracy / total_accuracy * len(self.models)
-                )
+                model.weight = max(0.2, model.accuracy / total_accuracy * len(self.models))
 
     def get_model_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for each model"""

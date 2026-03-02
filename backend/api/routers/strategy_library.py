@@ -101,9 +101,7 @@ class CreateStrategyRequest(BaseModel):
     strategy_id: str = Field(..., description="Strategy ID from registry")
     symbol: str = Field(..., description="Trading symbol (e.g., BTCUSDT)")
     timeframe: str = Field("60", description="Candle timeframe")
-    parameters: dict[str, Any] = Field(
-        default_factory=dict, description="Custom parameter values"
-    )
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Custom parameter values")
     paper_trading: bool = Field(True, description="Use paper trading mode")
 
 
@@ -255,9 +253,7 @@ async def get_strategy_details(strategy_id: str):
     strategy_class = StrategyRegistry.get(strategy_id)
 
     if not strategy_class or not strategy_class.STRATEGY_INFO:
-        raise HTTPException(
-            status_code=404, detail=f"Strategy not found: {strategy_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"Strategy not found: {strategy_id}")
 
     return strategy_info_to_response(strategy_class.STRATEGY_INFO)
 
@@ -270,9 +266,7 @@ async def get_strategy_parameters(strategy_id: str):
     strategy_class = StrategyRegistry.get(strategy_id)
 
     if not strategy_class or not strategy_class.STRATEGY_INFO:
-        raise HTTPException(
-            status_code=404, detail=f"Strategy not found: {strategy_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"Strategy not found: {strategy_id}")
 
     return [
         ParameterSpecResponse(
@@ -290,9 +284,7 @@ async def get_strategy_parameters(strategy_id: str):
     ]
 
 
-@router.get(
-    "/{strategy_id}/optimization-space", response_model=OptimizationSpaceResponse
-)
+@router.get("/{strategy_id}/optimization-space", response_model=OptimizationSpaceResponse)
 async def get_optimization_space(strategy_id: str):
     """
     Get parameter optimization space for Optuna or other optimizers.
@@ -356,9 +348,7 @@ async def validate_parameters(
     strategy_class = StrategyRegistry.get(strategy_id)
 
     if not strategy_class or not strategy_class.STRATEGY_INFO:
-        raise HTTPException(
-            status_code=404, detail=f"Strategy not found: {strategy_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"Strategy not found: {strategy_id}")
 
     errors = []
     warnings = []
@@ -394,9 +384,7 @@ async def validate_parameters(
 
         # Choices validation
         if spec.choices and value not in spec.choices:
-            errors.append(
-                f"{name}: value {value} not in allowed choices {spec.choices}"
-            )
+            errors.append(f"{name}: value {value} not in allowed choices {spec.choices}")
 
     # Check for missing required parameters (none currently required)
 
@@ -445,12 +433,8 @@ async def get_library_summary():
 
 @router.get("/recommendations")
 async def get_strategy_recommendations(
-    market_condition: str | None = Query(
-        None, description="trending, ranging, volatile"
-    ),
-    experience_level: str | None = Query(
-        None, description="beginner, intermediate, advanced"
-    ),
+    market_condition: str | None = Query(None, description="trending, ranging, volatile"),
+    experience_level: str | None = Query(None, description="beginner, intermediate, advanced"),
     preferred_timeframe: str | None = Query(None, description="Preferred timeframe"),
     max_risk: str | None = Query("moderate", description="Maximum risk level"),
 ):
@@ -466,9 +450,7 @@ async def get_strategy_recommendations(
 
         # Risk level filter
         risk_order = {"conservative": 1, "moderate": 2, "aggressive": 3}
-        if max_risk and risk_order.get(info.risk_level, 2) > risk_order.get(
-            max_risk, 2
-        ):
+        if max_risk and risk_order.get(info.risk_level, 2) > risk_order.get(max_risk, 2):
             continue
 
         # Market condition matching

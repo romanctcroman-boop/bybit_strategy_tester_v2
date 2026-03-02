@@ -151,9 +151,7 @@ async def unregister_strategy(strategy_id: str):
 
 
 @router.post("/strategies/{strategy_id}/start")
-async def start_strategy(
-    strategy_id: str, request: StrategyActionRequest | None = None
-):
+async def start_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Start strategy execution"""
     manager = get_isolation_manager()
 
@@ -179,9 +177,7 @@ async def start_strategy(
 
 
 @router.post("/strategies/{strategy_id}/stop")
-async def stop_strategy(
-    strategy_id: str, request: StrategyActionRequest | None = None
-):
+async def stop_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Stop strategy execution"""
     manager = get_isolation_manager()
 
@@ -199,9 +195,7 @@ async def stop_strategy(
 
 
 @router.post("/strategies/{strategy_id}/pause")
-async def pause_strategy(
-    strategy_id: str, request: StrategyActionRequest | None = None
-):
+async def pause_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Pause strategy execution"""
     manager = get_isolation_manager()
 
@@ -254,9 +248,7 @@ async def update_strategy_quota(strategy_id: str, request: UpdateQuotaRequest):
 
 
 @router.post("/strategies/{strategy_id}/check-quota")
-async def check_strategy_quota(
-    strategy_id: str, request: QuotaCheckRequest | None = None
-):
+async def check_strategy_quota(strategy_id: str, request: QuotaCheckRequest | None = None):
     """Check if strategy is within quota limits"""
     manager = get_isolation_manager()
 
@@ -353,9 +345,7 @@ async def get_circuit_breaker_status(strategy_id: str):
         "triggered_at": context.circuit_breaker_triggered_at.isoformat()
         if context.circuit_breaker_triggered_at
         else None,
-        "cooldown_until": context.cooldown_until.isoformat()
-        if context.cooldown_until
-        else None,
+        "cooldown_until": context.cooldown_until.isoformat() if context.cooldown_until else None,
         "state": context.state.value,
     }
 

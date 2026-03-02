@@ -48,9 +48,7 @@ class FeatureConfig:
     long_period: int = 50
 
     # Feature categories to include
-    categories: list[FeatureCategory] = field(
-        default_factory=lambda: list(FeatureCategory)
-    )
+    categories: list[FeatureCategory] = field(default_factory=lambda: list(FeatureCategory))
 
     # Normalization
     normalize: bool = True
@@ -141,12 +139,8 @@ class FeatureEngine:
 
         # Returns
         features["return_1"] = np.concatenate([[0], np.diff(close) / close[:-1]])
-        features["return_5"] = np.concatenate(
-            [np.zeros(5), (close[5:] - close[:-5]) / close[:-5]]
-        )
-        features["return_20"] = np.concatenate(
-            [np.zeros(20), (close[20:] - close[:-20]) / close[:-20]]
-        )
+        features["return_5"] = np.concatenate([np.zeros(5), (close[5:] - close[:-5]) / close[:-5]])
+        features["return_20"] = np.concatenate([np.zeros(20), (close[20:] - close[:-20]) / close[:-20]])
 
         # Log returns
         features["log_return"] = np.concatenate([[0], np.diff(np.log(close + 1e-10))])
@@ -157,9 +151,7 @@ class FeatureEngine:
         features["price_position"] = (close - low) / range_hl
 
         # Gap
-        features["gap"] = np.concatenate(
-            [[0], (open_arr[1:] - close[:-1]) / close[:-1]]
-        )
+        features["gap"] = np.concatenate([[0], (open_arr[1:] - close[:-1]) / close[:-1]])
 
         # Body ratio
         body = np.abs(close - open_arr)
@@ -185,9 +177,7 @@ class FeatureEngine:
         features["relative_volume"] = volume / vol_sma
 
         # Volume change
-        features["volume_change"] = np.concatenate(
-            [[0], np.diff(volume) / (volume[:-1] + 1e-10)]
-        )
+        features["volume_change"] = np.concatenate([[0], np.diff(volume) / (volume[:-1] + 1e-10)])
 
         # On-balance volume
         obv = np.zeros(len(close))
@@ -206,9 +196,7 @@ class FeatureEngine:
         features["vwap_ratio"] = close / (vwap + 1e-10)
 
         # Volume-price trend
-        features["vpt"] = np.cumsum(
-            volume * np.concatenate([[0], np.diff(close) / (close[:-1] + 1e-10)])
-        )
+        features["vpt"] = np.cumsum(volume * np.concatenate([[0], np.diff(close) / (close[:-1] + 1e-10)]))
 
         return features
 
@@ -339,12 +327,8 @@ class FeatureEngine:
         lower_shadow = np.minimum(open_arr, close) - low
         upper_shadow = high - np.maximum(open_arr, close)
 
-        features["is_hammer"] = (
-            (lower_shadow > 2 * body) & (upper_shadow < body)
-        ).astype(float)
-        features["is_shooting_star"] = (
-            (upper_shadow > 2 * body) & (lower_shadow < body)
-        ).astype(float)
+        features["is_hammer"] = ((lower_shadow > 2 * body) & (upper_shadow < body)).astype(float)
+        features["is_shooting_star"] = ((upper_shadow > 2 * body) & (lower_shadow < body)).astype(float)
 
         # Engulfing
         is_bullish_engulf = np.zeros(n)
@@ -511,7 +495,7 @@ class FeatureEngine:
         for i in range(period - 1, len(close)):
             mad[i] = np.mean(np.abs(tp[i - period + 1 : i + 1] - sma_tp[i]))
 
-        mad = np.where(mad == 0, 1, mad)
+        mad = np.where(mad == 0, 1, mad)  # type: ignore[assignment]
         return (tp - sma_tp) / (0.015 * mad)
 
     def _atr(
@@ -795,13 +779,13 @@ class SimpleMLPClassifier(SignalClassifier):
         patience_counter = 0
         patience = 10
 
-        for epoch in range(self.config.epochs):
+        for _epoch in range(self.config.epochs):
             # Shuffle data
             indices = np.random.permutation(n_samples)
             features_shuffled = features[indices]
             labels_shuffled = one_hot[indices]
 
-            epoch_loss = 0
+            epoch_loss: float = 0.0
 
             # Mini-batch training
             for i in range(0, n_samples, self.config.batch_size):
@@ -820,20 +804,14 @@ class SimpleMLPClassifier(SignalClassifier):
 
                 for layer in range(len(self._weights) - 1, -1, -1):
                     if layer == len(self._weights) - 1:
-                        grad_w = (
-                            batch_x.T @ error
-                            if layer == 0
-                            else self._forward(batch_x, False).T @ error
-                        )
+                        grad_w = batch_x.T @ error if layer == 0 else self._forward(batch_x, False).T @ error
                     else:
                         grad_w = batch_x.T @ error
 
                     grad_w /= len(batch_x)
 
                     self._weights[layer] -= self.config.learning_rate * grad_w
-                    self._biases[layer] -= self.config.learning_rate * error.mean(
-                        axis=0
-                    )
+                    self._biases[layer] -= self.config.learning_rate * error.mean(axis=0)
 
             epoch_loss /= n_samples // self.config.batch_size
 
@@ -841,6 +819,7 @@ class SimpleMLPClassifier(SignalClassifier):
             if epoch_loss < best_loss:
                 best_loss = epoch_loss
                 patience_counter = 0
+                epochs_trained = _epoch + 1
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
@@ -857,7 +836,7 @@ class SimpleMLPClassifier(SignalClassifier):
                 for i, v in enumerate(importance)
             }
 
-        return {"final_loss": best_loss, "epochs": epoch + 1}
+        return {"final_loss": best_loss, "epochs": locals().get("epochs_trained", self.config.epochs)}
 
     def predict(
         self,
@@ -885,11 +864,9 @@ class SimpleMLPClassifier(SignalClassifier):
             predictions.append(
                 SignalPrediction(
                     timestamp=i,
-                    signal=signal_map[class_idx],
+                    signal=signal_map[int(class_idx)],
                     confidence=float(confidence),
-                    probabilities={
-                        signal_map[j]: float(p) for j, p in enumerate(prob_row)
-                    },
+                    probabilities={signal_map[j]: float(p) for j, p in enumerate(prob_row)},
                     features_used=self._feature_names,
                 )
             )
@@ -958,10 +935,8 @@ class EnsemblePredictor:
             sample_indices = np.random.choice(n_samples, n_subsample, replace=True)
 
             # Feature subsampling
-            feature_indices = np.random.choice(
-                n_features, n_feat_subsample, replace=False
-            )
-            feature_indices = sorted(feature_indices)
+            feature_indices = np.random.choice(n_features, n_feat_subsample, replace=False)
+            feature_indices = sorted(feature_indices)  # type: ignore[assignment, type-var]
 
             # Train model
             model = self.base_classifier()
@@ -972,7 +947,7 @@ class EnsemblePredictor:
             training_results.append(result)
 
             self._models.append(model)
-            self._feature_subsets.append(feature_indices)
+            self._feature_subsets.append(feature_indices)  # type: ignore[arg-type]
 
         # Initialize equal weights
         self._model_weights = [1.0 / self.config.n_models] * self.config.n_models
@@ -1189,7 +1164,10 @@ class AdaptiveSignalGenerator:
             return True
 
         # Check performance
-        return bool(len(self._performance_history) >= self.config.performance_window and self.get_accuracy() < self.config.min_accuracy)
+        return bool(
+            len(self._performance_history) >= self.config.performance_window
+            and self.get_accuracy() < self.config.min_accuracy
+        )
 
 
 # =============================================================================

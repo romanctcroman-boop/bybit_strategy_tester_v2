@@ -11,6 +11,8 @@ SPOT and LINEAR (perpetual) market data. This enables:
 3. Better data organization
 """
 
+import contextlib
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -26,19 +28,13 @@ def upgrade():
     # Add column with default value
     op.add_column(
         "bybit_kline_audit",
-        sa.Column(
-            "market_type", sa.String(16), nullable=False, server_default="linear"
-        ),
+        sa.Column("market_type", sa.String(16), nullable=False, server_default="linear"),
     )
 
     # Update unique constraint to include market_type
     # First drop old constraint
-    try:
-        op.drop_constraint(
-            "uix_symbol_interval_open_time", "bybit_kline_audit", type_="unique"
-        )
-    except Exception:
-        pass  # Constraint might not exist
+    with contextlib.suppress(Exception):
+        op.drop_constraint("uix_symbol_interval_open_time", "bybit_kline_audit", type_="unique")
 
     # Create new constraint including market_type
     op.create_unique_constraint(
@@ -54,9 +50,7 @@ def upgrade():
 def downgrade():
     """Remove market_type column."""
     op.drop_index("ix_kline_market_type", "bybit_kline_audit")
-    op.drop_constraint(
-        "uix_symbol_interval_market_open_time", "bybit_kline_audit", type_="unique"
-    )
+    op.drop_constraint("uix_symbol_interval_market_open_time", "bybit_kline_audit", type_="unique")
     op.drop_column("bybit_kline_audit", "market_type")
 
     # Restore original constraint

@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **[ENGINE] TV-parity Sharpe/Sortino using trade-close equity** (`8712a7e26`, 2026-03-02)
+
+    **Problem:** `sharpe_ratio` = 0.807 (DB) vs 0.934 (TV); `sortino_ratio` = 3.53 (DB) vs 4.19 (TV).
+
+    **Root cause:** Engine was computing monthly returns from bar-level equity (unrealized PnL at
+    every 15m bar, ~20 000 points). TradingView computes monthly returns from **trade-close equity**
+    — equity value only at the 42 trade exit timestamps.
+
+    **Key differences:**
+    - Bar-level → 12 monthly returns (Jan–Dec 2025); trade-close → 14 returns (Jan 2025–Feb 2026)
+    - Last trade exits 2026-02-23, so Dec 2025 equity at trade-close (~11 534) differs from year-end bar equity
+    - Sharpe formula: `ddof=1` (sample std) → `ddof=0` (population std, matches TV)
+    - Sortino formula: `N-1` denominator → `N` denominator (matches TV)
+    - RFR = 2%/yr = 0.1667%/mo (unchanged)
+
+    **Result after fix:**
+    - `sharpe_ratio` = **0.9336** (TV=0.934) ✅
+    - `sortino_ratio` = **4.1904** (TV=4.19) ✅
+
+    **Also fixed:** `NameError: position_value_at_entry` — undefined variable used as guard at
+    line 2541 in `_run_fallback`; replaced with `entry_price > 0`.
+
+    **Changes:** `backend/backtesting/engine.py` — lines 304–375 (Sharpe/Sortino block), line 2541
+
 - **[INDICATOR_HANDLERS] MACD EMA formula fix: replace `vbt.MACD.run()` with `ewm(adjust=False)` for TV parity**
 
     **Problem:** `StrategyBuilderAdapter` MACD blocks produced 62 trades (UI) vs 42 TV reference.
@@ -19,8 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
        seed than TradingView's `ta.ema()`. Max diff on ETHUSDT 30m: **22.71 USDT** (mean 1.07).
        This caused ~10x more crossover events: 487 long intersections vs TV's ~42 entries.
     2. **Signal memory ON by default** — `disable_signal_memory: false` in frontend defaults
-       - `signal_memory_bars: 5` extended each crossover signal to 5 bars, further inflating
-       intersections when both `use_cross_signal` AND `use_cross_zero` were active.
+        - `signal_memory_bars: 5` extended each crossover signal to 5 bars, further inflating
+          intersections when both `use_cross_signal` AND `use_cross_zero` were active.
 
     **Verified diagnostics (`scripts/_diag_adapter_signals.py`):**
     - Before fix: `memory=ON` → 68 trades (57 after EMA fix), `memory=OFF` → 45 trades (42 after EMA fix)
@@ -34,8 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       Also fixed inverted tooltip text.
 
     **TV parity check:** `compare_macd_tv.py` still passes 9/9 metrics after fix. ✅
-
-
 
     **Проблема:** Sharpe = 0.914 vs TV = 0.934 (−2.1%), Sortino = 4.14 vs TV = 4.19 (−1.2%).
 

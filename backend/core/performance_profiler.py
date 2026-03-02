@@ -74,9 +74,7 @@ class ProfileReport:
                     "avg": round(s.avg_time, 6),
                     "min": round(s.min_time, 6),
                     "max": round(s.max_time, 6),
-                    "pct": round(s.total_time / self.total_time * 100, 1)
-                    if self.total_time > 0
-                    else 0,
+                    "pct": round(s.total_time / self.total_time * 100, 1) if self.total_time > 0 else 0,
                 }
                 for name, s in self.sections.items()
             },
@@ -197,19 +195,13 @@ class BacktestProfiler:
 
     def get_report(self) -> ProfileReport:
         """Generate profiling report."""
-        trades_per_sec = (
-            self._n_trades / self._total_time if self._total_time > 0 else 0
-        )
+        trades_per_sec = self._n_trades / self._total_time if self._total_time > 0 else 0
         bars_per_sec = self._n_bars / self._total_time if self._total_time > 0 else 0
 
         # Identify bottlenecks (sections taking >20% of time)
         bottlenecks = []
         for name, section in self._sections.items():
-            pct = (
-                section.total_time / self._total_time * 100
-                if self._total_time > 0
-                else 0
-            )
+            pct = section.total_time / self._total_time * 100 if self._total_time > 0 else 0
             if pct > 20:
                 bottlenecks.append(f"{name}: {pct:.1f}%")
 
@@ -238,18 +230,10 @@ class BacktestProfiler:
 
         if report.sections:
             print("\n⏱️ Section Timings:")
-            sorted_sections = sorted(
-                report.sections.items(), key=lambda x: x[1].total_time, reverse=True
-            )
+            sorted_sections = sorted(report.sections.items(), key=lambda x: x[1].total_time, reverse=True)
             for name, section in sorted_sections:
-                pct = (
-                    section.total_time / report.total_time * 100
-                    if report.total_time > 0
-                    else 0
-                )
-                print(
-                    f"  {name:30s} {section.total_time:8.4f}s ({pct:5.1f}%) x{section.calls}"
-                )
+                pct = section.total_time / report.total_time * 100 if report.total_time > 0 else 0
+                print(f"  {name:30s} {section.total_time:8.4f}s ({pct:5.1f}%) x{section.calls}")
 
         if report.bottlenecks:
             print("\n🔴 Bottlenecks (>20% of time):")

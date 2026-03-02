@@ -36,9 +36,7 @@ def upgrade():
             nullable=False,
         ),
     )
-    op.create_unique_constraint(
-        "uix_symbol_open_time", "bybit_kline_audit", ["symbol", "open_time"]
-    )
+    op.create_unique_constraint("uix_symbol_open_time", "bybit_kline_audit", ["symbol", "open_time"])
 
 
 def downgrade():

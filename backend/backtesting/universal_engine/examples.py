@@ -33,15 +33,11 @@ def example_order_management():
     print("\n1. Creating orders...")
 
     # Limit order
-    limit_order = manager.create_limit_order(
-        side=OrderSide.BUY, size=0.1, price=49500.0, time_in_force="GTC"
-    )
+    limit_order = manager.create_limit_order(side=OrderSide.BUY, size=0.1, price=49500.0, time_in_force="GTC")
     print(f"   Limit Order: {limit_order.order_id} - BUY 0.1 @ $49,500")
 
     # Stop order
-    stop_order = manager.create_stop_order(
-        side=OrderSide.SELL, size=0.1, stop_price=48000.0
-    )
+    stop_order = manager.create_stop_order(side=OrderSide.SELL, size=0.1, stop_price=48000.0)
     print(f"   Stop Order: {stop_order.order_id} - SELL 0.1 @ stop $48,000")
 
     # Trailing stop
@@ -51,10 +47,7 @@ def example_order_management():
         config=TrailingStopConfig(trail_percent=0.02),
         current_price=50000.0,
     )
-    print(
-        f"   Trailing Stop: {trailing.order_id} - 2% trail from $50,000 "
-        f"(stop at ${trailing.stop_price:,.2f})"
-    )
+    print(f"   Trailing Stop: {trailing.order_id} - 2% trail from $50,000 (stop at ${trailing.stop_price:,.2f})")
 
     # OCO order
     _tp_order, _sl_order = manager.create_oco_order(
@@ -73,9 +66,7 @@ def example_order_management():
     ]
 
     for i, bar in enumerate(bars):
-        filled = manager.process_bar(
-            high=bar["high"], low=bar["low"], close=bar["close"], timestamp=i * 60000
-        )
+        filled = manager.process_bar(high=bar["high"], low=bar["low"], close=bar["close"], timestamp=i * 60000)
         print(f"   Bar {i + 1}: H={bar['high']}, L={bar['low']}, C={bar['close']}")
 
         for order in filled:
@@ -116,9 +107,7 @@ def example_risk_management():
             use_kelly=True,
             kelly_fraction=0.5,
         ),
-        drawdown_config=DrawdownGuardianConfig(
-            max_drawdown=0.1, max_consecutive_losses=5
-        ),
+        drawdown_config=DrawdownGuardianConfig(max_drawdown=0.1, max_consecutive_losses=5),
     )
 
     # Position sizing
@@ -139,15 +128,10 @@ def example_risk_management():
     # Break-even stop
     print("\n2. Break-Even Stop...")
     for price in [50000, 50300, 50600, 50800]:
-        new_stop = risk_mgr.check_break_even(
-            entry_price=50000, current_price=price, is_long=True, current_stop=49000
-        )
+        new_stop = risk_mgr.check_break_even(entry_price=50000, current_price=price, is_long=True, current_stop=49000)
         profit_pct = (price - 50000) / 50000 * 100
         if new_stop:
-            print(
-                f"   Price ${price:,} (+{profit_pct:.1f}%) → "
-                f"Break-even stop activated: ${new_stop:,.2f}"
-            )
+            print(f"   Price ${price:,} (+{profit_pct:.1f}%) → Break-even stop activated: ${new_stop:,.2f}")
         else:
             print(f"   Price ${price:,} (+{profit_pct:.1f}%) → No change")
 
@@ -164,9 +148,7 @@ def example_risk_management():
     ]
 
     for equity, pnl, desc in scenarios:
-        action = risk_mgr.check_drawdown_guardian(
-            current_equity=equity, last_trade_pnl=pnl, current_bar=10
-        )
+        action = risk_mgr.check_drawdown_guardian(current_equity=equity, last_trade_pnl=pnl, current_bar=10)
         dd = (100000 - equity) / 100000 * 100
         print(f"   {desc}: Equity ${equity:,} (DD: {dd:.1f}%) → {action.action}")
         if action.action != "allow":
@@ -197,9 +179,7 @@ def example_trading_filters():
             allowed_sessions=[TradingSession.EUROPE, TradingSession.US],
             blocked_hours=[0, 1, 2],
         ),
-        news_config=NewsFilterConfig(
-            minutes_before=30, minutes_after=15, filter_impact=["high"]
-        ),
+        news_config=NewsFilterConfig(minutes_before=30, minutes_after=15, filter_impact=["high"]),
         cooldown_config=CooldownConfig(cooldown_after_loss=3, max_trades_per_day=10),
     )
 
@@ -377,9 +357,7 @@ def example_bar_simulation():
     )
 
     print("\n1. Simulating bar path...")
-    path = simulator.simulate_bar_path(
-        open_price=50000, high_price=50500, low_price=49700, close_price=50300
-    )
+    path = simulator.simulate_bar_path(open_price=50000, high_price=50500, low_price=49700, close_price=50300)
 
     print("   Bar: O=$50,000 H=$50,500 L=$49,700 C=$50,300")
     print(f"   Generated {len(path)} ticks")
@@ -393,9 +371,7 @@ def example_bar_simulation():
     test_stops = [49800, 49700, 49600]
 
     for stop in test_stops:
-        triggered, tick_idx, _exec_price = simulator.check_stop_triggered(
-            path=path, stop_price=stop, is_long=True
-        )
+        triggered, tick_idx, _exec_price = simulator.check_stop_triggered(path=path, stop_price=stop, is_long=True)
         if triggered:
             print(f"   Stop $49,{stop % 1000}: ✓ Triggered at tick {tick_idx}")
         else:
@@ -427,15 +403,9 @@ def example_liquidation():
 
     print("\n1. Liquidation prices at different leverages...")
     for leverage in [5, 10, 20, 50, 100]:
-        liq_long, _bank_long = engine.calculate_liquidation_price(
-            entry_price=50000, leverage=leverage, is_long=True
-        )
-        liq_short, _bank_short = engine.calculate_liquidation_price(
-            entry_price=50000, leverage=leverage, is_long=False
-        )
-        print(
-            f"   {leverage}x: Long liq ${liq_long:,.0f} | Short liq ${liq_short:,.0f}"
-        )
+        liq_long, _bank_long = engine.calculate_liquidation_price(entry_price=50000, leverage=leverage, is_long=True)
+        liq_short, _bank_short = engine.calculate_liquidation_price(entry_price=50000, leverage=leverage, is_long=False)
+        print(f"   {leverage}x: Long liq ${liq_long:,.0f} | Short liq ${liq_short:,.0f}")
 
     print("\n2. Position monitoring (10x long)...")
     entry = 50000
@@ -456,15 +426,10 @@ def example_liquidation():
         )
         loss_pct = (entry - price) / entry * 100
         status = "❌ LIQUIDATED" if result.is_liquidated else "✓ Safe"
-        print(
-            f"   Price ${price:,} ({loss_pct:.1f}% loss): {status} "
-            f"| Margin ratio: {result.margin_ratio:.1%}"
-        )
+        print(f"   Price ${price:,} ({loss_pct:.1f}% loss): {status} | Margin ratio: {result.margin_ratio:.1%}")
 
         if result.is_liquidated:
-            loss = engine.calculate_liquidation_loss(
-                entry, result.liquidation_price, size, True
-            )
+            loss = engine.calculate_liquidation_loss(entry, result.liquidation_price, size, True)
             print(f"      Total loss: ${abs(loss):,.2f}")
             break
 
@@ -485,26 +450,17 @@ def example_volume_slippage():
         VolumeSlippageModel,
     )
 
-    model = VolumeSlippageModel(
-        VolumeSlippageConfig(
-            base_slippage=0.0001, volume_exponent=0.5, max_slippage=0.01
-        )
-    )
+    model = VolumeSlippageModel(VolumeSlippageConfig(base_slippage=0.0001, volume_exponent=0.5, max_slippage=0.01))
 
     print("\n1. Slippage by order size...")
     bar_volume = 1000000  # $1M volume
 
     for order_size in [1000, 10000, 50000, 100000, 500000]:
         slippage = model.calculate_slippage(order_size, bar_volume, volatility=0.01)
-        print(
-            f"   ${order_size:>7,} order: {slippage:.4%} slippage "
-            f"(${order_size * slippage:.2f} cost)"
-        )
+        print(f"   ${order_size:>7,} order: {slippage:.4%} slippage (${order_size * slippage:.2f} cost)")
 
     print("\n2. Market impact analysis for large order...")
-    impact = model.estimate_market_impact(
-        order_size_usd=500000, average_volume_usd=1000000, n_bars_to_execute=10
-    )
+    impact = model.estimate_market_impact(order_size_usd=500000, average_volume_usd=1000000, n_bars_to_execute=10)
 
     print("   Order: $500,000 | Avg Volume: $1,000,000")
     print(f"   Single execution slippage: {impact['single_execution_slippage']:.4%}")

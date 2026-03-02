@@ -134,12 +134,8 @@ class DataGapRepairService:
             missing_candles = int(gap_ms / interval_ms) - 1
 
             # Parse datetime to check for weekend
-            gap_start_dt = datetime.fromisoformat(
-                row["open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=UTC)
-            gap_end_dt = datetime.fromisoformat(
-                row["next_open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=UTC)
+            gap_start_dt = datetime.fromisoformat(row["open_time_dt"].replace("+00:00", "")).replace(tzinfo=UTC)
+            gap_end_dt = datetime.fromisoformat(row["next_open_time_dt"].replace("+00:00", "")).replace(tzinfo=UTC)
 
             # Check if this is a weekend gap (Friday 21:00 UTC to Sunday 21:00 UTC typical)
             is_weekend = gap_start_dt.weekday() >= 4 and gap_end_dt.weekday() <= 1
@@ -354,9 +350,7 @@ class DataGapRepairService:
         for candle in candles:
             try:
                 # Prepare datetime string
-                open_time_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=UTC
-                ).isoformat()
+                open_time_dt = datetime.fromtimestamp(candle["open_time"] / 1000, tz=UTC).isoformat()
 
                 # Use INSERT OR REPLACE to handle existing candles
                 conn.execute(
@@ -448,8 +442,7 @@ class DataGapRepairService:
 
         # Count total candles
         cursor = conn.execute(
-            "SELECT COUNT(*), MIN(open_time), MAX(open_time) "
-            "FROM bybit_kline_audit WHERE symbol = ? AND interval = ?",
+            "SELECT COUNT(*), MIN(open_time), MAX(open_time) FROM bybit_kline_audit WHERE symbol = ? AND interval = ?",
             (symbol, interval),
         )
         row = cursor.fetchone()
@@ -469,9 +462,7 @@ class DataGapRepairService:
         conn.close()
 
         # Find gaps
-        timestamp_gaps = self.find_timestamp_gaps(
-            symbol, interval, max_gaps=100, skip_weekends=False
-        )
+        timestamp_gaps = self.find_timestamp_gaps(symbol, interval, max_gaps=100, skip_weekends=False)
         weekend_gaps = [g for g in timestamp_gaps if g.is_weekend]
         data_gaps = [g for g in timestamp_gaps if not g.is_weekend]
 
@@ -532,9 +523,7 @@ if __name__ == "__main__":
                 try:
                     summary = service.get_repair_summary(symbol, interval)
                     if summary["total_candles"] > 0:
-                        status = (
-                            "⚠️ NEEDS REPAIR" if summary["needs_repair"] else "✅ OK"
-                        )
+                        status = "⚠️ NEEDS REPAIR" if summary["needs_repair"] else "✅ OK"
                         print(
                             f"{symbol}:{interval:>3} | "
                             f"{summary['total_candles']:>6} candles | "

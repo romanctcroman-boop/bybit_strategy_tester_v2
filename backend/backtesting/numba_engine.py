@@ -73,7 +73,7 @@ def simulate_trades_numba(
     cash = initial_capital
     position = 0.0
     is_long = True
-    recorded_count = 0   # trades written into the array (capped at max_trades)
+    recorded_count = 0  # trades written into the array (capped at max_trades)
     total_trade_count = 0  # true trade count — may exceed max_trades
 
     # Equity tracking (cumulative PnL approach - matches Fallback)
@@ -209,15 +209,18 @@ def simulate_trades_numba(
 
                 if is_long:
                     pnl = (exit_price - entry_price) * entry_size - exit_fees
-                    # pnl_pct = % return on margin (allocated capital)
-                    pnl_pct = pnl / margin_used * 100.0 if margin_used > 0.0 else 0.0
+                    # TV-compatible pnl_pct = price change % (NOT pnl / margin)
+                    # Formula: ((exit - entry) / entry) × 100
+                    pnl_pct = (exit_price - entry_price) / entry_price * 100.0 if entry_price > 0 else 0.0
                     mfe_pct = (max_favorable_price - entry_price) / entry_price * 100.0
                     mae_pct = (entry_price - max_adverse_price) / entry_price * 100.0
                     mfe = (max_favorable_price - entry_price) * entry_size
                     mae = (entry_price - max_adverse_price) * entry_size
                 else:
                     pnl = (entry_price - exit_price) * entry_size - exit_fees
-                    pnl_pct = pnl / margin_used * 100.0 if margin_used > 0.0 else 0.0
+                    # TV-compatible pnl_pct = price change % (NOT pnl / margin)
+                    # Formula: ((entry - exit) / entry) × 100
+                    pnl_pct = (entry_price - exit_price) / entry_price * 100.0 if entry_price > 0 else 0.0
                     mfe_pct = (entry_price - max_favorable_price) / entry_price * 100.0
                     mae_pct = (max_adverse_price - entry_price) / entry_price * 100.0
                     mfe = (entry_price - max_favorable_price) * entry_size

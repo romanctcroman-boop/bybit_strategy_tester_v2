@@ -303,13 +303,9 @@ class DataIntegrityChecker:
             self.results.append(
                 IntegrityCheckResult(
                     check_name="ohlcv_data_validation",
-                    status=IntegrityStatus.OK
-                    if not issues
-                    else IntegrityStatus.WARNING,
+                    status=IntegrityStatus.OK if not issues else IntegrityStatus.WARNING,
                     source=DataSource.POSTGRES,
-                    message="OHLCV data validation passed"
-                    if not issues
-                    else f"{len(issues)} issues found",
+                    message="OHLCV data validation passed" if not issues else f"{len(issues)} issues found",
                     details={"issues": issues},
                     duration_ms=duration,
                 )
@@ -370,13 +366,9 @@ class DataIntegrityChecker:
             self.results.append(
                 IntegrityCheckResult(
                     check_name="risk_calculations",
-                    status=IntegrityStatus.OK
-                    if not issues
-                    else IntegrityStatus.WARNING,
+                    status=IntegrityStatus.OK if not issues else IntegrityStatus.WARNING,
                     source=DataSource.CACHE,
-                    message="Risk calculations valid"
-                    if not issues
-                    else f"{len(issues)} issues found",
+                    message="Risk calculations valid" if not issues else f"{len(issues)} issues found",
                     details={"issues": issues},
                     duration_ms=(time.time() - start) * 1000,
                 )

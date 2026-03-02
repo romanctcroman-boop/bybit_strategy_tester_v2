@@ -157,12 +157,8 @@ class ErrorDetail(BaseModel):
 
     code: str = Field(description="Error code for programmatic handling")
     message: str = Field(description="Human-readable error message")
-    field: str | None = Field(
-        default=None, description="Field that caused the error"
-    )
-    details: dict[str, Any] | None = Field(
-        default=None, description="Additional error context"
-    )
+    field: str | None = Field(default=None, description="Field that caused the error")
+    details: dict[str, Any] | None = Field(default=None, description="Additional error context")
 
 
 class ErrorResponse(BaseModel):
@@ -175,9 +171,7 @@ class ErrorResponse(BaseModel):
     success: bool = False
     error: str = Field(description="Main error message")
     code: str = Field(description="Error code")
-    errors: list[ErrorDetail] | None = Field(
-        default=None, description="Detailed errors (for validation)"
-    )
+    errors: list[ErrorDetail] | None = Field(default=None, description="Detailed errors (for validation)")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     request_id: str | None = None
 
@@ -232,9 +226,7 @@ class HealthStatus(BaseModel):
     status: str = Field(description="Overall status: healthy, degraded, unhealthy")
     version: str = Field(description="Application version")
     uptime_seconds: float = Field(description="Time since startup")
-    checks: dict[str, Any] = Field(
-        default_factory=dict, description="Individual component checks"
-    )
+    checks: dict[str, Any] = Field(default_factory=dict, description="Individual component checks")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

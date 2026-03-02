@@ -61,8 +61,7 @@ class MTFData:
         """Validate data after initialization."""
         if len(self.ltf_candles) != len(self.htf_index_map):
             raise ValueError(
-                f"LTF candles ({len(self.ltf_candles)}) and "
-                f"htf_index_map ({len(self.htf_index_map)}) length mismatch"
+                f"LTF candles ({len(self.ltf_candles)}) and htf_index_map ({len(self.htf_index_map)}) length mismatch"
             )
 
     @property
@@ -176,60 +175,44 @@ class MTFDataLoader:
         Raises:
             ValueError: If data cannot be loaded or intervals are invalid
         """
-        logger.info(
-            f"Loading MTF data: {symbol} LTF={ltf_interval} HTF={htf_interval} "
-            f"lookahead={lookahead_mode}"
-        )
+        logger.info(f"Loading MTF data: {symbol} LTF={ltf_interval} HTF={htf_interval} lookahead={lookahead_mode}")
 
         # Validate intervals
         ltf_minutes = interval_to_minutes(ltf_interval)
         htf_minutes = interval_to_minutes(htf_interval)
 
         if ltf_minutes is None or htf_minutes is None:
-            raise ValueError(
-                f"Invalid intervals: LTF={ltf_interval}, HTF={htf_interval}"
-            )
+            raise ValueError(f"Invalid intervals: LTF={ltf_interval}, HTF={htf_interval}")
 
         if htf_minutes <= ltf_minutes:
             raise ValueError(
-                f"HTF ({htf_interval}={htf_minutes}min) must be larger than "
-                f"LTF ({ltf_interval}={ltf_minutes}min)"
+                f"HTF ({htf_interval}={htf_minutes}min) must be larger than LTF ({ltf_interval}={ltf_minutes}min)"
             )
 
         # Load LTF candles
-        ltf_candles = self._load_candles(
-            symbol, ltf_interval, start_date, end_date, load_limit
-        )
+        ltf_candles = self._load_candles(symbol, ltf_interval, start_date, end_date, load_limit)
         if ltf_candles.empty:
             raise ValueError(f"No LTF data for {symbol} {ltf_interval}")
 
         # Load HTF candles
-        htf_candles = self._load_candles(
-            symbol, htf_interval, start_date, end_date, load_limit
-        )
+        htf_candles = self._load_candles(symbol, htf_interval, start_date, end_date, load_limit)
         if htf_candles.empty:
             raise ValueError(f"No HTF data for {symbol} {htf_interval}")
 
         # Create HTF index map
         ltf_timestamps = self._get_timestamps(ltf_candles)
         htf_timestamps = self._get_timestamps(htf_candles)
-        htf_index_map = create_htf_index_map(
-            ltf_timestamps, htf_timestamps, lookahead_mode
-        )
+        htf_index_map = create_htf_index_map(ltf_timestamps, htf_timestamps, lookahead_mode)
 
         # Load reference symbol if specified
         reference_candles = None
         reference_index_map = None
         if reference_symbol:
             ref_interval = reference_interval or htf_interval
-            reference_candles = self._load_candles(
-                reference_symbol, ref_interval, start_date, end_date, load_limit
-            )
+            reference_candles = self._load_candles(reference_symbol, ref_interval, start_date, end_date, load_limit)
             if not reference_candles.empty:
                 ref_timestamps = self._get_timestamps(reference_candles)
-                reference_index_map = create_htf_index_map(
-                    ltf_timestamps, ref_timestamps, lookahead_mode
-                )
+                reference_index_map = create_htf_index_map(ltf_timestamps, ref_timestamps, lookahead_mode)
             else:
                 logger.warning(f"No reference data for {reference_symbol}")
 
@@ -285,9 +268,7 @@ class MTFDataLoader:
         try:
             if self.use_cache:
                 # Try cache first
-                candles = CANDLE_CACHE.get_working_set(
-                    symbol, interval, ensure_loaded=False
-                )
+                candles = CANDLE_CACHE.get_working_set(symbol, interval, ensure_loaded=False)
                 if candles:
                     df = self._candles_to_df(candles)
                     df = self._filter_by_date(df, start_date, end_date)
@@ -295,9 +276,7 @@ class MTFDataLoader:
                         return df
 
                 # Load from API via cache
-                candles = CANDLE_CACHE.load_initial(
-                    symbol, interval, load_limit=load_limit, persist=True
-                )
+                candles = CANDLE_CACHE.load_initial(symbol, interval, load_limit=load_limit, persist=True)
                 if candles:
                     df = self._candles_to_df(candles)
                     df = self._filter_by_date(df, start_date, end_date)
@@ -350,9 +329,7 @@ class MTFDataLoader:
 
         return df
 
-    def _filter_by_date(
-        self, df: pd.DataFrame, start_date: str | None, end_date: str | None
-    ) -> pd.DataFrame:
+    def _filter_by_date(self, df: pd.DataFrame, start_date: str | None, end_date: str | None) -> pd.DataFrame:
         """Filter DataFrame by date range."""
         if df.empty or "time" not in df.columns:
             return df
@@ -377,8 +354,4 @@ class MTFDataLoader:
         elif df["time"].dtype == "int64":
             return df["time"].values
         else:
-            return (
-                pd.to_datetime(df["time"])
-                .values.astype("datetime64[ms]")
-                .astype(np.int64)
-            )
+            return pd.to_datetime(df["time"]).values.astype("datetime64[ms]").astype(np.int64)

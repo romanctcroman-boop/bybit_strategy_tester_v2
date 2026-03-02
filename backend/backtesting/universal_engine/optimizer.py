@@ -54,9 +54,7 @@ class OptimizableParameter:
             return []
 
         if self.param_type == "int":
-            return list(
-                range(int(self.min_value), int(self.max_value) + 1, int(self.step))
-            )
+            return list(range(int(self.min_value), int(self.max_value) + 1, int(self.step)))
         else:  # float
             values = []
             current = self.min_value
@@ -123,20 +121,12 @@ STRATEGY_PARAMS = {
     "take_profit": OptimizableParameter("take_profit", "float", 0.005, 0.20, 0.005),
     # DCA
     "dca_safety_orders": OptimizableParameter("dca_safety_orders", "int", 0, 10, 1),
-    "dca_price_deviation": OptimizableParameter(
-        "dca_price_deviation", "float", 0.005, 0.05, 0.005
-    ),
+    "dca_price_deviation": OptimizableParameter("dca_price_deviation", "float", 0.005, 0.05, 0.005),
     "dca_step_scale": OptimizableParameter("dca_step_scale", "float", 1.0, 2.0, 0.1),
-    "dca_volume_scale": OptimizableParameter(
-        "dca_volume_scale", "float", 1.0, 2.0, 0.1
-    ),
+    "dca_volume_scale": OptimizableParameter("dca_volume_scale", "float", 1.0, 2.0, 0.1),
     # Trailing Stop
-    "trailing_stop_activation": OptimizableParameter(
-        "trailing_stop_activation", "float", 0.005, 0.05, 0.005
-    ),
-    "trailing_stop_distance": OptimizableParameter(
-        "trailing_stop_distance", "float", 0.002, 0.03, 0.001
-    ),
+    "trailing_stop_activation": OptimizableParameter("trailing_stop_activation", "float", 0.005, 0.05, 0.005),
+    "trailing_stop_distance": OptimizableParameter("trailing_stop_distance", "float", 0.002, 0.03, 0.001),
     # Position Sizing
     "position_size": OptimizableParameter("position_size", "float", 0.05, 1.0, 0.05),
 }
@@ -236,11 +226,7 @@ class UniversalOptimizer:
             elif isinstance(values, tuple) and len(values) == 3:
                 # (min, max, step)
                 min_v, max_v, step = values
-                if (
-                    isinstance(min_v, int)
-                    and isinstance(max_v, int)
-                    and isinstance(step, int)
-                ):
+                if isinstance(min_v, int) and isinstance(max_v, int) and isinstance(step, int):
                     param_values[name] = list(range(min_v, max_v + 1, step))
                 else:
                     vals = []
@@ -429,9 +415,7 @@ class UniversalOptimizer:
 
         n_samples = min(max_combinations, total_possible)
 
-        logger.info(
-            f"Random search: {n_samples:,} samples out of {total_possible:,} possible"
-        )
+        logger.info(f"Random search: {n_samples:,} samples out of {total_possible:,} possible")
 
         # Generate random samples
         seen = set()
@@ -495,9 +479,7 @@ class UniversalOptimizer:
 
         return results
 
-    def _passes_filters(
-        self, metrics: EngineMetrics, filters: dict[str, float] | None
-    ) -> bool:
+    def _passes_filters(self, metrics: EngineMetrics, filters: dict[str, float] | None) -> bool:
         """Check if metrics pass all filters."""
         if filters is None:
             return True
@@ -511,10 +493,7 @@ class UniversalOptimizer:
         if "max_drawdown" in filters and metrics.max_drawdown > filters["max_drawdown"]:
             return False
 
-        if (
-            "min_profit_factor" in filters
-            and metrics.profit_factor < filters["min_profit_factor"]
-        ):
+        if "min_profit_factor" in filters and metrics.profit_factor < filters["min_profit_factor"]:
             return False
 
         return not ("min_sharpe" in filters and metrics.sharpe_ratio < filters["min_sharpe"])
@@ -547,9 +526,7 @@ class UniversalOptimizer:
                 "stop_loss": [0.01, 0.02, 0.03],
                 "take_profit": [0.01, 0.02, 0.03, 0.04],
             }
-            base_params = {
-                "strategy_params": {"period": 14, "overbought": 70, "oversold": 30}
-            }
+            base_params = {"strategy_params": {"period": 14, "overbought": 70, "oversold": 30}}
 
         elif strategy_type == "macd":
             param_ranges = {

@@ -281,7 +281,7 @@ export function createSaveLoadModule({
                 _slippage: parseFloat(document.getElementById('backtestSlippage')?.value || '0') / 100,
                 _pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value || '1', 10) || 1,
                 _start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
-                _end_date: document.getElementById('backtestEndDate')?.value || new Date().toISOString().slice(0, 10)
+                _end_date: (() => { const _n = new Date(); return document.getElementById('backtestEndDate')?.value || `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`; })()
             },
             blocks: blocks.map(b => ({
                 id: b.id,
@@ -506,7 +506,9 @@ export function createSaveLoadModule({
                 backtestStartDateEl.value = strategy.parameters?._start_date || strategy.start_date || '2025-01-01';
             }
             if (backtestEndDateEl) {
-                const today = new Date().toISOString().slice(0, 10);
+                // Use local date (not UTC) to avoid off-by-one at midnight in UTC+N timezones
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
                 // Clamp to today: don't allow future dates, but don't push saved past dates forward.
                 backtestEndDateEl.value = savedEnd <= today ? savedEnd : today;

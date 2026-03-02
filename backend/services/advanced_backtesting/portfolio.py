@@ -204,9 +204,7 @@ class PortfolioMetrics:
                 "concentration_ratio": round(self.concentration_ratio, 3),
                 "turnover_pct": round(self.turnover * 100, 2),
             },
-            "asset_contributions": {
-                k: round(v * 100, 2) for k, v in self.asset_contributions.items()
-            },
+            "asset_contributions": {k: round(v * 100, 2) for k, v in self.asset_contributions.items()},
         }
 
 
@@ -394,8 +392,7 @@ class PortfolioBacktester:
             # Inverse volatility weights
             total_inv_vol = sum(1 / v for v in volatilities.values() if v > 0)
             allocation.weights = {
-                asset: (1 / vol) / total_inv_vol if vol > 0 else 0
-                for asset, vol in volatilities.items()
+                asset: (1 / vol) / total_inv_vol if vol > 0 else 0 for asset, vol in volatilities.items()
             }
 
         elif method == AllocationMethod.MIN_VARIANCE:
@@ -423,9 +420,7 @@ class PortfolioBacktester:
             total = sum(positive_momentum.values())
 
             if total > 0:
-                allocation.weights = {
-                    asset: score / total for asset, score in positive_momentum.items()
-                }
+                allocation.weights = {asset: score / total for asset, score in positive_momentum.items()}
             else:
                 # Fall back to equal weight
                 weight = 1.0 / len(self.assets)
@@ -630,9 +625,7 @@ class PortfolioBacktester:
 
     def _calculate_portfolio_value(self, prices: dict[str, float]) -> float:
         """Calculate total portfolio value."""
-        position_value = sum(
-            self.positions[asset] * prices.get(asset, 0) for asset in self.assets
-        )
+        position_value = sum(self.positions[asset] * prices.get(asset, 0) for asset in self.assets)
         return self.capital + position_value
 
     def _update_weights(self, prices: dict[str, float], total_value: float):
@@ -768,9 +761,7 @@ class PortfolioBacktester:
         returns = []
         for i in range(1, len(self.equity_curve)):
             if self.equity_curve[i - 1] > 0:
-                ret = (
-                    self.equity_curve[i] - self.equity_curve[i - 1]
-                ) / self.equity_curve[i - 1]
+                ret = (self.equity_curve[i] - self.equity_curve[i - 1]) / self.equity_curve[i - 1]
                 returns.append(ret)
 
         return returns
@@ -790,9 +781,7 @@ class PortfolioBacktester:
 
         # Returns
         metrics.total_return = (self.equity_curve[-1] / self.initial_capital) - 1
-        metrics.annualized_return = (1 + metrics.total_return) ** (
-            365 / len(returns)
-        ) - 1
+        metrics.annualized_return = (1 + metrics.total_return) ** (365 / len(returns)) - 1
 
         # Risk
         metrics.volatility = np.std(returns_arr) * np.sqrt(365)
@@ -831,25 +820,16 @@ class PortfolioBacktester:
 
         # Diversification ratio: weighted_avg_vol / portfolio_vol
         if data and len(self.assets) >= 2:
-            metrics.diversification_ratio = self._compute_diversification_ratio(
-                data, returns_arr
-            )
+            metrics.diversification_ratio = self._compute_diversification_ratio(data, returns_arr)
 
         # Turnover (simplified)
         if self.rebalance_events:
-            total_traded = sum(
-                sum(t["value"] for t in event["trades"])
-                for event in self.rebalance_events
-            )
-            metrics.turnover = total_traded / (
-                self.initial_capital * len(returns) / 365
-            )
+            total_traded = sum(sum(t["value"] for t in event["trades"]) for event in self.rebalance_events)
+            metrics.turnover = total_traded / (self.initial_capital * len(returns) / 365)
 
         # Asset contributions (simplified)
         for asset in self.assets:
-            metrics.asset_contributions[asset] = (
-                self.weights.get(asset, 0) * metrics.total_return
-            )
+            metrics.asset_contributions[asset] = self.weights.get(asset, 0) * metrics.total_return
 
         return metrics
 
@@ -926,9 +906,7 @@ class PortfolioBacktester:
                 c = np.corrcoef(r1[i - window : i], r2[i - window : i])[0, 1]
                 rolling.append(float(c) if not np.isnan(c) else 0.0)
             pair_key = f"{assets_list[0]}_{assets_list[1]}"
-            analysis.rolling_correlations[pair_key] = [
-                round(x, 4) for x in rolling[-100:]
-            ]
+            analysis.rolling_correlations[pair_key] = [round(x, 4) for x in rolling[-100:]]
 
         return analysis
 

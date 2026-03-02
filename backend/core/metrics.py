@@ -407,9 +407,7 @@ class MetricsCollector:
     # MCP Tool Metrics
     # -------------------------------------------------------------------------
 
-    def mcp_tool_call(
-        self, tool: str, success: bool, duration: float | None = None
-    ) -> None:
+    def mcp_tool_call(self, tool: str, success: bool, duration: float | None = None) -> None:
         """Record MCP tool call."""
         try:
             MCP_TOOL_CALLS.labels(tool=tool, success=str(success).lower()).inc()
@@ -425,16 +423,12 @@ class MetricsCollector:
         except Exception as e:
             logger.warning(f"Failed to record MCP tool error: {e}")
 
-    def mcp_bridge_call(
-        self, tool: str, success: bool, duration: float | None = None
-    ) -> None:
+    def mcp_bridge_call(self, tool: str, success: bool, duration: float | None = None) -> None:
         """Record MCP bridge call."""
         try:
             MCP_BRIDGE_CALLS.labels(tool=tool, success=str(success).lower()).inc()
             if duration is not None:
-                MCP_BRIDGE_DURATION.labels(
-                    tool=tool, success=str(success).lower()
-                ).observe(duration)
+                MCP_BRIDGE_DURATION.labels(tool=tool, success=str(success).lower()).observe(duration)
         except Exception as e:
             logger.warning(f"Failed to record MCP bridge call: {e}")
 
@@ -486,9 +480,9 @@ class MetricsCollector:
     ) -> None:
         """Record strategy health metrics."""
         try:
-            STRATEGY_HEALTH_SCORE.labels(
-                strategy_id=strategy_id, strategy_name=strategy_name or strategy_id
-            ).set(health_score)
+            STRATEGY_HEALTH_SCORE.labels(strategy_id=strategy_id, strategy_name=strategy_name or strategy_id).set(
+                health_score
+            )
 
             if drawdown is not None:
                 STRATEGY_DRAWDOWN.labels(strategy_id=strategy_id).set(drawdown)
@@ -502,9 +496,7 @@ class MetricsCollector:
     def record_trade(self, strategy_id: str, side: str, result: str) -> None:
         """Record trade execution. side: buy/sell, result: win/loss/breakeven"""
         try:
-            STRATEGY_TRADES_TOTAL.labels(
-                strategy_id=strategy_id, side=side, result=result
-            ).inc()
+            STRATEGY_TRADES_TOTAL.labels(strategy_id=strategy_id, side=side, result=result).inc()
         except Exception as e:
             logger.warning(f"Failed to record trade: {e}")
 
@@ -636,17 +628,13 @@ class MetricsCollector:
     # API Metrics
     # -------------------------------------------------------------------------
 
-    def record_api_request(
-        self, method: str, endpoint: str, status_code: int, duration: float
-    ) -> None:
+    def record_api_request(self, method: str, endpoint: str, status_code: int, duration: float) -> None:
         """Record API request."""
         try:
-            API_REQUEST_TOTAL.labels(
-                method=method, endpoint=endpoint, status_code=str(status_code)
-            ).inc()
-            API_REQUEST_DURATION.labels(
-                method=method, endpoint=endpoint, status_code=str(status_code)
-            ).observe(duration)
+            API_REQUEST_TOTAL.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
+            API_REQUEST_DURATION.labels(method=method, endpoint=endpoint, status_code=str(status_code)).observe(
+                duration
+            )
         except Exception as e:
             logger.warning(f"Failed to record API request: {e}")
 
@@ -739,8 +727,6 @@ class MetricsTimer:
             m.record_api_request(
                 method=self.labels.get("method", "GET"),
                 endpoint=self.labels.get("endpoint", "/"),
-                status_code=self.labels.get(
-                    "status_code", 200 if self.success else 500
-                ),
+                status_code=self.labels.get("status_code", 200 if self.success else 500),
                 duration=self.duration,
             )

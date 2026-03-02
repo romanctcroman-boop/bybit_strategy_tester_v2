@@ -352,10 +352,11 @@ class AlertManager:
                     if rule.duration_seconds > 0:
                         if alert.firing_since is None:
                             alert.firing_since = now
-                        elif (now - alert.firing_since).total_seconds() >= rule.duration_seconds:
-                            if alert.state == AlertState.PENDING:
-                                alert.state = AlertState.FIRING
-                                new_alerts.append(alert)
+                        elif (
+                            now - alert.firing_since
+                        ).total_seconds() >= rule.duration_seconds and alert.state == AlertState.PENDING:
+                            alert.state = AlertState.FIRING
+                            new_alerts.append(alert)
                     elif alert.state == AlertState.PENDING:
                         alert.state = AlertState.FIRING
                         new_alerts.append(alert)

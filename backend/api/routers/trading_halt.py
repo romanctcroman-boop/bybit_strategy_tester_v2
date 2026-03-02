@@ -4,7 +4,6 @@ Trading Halt API Router.
 Provides REST API for trading halt management and emergency stop.
 """
 
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -336,10 +335,7 @@ async def update_risk_metrics(request: RiskMetricsRequest):
 @router.get("/halt-reasons")
 async def list_halt_reasons():
     """List all available halt reasons."""
-    return [
-        {"value": r.value, "description": r.name.replace("_", " ").title()}
-        for r in HaltReason
-    ]
+    return [{"value": r.value, "description": r.name.replace("_", " ").title()} for r in HaltReason]
 
 
 @router.get("/halt-levels")

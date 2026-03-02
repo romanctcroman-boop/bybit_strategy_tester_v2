@@ -218,9 +218,7 @@ class CovarianceEstimator:
         return weighted_cov
 
     @staticmethod
-    def minimum_covariance_determinant(
-        returns: NDArray, support_fraction: float = 0.75
-    ) -> NDArray:
+    def minimum_covariance_determinant(returns: NDArray, support_fraction: float = 0.75) -> NDArray:
         """
         Robust covariance estimation using MCD.
         Removes outliers from covariance calculation.
@@ -240,9 +238,7 @@ class CovarianceEstimator:
             except np.linalg.LinAlgError:
                 cov_inv = np.linalg.pinv(cov)
 
-            distances = np.array(
-                [np.sqrt((r - mean) @ cov_inv @ (r - mean)) for r in returns]
-            )
+            distances = np.array([np.sqrt((r - mean) @ cov_inv @ (r - mean)) for r in returns])
 
             # Select h points with smallest distances
             indices = np.argsort(distances)[:h]
@@ -373,26 +369,16 @@ class RiskParityOptimizer:
         rc = weights * mrc
 
         # Expected return
-        mean_returns = (
-            np.mean(self._returns, axis=0)
-            if self._returns is not None
-            else np.zeros(n_assets)
-        )
+        mean_returns = np.mean(self._returns, axis=0) if self._returns is not None else np.zeros(n_assets)
         expected_return = float(weights @ mean_returns * 252)  # Annualized
 
         # Sharpe ratio
-        sharpe = (
-            (expected_return - self.risk_free_rate) / (port_vol * np.sqrt(252))
-            if port_vol > 0
-            else 0
-        )
+        sharpe = (expected_return - self.risk_free_rate) / (port_vol * np.sqrt(252)) if port_vol > 0 else 0
 
         return PortfolioWeights(
             weights={f"asset_{i}": float(w) for i, w in enumerate(weights)},
             objective_value=float(result.fun),
-            risk_contributions={
-                f"asset_{i}": float(r / port_vol) for i, r in enumerate(rc)
-            },
+            risk_contributions={f"asset_{i}": float(r / port_vol) for i, r in enumerate(rc)},
             expected_return=expected_return,
             expected_risk=float(port_vol * np.sqrt(252)),
             sharpe_ratio=sharpe,
@@ -425,9 +411,7 @@ class HierarchicalRiskParity:
     issues with covariance matrix inversion.
     """
 
-    def __init__(
-        self, cov_estimator: str = "ledoit_wolf", linkage_method: str = "single"
-    ):
+    def __init__(self, cov_estimator: str = "ledoit_wolf", linkage_method: str = "single"):
         self.cov_estimator = cov_estimator
         self.linkage_method = linkage_method
         self._cov_matrix: NDArray | None = None
@@ -486,9 +470,7 @@ class HierarchicalRiskParity:
 
         return sorted_items
 
-    def _get_recursive_bisection(
-        self, cov: NDArray, sorted_items: list[int]
-    ) -> NDArray:
+    def _get_recursive_bisection(self, cov: NDArray, sorted_items: list[int]) -> NDArray:
         """Compute HRP allocation through recursive bisection."""
         n = len(sorted_items)
         weights = np.ones(n)
@@ -535,9 +517,7 @@ class HierarchicalRiskParity:
         # Cluster variance
         return float(ivp @ cov_slice @ ivp)
 
-    def optimize(
-        self, constraints: PortfolioConstraints | None = None
-    ) -> PortfolioWeights:
+    def optimize(self, constraints: PortfolioConstraints | None = None) -> PortfolioWeights:
         """
         Find HRP weights.
 
@@ -573,20 +553,14 @@ class HierarchicalRiskParity:
         port_var = weights @ self._cov_matrix @ weights
         port_vol = np.sqrt(port_var)
 
-        mean_returns = (
-            np.mean(self._returns, axis=0)
-            if self._returns is not None
-            else np.zeros(n_assets)
-        )
+        mean_returns = np.mean(self._returns, axis=0) if self._returns is not None else np.zeros(n_assets)
         expected_return = float(weights @ mean_returns * 252)
 
         return PortfolioWeights(
             weights={f"asset_{i}": float(w) for i, w in enumerate(weights)},
             expected_return=expected_return,
             expected_risk=float(port_vol * np.sqrt(252)),
-            sharpe_ratio=expected_return / (port_vol * np.sqrt(252))
-            if port_vol > 0
-            else 0,
+            sharpe_ratio=expected_return / (port_vol * np.sqrt(252)) if port_vol > 0 else 0,
         )
 
 
@@ -608,9 +582,7 @@ class MeanVarianceOptimizer:
         self._cov_matrix: NDArray | None = None
         self._expected_returns: NDArray | None = None
 
-    def fit(
-        self, returns: NDArray, expected_returns: NDArray | None = None
-    ) -> "MeanVarianceOptimizer":
+    def fit(self, returns: NDArray, expected_returns: NDArray | None = None) -> "MeanVarianceOptimizer":
         """
         Fit with return data.
 
@@ -723,9 +695,7 @@ class MeanVarianceOptimizer:
         port_var = weights @ self._cov_matrix @ weights
         port_vol = np.sqrt(port_var) * np.sqrt(252)
         expected_return = float(weights @ self._expected_returns * 252)
-        sharpe = (
-            (expected_return - self.risk_free_rate) / port_vol if port_vol > 0 else 0
-        )
+        sharpe = (expected_return - self.risk_free_rate) / port_vol if port_vol > 0 else 0
 
         return PortfolioWeights(
             weights={f"asset_{i}": float(w) for i, w in enumerate(weights)},
@@ -865,9 +835,7 @@ class BlackLittermanModel:
         mv_optimizer._cov_matrix = self._cov_matrix
         mv_optimizer._expected_returns = expected_returns
 
-        return mv_optimizer.optimize(
-            objective=OptimizationObjective.MAX_SHARPE, constraints=constraints
-        )
+        return mv_optimizer.optimize(objective=OptimizationObjective.MAX_SHARPE, constraints=constraints)
 
 
 # ============================================================================
@@ -922,13 +890,8 @@ class RiskBudgeting:
         result = rp.optimize(risk_budgets=budgets, constraints=constraints)
 
         # Rename assets
-        result.weights = {
-            a: result.weights.get(f"asset_{i}", 0) for i, a in enumerate(assets)
-        }
-        result.risk_contributions = {
-            a: result.risk_contributions.get(f"asset_{i}", 0)
-            for i, a in enumerate(assets)
-        }
+        result.weights = {a: result.weights.get(f"asset_{i}", 0) for i, a in enumerate(assets)}
+        result.risk_contributions = {a: result.risk_contributions.get(f"asset_{i}", 0) for i, a in enumerate(assets)}
 
         return result
 
@@ -1075,9 +1038,7 @@ class DynamicRebalancer:
                 last_rebalance_idx = t
 
                 weights_history.append(
-                    PortfolioWeights(
-                        weights={f"asset_{i}": float(w) for i, w in enumerate(weights)}
-                    )
+                    PortfolioWeights(weights={f"asset_{i}": float(w) for i, w in enumerate(weights)})
                 )
 
             equity.append(equity[-1] * (1 + port_return))
@@ -1102,11 +1063,7 @@ class DynamicRebalancer:
 
         # Sortino
         neg_returns = daily_returns[daily_returns < 0]
-        downside_vol = (
-            float(np.std(neg_returns) * np.sqrt(252))
-            if len(neg_returns) > 0
-            else volatility
-        )
+        downside_vol = float(np.std(neg_returns) * np.sqrt(252)) if len(neg_returns) > 0 else volatility
         sortino = ann_return / downside_vol if downside_vol > 0 else 0
 
         return BacktestResult(
@@ -1137,9 +1094,7 @@ class PortfolioRiskCalculator:
         else:
             self.confidence_levels = confidence_levels
 
-    def calculate_var(
-        self, returns: NDArray, weights: NDArray, confidence: float = 0.95
-    ) -> float:
+    def calculate_var(self, returns: NDArray, weights: NDArray, confidence: float = 0.95) -> float:
         """
         Calculate Value at Risk.
 
@@ -1155,9 +1110,7 @@ class PortfolioRiskCalculator:
         var = -float(np.percentile(portfolio_returns, (1 - confidence) * 100))
         return var
 
-    def calculate_cvar(
-        self, returns: NDArray, weights: NDArray, confidence: float = 0.95
-    ) -> float:
+    def calculate_cvar(self, returns: NDArray, weights: NDArray, confidence: float = 0.95) -> float:
         """
         Calculate Conditional Value at Risk (Expected Shortfall).
         """
@@ -1204,11 +1157,7 @@ class PortfolioRiskCalculator:
 
             excess_returns = portfolio_returns - benchmark_returns
             tracking_error = float(np.std(excess_returns) * np.sqrt(252))
-            information_ratio = (
-                float(np.mean(excess_returns) * 252) / tracking_error
-                if tracking_error > 0
-                else 0
-            )
+            information_ratio = float(np.mean(excess_returns) * 252) / tracking_error if tracking_error > 0 else 0
 
         return RiskMetrics(
             volatility=volatility,
@@ -1292,10 +1241,7 @@ def create_risk_parity_portfolio(
     result = optimizer.optimize(constraints=constraints)
 
     if asset_names:
-        result.weights = {
-            name: result.weights.get(f"asset_{i}", 0)
-            for i, name in enumerate(asset_names)
-        }
+        result.weights = {name: result.weights.get(f"asset_{i}", 0) for i, name in enumerate(asset_names)}
 
     return result
 
@@ -1311,10 +1257,7 @@ def create_hrp_portfolio(
     result = optimizer.optimize(constraints=constraints)
 
     if asset_names:
-        result.weights = {
-            name: result.weights.get(f"asset_{i}", 0)
-            for i, name in enumerate(asset_names)
-        }
+        result.weights = {name: result.weights.get(f"asset_{i}", 0) for i, name in enumerate(asset_names)}
 
     return result
 
@@ -1328,15 +1271,10 @@ def create_max_sharpe_portfolio(
     """Quick function to create maximum Sharpe ratio portfolio."""
     optimizer = MeanVarianceOptimizer(risk_free_rate=risk_free_rate)
     optimizer.fit(returns)
-    result = optimizer.optimize(
-        objective=OptimizationObjective.MAX_SHARPE, constraints=constraints
-    )
+    result = optimizer.optimize(objective=OptimizationObjective.MAX_SHARPE, constraints=constraints)
 
     if asset_names:
-        result.weights = {
-            name: result.weights.get(f"asset_{i}", 0)
-            for i, name in enumerate(asset_names)
-        }
+        result.weights = {name: result.weights.get(f"asset_{i}", 0) for i, name in enumerate(asset_names)}
 
     return result
 

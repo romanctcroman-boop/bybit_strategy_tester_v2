@@ -17,6 +17,8 @@ class StrategyType(str, Enum):
     SMA_CROSSOVER = "sma_crossover"
     RSI = "rsi"
     MACD = "macd"
+    ADVANCED_MACD = "advanced_macd"  # Advanced MACD with TP/SL — TradingView parity (Strategy_MACD_01)
+    MACD_01 = "macd_01"  # Alias for ADVANCED_MACD
     BOLLINGER_BANDS = "bollinger_bands"
     # Pyramiding strategies
     GRID = "grid"
@@ -412,6 +414,15 @@ class BacktestConfig(BaseModel):
     process_orders_on_close: bool = Field(
         default=True,
         description="Process orders on bar close (default). False = process immediately.",
+    )
+    entry_on_next_bar_open: bool = Field(
+        default=True,
+        description=(
+            "TradingView parity: when True (default), a signal on bar N causes entry at "
+            "open of bar N+1. This matches TradingView's default behaviour "
+            "(calc_on_every_tick=false, process_orders_on_close=true). "
+            "Set False only if you need same-bar close entry (non-TV mode)."
+        ),
     )
 
     # ===== NEW: Start With Position (TradingView compatible) =====

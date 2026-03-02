@@ -90,9 +90,7 @@ def get_breaker_history(breaker_name: str, limit: int = 100) -> list[dict[str, A
 
         import redis
 
-        redis_client = redis.Redis(
-            host="localhost", port=6379, db=0, decode_responses=True
-        )
+        redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
         history_key = f"breaker:history:{breaker_name}"
 
         # Get last N entries from Redis list
@@ -133,9 +131,7 @@ def record_breaker_event(breaker_name: str, event_type: str, state: str, **metad
 
         import redis
 
-        redis_client = redis.Redis(
-            host="localhost", port=6379, db=0, decode_responses=True
-        )
+        redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
         history_key = f"breaker:history:{breaker_name}"
 
         event = {
@@ -189,9 +185,7 @@ def get_breaker_metrics(breaker_name: str) -> dict[str, Any]:
             "success_count": breaker.success_count,
             "failure_threshold": breaker.failure_threshold,
             "recovery_timeout": breaker.recovery_timeout,
-            "last_failure_time": breaker.last_failure_time.isoformat()
-            if breaker.last_failure_time
-            else None,
+            "last_failure_time": breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
         }
 
     except Exception as e:

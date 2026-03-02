@@ -56,9 +56,7 @@ class GPUBatchOptimizer:
         if self.gpu_available:
             logger.info("🚀 GPUBatchOptimizer initialized with CUDA support")
         else:
-            logger.warning(
-                "⚠️ GPUBatchOptimizer: CuPy not available, using NumPy fallback"
-            )
+            logger.warning("⚠️ GPUBatchOptimizer: CuPy not available, using NumPy fallback")
 
     def optimize_rsi_batch(
         self,
@@ -120,9 +118,7 @@ class GPUBatchOptimizer:
 
         elapsed = time.time() - start_time
         speed = n_combos / elapsed if elapsed > 0 else 0
-        logger.info(
-            f"✅ GPUBatchOptimizer completed: {elapsed:.2f}s ({speed:.0f} comb/sec)"
-        )
+        logger.info(f"✅ GPUBatchOptimizer completed: {elapsed:.2f}s ({speed:.0f} comb/sec)")
 
         return results
 
@@ -408,12 +404,7 @@ class GPUBatchOptimizer:
                     exit_triggered = True
 
                 if exit_triggered:
-                    pnl = (
-                        position_size
-                        * (exit_price - entry_price)
-                        / entry_price
-                        * leverage
-                    )
+                    pnl = position_size * (exit_price - entry_price) / entry_price * leverage
                     pnl -= position_size * commission * 2  # Entry + exit fees
                     cash += pnl
                     trades.append(pnl)
@@ -435,12 +426,7 @@ class GPUBatchOptimizer:
                     exit_triggered = True
 
                 if exit_triggered:
-                    pnl = (
-                        position_size
-                        * (entry_price - exit_price)
-                        / entry_price
-                        * leverage
-                    )
+                    pnl = position_size * (entry_price - exit_price) / entry_price * leverage
                     pnl -= position_size * commission * 2
                     cash += pnl
                     trades.append(pnl)
@@ -487,11 +473,7 @@ class GPUBatchOptimizer:
         # Sharpe ratio (simplified)
         if len(trades) > 1:
             returns = np.array(trades) / initial_capital
-            sharpe = (
-                np.mean(returns) / np.std(returns) * np.sqrt(252)
-                if np.std(returns) > 0
-                else 0
-            )
+            sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
         else:
             sharpe = 0
 

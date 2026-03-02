@@ -59,6 +59,6 @@ class L2Snapshot:
 
     def to_order_book_levels(self) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
         """Convert to (bids, asks) as list of (price, size) for OrderBookSimulator."""
-        bids = [(l.price, l.size) for l in self.bids]
-        asks = [(l.price, l.size) for l in self.asks]
+        bids = [(lvl.price, lvl.size) for lvl in self.bids]
+        asks = [(lvl.price, lvl.size) for lvl in self.asks]
         return bids, asks

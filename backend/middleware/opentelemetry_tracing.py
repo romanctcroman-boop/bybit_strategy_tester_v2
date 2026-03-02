@@ -26,9 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 logger = logging.getLogger(__name__)
 
 # Context variable for current trace context
-_current_trace: ContextVar[Optional["TraceContext"]] = ContextVar(
-    "current_trace", default=None
-)
+_current_trace: ContextVar[Optional["TraceContext"]] = ContextVar("current_trace", default=None)
 
 
 @dataclass
@@ -87,9 +85,7 @@ class SpanContext:
             "operation_name": self.operation_name,
             "service_name": self.service_name,
             "start_time": datetime.fromtimestamp(self.start_time).isoformat(),
-            "end_time": datetime.fromtimestamp(self.end_time).isoformat()
-            if self.end_time
-            else None,
+            "end_time": datetime.fromtimestamp(self.end_time).isoformat() if self.end_time else None,
             "duration_ms": self.duration_ms,
             "status": self.status,
             "attributes": self.attributes,
@@ -224,9 +220,7 @@ class TracingManager:
 
         return random.random() < self.sampling_rate
 
-    def create_trace(
-        self, trace_id: str | None = None, baggage: dict[str, str] | None = None
-    ) -> TraceContext:
+    def create_trace(self, trace_id: str | None = None, baggage: dict[str, str] | None = None) -> TraceContext:
         """Create a new trace context."""
         trace = TraceContext(
             trace_id=trace_id or str(uuid4()),
@@ -242,9 +236,7 @@ class TracingManager:
         """Get the current trace from context."""
         return _current_trace.get()
 
-    def start_span(
-        self, operation_name: str, attributes: dict[str, Any] | None = None
-    ) -> SpanContext | None:
+    def start_span(self, operation_name: str, attributes: dict[str, Any] | None = None) -> SpanContext | None:
         """Start a new span in the current trace."""
         trace = self.get_current_trace()
         if not trace:
@@ -448,9 +440,7 @@ class OpenTelemetryMiddleware(BaseHTTPMiddleware):
 
             # Add response attributes
             span.set_attribute("http.status_code", response.status_code)
-            span.set_attribute(
-                "http.response_content_type", response.headers.get("content-type", "")
-            )
+            span.set_attribute("http.response_content_type", response.headers.get("content-type", ""))
 
             # Determine status based on HTTP code
             if response.status_code >= 500:

@@ -40,9 +40,7 @@ except ImportError:
 
 
 @njit(cache=True)
-def calculate_fixed_position_size(
-    capital: float, position_size_pct: float, leverage: int, price: float
-) -> float:
+def calculate_fixed_position_size(capital: float, position_size_pct: float, leverage: int, price: float) -> float:
     """
     Calculate fixed position size as % of capital.
 
@@ -327,9 +325,7 @@ class Position:
     max_adverse: float = 0.0  # MAE tracking
 
     # DCA state
-    pending_dca_levels: list[tuple[float, float]] = field(
-        default_factory=list
-    )  # (price, size)
+    pending_dca_levels: list[tuple[float, float]] = field(default_factory=list)  # (price, size)
     dca_orders_filled: int = 0
 
     # Breakeven state
@@ -457,9 +453,7 @@ class UniversalPositionManager:
         self.active_positions: list[Position] = []
         self._atr_values: np.ndarray | None = None
 
-    def calculate_position_size(
-        self, capital: float, price: float, direction: str, atr_value: float = 0.0
-    ) -> float:
+    def calculate_position_size(self, capital: float, price: float, direction: str, atr_value: float = 0.0) -> float:
         """
         Calculate position size based on configured mode.
 
@@ -479,14 +473,10 @@ class UniversalPositionManager:
             return (cfg.fixed_amount * cfg.leverage) / price
 
         if cfg.position_sizing_mode == "fixed":
-            return calculate_fixed_position_size(
-                capital, cfg.position_size, cfg.leverage, price
-            )
+            return calculate_fixed_position_size(capital, cfg.position_size, cfg.leverage, price)
 
         elif cfg.position_sizing_mode == "risk":
-            return calculate_risk_based_size(
-                capital, cfg.risk_per_trade, cfg.stop_loss, cfg.leverage, price
-            )
+            return calculate_risk_based_size(capital, cfg.risk_per_trade, cfg.stop_loss, cfg.leverage, price)
 
         elif cfg.position_sizing_mode == "kelly":
             return calculate_kelly_size(
@@ -502,9 +492,7 @@ class UniversalPositionManager:
 
         elif cfg.position_sizing_mode == "volatility":
             if atr_value <= 0:
-                return calculate_fixed_position_size(
-                    capital, cfg.position_size, cfg.leverage, price
-                )
+                return calculate_fixed_position_size(capital, cfg.position_size, cfg.leverage, price)
             # Use average ATR as baseline
             avg_atr = atr_value  # Should be from historical calculation
             return calculate_volatility_size(
@@ -520,9 +508,7 @@ class UniversalPositionManager:
 
         else:
             # Default to fixed
-            return calculate_fixed_position_size(
-                capital, cfg.position_size, cfg.leverage, price
-            )
+            return calculate_fixed_position_size(capital, cfg.position_size, cfg.leverage, price)
 
     def can_open_position(self, direction: str) -> bool:
         """
@@ -534,11 +520,7 @@ class UniversalPositionManager:
         Returns:
             True if position can be opened
         """
-        same_direction = sum(
-            1
-            for p in self.active_positions
-            if p.direction == direction and p.total_size > 0
-        )
+        same_direction = sum(1 for p in self.active_positions if p.direction == direction and p.total_size > 0)
         return same_direction < self.config.pyramiding
 
     def open_position(
@@ -608,9 +590,7 @@ class UniversalPositionManager:
             levels = np.array(cfg.scale_in_levels, dtype=np.float64)
             portions = np.array(cfg.scale_in_portions, dtype=np.float64)
 
-            prices, sizes = calculate_scale_in_levels(
-                price, dir_int, levels, portions, base_size, price
-            )
+            prices, sizes = calculate_scale_in_levels(price, dir_int, levels, portions, base_size, price)
 
             # Fill first level immediately (usually at entry price)
             first_entry = PositionEntry(
@@ -642,9 +622,7 @@ class UniversalPositionManager:
         self.active_positions.append(position)
         return position
 
-    def check_dca_fills(
-        self, position: Position, low: float, high: float, bar_index: int
-    ) -> list[PositionEntry]:
+    def check_dca_fills(self, position: Position, low: float, high: float, bar_index: int) -> list[PositionEntry]:
         """
         Check and fill DCA orders based on price action.
 

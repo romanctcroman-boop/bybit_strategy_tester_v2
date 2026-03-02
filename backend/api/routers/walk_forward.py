@@ -185,9 +185,7 @@ async def quick_validation(request: QuickValidationRequest) -> ValidationMetrics
             1.0,
             max(
                 0.0,
-                0.5 * (1 - consistency)
-                + 0.3 * min(1.0, abs(avg_deg))
-                + 0.2 * (1 if avg_test < 0 else 0),
+                0.5 * (1 - consistency) + 0.3 * min(1.0, abs(avg_deg)) + 0.2 * (1 if avg_test < 0 else 0),
             ),
         )
 
@@ -256,9 +254,7 @@ async def analyze_robustness(
     train_return: float = Query(..., description="Training return (decimal)"),
     test_return: float = Query(..., description="Test return (decimal)"),
     n_windows: int = Query(default=5, ge=1, description="Number of windows tested"),
-    positive_windows: int = Query(
-        ..., ge=0, description="Windows with positive test return"
-    ),
+    positive_windows: int = Query(..., ge=0, description="Windows with positive test return"),
 ) -> dict:
     """
     Quick robustness analysis from summary statistics.
@@ -278,9 +274,7 @@ async def analyze_robustness(
         1.0,
         max(
             0.0,
-            0.4 * (1 - consistency)
-            + 0.3 * min(1.0, abs(return_deg))
-            + 0.3 * min(1.0, abs(sharpe_deg)),
+            0.4 * (1 - consistency) + 0.3 * min(1.0, abs(return_deg)) + 0.3 * min(1.0, abs(sharpe_deg)),
         ),
     )
 

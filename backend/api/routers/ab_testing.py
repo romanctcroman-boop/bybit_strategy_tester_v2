@@ -137,16 +137,11 @@ async def create_experiment(request: ExperimentCreate) -> ExperimentResponse:
             "time_based": AllocationStrategy.TIME_BASED,
             "symbol_based": AllocationStrategy.SYMBOL_BASED,
         }
-        allocation = strategy_map.get(
-            request.allocation_strategy.lower(), AllocationStrategy.DETERMINISTIC
-        )
+        allocation = strategy_map.get(request.allocation_strategy.lower(), AllocationStrategy.DETERMINISTIC)
 
         # Convert variants
         variants = [
-            Variant(
-                name=v.name, weight=v.weight, config=v.config, is_control=v.is_control
-            )
-            for v in request.variants
+            Variant(name=v.name, weight=v.weight, config=v.config, is_control=v.is_control) for v in request.variants
         ]
 
         # Convert guardrails
@@ -165,9 +160,7 @@ async def create_experiment(request: ExperimentCreate) -> ExperimentResponse:
             min_samples_per_variant=request.min_samples_per_variant,
             confidence_level=request.confidence_level,
             primary_metric=request.primary_metric,
-            target_symbols=set(request.target_symbols)
-            if request.target_symbols
-            else None,
+            target_symbols=set(request.target_symbols) if request.target_symbols else None,
             target_users=set(request.target_users) if request.target_users else None,
             guardrail_metrics=guardrails,
         )
@@ -289,9 +282,7 @@ async def start_experiment(experiment_id: str) -> ExperimentResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post(
-    "/experiments/{experiment_id}/stop", response_model=ExperimentResultResponse
-)
+@router.post("/experiments/{experiment_id}/stop", response_model=ExperimentResultResponse)
 async def stop_experiment(experiment_id: str) -> ExperimentResultResponse:
     """Stop an experiment and get results."""
     manager = get_experiment_manager()
@@ -353,9 +344,7 @@ async def resume_experiment(experiment_id: str) -> dict[str, str]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get(
-    "/experiments/{experiment_id}/results", response_model=ExperimentResultResponse
-)
+@router.get("/experiments/{experiment_id}/results", response_model=ExperimentResultResponse)
 async def get_experiment_results(experiment_id: str) -> ExperimentResultResponse:
     """Get current results for an experiment."""
     manager = get_experiment_manager()
@@ -421,9 +410,7 @@ async def record_trade(experiment_id: str, request: TradeRecord) -> dict[str, st
 
 
 @router.get("/allocate", response_model=VariantAllocationResponse)
-async def allocate_variant(
-    symbol: str, user_id: str | None = None
-) -> VariantAllocationResponse:
+async def allocate_variant(symbol: str, user_id: str | None = None) -> VariantAllocationResponse:
     """Get the variant allocation for a request."""
     manager = get_experiment_manager()
 

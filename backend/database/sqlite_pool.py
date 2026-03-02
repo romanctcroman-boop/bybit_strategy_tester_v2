@@ -114,8 +114,7 @@ class SQLiteConnectionPool:
 
             self._initialized = True
             logger.info(
-                f"SQLite pool initialized: {self._pool.qsize()}/{self.pool_size} "
-                f"connections for {db_path.name}"
+                f"SQLite pool initialized: {self._pool.qsize()}/{self.pool_size} connections for {db_path.name}"
             )
 
     def _create_connection(self, for_thread_local: bool = False) -> sqlite3.Connection:
@@ -175,10 +174,7 @@ class SQLiteConnectionPool:
         thread_id = threading.get_ident()
 
         # Check thread-local storage first
-        if (
-            hasattr(_thread_local, "connection")
-            and _thread_local.connection is not None
-        ):
+        if hasattr(_thread_local, "connection") and _thread_local.connection is not None:
             conn = _thread_local.connection
             if self._validate_connection(conn):
                 return conn
@@ -321,9 +317,7 @@ class SQLiteConnectionPool:
                 try:
                     conn.close()
                     closed += 1
-                    logger.debug(
-                        f"Closed thread-local connection for thread {thread_id}"
-                    )
+                    logger.debug(f"Closed thread-local connection for thread {thread_id}")
                 except Exception as e:
                     logger.error(f"Error closing thread connection {thread_id}: {e}")
             self._thread_connections.clear()

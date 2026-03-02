@@ -93,27 +93,11 @@ if GPU_AVAILABLE:
     def _gpu_calculate_sl_tp_prices(entry_prices, stop_loss, take_profit, is_long):
         """Calculate SL/TP prices on GPU."""
         if is_long:
-            sl_prices = (
-                entry_prices * (1.0 - stop_loss)
-                if stop_loss > 0
-                else cp.zeros_like(entry_prices)
-            )
-            tp_prices = (
-                entry_prices * (1.0 + take_profit)
-                if take_profit > 0
-                else cp.full_like(entry_prices, 1e10)
-            )
+            sl_prices = entry_prices * (1.0 - stop_loss) if stop_loss > 0 else cp.zeros_like(entry_prices)
+            tp_prices = entry_prices * (1.0 + take_profit) if take_profit > 0 else cp.full_like(entry_prices, 1e10)
         else:
-            sl_prices = (
-                entry_prices * (1.0 + stop_loss)
-                if stop_loss > 0
-                else cp.full_like(entry_prices, 1e10)
-            )
-            tp_prices = (
-                entry_prices * (1.0 - take_profit)
-                if take_profit > 0
-                else cp.zeros_like(entry_prices)
-            )
+            sl_prices = entry_prices * (1.0 + stop_loss) if stop_loss > 0 else cp.full_like(entry_prices, 1e10)
+            tp_prices = entry_prices * (1.0 - take_profit) if take_profit > 0 else cp.zeros_like(entry_prices)
         return sl_prices, tp_prices
 
 
@@ -147,6 +131,7 @@ class GPUEngineV2(BaseBacktestEngine):
 
     def __init__(self):
         import warnings
+
         warnings.warn(
             "GPUEngineV2 is deprecated. Use NumbaEngine for full V4 support "
             "(pyramiding, ATR, multi-TP, trailing) with 20-40x speedup. "
@@ -193,26 +178,10 @@ class GPUEngineV2(BaseBacktestEngine):
         n = len(close_prices)
 
         # Handle None signals - create zero arrays if not provided
-        long_entries = (
-            input_data.long_entries
-            if input_data.long_entries is not None
-            else np.zeros(n, dtype=bool)
-        )
-        long_exits = (
-            input_data.long_exits
-            if input_data.long_exits is not None
-            else np.zeros(n, dtype=bool)
-        )
-        short_entries = (
-            input_data.short_entries
-            if input_data.short_entries is not None
-            else np.zeros(n, dtype=bool)
-        )
-        short_exits = (
-            input_data.short_exits
-            if input_data.short_exits is not None
-            else np.zeros(n, dtype=bool)
-        )
+        long_entries = input_data.long_entries if input_data.long_entries is not None else np.zeros(n, dtype=bool)
+        long_exits = input_data.long_exits if input_data.long_exits is not None else np.zeros(n, dtype=bool)
+        short_entries = input_data.short_entries if input_data.short_entries is not None else np.zeros(n, dtype=bool)
+        short_exits = input_data.short_exits if input_data.short_exits is not None else np.zeros(n, dtype=bool)
 
         # Parameters
         initial_capital = input_data.initial_capital
@@ -235,11 +204,7 @@ class GPUEngineV2(BaseBacktestEngine):
         allow_short = direction in (TradeDirection.SHORT, TradeDirection.BOTH)
 
         # Bar Magnifier index
-        bar_magnifier_index = (
-            self._build_bar_magnifier_index(candles, candles_1m)
-            if use_bar_magnifier
-            else None
-        )
+        bar_magnifier_index = self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
 
         # =====================================================================
         # SIMULATION (Same logic as FallbackEngineV2)
@@ -560,22 +525,13 @@ class GPUEngineV2(BaseBacktestEngine):
 
         if is_long:
             sl_price = entry_price * (1.0 - stop_loss) if stop_loss > 0 else 0.0
-            tp_price = (
-                entry_price * (1.0 + take_profit) if take_profit > 0 else float("inf")
-            )
+            tp_price = entry_price * (1.0 + take_profit) if take_profit > 0 else float("inf")
         else:
-            sl_price = (
-                entry_price * (1.0 + stop_loss) if stop_loss > 0 else float("inf")
-            )
+            sl_price = entry_price * (1.0 + stop_loss) if stop_loss > 0 else float("inf")
             tp_price = entry_price * (1.0 - take_profit) if take_profit > 0 else 0.0
 
         # === BAR MAGNIFIER: Precise intrabar SL/TP detection ===
-        if (
-            use_bar_magnifier
-            and bar_magnifier_index
-            and candles_1m is not None
-            and bar_idx in bar_magnifier_index
-        ):
+        if use_bar_magnifier and bar_magnifier_index and candles_1m is not None and bar_idx in bar_magnifier_index:
             start_idx, end_idx = bar_magnifier_index[bar_idx]
             m1_highs = candles_1m["high"].values[start_idx:end_idx]
             m1_lows = candles_1m["low"].values[start_idx:end_idx]
@@ -640,9 +596,7 @@ class GPUEngineV2(BaseBacktestEngine):
 
         return None, 0.0
 
-    def _build_bar_magnifier_index(
-        self, candles: pd.DataFrame, candles_1m: pd.DataFrame
-    ) -> dict[int, tuple[int, int]]:
+    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> dict[int, tuple[int, int]]:
         """
         Build index for Bar Magnifier.
         Returns dict: bar_idx -> (start_1m_idx, end_1m_idx)
@@ -653,25 +607,15 @@ class GPUEngineV2(BaseBacktestEngine):
         index = {}
 
         # Get timestamps
-        bar_times = (
-            candles.index
-            if isinstance(candles.index, pd.DatetimeIndex)
-            else pd.to_datetime(candles.index)
-        )
+        bar_times = candles.index if isinstance(candles.index, pd.DatetimeIndex) else pd.to_datetime(candles.index)
         m1_times = (
-            candles_1m.index
-            if isinstance(candles_1m.index, pd.DatetimeIndex)
-            else pd.to_datetime(candles_1m.index)
+            candles_1m.index if isinstance(candles_1m.index, pd.DatetimeIndex) else pd.to_datetime(candles_1m.index)
         )
 
         # For each main timeframe bar, find corresponding 1m bars
         for i in range(len(candles)):
             bar_start = bar_times[i]
-            bar_end = (
-                bar_times[i + 1]
-                if i + 1 < len(candles)
-                else bar_times[i] + pd.Timedelta(hours=1)
-            )
+            bar_end = bar_times[i + 1] if i + 1 < len(candles) else bar_times[i] + pd.Timedelta(hours=1)
 
             # Find 1m bars in this range
             mask = (m1_times >= bar_start) & (m1_times < bar_end)
@@ -760,13 +704,7 @@ class GPUEngineV2(BaseBacktestEngine):
         largest_win = max(wins) if wins else 0.0
         largest_loss = min(losses) if losses else 0.0
 
-        profit_factor = (
-            gross_profit / gross_loss
-            if gross_loss > 0
-            else float("inf")
-            if gross_profit > 0
-            else 0.0
-        )
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf") if gross_profit > 0 else 0.0
         payoff_ratio = avg_win / abs(avg_loss) if avg_loss != 0 else 0.0
         expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
 
@@ -786,9 +724,7 @@ class GPUEngineV2(BaseBacktestEngine):
         returns = np.diff(equity_curve) / equity_curve[:-1]
         returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
         if len(returns) > 1 and np.std(returns) > 0:
-            sharpe_ratio = (
-                np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)
-            )  # Hourly
+            sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)  # Hourly
         else:
             sharpe_ratio = 0.0
 
@@ -816,15 +752,9 @@ class GPUEngineV2(BaseBacktestEngine):
 
         long_trades_count = len(long_trades_list)
         short_trades_count = len(short_trades_list)
-        long_win_rate = (
-            sum(1 for t in long_trades_list if t.pnl > 0) / long_trades_count
-            if long_trades_count
-            else 0
-        )
+        long_win_rate = sum(1 for t in long_trades_list if t.pnl > 0) / long_trades_count if long_trades_count else 0
         short_win_rate = (
-            sum(1 for t in short_trades_list if t.pnl > 0) / short_trades_count
-            if short_trades_count
-            else 0
+            sum(1 for t in short_trades_list if t.pnl > 0) / short_trades_count if short_trades_count else 0
         )
         long_profit = sum(t.pnl for t in long_trades_list)
         short_profit = sum(t.pnl for t in short_trades_list)

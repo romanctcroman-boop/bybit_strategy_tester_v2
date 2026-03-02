@@ -34,9 +34,7 @@ class AlertRequest(BaseModel):
     title: str = Field(..., description="Alert title")
     message: str = Field(..., description="Alert message")
     source: str = Field(default="api", description="Source system/component")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class AlertResponse(BaseModel):
@@ -88,9 +86,7 @@ async def get_alerting_status() -> AlertConfigStatus:
         slack_configured=bool(config.slack_webhook_url),
         slack_channel=config.slack_channel,
         telegram_enabled=config.telegram_enabled,
-        telegram_configured=bool(
-            config.telegram_bot_token and config.telegram_chat_ids
-        ),
+        telegram_configured=bool(config.telegram_bot_token and config.telegram_chat_ids),
         telegram_chat_count=len(config.telegram_chat_ids),
         email_enabled=config.email_enabled,
         email_configured=all(
@@ -148,9 +144,7 @@ async def send_alert(
 
     return AlertResponse(
         success=success,
-        message="Alert sent successfully"
-        if success
-        else "Alert sending failed or was rate-limited",
+        message="Alert sent successfully" if success else "Alert sending failed or was rate-limited",
         channels_notified=channels if success else [],
     )
 
@@ -202,9 +196,7 @@ async def test_alerting() -> TestAlertResponse:
     if results:
         message = f"Test alert sent successfully via: {', '.join(results)}"
     else:
-        message = (
-            "Test alert failed to send via any channel. Check configuration and logs."
-        )
+        message = "Test alert failed to send via any channel. Check configuration and logs."
 
     return TestAlertResponse(
         test_sent=bool(results),

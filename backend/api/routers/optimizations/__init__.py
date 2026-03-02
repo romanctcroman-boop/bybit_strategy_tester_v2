@@ -1,4 +1,4 @@
-﻿"""
+"""
 Optimization API sub-router package.
 
 Assembles all optimization sub-routers into a single ``router`` object
@@ -16,15 +16,6 @@ Sub-modules:
 """
 
 from fastapi import APIRouter
-
-# Re-export DB model for backward compatibility
-from backend.database.models.optimization import OptimizationStatus  # noqa: F401
-
-# Re-export external model classes used by tests
-from backend.optimization.models import (  # noqa: F401
-    OptunaSyncRequest,
-    SyncOptimizationRequest,
-)
 
 from backend.api.routers.optimizations.crud import launch_optimization_task  # noqa: F401
 from backend.api.routers.optimizations.crud import router as crud_router
@@ -44,6 +35,8 @@ from backend.api.routers.optimizations.results import (  # noqa: F401
     ApplyParamsResponse,
     ConvergenceDataResponse,
     SensitivityDataResponse,
+)
+from backend.api.routers.optimizations.results import (
     router as results_router,
 )
 from backend.api.routers.optimizations.two_stage import router as two_stage_router
@@ -55,6 +48,15 @@ from backend.api.routers.optimizations.workers import (  # noqa: F401
     _passes_dynamic_constraints,
     _passes_filters,
     _rank_by_multi_criteria,
+)
+
+# Re-export DB model for backward compatibility
+from backend.database.models.optimization import OptimizationStatus  # noqa: F401
+
+# Re-export external model classes used by tests
+from backend.optimization.models import (  # noqa: F401
+    OptunaSyncRequest,
+    SyncOptimizationRequest,
 )
 
 router = APIRouter(tags=["Optimization"])  # Prefix set in app.py

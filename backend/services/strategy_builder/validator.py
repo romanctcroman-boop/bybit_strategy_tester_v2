@@ -156,14 +156,12 @@ class StrategyValidator:
         # Lookback requirements by indicator
         self.lookback_requirements = {
             BlockType.INDICATOR_RSI: lambda p: p.get("period", 14) + 1,
-            BlockType.INDICATOR_MACD: lambda p: p.get("slow_period", 26)
-            + p.get("signal_period", 9),
+            BlockType.INDICATOR_MACD: lambda p: p.get("slow_period", 26) + p.get("signal_period", 9),
             BlockType.INDICATOR_BOLLINGER: lambda p: p.get("period", 20),
             BlockType.INDICATOR_EMA: lambda p: p.get("period", 20) * 2,
             BlockType.INDICATOR_SMA: lambda p: p.get("period", 20),
             BlockType.INDICATOR_ATR: lambda p: p.get("period", 14) + 1,
-            BlockType.INDICATOR_STOCHASTIC: lambda p: p.get("k_period", 14)
-            + p.get("d_period", 3),
+            BlockType.INDICATOR_STOCHASTIC: lambda p: p.get("k_period", 14) + p.get("d_period", 3),
         }
 
     def validate(self, graph: StrategyGraph) -> ValidationResult:
@@ -208,9 +206,7 @@ class StrategyValidator:
         complexity = self._calculate_complexity(graph)
         lookback = self._estimate_lookback(graph)
 
-        is_valid = (
-            len([e for e in errors if e.severity == ValidationSeverity.ERROR]) == 0
-        )
+        is_valid = len([e for e in errors if e.severity == ValidationSeverity.ERROR]) == 0
 
         return ValidationResult(
             is_valid=is_valid,
@@ -240,9 +236,7 @@ class StrategyValidator:
             return errors
 
         # Check for data source
-        has_data_source = any(
-            b.block_type in self.data_sources for b in graph.blocks.values()
-        )
+        has_data_source = any(b.block_type in self.data_sources for b in graph.blocks.values())
         if not has_data_source:
             errors.append(
                 ValidationError(
@@ -254,9 +248,7 @@ class StrategyValidator:
             )
 
         # Check for action/output
-        has_action = any(
-            b.block_type in self.action_blocks for b in graph.blocks.values()
-        )
+        has_action = any(b.block_type in self.action_blocks for b in graph.blocks.values())
         if not has_action:
             errors.append(
                 ValidationError(
@@ -286,18 +278,12 @@ class StrategyValidator:
             main_inputs = [inp.name for inp in main_block.inputs]
 
             # Check for connections to main node
-            main_connections = [
-                conn
-                for conn in graph.connections
-                if conn.target_block_id == main_node
-            ]
+            main_connections = [conn for conn in graph.connections if conn.target_block_id == main_node]
 
             # If main node has entry_long/entry_short inputs, require them
             if "entry_long" in main_inputs or "entry_short" in main_inputs:
                 entry_connections = [
-                    conn
-                    for conn in main_connections
-                    if conn.target_input in ["entry_long", "entry_short"]
+                    conn for conn in main_connections if conn.target_input in ["entry_long", "entry_short"]
                 ]
                 if not entry_connections:
                     errors.append(
@@ -324,19 +310,18 @@ class StrategyValidator:
         # Check for orphan blocks (not connected to anything)
         connected_blocks = self._get_connected_blocks(graph)
         for block_id, block in graph.blocks.items():
-            if block_id not in connected_blocks:
-                # Data sources don't need incoming connections
-                if block.block_type not in self.data_sources:
-                    errors.append(
-                        ValidationError(
-                            code="ORPHAN_BLOCK",
-                            message=f"Block '{block.name}' is not connected",
-                            severity=ValidationSeverity.WARNING,
-                            block_id=block_id,
-                            block_name=block.name,
-                            suggestion="Connect this block or remove it",
-                        )
+            if block_id not in connected_blocks and block.block_type not in self.data_sources:
+                # Orphan block: not connected to anything and not a data source
+                errors.append(
+                    ValidationError(
+                        code="ORPHAN_BLOCK",
+                        message=f"Block '{block.name}' is not connected",
+                        severity=ValidationSeverity.WARNING,
+                        block_id=block_id,
+                        block_name=block.name,
+                        suggestion="Connect this block or remove it",
                     )
+                )
 
         return errors
 
@@ -407,12 +392,8 @@ class StrategyValidator:
             connected_inputs[conn.target_block_id].add(conn.target_input)
 
             # Type compatibility check
-            output = next(
-                (o for o in source_block.outputs if o.name == conn.source_output), None
-            )
-            input_port = next(
-                (i for i in target_block.inputs if i.name == conn.target_input), None
-            )
+            output = next((o for o in source_block.outputs if o.name == conn.source_output), None)
+            input_port = next((i for i in target_block.inputs if i.name == conn.target_input), None)
 
             if output and input_port and not self._types_compatible(output.data_type, input_port.data_type):
                 errors.append(
@@ -429,9 +410,7 @@ class StrategyValidator:
         # Check required inputs
         for block_id, block in graph.blocks.items():
             for inp in block.inputs:
-                if inp.required and inp.name not in connected_inputs.get(
-                    block_id, set()
-                ):
+                if inp.required and inp.name not in connected_inputs.get(block_id, set()):
                     errors.append(
                         ValidationError(
                             code="MISSING_INPUT",
@@ -560,19 +539,11 @@ class StrategyValidator:
         """Validate risk management"""
         warnings = []
 
-        has_stop_loss = any(
-            b.block_type == BlockType.ACTION_SET_STOP_LOSS
-            for b in graph.blocks.values()
-        )
+        has_stop_loss = any(b.block_type == BlockType.ACTION_SET_STOP_LOSS for b in graph.blocks.values())
 
-        has_take_profit = any(
-            b.block_type == BlockType.ACTION_SET_TAKE_PROFIT
-            for b in graph.blocks.values()
-        )
+        has_take_profit = any(b.block_type == BlockType.ACTION_SET_TAKE_PROFIT for b in graph.blocks.values())
 
-        has_position_sizing = any(
-            b.block_type == BlockType.RISK_POSITION_SIZE for b in graph.blocks.values()
-        )
+        has_position_sizing = any(b.block_type == BlockType.RISK_POSITION_SIZE for b in graph.blocks.values())
 
         if not has_stop_loss:
             warnings.append(
@@ -602,12 +573,8 @@ class StrategyValidator:
             )
 
         # Check for multiple buy/sell without risk management
-        buy_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_BUY
-        )
-        sell_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_SELL
-        )
+        buy_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_BUY)
+        sell_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_SELL)
 
         if buy_count > 0 and sell_count == 0:
             warnings.append(
@@ -626,11 +593,7 @@ class StrategyValidator:
         info = []
 
         # Count indicator blocks
-        indicator_count = sum(
-            1
-            for b in graph.blocks.values()
-            if b.block_type.value.startswith("indicator_")
-        )
+        indicator_count = sum(1 for b in graph.blocks.values() if b.block_type.value.startswith("indicator_"))
 
         if indicator_count > 5:
             warnings.append(
@@ -642,22 +605,14 @@ class StrategyValidator:
             )
 
         # Check for conflicting conditions
-        and_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_AND
-        )
-        or_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_OR
-        )
+        and_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_AND)
+        or_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_OR)
 
         if and_count > 3:
-            info.append(
-                f"Strategy uses {and_count} AND conditions - signals may be rare"
-            )
+            info.append(f"Strategy uses {and_count} AND conditions - signals may be rare")
 
         if or_count > 3:
-            info.append(
-                f"Strategy uses {or_count} OR conditions - signals may be frequent"
-            )
+            info.append(f"Strategy uses {or_count} OR conditions - signals may be frequent")
 
         # Timeframe hints
         has_scalping_indicators = any(
@@ -707,14 +662,7 @@ class StrategyValidator:
         indicator_score = min(indicator_score * 3, 30)
 
         # Condition complexity
-        condition_score = (
-            sum(
-                1
-                for b in graph.blocks.values()
-                if b.block_type.value.startswith("condition_")
-            )
-            * 2
-        )
+        condition_score = sum(1 for b in graph.blocks.values() if b.block_type.value.startswith("condition_")) * 2
         condition_score = min(condition_score, 20)
 
         return min(block_score + conn_score + indicator_score + condition_score, 100)
@@ -778,10 +726,7 @@ class StrategyValidator:
         result = self.validate(graph)
 
         # Live trading requires risk management
-        has_stop = any(
-            b.block_type == BlockType.ACTION_SET_STOP_LOSS
-            for b in graph.blocks.values()
-        )
+        has_stop = any(b.block_type == BlockType.ACTION_SET_STOP_LOSS for b in graph.blocks.values())
 
         if not has_stop:
             result.errors.append(

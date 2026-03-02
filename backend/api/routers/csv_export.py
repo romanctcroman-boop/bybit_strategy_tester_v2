@@ -40,9 +40,7 @@ async def export_backtest_pdf(backtest_id: str):
         with SessionLocal() as db:
             backtest = db.query(Backtest).filter(Backtest.id == backtest_id).first()
             if not backtest:
-                raise HTTPException(
-                    status_code=404, detail=f"Backtest {backtest_id} not found"
-                )
+                raise HTTPException(status_code=404, detail=f"Backtest {backtest_id} not found")
 
             # Build report data
             metrics = backtest.metrics or {}
@@ -55,9 +53,7 @@ async def export_backtest_pdf(backtest_id: str):
                 strategy_type=backtest.strategy_type,
                 strategy_params=backtest.strategy_params or {},
                 initial_capital=float(backtest.initial_capital),
-                final_capital=float(
-                    metrics.get("final_capital", backtest.initial_capital)
-                ),
+                final_capital=float(metrics.get("final_capital", backtest.initial_capital)),
                 total_return_pct=float(metrics.get("total_return_pct", 0)),
                 total_trades=int(metrics.get("total_trades", 0)),
                 winning_trades=int(metrics.get("winning_trades", 0)),
@@ -79,9 +75,7 @@ async def export_backtest_pdf(backtest_id: str):
         service = get_report_service()
         pdf_bytes = service.generate_pdf_report(report_data)
 
-        filename = (
-            f"backtest_{backtest.symbol}_{backtest.interval}_{backtest_id[:8]}.pdf"
-        )
+        filename = f"backtest_{backtest.symbol}_{backtest.interval}_{backtest_id[:8]}.pdf"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -113,9 +107,7 @@ async def export_backtest_excel(backtest_id: str):
         with SessionLocal() as db:
             backtest = db.query(Backtest).filter(Backtest.id == backtest_id).first()
             if not backtest:
-                raise HTTPException(
-                    status_code=404, detail=f"Backtest {backtest_id} not found"
-                )
+                raise HTTPException(status_code=404, detail=f"Backtest {backtest_id} not found")
 
             metrics = backtest.metrics or {}
             report_data = BacktestReportData(
@@ -127,9 +119,7 @@ async def export_backtest_excel(backtest_id: str):
                 strategy_type=backtest.strategy_type,
                 strategy_params=backtest.strategy_params or {},
                 initial_capital=float(backtest.initial_capital),
-                final_capital=float(
-                    metrics.get("final_capital", backtest.initial_capital)
-                ),
+                final_capital=float(metrics.get("final_capital", backtest.initial_capital)),
                 total_return_pct=float(metrics.get("total_return_pct", 0)),
                 total_trades=int(metrics.get("total_trades", 0)),
                 winning_trades=int(metrics.get("winning_trades", 0)),
@@ -151,9 +141,7 @@ async def export_backtest_excel(backtest_id: str):
         service = get_report_service()
         excel_bytes = service.generate_excel_report(report_data)
 
-        filename = (
-            f"backtest_{backtest.symbol}_{backtest.interval}_{backtest_id[:8]}.xlsx"
-        )
+        filename = f"backtest_{backtest.symbol}_{backtest.interval}_{backtest_id[:8]}.xlsx"
         return Response(
             content=excel_bytes,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -164,9 +152,7 @@ async def export_backtest_excel(backtest_id: str):
         raise
     except Exception as e:
         logger.exception(f"Failed to generate Excel report: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate Excel: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to generate Excel: {e!s}")
 
 
 @router.get("/backtest/{backtest_id}/csv")
@@ -187,9 +173,7 @@ async def export_backtest_csv(backtest_id: str):
         with SessionLocal() as db:
             backtest = db.query(Backtest).filter(Backtest.id == backtest_id).first()
             if not backtest:
-                raise HTTPException(
-                    status_code=404, detail=f"Backtest {backtest_id} not found"
-                )
+                raise HTTPException(status_code=404, detail=f"Backtest {backtest_id} not found")
 
             metrics = backtest.metrics or {}
             report_data = BacktestReportData(
@@ -201,9 +185,7 @@ async def export_backtest_csv(backtest_id: str):
                 strategy_type=backtest.strategy_type,
                 strategy_params=backtest.strategy_params or {},
                 initial_capital=float(backtest.initial_capital),
-                final_capital=float(
-                    metrics.get("final_capital", backtest.initial_capital)
-                ),
+                final_capital=float(metrics.get("final_capital", backtest.initial_capital)),
                 total_return_pct=float(metrics.get("total_return_pct", 0)),
                 total_trades=int(metrics.get("total_trades", 0)),
                 winning_trades=int(metrics.get("winning_trades", 0)),
@@ -257,8 +239,7 @@ async def get_available_formats():
             {
                 "name": "Excel",
                 "extension": ".xlsx",
-                "available": deps.get("xlsxwriter", False)
-                or deps.get("openpyxl", False),
+                "available": deps.get("xlsxwriter", False) or deps.get("openpyxl", False),
                 "description": "Excel spreadsheet with multiple sheets for analysis",
                 "requirements": "xlsxwriter or openpyxl"
                 if not (deps.get("xlsxwriter") or deps.get("openpyxl"))

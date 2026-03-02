@@ -294,9 +294,7 @@ class DataService:
         self.db.refresh(backtest)
         return backtest
 
-    def claim_backtest_to_run(
-        self, backtest_id: int, now: datetime, stale_seconds: int = 24 * 3600
-    ) -> ClaimResult:
+    def claim_backtest_to_run(self, backtest_id: int, now: datetime, stale_seconds: int = 24 * 3600) -> ClaimResult:
         """
         Atomically claim a backtest for running.
 
@@ -307,31 +305,20 @@ class DataService:
         """
         # Use SELECT ... FOR UPDATE to avoid races when supported by DB
         try:
-            bt = (
-                self.db.query(Backtest)
-                .filter(Backtest.id == backtest_id)
-                .with_for_update()
-                .first()
-            )
+            bt = self.db.query(Backtest).filter(Backtest.id == backtest_id).with_for_update().first()
         except Exception as exc:
             # with_for_update may not be supported by some DBs in test envs; fall back to plain query
-            logger.debug(
-                "with_for_update not supported or failed, falling back: %s", exc
-            )
+            logger.debug("with_for_update not supported or failed, falling back: %s", exc)
             bt = self.get_backtest(backtest_id)
 
         if not bt:
-            return ClaimResult(
-                status="not_found", backtest=None, message="Backtest not found"
-            )
+            return ClaimResult(status="not_found", backtest=None, message="Backtest not found")
 
         status = getattr(bt, "status", None)
         started_at = getattr(bt, "started_at", None)
 
         if status == "completed":
-            return ClaimResult(
-                status="completed", backtest=bt, message="Already completed"
-            )
+            return ClaimResult(status="completed", backtest=bt, message="Already completed")
 
         if status == "running" and started_at:
             # normalize started_at if naive
@@ -428,11 +415,7 @@ class DataService:
             # Trades list (store in Backtest.trades JSON column)
             trades = None
             if isinstance(results, dict):
-                trades = (
-                    results.get("trades")
-                    or results.get("all_trades")
-                    or results.get("trade_list")
-                )
+                trades = results.get("trades") or results.get("all_trades") or results.get("trade_list")
             if trades is not None:
                 update_data["trades"] = trades
                 try:
@@ -446,16 +429,12 @@ class DataService:
                     logger.debug("update_backtest_results: trades logging failed")
 
             # Equity curve
-            equity_curve = (
-                results.get("equity_curve") if isinstance(results, dict) else None
-            )
+            equity_curve = results.get("equity_curve") if isinstance(results, dict) else None
             if equity_curve is not None:
                 update_data["equity_curve"] = equity_curve
                 logger.info(
                     "update_backtest_results: will persist equity_curve (len=%s) for backtest %s",
-                    len(equity_curve)
-                    if hasattr(equity_curve, "__len__")
-                    else "unknown",
+                    len(equity_curve) if hasattr(equity_curve, "__len__") else "unknown",
                     backtest_id,
                 )
 
@@ -500,9 +479,7 @@ class DataService:
                     logger.info(
                         "update_backtest_results: extracted metric keys for backtest %s: %s",
                         backtest_id,
-                        ",".join(sorted(metrics.keys()))
-                        if hasattr(metrics, "keys")
-                        else str(type(metrics)),
+                        ",".join(sorted(metrics.keys())) if hasattr(metrics, "keys") else str(type(metrics)),
                     )
                 except Exception:
                     logger.debug("update_backtest_results: metrics logging failed")
@@ -627,11 +604,7 @@ class DataService:
 
     def get_trades_count(self, backtest_id: int) -> int:
         """Получить количество трейдов в бэктесте"""
-        return (
-            self.db.query(func.count(Trade.id))
-            .filter(Trade.backtest_id == backtest_id)
-            .scalar()
-        )
+        return self.db.query(func.count(Trade.id)).filter(Trade.backtest_id == backtest_id).scalar()
 
     def delete_trades_by_backtest(self, backtest_id: int) -> int:
         """Удалить все трейды бэктеста"""
@@ -699,11 +672,7 @@ class DataService:
 
     def get_optimization(self, optimization_id: int) -> Optimization | None:
         """Получить оптимизацию по ID"""
-        return (
-            self.db.query(Optimization)
-            .filter(Optimization.id == optimization_id)
-            .first()
-        )
+        return self.db.query(Optimization).filter(Optimization.id == optimization_id).first()
 
     def get_optimizations(
         self,
@@ -721,16 +690,9 @@ class DataService:
         if status:
             query = query.filter(Optimization.status == status)
 
-        return (
-            query.order_by(desc(Optimization.created_at))
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        return query.order_by(desc(Optimization.created_at)).offset(offset).limit(limit).all()
 
-    def update_optimization(
-        self, optimization_id: int, **kwargs
-    ) -> Optimization | None:
+    def update_optimization(self, optimization_id: int, **kwargs) -> Optimization | None:
         """Обновить оптимизацию"""
         optimization = self.get_optimization(optimization_id)
         if not optimization:
@@ -792,18 +754,14 @@ class DataService:
         order_by_score: bool = True,
     ) -> list[OptimizationResult]:
         """Получить результаты оптимизации"""
-        query = self.db.query(OptimizationResult).filter(
-            OptimizationResult.optimization_id == optimization_id
-        )
+        query = self.db.query(OptimizationResult).filter(OptimizationResult.optimization_id == optimization_id)
 
         if order_by_score:
             query = query.order_by(desc(OptimizationResult.score))
 
         return query.offset(offset).limit(limit).all()
 
-    def get_best_optimization_result(
-        self, optimization_id: int
-    ) -> OptimizationResult | None:
+    def get_best_optimization_result(self, optimization_id: int) -> OptimizationResult | None:
         """Получить лучший результат оптимизации"""
         return (
             self.db.query(OptimizationResult)
@@ -920,13 +878,7 @@ class DataService:
         if market_type:
             filters.append(MarketData.market_type == market_type)
 
-        return (
-            self.db.query(MarketData)
-            .filter(and_(*filters))
-            .order_by(MarketData.open_time)
-            .limit(limit)
-            .all()
-        )
+        return self.db.query(MarketData).filter(and_(*filters)).order_by(MarketData.open_time).limit(limit).all()
 
     def get_latest_candle(self, symbol: str, timeframe: str) -> MarketData | None:
         """Получить последнюю свечу из bybit_kline_audit"""
@@ -937,13 +889,9 @@ class DataService:
             .first()
         )
 
-    def delete_market_data(
-        self, symbol: str, timeframe: str, before_date: datetime | None = None
-    ) -> int:
+    def delete_market_data(self, symbol: str, timeframe: str, before_date: datetime | None = None) -> int:
         """Удалить старые свечи из bybit_kline_audit"""
-        query = self.db.query(MarketData).filter(
-            and_(MarketData.symbol == symbol, MarketData.interval == timeframe)
-        )
+        query = self.db.query(MarketData).filter(and_(MarketData.symbol == symbol, MarketData.interval == timeframe))
 
         if before_date:
             before_ms = int(before_date.timestamp() * 1000)

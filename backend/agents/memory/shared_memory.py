@@ -198,10 +198,14 @@ class SharedMemory:
                     return False
 
                 # Check pessimistic lock
-                if existing.lock_holder and existing.lock_holder != agent_id:
-                    if existing.lock_expires_at and existing.lock_expires_at > now:
-                        logger.warning(f"Key {key} is locked by {existing.lock_holder}")
-                        return False
+                if (
+                    existing.lock_holder
+                    and existing.lock_holder != agent_id
+                    and existing.lock_expires_at
+                    and existing.lock_expires_at > now
+                ):
+                    logger.warning(f"Key {key} is locked by {existing.lock_holder}")
+                    return False
 
                 # Update existing
                 existing.value = value
@@ -336,9 +340,8 @@ class SharedMemory:
             sv = self._data[key]
 
             # Check if already locked by another agent
-            if sv.lock_holder and sv.lock_holder != agent_id:
-                if sv.lock_expires_at and sv.lock_expires_at > now:
-                    return False
+            if sv.lock_holder and sv.lock_holder != agent_id and sv.lock_expires_at and sv.lock_expires_at > now:
+                return False
 
             # Acquire lock
             sv.lock_holder = agent_id
@@ -396,11 +399,11 @@ class SharedMemory:
             try:
                 for op, key, value in tx.operations:
                     if op == "SET":
-                        await self.set(tx.agent_id, key, value)
+                        await self.set(tx.agent_id or "", key, value)
                     elif op == "DELETE":
-                        await self.delete(tx.agent_id, key)
+                        await self.delete(tx.agent_id or "", key)
                     elif op == "INCREMENT":
-                        await self.increment(tx.agent_id, key, value)
+                        await self.increment(tx.agent_id or "", key, value)
 
                 tx.committed = True
                 self._pending_transactions.pop(tx.id, None)
@@ -527,9 +530,9 @@ class _TransactionContext:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            await self.memory.commit_transaction(self.tx)
+            await self.memory.commit_transaction(self.tx)  # type: ignore[arg-type]
         else:
-            await self.memory.rollback_transaction(self.tx)
+            await self.memory.rollback_transaction(self.tx)  # type: ignore[arg-type]
         return False
 
 

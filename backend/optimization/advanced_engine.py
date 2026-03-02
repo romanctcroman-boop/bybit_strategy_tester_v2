@@ -67,9 +67,7 @@ class AdvancedOptimizationResult:
             "best_sharpe": round(self.best_sharpe, 4),
             "best_sortino": round(self.best_sortino, 4),
             "best_calmar": round(self.best_calmar, 4),
-            "extended_metrics": self.extended_metrics.to_dict()
-            if self.extended_metrics
-            else {},
+            "extended_metrics": self.extended_metrics.to_dict() if self.extended_metrics else {},
             "is_robust": self.is_robust,
             "robustness_score": round(self.robustness_score, 2),
             "current_regime": self.current_regime,
@@ -186,29 +184,21 @@ class AdvancedOptimizationEngine:
 
         # Step 2: Optimization
         if self.optimization_method == "optuna" and self.optuna_optimizer:
-            opt_result = self._optimize_optuna(
-                data, strategy_class, param_space, base_config, n_trials, metric
-            )
+            opt_result = self._optimize_optuna(data, strategy_class, param_space, base_config, n_trials, metric)
             best_params = opt_result.best_params
             best_value = opt_result.best_value
             total_tested = opt_result.n_trials
-            top_results = (
-                opt_result.top_results if hasattr(opt_result, "top_results") else []
-            )
+            top_results = opt_result.top_results if hasattr(opt_result, "top_results") else []
         else:
             # Fallback to grid/random
-            opt_result = self._optimize_grid(
-                data, strategy_class, param_space, base_config, metric
-            )
+            opt_result = self._optimize_grid(data, strategy_class, param_space, base_config, metric)
             best_params = opt_result["best_params"]
             best_value = opt_result["best_value"]
             total_tested = opt_result["total_tested"]
             top_results = opt_result.get("top_results", [])
 
         # Step 3: Run final backtest with best params
-        final_result = self._run_backtest(
-            data, strategy_class, best_params, base_config
-        )
+        final_result = self._run_backtest(data, strategy_class, best_params, base_config)
 
         # Step 4: Calculate extended metrics
         if self.use_extended_metrics and hasattr(final_result, "equity_curve"):
@@ -225,9 +215,7 @@ class AdvancedOptimizationEngine:
 
         if validate and self.use_walk_forward and self.walk_forward:
             try:
-                wf_result = self._run_walk_forward(
-                    data, strategy_class, param_space, base_config
-                )
+                wf_result = self._run_walk_forward(data, strategy_class, param_space, base_config)
                 is_robust = wf_result.is_robust
                 robustness_score = wf_result.robustness_score
                 logger.info(f"Walk-Forward: {wf_result.validation_status.value}")
@@ -243,9 +231,7 @@ class AdvancedOptimizationEngine:
         # Create result
         result = AdvancedOptimizationResult(
             best_params=best_params,
-            best_sharpe=extended_metrics.sharpe_ratio
-            if extended_metrics
-            else best_value,
+            best_sharpe=extended_metrics.sharpe_ratio if extended_metrics else best_value,
             best_sortino=extended_metrics.sortino_ratio if extended_metrics else 0,
             best_calmar=extended_metrics.calmar_ratio if extended_metrics else 0,
             extended_metrics=extended_metrics,
@@ -253,9 +239,7 @@ class AdvancedOptimizationEngine:
             is_robust=is_robust,
             robustness_score=robustness_score,
             regime_result=regime_result,
-            current_regime=regime_result.current_regime_name
-            if regime_result
-            else "Unknown",
+            current_regime=regime_result.current_regime_name if regime_result else "Unknown",
             total_combinations_tested=total_tested,
             optimization_time_seconds=optimization_time,
             optimization_method=self.optimization_method,
@@ -380,9 +364,7 @@ class AdvancedOptimizationEngine:
 
         def optimizer_fn(is_data, ps):
             # Simple grid optimization on IS period
-            result = self._optimize_grid(
-                is_data, strategy_class, ps, base_config, "sharpe_ratio"
-            )
+            result = self._optimize_grid(is_data, strategy_class, ps, base_config, "sharpe_ratio")
             return result["best_params"]
 
         def backtest_fn(data_slice, strategy, params):

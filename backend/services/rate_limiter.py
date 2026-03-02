@@ -418,9 +418,7 @@ class RateLimiterService:
                         {
                             "ip": ip,
                             "rule": rule_name,
-                            "blocked_until": datetime.fromtimestamp(
-                                state.blocked_until
-                            ).isoformat(),
+                            "blocked_until": datetime.fromtimestamp(state.blocked_until).isoformat(),
                             "remaining_seconds": state.blocked_until - now,
                         }
                     )
@@ -439,11 +437,7 @@ class RateLimiterService:
                 "total_requests": m.total_requests,
                 "allowed_requests": m.allowed_requests,
                 "blocked_requests": m.blocked_requests,
-                "block_rate": (
-                    m.blocked_requests / m.total_requests * 100
-                    if m.total_requests > 0
-                    else 0
-                ),
+                "block_rate": (m.blocked_requests / m.total_requests * 100 if m.total_requests > 0 else 0),
                 "last_blocked": m.last_blocked.isoformat() if m.last_blocked else None,
             }
 
@@ -453,16 +447,12 @@ class RateLimiterService:
                 "allowed_requests": self._global_metrics.allowed_requests,
                 "blocked_requests": self._global_metrics.blocked_requests,
                 "block_rate": (
-                    self._global_metrics.blocked_requests
-                    / self._global_metrics.total_requests
-                    * 100
+                    self._global_metrics.blocked_requests / self._global_metrics.total_requests * 100
                     if self._global_metrics.total_requests > 0
                     else 0
                 ),
                 "last_blocked": (
-                    self._global_metrics.last_blocked.isoformat()
-                    if self._global_metrics.last_blocked
-                    else None
+                    self._global_metrics.last_blocked.isoformat() if self._global_metrics.last_blocked else None
                 ),
             },
             "by_rule": {
@@ -484,9 +474,7 @@ class RateLimiterService:
             "blocked_ips_count": len(self.get_blocked_ips()),
             "total_requests": self._global_metrics.total_requests,
             "block_rate": (
-                self._global_metrics.blocked_requests
-                / self._global_metrics.total_requests
-                * 100
+                self._global_metrics.blocked_requests / self._global_metrics.total_requests * 100
                 if self._global_metrics.total_requests > 0
                 else 0
             ),
@@ -511,11 +499,7 @@ class RateLimiterService:
             expire_time = now - 600
             for key in list(self._states[rule_name].keys()):
                 state = self._states[rule_name][key]
-                if (
-                    state.last_update < expire_time
-                    and state.tokens >= rule.burst_size
-                    and not state.blocked_until
-                ):
+                if state.last_update < expire_time and state.tokens >= rule.burst_size and not state.blocked_until:
                     del self._states[rule_name][key]
                     cleaned += 1
 

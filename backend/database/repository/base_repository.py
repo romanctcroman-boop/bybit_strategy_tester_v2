@@ -100,9 +100,7 @@ class BaseRepository[T]:
     def list(self, limit: int = 100, offset: int = 0) -> list[T]:
         """List entities with pagination."""
         try:
-            result = (
-                self.session.query(self.model_class).limit(limit).offset(offset).all()
-            )
+            result = self.session.query(self.model_class).limit(limit).offset(offset).all()
             logger.debug(f"Listed {len(result)} {self._entity_name} entities")
             return result
         except SQLAlchemyError as e:
@@ -112,13 +110,7 @@ class BaseRepository[T]:
     def list_by(self, limit: int = 100, offset: int = 0, **kwargs) -> builtins.list[T]:
         """List entities matching filter criteria."""
         try:
-            result = (
-                self.session.query(self.model_class)
-                .filter_by(**kwargs)
-                .limit(limit)
-                .offset(offset)
-                .all()
-            )
+            result = self.session.query(self.model_class).filter_by(**kwargs).limit(limit).offset(offset).all()
             return result
         except SQLAlchemyError as e:
             logger.error(f"Failed to list_by {self._entity_name} with {kwargs}: {e}")

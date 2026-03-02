@@ -1,4 +1,4 @@
-﻿"""
+"""
 GPUGridOptimizer class and run_gpu_optimization() entry point.
 
 Extracted from gpu_optimizer.py (lines 2544-4122).
@@ -23,8 +23,6 @@ from backend.backtesting.gpu.kernels import (
     _backtest_all_v3_hoisted,
     _backtest_all_v4_early_exit,
     _backtest_all_v5_transposed,
-    _backtest_all_v6_batch,
-    _backtest_all_vectorized,
     _backtest_all_with_params,
     _calculate_all_rsi_vectorized,
     _fast_calculate_rsi,
@@ -1616,4 +1614,3 @@ def run_gpu_optimization(
         direction=direction,
         **kwargs,
     )
-

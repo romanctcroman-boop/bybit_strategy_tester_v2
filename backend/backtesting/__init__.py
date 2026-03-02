@@ -45,6 +45,7 @@ from backend.backtesting.service import BacktestService, get_backtest_service
 
 # Strategies - lightweight
 from backend.backtesting.strategies import (
+    AdvancedMACDStrategy,
     BaseStrategy,
     BollingerBandsStrategy,
     MACDStrategy,
@@ -97,6 +98,7 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    "AdvancedMACDStrategy",
     "BTCCorrelationFilter",
     "BacktestConfig",
     "BacktestCreateRequest",

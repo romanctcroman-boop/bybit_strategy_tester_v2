@@ -113,12 +113,8 @@ class MonteCarloResult:
             "cvar_95": round(self.cvar_95, 4),
             "mean_sharpe": round(self.mean_sharpe, 4),
             "sharpe_ci_95": [round(x, 4) for x in self.sharpe_ci_95],
-            "equity_percentiles": {
-                k: round(v, 2) for k, v in self.equity_percentiles.items()
-            },
-            "drawdown_percentiles": {
-                k: round(v, 4) for k, v in self.drawdown_percentiles.items()
-            },
+            "equity_percentiles": {k: round(v, 2) for k, v in self.equity_percentiles.items()},
+            "drawdown_percentiles": {k: round(v, 4) for k, v in self.drawdown_percentiles.items()},
         }
 
 
@@ -196,36 +192,21 @@ class MonteCarloSimulator:
         if seed is not None:
             np.random.seed(seed)
 
-        logger.info(
-            f"Running {n_simulations} Monte Carlo simulations "
-            f"(method={method.value}, trades={self.n_trades})"
-        )
+        logger.info(f"Running {n_simulations} Monte Carlo simulations (method={method.value}, trades={self.n_trades})")
 
         # Run simulations based on method
         if method == SimulationMethod.TRADE_SHUFFLE:
-            final_equities, max_drawdowns, sharpes = self._simulate_shuffle(
-                n_simulations
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_shuffle(n_simulations)
         elif method == SimulationMethod.BOOTSTRAP:
-            final_equities, max_drawdowns, sharpes = self._simulate_bootstrap(
-                n_simulations
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_bootstrap(n_simulations)
         elif method == SimulationMethod.BLOCK_BOOTSTRAP:
-            final_equities, max_drawdowns, sharpes = self._simulate_block_bootstrap(
-                n_simulations, block_size
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_block_bootstrap(n_simulations, block_size)
         elif method == SimulationMethod.PARAMETRIC:
-            final_equities, max_drawdowns, sharpes = self._simulate_parametric(
-                n_simulations
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_parametric(n_simulations)
         elif method == SimulationMethod.SLIPPAGE_STRESS:
-            final_equities, max_drawdowns, sharpes = self._simulate_slippage_stress(
-                n_simulations
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_slippage_stress(n_simulations)
         elif method == SimulationMethod.PRICE_RANDOMIZATION:
-            final_equities, max_drawdowns, sharpes = self._simulate_price_randomization(
-                n_simulations
-            )
+            final_equities, max_drawdowns, sharpes = self._simulate_price_randomization(n_simulations)
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -247,9 +228,7 @@ class MonteCarloSimulator:
 
         return result
 
-    def _simulate_shuffle(
-        self, n_simulations: int
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _simulate_shuffle(self, n_simulations: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate by shuffling trade order."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -274,9 +253,7 @@ class MonteCarloSimulator:
 
         return final_equities, max_drawdowns, sharpes
 
-    def _simulate_bootstrap(
-        self, n_simulations: int
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _simulate_bootstrap(self, n_simulations: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate by sampling with replacement."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -332,9 +309,7 @@ class MonteCarloSimulator:
 
         return final_equities, max_drawdowns, sharpes
 
-    def _simulate_parametric(
-        self, n_simulations: int
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _simulate_parametric(self, n_simulations: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate assuming normal distribution of returns."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -425,9 +400,7 @@ class MonteCarloSimulator:
         drawdown = (peak - equity_curve) / peak
         return float(np.max(drawdown))
 
-    def _calculate_sharpe(
-        self, pnl: np.ndarray, annualization_factor: float = np.sqrt(252)
-    ) -> float:
+    def _calculate_sharpe(self, pnl: np.ndarray, annualization_factor: float = np.sqrt(252)) -> float:
         """Calculate Sharpe ratio from PnL series."""
         if len(pnl) < 2 or np.std(pnl) == 0:
             return 0.0
@@ -468,12 +441,8 @@ class MonteCarloSimulator:
 
         # Percentiles
         percentile_levels = [1, 5, 10, 25, 50, 75, 90, 95, 99]
-        equity_percentiles = {
-            p: float(np.percentile(final_equities, p)) for p in percentile_levels
-        }
-        drawdown_percentiles = {
-            p: float(np.percentile(max_drawdowns, p)) for p in percentile_levels
-        }
+        equity_percentiles = {p: float(np.percentile(final_equities, p)) for p in percentile_levels}
+        drawdown_percentiles = {p: float(np.percentile(max_drawdowns, p)) for p in percentile_levels}
 
         return MonteCarloResult(
             n_simulations=n_simulations,
@@ -502,9 +471,7 @@ class MonteCarloSimulator:
             all_max_drawdowns=max_drawdowns if store_raw else None,
         )
 
-    def _percentile_ci(
-        self, values: np.ndarray, confidence: float
-    ) -> tuple[float, float]:
+    def _percentile_ci(self, values: np.ndarray, confidence: float) -> tuple[float, float]:
         """Calculate confidence interval using percentiles."""
         lower_pct = (1 - confidence) / 2 * 100
         upper_pct = (1 + confidence) / 2 * 100
@@ -513,9 +480,7 @@ class MonteCarloSimulator:
             float(np.percentile(values, upper_pct)),
         )
 
-    def _empty_result(
-        self, n_simulations: int, method: SimulationMethod
-    ) -> MonteCarloResult:
+    def _empty_result(self, n_simulations: int, method: SimulationMethod) -> MonteCarloResult:
         """Return empty result for insufficient data."""
         return MonteCarloResult(
             n_simulations=n_simulations,
@@ -608,8 +573,6 @@ def run_monte_carlo_analysis(
 
     results = {}
     for method in methods:
-        results[method.value] = simulator.run_simulation(
-            n_simulations=n_simulations, method=method
-        )
+        results[method.value] = simulator.run_simulation(n_simulations=n_simulations, method=method)
 
     return results

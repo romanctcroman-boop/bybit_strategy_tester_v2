@@ -237,9 +237,7 @@ async def get_all_metrics():
             avg_latency_ms=m.avg_latency_ms,
             p95_latency_ms=m.p95_latency_ms,
             p99_latency_ms=m.p99_latency_ms,
-            min_latency_ms=m.min_latency_ms
-            if m.min_latency_ms != float("inf")
-            else 0.0,
+            min_latency_ms=m.min_latency_ms if m.min_latency_ms != float("inf") else 0.0,
             max_latency_ms=m.max_latency_ms,
             current_status=m.current_status.value,
             uptime_pct=m.uptime_pct,
@@ -268,9 +266,7 @@ async def get_probe_metrics(probe_id: str):
         avg_latency_ms=metrics.avg_latency_ms,
         p95_latency_ms=metrics.p95_latency_ms,
         p99_latency_ms=metrics.p99_latency_ms,
-        min_latency_ms=metrics.min_latency_ms
-        if metrics.min_latency_ms != float("inf")
-        else 0.0,
+        min_latency_ms=metrics.min_latency_ms if metrics.min_latency_ms != float("inf") else 0.0,
         max_latency_ms=metrics.max_latency_ms,
         current_status=metrics.current_status.value,
         uptime_pct=metrics.uptime_pct,
@@ -366,9 +362,7 @@ async def get_monitoring_health():
         "probes_unhealthy": status["by_status"].get("unhealthy", 0),
         "sla_status": {
             "uptime_pct": sla.uptime_pct if sla else None,
-            "error_budget_remaining_pct": sla.error_budget_remaining_pct
-            if sla
-            else None,
+            "error_budget_remaining_pct": sla.error_budget_remaining_pct if sla else None,
             "breaches": sla.uptime_breach or sla.latency_breach if sla else False,
         },
     }

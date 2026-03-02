@@ -3,15 +3,17 @@
 
 Главный класс генетического алгоритма оптимизации.
 
-@version: 1.0.0
-@date: 2026-02-26
+@version: 1.1.0
+@date: 2026-02-27
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -44,9 +46,10 @@ class GeneticOptimizationResult:
     history: EvolutionHistory
     n_evaluations: int = 0
     execution_time: float = 0.0
-    pareto_front: List[Individual] = field(default_factory=list)
+    pareto_front: list[Individual] = field(default_factory=list)
+    events: list[dict] = field(default_factory=list)  # События эволюции
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Конвертация в словарь"""
         return {
             "best_individual": self.best_individual.to_dict(),
@@ -99,7 +102,11 @@ class GeneticOptimizer:
         patience: int = 20,
         min_diversity: float = 0.01,
         n_workers: int = 1,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
+        use_caching: bool = True,
+        use_processes: bool = False,
+        cancel_event: threading.Event | None = None,
+        progress_callback: Callable[[dict], None] | None = None,
     ):
         """
         Args:
@@ -115,8 +122,12 @@ class GeneticOptimizer:
             early_stopping: Ранняя остановка при отсутствии улучшений
             patience: Количество поколений без улучшений для остановки
             min_diversity: Минимальное разнообразие для продолжения
-            n_workers: Количество потоков для параллельного бэктеста
+            n_workers: Количество потоков/процессов для параллельного бэктеста
             random_state: Seed для воспроизводимости
+            use_caching: Кэшировать fitness значения
+            use_processes: Использовать ProcessPoolExecutor (вместо ThreadPoolExecutor)
+            cancel_event: Событие для отмены оптимизации
+            progress_callback: Callback для уведомления о прогрессе
         """
         self.population_size = population_size
         self.n_generations = n_generations
@@ -157,11 +168,18 @@ class GeneticOptimizer:
         self.min_diversity = min_diversity
         self.n_workers = n_workers
         self.random_state = random_state
+        self.use_caching = use_caching
+        self.use_processes = use_processes
+        self.cancel_event = cancel_event
+        self.progress_callback = progress_callback
+
+        # Fitness кэш
+        self._fitness_cache: dict[str, float] = {}
 
         if random_state is not None:
             np.random.seed(random_state)
 
-    def _create_initial_population(self, param_ranges: Dict[str, Tuple[float, float]]) -> Population:
+    def _create_initial_population(self, param_ranges: dict[str, tuple[float, float]]) -> Population:
         """
         Создать начальную популяцию.
 
@@ -180,13 +198,17 @@ class GeneticOptimizer:
 
         return Population(individuals=individuals, generation=0, param_ranges=param_ranges)
 
+    def _get_chromosome_hash(self, chromosome: Chromosome) -> str:
+        """Создать хэш хромосомы для кэширования"""
+        return chromosome.get_hash()
+
     def _evaluate_individual(
         self,
         individual: Individual,
-        strategy_class: Type,
+        strategy_class: type,
         data: pd.DataFrame,
         backtest_engine: Any,
-        backtest_config: Dict,
+        backtest_config: dict,
     ) -> float:
         """
         Вычислить fitness особи.
@@ -202,6 +224,13 @@ class GeneticOptimizer:
             Fitness значение
         """
         try:
+            # Проверка кэша
+            if self.use_caching:
+                chrom_hash = self._get_chromosome_hash(individual.chromosome)
+                if chrom_hash in self._fitness_cache:
+                    individual.fitness = self._fitness_cache[chrom_hash]
+                    return individual.fitness
+
             # Создание стратегии с параметрами особи
             params = individual.chromosome.to_dict()
             strategy = strategy_class(**params)
@@ -220,6 +249,11 @@ class GeneticOptimizer:
             else:
                 individual.fitness = self.fitness_function.calculate(results)
 
+            # Сохранение в кэш
+            if self.use_caching:
+                chrom_hash = self._get_chromosome_hash(individual.chromosome)
+                self._fitness_cache[chrom_hash] = individual.fitness
+
             return individual.fitness
 
         except Exception as e:
@@ -230,10 +264,10 @@ class GeneticOptimizer:
     def _evaluate_population(
         self,
         population: Population,
-        strategy_class: Type,
+        strategy_class: type,
         data: pd.DataFrame,
         backtest_engine: Any,
-        backtest_config: Dict,
+        backtest_config: dict,
     ) -> int:
         """
         Вычислить fitness всей популяции.
@@ -250,26 +284,42 @@ class GeneticOptimizer:
         """
         n_evaluated = 0
 
+        # Получаем особей для оценки
+        individuals_to_eval = [ind for ind in population.individuals if not ind.is_evaluated()]
+
+        if not individuals_to_eval:
+            return 0
+
         if self.n_workers > 1:
             # Параллельное вычисление
-            with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
+            ExecutorClass = ProcessPoolExecutor if self.use_processes else ThreadPoolExecutor
+
+            with ExecutorClass(max_workers=self.n_workers) as executor:
+                # Создаем копии для потоков/процессов
                 futures = {
                     executor.submit(
-                        self._evaluate_individual, ind, strategy_class, data, backtest_engine, backtest_config
+                        self._evaluate_individual,
+                        ind.copy(),  # Копия для потока!
+                        strategy_class,
+                        data,
+                        backtest_engine,
+                        backtest_config,
                     ): ind
-                    for ind in population.individuals
-                    if not ind.is_evaluated()
+                    for ind in individuals_to_eval
                 }
 
                 for future in as_completed(futures):
                     try:
-                        future.result()
+                        result = future.result()
+                        # Обновляем оригинальную особь
+                        original = futures[future]
+                        original.set_fitness(result)
                         n_evaluated += 1
                     except Exception as e:
                         logger.error(f"Parallel evaluation error: {e}")
         else:
             # Последовательное вычисление
-            for individual in population.individuals:
+            for individual in individuals_to_eval:
                 if not individual.is_evaluated():
                     self._evaluate_individual(individual, strategy_class, data, backtest_engine, backtest_config)
                     n_evaluated += 1
@@ -279,7 +329,7 @@ class GeneticOptimizer:
 
         return n_evaluated
 
-    def _select_parents(self, population: Population) -> List[Individual]:
+    def _select_parents(self, population: Population) -> list[Individual]:
         """
         Выбрать родителей для размножения.
 
@@ -292,7 +342,7 @@ class GeneticOptimizer:
         n_parents = self.population_size - int(self.population_size * self.elitism_rate)
         return self.selection.select(population, n_parents)
 
-    def _create_offspring(self, parents: List[Individual]) -> List[Individual]:
+    def _create_offspring(self, parents: list[Individual]) -> list[Individual]:
         """
         Создать потомков из родителей.
 
@@ -323,7 +373,7 @@ class GeneticOptimizer:
 
         return offspring[: len(parents)]
 
-    def _apply_elitism(self, population: Population, offspring: List[Individual]) -> List[Individual]:
+    def _apply_elitism(self, population: Population, offspring: list[Individual]) -> list[Individual]:
         """
         Применить элитизм — сохранить лучших особей.
 
@@ -373,11 +423,11 @@ class GeneticOptimizer:
 
     def optimize(
         self,
-        strategy_class: Type,
-        param_ranges: Dict[str, Tuple[float, float]],
+        strategy_class: type,
+        param_ranges: dict[str, tuple[float, float]],
         data: pd.DataFrame,
         backtest_engine: Any,
-        backtest_config: Optional[Dict] = None,
+        backtest_config: dict | None = None,
     ) -> GeneticOptimizationResult:
         """
         Запустить генетическую оптимизацию.
@@ -394,9 +444,22 @@ class GeneticOptimizer:
         """
         start_time = datetime.now()
         n_total_evaluations = 0
+        events = []  # События эволюции
 
         logger.info(
             f"Starting genetic optimization: {self.population_size} individuals, {self.n_generations} generations"
+        )
+
+        # Событие: старт
+        events.append(
+            {
+                "type": "optimization_start",
+                "timestamp": start_time.isoformat(),
+                "config": {
+                    "population_size": self.population_size,
+                    "n_generations": self.n_generations,
+                },
+            }
         )
 
         # Создание начальной популяции
@@ -409,6 +472,18 @@ class GeneticOptimizer:
 
         # Главный цикл эволюции
         for generation in range(self.n_generations):
+            # Проверка отмены
+            if self.cancel_event and self.cancel_event.is_set():
+                logger.info(f"Optimization cancelled at generation {generation}")
+                events.append(
+                    {
+                        "type": "optimization_cancelled",
+                        "timestamp": datetime.now().isoformat(),
+                        "generation": generation,
+                    }
+                )
+                break
+
             population.generation = generation
 
             logger.info(
@@ -423,6 +498,36 @@ class GeneticOptimizer:
 
             # Запись в историю
             history.record_generation(population)
+
+            # Событие: поколение завершено
+            events.append(
+                {
+                    "type": "generation_complete",
+                    "timestamp": datetime.now().isoformat(),
+                    "generation": generation,
+                    "best_fitness": population.best_individual.fitness if population.best_individual else None,
+                    "avg_fitness": population.avg_fitness,
+                    "diversity": population.diversity,
+                }
+            )
+
+            # Progress callback
+            if self.progress_callback:
+                self.progress_callback(
+                    {
+                        "generation": generation,
+                        "best_fitness": population.best_individual.fitness if population.best_individual else None,
+                        "avg_fitness": population.avg_fitness,
+                        "diversity": population.diversity,
+                        "progress": (generation + 1) / self.n_generations * 100,
+                    }
+                )
+
+            # Обновление адаптивной мутации
+            if hasattr(self.mutation, "set_diversity"):
+                self.mutation.set_diversity(population.diversity)
+            if hasattr(self.mutation, "set_generation"):
+                self.mutation.set_generation(generation, self.n_generations)
 
             # Проверка ранней остановки
             if self._check_early_stopping(history):
@@ -454,11 +559,12 @@ class GeneticOptimizer:
         execution_time = (datetime.now() - start_time).total_seconds()
 
         result = GeneticOptimizationResult(
-            best_individual=population.best_individual,
+            best_individual=population.best_individual if population.best_individual else population.individuals[0],
             population=population,
             history=history,
             n_evaluations=n_total_evaluations,
             execution_time=execution_time,
+            events=events,
         )
 
         # Multi-objective: вычисление Pareto front
@@ -466,13 +572,21 @@ class GeneticOptimizer:
             result.pareto_front = self._compute_pareto_front(population)
 
         best_fitness_str = f"{result.best_individual.fitness:.4f}" if result.best_individual else "N/A"
-        logger.info(
-            f"Optimization complete: best_fitness={best_fitness_str}, time={execution_time:.2f}s"
+        logger.info(f"Optimization complete: best_fitness={best_fitness_str}, time={execution_time:.2f}s")
+
+        # Событие: завершение
+        events.append(
+            {
+                "type": "optimization_complete",
+                "timestamp": datetime.now().isoformat(),
+                "best_fitness": best_fitness_str,
+                "execution_time": execution_time,
+            }
         )
 
         return result
 
-    def _compute_pareto_front(self, population: Population) -> List[Individual]:
+    def _compute_pareto_front(self, population: Population) -> list[Individual]:
         """
         Вычислить Pareto front для multi-objective оптимизации.
 

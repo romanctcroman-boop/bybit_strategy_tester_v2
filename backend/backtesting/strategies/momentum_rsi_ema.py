@@ -13,7 +13,6 @@ Signal Logic:
 - Short Exit: RSI < 30 OR fast EMA crosses above slow EMA
 """
 
-
 import numpy as np
 
 
@@ -28,7 +27,7 @@ def momentum_strategy(
     stop_loss_multiplier: float = 1.5,
     take_profit_multiplier: float = 2.5,
     rsi_oversold: float = 30.0,
-    rsi_overbought: float = 70.0
+    rsi_overbought: float = 70.0,
 ) -> dict[str, np.ndarray]:
     """
     Momentum-based trading strategy using RSI and EMA crossovers with ATR-based risk management.
@@ -143,7 +142,7 @@ def momentum_strategy(
 
         # Calculate ATR
         atr = np.zeros(n)
-        atr[period] = np.mean(tr[1:period + 1])
+        atr[period] = np.mean(tr[1 : period + 1])
 
         for i in range(period + 1, n):
             atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
@@ -198,12 +197,12 @@ def momentum_strategy(
     short_entries = short_entries & ~short_exits
 
     return {
-        'long_entries': long_entries,
-        'short_entries': short_entries,
-        'long_exits': long_exits,
-        'short_exits': short_exits,
-        'stop_loss': stop_loss,
-        'take_profit': take_profit
+        "long_entries": long_entries,
+        "short_entries": short_entries,
+        "long_exits": long_exits,
+        "short_exits": short_exits,
+        "stop_loss": stop_loss,
+        "take_profit": take_profit,
     }
 
 
@@ -222,7 +221,7 @@ STRATEGY_INFO = {
         "take_profit_multiplier": {"type": "float", "default": 2.5, "min": 1.0, "max": 10.0},
         "rsi_oversold": {"type": "float", "default": 30.0, "min": 10, "max": 40},
         "rsi_overbought": {"type": "float", "default": 70.0, "min": 60, "max": 90},
-    }
+    },
 }
 
 

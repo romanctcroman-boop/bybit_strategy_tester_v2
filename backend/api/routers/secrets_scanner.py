@@ -34,9 +34,7 @@ class ScanHistoryRequest(BaseModel):
     """Request to scan git history."""
 
     repo_path: str = Field(..., description="Path to git repository")
-    max_commits: int = Field(
-        default=100, ge=1, le=1000, description="Maximum commits to scan"
-    )
+    max_commits: int = Field(default=100, ge=1, le=1000, description="Maximum commits to scan")
 
 
 class AddPatternRequest(BaseModel):
@@ -266,9 +264,7 @@ async def get_scan(scan_id: str):
 @router.get("/scans/{scan_id}/report")
 async def get_scan_report(
     scan_id: str,
-    format_type: str = Query(
-        default="json", enum=["json", "markdown"], description="Report format"
-    ),
+    format_type: str = Query(default="json", enum=["json", "markdown"], description="Report format"),
 ):
     """Generate a report for a scan."""
     scanner = get_secrets_scanner()
@@ -369,9 +365,7 @@ async def list_secret_types():
 @router.get("/severity-levels")
 async def list_severity_levels():
     """List all severity levels."""
-    return {
-        "severity_levels": [{"id": sl.value, "name": sl.name} for sl in SeverityLevel]
-    }
+    return {"severity_levels": [{"id": sl.value, "name": sl.name} for sl in SeverityLevel]}
 
 
 @router.get("/health")

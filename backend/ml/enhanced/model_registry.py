@@ -144,8 +144,8 @@ class ABTest:
     # Metrics
     model_a_predictions: int = 0
     model_b_predictions: int = 0
-    model_a_metrics: dict[str, float] = field(default_factory=dict)
-    model_b_metrics: dict[str, float] = field(default_factory=dict)
+    model_a_metrics: dict[str, list[float]] = field(default_factory=dict)
+    model_b_metrics: dict[str, list[float]] = field(default_factory=dict)
 
     # Status
     is_active: bool = True
@@ -347,7 +347,7 @@ class ModelRegistry:
         min_recall: float = 0.5,
         max_loss: float = 0.5,
         required_metrics: list[str] | None = None,
-    ) -> tuple[bool, dict[str, any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Validate a model before deployment/promotion.
 
@@ -374,7 +374,7 @@ class ModelRegistry:
         if not metrics:
             return False, {"error": "No validation metrics available"}
 
-        report = {
+        report: dict[str, Any] = {
             "model": name,
             "version": version,
             "checks": [],
@@ -408,10 +408,7 @@ class ModelRegistry:
         for metric_name, (op, threshold) in thresholds.items():
             if metric_name in metrics:
                 value = metrics[metric_name]
-                if op == ">=":
-                    passed = value >= threshold
-                else:  # <=
-                    passed = value <= threshold
+                passed = value >= threshold if op == ">=" else value <= threshold
 
                 report["checks"].append(
                     {
@@ -597,7 +594,7 @@ class ModelRegistry:
 
         test = self.ab_tests[test_id]
 
-        results = {
+        results: dict[str, Any] = {
             "test_id": test_id,
             "model_a": test.model_a,
             "model_b": test.model_b,

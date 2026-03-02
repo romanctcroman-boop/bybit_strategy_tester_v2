@@ -6,7 +6,7 @@ Provides REST API endpoints for ML-based anomaly detection.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -32,9 +32,7 @@ class DataPointRequest(BaseModel):
     value: float = Field(..., description="The value to check")
     symbol: str = Field(default="", description="Trading symbol")
     metric_type: str = Field(default="price", description="Type of metric")
-    timestamp: float | None = Field(
-        default=None, description="Unix timestamp (defaults to now)"
-    )
+    timestamp: float | None = Field(default=None, description="Unix timestamp (defaults to now)")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {
@@ -58,13 +56,9 @@ class BatchDataPointsRequest(BaseModel):
 class MultivariateCheckRequest(BaseModel):
     """Request for multivariate anomaly check."""
 
-    features: list[float] = Field(
-        ..., description="Feature vector for multivariate check"
-    )
+    features: list[float] = Field(..., description="Feature vector for multivariate check")
 
-    model_config = {
-        "json_schema_extra": {"example": {"features": [45000.0, 1000.5, 0.02, 1.5]}}
-    }
+    model_config = {"json_schema_extra": {"example": {"features": [45000.0, 1000.5, 0.02, 1.5]}}}
 
 
 class AnomalyEventResponse(BaseModel):
@@ -129,12 +123,8 @@ class MultivariateCheckResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """Request to update detector configuration."""
 
-    z_score_threshold: float | None = Field(
-        default=None, ge=1.0, le=10.0, description="Z-score threshold"
-    )
-    window_size: int | None = Field(
-        default=None, ge=10, le=1000, description="Rolling window size"
-    )
+    z_score_threshold: float | None = Field(default=None, ge=1.0, le=10.0, description="Z-score threshold")
+    window_size: int | None = Field(default=None, ge=10, le=1000, description="Rolling window size")
 
 
 # ============================================================================
@@ -153,7 +143,7 @@ async def get_detector_status():
     return DetectorStatusResponse(**detector.get_status())
 
 
-@router.post("/data-point", response_model=Optional[AnomalyEventResponse])
+@router.post("/data-point", response_model=AnomalyEventResponse | None)
 async def add_data_point(request: DataPointRequest):
     """
     Add data point for anomaly detection.
@@ -339,9 +329,7 @@ async def get_anomaly_statistics():
     )
 
 
-@router.get(
-    "/rolling-stats/{symbol}/{metric_type}", response_model=RollingStatsResponse
-)
+@router.get("/rolling-stats/{symbol}/{metric_type}", response_model=RollingStatsResponse)
 async def get_rolling_statistics(symbol: str, metric_type: str):
     """
     Get rolling statistics for a specific metric.
@@ -357,7 +345,7 @@ async def get_rolling_statistics(symbol: str, metric_type: str):
             detail=f"No statistics found for {symbol}:{metric_type}",
         )
 
-    return RollingStatsResponse(**stats)
+    return RollingStatsResponse(**stats)  # type: ignore[arg-type]
 
 
 @router.post("/acknowledge/{anomaly_id}")
@@ -454,9 +442,7 @@ async def get_anomaly_summary():
     stats = detector.get_statistics()
 
     # Get recent critical anomalies
-    critical = detector.get_recent_anomalies(
-        limit=10, severity=AnomalySeverity.CRITICAL
-    )
+    critical = detector.get_recent_anomalies(limit=10, severity=AnomalySeverity.CRITICAL)
     high = detector.get_recent_anomalies(limit=10, severity=AnomalySeverity.HIGH)
 
     return {
@@ -466,9 +452,7 @@ async def get_anomaly_summary():
             "by_type": stats.by_type,
             "by_severity": stats.by_severity,
             "by_symbol": stats.by_symbol,
-            "last_detection": stats.last_detection.isoformat()
-            if stats.last_detection
-            else None,
+            "last_detection": stats.last_detection.isoformat() if stats.last_detection else None,
             "detection_rate_per_hour": stats.detection_rate_per_hour,
         },
         "recent_critical": [

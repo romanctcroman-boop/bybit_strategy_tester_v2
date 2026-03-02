@@ -269,12 +269,7 @@ class OrderBookSimulator:
         fills: list[tuple[float, float]] = []
         total_cost = 0.0
 
-        if side == OrderBookSide.BID:
-            # Buy order - consume asks
-            levels = self.asks
-        else:
-            # Sell order - consume bids
-            levels = self.bids
+        levels = self.asks if side == OrderBookSide.BID else self.bids
 
         i = 0
         while remaining > 0 and i < len(levels):
@@ -296,9 +291,9 @@ class OrderBookSimulator:
 
         # Remove depleted levels
         if side == OrderBookSide.BID:
-            self.asks = [l for l in self.asks if l.size > 0]
+            self.asks = [lvl for lvl in self.asks if lvl.size > 0]
         else:
-            self.bids = [l for l in self.bids if l.size > 0]
+            self.bids = [lvl for lvl in self.bids if lvl.size > 0]
 
         filled_size = size - remaining
         avg_price = total_cost / filled_size if filled_size > 0 else 0
@@ -405,8 +400,8 @@ class MarketDepthAnalyzer:
         mid_price = snapshot.mid_price or 0
 
         # Calculate total depths
-        bid_depth = sum(l.size for l in snapshot.bids)
-        ask_depth = sum(l.size for l in snapshot.asks)
+        bid_depth = sum(lvl.size for lvl in snapshot.bids)
+        ask_depth = sum(lvl.size for lvl in snapshot.asks)
 
         # Depth ratio
         depth_ratio = bid_depth / ask_depth if ask_depth > 0 else 1.0
@@ -416,15 +411,13 @@ class MarketDepthAnalyzer:
         imbalance = (bid_depth - ask_depth) / total_depth if total_depth > 0 else 0
 
         # Imbalance at different depths
-        bid_5 = sum(l.size for l in snapshot.bids[:5])
-        ask_5 = sum(l.size for l in snapshot.asks[:5])
+        bid_5 = sum(lvl.size for lvl in snapshot.bids[:5])
+        ask_5 = sum(lvl.size for lvl in snapshot.asks[:5])
         imbalance_5 = (bid_5 - ask_5) / (bid_5 + ask_5) if (bid_5 + ask_5) > 0 else 0
 
-        bid_10 = sum(l.size for l in snapshot.bids[:10])
-        ask_10 = sum(l.size for l in snapshot.asks[:10])
-        imbalance_10 = (
-            (bid_10 - ask_10) / (bid_10 + ask_10) if (bid_10 + ask_10) > 0 else 0
-        )
+        bid_10 = sum(lvl.size for lvl in snapshot.bids[:10])
+        ask_10 = sum(lvl.size for lvl in snapshot.asks[:10])
+        imbalance_10 = (bid_10 - ask_10) / (bid_10 + ask_10) if (bid_10 + ask_10) > 0 else 0
 
         # Detect walls
         avg_bid_size = bid_depth / len(snapshot.bids) if snapshot.bids else 0
@@ -485,9 +478,7 @@ class MarketDepthAnalyzer:
             depth_2_pct=depth_2_pct,
         )
 
-    def _depth_within_pct(
-        self, snapshot: OrderBookSnapshot, mid_price: float, pct: float
-    ) -> float:
+    def _depth_within_pct(self, snapshot: OrderBookSnapshot, mid_price: float, pct: float) -> float:
         """Calculate total depth within percentage of mid price."""
         lower = mid_price * (1 - pct)
         upper = mid_price * (1 + pct)
@@ -619,16 +610,10 @@ class MarketImpactCalculator:
         vol_adj = 1 + volatility * self.config.volatility_multiplier
 
         # Permanent impact: η * sign(Q) * |Q|^α * σ
-        permanent = (
-            self.config.permanent_impact_coef
-            * (participation**self.config.volume_exponent)
-            * vol_adj
-        )
+        permanent = self.config.permanent_impact_coef * (participation**self.config.volume_exponent) * vol_adj
 
         # Temporary impact: γ * Q / T * σ
-        temporary = (
-            self.config.temporary_impact_coef * participation / time_horizon * vol_adj
-        )
+        temporary = self.config.temporary_impact_coef * participation / time_horizon * vol_adj
 
         # Total impact
         total_impact = permanent + temporary
@@ -641,19 +626,13 @@ class MarketImpactCalculator:
             impact_price = -impact_price
 
         # Execution price
-        execution_price = (
-            current_price + impact_price
-            if is_buy
-            else current_price - abs(impact_price)
-        )
+        execution_price = current_price + impact_price if is_buy else current_price - abs(impact_price)
 
         # Execution cost (value of impact)
         execution_cost = abs(impact_price) * order_size
 
         # Optimal execution time (minimize total cost)
-        optimal_time = self._calculate_optimal_time(
-            order_size, average_volume, volatility
-        )
+        optimal_time = self._calculate_optimal_time(order_size, average_volume, volatility)
 
         return MarketImpactResult(
             total_impact=abs(total_impact),
@@ -826,9 +805,7 @@ class LiquidationCascadeSimulator:
             price = current_price * (1 - i * self.config.level_step)
             size = max(
                 100,
-                self.rng.normal(
-                    self.config.avg_position_size, self.config.position_size_std
-                ),
+                self.rng.normal(self.config.avg_position_size, self.config.position_size_std),
             )
             leverage = max(2, self.rng.normal(self.config.avg_leverage, 5))
             n_positions = max(1, int(size / 1000))
@@ -847,9 +824,7 @@ class LiquidationCascadeSimulator:
             price = current_price * (1 + i * self.config.level_step)
             size = max(
                 100,
-                self.rng.normal(
-                    self.config.avg_position_size, self.config.position_size_std
-                ),
+                self.rng.normal(self.config.avg_position_size, self.config.position_size_std),
             )
             leverage = max(2, self.rng.normal(self.config.avg_leverage, 5))
             n_positions = max(1, int(size / 1000))
@@ -938,13 +913,10 @@ class LiquidationCascadeSimulator:
             price_impact=price_impact,
             final_price=current_price,
             triggered_levels=triggered_levels,
-            stopped_by_wall=order_book is not None
-            and cascade_waves < self.config.max_cascade_depth,
+            stopped_by_wall=order_book is not None and cascade_waves < self.config.max_cascade_depth,
         )
 
-    def get_liquidation_heatmap(
-        self, price_range: tuple[float, float], n_buckets: int = 50
-    ) -> NDArray[np.float64]:
+    def get_liquidation_heatmap(self, price_range: tuple[float, float], n_buckets: int = 50) -> NDArray[np.float64]:
         """
         Get liquidation volume heatmap.
 
@@ -1135,14 +1107,10 @@ class OrderFlowAnalyzer:
             self._price_at_delta_start = current_price
             delta_divergence = 0.0
         else:
-            price_change = (
-                current_price - self._price_at_delta_start
-            ) / self._price_at_delta_start
+            price_change = (current_price - self._price_at_delta_start) / self._price_at_delta_start
             expected_delta_direction = 1 if price_change > 0 else -1
             actual_delta_direction = 1 if self._cumulative_delta > 0 else -1
-            delta_divergence = (
-                1.0 if expected_delta_direction != actual_delta_direction else 0.0
-            )
+            delta_divergence = 1.0 if expected_delta_direction != actual_delta_direction else 0.0
 
         return OrderFlowMetrics(
             buy_volume=buy_volume,

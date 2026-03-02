@@ -560,9 +560,7 @@ class GitSecretsScanner:
         if len(secret_match) <= 8:
             masked = "****"
         else:
-            masked = (
-                secret_match[:4] + "*" * (len(secret_match) - 8) + secret_match[-4:]
-            )
+            masked = secret_match[:4] + "*" * (len(secret_match) - 8) + secret_match[-4:]
         return line.replace(secret_match, masked)
 
     def _get_remediation(self, secret_type: SecretType) -> str:
@@ -582,9 +580,7 @@ class GitSecretsScanner:
             SecretType.CRYPTO_KEY: "Rotate encryption key and re-encrypt data",
             SecretType.SSH_KEY: "Remove from authorized_keys, regenerate, and store securely",
         }
-        return remediation.get(
-            secret_type, "Review the finding and rotate credentials if necessary"
-        )
+        return remediation.get(secret_type, "Review the finding and rotate credentials if necessary")
 
     def scan_file(self, file_path: Path) -> list[Finding]:
         """Scan a single file for secrets."""
@@ -620,9 +616,7 @@ class GitSecretsScanner:
                             severity=pattern.severity,
                             file_path=str(file_path),
                             line_number=line_num,
-                            line_content=self._mask_secret(
-                                line.strip()[:200], secret_value[:20]
-                            ),
+                            line_content=self._mask_secret(line.strip()[:200], secret_value[:20]),
                             pattern_name=pattern.name,
                             remediation=self._get_remediation(pattern.secret_type),
                         )
@@ -798,16 +792,12 @@ class GitSecretsScanner:
                                     severity=pattern.severity,
                                     file_path=file_path,
                                     line_number=line_num,
-                                    line_content=self._mask_secret(
-                                        line.strip()[:200], secret_value[:20]
-                                    ),
+                                    line_content=self._mask_secret(line.strip()[:200], secret_value[:20]),
                                     pattern_name=pattern.name,
                                     commit_hash=commit_hash,
                                     author=author,
                                     commit_date=commit_date,
-                                    remediation=self._get_remediation(
-                                        pattern.secret_type
-                                    ),
+                                    remediation=self._get_remediation(pattern.secret_type),
                                 )
                                 result.findings.append(finding)
 
@@ -872,9 +862,7 @@ class GitSecretsScanner:
                 {
                     "scan_id": scan_result.scan_id,
                     "start_time": scan_result.start_time.isoformat(),
-                    "end_time": scan_result.end_time.isoformat()
-                    if scan_result.end_time
-                    else None,
+                    "end_time": scan_result.end_time.isoformat() if scan_result.end_time else None,
                     "status": scan_result.status.value,
                     "scan_path": scan_result.scan_path,
                     "files_scanned": scan_result.files_scanned,

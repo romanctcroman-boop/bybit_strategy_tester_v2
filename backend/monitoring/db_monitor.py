@@ -98,9 +98,7 @@ class DatabaseMonitor:
     THRESHOLDS = {
         "query_latency": AlertThreshold(warning=50.0, critical=200.0, unit="ms"),
         "connection_time": AlertThreshold(warning=10.0, critical=50.0, unit="ms"),
-        "table_size": AlertThreshold(
-            warning=1_000_000, critical=10_000_000, unit="rows"
-        ),
+        "table_size": AlertThreshold(warning=1_000_000, critical=10_000_000, unit="rows"),
         "archive_age": AlertThreshold(warning=30, critical=90, unit="days"),
     }
 
@@ -162,15 +160,9 @@ class DatabaseMonitor:
             components=components,
             summary={
                 "total_components": len(components),
-                "healthy": sum(
-                    1 for c in components if c.status == HealthStatus.HEALTHY
-                ),
-                "degraded": sum(
-                    1 for c in components if c.status == HealthStatus.DEGRADED
-                ),
-                "unhealthy": sum(
-                    1 for c in components if c.status == HealthStatus.UNHEALTHY
-                ),
+                "healthy": sum(1 for c in components if c.status == HealthStatus.HEALTHY),
+                "degraded": sum(1 for c in components if c.status == HealthStatus.DEGRADED),
+                "unhealthy": sum(1 for c in components if c.status == HealthStatus.UNHEALTHY),
                 "db_path": str(self.db_path),
             },
         )
@@ -343,9 +335,7 @@ class DatabaseMonitor:
                 message = "No archive tables (archiving may not be configured)"
             else:
                 status = HealthStatus.HEALTHY
-                message = (
-                    f"{len(archive_tables)} archive tables, {total_archived:,} records"
-                )
+                message = f"{len(archive_tables)} archive tables, {total_archived:,} records"
 
             return ComponentHealth(
                 name="archive_status",
@@ -463,9 +453,7 @@ class DatabaseMonitor:
 
             # Database size
             if self.db_path.exists():
-                metrics["database_size_mb"] = round(
-                    self.db_path.stat().st_size / (1024 * 1024), 2
-                )
+                metrics["database_size_mb"] = round(self.db_path.stat().st_size / (1024 * 1024), 2)
 
             conn.close()
 
@@ -493,18 +481,14 @@ class DatabaseMonitor:
         if "database_size_mb" in metrics:
             lines.append("# HELP database_size_mb Database file size in megabytes")
             lines.append("# TYPE database_size_mb gauge")
-            lines.append(
-                f'database_size_mb{{db="kline"}} {metrics["database_size_mb"]}'
-            )
+            lines.append(f'database_size_mb{{db="kline"}} {metrics["database_size_mb"]}')
 
         # Main table records
         if "main_table" in metrics:
             mt = metrics["main_table"]
             lines.append("# HELP kline_main_table_records Total records in main table")
             lines.append("# TYPE kline_main_table_records gauge")
-            lines.append(
-                f'kline_main_table_records{{table="bybit_kline_audit"}} {mt["total_records"]}'
-            )
+            lines.append(f'kline_main_table_records{{table="bybit_kline_audit"}} {mt["total_records"]}')
 
             lines.append("# HELP kline_unique_symbols Number of unique trading symbols")
             lines.append("# TYPE kline_unique_symbols gauge")

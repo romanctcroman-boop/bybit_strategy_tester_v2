@@ -140,9 +140,7 @@ class AICacheManager:
             return None
 
         try:
-            cache_key = self._generate_cache_key(
-                prompt, model, temperature, max_tokens, **kwargs
-            )
+            cache_key = self._generate_cache_key(prompt, model, temperature, max_tokens, **kwargs)
 
             cached_data = self.redis_client.get(cache_key)
 
@@ -195,9 +193,7 @@ class AICacheManager:
             return False
 
         try:
-            cache_key = self._generate_cache_key(
-                prompt, model, temperature, max_tokens, **kwargs
-            )
+            cache_key = self._generate_cache_key(prompt, model, temperature, max_tokens, **kwargs)
 
             # Add cache metadata
             response_copy = response.copy()
@@ -211,9 +207,7 @@ class AICacheManager:
             ttl_seconds = ttl or self.default_ttl
             self.redis_client.setex(cache_key, ttl_seconds, cached_data)
 
-            logger.debug(
-                f"💾 Cached response for key: {cache_key[:16]}... (TTL: {ttl_seconds}s)"
-            )
+            logger.debug(f"💾 Cached response for key: {cache_key[:16]}... (TTL: {ttl_seconds}s)")
             return True
 
         except Exception as e:
@@ -239,9 +233,7 @@ class AICacheManager:
             return False
 
         try:
-            cache_key = self._generate_cache_key(
-                prompt, model, temperature, max_tokens, **kwargs
-            )
+            cache_key = self._generate_cache_key(prompt, model, temperature, max_tokens, **kwargs)
 
             deleted = self.redis_client.delete(cache_key)
 
@@ -290,9 +282,7 @@ class AICacheManager:
             Dict with hit rate, miss rate, errors, etc.
         """
         total_requests = self.stats["hits"] + self.stats["misses"]
-        hit_rate = (
-            (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0.0
-        )
+        hit_rate = (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0.0
 
         return {
             "enabled": self.enabled,

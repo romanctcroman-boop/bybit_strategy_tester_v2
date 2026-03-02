@@ -213,9 +213,7 @@ class SLOErrorBudgetService:
 
         return is_good
 
-    def record_success(
-        self, slo_name: str, endpoint: str = "", metadata: dict | None = None
-    ) -> None:
+    def record_success(self, slo_name: str, endpoint: str = "", metadata: dict | None = None) -> None:
         """Record a successful event (for availability/error rate SLOs)."""
         if slo_name not in self._slos:
             return
@@ -294,9 +292,7 @@ class SLOErrorBudgetService:
 
         # Calculate SLI (Service Level Indicator)
         if slo.slo_type == SLOType.AVAILABILITY:
-            current_sli = (
-                (good_events / total_events * 100) if total_events > 0 else 100.0
-            )
+            current_sli = (good_events / total_events * 100) if total_events > 0 else 100.0
             # Error budget = allowed bad events
             error_budget_total = total_events * (1 - slo.target / 100)
         elif slo.slo_type == SLOType.ERROR_RATE:
@@ -304,17 +300,13 @@ class SLOErrorBudgetService:
             error_budget_total = total_events * (slo.target / 100)
         else:
             # Latency SLOs
-            current_sli = (
-                (good_events / total_events * 100) if total_events > 0 else 100.0
-            )
+            current_sli = (good_events / total_events * 100) if total_events > 0 else 100.0
             # Assume 99.9% SLO for latency metrics
             error_budget_total = total_events * 0.001
 
         error_budget_remaining = max(0, error_budget_total - bad_events)
         error_budget_remaining_pct = (
-            (error_budget_remaining / error_budget_total * 100)
-            if error_budget_total > 0
-            else 100.0
+            (error_budget_remaining / error_budget_total * 100) if error_budget_total > 0 else 100.0
         )
 
         # Calculate burn rates
@@ -455,9 +447,7 @@ class SLOErrorBudgetService:
         healthy = sum(1 for s in states.values() if s.status == BudgetStatus.HEALTHY)
         warning = sum(1 for s in states.values() if s.status == BudgetStatus.WARNING)
         critical = sum(1 for s in states.values() if s.status == BudgetStatus.CRITICAL)
-        exhausted = sum(
-            1 for s in states.values() if s.status == BudgetStatus.EXHAUSTED
-        )
+        exhausted = sum(1 for s in states.values() if s.status == BudgetStatus.EXHAUSTED)
 
         # Find most critical SLOs
         critical_slos = [
@@ -481,11 +471,7 @@ class SLOErrorBudgetService:
                 "exhausted": exhausted,
             },
             "overall_health": (
-                "critical"
-                if exhausted > 0 or critical > 0
-                else "warning"
-                if warning > 0
-                else "healthy"
+                "critical" if exhausted > 0 or critical > 0 else "warning" if warning > 0 else "healthy"
             ),
             "critical_slos": critical_slos,
             "recent_alerts": [
@@ -495,9 +481,7 @@ class SLOErrorBudgetService:
                     "message": a.message,
                     "timestamp": a.timestamp.isoformat(),
                 }
-                for a in sorted(self._alerts, key=lambda x: x.timestamp, reverse=True)[
-                    :10
-                ]
+                for a in sorted(self._alerts, key=lambda x: x.timestamp, reverse=True)[:10]
             ],
         }
 

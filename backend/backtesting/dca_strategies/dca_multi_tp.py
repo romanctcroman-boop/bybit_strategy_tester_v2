@@ -207,9 +207,7 @@ class DCADealState:
     """
 
     # Entry tracking
-    entries: list[tuple[float, float, int]] = field(
-        default_factory=list
-    )  # (price, size, bar_idx)
+    entries: list[tuple[float, float, int]] = field(default_factory=list)  # (price, size, bar_idx)
     total_cost: float = 0.0
     total_size: float = 0.0
     avg_entry_price: float = 0.0
@@ -240,9 +238,7 @@ class DCADealState:
         self.entries.append((price, size, bar_idx))
         self.total_cost += price * size
         self.total_size += size
-        self.avg_entry_price = (
-            self.total_cost / self.total_size if self.total_size > 0 else 0.0
-        )
+        self.avg_entry_price = self.total_cost / self.total_size if self.total_size > 0 else 0.0
 
         if len(self.entries) == 1:
             self.base_entry_price = price
@@ -353,17 +349,13 @@ class DCAMultiTPStrategy:
         cfg = self.config
 
         if cfg.max_safety_orders < 0:
-            raise ValueError(
-                f"max_safety_orders must be >= 0, got {cfg.max_safety_orders}"
-            )
+            raise ValueError(f"max_safety_orders must be >= 0, got {cfg.max_safety_orders}")
 
         if cfg.tp_mode == TPMode.MULTI:
             if len(cfg.tp_levels_pct) != len(cfg.tp_portions):
                 raise ValueError("tp_levels_pct and tp_portions must have same length")
             if abs(sum(cfg.tp_portions) - 1.0) > 0.01:
-                raise ValueError(
-                    f"tp_portions must sum to 1.0, got {sum(cfg.tp_portions)}"
-                )
+                raise ValueError(f"tp_portions must sum to 1.0, got {sum(cfg.tp_portions)}")
 
         if cfg.fixed_sl_pct < 0:
             raise ValueError(f"fixed_sl_pct must be >= 0, got {cfg.fixed_sl_pct}")
@@ -402,9 +394,7 @@ class DCAMultiTPStrategy:
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def _calculate_atr(
-        self, high: pd.Series, low: pd.Series, close: pd.Series
-    ) -> pd.Series:
+    def _calculate_atr(self, high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
         """Calculate ATR using Wilder's smoothing."""
         tr1 = high - low
         tr2 = abs(high - close.shift(1))
@@ -415,18 +405,14 @@ class DCAMultiTPStrategy:
         atr = tr.ewm(alpha=alpha, adjust=False).mean()
         return atr
 
-    def _calculate_htf_indicator(
-        self, htf_close: pd.Series, period: int, filter_type: str
-    ) -> pd.Series:
+    def _calculate_htf_indicator(self, htf_close: pd.Series, period: int, filter_type: str) -> pd.Series:
         """Calculate HTF trend indicator (SMA or EMA)."""
         if filter_type.lower() == "ema":
             return htf_close.ewm(span=period, adjust=False).mean()
         else:
             return htf_close.rolling(window=period).mean()
 
-    def _check_mtf_filter(
-        self, htf_close: float, htf_indicator: float, direction: str
-    ) -> bool:
+    def _check_mtf_filter(self, htf_close: float, htf_indicator: float, direction: str) -> bool:
         """
         Check if signal is allowed by MTF filter.
 
@@ -451,9 +437,7 @@ class DCAMultiTPStrategy:
         else:
             return htf_close < htf_indicator
 
-    def _calculate_tp_prices(
-        self, avg_entry: float, atr: float, direction: str
-    ) -> list[float]:
+    def _calculate_tp_prices(self, avg_entry: float, atr: float, direction: str) -> list[float]:
         """
         Calculate take profit prices based on mode.
 
@@ -490,9 +474,7 @@ class DCAMultiTPStrategy:
 
         return tp_prices
 
-    def _calculate_sl_price(
-        self, avg_entry: float, atr: float, direction: str
-    ) -> float:
+    def _calculate_sl_price(self, avg_entry: float, atr: float, direction: str) -> float:
         """Calculate stop loss price based on mode."""
         cfg = self.config
 
@@ -554,11 +536,7 @@ class DCAMultiTPStrategy:
         n = len(ohlcv)
 
         # Calculate indicators
-        rsi = (
-            self._calculate_rsi(close_prices)
-            if cfg.rsi_enabled
-            else pd.Series(50.0, index=close_prices.index)
-        )
+        rsi = self._calculate_rsi(close_prices) if cfg.rsi_enabled else pd.Series(50.0, index=close_prices.index)
         atr = self._calculate_atr(high_prices, low_prices, close_prices)
 
         # Calculate HTF indicator if MTF enabled
@@ -584,18 +562,10 @@ class DCAMultiTPStrategy:
         entry_sizes = pd.Series(0.0, index=ohlcv.index)
 
         # Multi-TP partial exit signals
-        tp1_exits = (
-            pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
-        )
-        tp2_exits = (
-            pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
-        )
-        tp3_exits = (
-            pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
-        )
-        tp4_exits = (
-            pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
-        )
+        tp1_exits = pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
+        tp2_exits = pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
+        tp3_exits = pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
+        tp4_exits = pd.Series(False, index=ohlcv.index) if cfg.tp_mode == TPMode.MULTI else None
 
         # Deal state
         deal = DCADealState()
@@ -650,13 +620,9 @@ class DCAMultiTPStrategy:
                 if cfg.sl_mode == SLMode.TRAILING:
                     profit_pct = 0.0
                     if direction == "long":
-                        profit_pct = (
-                            current_high - deal.avg_entry_price
-                        ) / deal.avg_entry_price
+                        profit_pct = (current_high - deal.avg_entry_price) / deal.avg_entry_price
                     else:
-                        profit_pct = (
-                            deal.avg_entry_price - current_low
-                        ) / deal.avg_entry_price
+                        profit_pct = (deal.avg_entry_price - current_low) / deal.avg_entry_price
 
                     # Activate trailing
                     if profit_pct >= cfg.trailing_activation_pct / 100.0:
@@ -667,9 +633,7 @@ class DCAMultiTPStrategy:
                         if direction == "long":
                             if current_high > deal.peak_price:
                                 deal.peak_price = current_high
-                                deal.trailing_sl_price = deal.peak_price * (
-                                    1 - cfg.trailing_distance_pct / 100.0
-                                )
+                                deal.trailing_sl_price = deal.peak_price * (1 - cfg.trailing_distance_pct / 100.0)
 
                             if current_low <= deal.trailing_sl_price:
                                 exits.iloc[i] = True
@@ -680,9 +644,7 @@ class DCAMultiTPStrategy:
                         else:
                             if deal.peak_price == 0 or current_low < deal.peak_price:
                                 deal.peak_price = current_low
-                                deal.trailing_sl_price = deal.peak_price * (
-                                    1 + cfg.trailing_distance_pct / 100.0
-                                )
+                                deal.trailing_sl_price = deal.peak_price * (1 + cfg.trailing_distance_pct / 100.0)
 
                             if current_high >= deal.trailing_sl_price:
                                 exits.iloc[i] = True
@@ -713,11 +675,7 @@ class DCAMultiTPStrategy:
                                     tp4_exits.iloc[i] = True
 
                                 # Update remaining size
-                                portion = (
-                                    cfg.tp_portions[tp_idx]
-                                    if tp_idx < len(cfg.tp_portions)
-                                    else 0.25
-                                )
+                                portion = cfg.tp_portions[tp_idx] if tp_idx < len(cfg.tp_portions) else 0.25
                                 deal.remaining_size -= deal.total_size * portion
 
                                 # Activate breakeven after TP1
@@ -725,13 +683,9 @@ class DCAMultiTPStrategy:
                                     deal.breakeven_active = True
                                     offset = cfg.breakeven_offset_pct / 100.0
                                     if direction == "long":
-                                        deal.sl_price = deal.avg_entry_price * (
-                                            1 + offset
-                                        )
+                                        deal.sl_price = deal.avg_entry_price * (1 + offset)
                                     else:
-                                        deal.sl_price = deal.avg_entry_price * (
-                                            1 - offset
-                                        )
+                                        deal.sl_price = deal.avg_entry_price * (1 - offset)
 
                                 # Check if all TPs hit
                                 if all(deal.tp_hit):
@@ -778,21 +732,13 @@ class DCAMultiTPStrategy:
                         entries.iloc[i] = True
                         entry_sizes.iloc[i] = cfg.base_order_size_pct / 100.0
 
-                        deal.add_entry(
-                            current_close, cfg.base_order_size_pct / 100.0, i
-                        )
+                        deal.add_entry(current_close, cfg.base_order_size_pct / 100.0, i)
 
                         # Calculate TP/SL prices
-                        deal.tp_prices = self._calculate_tp_prices(
-                            deal.avg_entry_price, current_atr, direction
-                        )
+                        deal.tp_prices = self._calculate_tp_prices(deal.avg_entry_price, current_atr, direction)
                         deal.tp_hit = [False] * len(deal.tp_prices)
-                        deal.sl_price = self._calculate_sl_price(
-                            deal.avg_entry_price, current_atr, direction
-                        )
-                        deal.peak_price = (
-                            current_high if direction == "long" else current_low
-                        )
+                        deal.sl_price = self._calculate_sl_price(deal.avg_entry_price, current_atr, direction)
+                        deal.peak_price = current_high if direction == "long" else current_low
 
                 else:
                     # SAFETY ORDER: check price deviation
@@ -802,14 +748,10 @@ class DCAMultiTPStrategy:
                         so_deviation = self.so_levels[so_index]
 
                         if direction == "long":
-                            so_trigger_price = deal.base_entry_price * (
-                                1 - so_deviation
-                            )
+                            so_trigger_price = deal.base_entry_price * (1 - so_deviation)
                             so_triggered = current_low <= so_trigger_price
                         else:
-                            so_trigger_price = deal.base_entry_price * (
-                                1 + so_deviation
-                            )
+                            so_trigger_price = deal.base_entry_price * (1 + so_deviation)
                             so_triggered = current_high >= so_trigger_price
 
                         if so_triggered:
@@ -819,16 +761,10 @@ class DCAMultiTPStrategy:
                             deal.add_entry(current_close, self.so_volumes[so_index], i)
 
                             # Recalculate TP/SL based on new average
-                            deal.tp_prices = self._calculate_tp_prices(
-                                deal.avg_entry_price, current_atr, direction
-                            )
+                            deal.tp_prices = self._calculate_tp_prices(deal.avg_entry_price, current_atr, direction)
                             deal.tp_hit = [False] * len(deal.tp_prices)
-                            if (
-                                not deal.breakeven_active
-                            ):  # Don't reset SL if breakeven active
-                                deal.sl_price = self._calculate_sl_price(
-                                    deal.avg_entry_price, current_atr, direction
-                                )
+                            if not deal.breakeven_active:  # Don't reset SL if breakeven active
+                                deal.sl_price = self._calculate_sl_price(deal.avg_entry_price, current_atr, direction)
 
         # Create result based on direction
         if direction == "long":

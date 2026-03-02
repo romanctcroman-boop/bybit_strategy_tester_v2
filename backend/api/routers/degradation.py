@@ -135,9 +135,7 @@ async def list_services():
                     success_rate=round(svc.success_rate, 2),
                     failure_count=svc.failure_count,
                     success_count=svc.success_count,
-                    degraded_since=svc.degraded_since.isoformat()
-                    if svc.degraded_since
-                    else None,
+                    degraded_since=svc.degraded_since.isoformat() if svc.degraded_since else None,
                     error_message=svc.error_message,
                 )
             )
@@ -175,9 +173,7 @@ async def get_service_status(service_name: str):
             success_rate=round(svc.success_rate, 2),
             failure_count=svc.failure_count,
             success_count=svc.success_count,
-            degraded_since=svc.degraded_since.isoformat()
-            if svc.degraded_since
-            else None,
+            degraded_since=svc.degraded_since.isoformat() if svc.degraded_since else None,
             error_message=svc.error_message,
         )
     except HTTPException:
@@ -226,9 +222,7 @@ async def list_cache_entries():
                     age_seconds=round(entry.age_seconds, 2),
                     is_expired=entry.is_expired,
                     access_count=entry.access_count,
-                    last_accessed=entry.last_accessed.isoformat()
-                    if entry.last_accessed
-                    else None,
+                    last_accessed=entry.last_accessed.isoformat() if entry.last_accessed else None,
                 )
             )
 

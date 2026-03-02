@@ -378,9 +378,7 @@ class GeneticOptimizer:
         fitness: list[float],
     ) -> np.ndarray:
         """Tournament selection."""
-        indices = np.random.choice(
-            len(population), size=self.config.tournament_size, replace=False
-        )
+        indices = np.random.choice(len(population), size=self.config.tournament_size, replace=False)
         best_idx = indices[0]
         for idx in indices[1:]:
             if fitness[idx] > fitness[best_idx]:
@@ -543,10 +541,7 @@ class BayesianOptimizer:
         param_types: dict[str, str] | None = None,  # "float", "int", "categorical"
     ):
         if not OPTUNA_AVAILABLE:
-            raise ImportError(
-                "Optuna is required for Bayesian optimization. "
-                "Install with: pip install optuna"
-            )
+            raise ImportError("Optuna is required for Bayesian optimization. Install with: pip install optuna")
 
         self.config = config or BayesianConfig()
         self.param_bounds = param_bounds or {}
@@ -561,9 +556,7 @@ class BayesianOptimizer:
         sampler_name = self.config.sampler.upper()
 
         if sampler_name == "TPE":
-            return optuna.samplers.TPESampler(
-                n_startup_trials=self.config.n_startup_trials
-            )
+            return optuna.samplers.TPESampler(n_startup_trials=self.config.n_startup_trials)
         elif sampler_name == "CMA-ES" or sampler_name == "CMAES":
             return optuna.samplers.CmaEsSampler()
         elif sampler_name == "RANDOM":
@@ -576,9 +569,7 @@ class BayesianOptimizer:
         pruner_name = self.config.pruner.lower()
 
         if pruner_name == "median":
-            return optuna.pruners.MedianPruner(
-                n_warmup_steps=self.config.n_warmup_steps
-            )
+            return optuna.pruners.MedianPruner(n_warmup_steps=self.config.n_warmup_steps)
         elif pruner_name == "hyperband":
             return optuna.pruners.HyperbandPruner()
         elif pruner_name == "none":
@@ -652,11 +643,7 @@ class BayesianOptimizer:
         self.best_value = self.study.best_value
 
         # Get history
-        history = [
-            {"params": t.params, "value": t.value}
-            for t in self.study.trials
-            if t.value is not None
-        ]
+        history = [{"params": t.params, "value": t.value} for t in self.study.trials if t.value is not None]
 
         return {
             "best_params": self.best_params,
@@ -703,10 +690,7 @@ class WalkForwardAnalyzer:
                 train_idx = np.arange(start, train_end)
                 test_idx = np.arange(train_end, test_end)
 
-                if (
-                    len(train_idx) >= self.config.min_train_samples
-                    and len(test_idx) >= self.config.min_test_samples
-                ):
+                if len(train_idx) >= self.config.min_train_samples and len(test_idx) >= self.config.min_test_samples:
                     folds.append((train_idx, test_idx))
 
         elif mode == WalkForwardMode.ANCHORED:
@@ -720,10 +704,7 @@ class WalkForwardAnalyzer:
                 train_idx = np.arange(0, train_end)
                 test_idx = np.arange(train_end, test_end)
 
-                if (
-                    len(train_idx) >= self.config.min_train_samples
-                    and len(test_idx) >= self.config.min_test_samples
-                ):
+                if len(train_idx) >= self.config.min_train_samples and len(test_idx) >= self.config.min_test_samples:
                     folds.append((train_idx, test_idx))
 
         elif mode == WalkForwardMode.ROLLING:
@@ -746,10 +727,7 @@ class WalkForwardAnalyzer:
                 train_idx = np.arange(start, train_end)
                 test_idx = np.arange(train_end, test_end)
 
-                if (
-                    len(train_idx) >= self.config.min_train_samples
-                    and len(test_idx) >= self.config.min_test_samples
-                ):
+                if len(train_idx) >= self.config.min_train_samples and len(test_idx) >= self.config.min_test_samples:
                     folds.append((train_idx, test_idx))
 
         return folds
@@ -783,10 +761,7 @@ class WalkForwardAnalyzer:
 
         for fold_idx, (train_idx, test_idx) in enumerate(folds):
             if verbose:
-                print(
-                    f"Fold {fold_idx + 1}/{len(folds)}: "
-                    f"Train {len(train_idx)}, Test {len(test_idx)}"
-                )
+                print(f"Fold {fold_idx + 1}/{len(folds)}: Train {len(train_idx)}, Test {len(test_idx)}")
 
             # Train data
             train_data = data[train_idx]
@@ -824,11 +799,7 @@ class WalkForwardAnalyzer:
         avg_oos_return = np.mean(oos_profits) if oos_profits else 0
 
         robustness = avg_oos_return / avg_is_return if avg_is_return > 0 else 0
-        consistency = (
-            sum(1 for p in oos_profits if p > 0) / len(oos_profits)
-            if oos_profits
-            else 0
-        )
+        consistency = sum(1 for p in oos_profits if p > 0) / len(oos_profits) if oos_profits else 0
 
         self.results = WalkForwardResult(
             fold_results=fold_results,

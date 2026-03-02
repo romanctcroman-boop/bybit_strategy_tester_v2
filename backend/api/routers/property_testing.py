@@ -105,9 +105,7 @@ def _convert_result(result: PropertyTestResult) -> TestResultResponse:
         property_name=result.property_name,
         result=result.result.value,
         examples_tested=result.examples_tested,
-        failing_example=(
-            str(result.failing_example)[:500] if result.failing_example else None
-        ),
+        failing_example=(str(result.failing_example)[:500] if result.failing_example else None),
         error_message=result.error_message,
         duration_ms=result.duration_ms,
         timestamp=result.timestamp.isoformat(),

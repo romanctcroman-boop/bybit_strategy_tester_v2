@@ -101,9 +101,7 @@ class WalkForwardOptimizer:
 
     def _create_windows(
         self, data: pd.DataFrame, timestamp_col: str = "timestamp"
-    ) -> list[
-        tuple[pd.DataFrame, pd.DataFrame, datetime, datetime, datetime, datetime]
-    ]:
+    ) -> list[tuple[pd.DataFrame, pd.DataFrame, datetime, datetime, datetime, datetime]]:
         """
         Create walk-forward windows from data.
 
@@ -131,30 +129,12 @@ class WalkForwardOptimizer:
                 oos_data = data.iloc[oos_start_idx:oos_end_idx].copy()
 
                 # Get timestamps
-                is_start = (
-                    is_data[timestamp_col].iloc[0]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                is_end = (
-                    is_data[timestamp_col].iloc[-1]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                oos_start = (
-                    oos_data[timestamp_col].iloc[0]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
-                oos_end = (
-                    oos_data[timestamp_col].iloc[-1]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
+                is_start = is_data[timestamp_col].iloc[0] if timestamp_col in is_data.columns else datetime.now()
+                is_end = is_data[timestamp_col].iloc[-1] if timestamp_col in is_data.columns else datetime.now()
+                oos_start = oos_data[timestamp_col].iloc[0] if timestamp_col in oos_data.columns else datetime.now()
+                oos_end = oos_data[timestamp_col].iloc[-1] if timestamp_col in oos_data.columns else datetime.now()
 
-                windows.append(
-                    (is_data, oos_data, is_start, is_end, oos_start, oos_end)
-                )
+                windows.append((is_data, oos_data, is_start, is_end, oos_start, oos_end))
 
         elif self.mode == "anchored":
             # Anchored window: IS always starts from beginning, grows over time
@@ -173,30 +153,12 @@ class WalkForwardOptimizer:
                 oos_data = data.iloc[oos_start_idx:oos_end_idx].copy()
 
                 # Get timestamps
-                is_start = (
-                    is_data[timestamp_col].iloc[0]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                is_end = (
-                    is_data[timestamp_col].iloc[-1]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                oos_start = (
-                    oos_data[timestamp_col].iloc[0]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
-                oos_end = (
-                    oos_data[timestamp_col].iloc[-1]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
+                is_start = is_data[timestamp_col].iloc[0] if timestamp_col in is_data.columns else datetime.now()
+                is_end = is_data[timestamp_col].iloc[-1] if timestamp_col in is_data.columns else datetime.now()
+                oos_start = oos_data[timestamp_col].iloc[0] if timestamp_col in oos_data.columns else datetime.now()
+                oos_end = oos_data[timestamp_col].iloc[-1] if timestamp_col in oos_data.columns else datetime.now()
 
-                windows.append(
-                    (is_data, oos_data, is_start, is_end, oos_start, oos_end)
-                )
+                windows.append((is_data, oos_data, is_start, is_end, oos_start, oos_end))
 
         elif self.mode == "expanding":
             # Expanding: IS grows, OOS is fixed-size at end of each window
@@ -220,30 +182,12 @@ class WalkForwardOptimizer:
                 is_data = data.iloc[0:is_end_idx].copy()
                 oos_data = data.iloc[oos_start_idx:oos_end_idx].copy()
 
-                is_start = (
-                    is_data[timestamp_col].iloc[0]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                is_end = (
-                    is_data[timestamp_col].iloc[-1]
-                    if timestamp_col in is_data.columns
-                    else datetime.now()
-                )
-                oos_start = (
-                    oos_data[timestamp_col].iloc[0]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
-                oos_end = (
-                    oos_data[timestamp_col].iloc[-1]
-                    if timestamp_col in oos_data.columns
-                    else datetime.now()
-                )
+                is_start = is_data[timestamp_col].iloc[0] if timestamp_col in is_data.columns else datetime.now()
+                is_end = is_data[timestamp_col].iloc[-1] if timestamp_col in is_data.columns else datetime.now()
+                oos_start = oos_data[timestamp_col].iloc[0] if timestamp_col in oos_data.columns else datetime.now()
+                oos_end = oos_data[timestamp_col].iloc[-1] if timestamp_col in oos_data.columns else datetime.now()
 
-                windows.append(
-                    (is_data, oos_data, is_start, is_end, oos_start, oos_end)
-                )
+                windows.append((is_data, oos_data, is_start, is_end, oos_start, oos_end))
 
         return windows
 
@@ -274,9 +218,7 @@ class WalkForwardOptimizer:
         results = []
         all_params_used = []
 
-        for idx, (is_data, oos_data, is_start, is_end, oos_start, oos_end) in enumerate(
-            windows_data
-        ):
+        for idx, (is_data, oos_data, is_start, is_end, oos_start, oos_end) in enumerate(windows_data):
             # === IN-SAMPLE OPTIMIZATION ===
             best_params = None
             best_is_metric = -np.inf
@@ -324,16 +266,8 @@ class WalkForwardOptimizer:
             is_return = best_is_result.get("total_return", 0)
             oos_return = oos_result.get("total_return", 0)
 
-            sharpe_deg = (
-                ((oos_sharpe - is_sharpe) / abs(is_sharpe) * 100)
-                if is_sharpe != 0
-                else 0
-            )
-            return_deg = (
-                ((oos_return - is_return) / abs(is_return) * 100)
-                if is_return != 0
-                else 0
-            )
+            sharpe_deg = ((oos_sharpe - is_sharpe) / abs(is_sharpe) * 100) if is_sharpe != 0 else 0
+            return_deg = ((oos_return - is_return) / abs(is_return) * 100) if is_return != 0 else 0
 
             window_result = WalkForwardWindow(
                 window_idx=idx,
@@ -398,9 +332,7 @@ class WalkForwardOptimizer:
             combined_oos_return=sum([w.out_sample_return for w in results]),
         )
 
-    def _generate_param_combinations(
-        self, param_grid: dict[str, list[Any]]
-    ) -> list[dict[str, Any]]:
+    def _generate_param_combinations(self, param_grid: dict[str, list[Any]]) -> list[dict[str, Any]]:
         """Generate all combinations of parameters from grid."""
         import itertools
 
@@ -452,9 +384,7 @@ class WalkForwardOptimizer:
 
         return stability
 
-    def get_param_stability_report(
-        self, all_params: list[dict[str, Any]]
-    ) -> dict[str, dict[str, float]]:
+    def get_param_stability_report(self, all_params: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
         """
         Per-parameter stability report across windows.
 
@@ -502,24 +432,16 @@ class WalkForwardOptimizer:
         lines.append(f"WALK-FORWARD OPTIMIZATION REPORT: {result.strategy_name}")
         lines.append("=" * 70)
         lines.append(f"Mode: {self.mode}, Windows: {result.total_windows}")
-        lines.append(
-            f"IS Ratio: {self.in_sample_ratio:.0%}, Min Trades: {self.min_trades_per_window}"
-        )
+        lines.append(f"IS Ratio: {self.in_sample_ratio:.0%}, Min Trades: {self.min_trades_per_window}")
         lines.append("")
 
         # Summary table
         lines.append("-" * 70)
         lines.append(f"{'Metric':<30} {'In-Sample':>15} {'Out-of-Sample':>15}")
         lines.append("-" * 70)
-        lines.append(
-            f"{'Avg Sharpe Ratio':<30} {result.avg_is_sharpe:>15.2f} {result.avg_oos_sharpe:>15.2f}"
-        )
-        lines.append(
-            f"{'Avg Return':<30} {result.avg_is_return:>14.1%} {result.avg_oos_return:>14.1%}"
-        )
-        lines.append(
-            f"{'Total Trades':<30} {result.total_is_trades:>15} {result.total_oos_trades:>15}"
-        )
+        lines.append(f"{'Avg Sharpe Ratio':<30} {result.avg_is_sharpe:>15.2f} {result.avg_oos_sharpe:>15.2f}")
+        lines.append(f"{'Avg Return':<30} {result.avg_is_return:>14.1%} {result.avg_oos_return:>14.1%}")
+        lines.append(f"{'Total Trades':<30} {result.total_is_trades:>15} {result.total_oos_trades:>15}")
         lines.append("-" * 70)
 
         # Robustness metrics
@@ -550,17 +472,11 @@ class WalkForwardOptimizer:
         # Verdict
         lines.append("")
         if result.avg_sharpe_degradation > -30 and result.oos_win_rate >= 60:
-            lines.append(
-                "✅ VERDICT: Strategy appears ROBUST (low degradation, high OOS win rate)"
-            )
+            lines.append("✅ VERDICT: Strategy appears ROBUST (low degradation, high OOS win rate)")
         elif result.avg_sharpe_degradation > -50 and result.oos_win_rate >= 50:
-            lines.append(
-                "⚠️ VERDICT: Strategy shows MODERATE robustness (some degradation)"
-            )
+            lines.append("⚠️ VERDICT: Strategy shows MODERATE robustness (some degradation)")
         else:
-            lines.append(
-                "❌ VERDICT: Strategy may be OVERFIT (high degradation or low OOS win rate)"
-            )
+            lines.append("❌ VERDICT: Strategy may be OVERFIT (high degradation or low OOS win rate)")
 
         lines.append("=" * 70)
 

@@ -175,7 +175,7 @@ describe('Trading Page — StateManager Integration (P0-3)', () => {
         });
 
         it('can store chart instance and retrieve it', () => {
-            const mockChart = { destroy: () => {} };
+            const mockChart = { destroy: () => { } };
             store.set('trading.charts.chart', mockChart);
             // StateManager may clone objects; use toStrictEqual for structural equality
             expect(store.get('trading.charts.chart')).toStrictEqual(mockChart);

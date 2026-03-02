@@ -203,11 +203,10 @@ def check_order_fill_on_path(
                 fill_price = max(price, order_price) + slippage
                 return True, fill_price, i
 
-        elif order_type == "stop_short":
+        elif order_type == "stop_short" and price <= order_price:
             # Sell stop: fill when price drops below stop (breakdown)
-            if price <= order_price:
-                fill_price = min(price, order_price) - slippage
-                return True, fill_price, i
+            fill_price = min(price, order_price) - slippage
+            return True, fill_price, i
 
     return False, 0.0, -1
 

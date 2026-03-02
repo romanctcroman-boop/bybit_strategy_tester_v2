@@ -28,9 +28,7 @@ except ImportError:
     loguru_logger: LoguruLogger = None  # type: ignore[no-redef]
 
 # Default log format
-DEFAULT_FORMAT = (
-    "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
-)
+DEFAULT_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
 SIMPLE_FORMAT = "%(levelname)s: %(message)s"
 
 # Loguru format (cleaner)
@@ -61,9 +59,7 @@ def setup_logging(
     numeric_level = getattr(logging, level.upper(), logging.INFO)
 
     # Create formatter
-    formatter = logging.Formatter(
-        format_string or DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    formatter = logging.Formatter(format_string or DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
     # Get root logger
     root_logger = logging.getLogger()
@@ -196,9 +192,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        loguru_logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def enable_loguru_intercept() -> None:

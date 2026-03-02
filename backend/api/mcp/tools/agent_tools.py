@@ -65,9 +65,7 @@ def _update_metrics(tool: str, success: bool, duration: float, error_type: str |
         logger.warning(f"Failed to update metrics: {e}")
 
 
-async def send_to_deepseek(
-    content: str, conversation_id: str | None = None, context: dict | None = None
-) -> dict:
+async def send_to_deepseek(content: str, conversation_id: str | None = None, context: dict | None = None) -> dict:
     """
     Send message to DeepSeek agent via MCP.
 
@@ -85,9 +83,7 @@ async def send_to_deepseek(
     # Circuit breaker guard
     if cb.is_open():
         _update_metrics("send_to_deepseek", False, 0, "CircuitOpen")
-        return AgentUnavailableError(
-            "Circuit breaker open for send_to_deepseek"
-        ).to_dict()
+        return AgentUnavailableError("Circuit breaker open for send_to_deepseek").to_dict()
 
     try:
         communicator = get_communicator()
@@ -135,9 +131,7 @@ async def send_to_deepseek(
         return mcp_error.to_dict()
 
 
-async def send_to_perplexity(
-    content: str, conversation_id: str | None = None, context: dict | None = None
-) -> dict:
+async def send_to_perplexity(content: str, conversation_id: str | None = None, context: dict | None = None) -> dict:
     """
     Send message to Perplexity agent via MCP.
 
@@ -155,9 +149,7 @@ async def send_to_perplexity(
     # Circuit breaker guard
     if cb.is_open():
         _update_metrics("send_to_perplexity", False, 0, "CircuitOpen")
-        return AgentUnavailableError(
-            "Circuit breaker open for send_to_perplexity"
-        ).to_dict()
+        return AgentUnavailableError("Circuit breaker open for send_to_perplexity").to_dict()
 
     try:
         communicator = get_communicator()
@@ -234,9 +226,7 @@ async def get_consensus(question: str, agents: list[str] | None = None) -> dict:
         # Semaphore + extended timeout for multi-agent consensus
         async with mcp_semaphore:
             async with asyncio.timeout(180):
-                result = await communicator.parallel_consensus(
-                    question=question, agents=agent_types
-                )
+                result = await communicator.parallel_consensus(question=question, agents=agent_types)
 
         response = {
             "success": True,
@@ -284,9 +274,7 @@ def register_agent_tools(mcp):
         return await send_to_perplexity(content, conversation_id, context)
 
     @mcp.tool()
-    async def mcp_agent_to_agent_get_consensus(
-        question: str, agents: list | None = None
-    ) -> dict:
+    async def mcp_agent_to_agent_get_consensus(question: str, agents: list | None = None) -> dict:
         """Get consensus from multiple agents"""
         return await get_consensus(question, agents)
 

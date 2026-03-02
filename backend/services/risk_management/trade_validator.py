@@ -231,17 +231,13 @@ class TradeValidator:
     def __init__(self, config: ValidationConfig | None = None):
         """Initialize TradeValidator."""
         self.config = config or ValidationConfig()
-        self._custom_validators: list[
-            Callable[[TradeRequest, AccountState], RejectionReason | None]
-        ] = []
+        self._custom_validators: list[Callable[[TradeRequest, AccountState], RejectionReason | None]] = []
         self._price_cache: dict[str, float] = {}
         self._last_price_update: dict[str, datetime] = {}
 
         # Callbacks
         self.on_rejection: Callable[[TradeRequest, list[RejectionReason]], None] | None = None
-        self.on_approval: Callable[[TradeRequest, ValidationReport], None] | None = (
-            None
-        )
+        self.on_approval: Callable[[TradeRequest, ValidationReport], None] | None = None
 
         logger.info("TradeValidator initialized")
 
@@ -269,9 +265,7 @@ class TradeValidator:
         self._custom_validators.append(validator)
         logger.info(f"Added custom validator: {validator.__name__}")
 
-    def validate(
-        self, request: TradeRequest, account_state: AccountState
-    ) -> ValidationReport:
+    def validate(self, request: TradeRequest, account_state: AccountState) -> ValidationReport:
         """
         Validate a trade request against all rules.
 
@@ -314,15 +308,11 @@ class TradeValidator:
         details["current_price"] = current_price
 
         # Balance checks
-        balance_errors = self._validate_balance(
-            notional_value, request.leverage, account_state
-        )
+        balance_errors = self._validate_balance(notional_value, request.leverage, account_state)
         rejection_reasons.extend(balance_errors)
 
         # Order size checks
-        size_errors = self._validate_order_size(
-            notional_value, account_state.total_equity
-        )
+        size_errors = self._validate_order_size(notional_value, account_state.total_equity)
         rejection_reasons.extend(size_errors)
 
         # Leverage check
@@ -452,9 +442,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_order_size(
-        self, notional_value: float, equity: float
-    ) -> list[RejectionReason]:
+    def _validate_order_size(self, notional_value: float, equity: float) -> list[RejectionReason]:
         """Validate order size limits."""
         errors = []
 
@@ -471,9 +459,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_position_limits(
-        self, request: TradeRequest, account_state: AccountState
-    ) -> list[RejectionReason]:
+    def _validate_position_limits(self, request: TradeRequest, account_state: AccountState) -> list[RejectionReason]:
         """Validate position count limits."""
         errors = []
 
@@ -509,9 +495,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_risk_reward(
-        self, request: TradeRequest, current_price: float
-    ) -> RejectionReason | None:
+    def _validate_risk_reward(self, request: TradeRequest, current_price: float) -> RejectionReason | None:
         """Validate risk/reward ratio if stop loss and take profit are set."""
         if not request.stop_loss or not request.take_profit:
             return None
@@ -536,13 +520,9 @@ class TradeValidator:
 
         return None
 
-    def quick_check(
-        self, symbol: str, side: str, quantity: float, account_state: AccountState
-    ) -> bool:
+    def quick_check(self, symbol: str, side: str, quantity: float, account_state: AccountState) -> bool:
         """Quick validation without full report."""
-        request = TradeRequest(
-            symbol=symbol, side=side, order_type="market", quantity=quantity
-        )
+        request = TradeRequest(symbol=symbol, side=side, order_type="market", quantity=quantity)
         report = self.validate(request, account_state)
         return report.approved
 
@@ -572,9 +552,7 @@ class TradeValidator:
         max_notional_balance = usable_balance * leverage
 
         # Max from percentage limit
-        max_notional_pct = account_state.total_equity * (
-            self.config.max_order_size_pct / 100
-        )
+        max_notional_pct = account_state.total_equity * (self.config.max_order_size_pct / 100)
 
         # Max from absolute limit
         max_notional_abs = self.config.max_order_size_usd
@@ -608,9 +586,7 @@ class TradeValidatorBuilder:
     def __init__(self):
         self._config = ValidationConfig()
 
-    def with_balance_limits(
-        self, min_balance: float = 100.0, min_free_pct: float = 10.0
-    ) -> "TradeValidatorBuilder":
+    def with_balance_limits(self, min_balance: float = 100.0, min_free_pct: float = 10.0) -> "TradeValidatorBuilder":
         """Set balance limits."""
         self._config.min_balance_usd = min_balance
         self._config.min_free_balance_pct = min_free_pct
@@ -625,9 +601,7 @@ class TradeValidatorBuilder:
         self._config.max_order_size_pct = max_pct
         return self
 
-    def with_leverage_limit(
-        self, max_leverage: float = 10.0
-    ) -> "TradeValidatorBuilder":
+    def with_leverage_limit(self, max_leverage: float = 10.0) -> "TradeValidatorBuilder":
         """Set maximum leverage."""
         self._config.max_leverage = max_leverage
         return self
@@ -644,9 +618,7 @@ class TradeValidatorBuilder:
         self._config.min_trade_interval_seconds = min_interval_seconds
         return self
 
-    def with_position_limits(
-        self, max_positions: int = 20, max_per_symbol: int = 1
-    ) -> "TradeValidatorBuilder":
+    def with_position_limits(self, max_positions: int = 20, max_per_symbol: int = 1) -> "TradeValidatorBuilder":
         """Set position limits."""
         self._config.max_open_positions = max_positions
         self._config.max_positions_per_symbol = max_per_symbol

@@ -108,9 +108,7 @@ class HSMInterface(Protocol):
         """Check if connected to HSM."""
         ...
 
-    def create_key(
-        self, key_id: str, key_type: KeyType, usage: KeyUsage, exportable: bool = False
-    ) -> HSMKey:
+    def create_key(self, key_id: str, key_type: KeyType, usage: KeyUsage, exportable: bool = False) -> HSMKey:
         """Create a new key in HSM."""
         ...
 
@@ -222,7 +220,6 @@ class LocalHSM:
         else:
             # For asymmetric keys, generate placeholder
             key_material = secrets.token_bytes(32)
-
 
         hsm_key = HSMKey(
             key_id=key_id,

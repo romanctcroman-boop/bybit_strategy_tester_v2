@@ -109,9 +109,7 @@ class AgentConfig:
             prompt=PromptConfig(
                 max_length=prompt_data.get("max_length", 16000),
                 truncate_notice=prompt_data.get("truncate_notice", "[TRUNCATED]"),
-                system_prompt_template=prompt_data.get(
-                    "system_prompt_template", "You are a helpful AI assistant."
-                ),
+                system_prompt_template=prompt_data.get("system_prompt_template", "You are a helpful AI assistant."),
             ),
             circuit_breaker=CircuitBreakerConfig(
                 failure_threshold=cb_data.get("failure_threshold", 5),
@@ -176,9 +174,7 @@ def _load_config_from_file(path: Path) -> AgentConfig:
             data = yaml.safe_load(f) or {}
 
         config = AgentConfig.from_dict(data)
-        logger.info(
-            f"✅ Loaded agent config from {path} (version={config.meta.version})"
-        )
+        logger.info(f"✅ Loaded agent config from {path} (version={config.meta.version})")
         return config
 
     except Exception as e:

@@ -36,11 +36,7 @@ async def health_check() -> dict[str, Any]:
             "status": "healthy",
             "components": {
                 "api": {"status": "healthy"},
-                "cache": {
-                    "status": "connected"
-                    if cache_manager.redis_connected
-                    else "disconnected"
-                },
+                "cache": {"status": "connected" if cache_manager.redis_connected else "disconnected"},
                 "ai_agents": {"status": "ready"},
                 "backtest_engine": {"status": "ready"},
             },
@@ -163,9 +159,7 @@ async def ai_agents_status() -> dict[str, Any]:
             deepseek_health = False
 
         try:
-            perplexity_health = agent.health_monitor.get_component_health(
-                "perplexity_api"
-            )
+            perplexity_health = agent.health_monitor.get_component_health("perplexity_api")
         except Exception:
             perplexity_health = False
 

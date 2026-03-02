@@ -92,9 +92,7 @@ class ScaleInConfig:
 
     # Risk management
     max_position_size: float = 1.0  # Максимальный размер позиции
-    move_sl_to_breakeven: bool = (
-        True  # Переносить SL в безубыток после первого scale-in
-    )
+    move_sl_to_breakeven: bool = True  # Переносить SL в безубыток после первого scale-in
 
 
 @dataclass
@@ -607,9 +605,7 @@ class AdvancedFeatures:
             )
 
         if model == SlippageModel.VOLATILITY_BASED:
-            return calculate_slippage_volatility_based(
-                price, atr, self.slippage.volatility_multiplier, is_buy
-            )
+            return calculate_slippage_volatility_based(price, atr, self.slippage.volatility_multiplier, is_buy)
 
         return price
 
@@ -700,10 +696,7 @@ class AdvancedFeatures:
         dt = datetime.datetime.fromtimestamp(timestamp / 1000)
 
         if mode == TimeExitMode.SESSION_CLOSE:
-            return (
-                dt.hour >= self.time_exit.session_end_hour
-                and dt.minute >= self.time_exit.session_end_minute
-            )
+            return dt.hour >= self.time_exit.session_end_hour and dt.minute >= self.time_exit.session_end_minute
 
         if mode == TimeExitMode.WEEKEND_CLOSE:
             return dt.weekday() == 4 and dt.hour >= self.time_exit.friday_close_hour
@@ -784,15 +777,9 @@ class HedgeManager:
 
         if size > 0:
             # Усреднение цены входа
-            total_cost = (
-                self.position.long_entry * self.position.long_size + price * size
-            )
+            total_cost = self.position.long_entry * self.position.long_size + price * size
             self.position.long_size += size
-            self.position.long_entry = (
-                total_cost / self.position.long_size
-                if self.position.long_size > 0
-                else 0
-            )
+            self.position.long_entry = total_cost / self.position.long_size if self.position.long_size > 0 else 0
 
         return True
 
@@ -808,15 +795,9 @@ class HedgeManager:
             size -= close_size
 
         if size > 0:
-            total_cost = (
-                self.position.short_entry * self.position.short_size + price * size
-            )
+            total_cost = self.position.short_entry * self.position.short_size + price * size
             self.position.short_size += size
-            self.position.short_entry = (
-                total_cost / self.position.short_size
-                if self.position.short_size > 0
-                else 0
-            )
+            self.position.short_entry = total_cost / self.position.short_size if self.position.short_size > 0 else 0
 
         return True
 

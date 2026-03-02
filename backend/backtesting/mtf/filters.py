@@ -1,4 +1,4 @@
-﻿"""
+"""
 рџЋЇ HTF Filters Module
 
 Provides filters based on Higher Timeframe (HTF) data to control

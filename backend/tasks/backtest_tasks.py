@@ -94,24 +94,23 @@ def run_backtest_task(
                 return {"backtest_id": backtest_id, "status": "running"}
 
             if status == "error":
-                raise RuntimeError(
-                    f"Failed to claim backtest: {claimed.get('message')}"
-                )
+                raise RuntimeError(f"Failed to claim backtest: {claimed.get('message')}")
             # if status == 'claimed' we continue
         else:
             # Legacy path: mark running if not already running/recent
             running_since = getattr(backtest, "started_at", None)
-            if getattr(backtest, "status", None) == "running" and running_since:
-                if now - running_since < timedelta(hours=24):
-                    logger.info(f"Backtest {backtest_id} is already running; skipping")
-                    return {"backtest_id": backtest_id, "status": "running"}
+            if (
+                getattr(backtest, "status", None) == "running"
+                and running_since
+                and now - running_since < timedelta(hours=24)
+            ):
+                logger.info(f"Backtest {backtest_id} is already running; skipping")
+                return {"backtest_id": backtest_id, "status": "running"}
 
             ds.update_backtest(backtest_id, status="running", started_at=now)
 
         logger.info("📥 Loading market data...")
-        candles = ds.get_market_data(
-            symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date
-        )
+        candles = ds.get_market_data(symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date)
 
         if candles is None:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -167,9 +166,7 @@ def run_backtest_task(
             max_retries = getattr(self, "max_retries", 0)
 
         if retries < max_retries:
-            logger.info(
-                f"Retrying backtest {backtest_id} (attempt {retries + 1}/{max_retries})"
-            )
+            logger.info(f"Retrying backtest {backtest_id} (attempt {retries + 1}/{max_retries})")
             if self is not None and hasattr(self, "retry"):
                 raise self.retry(exc=e)
             # If running in tests or self lacks retry, re-raise the exception to surface failure

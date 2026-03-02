@@ -3,7 +3,6 @@
 Расчёт ATR для использования в TP/SL.
 """
 
-
 import numpy as np
 import pandas as pd
 

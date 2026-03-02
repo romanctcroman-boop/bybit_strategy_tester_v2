@@ -124,8 +124,7 @@ class ReasoningStorageService:
         }
 
         final_conclusion = (
-            f"Tournament '{tournament_name}' completed. "
-            f"Winner: {winner['strategy_name'] if winner else 'None'}"
+            f"Tournament '{tournament_name}' completed. Winner: {winner['strategy_name'] if winner else 'None'}"
         )
 
         return await self.store_reasoning_trace(
@@ -291,12 +290,8 @@ class ReasoningStorageService:
                                 agent_type = trace.get("agent_type", "unknown")
                                 task_type = trace.get("task_type", "unknown")
 
-                                stats["by_agent_type"][agent_type] = (
-                                    stats["by_agent_type"].get(agent_type, 0) + 1
-                                )
-                                stats["by_task_type"][task_type] = (
-                                    stats["by_task_type"].get(task_type, 0) + 1
-                                )
+                                stats["by_agent_type"][agent_type] = stats["by_agent_type"].get(agent_type, 0) + 1
+                                stats["by_task_type"][task_type] = stats["by_task_type"].get(task_type, 0) + 1
                             except json.JSONDecodeError:
                                 pass
 

@@ -6,7 +6,7 @@
  *
  * @version 2.0.0
  * @date 2026-02-26
- * 
+ *
  * @migration StateManager v2.0 - P0-3
  * - Replaced global variables with StateManager
  * - Added state subscriptions for reactive UI updates
@@ -15,19 +15,13 @@
 
 // Import shared utilities
 import { formatNumber, formatDate } from '../utils.js';
-import { getStore } from '../core/StateManager.js';
-import { 
-    bindToState, 
-    bindInputToState, 
-    bindCheckboxToState,
-    initState 
-} from '../core/state-helpers.js';
-
+import { localDateStr } from '../utils/dateUtils.js';
+import { getStore, initStore } from '../core/StateManager.js';
 // Configuration
 const API_BASE = '/api/v1';
 
-// Get store instance
-const store = getStore();
+// Get or initialize store instance (initStore is safe to call multiple times — singleton)
+const store = getStore() || initStore();
 
 // ==========================================
 // STATE INITIALIZATION
@@ -109,7 +103,7 @@ document.querySelectorAll('.dashboard-toolbar .period-btn').forEach(btn => {
 });
 
 // Metric selector for top performers
-document.getElementById('performerMetric').addEventListener('change', (e) => {
+document.getElementById('performerMetric')?.addEventListener('change', (e) => {
     loadTopPerformers(e.target.value);
 });
 
@@ -140,7 +134,7 @@ async function loadMetricsSummary() {
     try {
         const url = getMetricsUrl();
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to load metrics');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
 
@@ -163,14 +157,19 @@ async function loadMetricsSummary() {
         document.getElementById('avgDuration').textContent = `${data.performance.avg_backtest_duration_sec.toFixed(1)}s`;
 
     } catch (error) {
-        console.error('Metrics summary error:', error);
+        console.error('[Dashboard] loadMetricsSummary failed:', error.message);
         showToast('Failed to load metrics summary', 'error');
     }
 }
 
 // Load top performers
 async function loadTopPerformers(metric = null) {
-    metric = metric || document.getElementById('performerMetric').value;
+    const el = document.getElementById('performerMetric');
+    metric = metric || (el && el.value) || 'sharpe_ratio';
+
+    // Normalize legacy/abbreviated metric names to API-accepted values
+    const metricMap = { sharpe: 'sharpe_ratio', return: 'total_return', winrate: 'win_rate', win: 'win_rate' };
+    metric = metricMap[metric] || metric;
 
     try {
         const response = await fetch(`${API_BASE}/dashboard/metrics/top-performers?limit=10&metric=${metric}`);
@@ -388,32 +387,43 @@ const chartColors = {
     text: '#888'
 };
 
-// Chart.js global defaults
-Chart.defaults.color = chartColors.text;
-Chart.defaults.borderColor = chartColors.grid;
-Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+// Chart.js global defaults — guard against CDN load failure
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = chartColors.text;
+    Chart.defaults.borderColor = chartColors.grid;
+    Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+} else {
+    console.error('[Dashboard] Chart.js not loaded — charts will be unavailable');
+}
 
 // ==========================================
-// CHART INSTANCES - StateManager Storage
-// Chart instances are stored in StateManager
+// CHART INSTANCES - Plain Map (NOT StateManager)
+// Chart.js objects contain circular refs / DOM nodes — deep-cloning breaks them.
 // ==========================================
+
+/** Module-level registry: chartName → Chart instance */
+const _chartRegistry = new Map();
 
 /**
- * Get chart instance from state
- * @param {string} chartName - Chart name (performance, distribution, winRate, activity, portfolioHistory, pnlMini)
- * @returns {Chart|null} Chart instance or null
+ * Get chart instance
+ * @param {string} chartName
+ * @returns {Chart|null}
  */
 function getChart(chartName) {
-    return store.get(`dashboard.charts.${chartName}`) || null;
+    return _chartRegistry.get(chartName) || null;
 }
 
 /**
- * Set chart instance in state
- * @param {string} chartName - Chart name
- * @param {Chart|null} chart - Chart instance
+ * Store chart instance
+ * @param {string} chartName
+ * @param {Chart|null} chart
  */
 function setChart(chartName, chart) {
-    store.set(`dashboard.charts.${chartName}`, chart);
+    if (chart) {
+        _chartRegistry.set(chartName, chart);
+    } else {
+        _chartRegistry.delete(chartName);
+    }
 }
 
 // Initialize all charts
@@ -879,7 +889,7 @@ function stopPingInterval() {
 function attemptWsReconnect() {
     const maxReconnect = WS_CONFIG.maxReconnect;
     const currentAttempts = getWsReconnectAttempts();
-    
+
     if (currentAttempts >= maxReconnect) {
         console.log('[WebSocket] Max reconnect attempts reached, falling back to polling only');
         showToast('Live updates unavailable. Using polling mode.', 'warning');
@@ -919,18 +929,24 @@ function updateWsStatus(status) {
     wsStatusEl.className = 'ws-status ' + status;
     const statusText = wsStatusEl.querySelector('span');
     if (statusText) {
-        statusText.textContent = status === 'connected' ? 'Live' : 'Offline';
+        if (status === 'connected') {
+            statusText.textContent = 'Live';
+        } else if (status === 'disconnected') {
+            // Only show Offline if we never connected successfully; otherwise show Reconnecting
+            const wasConnected = wsStatusEl.dataset.wasConnected === 'true';
+            statusText.textContent = wasConnected ? 'Reconnecting...' : 'Offline';
+        }
     }
 
-    // Make status clickable for manual reconnect
-    if (status === 'disconnected') {
-        wsStatusEl.style.cursor = 'pointer';
-        wsStatusEl.title = 'Click to reconnect';
-        wsStatusEl.onclick = reconnectWebSocket;
-    } else {
+    if (status === 'connected') {
+        wsStatusEl.dataset.wasConnected = 'true';
         wsStatusEl.style.cursor = 'default';
         wsStatusEl.title = 'Real-time updates active';
         wsStatusEl.onclick = null;
+    } else {
+        wsStatusEl.style.cursor = 'pointer';
+        wsStatusEl.title = 'Click to reconnect';
+        wsStatusEl.onclick = reconnectWebSocket;
     }
 }
 
@@ -1056,20 +1072,24 @@ function initDatePickers() {
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
 
-    if (dateFrom) dateFrom.value = weekAgo.toISOString().split('T')[0];
-    if (dateTo) dateTo.value = today.toISOString().split('T')[0];
+    if (dateFrom) dateFrom.value = localDateStr(weekAgo);
+    if (dateTo) dateTo.value = localDateStr(today);
 }
 
 // Chart metric selector
 document.getElementById('chartMetricSelect')?.addEventListener('change', (e) => {
     const metric = e.target.value;
     // Update performance chart based on selected metric
+    const performanceChart = getChart('performance');
     if (performanceChart && window.lastPerformers) {
         updatePerformanceChartMetric(metric);
     }
 });
 
 function updatePerformanceChartMetric(metric) {
+    const performanceChart = getChart('performance');
+    if (!performanceChart) return;
+
     const performers = window.lastPerformers || [];
     const sortedByDate = [...performers].sort((a, b) =>
         new Date(a.completed_at) - new Date(b.completed_at)
@@ -1590,7 +1610,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---- Core Initialization ----
     initDatePickers();
-    initializeCharts();
+    try { initializeCharts(); } catch (e) { console.error('[Dashboard] initializeCharts failed:', e); }
     refreshDashboard();
 
     // Try WebSocket, fall back to polling
@@ -1604,12 +1624,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStrategyLeaderboard();
 
     // ---- Dashboard Enhancements ----
-    initMarketOverview();
-    initLiveTicker();
-    initWatchlist();
-    initMiniCalendar();
-    initRiskHeatmap();
-    initKeyboardShortcuts();
+    try { initMarketOverview(); } catch (e) { console.error('[Dashboard] initMarketOverview:', e); }
+    try { initLiveTicker(); } catch (e) { console.error('[Dashboard] initLiveTicker:', e); }
+    try { initWatchlist(); } catch (e) { console.error('[Dashboard] initWatchlist:', e); }
+    try { initMiniCalendar(); } catch (e) { console.error('[Dashboard] initMiniCalendar:', e); }
+    try { initRiskHeatmap(); } catch (e) { console.error('[Dashboard] initRiskHeatmap:', e); }
+    try { initKeyboardShortcuts(); } catch (e) { console.error('[Dashboard] initKeyboardShortcuts:', e); }
     loadTheme();
     initToastContainer();
 
@@ -2252,10 +2272,10 @@ function changeMonth(delta) {
     const calendar = getCalendarState();
     let newMonth = calendar.month + delta;
     let newYear = calendar.year;
-    
+
     if (newMonth > 11) { newMonth = 0; newYear++; }
     if (newMonth < 0) { newMonth = 11; newYear--; }
-    
+
     setCalendarState(newYear, newMonth);
     renderCalendar(newYear, newMonth);
 }
@@ -2305,7 +2325,8 @@ function updateRiskHeatmap() {
     if (!container) return;
 
     // Use market data if available, otherwise use defaults
-    const coins = marketData.length > 0 ? marketData : [
+    const currentMarketData = getMarketData();
+    const coins = currentMarketData.length > 0 ? currentMarketData : [
         { symbol: 'BTCUSDT', change: 0 },
         { symbol: 'ETHUSDT', change: 0 },
         { symbol: 'SOLUSDT', change: 0 },

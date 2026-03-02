@@ -313,16 +313,12 @@ async def list_methods() -> dict:
 @router.post("/quick-analysis")
 async def quick_analysis(
     backtest_id: int | None = None,
-    total_return: float = Query(
-        ..., description="Total return as decimal (e.g., 0.25 for 25%)"
-    ),
+    total_return: float = Query(..., description="Total return as decimal (e.g., 0.25 for 25%)"),
     total_trades: int = Query(..., ge=1, description="Total number of trades"),
     win_rate: float = Query(..., ge=0, le=1, description="Win rate as decimal (0-1)"),
     avg_win: float = Query(default=0.02, description="Average winning trade return"),
     avg_loss: float = Query(default=-0.01, description="Average losing trade return"),
-    max_drawdown: float = Query(
-        default=-0.1, description="Maximum drawdown as decimal"
-    ),
+    max_drawdown: float = Query(default=-0.1, description="Maximum drawdown as decimal"),
     n_simulations: int = Query(default=5000, ge=100, le=50000),
 ) -> dict:
     """
@@ -410,19 +406,11 @@ class KellyRequest(BaseModel):
 class KellyResponse(BaseModel):
     """Response model for Kelly calculation."""
 
-    kelly_fraction: float | None = Field(
-        None, description="Recommended position size as fraction of capital"
-    )
-    full_kelly: float | None = Field(
-        None, description="Full Kelly value (use with caution)"
-    )
-    half_kelly: float | None = Field(
-        None, description="Half-Kelly value (recommended)"
-    )
+    kelly_fraction: float | None = Field(None, description="Recommended position size as fraction of capital")
+    full_kelly: float | None = Field(None, description="Full Kelly value (use with caution)")
+    half_kelly: float | None = Field(None, description="Half-Kelly value (recommended)")
     win_rate: float | None = Field(None, description="Win rate of analyzed trades")
-    win_loss_ratio: float | None = Field(
-        None, description="Average win / average loss ratio"
-    )
+    win_loss_ratio: float | None = Field(None, description="Average win / average loss ratio")
     avg_win: float | None = Field(None, description="Average winning trade PnL")
     avg_loss: float | None = Field(None, description="Average losing trade PnL")
     trades_analyzed: int = Field(..., description="Number of trades analyzed")
@@ -474,8 +462,7 @@ async def calculate_kelly(request: KellyRequest) -> KellyResponse:
             )
         elif stats["kelly_fraction"] and stats["kelly_fraction"] < 0.05:
             recommendation = (
-                "Low Kelly suggests poor edge. Consider smaller positions (2-5%) "
-                "or review strategy parameters."
+                "Low Kelly suggests poor edge. Consider smaller positions (2-5%) or review strategy parameters."
             )
         elif stats["kelly_fraction"] and stats["kelly_fraction"] > 0.20:
             recommendation = (
@@ -638,12 +625,8 @@ async def enhanced_monte_carlo(request: EnhancedMCRequest) -> EnhancedMCResponse
 async def quick_kelly_from_stats(
     win_rate: float = Query(..., ge=0, le=1, description="Win rate as decimal (0-1)"),
     avg_win: float = Query(..., gt=0, description="Average winning trade amount"),
-    avg_loss: float = Query(
-        ..., gt=0, description="Average losing trade amount (positive)"
-    ),
-    kelly_fraction: float = Query(
-        default=0.5, ge=0.1, le=1.0, description="Kelly fraction"
-    ),
+    avg_loss: float = Query(..., gt=0, description="Average losing trade amount (positive)"),
+    kelly_fraction: float = Query(default=0.5, ge=0.1, le=1.0, description="Kelly fraction"),
 ) -> dict:
     """
     Quick Kelly calculation from summary statistics.

@@ -161,10 +161,7 @@ class PositionSizer:
     def update_stats(self, trades: list[dict]):
         """Update trading statistics from trade history."""
         self.stats = TradingStats.from_trades(trades)
-        logger.debug(
-            f"Stats updated: {self.stats.total_trades} trades, "
-            f"win_rate={self.stats.win_rate:.2%}"
-        )
+        logger.debug(f"Stats updated: {self.stats.total_trades} trades, win_rate={self.stats.win_rate:.2%}")
 
     def update_atr(self, symbol: str, atr: float):
         """Update ATR value for a symbol."""
@@ -197,19 +194,13 @@ class PositionSizer:
 
         # Calculate based on method
         if method == SizingMethod.FIXED_PERCENTAGE:
-            result = self._fixed_percentage(
-                entry_price, stop_loss_price, risk_pct, leverage
-            )
+            result = self._fixed_percentage(entry_price, stop_loss_price, risk_pct, leverage)
         elif method == SizingMethod.KELLY_CRITERION:
             result = self._kelly_criterion(entry_price, stop_loss_price, leverage)
         elif method == SizingMethod.HALF_KELLY:
-            result = self._kelly_criterion(
-                entry_price, stop_loss_price, leverage, fraction=0.5
-            )
+            result = self._kelly_criterion(entry_price, stop_loss_price, leverage, fraction=0.5)
         elif method == SizingMethod.QUARTER_KELLY:
-            result = self._kelly_criterion(
-                entry_price, stop_loss_price, leverage, fraction=0.25
-            )
+            result = self._kelly_criterion(entry_price, stop_loss_price, leverage, fraction=0.25)
         elif method == SizingMethod.VOLATILITY_BASED:
             result = self._volatility_based(entry_price, symbol, risk_pct, leverage)
         elif method == SizingMethod.FIXED_FRACTIONAL:
@@ -217,9 +208,7 @@ class PositionSizer:
         elif method == SizingMethod.OPTIMAL_F:
             result = self._optimal_f(entry_price, stop_loss_price, leverage)
         else:
-            result = self._fixed_percentage(
-                entry_price, stop_loss_price, risk_pct, leverage
-            )
+            result = self._fixed_percentage(entry_price, stop_loss_price, risk_pct, leverage)
 
         # Apply constraints
         result = self._apply_constraints(result, entry_price, leverage)
@@ -310,9 +299,7 @@ class PositionSizer:
             logger.warning(f"Negative Kelly: {kelly_pct:.2f}% - reducing to minimum")
             kelly_pct = 0.5
 
-        result = self._fixed_percentage(
-            entry_price, stop_loss_price, kelly_pct, leverage
-        )
+        result = self._fixed_percentage(entry_price, stop_loss_price, kelly_pct, leverage)
         result.method_used = (
             SizingMethod.HALF_KELLY
             if fraction == 0.5
@@ -437,9 +424,7 @@ class PositionSizer:
         if optimal_f_pct <= 0:
             optimal_f_pct = 0.5
 
-        result = self._fixed_percentage(
-            entry_price, stop_loss_price, optimal_f_pct, leverage
-        )
+        result = self._fixed_percentage(entry_price, stop_loss_price, optimal_f_pct, leverage)
         result.method_used = SizingMethod.OPTIMAL_F
         result.details.update(
             {

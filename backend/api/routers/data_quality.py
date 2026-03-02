@@ -181,9 +181,7 @@ async def validate_batch(request: BatchCandlesRequest):
     # Aggregate results
     valid_count = sum(1 for r in results if r.is_valid)
     total_issues = sum(len(r.issues) for r in results)
-    avg_quality = (
-        sum(r.quality_score for r in results) / len(results) if results else 100.0
-    )
+    avg_quality = sum(r.quality_score for r in results) / len(results) if results else 100.0
 
     return {
         "total_candles": len(results),
