@@ -503,7 +503,7 @@ class PyramidingManager:
             "pnl_pct": pnl_pct,
             "fees": fees,
             "exit_reason": exit_reason,
-            "duration_bars": exit_bar_idx - first_bar,
+            "duration_bars": exit_bar_idx - first_bar + 1,
             "partial": True,
             "portion": portion,
         }
@@ -572,7 +572,7 @@ class PyramidingManager:
                     "pnl_pct": pnl_pct,
                     "fees": fees,
                     "exit_reason": exit_reason,
-                    "duration_bars": exit_bar_idx - first_bar,
+                    "duration_bars": exit_bar_idx - first_bar + 1,
                     "entry_count": entry_count_before_close,
                 }
             )
@@ -613,7 +613,7 @@ class PyramidingManager:
                     "pnl_pct": pnl_pct,
                     "fees": fees,
                     "exit_reason": exit_reason,
-                    "duration_bars": exit_bar_idx - first_bar,
+                    "duration_bars": exit_bar_idx - first_bar + 1,
                 }
             )
 
@@ -655,7 +655,7 @@ class PyramidingManager:
                         "pnl_pct": pnl_pct,
                         "fees": fees,
                         "exit_reason": exit_reason,
-                        "duration_bars": exit_bar_idx - entry.entry_bar_idx,
+                        "duration_bars": exit_bar_idx - entry.entry_bar_idx + 1,
                     }
                 )
 
@@ -697,7 +697,7 @@ class PyramidingManager:
                         "pnl_pct": pnl_pct,
                         "fees": fees,
                         "exit_reason": exit_reason,
-                        "duration_bars": exit_bar_idx - entry.entry_bar_idx,
+                        "duration_bars": exit_bar_idx - entry.entry_bar_idx + 1,
                     }
                 )
 
