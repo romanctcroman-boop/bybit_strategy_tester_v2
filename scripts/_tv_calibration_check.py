@@ -129,7 +129,7 @@ status = data.get("status", "?")
 print(f"Status: {status}")
 
 if status != "completed":
-    print(f"Backtest not completed. Full response:")
+    print("Backtest not completed. Full response:")
     print(json.dumps(data, indent=2)[:2000])
     sys.exit(1)
 
@@ -202,7 +202,9 @@ print(check("Net profit (%)", our_net_pct, TV["net_profit_pct"]))
 # P&L identity check: gross_profit - gross_loss - commission = net_profit
 identity = our_gp - our_gl - our_tc - our_net
 identity_ok = "✅" if abs(identity) < 0.01 else "❌"
-print(f"{identity_ok}   P&L identity: gp({our_gp:.2f}) - gl({our_gl:.2f}) - comm({our_tc:.2f}) = {our_gp - our_gl - our_tc:.2f} (net={our_net:.2f}, diff={identity:+.4f})")
+print(
+    f"{identity_ok}   P&L identity: gp({our_gp:.2f}) - gl({our_gl:.2f}) - comm({our_tc:.2f}) = {our_gp - our_gl - our_tc:.2f} (net={our_net:.2f}, diff={identity:+.4f})"
+)
 
 # ─── SECTION 3: Win Rate ──────────────────────────────────────────────────────
 print("\n" + "─" * 70)
@@ -312,15 +314,15 @@ print("\n" + "─" * 70)
 print("SECTION 8: AVERAGE BARS IN TRADE")
 print("─" * 70)
 
-our_avg_bars = int(round(float(m.get("avg_bars_in_trade", 0))))
-our_avg_bars_win = int(round(float(m.get("avg_bars_in_winning", 0))))
-our_avg_bars_los = int(round(float(m.get("avg_bars_in_losing", 0))))
-our_avg_bars_l = int(round(float(m.get("avg_bars_in_long", 0))))
-our_avg_bars_s = int(round(float(m.get("avg_bars_in_short", 0))))
-our_avg_bars_wl = int(round(float(m.get("avg_bars_in_winning_long", 0))))
-our_avg_bars_ll = int(round(float(m.get("avg_bars_in_losing_long", 0))))
-our_avg_bars_ws = int(round(float(m.get("avg_bars_in_winning_short", 0))))
-our_avg_bars_ls = int(round(float(m.get("avg_bars_in_losing_short", 0))))
+our_avg_bars = round(float(m.get("avg_bars_in_trade", 0)))
+our_avg_bars_win = round(float(m.get("avg_bars_in_winning", 0)))
+our_avg_bars_los = round(float(m.get("avg_bars_in_losing", 0)))
+our_avg_bars_l = round(float(m.get("avg_bars_in_long", 0)))
+our_avg_bars_s = round(float(m.get("avg_bars_in_short", 0)))
+our_avg_bars_wl = round(float(m.get("avg_bars_in_winning_long", 0)))
+our_avg_bars_ll = round(float(m.get("avg_bars_in_losing_long", 0)))
+our_avg_bars_ws = round(float(m.get("avg_bars_in_winning_short", 0)))
+our_avg_bars_ls = round(float(m.get("avg_bars_in_losing_short", 0)))
 
 print(check("Avg bars (all)", our_avg_bars, TV["avg_bars_in_trade"], is_int=True))
 print(check("Avg bars (winning)", our_avg_bars_win, TV["avg_bars_winning"], is_int=True))

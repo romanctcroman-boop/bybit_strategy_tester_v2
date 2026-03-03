@@ -83,14 +83,26 @@ https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions
 
 ### Models (International Region)
 
-| Model               | Context | Max Output                    | Input $/1M    | Output $/1M                    | Notes                              |
-| ------------------- | ------- | ----------------------------- | ------------- | ------------------------------ | ---------------------------------- |
-| `qwen-flash`        | 1M      | 32K                           | $0.05 (≤256K) | $0.40                          | Cheapest, fastest                  |
-| `qwen-plus`         | 1M      | 32K                           | $0.40 (≤256K) | $1.20 (non-think) / $4 (think) | Best balance                       |
-| `qwen3-max`         | 262K    | 32K (think) / 65K (non-think) | $1.20 (≤32K)  | $6.00                          | Most powerful                      |
-| `qwen3-coder-plus`  | 1M      | 65K                           | $1.00 (≤32K)  | $5.00                          | Best for code + tool calling       |
-| `qwen3-coder-flash` | 1M      | 65K                           | $0.30 (≤32K)  | $1.50                          | Fast code model                    |
-| `qwq-plus`          | 131K    | 8K                            | $0.80         | $2.40                          | Reasoning model (like DeepSeek-R1) |
+#### 🏆 Recommended for TRADING (Backtesting & Strategy)
+
+| Model         | Context | Max Output   | Input $/1M    | Output $/1M   | Use Case                        |
+| ------------- | ------- | ------------ | ------------- | ------------- | ------------------------------- |
+| `qwen3-max` ⭐ | 262K    | 32K/65K      | $1.20 (≤32K)  | $6.00         | **Trading strategies, analysis** |
+| `qwen-plus`   | 1M      | 32K          | $0.40 (≤256K) | $1.20         | Simple queries, monitoring      |
+
+#### 💻 For CODE Development
+
+| Model                | Context | Max Output   | Input $/1M    | Output $/1M   | Use Case                        |
+| -------------------- | ------- | ------------ | ------------- | ------------- | ------------------------------- |
+| `qwen3-coder-plus`   | 1M      | 65K          | $1.00 (≤32K)  | $5.00         | Code generation, refactoring    |
+| `qwen3-coder-flash`  | 1M      | 65K          | $0.30 (≤32K)  | $1.50         | Fast code tasks, reviews        |
+
+#### 💰 Cost-Effective (General Tasks)
+
+| Model         | Context | Max Output                    | Input $/1M    | Output $/1M                    | Use Case              |
+| ------------- | ------- | ----------------------------- | ------------- | ------------------------------ | --------------------- |
+| `qwen-flash`  | 1M      | 32K                           | $0.05 (≤256K) | $0.40                          | Cheapest, fastest     |
+| `qwq-plus`    | 131K    | 8K                            | $0.80         | $2.40                          | Reasoning (like R1)   |
 
 ### Parameters
 

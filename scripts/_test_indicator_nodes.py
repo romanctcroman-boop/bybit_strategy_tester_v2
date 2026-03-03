@@ -492,9 +492,9 @@ graph = make_graph(
             "type": "divergence",
             "category": "divergence",
             "params": {
-                "pivot_interval": 2,           # small window → more pivots on 500-bar sine data
+                "pivot_interval": 2,  # small window → more pivots on 500-bar sine data
                 "act_without_confirmation": True,
-                "use_divergence_rsi": True,    # correct param name (not "indicator")
+                "use_divergence_rsi": True,  # correct param name (not "indicator")
                 "rsi_period": 14,
             },
         }

@@ -506,15 +506,42 @@ DEEPSEEK_API_KEY=sk-your_key
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TEMPERATURE=0.7
 
-# Qwen
+# Qwen — TRADING OPTIMIZED (Backtesting & Strategy Generation)
 QWEN_API_KEY=sk-your_key
-QWEN_MODEL=qwen-plus
-QWEN_TEMPERATURE=0.4
+QWEN_MODEL=qwen3-max            # Primary: BEST for trading strategies
+QWEN_MODEL_FAST=qwen-plus       # Auto-switch for simple queries
+QWEN_TEMPERATURE=0.3            # Lower for consistent trading signals
+QWEN_ENABLE_THINKING=true       # ENABLED for complex strategy analysis
 
 # Perplexity
 PERPLEXITY_API_KEY=pplx-your_key
 PERPLEXITY_MODEL=sonar
 ```
+
+### Model Switching
+
+The system **automatically switches** between models:
+
+| Condition | Model Used |
+|-----------|------------|
+| Trading strategy generation | `QWEN_MODEL` (qwen3-max) |
+| Market analysis, news | `QWEN_MODEL` (qwen3-max) |
+| Walk-forward optimization | `QWEN_MODEL` (qwen3-max) |
+| Monte Carlo simulation | `QWEN_MODEL` (qwen3-max) |
+| Simple queries, status checks | `QWEN_MODEL_FAST` (qwen-plus) |
+| Complex analysis (if `QWEN_ENABLE_THINKING=true`) | `QWEN_MODEL` with thinking mode |
+
+**Manual override**: Change `QWEN_MODEL` in `.env` and restart server.
+
+### Trading-Optimized Configuration
+
+| Task | Recommended Model | Why |
+|------|------------------|-----|
+| Strategy generation | `qwen3-max` ⭐ | Best pattern recognition |
+| Market analysis | `qwen3-max` ⭐ | Deep multi-factor analysis |
+| Parameter optimization | `qwen3-max` ⭐ | Handles complex constraints |
+| Code refactoring | `qwen3-coder-plus` | Specialized for code |
+| Simple queries | `qwen-plus` | Cost-effective |
 
 ### Unified Agent Interface
 

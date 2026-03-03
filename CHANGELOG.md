@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
     `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
-  m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
+m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
 
     **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
     (no fallback chain) for all four long/short largest fields.

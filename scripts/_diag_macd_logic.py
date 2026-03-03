@@ -1,9 +1,13 @@
 """Deep dive into why StrategyBuilderAdapter gives 489 signals vs AdvancedMACDStrategy ~42"""
 
 import sys
+from typing import TextIO
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
+# Reconfigure stdout for UTF-8 output (ignore mypy type issue)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 import sqlite3
 
