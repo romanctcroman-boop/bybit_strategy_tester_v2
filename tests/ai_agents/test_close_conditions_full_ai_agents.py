@@ -129,16 +129,25 @@ def _make_graph(close_block_type: str, close_params: dict[str, Any]) -> dict[str
                 "type": "rsi",
                 "category": "indicator",
                 "name": "RSI",
-                "x": 100, "y": 100,
-                "params": {"period": 14, "use_long_range": True, "long_more": 30, "long_less": 50,
-                           "use_short_range": True, "short_more": 50, "short_less": 70},
+                "x": 100,
+                "y": 100,
+                "params": {
+                    "period": 14,
+                    "use_long_range": True,
+                    "long_more": 30,
+                    "long_less": 50,
+                    "use_short_range": True,
+                    "short_more": 50,
+                    "short_less": 70,
+                },
             },
             {
                 "id": "b_close",
                 "type": close_block_type,
                 "category": "close_conditions",
                 "name": close_block_type,
-                "x": 600, "y": 450,
+                "x": 600,
+                "y": 450,
                 "params": close_params,
             },
             {
@@ -147,7 +156,8 @@ def _make_graph(close_block_type: str, close_params: dict[str, Any]) -> dict[str
                 "category": "main",
                 "name": "Strategy",
                 "isMain": True,
-                "x": 500, "y": 100,
+                "x": 500,
+                "y": 100,
                 "params": {},
             },
         ],
@@ -322,9 +332,15 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         for key in ("exit_long", "exit_short", "exit", "signal"):
             assert key in out, f"Missing key: {key}"
@@ -333,32 +349,34 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band"},
-            sample_ohlcv, {}
+            {"channel_type": "Keltner Channel", "band_to_close": "Rebound", "close_condition": "Wick out of band"},
+            sample_ohlcv,
+            {},
         )
         expected = out["exit_long"] | out["exit_short"]
-        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True),
-                                       expected.reset_index(drop=True))
+        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True), expected.reset_index(drop=True))
 
     def test_signal_equals_exit(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
-            "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound"},
-            sample_ohlcv, {}
+            "close_channel", {"channel_type": "Keltner Channel", "band_to_close": "Rebound"}, sample_ohlcv, {}
         )
-        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True),
-                                       out["exit"].reset_index(drop=True))
+        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True), out["exit"].reset_index(drop=True))
 
     def test_keltner_rebound_produces_signals(self, sample_ohlcv):
         """Keltner + Rebound + Wick should produce some exit signals."""
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 1.0},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 1.0,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit"].sum() > 0, "Keltner rebound should produce some exits"
 
@@ -367,9 +385,15 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Bollinger Bands", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "bb_length": 20, "bb_deviation": 2.0},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Bollinger Bands",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "bb_length": 20,
+                "bb_deviation": 2.0,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit"].sum() > 0, "BB rebound should produce some exits"
 
@@ -378,28 +402,47 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out_rebound = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         out_breakout = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Breakout",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Breakout",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         # exit_long must swap: Rebound long exits on upper, Breakout long exits on lower
-        assert not out_rebound["exit_long"].equals(out_breakout["exit_long"]), \
+        assert not out_rebound["exit_long"].equals(out_breakout["exit_long"]), (
             "Rebound vs Breakout exit_long should differ"
+        )
 
     def test_out_of_band_closure_condition(self, sample_ohlcv):
         """'Out-of-band closure' uses close price (not wicks)."""
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Out-of-band closure", "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Out-of-band closure",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out
         assert out["exit"].dtype == bool or out["exit"].dtype == object
@@ -409,10 +452,15 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of the band then close in",
-             "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of the band then close in",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out
 
@@ -421,10 +469,15 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Close out of the band then close in",
-             "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Close out of the band then close in",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out
 
@@ -433,18 +486,31 @@ class TestCloseChannelHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out_tight = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 0.5},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 0.5,
+            },
+            sample_ohlcv,
+            {},
         )
         out_wide = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 3.0},
-            sample_ohlcv, {}
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 3.0,
+            },
+            sample_ohlcv,
+            {},
         )
-        assert out_tight["exit"].sum() >= out_wide["exit"].sum(), \
+        assert out_tight["exit"].sum() >= out_wide["exit"].sum(), (
             "Tighter channel must produce >= exits vs wider channel"
+        )
 
 
 # ============================================================
@@ -487,43 +553,31 @@ class TestCloseMACrossHandler:
 
     def test_returns_all_required_keys(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {}
-        )
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {})
         for key in ("exit_long", "exit_short", "exit", "signal"):
             assert key in out, f"Missing key: {key}"
 
     def test_exit_is_or_of_long_short(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {}
-        )
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {})
         expected = out["exit_long"] | out["exit_short"]
-        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True),
-                                       expected.reset_index(drop=True))
+        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True), expected.reset_index(drop=True))
 
     def test_signal_equals_exit(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {}
-        )
-        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True),
-                                       out["exit"].reset_index(drop=True))
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 10, "ma2_length": 30}, sample_ohlcv, {})
+        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True), out["exit"].reset_index(drop=True))
 
     def test_produces_cross_signals(self, sample_ohlcv):
         """MA cross must produce some exit signals on trending data."""
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {}
-        )
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {})
         assert out["exit"].sum() > 0, "MA cross should produce at least some exit signals"
 
     def test_exit_long_is_bearish_cross(self, sample_ohlcv):
         """exit_long happens when fast MA crosses BELOW slow MA (bearish)."""
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {}
-        )
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {})
         # Manually verify: exit_long[i] = fast[i] < slow[i] AND fast[i-1] >= slow[i-1]
         close = sample_ohlcv["close"]
         fast = close.ewm(span=5, adjust=False).mean()
@@ -537,9 +591,7 @@ class TestCloseMACrossHandler:
     def test_exit_short_is_bullish_cross(self, sample_ohlcv):
         """exit_short happens when fast MA crosses ABOVE slow MA (bullish)."""
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
-        out = adapter._execute_close_condition(
-            "close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {}
-        )
+        out = adapter._execute_close_condition("close_ma_cross", {"ma1_length": 5, "ma2_length": 20}, sample_ohlcv, {})
         close = sample_ohlcv["close"]
         fast = close.ewm(span=5, adjust=False).mean()
         slow = close.ewm(span=20, adjust=False).mean()
@@ -555,7 +607,8 @@ class TestCloseMACrossHandler:
         out = adapter._execute_close_condition(
             "close_ma_cross",
             {"ma1_length": 10, "ma2_length": 30, "profit_only": True, "min_profit_percent": 2.5},
-            sample_ohlcv, {}
+            sample_ohlcv,
+            {},
         )
         assert "profit_only" in out, "profit_only=True must add profit_only key"
         assert "min_profit" in out, "profit_only=True must add min_profit key"
@@ -566,9 +619,7 @@ class TestCloseMACrossHandler:
         """profit_only=False must NOT add profit_only/min_profit keys."""
         adapter = StrategyBuilderAdapter(_make_graph("close_ma_cross", {}))
         out = adapter._execute_close_condition(
-            "close_ma_cross",
-            {"ma1_length": 10, "ma2_length": 30, "profit_only": False},
-            sample_ohlcv, {}
+            "close_ma_cross", {"ma1_length": 10, "ma2_length": 30, "profit_only": False}, sample_ohlcv, {}
         )
         assert "profit_only" not in out
         assert "min_profit" not in out
@@ -582,8 +633,7 @@ class TestCloseMACrossHandler:
         out_long = adapter._execute_close_condition(
             "close_ma_cross", {"ma1_length": 20, "ma2_length": 80}, sample_ohlcv, {}
         )
-        assert out_short["exit"].sum() > out_long["exit"].sum(), \
-            "Shorter MAs should cross more frequently"
+        assert out_short["exit"].sum() > out_long["exit"].sum(), "Shorter MAs should cross more frequently"
 
 
 # ============================================================
@@ -613,8 +663,7 @@ class TestCloseRSIDefaults:
         assert False is False
 
     def test_default_reach_levels(self):
-        defaults = {"rsi_long_more": 70, "rsi_long_less": 100,
-                    "rsi_short_less": 30, "rsi_short_more": 1}
+        defaults = {"rsi_long_more": 70, "rsi_long_less": 100, "rsi_short_less": 30, "rsi_short_more": 1}
         assert defaults["rsi_long_more"] == 70
         assert defaults["rsi_long_less"] == 100
         assert defaults["rsi_short_less"] == 30
@@ -644,9 +693,7 @@ class TestCloseRSIHandler:
         """When neither reach nor cross is active, all exits are False."""
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
-            "close_rsi",
-            {"activate_rsi_reach": False, "activate_rsi_cross": False},
-            sample_ohlcv, {}
+            "close_rsi", {"activate_rsi_reach": False, "activate_rsi_cross": False}, sample_ohlcv, {}
         )
         assert out["exit"].sum() == 0, "Both modes off → no exits"
 
@@ -655,10 +702,16 @@ class TestCloseRSIHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_close_length": 14,
-             "rsi_long_more": 60, "rsi_long_less": 100,
-             "rsi_short_less": 40, "rsi_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "rsi_close_length": 14,
+                "rsi_long_more": 60,
+                "rsi_long_less": 100,
+                "rsi_short_less": 40,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit_long"].sum() > 0, "Reach mode (60-100) should produce long exits"
         assert out["exit_short"].sum() > 0, "Reach mode (1-40) should produce short exits"
@@ -669,9 +722,15 @@ class TestCloseRSIHandler:
         # rsi_long_more=100, rsi_long_less=70 → inverted, should swap to [70, 100]
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_long_more": 100, "rsi_long_less": 70,
-             "rsi_short_less": 1, "rsi_short_more": 30},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "rsi_long_more": 100,
+                "rsi_long_less": 70,
+                "rsi_short_less": 1,
+                "rsi_short_more": 30,
+            },
+            sample_ohlcv,
+            {},
         )
         # Should not raise and should produce same result as correct order
         assert "exit" in out
@@ -679,17 +738,21 @@ class TestCloseRSIHandler:
     def test_cross_mode_exit_long_on_cross_down(self, sample_ohlcv):
         """Cross mode: exit_long when RSI crosses DOWN through level (from above to below)."""
         from backend.core.indicators import calculate_rsi
+
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_cross": True, "rsi_close_length": 14,
-             "rsi_cross_long_level": 60, "rsi_cross_short_level": 40},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_cross": True,
+                "rsi_close_length": 14,
+                "rsi_cross_long_level": 60,
+                "rsi_cross_short_level": 40,
+            },
+            sample_ohlcv,
+            {},
         )
         # Verify the cross direction manually
-        rsi_vals = pd.Series(
-            calculate_rsi(sample_ohlcv["close"].values, 14), index=sample_ohlcv.index
-        )
+        rsi_vals = pd.Series(calculate_rsi(sample_ohlcv["close"].values, 14), index=sample_ohlcv.index)
         expected_long = (rsi_vals < 60) & (rsi_vals.shift(1) >= 60)
         pd.testing.assert_series_equal(
             out["exit_long"].fillna(False).reset_index(drop=True),
@@ -699,16 +762,20 @@ class TestCloseRSIHandler:
     def test_cross_mode_exit_short_on_cross_up(self, sample_ohlcv):
         """Cross mode: exit_short when RSI crosses UP through level (from below to above)."""
         from backend.core.indicators import calculate_rsi
+
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_cross": True, "rsi_close_length": 14,
-             "rsi_cross_long_level": 60, "rsi_cross_short_level": 40},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_cross": True,
+                "rsi_close_length": 14,
+                "rsi_cross_long_level": 60,
+                "rsi_cross_short_level": 40,
+            },
+            sample_ohlcv,
+            {},
         )
-        rsi_vals = pd.Series(
-            calculate_rsi(sample_ohlcv["close"].values, 14), index=sample_ohlcv.index
-        )
+        rsi_vals = pd.Series(calculate_rsi(sample_ohlcv["close"].values, 14), index=sample_ohlcv.index)
         expected_short = (rsi_vals > 40) & (rsi_vals.shift(1) <= 40)
         pd.testing.assert_series_equal(
             out["exit_short"].fillna(False).reset_index(drop=True),
@@ -720,38 +787,59 @@ class TestCloseRSIHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out_reach = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "activate_rsi_cross": False,
-             "rsi_long_more": 65, "rsi_long_less": 100, "rsi_short_less": 35, "rsi_short_more": 1,
-             "rsi_close_length": 14},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "activate_rsi_cross": False,
+                "rsi_long_more": 65,
+                "rsi_long_less": 100,
+                "rsi_short_less": 35,
+                "rsi_short_more": 1,
+                "rsi_close_length": 14,
+            },
+            sample_ohlcv,
+            {},
         )
         out_cross = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": False, "activate_rsi_cross": True,
-             "rsi_cross_long_level": 65, "rsi_cross_short_level": 35,
-             "rsi_close_length": 14},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": False,
+                "activate_rsi_cross": True,
+                "rsi_cross_long_level": 65,
+                "rsi_cross_short_level": 35,
+                "rsi_close_length": 14,
+            },
+            sample_ohlcv,
+            {},
         )
         out_both = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "activate_rsi_cross": True,
-             "rsi_long_more": 65, "rsi_long_less": 100, "rsi_short_less": 35, "rsi_short_more": 1,
-             "rsi_cross_long_level": 65, "rsi_cross_short_level": 35,
-             "rsi_close_length": 14},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "activate_rsi_cross": True,
+                "rsi_long_more": 65,
+                "rsi_long_less": 100,
+                "rsi_short_less": 35,
+                "rsi_short_more": 1,
+                "rsi_cross_long_level": 65,
+                "rsi_cross_short_level": 35,
+                "rsi_close_length": 14,
+            },
+            sample_ohlcv,
+            {},
         )
         expected_long = out_reach["exit_long"] | out_cross["exit_long"]
-        assert out_both["exit_long"].sum() >= out_reach["exit_long"].sum(), \
+        assert out_both["exit_long"].sum() >= out_reach["exit_long"].sum(), (
             "Both modes must produce >= signals than reach alone"
+        )
 
     def test_profit_only_adds_config_keys(self, sample_ohlcv):
         """rsi_close_profit_only=True must add profit_only and min_profit keys."""
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_close_profit_only": True,
-             "rsi_close_min_profit": 1.5},
-            sample_ohlcv, {}
+            {"activate_rsi_reach": True, "rsi_close_profit_only": True, "rsi_close_min_profit": 1.5},
+            sample_ohlcv,
+            {},
         )
         assert "profit_only" in out
         assert "min_profit" in out
@@ -762,20 +850,33 @@ class TestCloseRSIHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out_wide = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_close_length": 14,
-             "rsi_long_more": 50, "rsi_long_less": 100,
-             "rsi_short_less": 50, "rsi_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "rsi_close_length": 14,
+                "rsi_long_more": 50,
+                "rsi_long_less": 100,
+                "rsi_short_less": 50,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         out_narrow = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_close_length": 14,
-             "rsi_long_more": 85, "rsi_long_less": 100,
-             "rsi_short_less": 15, "rsi_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "rsi_close_length": 14,
+                "rsi_long_more": 85,
+                "rsi_long_less": 100,
+                "rsi_short_less": 15,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
-        assert out_wide["exit"].sum() >= out_narrow["exit"].sum(), \
+        assert out_wide["exit"].sum() >= out_narrow["exit"].sum(), (
             "Wider RSI zone must produce >= exits than narrow zone"
+        )
 
 
 # ============================================================
@@ -806,8 +907,7 @@ class TestCloseStochasticDefaults:
         assert 3 == 3
 
     def test_default_reach_levels(self):
-        defaults = {"stoch_long_more": 80, "stoch_long_less": 100,
-                    "stoch_short_less": 20, "stoch_short_more": 1}
+        defaults = {"stoch_long_more": 80, "stoch_long_less": 100, "stoch_short_less": 20, "stoch_short_more": 1}
         assert defaults["stoch_long_more"] == 80
         assert defaults["stoch_short_less"] == 20
 
@@ -828,9 +928,7 @@ class TestCloseStochasticHandler:
     def test_no_active_mode_returns_all_false(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
-            "close_stochastic",
-            {"activate_stoch_reach": False, "activate_stoch_cross": False},
-            sample_ohlcv, {}
+            "close_stochastic", {"activate_stoch_reach": False, "activate_stoch_cross": False}, sample_ohlcv, {}
         )
         assert out["exit"].sum() == 0, "Both modes off → no exits"
 
@@ -839,10 +937,16 @@ class TestCloseStochasticHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "stoch_close_k_length": 14,
-             "stoch_long_more": 70, "stoch_long_less": 100,
-             "stoch_short_less": 30, "stoch_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_reach": True,
+                "stoch_close_k_length": 14,
+                "stoch_long_more": 70,
+                "stoch_long_less": 100,
+                "stoch_short_less": 30,
+                "stoch_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit_long"].sum() > 0
         assert out["exit_short"].sum() > 0
@@ -852,9 +956,14 @@ class TestCloseStochasticHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_cross": True, "stoch_close_k_length": 14,
-             "stoch_cross_long_level": 70, "stoch_cross_short_level": 30},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_cross": True,
+                "stoch_close_k_length": 14,
+                "stoch_cross_long_level": 70,
+                "stoch_cross_short_level": 30,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit"].sum() > 0
 
@@ -863,9 +972,15 @@ class TestCloseStochasticHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "stoch_long_more": 100, "stoch_long_less": 70,
-             "stoch_short_less": 1, "stoch_short_more": 30},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_reach": True,
+                "stoch_long_more": 100,
+                "stoch_long_less": 70,
+                "stoch_short_less": 1,
+                "stoch_short_more": 30,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out  # must not raise
 
@@ -873,9 +988,9 @@ class TestCloseStochasticHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "stoch_close_profit_only": True,
-             "stoch_close_min_profit": 2.0},
-            sample_ohlcv, {}
+            {"activate_stoch_reach": True, "stoch_close_profit_only": True, "stoch_close_min_profit": 2.0},
+            sample_ohlcv,
+            {},
         )
         assert "profit_only" in out
         assert "min_profit" in out
@@ -886,35 +1001,54 @@ class TestCloseStochasticHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out_reach = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "activate_stoch_cross": False,
-             "stoch_long_more": 70, "stoch_long_less": 100,
-             "stoch_short_less": 30, "stoch_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_reach": True,
+                "activate_stoch_cross": False,
+                "stoch_long_more": 70,
+                "stoch_long_less": 100,
+                "stoch_short_less": 30,
+                "stoch_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         out_both = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "activate_stoch_cross": True,
-             "stoch_long_more": 70, "stoch_long_less": 100,
-             "stoch_short_less": 30, "stoch_short_more": 1,
-             "stoch_cross_long_level": 70, "stoch_cross_short_level": 30},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_reach": True,
+                "activate_stoch_cross": True,
+                "stoch_long_more": 70,
+                "stoch_long_less": 100,
+                "stoch_short_less": 30,
+                "stoch_short_more": 1,
+                "stoch_cross_long_level": 70,
+                "stoch_cross_short_level": 30,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out_both["exit"].sum() >= out_reach["exit"].sum()
 
     def test_uses_k_line_for_reach(self, sample_ohlcv):
         """Handler uses %K (not %D) for reach/cross detection."""
         from backend.core.indicators import calculate_stochastic
+
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
             "close_stochastic",
-            {"activate_stoch_reach": True, "stoch_close_k_length": 14,
-             "stoch_long_more": 70, "stoch_long_less": 100,
-             "stoch_short_less": 30, "stoch_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_stoch_reach": True,
+                "stoch_close_k_length": 14,
+                "stoch_long_more": 70,
+                "stoch_long_less": 100,
+                "stoch_short_less": 30,
+                "stoch_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         k, _d = calculate_stochastic(
-            sample_ohlcv["high"].values, sample_ohlcv["low"].values,
-            sample_ohlcv["close"].values, 14, 3, 3
+            sample_ohlcv["high"].values, sample_ohlcv["low"].values, sample_ohlcv["close"].values, 14, 3, 3
         )
         k_series = pd.Series(k, index=sample_ohlcv.index)
         expected_long = (k_series >= 70) & (k_series <= 100)
@@ -976,55 +1110,55 @@ class TestClosePSARHandler:
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition("close_psar", {}, sample_ohlcv, {})
         expected = out["exit_long"] | out["exit_short"]
-        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True),
-                                       expected.reset_index(drop=True))
+        pd.testing.assert_series_equal(out["exit"].reset_index(drop=True), expected.reset_index(drop=True))
 
     def test_signal_equals_exit(self, sample_ohlcv):
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition("close_psar", {}, sample_ohlcv, {})
-        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True),
-                                       out["exit"].reset_index(drop=True))
+        pd.testing.assert_series_equal(out["signal"].reset_index(drop=True), out["exit"].reset_index(drop=True))
 
     def test_produces_trend_change_signals(self, sample_ohlcv):
         """PSAR produces exit signals when trend changes."""
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition(
             "close_psar",
-            {"psar_start": 0.02, "psar_increment": 0.02, "psar_maximum": 0.2,
-             "psar_opposite": False, "psar_close_nth_bar": 1},
-            sample_ohlcv, {}
+            {
+                "psar_start": 0.02,
+                "psar_increment": 0.02,
+                "psar_maximum": 0.2,
+                "psar_opposite": False,
+                "psar_close_nth_bar": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         assert out["exit"].sum() > 0, "PSAR should produce some trend-change exits"
 
     def test_normal_vs_opposite_differ(self, sample_ohlcv):
         """Normal and opposite modes produce different exit_long patterns."""
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
-        out_normal = adapter._execute_close_condition(
-            "close_psar",
-            {"psar_opposite": False},
-            sample_ohlcv, {}
-        )
-        out_opposite = adapter._execute_close_condition(
-            "close_psar",
-            {"psar_opposite": True},
-            sample_ohlcv, {}
-        )
-        assert not out_normal["exit_long"].equals(out_opposite["exit_long"]), \
-            "Normal vs opposite exit_long must differ"
+        out_normal = adapter._execute_close_condition("close_psar", {"psar_opposite": False}, sample_ohlcv, {})
+        out_opposite = adapter._execute_close_condition("close_psar", {"psar_opposite": True}, sample_ohlcv, {})
+        assert not out_normal["exit_long"].equals(out_opposite["exit_long"]), "Normal vs opposite exit_long must differ"
 
     def test_normal_exit_long_on_bearish_change(self, sample_ohlcv):
         """Normal mode: exit_long when PSAR trend changes from bullish to bearish."""
         from backend.core.indicators import calculate_parabolic_sar
+
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition(
             "close_psar",
-            {"psar_start": 0.02, "psar_increment": 0.02, "psar_maximum": 0.2,
-             "psar_opposite": False, "psar_close_nth_bar": 1},
-            sample_ohlcv, {}
+            {
+                "psar_start": 0.02,
+                "psar_increment": 0.02,
+                "psar_maximum": 0.2,
+                "psar_opposite": False,
+                "psar_close_nth_bar": 1,
+            },
+            sample_ohlcv,
+            {},
         )
-        _sar, trend = calculate_parabolic_sar(
-            sample_ohlcv["high"].values, sample_ohlcv["low"].values, 0.02, 0.02, 0.2
-        )
+        _sar, trend = calculate_parabolic_sar(sample_ohlcv["high"].values, sample_ohlcv["low"].values, 0.02, 0.02, 0.2)
         trend_series = pd.Series(trend, index=sample_ohlcv.index)
         # Normal: exit_long when trend changes 1→-1 (bullish→bearish)
         expected_long = (trend_series == -1) & (trend_series.shift(1) == 1)
@@ -1036,16 +1170,21 @@ class TestClosePSARHandler:
     def test_opposite_exit_long_on_bullish_change(self, sample_ohlcv):
         """Opposite mode: exit_long when PSAR trend changes from bearish to bullish."""
         from backend.core.indicators import calculate_parabolic_sar
+
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition(
             "close_psar",
-            {"psar_start": 0.02, "psar_increment": 0.02, "psar_maximum": 0.2,
-             "psar_opposite": True, "psar_close_nth_bar": 1},
-            sample_ohlcv, {}
+            {
+                "psar_start": 0.02,
+                "psar_increment": 0.02,
+                "psar_maximum": 0.2,
+                "psar_opposite": True,
+                "psar_close_nth_bar": 1,
+            },
+            sample_ohlcv,
+            {},
         )
-        _sar, trend = calculate_parabolic_sar(
-            sample_ohlcv["high"].values, sample_ohlcv["low"].values, 0.02, 0.02, 0.2
-        )
+        _sar, trend = calculate_parabolic_sar(sample_ohlcv["high"].values, sample_ohlcv["low"].values, 0.02, 0.02, 0.2)
         trend_series = pd.Series(trend, index=sample_ohlcv.index)
         # Opposite: exit_long when trend changes -1→1 (bearish→bullish)
         expected_long = (trend_series == 1) & (trend_series.shift(1) == -1)
@@ -1058,9 +1197,7 @@ class TestClosePSARHandler:
         """psar_close_profit_only=True must add profit_only and min_profit."""
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition(
-            "close_psar",
-            {"psar_close_profit_only": True, "psar_close_min_profit": 1.0},
-            sample_ohlcv, {}
+            "close_psar", {"psar_close_profit_only": True, "psar_close_min_profit": 1.0}, sample_ohlcv, {}
         )
         assert "profit_only" in out
         assert "min_profit" in out
@@ -1069,14 +1206,10 @@ class TestClosePSARHandler:
         """Faster PSAR (lower increment) vs standard — both should produce signals."""
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out_fast = adapter._execute_close_condition(
-            "close_psar",
-            {"psar_start": 0.05, "psar_increment": 0.05, "psar_maximum": 0.2},
-            sample_ohlcv, {}
+            "close_psar", {"psar_start": 0.05, "psar_increment": 0.05, "psar_maximum": 0.2}, sample_ohlcv, {}
         )
         out_slow = adapter._execute_close_condition(
-            "close_psar",
-            {"psar_start": 0.01, "psar_increment": 0.01, "psar_maximum": 0.1},
-            sample_ohlcv, {}
+            "close_psar", {"psar_start": 0.01, "psar_increment": 0.01, "psar_maximum": 0.1}, sample_ohlcv, {}
         )
         # Both should produce signals (not just validate count direction)
         assert out_fast["exit"].sum() > 0
@@ -1103,9 +1236,14 @@ class TestCloseConditionsIntegration:
         """close_channel block wired to strategy runs without error."""
         result, _ = _run(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "Wick out of band", "keltner_length": 14, "keltner_mult": 1.5},
-            sample_ohlcv
+            {
+                "channel_type": "Keltner Channel",
+                "band_to_close": "Rebound",
+                "close_condition": "Wick out of band",
+                "keltner_length": 14,
+                "keltner_mult": 1.5,
+            },
+            sample_ohlcv,
         )
         assert result.entries is not None
 
@@ -1118,9 +1256,14 @@ class TestCloseConditionsIntegration:
         """close_rsi block wired to strategy runs without error."""
         result, _ = _run(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_long_more": 70, "rsi_long_less": 100,
-             "rsi_short_less": 30, "rsi_short_more": 1},
-            sample_ohlcv
+            {
+                "activate_rsi_reach": True,
+                "rsi_long_more": 70,
+                "rsi_long_less": 100,
+                "rsi_short_less": 30,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
         )
         assert result.entries is not None
 
@@ -1129,7 +1272,7 @@ class TestCloseConditionsIntegration:
         result, _ = _run(
             "close_stochastic",
             {"activate_stoch_reach": True, "stoch_long_more": 80, "stoch_long_less": 100},
-            sample_ohlcv
+            sample_ohlcv,
         )
         assert result.entries is not None
 
@@ -1142,9 +1285,14 @@ class TestCloseConditionsIntegration:
         """extra_data from adapter should contain exit information."""
         result, adapter = _run(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_long_more": 60, "rsi_long_less": 100,
-             "rsi_short_less": 40, "rsi_short_more": 1},
-            sample_ohlcv
+            {
+                "activate_rsi_reach": True,
+                "rsi_long_more": 60,
+                "rsi_long_less": 100,
+                "rsi_short_less": 40,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
         )
         # Exits should be available in result.exits or extra_data
         assert result.exits is not None or result.extra_data is not None
@@ -1153,9 +1301,14 @@ class TestCloseConditionsIntegration:
         """Bollinger Bands close_channel runs without error."""
         result, _ = _run(
             "close_channel",
-            {"channel_type": "Bollinger Bands", "band_to_close": "Rebound",
-             "close_condition": "Out-of-band closure", "bb_length": 20, "bb_deviation": 2.0},
-            sample_ohlcv
+            {
+                "channel_type": "Bollinger Bands",
+                "band_to_close": "Rebound",
+                "close_condition": "Out-of-band closure",
+                "bb_length": 20,
+                "bb_deviation": 2.0,
+            },
+            sample_ohlcv,
         )
         assert result.entries is not None
 
@@ -1189,18 +1342,26 @@ class TestCloseConditionsOptimizationParams:
     def test_close_rsi_optimizable_params(self):
         optimizable = [
             "rsi_close_length",
-            "rsi_long_more", "rsi_long_less",
-            "rsi_short_less", "rsi_short_more",
-            "rsi_cross_long_level", "rsi_cross_short_level",
+            "rsi_long_more",
+            "rsi_long_less",
+            "rsi_short_less",
+            "rsi_short_more",
+            "rsi_cross_long_level",
+            "rsi_cross_short_level",
         ]
         assert len(optimizable) == 7
 
     def test_close_stochastic_optimizable_params(self):
         optimizable = [
-            "stoch_close_k_length", "stoch_close_k_smoothing", "stoch_close_d_smoothing",
-            "stoch_long_more", "stoch_long_less",
-            "stoch_short_less", "stoch_short_more",
-            "stoch_cross_long_level", "stoch_cross_short_level",
+            "stoch_close_k_length",
+            "stoch_close_k_smoothing",
+            "stoch_close_d_smoothing",
+            "stoch_long_more",
+            "stoch_long_less",
+            "stoch_short_less",
+            "stoch_short_more",
+            "stoch_cross_long_level",
+            "stoch_cross_short_level",
         ]
         assert len(optimizable) == 9
 
@@ -1231,10 +1392,16 @@ class TestCloseConditionsEdgeCases:
         adapter = StrategyBuilderAdapter(_make_graph("close_rsi", {}))
         out = adapter._execute_close_condition(
             "close_rsi",
-            {"activate_rsi_reach": True, "rsi_close_length": 1,
-             "rsi_long_more": 50, "rsi_long_less": 100,
-             "rsi_short_less": 50, "rsi_short_more": 1},
-            sample_ohlcv, {}
+            {
+                "activate_rsi_reach": True,
+                "rsi_close_length": 1,
+                "rsi_long_more": 50,
+                "rsi_long_less": 100,
+                "rsi_short_less": 50,
+                "rsi_short_more": 1,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out
 
@@ -1242,9 +1409,7 @@ class TestCloseConditionsEdgeCases:
         """Stochastic k_length=1 should not raise."""
         adapter = StrategyBuilderAdapter(_make_graph("close_stochastic", {}))
         out = adapter._execute_close_condition(
-            "close_stochastic",
-            {"activate_stoch_reach": True, "stoch_close_k_length": 1},
-            sample_ohlcv, {}
+            "close_stochastic", {"activate_stoch_reach": True, "stoch_close_k_length": 1}, sample_ohlcv, {}
         )
         assert "exit" in out
 
@@ -1253,9 +1418,9 @@ class TestCloseConditionsEdgeCases:
         adapter = StrategyBuilderAdapter(_make_graph("close_channel", {}))
         out = adapter._execute_close_condition(
             "close_channel",
-            {"channel_type": "Keltner Channel", "band_to_close": "Rebound",
-             "close_condition": "UNKNOWN_CONDITION"},
-            sample_ohlcv, {}
+            {"channel_type": "Keltner Channel", "band_to_close": "Rebound", "close_condition": "UNKNOWN_CONDITION"},
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out  # must not raise
 
@@ -1264,9 +1429,15 @@ class TestCloseConditionsEdgeCases:
         adapter = StrategyBuilderAdapter(_make_graph("close_psar", {}))
         out = adapter._execute_close_condition(
             "close_psar",
-            {"psar_start": 0.02, "psar_increment": 0.02, "psar_maximum": 0.2,
-             "psar_opposite": False, "psar_close_nth_bar": 3},
-            sample_ohlcv, {}
+            {
+                "psar_start": 0.02,
+                "psar_increment": 0.02,
+                "psar_maximum": 0.2,
+                "psar_opposite": False,
+                "psar_close_nth_bar": 3,
+            },
+            sample_ohlcv,
+            {},
         )
         assert "exit" in out  # should not raise
 
@@ -1284,13 +1455,20 @@ class TestCloseConditionsEdgeCases:
         for close_type, params in configs:
             out = adapter._execute_close_condition(close_type, params, sample_ohlcv, {})
             assert isinstance(out["exit"], pd.Series), f"{close_type}: exit must be pd.Series"
-            assert out["exit"].dtype in (bool, object, "bool"), \
+            assert out["exit"].dtype in (bool, object, "bool"), (
                 f"{close_type}: exit must be bool dtype, got {out['exit'].dtype}"
+            )
 
     def test_close_conditions_category_is_close_conditions_not_indicator(self):
         """All 6 blocks must NOT be categorized as 'indicator' (old bug)."""
-        for block_type in ("close_by_time", "close_channel", "close_ma_cross",
-                           "close_rsi", "close_stochastic", "close_psar"):
+        for block_type in (
+            "close_by_time",
+            "close_channel",
+            "close_ma_cross",
+            "close_rsi",
+            "close_stochastic",
+            "close_psar",
+        ):
             cat = StrategyBuilderAdapter._infer_category(block_type)
             assert cat != "indicator", f"{block_type} must not be 'indicator', got '{cat}'"
             assert cat == "close_conditions", f"{block_type} must be 'close_conditions'"
