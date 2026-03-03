@@ -940,6 +940,7 @@ class PerformanceMetrics(BaseModel):
     avg_loss: float = Field(default=0.0, description="Average losing trade percentage")
     avg_loss_value: float = Field(default=0.0, description="Average losing trade in currency ($)")
     avg_win_loss_ratio: float = Field(default=0.0, description="Ratio avg win / avg loss")
+    payoff_ratio: float = Field(default=0.0, description="Payoff ratio: avg winning trade / avg losing trade (absolute)")
     largest_win: float = Field(default=0.0, description="Largest winning trade percentage")
     largest_win_value: float = Field(default=0.0, description="Largest winning trade in currency ($)")
     largest_loss: float = Field(default=0.0, description="Largest losing trade percentage (negative)")
@@ -947,6 +948,7 @@ class PerformanceMetrics(BaseModel):
 
     # Average P&L - DUAL FORMAT
     avg_trade: float = Field(default=0.0, description="Average trade P&L percentage")
+    avg_trade_pct: float = Field(default=0.0, description="Average trade P&L as percentage (alias for avg_trade)")
     avg_trade_value: float = Field(default=0.0, description="Average trade P&L in currency ($)")
 
     # Bars/Duration in trades

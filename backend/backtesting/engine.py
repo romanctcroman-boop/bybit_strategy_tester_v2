@@ -960,6 +960,7 @@ def _build_performance_metrics(
         avg_loss=calc_metrics["avg_loss"],
         avg_loss_value=calc_metrics["avg_loss_value"],
         avg_trade=calc_metrics["avg_trade"],
+        avg_trade_pct=calc_metrics.get("avg_trade_pct", calc_metrics["avg_trade"]),
         avg_trade_value=calc_metrics["avg_trade_value"],
         # Largest trades
         largest_win=calc_metrics["largest_win"],
@@ -976,6 +977,7 @@ def _build_performance_metrics(
         avg_trade_duration_hours=np.mean([getattr(t, "duration_hours", 0) or 0 for t in trades]) if trades else 0,
         # Win/Loss Ratio
         avg_win_loss_ratio=avg_win_loss_ratio,
+        payoff_ratio=calc_metrics.get("payoff_ratio", avg_win_loss_ratio),
         # Largest as pct of gross
         largest_win_pct_of_gross=largest_win_pct_of_gross,
         largest_loss_pct_of_gross=largest_loss_pct_of_gross,
