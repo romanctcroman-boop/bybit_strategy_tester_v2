@@ -62,6 +62,7 @@ class PromptEngineer:
         platform_config: dict[str, Any],
         agent_name: str = "deepseek",
         include_examples: bool = True,
+        dynamic_examples: bool = True,
     ) -> str:
         """
         Create a complete strategy generation prompt.
@@ -71,6 +72,7 @@ class PromptEngineer:
             platform_config: Platform settings (leverage, commission, etc.)
             agent_name: Agent name for specialization ("deepseek", "qwen", "perplexity")
             include_examples: Whether to append few-shot examples
+            dynamic_examples: Choose examples based on market regime (default: True)
 
         Returns:
             Complete prompt string ready for LLM API call
@@ -108,24 +110,86 @@ class PromptEngineer:
 
         if include_examples:
             prompt += "\n\nEXAMPLE STRATEGIES FOR REFERENCE:\n"
-            # Choose example based on market regime
-            if context.market_regime in ("trending_up", "trending_down"):
-                prompt += STRATEGY_EXAMPLE_MACD_TREND
-                prompt += "\n\n"
-                prompt += STRATEGY_EXAMPLE_SUPERTREND_FOLLOW
-            elif context.market_regime in ("ranging", "consolidating"):
-                prompt += STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION
-                prompt += "\n\n"
-                prompt += STRATEGY_EXAMPLE_QQE_MOMENTUM
+            
+            if dynamic_examples:
+                # P1: Dynamic examples based on market regime + volatility
+                examples = self._get_dynamic_examples(context)
             else:
-                prompt += STRATEGY_EXAMPLE_RSI_MEAN_REVERSION
+                # Legacy: regime-based only
+                examples = self._get_legacy_examples(context)
+            
+            prompt += "\n\n".join(examples)
 
         logger.debug(
             f"Created strategy prompt for {agent_name} "
-            f"({context.symbol}/{context.timeframe}, regime={context.market_regime})"
+            f"({context.symbol}/{context.timeframe}, regime={context.market_regime}, "
+            f"dynamic_examples={dynamic_examples})"
         )
 
         return prompt
+    
+    def _get_dynamic_examples(self, context: MarketContext) -> list[str]:
+        """
+        P1: Get examples dynamically matched to market regime and volatility.
+        
+        Args:
+            context: Market context
+        
+        Returns:
+            List of example strategy JSONs
+        """
+        regime = context.market_regime
+        volatility = context.historical_volatility
+        trend_strength = context.trend_strength
+        
+        examples = []
+        
+        # Primary example: Match regime
+        if regime in ("trending_up", "trending_down"):
+            if trend_strength == "strong":
+                examples.append(STRATEGY_EXAMPLE_MACD_TREND)
+            else:
+                examples.append(STRATEGY_EXAMPLE_SUPERTREND_FOLLOW)
+        elif regime in ("ranging", "consolidating"):
+            if volatility and volatility > 0.03:  # High volatility
+                examples.append(STRATEGY_EXAMPLE_QQE_MOMENTUM)
+            else:
+                examples.append(STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION)
+        elif regime == "volatile":
+            examples.append(STRATEGY_EXAMPLE_RSI_MEAN_REVERSION)
+            examples.append(STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION)
+        else:
+            # Default fallback
+            examples.append(STRATEGY_EXAMPLE_RSI_MEAN_REVERSION)
+        
+        # Secondary example: Complementary strategy
+        if len(examples) == 1:
+            # Add a different approach for diversification
+            if "MACD" in examples[0]:
+                examples.append(STRATEGY_EXAMPLE_RSI_MEAN_REVERSION)
+            elif "RSI" in examples[0]:
+                examples.append(STRATEGY_EXAMPLE_MACD_TREND)
+            elif "Stochastic" in examples[0]:
+                examples.append(STRATEGY_EXAMPLE_QQE_MOMENTUM)
+        
+        return examples
+    
+    def _get_legacy_examples(self, context: MarketContext) -> list[str]:
+        """
+        Legacy example selection (regime-based only).
+        
+        Args:
+            context: Market context
+        
+        Returns:
+            List of example strategy JSONs
+        """
+        if context.market_regime in ("trending_up", "trending_down"):
+            return [STRATEGY_EXAMPLE_MACD_TREND, STRATEGY_EXAMPLE_SUPERTREND_FOLLOW]
+        elif context.market_regime in ("ranging", "consolidating"):
+            return [STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION, STRATEGY_EXAMPLE_QQE_MOMENTUM]
+        else:
+            return [STRATEGY_EXAMPLE_RSI_MEAN_REVERSION]
 
     def create_market_analysis_prompt(
         self,

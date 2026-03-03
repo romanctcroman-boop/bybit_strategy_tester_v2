@@ -40,7 +40,7 @@ class APIMixin:
         """Get URL for API.
 
         Qwen uses Singapore (intl) endpoint.
-        Available models: qwen-plus, qwen-flash, qwen3-max, qwq-plus, qwen3-coder-plus
+        Available models: qwen3-max (trading), qwen-plus, qwen-flash, qwq-plus, qwen3-coder-plus
         """
         if agent_type == AgentType.DEEPSEEK:
             if strict_mode:

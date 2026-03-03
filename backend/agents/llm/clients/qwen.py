@@ -4,14 +4,15 @@ Qwen LLM Client
 OpenAI-compatible API client for Alibaba Cloud Model Studio (Qwen) models.
 
 Supported models (International / Singapore region):
-  Commercial:
-    - qwen-plus          Best balance (1M ctx, $0.40/$1.20 per 1M tok)
+  Trading & Strategy (RECOMMENDED for this project):
+    - qwen3-max          BEST for trading strategies, market analysis, optimization
+    - qwen-plus          Good balance for simple queries
     - qwen-flash         Fastest & cheapest (1M ctx, $0.05/$0.40 per 1M tok)
-    - qwen3-max          Most powerful (262K ctx, $1.20/$6.00 per 1M tok)
   Reasoning:
     - qwq-plus           Chain-of-thought reasoning ($0.80/$2.40 per 1M tok)
-  Code:
+  Code Development:
     - qwen3-coder-plus   Code generation & tool calling (1M ctx)
+    - qwen3-coder-flash  Fast code model, cheaper
 
 Regional endpoints (API keys are NOT interchangeable between regions):
   - Singapore:   https://dashscope-intl.aliyuncs.com/compatible-mode/v1
