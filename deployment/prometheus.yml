@@ -1,0 +1,63 @@
+# Prometheus Configuration
+# For Bybit Strategy Tester v2
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'bybit-strategy-tester'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load rules
+rule_files:
+  - "rules/prometheus_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus'
+
+  # Bybit Strategy Tester API
+  - job_name: 'bybit-api'
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+        labels:
+          instance: 'api-server'
+          service: 'backend'
+    metrics_path: '/health/metrics'
+    scrape_interval: 30s
+
+  # Node Exporter (system metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node_exporter:9100']
+        labels:
+          instance: 'server'
+          service: 'system'
+
+  # Redis Exporter (if Redis is used)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['host.docker.internal:6379']
+        labels:
+          instance: 'redis'
+          service: 'cache'
+    scrape_interval: 30s
+
+  # PostgreSQL Exporter (if PostgreSQL is used)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['host.docker.internal:9187']
+        labels:
+          instance: 'postgres'
+          service: 'database'
+    scrape_interval: 30s
