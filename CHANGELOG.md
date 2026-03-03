@@ -7,7 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **[TESTS] Complete entry & exit condition test coverage — 428 new tests** (2026-03-04)
+
+    **Summary:** Expanded AI agent test suite from 1208 to 1636 tests, covering all previously
+    untested indicator blocks and exit condition types. Zero regressions.
+
+    **Entry Conditions** — `tests/ai_agents/test_entry_conditions_ai_agents.py` (new, ~280 tests):
+
+    Covers all 29 previously-uncovered `BLOCK_REGISTRY` indicator blocks:
+    | Group | Blocks |
+    |---|---|
+    | Moving Averages (6) | `ema`, `sma`, `wma`, `dema`, `tema`, `hull_ma` |
+    | Bands/Channels (3) | `bollinger`, `keltner`, `donchian` |
+    | Volatility (3) | `atr`, `atrp`, `stddev` |
+    | Trend (4) | `adx`, `ichimoku`, `parabolic_sar`, `aroon` |
+    | Volume (6) | `mfi`, `obv`, `vwap`, `cmf`, `ad_line`, `pvt` |
+    | Oscillators (5) | `cci`, `cmo`, `roc`, `williams_r`, `stoch_rsi` |
+    | Special (2) | `mtf`, `pivot_points` |
+
+    Each block tested for: category in `_BLOCK_CATEGORY_MAP` == "indicator", all registry `outputs`
+    keys present, numeric pd.Series output, valid data after warmup, E2E via `generate_signals()`.
+    Includes integration tests (EMA crossover, Bollinger+RSI, Ichimoku+Supertrend, OBV+EMA, ATR+ADX)
+    and block registry completeness parametrized suite (29 blocks × outputs contract).
+
+    **Exit Conditions** — `tests/ai_agents/test_exit_conditions_extended_ai_agents.py` (new, ~150 tests):
+
+    Covers all 8 previously-uncovered `_execute_exit` types:
+    | Exit Type | Key Tests |
+    |---|---|
+    | `atr_stop` | use_atr_sl=True, atr_sl Series positive, multiplier clamped [0.1–4.0], period clamped [1–150], 4 smoothing methods |
+    | `time_exit` | all-False exit, max_bars constant Series, default bars=10 |
+    | `breakeven_exit` / `break_even_exit` | breakeven_trigger float, both aliases equivalent |
+    | `chandelier_exit` | exit_long\|exit_short union, fires real signals over 1000 bars |
+    | `session_exit` | fires only at matching hour, ~41 exits per hour on hourly data |
+    | `signal_exit` | signal_exit_mode=True, all-False exit |
+    | `indicator_exit` | 7 indicators (rsi/cci/mfi/roc/obv/macd/stochastic) × 4 modes (above/below/cross_above/cross_below) = 28 combos, no NaN |
+    | `partial_close` | partial_targets list structure, empty targets, defaults |
+
+    Also includes: `TestExitEntryIntegration` (7 E2E combos) + `TestExitBlockCompleteness`
+    (all 13 exit types return `exit` pd.Series of correct length).
+
+    **Test counts before/after:**
+    - Baseline: 1208 passed, 7 failed (all pre-existing)
+    - After: **1636 passed, 7 failed** (same 7 pre-existing — no regressions)
+
 ### Fixed
+
+- **[ENGINE] bars_in_trade off-by-1: switch to TV-compatible inclusive bar counting** (2026-03-03)
+
+    **Problem:** All 9 `avg_bars_*` metrics were consistently off by −1 vs TradingView.
+    Example: `avg_bars_in_trade` = 275 (ours) vs 276 (TV), `avg_bars_in_short` = 274 vs 275, etc.
+
+    **Root cause:** TV counts bars from entry bar through exit bar **inclusive** (`exit_bar − entry_bar + 1`).
+    Our engine used **exclusive** counting (`exit_bar − entry_bar`), producing one fewer bar per trade.
+
+    **Fix:**
+    - `backend/backtesting/engine.py` line 2393: `i − entry_idx` → `i − entry_idx + 1`
+    - `backend/backtesting/pyramiding.py` lines 506, 575, 616, 658, 700:
+      `exit_bar_idx − first_bar` → `exit_bar_idx − first_bar + 1`
+      `exit_bar_idx − entry.entry_bar_idx` → `exit_bar_idx − entry.entry_bar_idx + 1`
+
+    **Note:** `engine.py` end-of-backtest close (line 2581) already used inclusive counting via
+    `len(ohlcv) − entry_pos` = `exit_bar − entry_bar + 1` — no change needed there.
+
+    **Result:** All 9 avg_bars metrics now match TradingView exactly (Δ = 0):
+    `avg_bars_in_trade`=276, `avg_bars_winning`=266, `avg_bars_losing`=344,
+    `avg_bars_long`=276, `avg_bars_short`=275, `avg_bars_winning_long`=254,
+    `avg_bars_losing_long`=402, `avg_bars_winning_short`=277, `avg_bars_losing_short`=257
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
@@ -17,14 +85,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
     `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
-    m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
+  m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
 
     **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
     (no fallback chain) for all four long/short largest fields.
 
     **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-    TradingView within 0.02%. Section 8 (avg_bars) has a known ~+19 bar discrepancy for short
-    trades (bar-counting convention difference vs TV, does not affect PnL metrics).
+    TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+    (bars_in_trade now uses inclusive counting to match TV).
 
     **File:** `scripts/_tv_calibration_check.py`
 
