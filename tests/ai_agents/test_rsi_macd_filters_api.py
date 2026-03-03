@@ -675,10 +675,11 @@ class TestMACDSignalMemory:
 
 
 class TestMACDCombinedModes:
-    """Test OR logic: Cross Zero + Cross Signal combined."""
+    """Test AND logic: Cross Zero + Cross Signal combined."""
 
-    def test_or_logic_more_signals_than_either(self, sample_ohlcv):
-        """Both modes ON → signals from either mode (OR)."""
+    def test_and_logic_fewer_signals_than_either(self, sample_ohlcv):
+        """Both modes ON → AND logic: signal fires only when BOTH cross on the same bar.
+        This matches TradingView parity: combined signals <= each individual mode."""
         cross_zero_only = {
             "fast_period": 12,
             "slow_period": 26,
@@ -712,10 +713,12 @@ class TestMACDCombinedModes:
         signal_count = r_signal.entries.sum()
         both_count = r_both.entries.sum()
 
-        # OR: combined >= each individual
-        assert both_count >= zero_count, f"Combined (OR) should >= cross_zero: combined={both_count}, zero={zero_count}"
-        assert both_count >= signal_count, (
-            f"Combined (OR) should >= cross_signal: combined={both_count}, signal={signal_count}"
+        # AND: combined <= each individual (TradingView parity)
+        assert both_count <= zero_count, (
+            f"Combined (AND) should <= cross_zero: combined={both_count}, zero={zero_count}"
+        )
+        assert both_count <= signal_count, (
+            f"Combined (AND) should <= cross_signal: combined={both_count}, signal={signal_count}"
         )
 
 
@@ -804,8 +807,9 @@ class TestRSIvsMACDLogic:
         assert both_count <= range_count, f"RSI AND: combined({both_count}) should <= range({range_count})"
         assert both_count <= cross_count, f"RSI AND: combined({both_count}) should <= cross({cross_count})"
 
-    def test_macd_uses_or_logic(self, sample_ohlcv):
-        """MACD: CrossZero OR CrossSignal → combined >= each individual."""
+    def test_macd_uses_and_logic(self, sample_ohlcv):
+        """MACD: CrossZero AND CrossSignal → combined <= each individual.
+        TradingView parity: when both modes enabled, BOTH must fire on the same bar."""
         cross_zero = {
             "fast_period": 12,
             "slow_period": 26,
@@ -837,9 +841,9 @@ class TestRSIvsMACDLogic:
         signal_count = r_signal.entries.sum()
         both_count = r_both.entries.sum()
 
-        # OR: combined >= each individual
-        assert both_count >= zero_count, f"MACD OR: combined({both_count}) should >= zero({zero_count})"
-        assert both_count >= signal_count, f"MACD OR: combined({both_count}) should >= signal({signal_count})"
+        # AND: combined <= each individual (TradingView parity)
+        assert both_count <= zero_count, f"MACD AND: combined({both_count}) should <= zero({zero_count})"
+        assert both_count <= signal_count, f"MACD AND: combined({both_count}) should <= signal({signal_count})"
 
 
 # ============================================================

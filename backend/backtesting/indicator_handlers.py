@@ -545,6 +545,14 @@ def _handle_macd(
     long_signal = pd.Series(False, index=ohlcv.index)
     short_signal = pd.Series(False, index=ohlcv.index)
 
+    # Default fresh-signal masks (populated inside each mode block).
+    fresh_cross_long = pd.Series(False, index=ohlcv.index)
+    fresh_cross_short = pd.Series(False, index=ohlcv.index)
+    fresh_zero_cross_long = pd.Series(False, index=ohlcv.index)
+    fresh_zero_cross_short = pd.Series(False, index=ohlcv.index)
+    cross_long_mem = pd.Series(False, index=ohlcv.index)
+    cross_short_mem = pd.Series(False, index=ohlcv.index)
+
     if use_cross:
         macd_prev = macd_line.shift(1)
         signal_prev = signal_line.shift(1)
@@ -562,6 +570,10 @@ def _handle_macd(
             cross_long = cross_long & (macd_line > 0)
             cross_short = cross_short & (macd_line < 0)
 
+        # Keep track of fresh (raw, non-memory) cross signals for conflict resolution.
+        fresh_cross_long = cross_long.copy()
+        fresh_cross_short = cross_short.copy()
+
         # Memory: frontend sends disable_signal_memory (default False = memory ON) + signal_memory_bars.
         # Legacy path: use_cross_memory + cross_memory_bars.
         disable_memory = params.get("disable_signal_memory", False)
@@ -570,8 +582,9 @@ def _handle_macd(
             cross_long = adapter._apply_signal_memory(cross_long, memory_bars)
             cross_short = adapter._apply_signal_memory(cross_short, memory_bars)
 
-        long_signal = long_signal | cross_long.fillna(False)
-        short_signal = short_signal | cross_short.fillna(False)
+        # Store memory-extended cross signals for potential AND combination with zero_cross.
+        cross_long_mem = cross_long.fillna(False)
+        cross_short_mem = cross_short.fillna(False)
 
     if use_histogram:
         hist_threshold = float(params.get("histogram_threshold", 0))
@@ -587,14 +600,68 @@ def _handle_macd(
         if params.get("opposite_macd_cross_zero", params.get("opposite_signal", False)):
             zero_cross_long, zero_cross_short = zero_cross_short, zero_cross_long
 
+        # Track fresh zero-cross signals before memory extension.
+        fresh_zero_cross_long = zero_cross_long.copy()
+        fresh_zero_cross_short = zero_cross_short.copy()
+
         disable_memory = params.get("disable_signal_memory", False)
         if not disable_memory or params.get("use_zero_cross_memory", False):
             memory_bars = int(params.get("signal_memory_bars", params.get("zero_cross_memory_bars", 5)))
             zero_cross_long = adapter._apply_signal_memory(zero_cross_long, memory_bars)
             zero_cross_short = adapter._apply_signal_memory(zero_cross_short, memory_bars)
 
-        long_signal = long_signal | zero_cross_long.fillna(False)
-        short_signal = short_signal | zero_cross_short.fillna(False)
+        zero_cross_long_mem = zero_cross_long.fillna(False)
+        zero_cross_short_mem = zero_cross_short.fillna(False)
+
+        if use_cross:
+            # Both cross_signal AND cross_zero are enabled: TV uses AND logic —
+            # a trade fires only when BOTH conditions trigger on the SAME bar (fresh AND).
+            # Memory is then applied to that combined signal.
+            # This is the key TradingView parity fix: OR (or AND of memory-extended signals)
+            # produces too many signals; the AND must be on the raw/fresh signals.
+            both_long_raw = fresh_cross_long.fillna(False) & fresh_zero_cross_long.fillna(False)
+            both_short_raw = fresh_cross_short.fillna(False) & fresh_zero_cross_short.fillna(False)
+            # Apply memory to the combined signal so position can be held.
+            disable_memory = params.get("disable_signal_memory", False)
+            if not disable_memory:
+                memory_bars = int(params.get("signal_memory_bars", params.get("cross_memory_bars", 5)))
+                both_long_mem = adapter._apply_signal_memory(both_long_raw, memory_bars)
+                both_short_mem = adapter._apply_signal_memory(both_short_raw, memory_bars)
+            else:
+                both_long_mem = both_long_raw
+                both_short_mem = both_short_raw
+            long_signal = long_signal | both_long_mem.fillna(False)
+            short_signal = short_signal | both_short_mem.fillna(False)
+        else:
+            # Only zero_cross is enabled: plain OR (additive).
+            long_signal = long_signal | zero_cross_long_mem
+            short_signal = short_signal | zero_cross_short_mem
+    elif use_cross:
+        # Only cross_signal is enabled (no zero_cross): apply directly.
+        long_signal = long_signal | cross_long_mem
+        short_signal = short_signal | cross_short_mem
+
+    # Conflict resolution: when both long and short are simultaneously active,
+    # prefer the direction with a FRESH (non-memory) signal.  This matches
+    # TradingView behaviour where a new cross in one direction cancels the
+    # memory extension of the opposite direction.
+    #
+    # Build a combined "fresh signal" mask from all active modes.
+    fresh_long = pd.Series(False, index=ohlcv.index)
+    fresh_short = pd.Series(False, index=ohlcv.index)
+    if use_cross:
+        fresh_long = fresh_long | fresh_cross_long.fillna(False)
+        fresh_short = fresh_short | fresh_cross_short.fillna(False)
+    if use_zero_cross:
+        fresh_long = fresh_long | fresh_zero_cross_long.fillna(False)
+        fresh_short = fresh_short | fresh_zero_cross_short.fillna(False)
+
+    conflict = long_signal & short_signal  # bars where both are active
+    if conflict.any():
+        # Where both fire and SHORT is fresh → suppress LONG (memory-only)
+        long_signal = long_signal & ~(conflict & fresh_short & ~fresh_long)
+        # Where both fire and LONG is fresh → suppress SHORT (memory-only)
+        short_signal = short_signal & ~(conflict & fresh_long & ~fresh_short)
 
     logger.debug(
         "MACD node | fast={} slow={} signal={} | cross={} hist={} zero={} | long={} short={}",
