@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **[CRITICAL] MACD AND logic: TradingView parity for cross_signal + cross_zero** (2026-03-03)
+
+    **Root cause:** When both `use_macd_cross_signal=True` AND `use_macd_cross_zero=True` are
+    enabled, the old code used OR logic — a trade fired whenever _either_ condition was active.
+    TradingView uses AND logic: a trade fires only when **both** cross_signal AND cross_zero
+    trigger on the **same bar** (raw/fresh, before memory extension). Memory is then applied
+    to the combined signal.
+
+    **Impact:** Strategy_MACD_05 (ETHUSDT 30m, fast=14, slow=15, signal=9) went from
+    72 trades (net=-759 USDT, win=61.97%) to 42 trades (net=+1723 USDT, win=88.10%),
+    **exactly matching TV benchmark.**
+
+    | Metric | Before | After | TV Benchmark |
+    |---|---|---|---|
+    | Total trades | 72 | **42** | 42 ✅ |
+    | TP / SL | 44 / 27 | **37 / 5** | 37 / 5 ✅ |
+    | Win rate | 61.97% | **88.10%** | 88.10% ✅ |
+    | Net profit | -759 USDT | **+1723 USDT** | +1723 USDT ✅ |
+    | Profit factor | — | **3.584** | 3.584 ✅ |
+
+    **Changes:** `backend/backtesting/indicator_handlers.py` — `_handle_macd()`:
+    - When `use_cross=True` AND `use_zero_cross=True`: AND fresh signals → memory on combined
+    - When only one mode active: unchanged (OR/direct behavior preserved)
+    - Default False initialization for all fresh-signal masks added
+    - `tests/ai_agents/test_rsi_macd_filters_api.py`: `TestMACDCombinedModes` updated to AND semantics
+
+- **[MACD] Conflict resolution for simultaneous LONG memory + fresh SHORT** (prior commit)
+
+    Added `fresh_cross_long/short` tracking and conflict resolution in `_handle_macd()`.
+    When memory-extended LONG and fresh SHORT fire on same bar → suppress LONG (and vice versa).
+    First trade: SHORT @ 3634.97 @ 2025-01-04T12:30 now correctly matches TV.
+
 ### Added
 
 - **[TESTS] Complete entry & exit condition test coverage — 428 new tests** (2026-03-04)
