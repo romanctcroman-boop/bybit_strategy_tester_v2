@@ -502,14 +502,17 @@ export function createSaveLoadModule({
 
             const backtestStartDateEl = document.getElementById('backtestStartDate');
             const backtestEndDateEl = document.getElementById('backtestEndDate');
+            // Helper: strip time part from ISO datetime strings like "2025-01-04T12:00:00"
+            // <input type="date"> only accepts "YYYY-MM-DD"; values with time are silently ignored.
+            const toDateOnly = (val) => (val ? String(val).slice(0, 10) : null);
             if (backtestStartDateEl) {
-                backtestStartDateEl.value = strategy.parameters?._start_date || strategy.start_date || '2025-01-01';
+                backtestStartDateEl.value = toDateOnly(strategy.parameters?._start_date || strategy.start_date) || '2025-01-01';
             }
             if (backtestEndDateEl) {
                 // Use local date (not UTC) to avoid off-by-one at midnight in UTC+N timezones
                 const now = new Date();
                 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const savedEnd = strategy.parameters?._end_date || strategy.end_date || today;
+                const savedEnd = toDateOnly(strategy.parameters?._end_date || strategy.end_date) || today;
                 // Clamp to today: don't allow future dates, but don't push saved past dates forward.
                 backtestEndDateEl.value = savedEnd <= today ? savedEnd : today;
             }
