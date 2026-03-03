@@ -395,10 +395,10 @@ body {
     scroll-behavior: smooth;
     /* Hide scrollbar but keep functionality (all browsers) */
     -ms-overflow-style: none; /* IE/Edge */
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none; /* Firefox 64+ */
 }
 
-/* Hide scrollbar for Chrome/Safari/Opera */
+/* Hide scrollbar for Chrome/Safari/Opera (Chrome < 121 fallback) */
 .block-categories::-webkit-scrollbar {
     display: none;
 }
@@ -7871,7 +7871,7 @@ body.floating-window-open .zoom-controls {
     flex-direction: column;
     gap: 8px;
     max-height: 520px;
-    scrollbar-width: thin;
+    scrollbar-width: thin; /* Firefox 64+ */
     scrollbar-color: #3d3d5c transparent;
 }
 

@@ -26,7 +26,6 @@ import { chartManager } from '../components/ChartManager.js';
 
 // Import TradesTable utilities (P0-2 Phase 2)
 import {
-  TRADES_PAGE_SIZE,
   buildTradeRows,
   sortRows,
   renderPage as renderTradesPageUtil,
@@ -68,7 +67,7 @@ const API_BASE = '/api/v1';
 /**
  * @migration P0-3 StateManager
  * Legacy variables below are now StateManager-backed proxies.
- * All reads/writes go through getStore() so state is centralised.
+ * All reads/writes go through getStore() so state is centralized.
  * The proxy Proxy() approach is NOT used because this is a plain-JS ES module
  * without a build step — instead each variable is a thin wrapper that is
  * lazily connected to the store after initializeBacktestResultsState() runs.
@@ -90,7 +89,6 @@ let compareMode = false;
 
 // Trades table pagination state
 let tradesCurrentPage = 0;       // 0-based page index
-// TRADES_PAGE_SIZE imported from TradesTable.js
 let tradesCachedRows = [];       // pre-built HTML rows (reversed, newest-first)
 let tradesSortKey = null;        // active sort column key
 let tradesSortAsc = true;        // sort direction
@@ -1304,10 +1302,10 @@ function initCharts() {
         // connecting BH's max edge to Strategy's min edge, tapering to a point at x0
         if (bhBar && stBar && bh && st) {
           const xBhRight = xScale.getPixelForValue(bh.max);   // right edge of BH bar
-          const xStLeft  = xScale.getPixelForValue(st.min);   // left edge of Strategy bar
-          const yBhTop    = bhBar.top;
+          const xStLeft = xScale.getPixelForValue(st.min);   // left edge of Strategy bar
+          const yBhTop = bhBar.top;
           const yBhBottom = bhBar.bottom;
-          const yStTop    = stBar.top;
+          const yStTop = stBar.top;
           const yStBottom = stBar.bottom;
           const yTip = (bhBar.mid + stBar.mid) / 2;  // midpoint between two bars
 
@@ -1355,11 +1353,11 @@ function initCharts() {
           ctx.setLineDash([3, 3]);
           if (xBhRight <= x0 && xStLeft >= x0) {
             ctx.beginPath();
-            ctx.moveTo(xBhRight, yBhTop);    ctx.lineTo(x0, yTip);
+            ctx.moveTo(xBhRight, yBhTop); ctx.lineTo(x0, yTip);
             ctx.moveTo(xBhRight, yBhBottom); ctx.lineTo(x0, yTip);
             ctx.stroke();
             ctx.beginPath();
-            ctx.moveTo(xStLeft, yStTop);    ctx.lineTo(x0, yTip);
+            ctx.moveTo(xStLeft, yStTop); ctx.lineTo(x0, yTip);
             ctx.moveTo(xStLeft, yStBottom); ctx.lineTo(x0, yTip);
             ctx.stroke();
           }

@@ -682,6 +682,136 @@ class TradingViewEquityChart {
     const timestamps = data.timestamps || [];
     const base = equity[0] || this.initialCapital;
 
+    // Pre-compute growth/drawdown segments (TV-like "Рост средств / Просадка средств")
+    const gdSegments = (() => {
+      const n = Math.min(timestamps.length, equity.length);
+      if (n < 2) return [];
+
+      const num = (v) => {
+        const x = Number(v);
+        return Number.isFinite(x) ? x : 0;
+      };
+
+      const segments = [];
+      let regime = 'growth';
+      let segStart = 0;
+      let hwm = num(equity[0]);
+      let ddMin = hwm;
+      let ddMinIdx = 0;
+
+      for (let i = 1; i < n; i += 1) {
+        const v = num(equity[i]);
+        if (regime === 'growth') {
+          if (v >= hwm) {
+            hwm = v;
+          } else {
+            const start = segStart;
+            const end = i - 1;
+            if (end > start) {
+              const startV = num(equity[start]);
+              const endV = num(equity[end]);
+              const absChange = endV - startV;
+              const pctChange = startV !== 0 ? absChange / startV : 0;
+              segments.push({
+                kind: 'growth',
+                startIndex: start,
+                endIndex: end,
+                startTime: timestamps[start],
+                endTime: timestamps[end],
+                absChange,
+                pctChange
+              });
+            }
+            regime = 'drawdown';
+            segStart = end;
+            ddMin = v;
+            ddMinIdx = i;
+          }
+        } else {
+          if (v <= ddMin) {
+            ddMin = v;
+            ddMinIdx = i;
+          }
+          if (v >= hwm) {
+            const start = segStart;
+            const end = ddMinIdx;
+            if (end > start) {
+              const startV = num(equity[start]);
+              const endV = num(equity[end]);
+              const absChange = startV - endV;
+              const pctChange = startV !== 0 ? absChange / startV : 0;
+              segments.push({
+                kind: 'drawdown',
+                startIndex: start,
+                endIndex: end,
+                startTime: timestamps[start],
+                endTime: timestamps[end],
+                absChange,
+                pctChange
+              });
+            }
+            regime = 'growth';
+            segStart = end;
+            hwm = v;
+          }
+        }
+      }
+
+      const lastIdx = n - 1;
+      if (segStart < lastIdx) {
+        const start = segStart;
+        const end = lastIdx;
+        const startV = num(equity[start]);
+        const endV = num(equity[end]);
+        if (end > start) {
+          if (regime === 'growth') {
+            const absChange = endV - startV;
+            const pctChange = startV !== 0 ? absChange / startV : 0;
+            segments.push({
+              kind: 'growth',
+              startIndex: start,
+              endIndex: end,
+              startTime: timestamps[start],
+              endTime: timestamps[end],
+              absChange,
+              pctChange
+            });
+          } else {
+            let minV = startV;
+            let minIdx = start;
+            for (let j = start; j <= end; j += 1) {
+              const vj = num(equity[j]);
+              if (vj <= minV) {
+                minV = vj;
+                minIdx = j;
+              }
+            }
+            const absChange = startV - minV;
+            const pctChange = startV !== 0 ? absChange / startV : 0;
+            segments.push({
+              kind: 'drawdown',
+              startIndex: start,
+              endIndex: minIdx,
+              startTime: timestamps[start],
+              endTime: timestamps[minIdx],
+              absChange,
+              pctChange
+            });
+          }
+        }
+      }
+
+      return segments;
+    })();
+
+    // Map each equity point index to its growth/drawdown segment
+    const gdIndexToSeg = new Array(timestamps.length).fill(null);
+    gdSegments.forEach((seg) => {
+      for (let i = seg.startIndex; i <= seg.endIndex && i < gdIndexToSeg.length; i += 1) {
+        gdIndexToSeg[i] = seg;
+      }
+    });
+
     // Pre-compute: for each equity point index, which trade is it?
     // EC timestamps are bar open times (not exact exit times), so we use
     // closest-exit-time matching (within one timeframe bar = 4h window) rather
@@ -775,6 +905,8 @@ class TradingViewEquityChart {
         ? `-${maePct.toFixed(2)}%`
         : (maeUsdt > 0 ? `-${this._fmtUsdt(maeUsdt)}` : '0.00 USDT');
 
+      const seg = gdIndexToSeg[ci];
+
       let html = '';
       // Header
       html += `<div style="text-align:center;color:#d1d4dc;font-size:12px;font-weight:600;margin-bottom:7px">Trade #${tradeNum} ${sideLabel}</div>`;
@@ -784,6 +916,37 @@ class TradingViewEquityChart {
       html += tvRow('#26a69a', 'Cumulative P&L', pnlStr, pnlCol);
       html += tvRow('#26a69a', 'Favorable excursion', mfeStr, '#26a69a');
       html += tvRow('#ef5350', 'Adverse excursion', maeStr, '#ef5350');
+
+      if (seg) {
+        const isGrowth = seg.kind === 'growth';
+        const label = isGrowth ? 'Рост средств' : 'Просадка средств';
+        const amountAbs = Math.abs(seg.absChange);
+        const pctAbs = Math.abs(seg.pctChange * 100);
+        const sign = isGrowth ? '+' : '-';
+
+        const amountStr = `${sign}${amountAbs.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })} USDT`;
+        const pctStr = `${pctAbs.toFixed(2)}%`;
+
+        const startDate = seg.startTime ? new Date(seg.startTime) : null;
+        const endDate = seg.endTime ? new Date(seg.endTime) : null;
+        const rangeStr = startDate && endDate
+          ? `${startDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })} — ${endDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })}`
+          : '';
+
+        html += '<div style="border-top:1px solid rgba(255,255,255,0.07);margin:6px 0 4px"></div>';
+        html += tvRow(
+          isGrowth ? '#22c55e' : '#f97373',
+          label,
+          `${amountStr} (${pctStr})`,
+          isGrowth ? '#22c55e' : '#f97373'
+        );
+        if (rangeStr) {
+          html += `<div style="text-align:left;color:#787b86;font-size:11px;margin-top:2px">${rangeStr}</div>`;
+        }
+      }
       // Footer: exit datetime
       if (exitDateStr) {
         html += '<div style="border-top:1px solid rgba(255,255,255,0.07);margin-top:6px;padding-top:5px">';
