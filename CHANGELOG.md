@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Real-Time Live Chart MVP** (2026-03-04)
+
+    Full streaming pipeline: Bybit WebSocket → `LiveChartSessionManager` (fan-out)
+    → SSE endpoint → Browser `EventSource` → LightweightCharts live candle/marker updates.
+
+    **New files:**
+    - `backend/services/live_chart/session_manager.py` — `LiveChartSessionManager` with 1-WS-per-(symbol×interval) fan-out to N SSE subscriber queues
+    - `backend/services/live_chart/signal_service.py` — sliding OHLCV window (deque maxlen=500) + `StrategyBuilderAdapter` signal recompute on each closed bar
+    - `backend/services/live_chart/__init__.py` — package exports + `LIVE_CHART_MANAGER` singleton
+    - `tests/backend/services/test_live_chart_session.py` — 15 unit tests
+    - `tests/backend/services/test_live_signal_service.py` — 14 unit tests
+
+    **Modified:**
+    - `backend/api/routers/marketdata.py` — `GET /api/v1/marketdata/live-chart/stream` SSE endpoint (500-bar warmup, heartbeat every 20 s, reconnect via `Last-Event-ID`)
+    - `backend/api/lifespan.py` — `LIVE_CHART_MANAGER.shutdown_all()` registered in app shutdown
+    - `frontend/backtest-results.html` — `#btLiveChartBtn` in `.bt-price-chart-controls`
+    - `frontend/css/backtest_results.css` — `.bt-live-btn` with 5 states (idle/connecting/active/reconnecting/error) + `@keyframes live-pulse`
+    - `frontend/js/pages/backtest_results.js` — EventSource state machine, `_applyLiveSignals()` (500-marker cap), Page Visibility API pause/resume, REST backfill on reconnect
+
+    **Expert fixes applied:**
+    1. `push_closed_bar` returns `{"error": ..., "long": False, "short": False, "bars_used": N}` on failure — never raises
+    2. Empty bars (volume=0) are skipped before calling the adapter
+    3. Timing warning emitted if `generate_signals()` takes >2 s
+
 ### Fixed
 
 - **[CRITICAL] MACD AND logic: TradingView parity for cross_signal + cross_zero** (2026-03-03)
@@ -21,13 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     72 trades (net=-759 USDT, win=61.97%) to 42 trades (net=+1723 USDT, win=88.10%),
     **exactly matching TV benchmark.**
 
-    | Metric | Before | After | TV Benchmark |
-    |---|---|---|---|
-    | Total trades | 72 | **42** | 42 ✅ |
-    | TP / SL | 44 / 27 | **37 / 5** | 37 / 5 ✅ |
-    | Win rate | 61.97% | **88.10%** | 88.10% ✅ |
-    | Net profit | -759 USDT | **+1723 USDT** | +1723 USDT ✅ |
-    | Profit factor | — | **3.584** | 3.584 ✅ |
+    | Metric        | Before    | After          | TV Benchmark  |
+    | ------------- | --------- | -------------- | ------------- |
+    | Total trades  | 72        | **42**         | 42 ✅         |
+    | TP / SL       | 44 / 27   | **37 / 5**     | 37 / 5 ✅     |
+    | Win rate      | 61.97%    | **88.10%**     | 88.10% ✅     |
+    | Net profit    | -759 USDT | **+1723 USDT** | +1723 USDT ✅ |
+    | Profit factor | —         | **3.584**      | 3.584 ✅      |
 
     **Changes:** `backend/backtesting/indicator_handlers.py` — `_handle_macd()`:
     - When `use_cross=True` AND `use_zero_cross=True`: AND fresh signals → memory on combined
@@ -113,22 +139,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-    **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-    instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-    **price-change percentage** (6.6%), not the USDT amount.
+        **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+        instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+        **price-change percentage** (6.6%), not the USDT amount.
 
-    **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-    `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
-m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
+        **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+        `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
 
-    **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-    (no fallback chain) for all four long/short largest fields.
+    m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
 
-    **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-    TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-    (bars_in_trade now uses inclusive counting to match TV).
+        **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+        (no fallback chain) for all four long/short largest fields.
 
-    **File:** `scripts/_tv_calibration_check.py`
+        **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+        TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+        (bars_in_trade now uses inclusive counting to match TV).
+
+        **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 
