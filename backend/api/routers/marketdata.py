@@ -2492,3 +2492,163 @@ async def get_instrument_info(symbol: str):
     except Exception as e:
         logger.exception(f"Error fetching instrument info for {symbol}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# LIVE CHART SSE ENDPOINT
+# =============================================================================
+
+
+@router.get(
+    "/live-chart/stream",
+    summary="Real-time live chart streaming via SSE",
+    tags=["Live Chart"],
+    response_class=None,  # StreamingResponse — not a JSON model
+)
+async def live_chart_stream(
+    symbol: str = Query(..., description="Trading pair, e.g. BTCUSDT"),
+    interval: str = Query(..., description="Timeframe: 1, 5, 15, 30, 60, 240, D"),
+    session_id: str = Query(..., description="Unique browser session ID (generated client-side)"),
+    strategy_id: int | None = Query(None, description="ID of saved builder strategy (optional — enables live signals)"),
+    last_event_id: str | None = Query(
+        None, alias="lastEventId", description="Last received SSE event ID for reconnect"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Server-Sent Events stream for the live price chart.
+
+    Emits three event types:
+
+    * **tick** — open bar update (every Bybit WS tick)
+    * **bar_closed** — confirmed closed bar + optional strategy signals
+    * **heartbeat** — keepalive sent every 20 s when no data arrives
+
+    Event format::
+
+        id: 42
+        data: {"type":"tick","candle":{"time":…,"open":…,"high":…,"low":…,"close":…,"volume":…},"confirm":false}
+
+        id: 43
+        data: {"type":"bar_closed","candle":{…},"confirm":true,"signals":{"long":false,"short":true,"bars_used":500}}
+
+        data: {"type":"heartbeat"}
+
+    Live signals are computed only when ``strategy_id`` is supplied and the
+    strategy was created with the Strategy Builder (``is_builder_strategy=True``).
+
+    On reconnect the browser sends ``lastEventId``; warmup bars are **skipped**
+    because the browser already has them — only new events are delivered.
+    """
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
+    from backend.services.live_chart.signal_service import LiveSignalService
+
+    symbol_upper = symbol.upper()
+    is_reconnect = last_event_id is not None
+
+    # 1. Get-or-create shared WS session (fan-out)
+    try:
+        chart_session = await LIVE_CHART_MANAGER.get_or_create(symbol_upper, interval)
+    except Exception as exc:
+        logger.error("[LiveChart] Failed to create WS session for %s/%s: %s", symbol_upper, interval, exc)
+        raise HTTPException(status_code=503, detail=f"Unable to connect to Bybit WebSocket: {exc}")
+
+    # 2. Load warmup bars from DB (skip on reconnect — browser already has them)
+    signal_service: LiveSignalService | None = None
+
+    if not is_reconnect and strategy_id:
+        try:
+            warmup_rows = await asyncio.to_thread(
+                lambda: (
+                    db.query(BybitKlineAudit)
+                    .filter(
+                        BybitKlineAudit.symbol == symbol_upper,
+                        BybitKlineAudit.interval == interval,
+                    )
+                    .order_by(BybitKlineAudit.open_time.desc())
+                    .limit(500)
+                    .all()
+                )
+            )
+            warmup_bars = [
+                {
+                    "time": int(r.open_time / 1000),
+                    "open": float(r.open_price),
+                    "high": float(r.high_price),
+                    "low": float(r.low_price),
+                    "close": float(r.close_price),
+                    "volume": float(r.volume or 0),
+                }
+                for r in reversed(warmup_rows)
+            ]
+        except Exception as exc:
+            logger.warning("[LiveChart] Failed to load warmup bars: %s", exc)
+            warmup_bars = []
+
+        # 3. Load strategy graph (D1.3: use builder_graph, NOT strategy_config)
+        try:
+            from backend.database.models.strategy import Strategy as StrategyModel
+
+            strat_obj = await asyncio.to_thread(
+                lambda: db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
+            )
+            if strat_obj and strat_obj.is_builder_strategy and strat_obj.builder_graph:
+                strategy_graph = strat_obj.builder_graph  # already a dict via JSON column
+                signal_service = LiveSignalService(
+                    strategy_graph=strategy_graph,
+                    warmup_bars=warmup_bars,
+                    symbol=symbol_upper,
+                )
+        except Exception as exc:
+            logger.warning("[LiveChart] Failed to load strategy %s: %s", strategy_id, exc)
+
+    # 4. Subscribe this browser to the shared session
+    queue = chart_session.add_subscriber(session_id)
+
+    async def event_generator():
+        event_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
+        heartbeat_interval = 20  # seconds
+
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                except TimeoutError:
+                    # Keep SSE connection alive
+                    yield f"data: {_json.dumps({'type': 'heartbeat'})}\n\n"
+                    continue
+                except asyncio.CancelledError:
+                    break
+
+                # For closed bars: compute strategy signals
+                if event["type"] == "bar_closed" and signal_service is not None:
+                    signals = signal_service.push_closed_bar(event["candle"])
+                    event["signals"] = signals
+
+                event_id += 1
+                yield f"id: {event_id}\ndata: {_json.dumps(event)}\n\n"
+
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error(
+                "[LiveChart] SSE generator error for %s/%s sub=%s: %s", symbol_upper, interval, session_id, exc
+            )
+        finally:
+            chart_session.remove_subscriber(session_id)
+            await LIVE_CHART_MANAGER.cleanup(symbol_upper, interval)
+            logger.info("[LiveChart] SSE stream closed for session=%s (%s/%s)", session_id, symbol_upper, interval)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable NGINX response buffering for SSE
+        },
+    )

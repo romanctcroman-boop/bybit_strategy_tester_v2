@@ -122,6 +122,28 @@ let btPriceChartPending = false; // true when chart needs (re-)creation on tab s
 let _priceChartGeneration = 0; // generation counter to cancel stale async renders
 let _priceChartResizeObserver = null; // stored so we can disconnect on chart rebuild
 
+// ── Live Chart streaming state ─────────────────────────────────────────────
+/** @type {EventSource|null} Active SSE connection, null when not streaming. */
+let _liveChartSource = null;
+/** @type {string|null} Unique browser-session ID (generated once per page load). */
+let _liveChartSessionId = null;
+/** @type {Array} Markers produced by live signals (separate from historical trade markers). */
+let _liveChartMarkers = [];
+/** @type {boolean} True when live streaming is active (button pressed). */
+let _liveChartActive = false;
+/** @type {string} State machine state: idle | connecting | streaming | reconnecting | error */
+let _liveChartState = 'idle';
+/** @type {number} Consecutive reconnect attempts since last success. */
+let _liveChartRetryCount = 0;
+/** @type {string|null} Symbol currently being streamed. */
+let _liveSymbol = null;
+/** @type {string|null} Interval currently being streamed. */
+let _liveInterval = null;
+// Maximum live signal markers to keep in memory (prevents setMarkers() lag)
+const _LIVE_MARKERS_MAX = 500;
+// Maximum reconnect attempts before switching to ERROR state
+const _LIVE_MAX_RETRIES = 3;
+
 /**
  * Sync shim variables ↔ StateManager.
  * Called once from initializeBacktestResultsState() after the store slice
@@ -164,6 +186,12 @@ function _setupLegacyShimSync() {
   store.subscribe('backtestResults.priceChart.pending', (v) => { btPriceChartPending = !!v; });
   store.subscribe('backtestResults.priceChart.generation', (v) => { _priceChartGeneration = v ?? 0; });
   store.subscribe('backtestResults.priceChart.resizeObserver', (v) => { _priceChartResizeObserver = v; });
+
+  // Live chart state → shim
+  store.subscribe('backtestResults.priceChart.liveSource', (v) => { _liveChartSource = v ?? null; });
+  store.subscribe('backtestResults.priceChart.liveSessionId', (v) => { _liveChartSessionId = v ?? null; });
+  store.subscribe('backtestResults.priceChart.liveMarkers', (v) => { _liveChartMarkers = v ?? []; });
+  store.subscribe('backtestResults.priceChart.liveActive', (v) => { _liveChartActive = !!v; });
 
   // Seed store with current shim values (Sets are shared by reference)
   store.set('backtestResults.service.recentlyDeletedIds', recentlyDeletedIds);
@@ -4424,6 +4452,11 @@ async function updatePriceChart(backtest) {
       _priceChartResizeObserver.disconnect();
       _priceChartResizeObserver = null;
     }
+    // Stop live stream before destroying chart to avoid dangling SSE connection
+    if (_liveChartActive || _liveChartSource) {
+      stopLiveChart();
+      _liveChartMarkers = [];
+    }
     if (btPriceChart) {
       btPriceChart.remove();
       btPriceChart = null;
@@ -4536,6 +4569,20 @@ async function updatePriceChart(backtest) {
     setPriceChartTradeLineSeries(btTradeLineSeries);
     setPriceChartResizeObserver(_priceChartResizeObserver);
 
+    // Wire the Live button — remove stale handler by cloning, then add fresh one
+    const liveBtn = document.getElementById('btLiveChartBtn');
+    if (liveBtn) {
+      const freshBtn = liveBtn.cloneNode(true);
+      liveBtn.replaceWith(freshBtn);
+      freshBtn.addEventListener('click', () => {
+        if (_liveChartActive) {
+          stopLiveChart();
+        } else {
+          startLiveChart(backtest);
+        }
+      });
+    }
+
     console.log(`[PriceChart] Rendered ${candles.length} candles, ${btPriceChartMarkers.length} trade markers for ${symbol}/${interval}`);
 
   } catch (error) {
@@ -4585,12 +4632,13 @@ function buildTradeMarkers(trades, candles, options = {}) {
 
     if (!entryTimeSec || !exitTimeSec) return;
 
+    // Skip markers outside visible range BEFORE snapping (snapToCandle always
+    // returns a value inside [first, last], making the check useless after snap)
+    if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
+
     // Snap to nearest candle time
     entryTimeSec = snapToCandle(entryTimeSec, candles);
     exitTimeSec = snapToCandle(exitTimeSec, candles);
-
-    // Skip markers outside visible range
-    if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
 
     const sideNorm = (trade.side || 'long').toLowerCase();
     const isLong = sideNorm === 'long' || sideNorm === 'buy';
@@ -4691,61 +4739,82 @@ function buildTradePriceLines(trades, candles, chart) {
 
   const firstCandleTime = candles[0].time;
   const lastCandleTime = candles[candles.length - 1].time;
-  const seriesList = [];
 
+  // Build flat point arrays for two shared series:
+  //   entryPoints — dashed horizontal at entry_price (green/red depending on PnL)
+  //   exitPoints  — dotted horizontal at exit_price (same color, lighter)
+  // We separate profitable and losing trades into their own point arrays so
+  // each colour gets its own series (LightweightCharts doesn't support
+  // per-point colour on a line series).  4 series total instead of 2×N.
+  const profitEntry = []; // profitable trades — entry price segments
+  const lossEntry = []; // losing trades    — entry price segments
+  const profitExit = []; // profitable trades — exit price segments
+  const lossExit = []; // losing trades    — exit price segments
+
+  // Each horizontal segment is encoded as two points with the same value
+  // separated by a NaN point (NaN breaks the line so segments don't connect).
   trades.forEach((trade) => {
     let entryTimeSec = parseTradeTime(trade.entry_time);
     let exitTimeSec = parseTradeTime(trade.exit_time);
     if (!entryTimeSec || !exitTimeSec) return;
 
-    entryTimeSec = snapToCandle(entryTimeSec, candles);
-    exitTimeSec = snapToCandle(exitTimeSec, candles);
-
+    // Range check BEFORE snapping (snapToCandle always returns a value inside
+    // [first, last], so checking after snap is always false)
     if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
     if (exitTimeSec < firstCandleTime) return;
-    // Clamp exit to visible range
+    // Clamp exit to visible range before snapping
     if (exitTimeSec > lastCandleTime) exitTimeSec = lastCandleTime;
 
-    const entryPrice = trade.entry_price || 0;
-    const exitPrice = trade.exit_price || 0;
-    const pnl = trade.pnl || 0;
-    const isProfitable = pnl >= 0;
+    entryTimeSec = snapToCandle(entryTimeSec, candles);
+    exitTimeSec = snapToCandle(exitTimeSec, candles);
 
     // Don't draw line if entry and exit are on same candle
     if (entryTimeSec === exitTimeSec) return;
 
-    // --- Entry price line (dashed, from entry to exit) ---
-    const entryLine = chart.addLineSeries({
-      color: isProfitable ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+    const entryPrice = trade.entry_price || 0;
+    const exitPrice = trade.exit_price || 0;
+    const isProfitable = (trade.pnl || 0) >= 0;
+
+    const entryArr = isProfitable ? profitEntry : lossEntry;
+    entryArr.push(
+      { time: entryTimeSec, value: entryPrice },
+      { time: exitTimeSec, value: entryPrice },
+      { time: exitTimeSec, value: NaN }         // break between segments
+    );
+
+    if (Math.abs(exitPrice - entryPrice) > 0.01) {
+      const exitArr = isProfitable ? profitExit : lossExit;
+      exitArr.push(
+        { time: entryTimeSec, value: exitPrice },
+        { time: exitTimeSec, value: exitPrice },
+        { time: exitTimeSec, value: NaN }
+      );
+    }
+  });
+
+  // Helper: create one shared line series and populate it
+  const makeSeries = (points, color, lineStyle) => {
+    if (points.length === 0) return null;
+    // Sort by time — required by LightweightCharts (NaN breaks don't affect sort)
+    points.sort((a, b) => (a.time || 0) - (b.time || 0));
+    const series = chart.addLineSeries({
+      color,
       lineWidth: 1,
-      lineStyle: LightweightCharts.LineStyle.Dashed,
+      lineStyle,
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false
     });
-    entryLine.setData([
-      { time: entryTimeSec, value: entryPrice },
-      { time: exitTimeSec, value: entryPrice }
-    ]);
-    seriesList.push(entryLine);
+    series.setData(points);
+    return series;
+  };
 
-    // --- Exit price line (dotted, from entry to exit) for TP/SL visualization ---
-    if (Math.abs(exitPrice - entryPrice) > 0.01) {
-      const exitLine = chart.addLineSeries({
-        color: isProfitable ? 'rgba(38,166,154,0.3)' : 'rgba(239,83,80,0.3)',
-        lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dotted,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false
-      });
-      exitLine.setData([
-        { time: entryTimeSec, value: exitPrice },
-        { time: exitTimeSec, value: exitPrice }
-      ]);
-      seriesList.push(exitLine);
-    }
-  });
+  const seriesList = [
+    makeSeries(profitEntry, 'rgba(38,166,154,0.5)', LightweightCharts.LineStyle.Dashed),
+    makeSeries(lossEntry, 'rgba(239,83,80,0.5)', LightweightCharts.LineStyle.Dashed),
+    makeSeries(profitExit, 'rgba(38,166,154,0.3)', LightweightCharts.LineStyle.Dotted),
+    makeSeries(lossExit, 'rgba(239,83,80,0.3)', LightweightCharts.LineStyle.Dotted)
+  ].filter(Boolean);
 
   return seriesList;
 }
@@ -4808,6 +4877,282 @@ function formatInterval(interval) {
 }
 
 // ============================================
+// Live Chart Streaming
+// ============================================
+
+/**
+ * Normalize various timeframe representations to Bybit WS interval codes.
+ * @param {string} tf
+ * @returns {string}
+ */
+function _normalizeInterval(tf) {
+  const MAP = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240', '1d': 'D', '1w': 'W' };
+  return MAP[String(tf).toLowerCase()] ?? tf;
+}
+
+/**
+ * Return a stable unique session ID for this page load.
+ * @returns {string}
+ */
+function _getLiveChartSessionId() {
+  if (!_liveChartSessionId) {
+    _liveChartSessionId = `lc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  }
+  return _liveChartSessionId;
+}
+
+/**
+ * Update the Live button appearance for one of the 4 states.
+ * @param {'idle'|'connecting'|'streaming'|'reconnecting'|'error'} state
+ */
+function _updateLiveButton(state) {
+  const btn = document.getElementById('btLiveChartBtn');
+  if (!btn) return;
+
+  const STATES = {
+    idle: { text: '● Live', cls: '', title: 'Запустить real-time стриминг' },
+    connecting: { text: '◌ Connecting…', cls: 'connecting', title: 'Подключение к Bybit WS…' },
+    streaming: { text: '■ Stop Live', cls: 'active', title: 'Остановить стриминг' },
+    reconnecting: { text: '↻ Reconnect…', cls: 'reconnecting', title: `Переподключение (${_liveChartRetryCount}/${_LIVE_MAX_RETRIES})…` },
+    error: { text: '⚠ Live Error', cls: 'error', title: 'Ошибка стриминга. Нажмите для повтора.' }
+  };
+
+  const s = STATES[state] || STATES.idle;
+  btn.textContent = s.text;
+  btn.title = s.title;
+  btn.className = `bt-live-btn${s.cls ? ' ' + s.cls : ''}`;
+}
+
+/**
+ * Start the live chart stream for the given backtest.
+ *
+ * Guards against "hot start" when the chart is not yet rendered (expert fix).
+ * @param {Object} backtest — currentBacktest object
+ */
+function startLiveChart(backtest) {
+  if (_liveChartActive && _liveChartState === 'streaming') return;
+
+  // Expert fix: guard against hot start before chart is ready
+  if (!btCandleSeries || !_btCachedCandles || _btCachedCandles.length === 0) {
+    console.warn('[LiveChart] Chart not ready, retrying in 500 ms…');
+    setTimeout(() => startLiveChart(backtest), 500);
+    return;
+  }
+
+  const symbol = backtest.symbol || backtest.ticker;
+  const interval = _normalizeInterval(backtest.timeframe || backtest.interval || '15');
+  const stratId = backtest.strategy_id ?? backtest.id ?? null;
+
+  if (!symbol || !interval) {
+    console.warn('[LiveChart] Missing symbol or interval — cannot start');
+    return;
+  }
+
+  _liveSymbol = symbol;
+  _liveInterval = interval;
+  _liveChartActive = true;
+  _liveChartState = 'connecting';
+  _updateLiveButton('connecting');
+
+  const sessionId = _getLiveChartSessionId();
+  const params = new URLSearchParams({ symbol, interval, session_id: sessionId });
+  if (stratId) params.set('strategy_id', String(stratId));
+
+  const url = `/api/v1/marketdata/live-chart/stream?${params}`;
+  console.log(`[LiveChart] Connecting → ${url}`);
+
+  _liveChartSource = new EventSource(url);
+
+  _liveChartSource.onopen = async () => {
+    const wasReconnect = _liveChartRetryCount > 0;
+    _liveChartState = 'streaming';
+    _liveChartRetryCount = 0;
+    _updateLiveButton('streaming');
+    console.log('[LiveChart] SSE stream open');
+    // D3: backfill any bars missed during reconnect
+    if (wasReconnect) {
+      await _fetchMissingBars();
+    }
+  };
+
+  _liveChartSource.onerror = () => {
+    _liveChartRetryCount++;
+    console.warn(`[LiveChart] SSE error (attempt ${_liveChartRetryCount}/${_LIVE_MAX_RETRIES})`);
+    if (_liveChartRetryCount > _LIVE_MAX_RETRIES) {
+      _liveChartState = 'error';
+      _updateLiveButton('error');
+      if (_liveChartSource) {
+        _liveChartSource.close();
+        _liveChartSource = null;
+      }
+      console.error('[LiveChart] Max retries exceeded — stopped');
+    } else {
+      _liveChartState = 'reconnecting';
+      _updateLiveButton('reconnecting');
+      // EventSource auto-reconnects in ~3 s
+    }
+  };
+
+  _liveChartSource.onmessage = (evt) => {
+    try {
+      const event = JSON.parse(evt.data);
+      _handleLiveChartEvent(event);
+    } catch (e) {
+      console.error('[LiveChart] Failed to parse SSE event:', e);
+    }
+  };
+}
+
+/**
+ * Stop the live chart stream and reset to idle state.
+ * Safe to call when already stopped.
+ */
+function stopLiveChart() {
+  if (_liveChartSource) {
+    _liveChartSource.close();
+    _liveChartSource = null;
+  }
+  _liveChartActive = false;
+  _liveChartState = 'idle';
+  _updateLiveButton('idle');
+  console.log('[LiveChart] Stream stopped');
+}
+
+/**
+ * Handle an incoming SSE event from the live chart stream.
+ * @param {Object} event  — parsed event: {type, candle, signals?, ...}
+ */
+function _handleLiveChartEvent(event) {
+  if (!btCandleSeries) return;
+  if (event.type === 'heartbeat') return;
+  if (event.type !== 'tick' && event.type !== 'bar_closed') return;
+
+  const candle = event.candle;
+
+  // D3: Update candle on chart (handles open-bar updates AND new candles)
+  btCandleSeries.update({
+    time: candle.time,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close
+  });
+
+  // On confirmed closed bar: extend cache and apply signals
+  if (event.type === 'bar_closed') {
+    const lastHistoricalTime = _btCachedCandles.length > 0
+      ? _btCachedCandles[_btCachedCandles.length - 1].time
+      : 0;
+    if (candle.time > lastHistoricalTime) {
+      _btCachedCandles = [..._btCachedCandles, candle];
+    }
+    if (event.signals && !event.signals.empty_bar) {
+      _applyLiveSignals(candle.time, event.signals);
+    }
+  }
+}
+
+/**
+ * Add live signal markers to the chart for a just-closed bar.
+ * Expert fix: caps _liveChartMarkers at 500 entries (prevents setMarkers lag).
+ *
+ * @param {number} timeSec — bar close time in epoch seconds
+ * @param {Object} signals — {long: bool, short: bool, error?: string}
+ */
+function _applyLiveSignals(timeSec, signals) {
+  if (!btCandleSeries) return;
+
+  const newMarkers = [];
+  if (signals.long) {
+    newMarkers.push({
+      time: timeSec,
+      position: 'belowBar',
+      color: '#26a69a',
+      shape: 'arrowUp',
+      text: '▲ Live',
+      size: 1
+    });
+  }
+  if (signals.short) {
+    newMarkers.push({
+      time: timeSec,
+      position: 'aboveBar',
+      color: '#ef5350',
+      shape: 'arrowDown',
+      text: '▼ Live',
+      size: 1
+    });
+  }
+
+  if (newMarkers.length === 0) return;
+
+  // Expert fix: limit to 500 markers — slice oldest when limit exceeded
+  _liveChartMarkers = [..._liveChartMarkers, ...newMarkers].slice(-_LIVE_MARKERS_MAX);
+
+  // Merge with historical trade markers (LightweightCharts requires sorted order)
+  const allMarkers = [...btPriceChartMarkers, ..._liveChartMarkers]
+    .sort((a, b) => a.time - b.time);
+  btCandleSeries.setMarkers(allMarkers);
+}
+
+/**
+ * Backfill bars that were missed during an SSE reconnect gap.
+ */
+async function _fetchMissingBars() {
+  if (!_liveSymbol || !_liveInterval || _btCachedCandles.length === 0) return;
+
+  const lastTime = _btCachedCandles[_btCachedCandles.length - 1].time;
+  const now = Math.floor(Date.now() / 1000);
+  if (now - lastTime < 60) return;  // gap < 1 min — nothing to fill
+
+  try {
+    const resp = await fetch(
+      `/api/v1/marketdata/bybit/klines/range?symbol=${_liveSymbol}`
+      + `&interval=${_liveInterval}&start=${lastTime * 1000}&end=${now * 1000}`
+    );
+    if (!resp.ok) return;
+    const bars = await resp.json();
+    if (!Array.isArray(bars)) return;
+
+    for (const bar of bars) {
+      const c = {
+        time: Math.floor((bar.open_time ?? bar.start) / 1000),
+        open: parseFloat(bar.open),
+        high: parseFloat(bar.high),
+        low: parseFloat(bar.low),
+        close: parseFloat(bar.close)
+      };
+      if (c.time > lastTime) {
+        btCandleSeries.update(c);
+        _btCachedCandles.push(c);
+      }
+    }
+    console.log(`[LiveChart] Backfilled ${bars.length} missing bar(s) after reconnect`);
+  } catch (err) {
+    console.warn('[LiveChart] Failed to backfill missing bars:', err);
+  }
+}
+
+// D7: Page Visibility API — pause SSE when tab hidden, resume when visible
+document.addEventListener('visibilitychange', _onLiveChartVisibilityChange);
+
+function _onLiveChartVisibilityChange() {
+  if (document.hidden) {
+    if (_liveChartActive && _liveChartSource) {
+      _liveChartSource.close();
+      _liveChartSource = null;
+      _liveChartState = 'idle';
+      console.log('[LiveChart] Paused (tab hidden)');
+    }
+  } else {
+    if (_liveChartActive && !_liveChartSource && currentBacktest) {
+      console.log('[LiveChart] Resuming (tab visible)');
+      startLiveChart(currentBacktest);
+    }
+  }
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 
@@ -4833,6 +5178,10 @@ if (typeof window !== 'undefined') {
   window.selectAllForDelete = selectAllForDelete;
   window.deleteSelectedBacktests = deleteSelectedBacktests;
   window.toggleBulkSelectItem = toggleBulkSelectItem;
+
+  // Live chart controls — exposed for onclick in HTML and for external access
+  window.startLiveChart = startLiveChart;
+  window.stopLiveChart = stopLiveChart;
 
   window.backtestresultsPage = {
     loadBacktestResults,

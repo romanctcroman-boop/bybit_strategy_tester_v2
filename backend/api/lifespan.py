@@ -432,6 +432,19 @@ async def _shutdown_kline_db_service(app: "FastAPI"):
             logger.warning("⚠️ KlineDBService shutdown error: %s", e)
 
 
+async def _shutdown_live_chart_manager() -> None:
+    """Shut down all active LiveChart WebSocket sessions gracefully."""
+    try:
+        from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
+
+        if LIVE_CHART_MANAGER.active_session_count > 0:
+            logger.info("🛑 Shutting down %d live chart session(s)…", LIVE_CHART_MANAGER.active_session_count)
+            await LIVE_CHART_MANAGER.shutdown_all()
+            logger.info("✅ LiveChart sessions closed")
+    except Exception as exc:
+        logger.warning("⚠️ LiveChartManager shutdown error: %s", exc)
+
+
 def get_config():
     """Get CONFIG with fallback."""
     try:
@@ -526,3 +539,4 @@ async def lifespan(app: "FastAPI"):
     await _shutdown_plugin_manager(app)
     await _shutdown_websocket(app)
     await _shutdown_kline_db_service(app)
+    await _shutdown_live_chart_manager()

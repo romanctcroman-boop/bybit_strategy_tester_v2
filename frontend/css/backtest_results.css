@@ -945,7 +945,7 @@ body {
 
 /* Trades table container - scrollable list (no pagination) */
 .tv-trades-container {
-    max-height: 800px;  /* Increased height for better scrolling */
+    max-height: 800px; /* Increased height for better scrolling */
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -1865,5 +1865,70 @@ body {
     }
     .wf-stats-row {
         gap: 12px;
+    }
+}
+
+/* ─── Live Chart Button ─────────────────────────────────────────────── */
+
+.bt-live-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    margin-left: 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: transparent;
+    color: #aaa;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        border-color 0.2s,
+        color 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.bt-live-btn:hover {
+    border-color: #26a69a;
+    color: #26a69a;
+}
+
+/* CONNECTING state — orange pulse */
+.bt-live-btn.connecting {
+    color: #ffa726;
+    border-color: #ffa726;
+    animation: live-pulse 0.8s infinite;
+    cursor: default;
+}
+
+/* STREAMING (active) state — red pulse */
+.bt-live-btn.active {
+    color: #ef5350;
+    border-color: #ef5350;
+    animation: live-pulse 1.5s infinite;
+}
+
+/* RECONNECTING state — orange slower pulse */
+.bt-live-btn.reconnecting {
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: live-pulse 1s infinite;
+    cursor: default;
+}
+
+/* ERROR state — static red */
+.bt-live-btn.error {
+    color: #ef5350;
+    border-color: #ef5350;
+}
+
+@keyframes live-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
     }
 }
