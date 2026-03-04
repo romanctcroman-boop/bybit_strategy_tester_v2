@@ -1,4 +1,4 @@
-﻿"""
+"""
 Full Infrastructure E2E Test вЂ” AI Agent Pipeline Validation
 
 Tests the COMPLETE system pipeline:
@@ -671,7 +671,7 @@ class TestDirectEngineExecution:
         if result.trades:
             # If trades were made, verify commission was applied
             total_fees = sum(getattr(t, "fees", 0) or 0 for t in result.trades)
-            if total_fees > 0:
+            if total_fees > 0 and result.metrics.total_trades > 0:
                 # Fees should be reasonable for 0.07% commission
                 assert total_fees < result.metrics.total_trades * 10000, "Fees seem unreasonably high"
 

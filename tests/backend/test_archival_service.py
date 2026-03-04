@@ -51,23 +51,14 @@ _test_engine = create_engine(
 )
 _TestSessionLocal = sessionmaker(bind=_test_engine)
 
-# Monkey-patch backend.database BEFORE importing ArchivalService,
-# so that when it does `from backend.database import SessionLocal, engine`
-# it gets our test engine.
+# Import modules without patching at collection time — patching is done in setup_module()
 import backend.database as _dbmod
-
-_orig_engine = _dbmod.engine
-_orig_session = _dbmod.SessionLocal
-_dbmod.engine = _test_engine
-_dbmod.SessionLocal = _TestSessionLocal
-
-# Now import ArchivalService — it will pick up the patched engine/session
-# Also patch the already-imported references inside the archival_service module
 import backend.services.archival_service as _archival_mod
 from backend.services.archival_service import ArchivalService, ArchiveConfig
 
-_archival_mod.engine = _test_engine
-_archival_mod.SessionLocal = _TestSessionLocal
+# These will be set in setup_module() to avoid corrupting global state during collection
+_orig_engine = None
+_orig_session = None
 
 
 def make_row(symbol: str, ms: int):
@@ -86,6 +77,15 @@ def make_row(symbol: str, ms: int):
 
 
 def setup_module(module):
+    global _orig_engine, _orig_session
+    # Patch backend.database at test execution time (NOT collection time) to avoid
+    # corrupting backend.database.engine for other test modules during pytest collection.
+    _orig_engine = _dbmod.engine
+    _orig_session = _dbmod.SessionLocal
+    _dbmod.engine = _test_engine
+    _dbmod.SessionLocal = _TestSessionLocal
+    _archival_mod.engine = _test_engine
+    _archival_mod.SessionLocal = _TestSessionLocal
     Base.metadata.create_all(bind=_test_engine)
 
 

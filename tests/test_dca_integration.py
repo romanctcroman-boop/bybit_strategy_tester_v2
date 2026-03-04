@@ -3,11 +3,28 @@ DCA Integration Test - Run via pytest.
 Tests the ACTUAL data flow from Strategy Builder to DCA Engine.
 """
 
+import socket
 
 import pytest
 import requests
 
 BASE_URL = "http://localhost:8000"
+
+
+def _server_reachable() -> bool:
+    """Quick TCP check — returns False in < 0.5 s when server is down."""
+    try:
+        with socket.create_connection(("localhost", 8000), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+_SERVER_RUNNING = _server_reachable()
+pytestmark = pytest.mark.skipif(
+    not _SERVER_RUNNING,
+    reason="Server not reachable at localhost:8000 — start uvicorn to run these tests",
+)
 
 
 @pytest.fixture

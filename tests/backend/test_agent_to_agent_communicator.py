@@ -793,7 +793,7 @@ class TestValidationTelemetry:
         mock_get_agent.return_value = mock_agent
 
         telemetry = MagicMock()
-        telemetry.record_event = MagicMock()
+        telemetry.store_message = MagicMock()
 
         comm = AgentToAgentCommunicator(memory_manager=telemetry)
         result = await comm.validate_implementation(
@@ -802,7 +802,7 @@ class TestValidationTelemetry:
         )
 
         assert result["validated"] is True
-        telemetry.record_event.assert_called()
+        telemetry.store_message.assert_called()
 
     @pytest.mark.asyncio
     @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
@@ -827,7 +827,7 @@ class TestValidationTelemetry:
         mock_get_agent.return_value = mock_agent
 
         telemetry = MagicMock()
-        telemetry.record_event = MagicMock()
+        telemetry.store_message = MagicMock()
 
         backup = tmp_path / "unified_agent_interface.py.backup"
         target = tmp_path / "unified_agent_interface.py"
@@ -844,7 +844,7 @@ class TestValidationTelemetry:
 
         assert result["rolled_back"] is True
         assert "GOOD = True" in target.read_text(encoding="utf-8")
-        telemetry.record_event.assert_called()
+        telemetry.store_message.assert_called()
 
 
 # =============================================================================

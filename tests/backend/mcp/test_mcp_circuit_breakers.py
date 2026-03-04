@@ -5,11 +5,11 @@ Tests for P0-4 task: Per-tool circuit breakers in MCP bridge.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.mcp.mcp_integration import MCPFastAPIBridge, StructuredError
+from backend.mcp.mcp_integration import MCPFastAPIBridge
 
 
 class TestMCPFastAPIBridgeCircuitBreaker:
@@ -307,7 +307,6 @@ class TestCircuitBreakerIntegration:
     async def test_real_circuit_breaker_behavior(self):
         """Test with real CircuitBreakerManager."""
         from backend.agents.circuit_breaker_manager import (
-            CircuitBreakerManager,
             get_circuit_manager,
         )
 
@@ -372,13 +371,17 @@ class TestCircuitBreakerPerformance:
         async def mock_call_with_breaker(name, func):
             return await func()
 
+        original_call = bridge.circuit_manager.call_with_breaker
         bridge.circuit_manager.call_with_breaker = mock_call_with_breaker
 
-        # Measure overhead
-        start = time.time()
-        for _ in range(100):
-            await bridge.call_tool("fast_tool", {})
-        elapsed = time.time() - start
+        try:
+            # Measure overhead
+            start = time.time()
+            for _ in range(100):
+                await bridge.call_tool("fast_tool", {})
+            elapsed = time.time() - start
+        finally:
+            bridge.circuit_manager.call_with_breaker = original_call
 
         # Overhead should be < 20ms per call (100 calls = < 2000ms)
         assert elapsed < 2.0, f"Circuit breaker overhead too high: {elapsed}s for 100 calls"
@@ -402,11 +405,15 @@ class TestCircuitBreakerPerformance:
         async def mock_call_with_breaker(name, func):
             return await func()
 
+        original_call = bridge.circuit_manager.call_with_breaker
         bridge.circuit_manager.call_with_breaker = mock_call_with_breaker
 
-        # Call 10 tools concurrently
-        tasks = [bridge.call_tool(f"tool_{i}", {}) for i in range(10)]
-        await asyncio.gather(*tasks)
+        try:
+            # Call 10 tools concurrently
+            tasks = [bridge.call_tool(f"tool_{i}", {}) for i in range(10)]
+            await asyncio.gather(*tasks)
+        finally:
+            bridge.circuit_manager.call_with_breaker = original_call
 
         # All tools should be called
         assert call_count == 10

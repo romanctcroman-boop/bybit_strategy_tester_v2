@@ -3,7 +3,6 @@ Tests for Strategy Builder API
 Tests CRUD operations for visual block-based strategies.
 """
 
-
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -113,6 +112,37 @@ def sample_strategy_graph():
                 "y": 250,
                 "params": {},
             },
+            {
+                "id": "block_const_70",
+                "type": "constant",
+                "category": "input",
+                "name": "Constant 70",
+                "icon": "hash",
+                "x": 100,
+                "y": 400,
+                "params": {"value": 70},
+            },
+            {
+                "id": "block_greater_than",
+                "type": "greater_than",
+                "category": "condition",
+                "name": "Greater Than",
+                "icon": "chevron-double-up",
+                "x": 350,
+                "y": 380,
+                "params": {},
+            },
+            {
+                "id": "main_strategy",
+                "type": "strategy",
+                "category": "main",
+                "name": "Strategy",
+                "icon": "diagram-3",
+                "isMain": True,
+                "x": 600,
+                "y": 300,
+                "params": {},
+            },
         ],
         "connections": [
             {
@@ -125,6 +155,30 @@ def sample_strategy_graph():
                 "id": "conn_2",
                 "source": {"blockId": "block_const_30", "portId": "value"},
                 "target": {"blockId": "block_less_than", "portId": "b"},
+                "type": "data",
+            },
+            {
+                "id": "conn_3",
+                "source": {"blockId": "block_less_than", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "entry_long"},
+                "type": "data",
+            },
+            {
+                "id": "conn_4",
+                "source": {"blockId": "block_rsi", "portId": "value"},
+                "target": {"blockId": "block_greater_than", "portId": "a"},
+                "type": "data",
+            },
+            {
+                "id": "conn_5",
+                "source": {"blockId": "block_const_70", "portId": "value"},
+                "target": {"blockId": "block_greater_than", "portId": "b"},
+                "type": "data",
+            },
+            {
+                "id": "conn_6",
+                "source": {"blockId": "block_greater_than", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "exit_long"},
                 "type": "data",
             },
         ],
@@ -243,7 +297,8 @@ class TestUpdateStrategy:
         update_data = {
             **sample_strategy_graph,
             "name": "Updated Strategy Name",
-            "blocks": sample_strategy_graph["blocks"] + [
+            "blocks": sample_strategy_graph["blocks"]
+            + [
                 {
                     "id": "block_new",
                     "type": "ema",
@@ -318,7 +373,7 @@ class TestListStrategies:
         """Test listing with strategies"""
         # Create multiple strategies
         for i in range(3):
-            strategy_data = {**sample_strategy_graph, "name": f"Strategy {i+1}"}
+            strategy_data = {**sample_strategy_graph, "name": f"Strategy {i + 1}"}
             client.post("/api/v1/strategy-builder/strategies", json=strategy_data)
 
         response = client.get("/api/v1/strategy-builder/strategies")
@@ -335,7 +390,7 @@ class TestListStrategies:
         """Test pagination"""
         # Create 5 strategies
         for i in range(5):
-            strategy_data = {**sample_strategy_graph, "name": f"Strategy {i+1}"}
+            strategy_data = {**sample_strategy_graph, "name": f"Strategy {i + 1}"}
             client.post("/api/v1/strategy-builder/strategies", json=strategy_data)
 
         # Get first page
@@ -446,9 +501,7 @@ class TestGenerateCodeFromDb:
             "timeframe": "1h",
             "symbol": "BTCUSDT",
         }
-        create_resp = client.post(
-            "/api/v1/strategy-builder/strategies", json=minimal
-        )
+        create_resp = client.post("/api/v1/strategy-builder/strategies", json=minimal)
         assert create_resp.status_code == 200
         strategy_id = create_resp.json()["id"]
 
@@ -504,9 +557,7 @@ class TestBacktestEndpoint:
             "end_date": "2024-12-31T23:59:59Z",
         }
 
-        response = client.post(
-            "/api/v1/strategy-builder/strategies/nonexistent_id/backtest", json=backtest_data
-        )
+        response = client.post("/api/v1/strategy-builder/strategies/nonexistent_id/backtest", json=backtest_data)
 
         assert response.status_code == 404
 

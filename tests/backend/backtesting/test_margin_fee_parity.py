@@ -1,6 +1,6 @@
 """Tests for margin conservation, equity formula, and fee accuracy."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import numpy as np
@@ -10,7 +10,7 @@ import pytest
 from backend.backtesting.engine import BacktestEngine
 from backend.backtesting.models import BacktestConfig, StrategyType
 
-UTC = timezone.utc
+UTC = UTC
 
 
 def _cfg(**kw):
@@ -30,7 +30,11 @@ def _cfg(**kw):
         "direction": "long",
     }
     base.update(kw)
-    return BacktestConfig(**base)
+    cfg = BacktestConfig(**base)
+    # Ensure commission_value matches taker_fee for fee tests
+    if "taker_fee" in kw:
+        cfg = BacktestConfig(**{**base, "commission_value": kw["taker_fee"]})
+    return cfg
 
 
 def _ohlcv(prices):

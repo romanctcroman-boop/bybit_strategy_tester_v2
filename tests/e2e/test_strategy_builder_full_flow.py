@@ -106,12 +106,30 @@ def build_rsi_strategy() -> dict[str, Any]:
                 "params": {"value": 30},
             },
             {
+                "id": "block_const_70",
+                "type": "constant",
+                "category": "input",
+                "name": "Constant 70",
+                "x": 100,
+                "y": 300,
+                "params": {"value": 70},
+            },
+            {
                 "id": "block_less_than",
                 "type": "less_than",
                 "category": "condition",
                 "name": "Less Than",
                 "x": 500,
                 "y": 150,
+                "params": {},
+            },
+            {
+                "id": "block_greater_than",
+                "type": "greater_than",
+                "category": "condition",
+                "name": "Greater Than",
+                "x": 500,
+                "y": 280,
                 "params": {},
             },
             {
@@ -150,6 +168,24 @@ def build_rsi_strategy() -> dict[str, Any]:
                 "target": {"blockId": "main_strategy", "portId": "entry_long"},
                 "type": "data",
             },
+            {
+                "id": "conn_rsi_gt",
+                "source": {"blockId": "block_rsi", "portId": "value"},
+                "target": {"blockId": "block_greater_than", "portId": "a"},
+                "type": "data",
+            },
+            {
+                "id": "conn_const_gt",
+                "source": {"blockId": "block_const_70", "portId": "value"},
+                "target": {"blockId": "block_greater_than", "portId": "b"},
+                "type": "data",
+            },
+            {
+                "id": "conn_gt_exit",
+                "source": {"blockId": "block_greater_than", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "exit_long"},
+                "type": "data",
+            },
         ],
     }
 
@@ -171,7 +207,7 @@ class TestStrategyBuilderE2E:
 
         assert "id" in data, "Ответ должен содержать id стратегии"
         assert data["name"] == strategy_data["name"], "Имя стратегии должно совпадать"
-        assert data["is_builder_strategy"] == True, "is_builder_strategy должен быть True"
+        assert data["is_builder_strategy"], "is_builder_strategy должен быть True"
 
         # Сохранить ID для следующих тестов
         strategy_id_storage["id"] = data["id"]
@@ -188,11 +224,11 @@ class TestStrategyBuilderE2E:
         data = response.json()
 
         assert data["id"] == strategy_id, "ID стратегии должен совпадать"
-        assert data["is_builder_strategy"] == True, "is_builder_strategy должен быть True"
+        assert data["is_builder_strategy"], "is_builder_strategy должен быть True"
         assert "blocks" in data, "Ответ должен содержать blocks"
         assert "connections" in data, "Ответ должен содержать connections"
-        assert len(data["blocks"]) == 5, f"Ожидалось 5 блоков, получено {len(data['blocks'])}"
-        assert len(data["connections"]) == 4, f"Ожидалось 4 соединения, получено {len(data['connections'])}"
+        assert len(data["blocks"]) == 7, f"Ожидалось 7 блоков, получено {len(data['blocks'])}"
+        assert len(data["connections"]) == 7, f"Ожидалось 7 соединений, получено {len(data['connections'])}"
 
     def test_03_update_strategy(self, client, strategy_id_storage):
         """Тест 3: Обновление стратегии"""
@@ -229,7 +265,7 @@ class TestStrategyBuilderE2E:
         assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}: {response.text}"
         data = response.json()
 
-        assert data["success"] == True, f"Генерация кода должна быть успешной: {data.get('errors')}"
+        assert data["success"], f"Генерация кода должна быть успешной: {data.get('errors')}"
         assert "code" in data, "Ответ должен содержать сгенерированный код"
         assert "strategy_name" in data, "Ответ должен содержать имя класса стратегии"
         assert len(data["code"]) > 0, "Код не должен быть пустым"
@@ -256,7 +292,9 @@ class TestStrategyBuilderE2E:
         )
 
         # Бэктест может использовать синтетические данные в тестовой среде
-        assert response.status_code in [200, 201], f"Ожидался статус 200/201, получен {response.status_code}: {response.text}"
+        assert response.status_code in [200, 201], (
+            f"Ожидался статус 200/201, получен {response.status_code}: {response.text}"
+        )
 
     def test_06_list_strategies(self, client):
         """Тест 6: Получение списка стратегий"""
@@ -267,7 +305,9 @@ class TestStrategyBuilderE2E:
         data = response.json()
 
         # API возвращает "strategies" и "total"
-        assert "strategies" in data or "items" in data, f"Ответ должен содержать strategies или items. Получено: {list(data.keys())}"
+        assert "strategies" in data or "items" in data, (
+            f"Ответ должен содержать strategies или items. Получено: {list(data.keys())}"
+        )
         assert "total" in data, f"Ответ должен содержать total. Получено: {list(data.keys())}"
 
     def test_07_delete_strategy(self, client, strategy_id_storage):

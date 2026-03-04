@@ -8,6 +8,7 @@ Note: Requires Redis server running on localhost:6379
 """
 
 import os
+import socket
 import sys
 import time
 
@@ -16,17 +17,32 @@ sys.path.insert(0, "d:/bybit_strategy_tester_v2")
 import pytest
 
 from backend.monitoring.redis_cache import (
-    RedisContextCache,
-    RedisCacheConfig,
-    get_redis_cache,
     REDIS_AVAILABLE,
+    RedisCacheConfig,
+    RedisContextCache,
+    get_redis_cache,
 )
 
 
-# Skip all tests if redis package not installed
+def _redis_reachable() -> bool:
+    """Quick TCP check — returns False in < 0.5 s when Redis is down."""
+    if not REDIS_AVAILABLE:
+        return False
+    host = os.getenv("REDIS_HOST", "localhost")
+    port = int(os.getenv("REDIS_PORT", "6379"))
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+_REDIS_RUNNING = _redis_reachable()
+
+# Skip all tests if redis package not installed OR Redis not reachable
 pytestmark = pytest.mark.skipif(
-    not REDIS_AVAILABLE,
-    reason="Redis package not installed. Install with: pip install redis"
+    not _REDIS_RUNNING,
+    reason="Redis not reachable — start Redis to run these tests",
 )
 
 
@@ -59,10 +75,10 @@ class TestRedisContextCache:
     def test_redis_connection(self, cache):
         """Test Redis connection."""
         stats = cache.get_stats()
-        
+
         # Should have backend info
         assert "backend" in stats
-        
+
         # If connected, should be redis
         if not cache.is_using_fallback():
             assert stats["backend"] == "redis"
@@ -71,11 +87,11 @@ class TestRedisContextCache:
     def test_set_and_get(self, cache):
         """Test basic set and get."""
         data = {"symbol": "BTCUSDT", "regime": "trending"}
-        
+
         # Set
         success = cache.set("test_key", data, ttl=60)
         assert success is True
-        
+
         # Get
         result = cache.get("test_key")
         assert result == data
@@ -88,46 +104,46 @@ class TestRedisContextCache:
     def test_ttl_expiration(self, cache):
         """Test TTL-based expiration."""
         data = {"test": "data"}
-        
+
         # Set with short TTL
         cache.set("ttl_key", data, ttl=1)
-        
+
         # Should exist immediately
         assert cache.get("ttl_key") == data
-        
+
         # Wait for expiration
         time.sleep(1.5)
-        
+
         # Should be expired
         assert cache.get("ttl_key") is None
 
     def test_delete(self, cache):
         """Test deleting key."""
         data = {"test": "data"}
-        
+
         # Set
         cache.set("delete_key", data)
-        
+
         # Verify exists
         assert cache.get("delete_key") == data
-        
+
         # Delete
         success = cache.delete("delete_key")
         assert success is True
-        
+
         # Verify deleted
         assert cache.get("delete_key") is None
 
     def test_exists(self, cache):
         """Test key existence check."""
         data = {"test": "data"}
-        
+
         # Should not exist
         assert cache.exists("exists_key") is False
-        
+
         # Set
         cache.set("exists_key", data)
-        
+
         # Should exist
         assert cache.exists("exists_key") is True
 
@@ -137,13 +153,13 @@ class TestRedisContextCache:
         cache.set("key1", {"data": 1})
         cache.set("key2", {"data": 2})
         cache.set("key3", {"data": 3})
-        
+
         # Clear
         deleted = cache.clear()
-        
+
         # Should delete at least 3 keys
         assert deleted >= 3
-        
+
         # Verify cleared
         assert cache.get("key1") is None
         assert cache.get("key2") is None
@@ -152,7 +168,7 @@ class TestRedisContextCache:
     def test_stats(self, cache):
         """Test cache statistics."""
         stats = cache.get_stats()
-        
+
         assert isinstance(stats, dict)
         assert "backend" in stats
         assert "size" in stats or "connected" in stats
@@ -164,12 +180,12 @@ class TestRedisContextCache:
             enabled=False,
             fallback_to_memory=True,
         )
-        
+
         cache = RedisContextCache(config)
-        
+
         # Should use fallback
         assert cache.is_using_fallback() is True
-        
+
         # Should still work (in-memory)
         data = {"test": "data"}
         cache.set("fallback_key", data)
@@ -180,10 +196,10 @@ class TestRedisContextCache:
         """Test reconnection."""
         # Disconnect by setting flag
         cache._using_fallback = True
-        
+
         # Try to reconnect
         success = cache.reconnect()
-        
+
         # May succeed or fail depending on Redis availability
         assert isinstance(success, bool)
 
@@ -196,13 +212,13 @@ class TestRedisContextCache:
             "bool": True,
             "null": None,
         }
-        
+
         # Set
         cache.set("complex_key", data)
-        
+
         # Get
         result = cache.get("complex_key")
-        
+
         # Should match
         assert result == data
 
@@ -214,13 +230,13 @@ class TestRedisContextCache:
             "russian": "Привет",
             "arabic": "مرحبا",
         }
-        
+
         # Set
         cache.set("unicode_key", data)
-        
+
         # Get
         result = cache.get("unicode_key")
-        
+
         # Should match
         assert result == data
 
@@ -231,7 +247,7 @@ class TestRedisCacheConfig:
     def test_default_config(self):
         """Test default configuration."""
         config = RedisCacheConfig()
-        
+
         assert config.host == "localhost"
         assert config.port == 6379
         assert config.db == 0
@@ -249,7 +265,7 @@ class TestRedisCacheConfig:
             default_ttl=600,
             prefix="custom:",
         )
-        
+
         assert config.host == "redis.example.com"
         assert config.port == 6380
         assert config.db == 2
@@ -265,7 +281,7 @@ class TestGlobalCache:
         """Test singleton pattern."""
         cache1 = get_redis_cache()
         cache2 = get_redis_cache()
-        
+
         # Should be same instance
         assert cache1 is cache2
 
@@ -275,14 +291,14 @@ class TestGlobalCache:
         os.environ["REDIS_HOST"] = "localhost"
         os.environ["REDIS_PORT"] = "6379"
         os.environ["REDIS_DB"] = "0"
-        
+
         from backend.monitoring.redis_cache import init_redis_cache_from_env
-        
+
         cache = init_redis_cache_from_env()
-        
+
         # Should create cache instance
         assert cache is not None
-        
+
         # Cleanup
         del os.environ["REDIS_HOST"]
         del os.environ["REDIS_PORT"]
