@@ -70,6 +70,7 @@ class BlockType(Enum):
 
     # Risk Management
     RISK_POSITION_SIZE = "risk_position_size"
+    RISK_STATIC_SLTP = "risk_static_sltp"
     RISK_MAX_DRAWDOWN = "risk_max_drawdown"
     RISK_DAILY_LIMIT = "risk_daily_limit"
     RISK_CORRELATION = "risk_correlation"

@@ -12,6 +12,7 @@ Features:
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -102,7 +103,7 @@ class CodeGenerator:
         }
 
         # Block type to code mapping
-        self.block_generators: dict[BlockType, callable] = {
+        self.block_generators: dict[BlockType, Callable] = {
             BlockType.CANDLE_DATA: self._gen_candle_data,
             BlockType.INDICATOR_RSI: self._gen_rsi,
             BlockType.INDICATOR_MACD: self._gen_macd,
@@ -125,6 +126,7 @@ class CodeGenerator:
             BlockType.FILTER_TIME: self._gen_time_filter,
             BlockType.FILTER_VOLUME: self._gen_volume_filter,
             BlockType.RISK_POSITION_SIZE: self._gen_position_size,
+            BlockType.RISK_STATIC_SLTP: self._gen_static_sltp,
             BlockType.OUTPUT_SIGNAL: self._gen_output,
         }
 
@@ -166,7 +168,7 @@ class CodeGenerator:
 
             # Generate code for each block
             block_code = {}
-            variables = {}
+            variables: dict[str, str] = {}
 
             for block_id in execution_order:
                 block = graph.blocks[block_id]
@@ -915,6 +917,43 @@ class CodeGenerator:
 {indent}    'risk_per_trade': {risk_per_trade},
 {indent}    'max_position_pct': {max_position},
 {indent}}}
+"""
+        return code, var_name
+
+    def _gen_static_sltp(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
+        """Generate static stop-loss / take-profit config comment.
+
+        The actual SL/TP values are passed at backtest time via BacktestConfig,
+        but we emit a comment so exported code documents the intended values.
+        """
+        var_name = self._make_var_name(block)
+        indent = options.indent * 2
+        block_type_raw = block.name.lower()
+
+        if "trailing" in block_type_raw:
+            activation = block.parameters.get("activation_percent", 1.0)
+            trailing = block.parameters.get("trailing_percent", 0.5)
+            code = f"""
+{indent}# Trailing Stop Exit: {block.name}
+{indent}# Activation: {activation}%, Trailing distance: {trailing}%
+{indent}{var_name} = {{'type': 'trailing', 'activation_percent': {activation}, 'trailing_percent': {trailing}}}
+"""
+        elif "atr" in block_type_raw:
+            sl_mult = block.parameters.get("sl_multiplier", block.parameters.get("stop_loss_atr_mult", 1.5))
+            tp_mult = block.parameters.get("tp_multiplier", block.parameters.get("take_profit_atr_mult", 3.0))
+            code = f"""
+{indent}# ATR-based SL/TP: {block.name}
+{indent}# SL multiplier: {sl_mult}x ATR, TP multiplier: {tp_mult}x ATR
+{indent}{var_name} = {{'type': 'atr_sltp', 'sl_multiplier': {sl_mult}, 'tp_multiplier': {tp_mult}}}
+"""
+        else:
+            sl_pct = block.parameters.get("stop_loss_percent", block.parameters.get("stop_loss", 1.5))
+            tp_pct = block.parameters.get("take_profit_percent", block.parameters.get("take_profit", 3.0))
+            breakeven = block.parameters.get("activate_breakeven", False)
+            code = f"""
+{indent}# Static SL/TP: {block.name}
+{indent}# Stop Loss: {sl_pct}%, Take Profit: {tp_pct}%{", Breakeven enabled" if breakeven else ""}
+{indent}{var_name} = {{'type': 'static_sltp', 'stop_loss_percent': {sl_pct}, 'take_profit_percent': {tp_pct}, 'activate_breakeven': {breakeven}}}
 """
         return code, var_name
 

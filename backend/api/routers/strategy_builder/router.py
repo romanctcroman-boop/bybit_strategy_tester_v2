@@ -34,6 +34,7 @@ from backend.database.models import (
     StrategyVersion,
 )
 from backend.database.models.backtest import BacktestStatus as DBBacktestStatus
+from backend.services.adapters.bybit import BybitAdapter
 from backend.services.strategy_builder import (
     BlockType,
     CodeGenerator,
@@ -386,8 +387,6 @@ async def refresh_symbols_cache(request: Request):
     Called by the "Refresh list" button in Properties panel.
     """
     try:
-        from backend.services.adapters.bybit import BybitAdapter
-
         adapter = BybitAdapter(
             api_key=os.environ.get("BYBIT_API_KEY"),
             api_secret=os.environ.get("BYBIT_API_SECRET"),
@@ -1201,6 +1200,16 @@ async def generate_code_from_db(
         "time_filter": BlockType.FILTER_TIME,
         "volume_filter": BlockType.FILTER_VOLUME,
         "position_size": BlockType.RISK_POSITION_SIZE,
+        "fixed_size": BlockType.RISK_POSITION_SIZE,
+        "percent_balance": BlockType.RISK_POSITION_SIZE,
+        "risk_percent": BlockType.RISK_POSITION_SIZE,
+        # Static SL/TP and exit management blocks
+        "static_sltp": BlockType.RISK_STATIC_SLTP,
+        "atr_sltp": BlockType.RISK_STATIC_SLTP,
+        "trailing_stop_exit": BlockType.RISK_STATIC_SLTP,
+        "atr_exit": BlockType.RISK_STATIC_SLTP,
+        "multi_tp_exit": BlockType.RISK_STATIC_SLTP,
+        "close_by_time": BlockType.RISK_STATIC_SLTP,
         # Inputs/data
         "price": BlockType.CANDLE_DATA,
         "volume": BlockType.CANDLE_DATA,
@@ -1345,6 +1354,12 @@ async def list_templates(
     }
 
 
+@router.get("/templates/categories")
+async def list_template_categories():
+    """List template categories"""
+    return {"categories": [{"id": c.value, "name": c.name.replace("_", " ").title()} for c in TemplateCategory]}
+
+
 @router.get("/templates/{template_id}")
 async def get_template(template_id: str):
     """Get a template by ID"""
@@ -1379,12 +1394,6 @@ async def instantiate_template(request: InstantiateTemplateRequest):
     strategy_builder.strategies[graph.id] = graph
 
     return graph.to_dict()
-
-
-@router.get("/templates/categories")
-async def list_template_categories():
-    """List template categories"""
-    return {"categories": [{"id": c.value, "name": c.name.replace("_", " ").title()} for c in TemplateCategory]}
 
 
 # === Indicator Endpoints ===
@@ -2512,11 +2521,19 @@ class BacktestRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "BacktestRequest":
-        """Ensure start_date is before end_date."""
-        if self.start_date and self.end_date and self.start_date >= self.end_date:
-            raise ValueError(
-                f"start_date ({self.start_date.isoformat()}) must be before end_date ({self.end_date.isoformat()})"
-            )
+        """Ensure start_date is before end_date.
+
+        Normalises both dates to naive UTC before comparing to avoid
+        TypeError when one is timezone-aware and the other is naive.
+        """
+        if self.start_date and self.end_date:
+            # Strip timezone info for a plain comparison (both treated as UTC)
+            s = self.start_date.replace(tzinfo=None) if self.start_date.tzinfo else self.start_date
+            e = self.end_date.replace(tzinfo=None) if self.end_date.tzinfo else self.end_date
+            if s >= e:
+                raise ValueError(
+                    f"start_date ({self.start_date.isoformat()}) must be before end_date ({self.end_date.isoformat()})"
+                )
         return self
 
 

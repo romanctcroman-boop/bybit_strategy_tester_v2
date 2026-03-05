@@ -133,6 +133,9 @@ class BuilderWorkflowConfig:
     # AI Deliberation — optional, uses real LLM agents for planning
     enable_deliberation: bool = False
 
+    # Primary LLM agent for single-agent calls (qwen | deepseek | perplexity)
+    agent: str = "qwen"
+
     # Existing strategy — when set, skip create/blocks/connect stages (optimize mode)
     existing_strategy_id: str | None = None
 
@@ -293,6 +296,9 @@ class BuilderWorkflowResult:
     completed_at: str = ""
     # True when the run used optimizer sweep mode (for UI display)
     used_optimizer_mode: bool = False
+    # Final saved version name/id — set after the iteration loop completes
+    final_version_name: str = ""
+    final_version_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize result to dict."""
@@ -313,6 +319,8 @@ class BuilderWorkflowResult:
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "used_optimizer_mode": self.used_optimizer_mode,
+            "final_version_name": self.final_version_name,
+            "final_version_id": self.final_version_id,
         }
 
 
@@ -426,6 +434,8 @@ class BuilderWorkflow:
             started_at=datetime.now(UTC).isoformat(),
             used_optimizer_mode=config.use_optimizer_mode,
         )
+        # Store selected agent for use in helper methods that don't receive config
+        self._primary_agent: str = config.agent if config.agent in {"qwen", "deepseek", "perplexity"} else "qwen"
         start_time = time.monotonic()
 
         try:
@@ -444,6 +454,15 @@ class BuilderWorkflow:
             if config.existing_strategy_id:
                 self._result.strategy_id = config.existing_strategy_id
                 logger.info(f"[BuilderWorkflow] Optimize mode — using existing strategy: {config.existing_strategy_id}")
+                self._emit_agent_log(
+                    agent=self._primary_agent,
+                    role="planner",
+                    prompt=f"Optimizing existing strategy: {config.existing_strategy_id}",
+                    response=f"🔧 Optimize mode — loading existing strategy blocks and connections.\n"
+                    f"Symbol: {config.symbol} | Timeframe: {config.timeframe}m | "
+                    f"Agent: {self._primary_agent}",
+                    title=f"🔧 Optimize mode — {config.symbol} {config.timeframe}m",
+                )
 
                 # Fetch existing strategy state.  We need blocks (with params) and
                 # connections (graph topology) for both deliberation context and
@@ -830,6 +849,46 @@ class BuilderWorkflow:
             # ── Save best config to Semantic Memory (survives restarts) ───────
             await self._memory_store_best_config(config, best_iteration_record)
 
+            # ── Save FINAL version as a named clone ───────────────────────────
+            # Always save a permanent "final" clone so the user has a clearly
+            # named snapshot with the best parameters that came out of this run.
+            # Naming convention:
+            #   optimize mode : {base}_opt_v{iterations}
+            #   build mode    : {name}_ai_v{iterations}
+            try:
+                from backend.agents.mcp.tools.strategy_builder import (
+                    builder_clone_strategy,
+                )
+
+                _total_iters = len(self._result.iterations)
+                _base = config.name.split("_v")[0].split("_opt_")[0].split("_ai_")[0]
+                if config.existing_strategy_id:
+                    _final_name = f"{_base}_opt_v{_total_iters}"
+                else:
+                    _final_name = f"{_base}_ai_v{_total_iters}"
+
+                final_clone = await builder_clone_strategy(
+                    strategy_id=self._result.strategy_id,
+                    new_name=_final_name,
+                )
+                if isinstance(final_clone, dict) and "error" not in final_clone:
+                    self._result.final_version_name = _final_name
+                    self._result.final_version_id = final_clone.get("id", "")
+                    logger.info(
+                        f"[BuilderWorkflow] ✅ Final version saved: {_final_name} (id={self._result.final_version_id})"
+                    )
+                    self._emit_agent_log(
+                        agent=self._primary_agent,
+                        role="planner",
+                        prompt="Saving final optimized version",
+                        response=f"✅ Final strategy saved as «{_final_name}»\nID: {self._result.final_version_id}",
+                        title=f"💾 Saved: {_final_name}",
+                    )
+                else:
+                    logger.warning(f"[BuilderWorkflow] Final version clone failed: {final_clone}")
+            except Exception as _fv_err:
+                logger.warning(f"[BuilderWorkflow] Final version save error (non-fatal): {_fv_err}")
+
             # Completed
             self._set_stage(BuilderStage.COMPLETED)
 
@@ -989,28 +1048,23 @@ Recommended approach for positive profit (EMA + RSI combination):
 }}"""
 
         try:
-            from backend.agents.unified_agent_interface import get_agent_interface
+            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
 
-            agent = get_agent_interface()
-            result = await agent.query_deepseek(
-                prompt,
-                model="deepseek-chat",
-                temperature=0.3,  # low temp for structured JSON output
-                max_tokens=1500,
-                use_cache=False,
-            )
-
-            raw_text: str = result.get("response", "") or ""
-            logger.debug(f"[BuilderWorkflow] LLM plan raw response ({len(raw_text)} chars)")
+            _agent_name = config.agent if config.agent in {"qwen", "deepseek", "perplexity"} else "qwen"
+            delib = get_real_deliberation()
+            raw_text: str = await delib._real_ask(_agent_name, prompt) or ""
+            logger.debug(f"[BuilderWorkflow] LLM plan raw response from {_agent_name} ({len(raw_text)} chars)")
 
             # Emit agent log so the SSE panel can show what the planner said
             self._emit_agent_log(
-                agent="deepseek",
+                agent=_agent_name,
                 role="planner",
                 prompt=prompt,
                 response=raw_text,
                 title=f"📐 Strategy Design for {config.symbol} {config.timeframe}m",
             )
+
+            result: dict[str, Any] = {"response": raw_text, "success": bool(raw_text)}
 
             # Extract JSON from response — model may wrap in ```json ... ```
             json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
@@ -1922,26 +1976,19 @@ Only include the specific parameters that should change."""
                 logger.info("[BuilderWorkflow] A2A consensus returned empty — falling back to single LLM")
 
         except Exception as a2a_err:
-            logger.warning(f"[BuilderWorkflow] A2A consensus failed ({a2a_err}), falling back to single DeepSeek")
+            logger.warning(f"[BuilderWorkflow] A2A consensus failed ({a2a_err}), falling back to single LLM")
 
-        # ── Single DeepSeek fallback ──────────────────────────────────────────
+        # ── Single-agent fallback (uses config.agent set at run() start) ──────
         try:
-            from backend.agents.unified_agent_interface import get_agent_interface
+            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
 
-            agent = get_agent_interface()
-            result = await agent.query_deepseek(
-                prompt,
-                model="deepseek-chat",
-                temperature=0.2,
-                max_tokens=800,
-                use_cache=False,
-            )
+            _agent_name = getattr(self, "_primary_agent", "qwen")
+            delib = get_real_deliberation()
+            raw_text_fallback: str = await delib._real_ask(_agent_name, prompt) or ""
 
-            raw_text_fallback = result.get("response", "") or ""
-
-            # Emit agent log for the single-DeepSeek fallback
+            # Emit agent log for the single-agent fallback
             self._emit_agent_log(
-                agent="deepseek",
+                agent=_agent_name,
                 role="optimizer",
                 prompt=prompt,
                 response=raw_text_fallback,
@@ -1957,7 +2004,7 @@ Only include the specific parameters that should change."""
                 raise ValueError("LLM returned non-list adjustments")
 
             logger.info(
-                f"[BuilderWorkflow] 🤖 DeepSeek suggested {len(adjustments)} adjustments (iteration {iteration})"
+                f"[BuilderWorkflow] 🤖 {_agent_name} suggested {len(adjustments)} adjustments (iteration {iteration})"
             )
             return adjustments
 
@@ -2145,21 +2192,15 @@ Rules:
         except Exception as a2a_err:
             logger.warning(f"[BuilderWorkflow] A2A range consensus failed ({a2a_err}), falling back")
 
-        # ── Single DeepSeek fallback ──────────────────────────────────────────
+        # ── Single-agent fallback (uses config.agent set at run() start) ──────
         try:
-            from backend.agents.unified_agent_interface import get_agent_interface
+            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
 
-            agent = get_agent_interface()
-            result = await agent.query_deepseek(
-                prompt,
-                model="deepseek-chat",
-                temperature=0.2,
-                max_tokens=1000,
-                use_cache=False,
-            )
-            raw_text = result.get("response", "") or ""
+            _agent_name = getattr(self, "_primary_agent", "qwen")
+            delib = get_real_deliberation()
+            raw_text: str = await delib._real_ask(_agent_name, prompt) or ""
             self._emit_agent_log(
-                agent="deepseek",
+                agent=_agent_name,
                 role="optimizer",
                 prompt=prompt,
                 response=raw_text,

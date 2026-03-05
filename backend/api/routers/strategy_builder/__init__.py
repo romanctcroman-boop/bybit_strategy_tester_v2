@@ -28,11 +28,19 @@ from backend.api.routers.strategy_builder.router import (
     OptimizationLimits,
     ParamRangeSpec,
     SortSpec,
+    StrategyGraph,
     StrategyResponse,
     UpdateBlockRequest,
+    code_generator,
+    indicator_library,
     # FastAPI router
     router,
+    # Singleton services — tests patch these via sb_router.strategy_builder.strategies etc.
+    strategy_builder,
+    template_manager,
+    validator,
 )
+from backend.services.adapters.bybit import BybitAdapter
 
 __all__ = [
     "AddBlockRequest",
@@ -40,6 +48,7 @@ __all__ = [
     "BacktestRequest",
     "BlockResponse",
     "BuilderOptimizationRequest",
+    "BybitAdapter",
     "ConnectBlocksRequest",
     "CreateStrategyRequest",
     "DataPeriod",
@@ -52,10 +61,17 @@ __all__ = [
     "OptimizationLimits",
     "ParamRangeSpec",
     "SortSpec",
+    "StrategyGraph",
     "StrategyResponse",
     "UpdateBlockRequest",
+    "code_generator",
     "get_db",
+    "indicator_library",
     "router",
+    # Singleton services — exposed for test patching
+    "strategy_builder",
+    "template_manager",
+    "validator",
 ]
 
 # Re-export get_db so that unittest.mock.patch("backend.api.routers.strategy_builder.get_db")
