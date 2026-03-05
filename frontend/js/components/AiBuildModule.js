@@ -118,55 +118,117 @@ export function createAiBuildModule(deps) {
     /** Counts for each agent column badge */
     const _agentMsgCount = { deepseek: 0, qwen: 0, perplexity: 0 };
 
+    // ── Helper: load strategies from DB into #aiExistingStrategy ─────────────
+    async function _loadStrategiesList() {
+        const sel = document.getElementById('aiExistingStrategy');
+        if (!sel) return;
+        try {
+            const resp = await fetch('/api/v1/strategies/?page_size=100');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const strategies = Array.isArray(data) ? data : (data.items || data.strategies || []);
+            // keep first empty option
+            sel.innerHTML = '<option value="">— Создать новую стратегию —</option>';
+            strategies.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id || s.strategy_id || '';
+                const symbol = s.symbol || '';
+                const tf = s.timeframe ? s.timeframe + 'm' : '';
+                const name = s.name || s.strategy_name || s.id || '?';
+                opt.textContent = `${name}${symbol ? ' · ' + symbol : ''}${tf ? ' · ' + tf : ''}`;
+                opt.dataset.stratName = name;
+                sel.appendChild(opt);
+            });
+        } catch (e) {
+            console.warn('[AI Build] Could not load strategies:', e);
+        }
+    }
+
+    // ── Helper: apply mode based on #aiExistingStrategy selection ────────────
+    function _applyExistingStrategySelection() {
+        const sel = document.getElementById('aiExistingStrategy');
+        const hint = document.getElementById('aiExistingStrategyHint');
+        const nameHint = document.getElementById('aiNameHint');
+        const aiNameEl = document.getElementById('aiName');
+        const presetHeading = document.querySelector('.ai-build-preset-heading');
+        const presetSelect = document.getElementById('aiPreset');
+        const blocksPreview = document.getElementById('aiBlocksPreview');
+        const btnRun = document.getElementById('btnRunAiBuild');
+        const modal = document.getElementById('aiBuildModal');
+        const titleEl = modal?.querySelector('.ai-build-header h3');
+        const descriptionEl = document.getElementById('aiDescription');
+
+        const selectedId = sel?.value || '';
+
+        if (selectedId) {
+            // ── Optimize mode ──
+            _aiBuildMode = 'optimize';
+            _aiBuildExistingStrategyId = selectedId;
+            const selOption = sel.options[sel.selectedIndex];
+            const stratName = selOption?.dataset?.stratName || selOption?.text || 'Strategy';
+
+            if (hint) hint.style.display = 'block';
+            if (nameHint) nameHint.textContent = '(имя для сохранения результата оптимизации)';
+            if (aiNameEl) aiNameEl.value = `Opt_${stratName}`;
+            if (presetHeading) presetHeading.style.display = 'none';
+            if (presetSelect) presetSelect.style.display = 'none';
+            if (blocksPreview) {
+                blocksPreview.textContent = 'AI загрузит блоки из выбранной стратегии и оптимизирует параметры.';
+                blocksPreview.style.display = '';
+            }
+            if (descriptionEl) descriptionEl.placeholder = 'Опишите что улучшить (необязательно)';
+            if (btnRun) btnRun.innerHTML = '<i class="bi bi-stars"></i> Optimize & Backtest';
+            if (titleEl) titleEl.innerHTML = '<i class="bi bi-stars"></i> AI Strategy Optimizer';
+        } else {
+            // ── Build mode ──
+            _aiBuildMode = 'build';
+            _aiBuildExistingStrategyId = null;
+
+            if (hint) hint.style.display = 'none';
+            if (nameHint) nameHint.textContent = '(имя для новой стратегии)';
+            if (presetHeading) presetHeading.style.display = '';
+            if (presetSelect) presetSelect.style.display = '';
+            if (blocksPreview) blocksPreview.style.display = '';
+            if (descriptionEl) descriptionEl.placeholder = 'e.g. RSI mean-reversion with EMA trend filter, tight stop-loss 1.5%, take-profit 3%';
+            if (btnRun) btnRun.innerHTML = '<i class="bi bi-play-fill"></i> Build & Backtest';
+            if (titleEl) titleEl.innerHTML = '<i class="bi bi-robot"></i> AI Strategy Builder';
+            applyAiPreset();
+        }
+    }
+
     // ── Public: openAiBuildModal ──────────────────────────────────────────────
     function openAiBuildModal() {
         const modal = document.getElementById('aiBuildModal');
         modal.classList.remove('hidden');
         modal.style.display = 'flex';
 
-        const existingId = getStrategyIdFromURL();
-        const blocks = getBlocks();
-        const hasCanvasBlocks = blocks.length > 0;
-        const stratName = document.getElementById('strategyName')?.value || 'New Strategy';
-
-        if (existingId && hasCanvasBlocks) {
-            _aiBuildMode = 'optimize';
-            _aiBuildExistingStrategyId = existingId;
-        } else {
-            _aiBuildMode = 'build';
-            _aiBuildExistingStrategyId = null;
-        }
-
-        const titleEl = modal.querySelector('.ai-build-header h3');
-        if (titleEl) {
-            titleEl.innerHTML = _aiBuildMode === 'optimize'
-                ? '<i class="bi bi-stars"></i> AI Strategy Optimizer'
-                : '<i class="bi bi-robot"></i> AI Strategy Builder';
-        }
-
-        const presetHeading = modal.querySelector('.ai-build-preset-heading');
-        const presetSelect = document.getElementById('aiPreset');
-        const blocksPreview = document.getElementById('aiBlocksPreview');
-        const isOptimize = _aiBuildMode === 'optimize';
-
-        if (presetHeading) presetHeading.style.display = isOptimize ? 'none' : '';
-        if (presetSelect) presetSelect.style.display = isOptimize ? 'none' : '';
-        if (blocksPreview) {
-            if (isOptimize) {
-                const blockTypes = blocks.map(b => b.type || b.blockType || '?');
-                blocksPreview.textContent = `Текущие блоки на канвасе (${blockTypes.length}):\n` +
-                    blockTypes.map(t => `  • ${t}`).join('\n');
-                blocksPreview.style.display = '';
+        // Load strategies list (async, non-blocking)
+        _loadStrategiesList().then(() => {
+            // After loading, if canvas already has a strategy → pre-select it
+            const existingId = getStrategyIdFromURL();
+            const blocks = getBlocks();
+            const hasCanvasBlocks = blocks.length > 0;
+            const sel = document.getElementById('aiExistingStrategy');
+            if (existingId && hasCanvasBlocks && sel) {
+                // Try to find the option
+                const matchOpt = Array.from(sel.options).find(o => o.value === existingId);
+                if (matchOpt) {
+                    sel.value = existingId;
+                } else {
+                    // Canvas has a strategy not yet in the list → add it
+                    const stratName = document.getElementById('strategyName')?.value || existingId;
+                    const opt = document.createElement('option');
+                    opt.value = existingId;
+                    opt.textContent = stratName;
+                    opt.dataset.stratName = stratName;
+                    sel.appendChild(opt);
+                    sel.value = existingId;
+                }
             }
-        }
+            _applyExistingStrategySelection();
+        });
 
-        const btnRun = document.getElementById('btnRunAiBuild');
-        if (btnRun) {
-            btnRun.innerHTML = isOptimize
-                ? '<i class="bi bi-stars"></i> Optimize & Backtest'
-                : '<i class="bi bi-play-fill"></i> Build & Backtest';
-        }
-
+        // Fill summary
         const symbol = document.getElementById('backtestSymbol')?.value || '';
         const timeframe = document.getElementById('strategyTimeframe')?.value || '15';
         const direction = document.getElementById('builderDirection')?.value || 'both';
@@ -186,14 +248,7 @@ export function createAiBuildModule(deps) {
             if (!symbol) {
                 warning = '<div class="summary-warning"><i class="bi bi-exclamation-triangle"></i> Выберите тикер в панели Параметры</div>';
             }
-            let modeInfo = '';
-            if (isOptimize) {
-                modeInfo = `<div class="summary-row" style="background:#1a3a1a;border-radius:4px;padding:4px 8px;margin-bottom:4px;">
-          <span class="summary-label"><i class="bi bi-stars"></i> Режим:</span>
-          <span class="summary-value">Оптимизация «${stratName}»</span></div>`;
-            }
             summaryEl.innerHTML = `
-        ${modeInfo}
         <div class="summary-row"><span class="summary-label">Symbol:</span><span class="summary-value">${symbol || '—'}</span></div>
         <div class="summary-row"><span class="summary-label">Timeframe:</span><span class="summary-value">${tfLabels[timeframe] || timeframe}</span></div>
         <div class="summary-row"><span class="summary-label">Direction:</span><span class="summary-value">${dirLabels[direction] || direction}</span></div>
@@ -203,19 +258,6 @@ export function createAiBuildModule(deps) {
         <div class="summary-row"><span class="summary-label">Period:</span><span class="summary-value">${startDate || '—'} → ${endDate || '—'}</span></div>
         ${warning}
       `;
-        }
-
-        const aiNameEl = document.getElementById('aiName');
-        if (isOptimize) {
-            if (aiNameEl) aiNameEl.value = stratName;
-        } else {
-            if (aiNameEl && (aiNameEl.value === 'AI RSI Strategy' || aiNameEl.value === 'New Strategy' || !aiNameEl.value)) {
-                aiNameEl.value = stratName === 'New Strategy' ? 'AI RSI Strategy' : `AI ${stratName}`;
-            }
-        }
-
-        if (!isOptimize) {
-            applyAiPreset();
         }
     }
 
@@ -279,6 +321,7 @@ export function createAiBuildModule(deps) {
             min_sharpe: parseFloat(document.getElementById('aiMinSharpe')?.value || '0.5'),
             min_win_rate: 0.4,
             enable_deliberation: document.getElementById('aiDeliberation')?.checked ?? false,
+            agent: document.getElementById('aiAgentSelect')?.value || 'qwen',
             use_optimizer_mode: document.getElementById('aiUseOptimizer')?.checked ?? false,
             evaluation_config: (window.evaluationCriteriaPanel?.getCriteria && window.evaluationCriteriaPanel.getCriteria()) || {
                 primary_metric: 'sharpe_ratio',
@@ -426,14 +469,16 @@ export function createAiBuildModule(deps) {
     }
 
     function _appendAgentLog(log) {
-        const agent = (log.agent || 'deepseek').toLowerCase();
+        const agent = (log.agent || '').toLowerCase();
         const role = (log.role || 'unknown').toLowerCase();
         const title = log.title || '';
         const promptExcerpt = log.prompt_excerpt || '';
         const response = log.response || '';
         const ts = log.ts ? new Date(log.ts).toLocaleTimeString() : '';
 
-        const col = ['deepseek', 'qwen', 'perplexity'].includes(agent) ? agent : 'deepseek';
+        // 'system' and unknown agents go to the currently selected agent's column
+        const _selectedAgent = (document.getElementById('aiAgentSelect')?.value || 'deepseek').toLowerCase();
+        const col = ['deepseek', 'qwen', 'perplexity'].includes(agent) ? agent : _selectedAgent;
 
         _ensureAgentMonitorVisible();
 
@@ -602,7 +647,17 @@ export function createAiBuildModule(deps) {
         <span class="badge bg-secondary">ID: ${(w.strategy_id || '—').substring(0, 8)}…</span>
         <span class="badge bg-secondary">Backtest: ${(backtestId || '—').substring(0, 8)}…</span>
         <span class="badge bg-info text-dark">${iters.length} iteration${iters.length !== 1 ? 's' : ''}</span>
-      </div>`;
+        ${w.final_version_name ? `<span class="badge bg-success" title="Saved as new strategy version">💾 ${escapeHtml(w.final_version_name)}</span>` : ''}
+      </div>
+      ${w.final_version_name && w.final_version_id ? `
+      <div class="alert alert-success py-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+        <i class="bi bi-floppy2-fill"></i>
+        <span>Saved as <strong>${escapeHtml(w.final_version_name)}</strong></span>
+        <button class="btn btn-success btn-sm ms-auto"
+          onclick="window._loadAiFinalVersion('${escapeHtml(w.final_version_id)}', '${escapeHtml(w.final_version_name)}')">
+          📂 Load Final Version
+        </button>
+      </div>` : ''}`;
 
         if (iters.length > 0) {
             html += `
@@ -714,6 +769,71 @@ export function createAiBuildModule(deps) {
             window.open(`/frontend/backtest-results.html?backtest_id=${backtestId}`, '_blank');
         }
     }
+
+    // ── Public: load final saved version onto canvas ──────────────────────────
+    async function _loadAiFinalVersion(strategyId, strategyName) {
+        if (!strategyId) return;
+        try {
+            if (typeof loadStrategy === 'function') {
+                await loadStrategy(strategyId);
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('id', strategyId);
+                window.history.replaceState({}, '', newUrl);
+                console.log('[AI Build] Final version loaded onto canvas:', strategyName, strategyId);
+            }
+        } catch (err) {
+            console.error('[AI Build] Failed to load final version:', err);
+            alert('Не удалось загрузить финальную версию: ' + err.message);
+        }
+    }
+    // expose globally so onclick= attributes can call it
+    window._loadAiFinalVersion = _loadAiFinalVersion;
+
+    // ── Wire deliberation toggle → hide/show agent select ────────────────────
+    (function _wireControls() {
+        // Deliberation checkbox ↔ single-agent select visibility
+        const checkbox = document.getElementById('aiDeliberation');
+        const agentRow = document.getElementById('aiAgentRow');
+        if (checkbox && agentRow) {
+            const syncVisibility = () => {
+                agentRow.style.display = checkbox.checked ? 'none' : '';
+            };
+            syncVisibility();
+            checkbox.addEventListener('change', syncVisibility);
+        }
+
+        // Existing strategy selector → switch Build / Optimize mode
+        const existingSel = document.getElementById('aiExistingStrategy');
+        if (existingSel) {
+            existingSel.addEventListener('change', _applyExistingStrategySelection);
+
+            // Reload list every time the dropdown is opened (catches deletions/renames)
+            existingSel.addEventListener('mousedown', async () => {
+                const prevValue = existingSel.value;
+                await _loadStrategiesList();
+                // Restore selection if the item still exists, else reset to empty
+                if (prevValue && Array.from(existingSel.options).some(o => o.value === prevValue)) {
+                    existingSel.value = prevValue;
+                } else if (prevValue) {
+                    existingSel.value = '';
+                    _applyExistingStrategySelection();
+                }
+            });
+        }
+
+        // Refresh button → reload strategies list
+        const refreshBtn = document.getElementById('btnRefreshStrategies');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async () => {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i>';
+                await _loadStrategiesList();
+                _applyExistingStrategySelection();
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+            });
+        }
+    })();
 
     // ── Public API ────────────────────────────────────────────────────────────
     return {

@@ -1605,12 +1605,13 @@ body {
 .bt-price-chart-container {
     position: relative;
     width: 100%;
-    height: calc(100vh - 170px);
-    min-height: 400px;
+    height: calc(100vh - 240px);
+    min-height: 350px;
     background: #0d1117;
 }
 
 .bt-price-chart-container #btCandlestickChart {
+    position: relative; /* countdown overlay (#btCandleCountdown) is positioned inside here */
     width: 100%;
     height: 100%;
 }
@@ -1868,61 +1869,101 @@ body {
     }
 }
 
-/* ─── Live Chart Button ─────────────────────────────────────────────── */
-
-.bt-live-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    margin-left: 8px;
-    border: 1px solid #444;
-    border-radius: 4px;
+/* ---- Extend Backtest to Now button ---- */
+.bt-extend-btn {
+    padding: 5px 11px;
     background: transparent;
-    color: #aaa;
-    font-size: 12px;
+    color: #1a73e8;
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
     cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
     transition:
-        border-color 0.2s,
+        background 0.2s,
         color 0.2s;
-    white-space: nowrap;
-    flex-shrink: 0;
+    margin-left: 6px;
+}
+
+.bt-extend-btn:hover {
+    background: #1a73e8;
+    color: #fff;
+}
+
+.bt-extend-btn:disabled,
+.bt-extend-btn.loading {
+    background: #2a2a2a;
+    color: #666;
+    border-color: #444;
+    cursor: not-allowed;
+}
+
+/* ---- Live Chart Button ---- */
+.bt-live-btn {
+    padding: 5px 11px;
+    background: transparent;
+    color: #26a69a;
+    border: 1px solid #26a69a;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition:
+        background 0.2s,
+        color 0.2s,
+        border-color 0.2s;
+    margin-left: 6px;
 }
 
 .bt-live-btn:hover {
-    border-color: #26a69a;
-    color: #26a69a;
+    background: #26a69a;
+    color: #fff;
 }
 
-/* CONNECTING state — orange pulse */
+/* connecting state — pulsing amber */
 .bt-live-btn.connecting {
-    color: #ffa726;
-    border-color: #ffa726;
-    animation: live-pulse 0.8s infinite;
-    cursor: default;
+    background: transparent;
+    color: #f9a825;
+    border-color: #f9a825;
+    animation: live-pulse 1s ease-in-out infinite;
 }
 
-/* STREAMING (active) state — red pulse */
-.bt-live-btn.active {
-    color: #ef5350;
-    border-color: #ef5350;
-    animation: live-pulse 1.5s infinite;
+/* streaming state — solid green, active */
+.bt-live-btn.streaming {
+    background: #26a69a;
+    color: #fff;
+    border-color: #26a69a;
+    animation: live-pulse 2s ease-in-out infinite;
 }
 
-/* RECONNECTING state — orange slower pulse */
+/* reconnecting state — pulsing orange */
 .bt-live-btn.reconnecting {
-    color: #ff9800;
-    border-color: #ff9800;
-    animation: live-pulse 1s infinite;
-    cursor: default;
+    background: transparent;
+    color: #ef6c00;
+    border-color: #ef6c00;
+    animation: live-pulse 0.7s ease-in-out infinite;
 }
 
-/* ERROR state — static red */
+/* error state — red, disabled-look */
 .bt-live-btn.error {
+    background: transparent;
     color: #ef5350;
     border-color: #ef5350;
+    animation: none;
+    cursor: not-allowed;
 }
 
+/* disabled state */
+.bt-live-btn:disabled,
+.bt-live-btn.disabled {
+    background: #2a2a2a;
+    color: #666;
+    border-color: #444;
+    cursor: not-allowed;
+    animation: none;
+}
+
+/* Pulse keyframe for live indicator */
 @keyframes live-pulse {
     0%,
     100% {
@@ -1931,4 +1972,106 @@ body {
     50% {
         opacity: 0.5;
     }
+}
+
+/* ---- Candle countdown overlay — two-row price+time label, left of Y axis ---- */
+/*
+ * Replaces native lastValueVisible label (disabled via lastValueVisible:false).
+ * The dashed price line (priceLineVisible) remains enabled in LightweightCharts.
+ * Lives inside #btCandlestickChart (position:relative).
+ * JS sets top = priceToCoordinate(close) - 22  every rAF tick,
+ * centering the 44px box on the close price.
+ * right: 80px  → sits flush left of the 80px price scale, never covering it.
+ * opacity: 0.85 → 15% transparent as requested.
+ * data-dir="up"   → green  (bullish candle)
+ * data-dir="down" → red    (bearish candle)
+ */
+.bt-candle-countdown {
+    position: absolute;
+    right: 80px; /* flush left of the 80px right price scale */
+    top: 0; /* overridden every rAF tick by JS */
+    width: 72px;
+    height: 44px; /* 2 rows × 22px */
+    display: none; /* JS sets display:flex when ready */
+    flex-direction: column;
+    align-items: stretch;
+    background: #363c4e;
+    border-radius: 2px;
+    opacity: 0.85; /* 15% transparent */
+    pointer-events: none;
+    z-index: 6;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+}
+
+/* Price row (top 22px) */
+.bt-candle-countdown .bt-cc-price {
+    display: block;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+    color: #fff;
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Countdown row (bottom 22px) — thin divider from price row */
+.bt-candle-countdown .bt-cc-time {
+    display: block;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    border-top: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+/* Bullish → green */
+.bt-candle-countdown[data-dir='up'] {
+    background: #00843a;
+}
+
+/* Bearish → red */
+.bt-candle-countdown[data-dir='down'] {
+    background: #b71c1c;
+}
+
+/* Last 10 seconds → orange blink */
+.bt-candle-countdown.urgent {
+    background: #e65100 !important;
+    animation: countdown-urgent 1s ease-in-out infinite;
+}
+
+@keyframes countdown-urgent {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.55;
+    }
+}
+
+/* ---- Extended badge in backtest list ---- */
+.badge-extended {
+    background: #1a73e8;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
 }

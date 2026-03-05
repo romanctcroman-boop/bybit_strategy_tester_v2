@@ -16,14 +16,13 @@
         <link rel="stylesheet" href="./css/variables.css" />
         <link rel="stylesheet" href="./css/components.css" />
         <link rel="stylesheet" href="./css/common.css" />
-        <link rel="stylesheet" href="./css/backtest_results.css?v=20260217j" />
+        <link rel="stylesheet" href="./css/backtest_results.css?v=20260305a" />
         <!-- AI Assistant CSS -->
         <link rel="stylesheet" href="./css/ai-assistant.css" />
 
         <!-- Production Init (must load before all other scripts) -->
         <script src="js/init-production.js"></script>
-        <!-- TradingView Lightweight Charts (for candlestick chart) -->
-        <script src="libs/lightweight-charts.js"></script>
+        <!-- TradingView Lightweight Charts v4.2.0 loaded at end of body (CDN) -->
 
         <link
             href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css"
@@ -360,9 +359,29 @@
                                             <span class="bt-legend-marker bt-marker-exit"></span> Выход (TP/SL)
                                         </span>
                                     </div>
+                                    <button
+                                        id="btExtendBtn"
+                                        class="bt-extend-btn"
+                                        title="Продолжить бэктест до текущего времени"
+                                    >
+                                        ⟳ Extend
+                                    </button>
+                                    <button
+                                        id="btLiveChartBtn"
+                                        class="bt-live-btn"
+                                        title="Включить/выключить real-time стриминг"
+                                    >
+                                        ● Live
+                                    </button>
                                 </div>
                                 <div class="bt-price-chart-container" id="btPriceChartContainer">
-                                    <div id="btCandlestickChart"></div>
+                                    <div id="btCandlestickChart">
+                                        <div
+                                            id="btCandleCountdown"
+                                            class="bt-candle-countdown"
+                                            title="Осталось до закрытия свечи"
+                                        ></div>
+                                    </div>
                                     <div class="bt-price-chart-loading hidden" id="btPriceChartLoading">
                                         <div class="spinner-border spinner-border-sm text-secondary" role="status">
                                             <span class="visually-hidden">Loading...</span>
@@ -382,13 +401,6 @@
                                         <input type="checkbox" id="markerShowEntryPrice" checked />
                                         Показать цену входа
                                     </label>
-                                    <button
-                                        id="btLiveChartBtn"
-                                        class="bt-live-btn"
-                                        title="Запустить real-time стриминг"
-                                    >
-                                        ● Live
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -950,7 +962,7 @@
                         </div>
                     </div>
 
-                    <!-- AI Analysis — hidden, kept for JS compatibility -->
+                    <!-- AI Analysis -->
                     <div class="card" id="aiAnalysisCard">
                         <div class="card-header">
                             <span class="card-title"> <i class="bi bi-robot me-2"></i>AI Analysis </span>
@@ -965,7 +977,53 @@
                                     Выберите бэктест для получения AI-анализа и рекомендаций.
                                 </p>
                             </div>
-                            <div class="mt-3">
+                            <!-- Agent mode selector -->
+                            <div class="mt-3 d-flex align-items-center gap-2 flex-wrap">
+                                <!-- Mode toggle -->
+                                <div class="btn-group btn-group-sm" role="group" aria-label="AI Analysis Mode">
+                                    <input
+                                        type="radio"
+                                        class="btn-check"
+                                        name="aiMode"
+                                        id="aiModeSingle"
+                                        value="single"
+                                        autocomplete="off"
+                                        checked
+                                    />
+                                    <label
+                                        class="btn btn-outline-primary"
+                                        for="aiModeSingle"
+                                        title="Один агент — быстрый анализ"
+                                    >
+                                        <i class="bi bi-person me-1"></i>1 агент
+                                    </label>
+                                    <input
+                                        type="radio"
+                                        class="btn-check"
+                                        name="aiMode"
+                                        id="aiModeMulti"
+                                        value="multi"
+                                        autocomplete="off"
+                                    />
+                                    <label
+                                        class="btn btn-outline-warning"
+                                        for="aiModeMulti"
+                                        title="3 агента — консенсус (медленнее)"
+                                    >
+                                        <i class="bi bi-people me-1"></i>3 агента
+                                    </label>
+                                </div>
+                                <!-- Single-agent picker (hidden in multi mode) -->
+                                <select
+                                    id="aiAgentSelect"
+                                    class="form-select form-select-sm w-auto"
+                                    title="Выберите агента для одиночного анализа"
+                                >
+                                    <option value="qwen" selected>Qwen</option>
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="perplexity">Perplexity</option>
+                                </select>
+                                <!-- Trigger button -->
                                 <button
                                     class="btn btn-outline-secondary btn-sm"
                                     onclick="requestAIAnalysis()"
@@ -1460,7 +1518,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
         <!-- TradingView Lightweight Charts Equity Component -->
-        <script src="./js/components/TradingViewEquityChart.js?v=20260226aj"></script>
+        <script src="./js/components/TradingViewEquityChart.js?v=20260305b"></script>
 
         <!-- Custom plugin for donut center text -->
         <script>
@@ -1533,7 +1591,7 @@
                 .catch((e) => console.error('API error:', e));
         </script>
 
-        <script type="module" src="./js/pages/backtest_results.js?v=20260226ai"></script>
+        <script type="module" src="./js/pages/backtest_results.js?v=20260305g"></script>
 
         <!-- Fallback: if module fails, load data manually after 2 seconds -->
         <script>
@@ -1772,6 +1830,15 @@
                     console.log('AI Analysis enabled for backtest:', e.detail?.id);
                 }
             });
+
+            // Hide/show agent selector based on mode toggle
+            document.querySelectorAll('input[name="aiMode"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    var sel = document.getElementById('aiAgentSelect');
+                    if (sel) sel.style.display = this.value === 'multi' ? 'none' : '';
+                });
+            });
+
             // Note: requestAIAnalysis() is provided by the ES module
             // (backtest_results.js) which overrides window.requestAIAnalysis
         </script>

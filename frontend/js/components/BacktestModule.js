@@ -223,12 +223,18 @@ export function formatPrice(value) {
 
 export function formatDateTime(value) {
     if (!value) return '-';
-    const date = new Date(value);
+    // Normalize: append Z if no timezone info so it's treated as UTC
+    const normalized = (typeof value === 'string' && !value.endsWith('Z') && !value.includes('+') && value.includes('T'))
+        ? value + 'Z'
+        : value;
+    const date = new Date(normalized);
+    // Display in UTC+3 (Moscow / same as TradingView default)
     return date.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        timeZone: 'Europe/Moscow'
     });
 }
 
@@ -793,7 +799,10 @@ export function createBacktestModule(deps) {
                 const today = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
                 // If end date is in the future, clamp silently to today.
                 // The user sets 2030-01-01 as a "run to latest available data" sentinel.
-                return endVal > today ? today : endVal;
+                const clampedDate = endVal > today ? today : endVal;
+                // Always append end-of-day time so the full day is included
+                // (without time the backend defaults to T00:00:00 and cuts off same-day trades)
+                return `${clampedDate}T23:59:59`;
             })(),
             market_type: document.getElementById('builderMarketType')?.value || 'linear',
             initial_capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,

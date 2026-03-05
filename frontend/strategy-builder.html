@@ -748,8 +748,25 @@
               <!-- Populated by JS from Parameters panel -->
             </div>
 
+            <!-- ── Existing strategy selector (Optimize mode) ─────────────── -->
             <div class="ai-build-row">
-              <label>Strategy Name</label>
+              <label>Существующая стратегия <small class="text-muted">(оставь пустым — создать новую)</small></label>
+              <div class="d-flex gap-2 align-items-center">
+                <select id="aiExistingStrategy" class="form-select form-select-sm" title="Выбери стратегию из БД для оптимизации">
+                  <option value="">— Создать новую стратегию —</option>
+                </select>
+                <button class="btn btn-outline-secondary btn-sm" id="btnRefreshStrategies" title="Обновить список">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+              <small id="aiExistingStrategyHint" class="text-muted">
+                <i class="bi bi-stars text-warning"></i> Режим <b>Оптимизации</b> — AI улучшит параметры существующей стратегии
+              </small>
+            </div>
+            <hr class="my-2">
+
+            <div class="ai-build-row">
+              <label>Strategy Name <small class="text-muted" id="aiNameHint">(имя для новой стратегии)</small></label>
               <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm" title="Strategy name for AI-built strategy">
             </div>
             <div class="ai-build-row">
@@ -773,6 +790,14 @@
                 <input type="checkbox" id="aiDeliberation" class="form-check-input">
                 AI Deliberation (DeepSeek + Qwen + Perplexity consensus — uses API credits)
               </label>
+            </div>
+            <div class="ai-build-row d-flex align-items-center gap-2" id="aiAgentRow">
+              <label class="text-muted small mb-0" for="aiAgentSelect">Single-agent:</label>
+              <select id="aiAgentSelect" class="form-select form-select-sm w-auto" title="Primary LLM agent (used when AI Deliberation is off)">
+                <option value="qwen" selected>Qwen</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="perplexity">Perplexity</option>
+              </select>
             </div>
             <div class="ai-build-row">
               <label class="form-check-label">

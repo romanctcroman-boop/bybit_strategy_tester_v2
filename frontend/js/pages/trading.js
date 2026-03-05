@@ -194,18 +194,22 @@ function initCharts() {
             timeVisible: true,
             secondsVisible: false,
             rightOffset: 5,
-            barSpacing: 8
+            barSpacing: 8,
+            timezone: 'Europe/Moscow'
         },
         localization: {
             timeFormatter: (unixSeconds) => {
-                const d = new Date(unixSeconds * 1000);
-                const pad = (n) => String(n).padStart(2, '0');
-                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                return new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Europe/Moscow',
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                }).format(new Date(unixSeconds * 1000)).replace(',', '');
             },
             dateFormatter: (unixSeconds) => {
-                const d = new Date(unixSeconds * 1000);
-                const pad = (n) => String(n).padStart(2, '0');
-                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                return new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Europe/Moscow',
+                    year: 'numeric', month: '2-digit', day: '2-digit'
+                }).format(new Date(unixSeconds * 1000));
             }
         },
         handleScroll: { vertTouchDrag: false }

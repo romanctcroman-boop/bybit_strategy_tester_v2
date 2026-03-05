@@ -184,8 +184,21 @@ export function createSaveLoadModule({
                     finalStrategyId = null;
                 }
             } else if (nameChanged) {
-                // Name changed → force POST so a new strategy is created
-                finalStrategyId = null;
+                // Name changed → ask user: overwrite or save as new?
+                const saveAsNew = confirm(
+                    'Имя стратегии изменено:\n\n' +
+                    '  Было: «' + _loadedStrategyName + '»\n' +
+                    '  Стало: «' + currentName + '»\n\n' +
+                    'ОК — сохранить как НОВУЮ стратегию\n' +
+                    'Отмена — перезаписать оригинал «' + _loadedStrategyName + '»'
+                );
+                if (!saveAsNew) {
+                    // User chose to overwrite original → keep the original ID and name
+                    finalStrategyId = strategyId;
+                } else {
+                    // User confirmed Save As → create new
+                    finalStrategyId = null;
+                }
             }
 
             const method = finalStrategyId ? 'PUT' : 'POST';
@@ -203,22 +216,27 @@ export function createSaveLoadModule({
                 const data = await response.json();
                 _updateLastSaved(data.updated_at || new Date().toISOString());
 
-                // Update loaded name tracker so subsequent saves with same name do PUT
-                _loadedStrategyName = currentName;
-
-                if (nameChanged) {
-                    showNotification(`Стратегия сохранена как новая: «${currentName}»`, 'success');
-                } else {
-                    showNotification('Стратегия успешно сохранена!', 'success');
-                }
-
                 const savedId = finalStrategyId || data.id;
-                if (savedId) {
-                    _clearLocalStorageDraft(savedId);
-                }
-                // Always update URL when a new record is created (POST)
-                if (!finalStrategyId && data.id) {
-                    window.history.pushState({}, '', `?id=${data.id}`);
+
+                if (nameChanged && !finalStrategyId) {
+                    // Saved As new → update tracker, update URL
+                    _loadedStrategyName = currentName;
+                    showNotification('Стратегия сохранена как новая: «' + currentName + '»', 'success');
+                    if (savedId) {
+                        _clearLocalStorageDraft(savedId);
+                        window.history.pushState({}, '', '?id=' + savedId);
+                    }
+                } else if (nameChanged && finalStrategyId) {
+                    // Overwrote original with new name → sync name in UI back to original
+                    // (the name in the payload was the new one, but we saved to old ID)
+                    _loadedStrategyName = currentName;
+                    showNotification('Стратегия «' + _loadedStrategyName + '» перезаписана!', 'success');
+                    if (savedId) _clearLocalStorageDraft(savedId);
+                } else {
+                    // Normal overwrite → same name, same ID
+                    _loadedStrategyName = currentName;
+                    showNotification('Стратегия успешно сохранена!', 'success');
+                    if (savedId) _clearLocalStorageDraft(savedId);
                 }
             } else {
                 const errorText = await response.text();
@@ -438,7 +456,7 @@ export function createSaveLoadModule({
             const strategy = await response.json();
 
             // Track the loaded name so saveStrategy() can detect a rename ("Save As")
-            _loadedStrategyName = strategy.name || 'New Strategy';
+            _loadedStrategyName = (strategy.name || 'New Strategy').trim();
 
             // Populate form fields
             document.getElementById('strategyName').value = _loadedStrategyName;

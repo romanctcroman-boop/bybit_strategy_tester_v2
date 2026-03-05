@@ -394,11 +394,11 @@ body {
     flex-direction: column;
     scroll-behavior: smooth;
     /* Hide scrollbar but keep functionality (all browsers) */
-    -ms-overflow-style: none; /* IE/Edge */
-    scrollbar-width: none; /* Firefox 64+ */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+    scrollbar-width: none; /* Firefox 64+; Chrome 121+ */
 }
 
-/* Hide scrollbar for Chrome/Safari/Opera (Chrome < 121 fallback) */
+/* Chrome/Safari/Opera fallback — covers Chrome < 121, Safari, Samsung Internet */
 .block-categories::-webkit-scrollbar {
     display: none;
 }
@@ -7687,6 +7687,19 @@ body.floating-window-open .zoom-controls {
     margin-bottom: 10px;
 }
 
+/* Spinner animation for the refresh button */
+.spin {
+    display: inline-block;
+    animation: spin 0.7s linear infinite;
+}
+
+#aiExistingStrategyHint {
+    display: none; /* shown via JS when AI optimisation mode is active */
+    font-size: 11px;
+    color: var(--text-muted, #71717a);
+    margin-top: 3px;
+}
+
 .ai-build-summary {
     background: var(--bg-primary, #121218);
     border: 1px solid var(--border-color, #3d3d5c);
@@ -7871,11 +7884,11 @@ body.floating-window-open .zoom-controls {
     flex-direction: column;
     gap: 8px;
     max-height: 520px;
-    scrollbar-width: thin; /* Firefox 64+ */
+    scrollbar-width: thin; /* Firefox 64+; Chrome 121+ — webkit fallback below */
     scrollbar-color: #3d3d5c transparent;
 }
 
-/* Webkit fallback for .agent-feed scrollbar styling */
+/* Chrome/Safari/Samsung Internet fallback for .agent-feed scrollbar styling */
 .agent-feed::-webkit-scrollbar {
     width: 4px;
 }

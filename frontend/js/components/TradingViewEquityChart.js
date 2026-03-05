@@ -150,19 +150,46 @@ class TradingViewEquityChart {
       },
       localization: {
         timeFormatter: (unixSeconds) => {
+          // Timestamps are pre-shifted by +10800 (UTC+3), so format as UTC
           const d = new Date(unixSeconds * 1000);
           const pad = (n) => String(n).padStart(2, '0');
-          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
         },
         dateFormatter: (unixSeconds) => {
           const d = new Date(unixSeconds * 1000);
           const pad = (n) => String(n).padStart(2, '0');
-          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+          return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
         }
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: true },
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true }
     });
+
+    // ── Current time indicator (bottom-right, like TradingView "00:56:53 UTC+3") ──
+    this._clockEl = document.createElement('div');
+    this._clockEl.style.cssText = [
+      'position:absolute', 'bottom:6px', 'right:10px',
+      'font-size:13px', 'font-family:monospace',
+      'color:#c9d1d9', 'pointer-events:none',
+      'z-index:10', 'user-select:none',
+      'background:rgba(13,17,23,0.85)', 'padding:2px 7px', 'border-radius:3px'
+    ].join(';');
+    // Container must be position:relative for absolute child to work
+    if (getComputedStyle(this.container).position === 'static') {
+      this.container.style.position = 'relative';
+    }
+    this.container.appendChild(this._clockEl);
+
+    const updateClock = () => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-GB', {
+        timeZone: 'Europe/Moscow',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      if (this._clockEl) this._clockEl.textContent = `${timeStr} UTC+3`;
+    };
+    updateClock();
+    this._clockInterval = setInterval(updateClock, 1000);
 
     // Build .chart shim expected by backtest_results.js
     const self = this;
@@ -445,14 +472,14 @@ class TradingViewEquityChart {
       const mfes = this.trades.map((t, i) => ({
         i: i + 1,
         mfe: isPercent ? (t.mfe_pct ?? t.mfe_percent ?? 0) : (t.mfe ?? 0),
-        mae: isPercent ? (t.mae_pct ?? t.mae_percent ?? 0) : (t.mae ?? 0),
+        mae: isPercent ? (t.mae_pct ?? t.mae_percent ?? 0) : (t.mae ?? 0)
       }));
       const split = Math.min(62, mfes.length);
       const avg = (arr, key) => arr.reduce((s, v) => s + Math.abs(v[key]), 0) / arr.length;
       console.group('[TVEquityChart] MFE/MAE diagnostic');
       console.log(`Mode: ${isPercent ? 'percent' : 'absolute'}, total trades: ${mfes.length}`);
       console.log(`Trades 1-${split}:  avg MFE=${avg(mfes.slice(0, split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(0, split), 'mae').toFixed(3)}`);
-      console.log(`Trades ${split+1}-${mfes.length}: avg MFE=${avg(mfes.slice(split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(split), 'mae').toFixed(3)}`);
+      console.log(`Trades ${split + 1}-${mfes.length}: avg MFE=${avg(mfes.slice(split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(split), 'mae').toFixed(3)}`);
       console.log('First 5:', mfes.slice(0, 5));
       console.log('Around 62:', mfes.slice(59, 65));
       console.log('Last 5:', mfes.slice(-5));
@@ -855,7 +882,8 @@ class TradingViewEquityChart {
       }
 
       // Find closest equity index
-      const ms = param.time * 1000;
+      // param.time is pre-shifted by +10800 (UTC+3 display), subtract to get real UTC ms
+      const ms = (param.time - 10800) * 1000;
       let ci = 0, minD = Infinity;
       for (let i = 0; i < timestamps.length; i++) {
         const d = Math.abs(new Date(timestamps[i]).getTime() - ms);
@@ -881,7 +909,8 @@ class TradingViewEquityChart {
       const exitDateStr = exitDate
         ? exitDate.toLocaleString('en-US', {
           weekday: 'short', month: 'short', day: 'numeric',
-          year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+          year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+          timeZone: 'Europe/Moscow'
         })
         : '';
 
@@ -933,7 +962,7 @@ class TradingViewEquityChart {
         const startDate = seg.startTime ? new Date(seg.startTime) : null;
         const endDate = seg.endTime ? new Date(seg.endTime) : null;
         const rangeStr = startDate && endDate
-          ? `${startDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })} — ${endDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })}`
+          ? `${startDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Moscow' })} — ${endDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Europe/Moscow' })}`
           : '';
 
         html += '<div style="border-top:1px solid rgba(255,255,255,0.07);margin:6px 0 4px"></div>';
@@ -1071,6 +1100,8 @@ class TradingViewEquityChart {
 
   _destroyInternal() {
     if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+    if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+    if (this._clockEl && this._clockEl.parentNode) { this._clockEl.parentNode.removeChild(this._clockEl); this._clockEl = null; }
     this._excursionCanvas = null;  // canvas no longer used
     this._mfeSeries = null;
     this._maeSeries = null;
@@ -1105,19 +1136,18 @@ class TradingViewEquityChart {
 
   _toUnixSec(ts) {
     if (!ts) return null;
+    const TZ = 10800; // UTC+3 shift: X-axis displays Moscow time labels
     if (typeof ts === 'number') {
       const ms = ts > 1e12 ? ts : ts * 1000;
-      return isNaN(ms) ? null : Math.floor(ms / 1000);
+      return isNaN(ms) ? null : Math.floor(ms / 1000) + TZ;
     }
     // For ISO strings: if no timezone suffix, treat as UTC (add Z)
     // This matches how the backend stores datetimes (all UTC)
     const str = String(ts).trim();
-    // If no timezone info present, append Z so Date() treats it as UTC
-    // (matches backend's all-UTC storage)
     const hasTimezone = str.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(str);
     const normalized = hasTimezone ? str : str + 'Z';
     const ms = new Date(normalized).getTime();
-    return isNaN(ms) ? null : Math.floor(ms / 1000);
+    return isNaN(ms) ? null : Math.floor(ms / 1000) + TZ;
   }
 
   _findEquityTimeForExit(exitEpochMs, maxWindowSec = Infinity) {
