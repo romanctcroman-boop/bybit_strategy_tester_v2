@@ -323,7 +323,7 @@ async def main():
     rsi_at_t1 = rsi_aligned.shift(-1)  # RSI at bar T+1 (lookahead from signal bar T)
     cross_short_confirmed = crossunder & (rsi_at_t1 < cross_short_level)
     cross_long_level = 24.0
-    rsi_prev_long = rsi_prev_aligned  # noqa: F841
+    rsi_prev_long = rsi_prev_aligned
     crossover_long = (rsi_prev_aligned <= cross_long_level) & (rsi_aligned > cross_long_level)
     rsi_at_t1_long = rsi_aligned.shift(-1)
     cross_long_confirmed = crossover_long & (rsi_at_t1_long > cross_long_level)

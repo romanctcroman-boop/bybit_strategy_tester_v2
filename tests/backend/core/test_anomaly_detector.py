@@ -220,9 +220,7 @@ class TestAnomalyDetector:
         for _ in range(5):
             detector.record_trade_result("test", is_win=False)
 
-        critical_anomalies = detector.get_anomalies(
-            "test", severity=AnomalySeverity.CRITICAL
-        )
+        critical_anomalies = detector.get_anomalies("test", severity=AnomalySeverity.CRITICAL)
         assert all(a.severity == AnomalySeverity.CRITICAL for a in critical_anomalies)
 
     def test_acknowledge_anomaly(self, detector):

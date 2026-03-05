@@ -480,7 +480,7 @@ class PyramidingManager:
         exit_fee = closed_size * exit_price * taker_fee
         fees = entry_fee + exit_fee
         net_pnl = gross_pnl - fees
-        
+
         # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
         # Formula: ((exit - entry) / entry) × sign
         if avg_price > 0:
@@ -548,7 +548,7 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
-            
+
             # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
             # Formula: ((exit - entry) / entry) × sign
             if avg_price > 0:
@@ -589,7 +589,7 @@ class PyramidingManager:
             exit_fee = total_size * exit_price * taker_fee
             fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
-            
+
             # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
             # Formula: ((exit - entry) / entry) × sign
             if avg_price > 0:
@@ -631,7 +631,7 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
-                
+
                 # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
                 # Formula: ((exit - entry) / entry) × sign
                 if entry.entry_price > 0:
@@ -673,7 +673,7 @@ class PyramidingManager:
                 exit_fee = entry.size * exit_price * taker_fee
                 fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
-                
+
                 # TV-compatible pnl_pct = price change % (NOT pnl / position_value)
                 # Formula: ((exit - entry) / entry) × sign
                 if entry.entry_price > 0:

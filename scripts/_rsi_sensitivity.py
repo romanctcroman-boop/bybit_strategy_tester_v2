@@ -83,7 +83,7 @@ async def main():
     target_bar = pd.Timestamp("2025-01-28 14:00:00")
     bar_loc = idx_naive.get_loc(target_bar)
 
-    print(f"=== ROOT #9 ANALYSIS ===")
+    print("=== ROOT #9 ANALYSIS ===")
     print(f"Bar: {target_bar}")
     print(f"BTC close at bar: {close[bar_loc]:.2f}")
     print(f"BTC close at bar-1: {close[bar_loc - 1]:.2f}")
@@ -158,12 +158,12 @@ async def main():
         print(f"  Close={p:.2f} (delta={p - close[bar_loc]:+.2f})  RSI={rsi_h:.4f}  cross<52={rsi_h < 52}")
 
     # Check Wilder state accumulation depth
-    print(f"\n=== WILDER STATE CONVERGENCE ===")
+    print("\n=== WILDER STATE CONVERGENCE ===")
     print(f"Warmup bars: {bar_loc} (from index 0)")
     print(f"Bars since RSI period init: {bar_loc - 14}")
 
     # Now check ALL 6 roots' RSI values and distances from cross level
-    print(f"\n=== ALL ROOT DIVERGENCES: RSI vs CROSS LEVEL ===")
+    print("\n=== ALL ROOT DIVERGENCES: RSI vs CROSS LEVEL ===")
 
     eth_candles = await svc._fetch_historical_data("ETHUSDT", "30", start_date, end_date)
     if eth_candles is None:

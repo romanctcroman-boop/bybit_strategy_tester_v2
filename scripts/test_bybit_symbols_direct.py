@@ -8,6 +8,7 @@
   py -3.14 scripts/test_bybit_symbols_direct.py
   py -3.14 scripts/test_bybit_symbols_direct.py --category spot
 """
+
 from __future__ import annotations
 
 import argparse

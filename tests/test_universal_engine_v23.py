@@ -7,7 +7,6 @@ Tests:
 3. Advanced ML Signals
 """
 
-
 import numpy as np
 import pytest
 

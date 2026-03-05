@@ -5,6 +5,7 @@ Downloads 1m BTCUSDT.P data from Bybit API for Bar Magnifier testing.
 
 Range: Oct 1, 2025 - Jan 24, 2026 (~116 days = ~167,040 bars)
 """
+
 import asyncio
 import sys
 from datetime import UTC, datetime
@@ -73,7 +74,7 @@ async def download_1m_data():
             all_candles.extend(candles)
 
             # Move to next batch
-            last_ts = candles[-1].get('open_time', candles[-1].get('timestamp', current_start))
+            last_ts = candles[-1].get("open_time", candles[-1].get("timestamp", current_start))
             if isinstance(last_ts, str):
                 last_ts = int(pd.to_datetime(last_ts).timestamp() * 1000)
 
@@ -90,24 +91,24 @@ async def download_1m_data():
 
             # Normalize column names
             column_map = {
-                'open_time': 'timestamp',
-                'open_price': 'open',
-                'high_price': 'high',
-                'low_price': 'low',
-                'close_price': 'close',
+                "open_time": "timestamp",
+                "open_price": "open",
+                "high_price": "high",
+                "low_price": "low",
+                "close_price": "close",
             }
             df.rename(columns=column_map, inplace=True)
 
             # Parse timestamp
-            if 'timestamp' in df.columns:
-                if df['timestamp'].dtype == 'int64':
-                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            if "timestamp" in df.columns:
+                if df["timestamp"].dtype == "int64":
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
                 else:
-                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                    df["timestamp"] = pd.to_datetime(df["timestamp"])
 
             # Sort by time
-            df.sort_values('timestamp', inplace=True)
-            df.drop_duplicates(subset='timestamp', keep='first', inplace=True)
+            df.sort_values("timestamp", inplace=True)
+            df.drop_duplicates(subset="timestamp", keep="first", inplace=True)
 
             # Save to CSV
             print(f"\n💾 Saving to {OUTPUT_FILE}...")
@@ -123,6 +124,7 @@ async def download_1m_data():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         raise
 

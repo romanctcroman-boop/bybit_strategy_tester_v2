@@ -2,6 +2,7 @@
 🔬 РЕАЛЬНЫЙ ТЕСТ: 147 МЕТРИК НА ИСТОРИЧЕСКИХ ДАННЫХ
 Использует реальные настройки стратегии и полные исторические данные
 """
+
 import sys
 from pathlib import Path
 
@@ -25,15 +26,18 @@ print("\n📊 Загрузка исторических данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Загружаем максимум данных
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 
 print(f"   📅 Период: {df_1h.index[0]} - {df_1h.index[-1]}")
 print(f"   📊 Баров: {len(df_1h):,}")
@@ -53,6 +57,7 @@ print("   🎯 Take Profit: 4%")
 print("   💰 Position Size: 10%")
 print("   📊 Leverage: 10x")
 
+
 # RSI
 def calculate_rsi(close, period=14):
     delta = close.diff()
@@ -63,10 +68,11 @@ def calculate_rsi(close, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+
 # EMA
-ema_50 = df_1h['close'].ewm(span=50).mean()
-ema_200 = df_1h['close'].ewm(span=200).mean()
-rsi = calculate_rsi(df_1h['close'], period=14)
+ema_50 = df_1h["close"].ewm(span=50).mean()
+ema_200 = df_1h["close"].ewm(span=200).mean()
+rsi = calculate_rsi(df_1h["close"], period=14)
 
 # Сигналы с EMA фильтром
 bullish_trend = ema_50 > ema_200
@@ -141,6 +147,7 @@ print("\n" + "=" * 100)
 print("📊 ВСЕ 147 МЕТРИК - СРАВНЕНИЕ ДВИЖКОВ")
 print("=" * 100)
 
+
 def format_value(val):
     if val is None:
         return "N/A"
@@ -154,6 +161,7 @@ def format_value(val):
         else:
             return f"{val:.6f}"
     return str(val)
+
 
 def check_match(fb_val, nb_val):
     if fb_val is None and nb_val is None:
@@ -170,6 +178,7 @@ def check_match(fb_val, nb_val):
         if pct_diff < 0.01:
             return "✅"
     return "❌"
+
 
 # === BACKTEST METRICS ===
 print("\n" + "=" * 50)
@@ -255,7 +264,7 @@ print("=" * 100)
 print(f"""
 📈 РЕЗУЛЬТАТЫ БЭКТЕСТА НА РЕАЛЬНЫХ ДАННЫХ
 
-   📅 Период тестирования:  {df_1h.index[0].strftime('%Y-%m-%d')} - {df_1h.index[-1].strftime('%Y-%m-%d')}
+   📅 Период тестирования:  {df_1h.index[0].strftime("%Y-%m-%d")} - {df_1h.index[-1].strftime("%Y-%m-%d")}
    📊 Количество баров:     {len(df_1h):,}
    💰 Начальный капитал:    $10,000
 
@@ -266,7 +275,7 @@ print(f"""
    📉 Max Drawdown:         {fb_m.max_drawdown:.2f}%
 
    🎯 Total Trades:         {fb_m.total_trades}
-   ✅ Win Rate:             {fb_m.win_rate*100:.1f}%
+   ✅ Win Rate:             {fb_m.win_rate * 100:.1f}%
    📊 Profit Factor:        {fb_m.profit_factor:.2f}
 
    📈 Sharpe Ratio:         {fb_m.sharpe_ratio:.2f}
@@ -284,7 +293,7 @@ print(f"""
 
    ⏱️ FallbackEngineV2:     {fb_time:.3f}s
    ⚡ NumbaEngineV2:        {nb_time:.3f}s
-   🚀 Speedup:              {fb_time/nb_time:.1f}x
+   🚀 Speedup:              {fb_time / nb_time:.1f}x
 
    ✅ Движки дают ИДЕНТИЧНЫЕ результаты!
 """)

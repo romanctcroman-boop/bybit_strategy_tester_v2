@@ -12,7 +12,7 @@ for c in cols_bt:
     print(f"  {c}")
 
 # Get last 3 backtests for Strategy-A2
-print(f"\n=== Backtests for Strategy-A2 ===")
+print("\n=== Backtests for Strategy-A2 ===")
 cur = conn.execute(
     "SELECT * FROM backtests WHERE strategy_id = ? ORDER BY created_at DESC LIMIT 3",
     (strategy_id,),

@@ -162,6 +162,7 @@ async def run_e2e_ticker_sync(symbols: list[str], headless: bool) -> int:
             msg = str(e).encode("ascii", "replace").decode("ascii")
             print(f"[FAIL] Oshibka: {msg}")
             import traceback
+
             traceback.print_exc()
             await browser.close()
             return 1

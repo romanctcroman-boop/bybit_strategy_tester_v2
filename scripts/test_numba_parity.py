@@ -31,6 +31,7 @@ from backend.backtesting.interfaces import (
 @dataclass
 class ParityResult:
     """Result of a parity test."""
+
     test_name: str
     fallback_trades: int
     numba_trades: int
@@ -68,13 +69,16 @@ def generate_synthetic_data(n_bars: int = 500, seed: int = 42) -> pd.DataFrame:
     # Create DataFrame with datetime index
     dates = pd.date_range(start="2025-01-01", periods=n_bars, freq="1h")
 
-    df = pd.DataFrame({
-        "open": open_,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": volume,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        },
+        index=dates,
+    )
 
     return df
 
@@ -97,13 +101,13 @@ def generate_rsi_signals(
     avg_loss = np.zeros(n)
 
     # Initial SMA
-    avg_gain[period] = np.mean(gain[1:period+1])
-    avg_loss[period] = np.mean(loss[1:period+1])
+    avg_gain[period] = np.mean(gain[1 : period + 1])
+    avg_loss[period] = np.mean(loss[1 : period + 1])
 
     # Wilder's smoothing
     for i in range(period + 1, n):
-        avg_gain[i] = (avg_gain[i-1] * (period - 1) + gain[i]) / period
-        avg_loss[i] = (avg_loss[i-1] * (period - 1) + loss[i]) / period
+        avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gain[i]) / period
+        avg_loss[i] = (avg_loss[i - 1] * (period - 1) + loss[i]) / period
 
     rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
     rsi = 100 - (100 / (1 + rs))
@@ -115,10 +119,10 @@ def generate_rsi_signals(
     short_exits = (rsi < oversold) & (np.roll(rsi, 1) >= oversold)
 
     # Clean up first period bars
-    long_entries[:period+1] = False
-    long_exits[:period+1] = False
-    short_entries[:period+1] = False
-    short_exits[:period+1] = False
+    long_entries[: period + 1] = False
+    long_exits[: period + 1] = False
+    short_entries[: period + 1] = False
+    short_exits[: period + 1] = False
 
     return long_entries, long_exits, short_entries, short_exits
 
@@ -187,11 +191,7 @@ def compare_results(
         "fb_equity": fb_equity,
         "numba_equity": numba_equity,
         "equity_diff_pct": equity_diff_pct,
-        "passed": (
-            fb_trades == numba_trades
-            and pnl_diff_pct < tolerance_pct
-            and equity_diff_pct < tolerance_pct
-        ),
+        "passed": (fb_trades == numba_trades and pnl_diff_pct < tolerance_pct and equity_diff_pct < tolerance_pct),
     }
 
 
@@ -256,8 +256,10 @@ def test_v2_basic() -> list[ParityResult]:
         {"direction": TradeDirection.LONG, "stop_loss": 0.02, "take_profit": 0.04},
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 2: Short only
     result = run_parity_test(
@@ -267,8 +269,10 @@ def test_v2_basic() -> list[ParityResult]:
         {"direction": TradeDirection.SHORT, "stop_loss": 0.02, "take_profit": 0.04},
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 3: Both directions
     result = run_parity_test(
@@ -278,8 +282,10 @@ def test_v2_basic() -> list[ParityResult]:
         {"direction": TradeDirection.BOTH, "stop_loss": 0.02, "take_profit": 0.04},
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 4: No SL/TP (signal-only exit)
     result = run_parity_test(
@@ -289,8 +295,10 @@ def test_v2_basic() -> list[ParityResult]:
         {"direction": TradeDirection.BOTH, "stop_loss": 0.0, "take_profit": 0.0},
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     return results
 
@@ -314,8 +322,10 @@ def test_v3_pyramiding() -> list[ParityResult]:
         tolerance_pct=5.0,  # Higher tolerance for pyramiding
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 2: Pyramiding = 3
     result = run_parity_test(
@@ -326,8 +336,10 @@ def test_v3_pyramiding() -> list[ParityResult]:
         tolerance_pct=5.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     return results
 
@@ -358,8 +370,10 @@ def test_v4_atr() -> list[ParityResult]:
         tolerance_pct=5.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 2: ATR TP only
     result = run_parity_test(
@@ -375,8 +389,10 @@ def test_v4_atr() -> list[ParityResult]:
         tolerance_pct=5.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 3: ATR SL + TP
     result = run_parity_test(
@@ -393,8 +409,10 @@ def test_v4_atr() -> list[ParityResult]:
         tolerance_pct=5.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     return results
 
@@ -421,14 +439,16 @@ def test_v4_multi_tp() -> list[ParityResult]:
             "tp_mode": TpMode.MULTI,
             "multi_tp_enabled": True,
             "tp_portions": (0.25, 0.25, 0.25, 0.25),  # 25% at each level
-            "tp_levels": (0.01, 0.02, 0.03, 0.04),    # 1%, 2%, 3%, 4% profit
+            "tp_levels": (0.01, 0.02, 0.03, 0.04),  # 1%, 2%, 3%, 4% profit
             "stop_loss": 0.02,
         },
         tolerance_pct=10.0,  # Higher tolerance for multi-TP
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 2: Multi-TP with ATR
     result = run_parity_test(
@@ -447,8 +467,10 @@ def test_v4_multi_tp() -> list[ParityResult]:
         tolerance_pct=10.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     return results
 
@@ -474,15 +496,17 @@ def test_v4_trailing() -> list[ParityResult]:
             "direction": TradeDirection.LONG,
             "trailing_stop_enabled": True,
             "trailing_stop_activation": 0.01,  # Activate after 1% profit
-            "trailing_stop_distance": 0.005,   # Trail 0.5% from best
+            "trailing_stop_distance": 0.005,  # Trail 0.5% from best
             "stop_loss": 0.03,
             "take_profit": 0.0,  # No fixed TP
         },
         tolerance_pct=10.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     # Test 2: Trailing + Multi-TP (activate after TP1)
     result = run_parity_test(
@@ -503,8 +527,10 @@ def test_v4_trailing() -> list[ParityResult]:
         tolerance_pct=15.0,
     )
     results.append(result)
-    print(f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
-          f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)")
+    print(
+        f"  {result.test_name}: {'PASS' if result.passed else 'FAIL'} "
+        f"(FB:{result.fallback_trades} NUM:{result.numba_trades} PnL diff:{result.pnl_diff_pct:.2f}%)"
+    )
 
     return results
 
@@ -545,11 +571,10 @@ def main():
 
     for r in all_results:
         status = "[PASS]" if r.passed else "[FAIL]"
-        print(f"{r.test_name:<30} {r.fallback_trades:>6} {r.numba_trades:>6} "
-              f"{r.pnl_diff_pct:>7.2f}% {status:>8}")
+        print(f"{r.test_name:<30} {r.fallback_trades:>6} {r.numba_trades:>6} {r.pnl_diff_pct:>7.2f}% {status:>8}")
 
     print("-" * 70)
-    print(f"TOTAL: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
+    print(f"TOTAL: {passed}/{total} tests passed ({passed / total * 100:.1f}%)")
 
     if passed == total:
         print("\n[OK] All parity tests PASSED!")

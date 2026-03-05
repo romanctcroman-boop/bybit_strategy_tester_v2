@@ -192,6 +192,7 @@ class BybitWebSocketClient:
                 self.public_url,
                 ping_interval=self.ping_interval,
                 ping_timeout=10.0,
+                open_timeout=10.0,
             )
             logger.info("✅ Public WebSocket connected")
 

@@ -427,6 +427,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             or normalized_ip == "127.0.0.1"
             or normalized_ip == "::1"
             or normalized_ip == "localhost"
+            or normalized_ip == "testclient"  # Starlette TestClient hostname
             or normalized_ip.startswith("127.")
             or normalized_ip.startswith("::ffff:127.")
         )

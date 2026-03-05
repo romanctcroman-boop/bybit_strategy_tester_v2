@@ -67,7 +67,7 @@ async def main():
     w_end = pd.Timestamp("2025-01-30 00:00", tz="UTC")
     window = bybit_btc.loc[w_start:w_end]
 
-    print(f"\n=== Bybit BTC 30m RSI around trade 9 divergence (2025-01-28) ===")
+    print("\n=== Bybit BTC 30m RSI around trade 9 divergence (2025-01-28) ===")
     print(f"{'Time (UTC)':20s}  {'close':10s}  {'RSI':8s}  cross52?")
     prev_rsi = None
     for ts, row in window.iterrows():
@@ -81,7 +81,7 @@ async def main():
         prev_rsi = row["rsi"]
 
     # ── Check duplicate/missing timestamps ───────────────────────────────────
-    print(f"\n=== Checking timestamp continuity (2025-01-27 to 2025-01-30) ===")
+    print("\n=== Checking timestamp continuity (2025-01-27 to 2025-01-30) ===")
     window_idx = window.index
     expected = pd.date_range(w_start, w_end, freq="30min", tz="UTC")
     missing = expected.difference(window_idx)
@@ -95,7 +95,7 @@ async def main():
         print("No missing or extra bars in window.")
 
     # ── Compare with Bybit mark price kline (TV may use mark price) ──────────
-    print(f"\n=== Fetching Bybit MARK PRICE kline for comparison ===")
+    print("\n=== Fetching Bybit MARK PRICE kline for comparison ===")
     try:
         url = "https://api.bybit.com/v5/market/mark-price-kline"
         params = {
@@ -126,7 +126,7 @@ async def main():
         print(f"Mark price fetch failed: {e}")
 
     # ── Check index timezone: are bars tz-naive from our fetch? ──────────────
-    print(f"\n=== Timezone check ===")
+    print("\n=== Timezone check ===")
     print(f"bybit_btc.index.tz = {bybit_btc.index.tz}")
     print(f"First 3 index values: {list(bybit_btc.index[:3])}")
 
@@ -134,7 +134,7 @@ async def main():
     seam_start = pd.Timestamp("2024-12-31 22:00", tz="UTC")
     seam_end = pd.Timestamp("2025-01-01 02:00", tz="UTC")
     seam = bybit_btc.loc[seam_start:seam_end]
-    print(f"\n=== Pagination seam (2025-01-01 boundary) ===")
+    print("\n=== Pagination seam (2025-01-01 boundary) ===")
     for ts, row in seam.iterrows():
         print(f"  {str(ts)[:16]}  close={row['close']:.2f}")
 

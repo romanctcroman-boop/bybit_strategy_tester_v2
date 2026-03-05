@@ -92,17 +92,21 @@ class MLflowAdapter:
         self.registry_uri = registry_uri or self.tracking_uri
         self._client: Any = None
         self._initialized = False
+        self._available: bool | None = None  # None = not yet checked (lazy init)
 
         if not MLFLOW_AVAILABLE:
             logger.warning(
                 "mlflow library not installed. MLflow integration disabled. Install with: pip install mlflow"
             )
-        else:
-            self._initialize()
+            self._available = False
 
     def _initialize(self) -> None:
-        """Initialize MLflow connection."""
+        """Initialize MLflow connection (called lazily on first use)."""
+        if self._initialized or self._available is False:
+            return
+
         if not MLFLOW_AVAILABLE:
+            self._available = False
             return
 
         try:
@@ -112,14 +116,20 @@ class MLflowAdapter:
 
             self._client = MlflowClient(tracking_uri=self.tracking_uri)
             self._initialized = True
+            self._available = True
             logger.info(f"Connected to MLflow at {self.tracking_uri}")
         except Exception as e:
             logger.warning(f"Failed to connect to MLflow: {e}")
             self._initialized = False
+            self._available = False
 
     @property
     def is_available(self) -> bool:
-        """Check if MLflow is available."""
+        """Check if MLflow is available (triggers lazy initialization)."""
+        if self._available is False:
+            return False
+        if not self._initialized:
+            self._initialize()
         return MLFLOW_AVAILABLE and self._initialized
 
     def set_experiment(

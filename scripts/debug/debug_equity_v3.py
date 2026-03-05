@@ -44,9 +44,7 @@ if "timestamp" in df.columns:
 long_entries = np.load(tv_data_dir / "long_signals.npy")
 short_entries = np.load(tv_data_dir / "short_signals.npy")
 
-print(
-    f"Loaded {len(df)} candles, {long_entries.sum()} long, {short_entries.sum()} short signals"
-)
+print(f"Loaded {len(df)} candles, {long_entries.sum()} long, {short_entries.sum()} short signals")
 
 # Prepare candles
 candles = df.reset_index(drop=True)
@@ -125,9 +123,7 @@ for i in range(min_len):
         for j in range(max(0, i - 3), min(min_len, i + 5)):
             diff = abs(fb_equity[j] - nb_equity[j])
             marker = " <-- DIFF" if diff > 0.01 else ""
-            print(
-                f"  Bar {j}: FB={fb_equity[j]:>12.2f}  NB={nb_equity[j]:>12.2f}{marker}"
-            )
+            print(f"  Bar {j}: FB={fb_equity[j]:>12.2f}  NB={nb_equity[j]:>12.2f}{marker}")
         break
 else:
     print("No differences found in equity curves!")

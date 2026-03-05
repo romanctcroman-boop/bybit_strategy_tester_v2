@@ -136,7 +136,7 @@ async def main():
             if se[i]:
                 se_bars.append((ts, i))
 
-        print(f"  SE=True bars in window:")
+        print("  SE=True bars in window:")
         for ts, i in se_bars:
             prev_bar = ts - pd.Timedelta(minutes=30)
             # Was prev_bar during the previous trade?

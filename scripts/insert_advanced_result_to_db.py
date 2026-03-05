@@ -23,9 +23,7 @@ bt.strategy_id = data.get("config", {}).get("strategy_id")
 start = data.get("config", {}).get("start_date")
 end = data.get("config", {}).get("end_date")
 try:
-    bt.start_date = (
-        datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
-    )
+    bt.start_date = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
     bt.end_date = datetime.fromisoformat(end.replace("Z", "+00:00")) if end else None
 except Exception:
     bt.start_date = None
@@ -54,16 +52,8 @@ bt.equity_curve = data.get("equity_curve")
 created_at = data.get("created_at")
 completed_at = data.get("completed_at")
 try:
-    bt.created_at = (
-        datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-        if created_at
-        else None
-    )
-    bt.completed_at = (
-        datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
-        if completed_at
-        else None
-    )
+    bt.created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00")) if created_at else None
+    bt.completed_at = datetime.fromisoformat(completed_at.replace("Z", "+00:00")) if completed_at else None
 except Exception:
     pass
 

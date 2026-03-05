@@ -1,6 +1,7 @@
 """
 Perplexity API consultation about VectorBT limitations (sonar-pro model)
 """
+
 import sys
 from pathlib import Path
 
@@ -43,6 +44,7 @@ We discovered VectorBT has critical limitations for accurate backtesting:
 Please provide technical recommendations with code examples.
 """
 
+
 def main():
     print("=" * 70)
     print("PERPLEXITY CONSULTATION: VectorBT Limitations")
@@ -63,7 +65,7 @@ def main():
         "messages": [
             {
                 "role": "system",
-                "content": "You are an expert in quantitative finance, algorithmic trading, and high-performance backtesting. Provide technical, actionable advice."
+                "content": "You are an expert in quantitative finance, algorithmic trading, and high-performance backtesting. Provide technical, actionable advice.",
             },
             {"role": "user", "content": PROMPT},
         ],
@@ -80,10 +82,7 @@ def main():
             response = client.post(
                 "https://api.perplexity.ai/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
 
         print(f"\n📥 Response status: {response.status_code}")
@@ -128,7 +127,9 @@ def main():
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

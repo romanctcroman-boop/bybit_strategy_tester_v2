@@ -717,8 +717,8 @@ class GPUEngineV2(BaseBacktestEngine):
         drawdown_pct = (peak - equity_curve) / peak * 100
         drawdown_usdt = peak - equity_curve  # Absolute drawdown in USDT
         max_drawdown = np.max(drawdown_pct)  # Percentage for consistency
-        max_drawdown_pct = np.max(drawdown_pct)  # noqa: F841 - Keep percentage version
-        max_drawdown_usdt = np.max(drawdown_usdt)  # noqa: F841 - USDT version for display
+        max_drawdown_pct = np.max(drawdown_pct)
+        max_drawdown_usdt = np.max(drawdown_usdt)
 
         # Sharpe Ratio (hourly returns - same as FallbackEngineV2)
         returns = np.diff(equity_curve) / equity_curve[:-1]

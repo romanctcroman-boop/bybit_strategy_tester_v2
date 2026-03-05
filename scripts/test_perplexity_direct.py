@@ -1,6 +1,7 @@
 """
 Direct Perplexity test with new API key
 """
+
 import os
 
 import httpx
@@ -33,6 +34,7 @@ We use VectorBT for fast optimization but found critical issues:
 Provide technical recommendations with code examples.
 """
 
+
 def main():
     print("=" * 70)
     print("PERPLEXITY DIRECT TEST")
@@ -58,10 +60,7 @@ def main():
             response = client.post(
                 "https://api.perplexity.ai/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
 
         print(f"📥 Status: {response.status_code}")
@@ -98,7 +97,9 @@ def main():
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

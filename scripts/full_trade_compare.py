@@ -1,4 +1,4 @@
-﻿"""Full per-trade comparison between fallback and vectorbt engines.
+"""Full per-trade comparison between fallback and vectorbt engines.
 
 Produces:
 - logs/full_trades_fallback.json
@@ -34,9 +34,7 @@ def dump(obj: Any, path: Path) -> None:
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:
-    df = pd.DataFrame(
-        data, columns=["open_time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume"])
     try:
         df["open_time"] = pd.to_datetime(df["open_time"].astype("int64"), unit="ms")
     except Exception:
@@ -64,6 +62,7 @@ def _parse_dt(v: Any) -> datetime | None:
         return v
     try:
         import pandas as _pd
+
         if isinstance(v, _pd.Timestamp):
             return v.to_pydatetime()
     except Exception:
@@ -196,18 +195,16 @@ def pairwise_match(
             }
             matches.append(match)
         else:
-            matches.append({
-                "fallback_idx": i,
-                "vectorbt_idx": None,
-                "fallback": ft,
-                "vectorbt": None,
-            })
+            matches.append(
+                {
+                    "fallback_idx": i,
+                    "vectorbt_idx": None,
+                    "fallback": ft,
+                    "vectorbt": None,
+                }
+            )
 
-    unmatched_vb = [
-        {"vectorbt_idx": j, "vectorbt": vt}
-        for j, vt in enumerate(vb_trades)
-        if j not in used_vb
-    ]
+    unmatched_vb = [{"vectorbt_idx": j, "vectorbt": vt} for j, vt in enumerate(vb_trades) if j not in used_vb]
 
     return {"matches": matches, "unmatched_vectorbt": unmatched_vb}
 
@@ -252,9 +249,7 @@ def main() -> int:
     vb_trades = [trade_to_dict(t) for t in res_vectorbt.trades]
 
     cfg_obj = (
-        config.model_dump()
-        if hasattr(config, "model_dump")
-        else (config.dict() if hasattr(config, "dict") else {})
+        config.model_dump() if hasattr(config, "model_dump") else (config.dict() if hasattr(config, "dict") else {})
     )
     dump({"config": cfg_obj, "trades": fb_trades}, ROOT / "logs" / "full_trades_fallback.json")
     dump({"config": cfg_obj, "trades": vb_trades}, ROOT / "logs" / "full_trades_vectorbt.json")

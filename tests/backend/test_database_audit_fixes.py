@@ -8,8 +8,6 @@ Verifies:
 """
 
 
-
-
 class TestSessionReExports:
     """Test that session.py correctly re-exports from __init__.py"""
 

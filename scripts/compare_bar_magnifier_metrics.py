@@ -32,27 +32,27 @@ def load_ohlc_data(filepath: Path, timeframe: str = "15") -> pd.DataFrame:
 
     # Нормализация колонок
     column_map = {
-        'time': 'timestamp',
-        'Time': 'timestamp',
-        'Open': 'open',
-        'High': 'high',
-        'Low': 'low',
-        'Close': 'close',
-        'Volume': 'volume',
+        "time": "timestamp",
+        "Time": "timestamp",
+        "Open": "open",
+        "High": "high",
+        "Low": "low",
+        "Close": "close",
+        "Volume": "volume",
     }
     df.rename(columns=column_map, inplace=True)
 
     # Parse timestamps - ensure proper datetime type
-    if 'timestamp' in df.columns:
-        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
         # Remove timezone info for consistency
-        df['timestamp'] = df['timestamp'].dt.tz_localize(None)
-        df.set_index('timestamp', inplace=True)
+        df["timestamp"] = df["timestamp"].dt.tz_localize(None)
+        df.set_index("timestamp", inplace=True)
 
     # Ensure OHLC columns are float
-    for col in ['open', 'high', 'low', 'close', 'volume']:
+    for col in ["open", "high", "low", "close", "volume"]:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
 
@@ -65,25 +65,25 @@ def generate_rsi_signals(
 ) -> tuple:
     """Генерация RSI сигналов."""
     # RSI calculation (если нет в данных)
-    if 'RSI' not in df.columns:
-        delta = df['close'].diff()
+    if "RSI" not in df.columns:
+        delta = df["close"].diff()
         gain = delta.where(delta > 0, 0).rolling(window=rsi_length).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_length).mean()
         rs = gain / loss
-        df['RSI'] = 100 - (100 / (1 + rs))
+        df["RSI"] = 100 - (100 / (1 + rs))
 
-    rsi = df['RSI'].values
+    rsi = df["RSI"].values
 
     # Long entry: RSI crosses above oversold
     long_entries = np.zeros(len(df), dtype=bool)
     for i in range(1, len(df)):
-        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]) and rsi[i-1] < oversold and rsi[i] >= oversold:
+        if not np.isnan(rsi[i]) and not np.isnan(rsi[i - 1]) and rsi[i - 1] < oversold and rsi[i] >= oversold:
             long_entries[i] = True
 
     # Short entry: RSI crosses below overbought
     short_entries = np.zeros(len(df), dtype=bool)
     for i in range(1, len(df)):
-        if not np.isnan(rsi[i]) and not np.isnan(rsi[i-1]) and rsi[i-1] > overbought and rsi[i] <= overbought:
+        if not np.isnan(rsi[i]) and not np.isnan(rsi[i - 1]) and rsi[i - 1] > overbought and rsi[i] <= overbought:
             short_entries[i] = True
 
     return long_entries, short_entries
@@ -108,9 +108,7 @@ def run_backtest_comparison(
     results = {}
 
     # Generate signals
-    long_entries, short_entries = generate_rsi_signals(
-        ohlc_15m.copy(), rsi_length, oversold, overbought
-    )
+    long_entries, short_entries = generate_rsi_signals(ohlc_15m.copy(), rsi_length, oversold, overbought)
 
     # Reset index for engine
     candles = ohlc_15m.reset_index()
@@ -140,10 +138,10 @@ def run_backtest_comparison(
     result_standard = engine.run(input_standard)
     time_standard = time.time() - start
 
-    results['standard'] = {
-        'metrics': result_standard.metrics,
-        'trades': result_standard.trades,
-        'execution_time': time_standard,
+    results["standard"] = {
+        "metrics": result_standard.metrics,
+        "trades": result_standard.trades,
+        "execution_time": time_standard,
     }
 
     print(f"   ✅ Завершено за {time_standard:.2f}s")
@@ -173,10 +171,10 @@ def run_backtest_comparison(
         result_magnifier = engine.run(input_magnifier)
         time_magnifier = time.time() - start
 
-        results['magnifier'] = {
-            'metrics': result_magnifier.metrics,
-            'trades': result_magnifier.trades,
-            'execution_time': time_magnifier,
+        results["magnifier"] = {
+            "metrics": result_magnifier.metrics,
+            "trades": result_magnifier.trades,
+            "execution_time": time_magnifier,
         }
 
         print(f"   ✅ Завершено за {time_magnifier:.2f}s")
@@ -184,7 +182,7 @@ def run_backtest_comparison(
         print(f"   💰 Net Profit: {result_magnifier.metrics.net_profit:.2f} USDT")
     else:
         print("\n⚠️ Нет 1-минутных данных для Bar Magnifier")
-        results['magnifier'] = None
+        results["magnifier"] = None
 
     return results
 
@@ -195,8 +193,8 @@ def print_comparison_report(results: dict[str, Any]):
     print("🔬 СРАВНЕНИЕ МЕТРИК: Standard vs Bar Magnifier")
     print("=" * 90)
 
-    standard = results['standard']['metrics']
-    magnifier = results.get('magnifier')
+    standard = results["standard"]["metrics"]
+    magnifier = results.get("magnifier")
 
     if magnifier is None:
         print("\n⚠️ Bar Magnifier не был запущен (нет 1m данных)")
@@ -207,24 +205,24 @@ def print_comparison_report(results: dict[str, Any]):
         print(f"   • Profit Factor: {standard.profit_factor:.3f}")
         return
 
-    mag = magnifier['metrics']
+    mag = magnifier["metrics"]
 
     print(f"\n{'Метрика':<30} {'Standard':>15} {'Bar Magnifier':>15} {'Разница':>12} {'%':>10}")
     print("-" * 90)
 
     metrics_to_compare = [
-        ('total_trades', 'Всего сделок', 0),
-        ('winning_trades', 'Выигрышных', 0),
-        ('losing_trades', 'Проигрышных', 0),
-        ('net_profit', 'Net Profit', 2),
-        ('gross_profit', 'Gross Profit', 2),
-        ('gross_loss', 'Gross Loss', 2),
-        ('win_rate', 'Win Rate', 4),
-        ('profit_factor', 'Profit Factor', 3),
-        ('max_drawdown', 'Max Drawdown', 2),
-        ('avg_trade', 'Avg Trade', 2),
-        ('avg_win', 'Avg Win', 2),
-        ('avg_loss', 'Avg Loss', 2),
+        ("total_trades", "Всего сделок", 0),
+        ("winning_trades", "Выигрышных", 0),
+        ("losing_trades", "Проигрышных", 0),
+        ("net_profit", "Net Profit", 2),
+        ("gross_profit", "Gross Profit", 2),
+        ("gross_loss", "Gross Loss", 2),
+        ("win_rate", "Win Rate", 4),
+        ("profit_factor", "Profit Factor", 3),
+        ("max_drawdown", "Max Drawdown", 2),
+        ("avg_trade", "Avg Trade", 2),
+        ("avg_win", "Avg Win", 2),
+        ("avg_loss", "Avg Loss", 2),
     ]
 
     for attr, name, decimals in metrics_to_compare:
@@ -256,8 +254,8 @@ def print_comparison_report(results: dict[str, Any]):
     print("-" * 90)
 
     # Time comparison
-    time_std = results['standard']['execution_time']
-    time_mag = magnifier['execution_time']
+    time_std = results["standard"]["execution_time"]
+    time_mag = magnifier["execution_time"]
     slowdown = time_mag / time_std if time_std > 0 else 0
 
     print("\n⏱️ Время выполнения:")
@@ -266,13 +264,13 @@ def print_comparison_report(results: dict[str, Any]):
 
     # MFE/MAE comparison for first few trades
     print("\n📈 Сравнение MFE/MAE (первые 5 сделок):")
-    std_trades = results['standard']['trades'][:5]
-    mag_trades = magnifier['trades'][:5]
+    std_trades = results["standard"]["trades"][:5]
+    mag_trades = magnifier["trades"][:5]
 
     print(f"{'#':<3} {'MFE Std':>12} {'MFE Mag':>12} {'MAE Std':>12} {'MAE Mag':>12}")
     print("-" * 55)
     for i, (st, mt) in enumerate(zip(std_trades, mag_trades, strict=False)):
-        print(f"{i+1:<3} {st.mfe:>12.2f} {mt.mfe:>12.2f} {st.mae:>12.2f} {mt.mae:>12.2f}")
+        print(f"{i + 1:<3} {st.mfe:>12.2f} {mt.mfe:>12.2f} {st.mae:>12.2f} {mt.mae:>12.2f}")
 
 
 def main():
@@ -322,18 +320,20 @@ def main():
             klines = session.execute(stmt).scalars().all()
 
             if klines:
-                ohlc_1m = pd.DataFrame([
-                    {
-                        'timestamp': k.timestamp,
-                        'open': k.open,
-                        'high': k.high,
-                        'low': k.low,
-                        'close': k.close,
-                        'volume': k.volume,
-                    }
-                    for k in klines
-                ])
-                ohlc_1m.set_index('timestamp', inplace=True)
+                ohlc_1m = pd.DataFrame(
+                    [
+                        {
+                            "timestamp": k.timestamp,
+                            "open": k.open,
+                            "high": k.high,
+                            "low": k.low,
+                            "close": k.close,
+                            "volume": k.volume,
+                        }
+                        for k in klines
+                    ]
+                )
+                ohlc_1m.set_index("timestamp", inplace=True)
                 print(f"   ✅ Загружено {len(ohlc_1m)} баров 1m из базы")
             else:
                 print("   ⚠️ 1m данные не найдены в базе")

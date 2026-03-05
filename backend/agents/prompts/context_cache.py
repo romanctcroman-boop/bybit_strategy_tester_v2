@@ -29,7 +29,8 @@ from loguru import logger
 
 # Optional Redis support
 try:
-    from backend.monitoring.redis_cache import RedisContextCache, RedisCacheConfig
+    from backend.monitoring.redis_cache import RedisCacheConfig, RedisContextCache
+
     REDIS_AVAILABLE = True
 except ImportError:
     RedisContextCache = None  # type: ignore
@@ -40,17 +41,18 @@ except ImportError:
 @dataclass
 class CacheEntry:
     """Cache entry with metadata."""
+
     key: str
     value: Any
     created_at: float
     ttl: int  # Time to live in seconds
     access_count: int = 0
     last_accessed: float = field(default_factory=time.time)
-    
+
     def is_expired(self) -> bool:
         """Check if entry is expired."""
         return time.time() > (self.created_at + self.ttl)
-    
+
     def touch(self) -> None:
         """Update last accessed time and access count."""
         self.access_count += 1
@@ -113,10 +115,9 @@ class ContextCache:
         self._misses = 0
 
         logger.info(
-            f"💾 ContextCache initialized "
-            f"(max_size={max_size}, default_ttl={default_ttl}s, redis={self.use_redis})"
+            f"💾 ContextCache initialized (max_size={max_size}, default_ttl={default_ttl}s, redis={self.use_redis})"
         )
-    
+
     def set(
         self,
         data: dict[str, Any],
@@ -206,7 +207,7 @@ class ContextCache:
         logger.debug(f"💾 Memory hit: {key[:16]}... (accesses={entry.access_count})")
 
         return entry.value
-    
+
     def get_or_set(
         self,
         key: str,
@@ -215,30 +216,30 @@ class ContextCache:
     ) -> Any:
         """
         Get from cache or set using factory function.
-        
+
         Args:
             key: Cache key
             factory: Function to generate value if not cached
             ttl: Time to live in seconds
-        
+
         Returns:
             Cached or newly generated value
         """
         value = self.get(key)
-        
+
         if value is None:
             value = factory()
             self.set(value, ttl=ttl, key=key)
-        
+
         return value
-    
+
     def delete(self, key: str) -> bool:
         """
         Delete entry from cache.
-        
+
         Args:
             key: Cache key
-        
+
         Returns:
             True if deleted, False if not found
         """
@@ -247,11 +248,11 @@ class ContextCache:
             logger.debug(f"🗑️ Cache delete: {key[:16]}...")
             return True
         return False
-    
+
     def clear(self) -> int:
         """
         Clear all cache entries.
-        
+
         Returns:
             Number of entries cleared
         """
@@ -259,27 +260,24 @@ class ContextCache:
         self._cache.clear()
         logger.info(f"🗑️ Cache cleared ({count} entries)")
         return count
-    
+
     def cleanup_expired(self) -> int:
         """
         Remove expired entries.
-        
+
         Returns:
             Number of entries removed
         """
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired()
-        ]
-        
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
+
         for key in expired_keys:
             del self._cache[key]
-        
+
         if expired_keys:
             logger.debug(f"🧹 Cleaned up {len(expired_keys)} expired entries")
-        
+
         return len(expired_keys)
-    
+
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         # If using Redis, get Redis stats
@@ -298,10 +296,7 @@ class ContextCache:
 
         # Size distribution by TTL
         now = time.time()
-        expiring_soon = sum(
-            1 for entry in self._cache.values()
-            if (entry.created_at + entry.ttl) - now < 60
-        )
+        expiring_soon = sum(1 for entry in self._cache.values() if (entry.created_at + entry.ttl) - now < 60)
 
         return {
             "backend": "memory",
@@ -313,43 +308,40 @@ class ContextCache:
             "expiring_soon": expiring_soon,
             "default_ttl": self.default_ttl,
         }
-    
+
     def _generate_key(self, data: dict[str, Any]) -> str:
         """Generate cache key from data."""
         # Sort keys for consistent hashing
         normalized = json.dumps(data, sort_keys=True)
         return hashlib.sha256(normalized.encode()).hexdigest()
-    
+
     def _evict_lru(self) -> None:
         """Evict least recently used entry."""
         if not self._cache:
             return
-        
+
         # Find entry with oldest last_accessed
-        lru_key = min(
-            self._cache.keys(),
-            key=lambda k: self._cache[k].last_accessed
-        )
-        
+        lru_key = min(self._cache.keys(), key=lambda k: self._cache[k].last_accessed)
+
         del self._cache[lru_key]
         logger.debug(f"🗑️ Evicted LRU: {lru_key[:16]}...")
-    
+
     def keys(self) -> list[str]:
         """Get all cache keys."""
         return list(self._cache.keys())
-    
+
     def values(self) -> list[Any]:
         """Get all cached values."""
         return [entry.value for entry in self._cache.values()]
-    
+
     def items(self) -> list[tuple[str, Any]]:
         """Get all cache items."""
         return [(key, entry.value) for key, entry in self._cache.items()]
-    
+
     def __len__(self) -> int:
         """Get cache size."""
         return len(self._cache)
-    
+
     def __contains__(self, key: str) -> bool:
         """Check if key is in cache."""
         return key in self._cache and not self._cache[key].is_expired()
@@ -358,11 +350,11 @@ class ContextCache:
 class MarketContextCache(ContextCache):
     """
     Specialized cache for market contexts.
-    
+
     Provides convenient methods for caching market analysis
     and strategy generation results.
     """
-    
+
     def cache_market_context(
         self,
         symbol: str,
@@ -372,13 +364,13 @@ class MarketContextCache(ContextCache):
     ) -> str:
         """
         Cache market context for symbol/timeframe.
-        
+
         Args:
             symbol: Trading pair symbol
             timeframe: Timeframe
             context_data: Market context data
             ttl: Time to live in seconds
-        
+
         Returns:
             Cache key
         """
@@ -386,7 +378,7 @@ class MarketContextCache(ContextCache):
         self.set(context_data, ttl=ttl, key=key)
         logger.debug(f"💾 Cached market context: {key}")
         return key
-    
+
     def get_market_context(
         self,
         symbol: str,
@@ -394,17 +386,17 @@ class MarketContextCache(ContextCache):
     ) -> dict[str, Any] | None:
         """
         Get cached market context.
-        
+
         Args:
             symbol: Trading pair symbol
             timeframe: Timeframe
-        
+
         Returns:
             Market context or None
         """
         key = f"market:{symbol}:{timeframe}"
         return self.get(key)
-    
+
     def cache_strategy_prompt(
         self,
         symbol: str,
@@ -415,14 +407,14 @@ class MarketContextCache(ContextCache):
     ) -> str:
         """
         Cache generated strategy prompt.
-        
+
         Args:
             symbol: Trading pair symbol
             timeframe: Timeframe
             agent_type: Agent type
             prompt: Generated prompt
             ttl: Time to live in seconds
-        
+
         Returns:
             Cache key
         """
@@ -430,7 +422,7 @@ class MarketContextCache(ContextCache):
         self.set({"prompt": prompt}, ttl=ttl, key=key)
         logger.debug(f"💾 Cached strategy prompt: {key}")
         return key
-    
+
     def get_strategy_prompt(
         self,
         symbol: str,
@@ -439,12 +431,12 @@ class MarketContextCache(ContextCache):
     ) -> str | None:
         """
         Get cached strategy prompt.
-        
+
         Args:
             symbol: Trading pair symbol
             timeframe: Timeframe
             agent_type: Agent type
-        
+
         Returns:
             Prompt or None
         """

@@ -195,15 +195,9 @@ class MegaDCATest:
             bullish_cross = 0
             bearish_cross = 0
             for i in range(1, len(macd_line)):
-                if (
-                    macd_line[i - 1] < signal_line[i - 1]
-                    and macd_line[i] > signal_line[i]
-                ):
+                if macd_line[i - 1] < signal_line[i - 1] and macd_line[i] > signal_line[i]:
                     bullish_cross += 1
-                elif (
-                    macd_line[i - 1] > signal_line[i - 1]
-                    and macd_line[i] < signal_line[i]
-                ):
+                elif macd_line[i - 1] > signal_line[i - 1] and macd_line[i] < signal_line[i]:
                     bearish_cross += 1
 
             valid = len(macd_line) == len(candles) and not np.any(np.isnan(macd_line))
@@ -302,11 +296,7 @@ class MegaDCATest:
             # ATR as % of price
             atr_pct = atr / close * 100
 
-            valid = (
-                len(atr) == len(candles)
-                and np.all(atr[period:] > 0)
-                and not np.any(np.isnan(atr[period:]))
-            )
+            valid = len(atr) == len(candles) and np.all(atr[period:] > 0) and not np.any(np.isnan(atr[period:]))
 
             return TestResult(
                 name="ATR Indicator",
@@ -318,11 +308,7 @@ class MegaDCATest:
                     "last_atr_pct": float(atr_pct[-1]),
                     "avg_atr_pct": float(np.mean(atr_pct[period:])),
                     "max_atr_pct": float(np.max(atr_pct[period:])),
-                    "volatility": "high"
-                    if atr_pct[-1] > 3
-                    else "medium"
-                    if atr_pct[-1] > 1.5
-                    else "low",
+                    "volatility": "high" if atr_pct[-1] > 3 else "medium" if atr_pct[-1] > 1.5 else "low",
                 },
             )
         except Exception as e:
@@ -355,11 +341,7 @@ class MegaDCATest:
             oversold = np.sum(k[k_period:] < 20)
             overbought = np.sum(k[k_period:] > 80)
 
-            valid = (
-                len(k) == len(candles)
-                and np.all(k[k_period:] >= 0)
-                and np.all(k[k_period:] <= 100)
-            )
+            valid = len(k) == len(candles) and np.all(k[k_period:] >= 0) and np.all(k[k_period:] <= 100)
 
             return TestResult(
                 name="Stochastic Oscillator",
@@ -437,9 +419,7 @@ class MegaDCATest:
 
             # Trend strength
             last_adx = adx[-1]
-            trend_strength = (
-                "strong" if last_adx > 25 else "weak" if last_adx < 20 else "moderate"
-            )
+            trend_strength = "strong" if last_adx > 25 else "weak" if last_adx < 20 else "moderate"
 
             valid = len(adx) == len(candles) and not np.any(np.isnan(adx[2 * period :]))
 
@@ -503,9 +483,7 @@ class MegaDCATest:
 
             results["golden_crosses"] = golden_crosses
             results["death_crosses"] = death_crosses
-            results["current_trend"] = (
-                "bullish" if ema_50[-1] > ema_200[-1] else "bearish"
-            )
+            results["current_trend"] = "bullish" if ema_50[-1] > ema_200[-1] else "bearish"
 
             return TestResult(
                 name="EMA/SMA Indicators",
@@ -520,9 +498,7 @@ class MegaDCATest:
     # FILTER TESTS
     # =========================================================================
 
-    def test_mtf_filter(
-        self, ltf_candles: pd.DataFrame, htf_candles: pd.DataFrame
-    ) -> TestResult:
+    def test_mtf_filter(self, ltf_candles: pd.DataFrame, htf_candles: pd.DataFrame) -> TestResult:
         """Test Multi-Timeframe filter."""
         try:
             from backend.backtesting.mtf.index_mapper import create_htf_index_map
@@ -560,9 +536,7 @@ class MegaDCATest:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "MTF Filter (Index Mapping)", "Filters", False, {}, str(e)
-            )
+            return TestResult("MTF Filter (Index Mapping)", "Filters", False, {}, str(e))
 
     def test_trend_filter(self, candles: pd.DataFrame) -> TestResult:
         """Test trend filter using EMA."""
@@ -640,13 +614,7 @@ class MegaDCATest:
             # Volatility regime
             avg_atr = np.mean(atr_pct[period:])
             current_vol = atr_pct[-1]
-            vol_regime = (
-                "HIGH"
-                if current_vol > avg_atr * 1.5
-                else "LOW"
-                if current_vol < avg_atr * 0.5
-                else "NORMAL"
-            )
+            vol_regime = "HIGH" if current_vol > avg_atr * 1.5 else "LOW" if current_vol < avg_atr * 0.5 else "NORMAL"
 
             return TestResult(
                 name="Volatility Filter",
@@ -729,12 +697,8 @@ class MegaDCATest:
                     "regime_type": str(regime.regime) if valid else "N/A",
                     "confidence": float(regime.confidence) if valid else 0,
                     "adx": float(regime.adx) if valid and hasattr(regime, "adx") else 0,
-                    "allow_long": regime.allow_long
-                    if valid and hasattr(regime, "allow_long")
-                    else None,
-                    "allow_short": regime.allow_short
-                    if valid and hasattr(regime, "allow_short")
-                    else None,
+                    "allow_long": regime.allow_long if valid and hasattr(regime, "allow_long") else None,
+                    "allow_short": regime.allow_short if valid and hasattr(regime, "allow_short") else None,
                 },
             )
         except ImportError:
@@ -877,9 +841,7 @@ class MegaDCATest:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Multi-TP Exit (TP1-TP4)", "Exit Strategies", False, {}, str(e)
-            )
+            return TestResult("Multi-TP Exit (TP1-TP4)", "Exit Strategies", False, {}, str(e))
 
     def test_trailing_stop(self, candles: pd.DataFrame) -> TestResult:
         """Test Trailing Stop exit strategy."""
@@ -919,9 +881,7 @@ class MegaDCATest:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Trailing Stop Exit", "Exit Strategies", False, {}, str(e)
-            )
+            return TestResult("Trailing Stop Exit", "Exit Strategies", False, {}, str(e))
 
     def test_breakeven_exit(self, candles: pd.DataFrame) -> TestResult:
         """Test Breakeven exit strategy."""
@@ -1101,17 +1061,11 @@ class MegaDCATest:
 
                 strategy = DCAMultiTPStrategy(config)
                 signals = strategy.generate_signals(candles, None, None)
-                entries = (
-                    int(signals.entries.sum()) if signals.entries is not None else 0
-                )
+                entries = int(signals.entries.sum()) if signals.entries is not None else 0
                 results[f"cooldown_{cooldown}"] = entries
 
             # Cooldown should reduce entries
-            valid = (
-                results.get("cooldown_0", 0)
-                >= results.get("cooldown_4", 0)
-                >= results.get("cooldown_12", 0)
-            )
+            valid = results.get("cooldown_0", 0) >= results.get("cooldown_4", 0) >= results.get("cooldown_12", 0)
 
             return TestResult(
                 name="DCA Cooldown Period",
@@ -1182,9 +1136,7 @@ class MegaDCATest:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Backtest Engine Execution", "Backtest Engine", False, {}, str(e)
-            )
+            return TestResult("Backtest Engine Execution", "Backtest Engine", False, {}, str(e))
 
     def _calculate_rsi(self, close: np.ndarray, period: int) -> np.ndarray:
         """Helper to calculate RSI."""
@@ -1268,27 +1220,13 @@ class MegaDCATest:
                 passed=all_present,
                 details={
                     "metrics_present": metrics_present,
-                    "net_profit": float(m.net_profit)
-                    if hasattr(m, "net_profit")
-                    else None,
-                    "total_return_pct": float(m.total_return)
-                    if hasattr(m, "total_return")
-                    else None,
-                    "max_drawdown_pct": float(m.max_drawdown)
-                    if hasattr(m, "max_drawdown")
-                    else None,
-                    "win_rate_pct": float(m.win_rate)
-                    if hasattr(m, "win_rate")
-                    else None,
-                    "sharpe_ratio": float(m.sharpe_ratio)
-                    if hasattr(m, "sharpe_ratio")
-                    else None,
-                    "profit_factor": float(m.profit_factor)
-                    if hasattr(m, "profit_factor")
-                    else None,
-                    "total_trades": int(m.total_trades)
-                    if hasattr(m, "total_trades")
-                    else None,
+                    "net_profit": float(m.net_profit) if hasattr(m, "net_profit") else None,
+                    "total_return_pct": float(m.total_return) if hasattr(m, "total_return") else None,
+                    "max_drawdown_pct": float(m.max_drawdown) if hasattr(m, "max_drawdown") else None,
+                    "win_rate_pct": float(m.win_rate) if hasattr(m, "win_rate") else None,
+                    "sharpe_ratio": float(m.sharpe_ratio) if hasattr(m, "sharpe_ratio") else None,
+                    "profit_factor": float(m.profit_factor) if hasattr(m, "profit_factor") else None,
+                    "total_trades": int(m.total_trades) if hasattr(m, "total_trades") else None,
                 },
             )
         except Exception as e:
@@ -1402,9 +1340,7 @@ class MegaDCATest:
             logger.error("Not enough data to run tests!")
             return
 
-        logger.info(
-            f"✅ Data loaded: {len(ltf_candles)} LTF, {len(htf_candles)} HTF candles"
-        )
+        logger.info(f"✅ Data loaded: {len(ltf_candles)} LTF, {len(htf_candles)} HTF candles")
 
         # === INDICATOR TESTS ===
         logger.info("\n" + "=" * 80)
@@ -1559,13 +1495,9 @@ def main():
     report = []
     report.append("# MEGA TEST REPORT: DCA + ALL SYSTEM FEATURES")
     report.append(f"\n**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    report.append(
-        f"**Test Period:** {tester.start_date.date()} to {tester.end_date.date()}"
-    )
+    report.append(f"**Test Period:** {tester.start_date.date()} to {tester.end_date.date()}")
     report.append(f"**Symbol:** {tester.symbol}")
-    report.append(
-        f"**Timeframes:** LTF={tester.ltf_interval}m, HTF={tester.htf_interval}m"
-    )
+    report.append(f"**Timeframes:** LTF={tester.ltf_interval}m, HTF={tester.htf_interval}m")
 
     report.append("\n## Summary")
     total_passed = sum(1 for r in tester.results if r.passed)

@@ -915,7 +915,9 @@ async def list_backtests(
                 long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
                 short_payoff_ratio=_safe_float(opt_metrics.get("short_payoff_ratio", 0)),
                 payoff_ratio=_safe_float(opt_metrics.get("payoff_ratio", opt_metrics.get("avg_win_loss_ratio", 0))),
-                avg_win_loss_ratio=_safe_float(opt_metrics.get("avg_win_loss_ratio", opt_metrics.get("payoff_ratio", 0))),
+                avg_win_loss_ratio=_safe_float(
+                    opt_metrics.get("avg_win_loss_ratio", opt_metrics.get("payoff_ratio", 0))
+                ),
                 long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
                 short_expectancy=_safe_float(opt_metrics.get("short_expectancy", 0)),
                 # Use DB columns first, fallback to opt_metrics
@@ -2805,6 +2807,283 @@ async def run_mtf_backtest(request: MTFBacktestRequest):
     except Exception as e:
         logger.exception(f"MTF backtest failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Extend Backtest to Now (P2)
+# ---------------------------------------------------------------------------
+
+# NOTE: INTERVAL_MS и OVERLAP_CANDLES перенесены в backend/services/kline_manager.py
+# Используйте: from backend.services.kline_manager import INTERVAL_MS, OVERLAP_CANDLES
+
+# Minimum gap before extension makes sense (2 full candles)
+_MIN_GAP_CANDLES = 2
+
+# Max gap: 730 days in ms
+_MAX_GAP_MS = 730 * 86_400_000
+
+
+@router.post("/{backtest_id}/extend")
+async def extend_backtest_to_now(
+    backtest_id: str,
+    market_type: str = Query("linear", description="Market type: 'spot' or 'linear'"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Extend a completed backtest forward to the current time.
+
+    Algorithm:
+    1. Load original backtest (config, trades, final_capital)
+    2. Determine gap: orig.end_date → now
+    3. Fetch missing candles from Bybit (with OVERLAP_CANDLES overlap) → persist to DB
+    4. Load OHLCV for warmup+gap from DB
+    5. Run strategy on gap period (warmup used for indicator warm-up only)
+    6. Merge original trades + new trades
+    7. Re-calculate all metrics on the full period
+    8. Save as new backtest with is_extended=True, source_backtest_id=orig.id
+
+    Returns:
+        {status, new_backtest_id, new_trades, gap_start, gap_end, new_metrics}
+    """
+    import uuid
+
+    from backend.backtesting.service import get_backtest_service
+    from backend.services.kline_manager import get_kline_manager
+
+    # ------------------------------------------------------------------ #
+    # Step 1: Load original backtest
+    # ------------------------------------------------------------------ #
+    orig = db.query(BacktestModel).filter(BacktestModel.id == backtest_id).first()
+    if not orig:
+        raise HTTPException(status_code=404, detail=f"Backtest {backtest_id!r} not found")
+
+    # Builder-strategy backtests use a block graph, not a strategy_type string.
+    # BacktestService.run_backtest() cannot reconstruct the graph from the stored
+    # parameters alone — extend is not supported for them yet.
+    strategy_type_str: str = str(orig.strategy_type or "")
+    if strategy_type_str.lower() in ("builder", "strategy_builder", "block_builder"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Extending builder-strategy backtests is not yet supported. "
+                "Open the Strategy Builder, select the strategy, and run a new backtest "
+                "with the desired end date instead."
+            ),
+        )
+
+    symbol: str = str(orig.symbol)
+    interval: str = str(orig.timeframe)  # model uses "timeframe", NOT "interval"
+
+    from backend.services.kline_manager import INTERVAL_MS as _KM_INTERVAL_MS
+
+    interval_ms = _KM_INTERVAL_MS.get(interval)
+    if interval_ms is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported timeframe {interval!r}. Supported: {list(_KM_INTERVAL_MS)}",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Step 2: Determine gap
+    # ------------------------------------------------------------------ #
+    now_utc = datetime.now(UTC)
+    now_ms = int(now_utc.timestamp() * 1000)
+
+    # orig.end_date is a DateTime column → convert to ms
+    end_dt = orig.end_date
+    if end_dt is None:
+        raise HTTPException(status_code=400, detail="Backtest has no end_date — cannot extend")
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=UTC)
+    backtest_end_ms = int(end_dt.timestamp() * 1000)
+
+    gap_ms = now_ms - backtest_end_ms
+    if gap_ms < interval_ms * _MIN_GAP_CANDLES:
+        return {
+            "status": "already_current",
+            "new_backtest_id": None,
+            "new_trades": 0,
+            "gap_start": backtest_end_ms,
+            "gap_end": now_ms,
+            "new_metrics": {},
+        }
+
+    if gap_ms > _MAX_GAP_MS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Gap > 730 days ({gap_ms // 86_400_000} days). Create a new full backtest instead.",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Step 3: Fetch missing candles from Bybit (with overlap) → persist
+    # ------------------------------------------------------------------ #
+    logger.info(
+        "[ExtendBacktest] %s/%s: ensuring candles up to now (gap=%dh)",
+        symbol,
+        interval,
+        gap_ms // 3_600_000,
+    )
+
+    try:
+        km = get_kline_manager()
+        await km.ensure_range(
+            symbol=symbol,
+            interval=interval,
+            start_ms=backtest_end_ms,
+            end_ms=now_ms,
+            market_type=market_type,
+        )
+    except Exception as exc:
+        logger.error("[ExtendBacktest] kline_manager.ensure_range failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"Could not fetch candles from Bybit: {exc}")
+
+    logger.info("[ExtendBacktest] Candles ensured for %s/%s up to %d", symbol, interval, now_ms)
+
+    # ------------------------------------------------------------------ #
+    # Step 4 + 5 + 6: Run backtest on the gap via BacktestService
+    #   We use the service's existing run_backtest() with:
+    #   - start_date = orig.end_date (gap start, with warmup handled internally)
+    #   - end_date   = now (clamped to 1 day in future max by validator)
+    #   - initial_capital = orig.final_capital (continue equity curve)
+    # ------------------------------------------------------------------ #
+    start_dt = orig.start_date
+    if start_dt is None:
+        raise HTTPException(status_code=400, detail="Backtest has no start_date")
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=UTC)
+
+    # end_date for gap run: clamp to a few seconds before midnight tomorrow
+    # to satisfy BacktestConfig validator (end_date <= now + 1 day)
+    gap_end_dt = now_utc
+
+    # Re-use the original strategy parameters
+    orig_params: dict = dict(orig.parameters or {})
+    # strategy_type_str already set above (and validated as non-builder)
+    # Fall back to sma_crossover only if the field is somehow empty
+    if not strategy_type_str:
+        strategy_type_str = "sma_crossover"
+    orig_capital: float = float(orig.initial_capital or 10000.0)
+    gap_initial_capital: float = float(orig.final_capital or orig_capital)
+
+    try:
+        gap_config = BacktestConfig(
+            symbol=symbol,
+            interval=interval,
+            start_date=end_dt,  # gap starts where original ended
+            end_date=gap_end_dt,
+            strategy_type=strategy_type_str,  # type: ignore[arg-type]
+            strategy_params=orig_params,
+            initial_capital=gap_initial_capital,
+            market_type=market_type,
+        )
+    except (ValidationError, PydanticCoreValidationError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid gap config: {exc}")
+
+    service = get_backtest_service()
+    gap_result = await service.run_backtest(gap_config)
+
+    if gap_result.status == BacktestStatus.FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Gap backtest failed: {gap_result.error_message}",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Step 6: Merge trades (original + gap)
+    # ------------------------------------------------------------------ #
+    original_trades: list[dict] = list(orig.trades or [])
+
+    # Convert gap TradeRecord objects → dicts for storage
+    gap_trade_dicts: list[dict] = []
+    if gap_result.trades:
+        for t in gap_result.trades:
+            if hasattr(t, "model_dump"):
+                gap_trade_dicts.append(t.model_dump())
+            elif hasattr(t, "dict"):
+                gap_trade_dicts.append(t.dict())  # type: ignore[attr-defined]
+            elif isinstance(t, dict):
+                gap_trade_dicts.append(t)
+
+    all_trades = sorted(
+        original_trades + gap_trade_dicts,
+        key=lambda t: t.get("entry_time", t.get("entry_date", 0)) if isinstance(t, dict) else 0,
+    )
+
+    # ------------------------------------------------------------------ #
+    # Step 7: Re-run full backtest (original start → now) to get merged metrics
+    # ------------------------------------------------------------------ #
+    try:
+        full_config = BacktestConfig(
+            symbol=symbol,
+            interval=interval,
+            start_date=start_dt,
+            end_date=gap_end_dt,
+            strategy_type=strategy_type_str,  # type: ignore[arg-type]
+            strategy_params=orig_params,
+            initial_capital=orig_capital,
+            market_type=market_type,
+        )
+    except (ValidationError, PydanticCoreValidationError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid full config: {exc}")
+
+    full_result = await service.run_backtest(full_config)
+
+    # Use full result metrics if available, otherwise fall back to gap result
+    final_result = full_result if full_result.status != BacktestStatus.FAILED else gap_result
+    new_metrics_obj = final_result.metrics
+    new_trades_list = all_trades  # keep merged list regardless
+
+    # ------------------------------------------------------------------ #
+    # Step 8: Save extended backtest
+    # ------------------------------------------------------------------ #
+    new_metrics_dict: dict = {}
+    if new_metrics_obj:
+        if hasattr(new_metrics_obj, "model_dump"):
+            new_metrics_dict = new_metrics_obj.model_dump()
+        elif hasattr(new_metrics_obj, "dict"):
+            new_metrics_dict = new_metrics_obj.dict()  # type: ignore[attr-defined]
+
+    new_bt = BacktestModel(
+        id=str(uuid.uuid4()),
+        strategy_id=orig.strategy_id,
+        strategy_type=orig.strategy_type,
+        status=DBBacktestStatus.COMPLETED,
+        symbol=symbol,
+        timeframe=interval,
+        market_type=market_type,
+        start_date=start_dt,
+        end_date=gap_end_dt,
+        initial_capital=orig_capital,
+        final_capital=float(new_metrics_dict.get("final_capital", gap_initial_capital)),
+        parameters=orig_params,
+        trades=new_trades_list,
+        metrics_json=new_metrics_dict,
+        is_extended=True,
+        source_backtest_id=str(orig.id),
+        created_at=now_utc,
+        updated_at=now_utc,
+        notes=f"Extended from {orig.id}",
+    )
+    db.add(new_bt)
+    db.commit()
+    db.refresh(new_bt)
+
+    logger.info(
+        "[ExtendBacktest] Created extended backtest %s (orig=%s, new_trades=%d, gap=%.1fh)",
+        new_bt.id,
+        orig.id,
+        len(gap_trade_dicts),
+        gap_ms / 3_600_000,
+    )
+
+    return {
+        "status": "ok",
+        "new_backtest_id": new_bt.id,
+        "new_trades": len(gap_trade_dicts),
+        "gap_start": backtest_end_ms,
+        "gap_end": now_ms,
+        "new_metrics": new_metrics_dict,
+    }
 
 
 @router.delete("/{backtest_id}")

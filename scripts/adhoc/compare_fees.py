@@ -61,13 +61,9 @@ for i in range(min(5, len(fb_result.trades))):
     nb_t = nb_result.trades[i]
 
     print(f"\nTrade {i + 1}:")
-    print(
-        f"  FB: {fb_t.direction:5} entry={fb_t.entry_price:.2f} exit={fb_t.exit_price:.2f}"
-    )
+    print(f"  FB: {fb_t.direction:5} entry={fb_t.entry_price:.2f} exit={fb_t.exit_price:.2f}")
     print(f"      PnL={fb_t.pnl:.4f}, Fees={fb_t.fees:.4f}")
-    print(
-        f"  NB: {nb_t.direction:5} entry={nb_t.entry_price:.2f} exit={nb_t.exit_price:.2f}"
-    )
+    print(f"  NB: {nb_t.direction:5} entry={nb_t.entry_price:.2f} exit={nb_t.exit_price:.2f}")
     print(f"      PnL={nb_t.pnl:.4f}, Fees={nb_t.fees:.4f}")
 
     if abs(fb_t.pnl - nb_t.pnl) > 0.01:

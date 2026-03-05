@@ -52,7 +52,7 @@ def get_btcusdh2026_candles() -> pd.DataFrame:
 
 def generate_rsi_signals(candles: pd.DataFrame, period: int, overbought: int, oversold: int):
     """Generate RSI crossover signals matching TradingView logic."""
-    closes = candles['close'].values
+    closes = candles["close"].values
 
     # Calculate RSI using Wilder's smoothing (RMA)
     delta = np.diff(closes, prepend=closes[0])
@@ -65,13 +65,13 @@ def generate_rsi_signals(candles: pd.DataFrame, period: int, overbought: int, ov
     avg_loss = np.zeros(len(closes))
 
     # Initialize
-    avg_gain[period] = np.mean(gains[1:period+1])
-    avg_loss[period] = np.mean(losses[1:period+1])
+    avg_gain[period] = np.mean(gains[1 : period + 1])
+    avg_loss[period] = np.mean(losses[1 : period + 1])
 
     # Calculate using RMA
     for i in range(period + 1, len(closes)):
-        avg_gain[i] = avg_gain[i-1] * (1 - alpha) + gains[i] * alpha
-        avg_loss[i] = avg_loss[i-1] * (1 - alpha) + losses[i] * alpha
+        avg_gain[i] = avg_gain[i - 1] * (1 - alpha) + gains[i] * alpha
+        avg_loss[i] = avg_loss[i - 1] * (1 - alpha) + losses[i] * alpha
 
     # Calculate RSI
     rs = np.where(avg_loss != 0, avg_gain / avg_loss, 0)
@@ -87,7 +87,7 @@ def generate_rsi_signals(candles: pd.DataFrame, period: int, overbought: int, ov
     warmup = period * 4  # RSI warmup period
 
     for i in range(warmup + 1, len(closes)):
-        prev_rsi = rsi[i-1]
+        prev_rsi = rsi[i - 1]
         curr_rsi = rsi[i]
 
         # Crossover: RSI crosses ABOVE oversold (Long entry)
@@ -121,8 +121,8 @@ def run_parity_test():
         return None
 
     # Date range
-    start_ts = candles['timestamp'].iloc[0]
-    end_ts = candles['timestamp'].iloc[-1]
+    start_ts = candles["timestamp"].iloc[0]
+    end_ts = candles["timestamp"].iloc[-1]
     start_dt = datetime.utcfromtimestamp(start_ts / 1000)
     end_dt = datetime.utcfromtimestamp(end_ts / 1000)
     print(f"   Range: {start_dt.date()} to {end_dt.date()}")
@@ -133,7 +133,7 @@ def run_parity_test():
     rsi_overbought = 70
     rsi_oversold = 25
     take_profit = 0.015  # 1.5%
-    stop_loss = 0.03     # 3.0%
+    stop_loss = 0.03  # 3.0%
     leverage = 10
     initial_capital = 100.0
 
@@ -141,16 +141,14 @@ def run_parity_test():
     print(f"   RSI Period: {rsi_period}")
     print(f"   Overbought: {rsi_overbought}")
     print(f"   Oversold: {rsi_oversold}")
-    print(f"   Take Profit: {take_profit*100}%")
-    print(f"   Stop Loss: {stop_loss*100}%")
+    print(f"   Take Profit: {take_profit * 100}%")
+    print(f"   Stop Loss: {stop_loss * 100}%")
     print(f"   Leverage: {leverage}x")
     print()
 
     # Generate signals
     print("🔍 Generating RSI signals...")
-    long_entries, short_entries = generate_rsi_signals(
-        candles, rsi_period, rsi_overbought, rsi_oversold
-    )
+    long_entries, short_entries = generate_rsi_signals(candles, rsi_period, rsi_overbought, rsi_oversold)
     long_signals = np.sum(long_entries)
     short_signals = np.sum(short_entries)
     print(f"   Long signals: {long_signals}")
@@ -193,18 +191,18 @@ def run_parity_test():
 
     print(f"\n   Total Trades:    {metrics.total_trades}")
     print(f"   Net Profit:      ${metrics.net_profit:.2f}")
-    print(f"   Win Rate:        {metrics.win_rate*100:.1f}%")
+    print(f"   Win Rate:        {metrics.win_rate * 100:.1f}%")
     print(f"   Profit Factor:   {metrics.profit_factor:.2f}")
     print(f"   Max Drawdown:    {metrics.max_drawdown:.2f}%")
 
     # Analyze trades by type
-    long_trades = [t for t in trades if t.direction == 'long']
-    short_trades = [t for t in trades if t.direction == 'short']
+    long_trades = [t for t in trades if t.direction == "long"]
+    short_trades = [t for t in trades if t.direction == "short"]
 
-    tp_long = [t for t in long_trades if 'take_profit' in str(t.exit_reason).lower()]
-    sl_long = [t for t in long_trades if 'stop_loss' in str(t.exit_reason).lower()]
-    tp_short = [t for t in short_trades if 'take_profit' in str(t.exit_reason).lower()]
-    sl_short = [t for t in short_trades if 'stop_loss' in str(t.exit_reason).lower()]
+    tp_long = [t for t in long_trades if "take_profit" in str(t.exit_reason).lower()]
+    sl_long = [t for t in long_trades if "stop_loss" in str(t.exit_reason).lower()]
+    tp_short = [t for t in short_trades if "take_profit" in str(t.exit_reason).lower()]
+    sl_short = [t for t in short_trades if "stop_loss" in str(t.exit_reason).lower()]
 
     print(f"\n   Long Trades:     {len(long_trades)}")
     print(f"   Short Trades:    {len(short_trades)}")
@@ -263,7 +261,9 @@ def run_parity_test():
     # Trade count comparison
     parity_ratio = (metrics.total_trades / tv_expected["trades"]) * 100
     status = "✅" if abs(parity_ratio - 100) < 15 else "⚠️"
-    print(f"   Total Trades    | {tv_expected['trades']:>11} | {metrics.total_trades:>10} | {status} {parity_ratio:.1f}%")
+    print(
+        f"   Total Trades    | {tv_expected['trades']:>11} | {metrics.total_trades:>10} | {status} {parity_ratio:.1f}%"
+    )
 
     # PnL type comparisons
     matches = []
@@ -315,9 +315,11 @@ def run_parity_test():
             entry_dt = datetime.utcfromtimestamp(trade.entry_time / 1000)
         else:
             entry_dt = trade.entry_time
-        direction = "LONG " if trade.direction == 'long' else "SHORT"
-        reason = str(trade.exit_reason).split('.')[-1] if trade.exit_reason else "?"
-        print(f"   {i+1:>2} | {direction} | {entry_dt.strftime('%Y-%m-%d %H:%M') if hasattr(entry_dt, 'strftime') else entry_dt} | {trade.pnl:>+8.2f} | {reason}")
+        direction = "LONG " if trade.direction == "long" else "SHORT"
+        reason = str(trade.exit_reason).split(".")[-1] if trade.exit_reason else "?"
+        print(
+            f"   {i + 1:>2} | {direction} | {entry_dt.strftime('%Y-%m-%d %H:%M') if hasattr(entry_dt, 'strftime') else entry_dt} | {trade.pnl:>+8.2f} | {reason}"
+        )
 
     print()
     print("=" * 70)

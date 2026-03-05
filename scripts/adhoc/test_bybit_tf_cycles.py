@@ -6,6 +6,7 @@
 
 Запуск: py scripts/adhoc/test_bybit_tf_cycles.py [--delay-ms 100]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -147,7 +148,9 @@ async def run_cycles(delay_ms: int = 0) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bybit TF cycles test (real adapter, ~70 candles, no DB)")
-    parser.add_argument("--delay-ms", type=int, default=100, metavar="MS", help="Delay in ms between requests (default: 100)")
+    parser.add_argument(
+        "--delay-ms", type=int, default=100, metavar="MS", help="Delay in ms between requests (default: 100)"
+    )
     args = parser.parse_args()
     asyncio.run(run_cycles(delay_ms=args.delay_ms))
 

@@ -72,9 +72,7 @@ class TestVariant:
 
     def test_variant_creation(self):
         """Test creating a variant."""
-        variant = Variant(
-            name="test", weight=0.5, config={"key": "value"}, is_control=True
-        )
+        variant = Variant(name="test", weight=0.5, config={"key": "value"}, is_control=True)
 
         assert variant.name == "test"
         assert variant.weight == 0.5
@@ -323,15 +321,11 @@ class TestExperimentResults:
 
         # Record metrics for control
         for _ in range(50):
-            experiment.record_metric(
-                "control", "pnl", 100 + 10 * (0.5 - __import__("random").random())
-            )
+            experiment.record_metric("control", "pnl", 100 + 10 * (0.5 - __import__("random").random()))
 
         # Record metrics for treatment (better)
         for _ in range(50):
-            experiment.record_metric(
-                "treatment", "pnl", 120 + 10 * (0.5 - __import__("random").random())
-            )
+            experiment.record_metric("treatment", "pnl", 120 + 10 * (0.5 - __import__("random").random()))
 
         results = experiment.get_results()
 

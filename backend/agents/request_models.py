@@ -19,8 +19,8 @@ from typing import Any
 from loguru import logger
 
 from backend.agents.models import AgentChannel, AgentType
-from backend.agents.prompts.prompt_validator import PromptValidator
 from backend.agents.prompts.prompt_logger import PromptLogger
+from backend.agents.prompts.prompt_validator import PromptValidator
 
 
 @dataclass
@@ -63,7 +63,7 @@ class AgentRequest:
         repr=False,
         compare=False,
     )
-    
+
     # Validators and loggers (initialized on first use)
     _validator: PromptValidator | None = field(
         default=None,
@@ -292,27 +292,27 @@ class AgentRequest:
 
         full_prompt = "\n".join(parts)
         full_prompt = sanitize(full_prompt)
-        
+
         # P0: Validate prompt before sending
         self._validate_prompt(full_prompt)
-        
+
         # P0: Log prompt for debugging
         self._log_prompt(full_prompt)
-        
+
         return full_prompt
-    
+
     def _validate_prompt(self, prompt: str) -> None:
         """P0: Validate prompt using PromptValidator."""
         if self._validator is None:
             self._validator = PromptValidator()
-        
+
         is_valid, errors = self._validator.validate_prompt(prompt)
-        
+
         if not is_valid:
             error_msg = "; ".join(errors)
             logger.error(f"🚫 Prompt validation failed: {error_msg}")
             # Don't raise, just log - let the API handle it
-    
+
     def _log_prompt(self, prompt: str) -> None:
         """P0: Log prompt using PromptLogger."""
         if self._logger is None:
@@ -321,14 +321,14 @@ class AgentRequest:
             except Exception as e:
                 logger.warning(f"Failed to initialize PromptLogger: {e}")
                 return
-        
+
         prompt_id = self._logger.log_prompt(
-            agent_type=self.agent_type.value if hasattr(self.agent_type, 'value') else str(self.agent_type),
+            agent_type=self.agent_type.value if hasattr(self.agent_type, "value") else str(self.agent_type),
             task_type=self.task_type,
             prompt=prompt,
-            context=self.context
+            context=self.context,
         )
-        
+
         logger.debug(f"📝 Prompt logged: {prompt_id[:8]}...")
 
     @staticmethod

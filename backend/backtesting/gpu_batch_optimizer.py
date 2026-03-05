@@ -134,8 +134,8 @@ class GPUBatchOptimizer:
         direction: str,
     ) -> list[BatchOptimizationResult]:
         """GPU-accelerated batch optimization using CuPy."""
-        n_combos = len(param_combinations)  # noqa: F841
-        n_bars = len(close)  # noqa: F841
+        n_combos = len(param_combinations)
+        n_bars = len(close)
 
         # Transfer price data to GPU (shared across all combinations)
         close_gpu = cp.asarray(close)
@@ -243,7 +243,7 @@ class GPUBatchOptimizer:
         Simplified vectorized backtest on GPU.
         Returns approximate metrics (fast but less accurate than full simulation).
         """
-        n = len(close)  # noqa: F841
+        n = len(close)
 
         # Convert signals to CPU for trade simulation
         long_entries_cpu = cp.asnumpy(long_entries)
@@ -443,7 +443,7 @@ class GPUBatchOptimizer:
             if allow_short and not in_short and not in_long and short_entries[i]:
                 in_short = True
                 entry_price = close[i]
-                entry_idx = i  # noqa: F841
+                entry_idx = i
                 position_size = cash
 
             equity_curve.append(cash)

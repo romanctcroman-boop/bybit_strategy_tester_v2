@@ -166,7 +166,7 @@ async def main():
                 # I.e., SE[k]=True where k >= prev_exit_idx → entry at bar k+1
                 # BUT: can k == prev_exit_idx? Can we fire a signal on the same bar as exit?
 
-                print(f"\nSE signals from prev exit bar onward:")
+                print("\nSE signals from prev exit bar onward:")
                 count = 0
                 for k in range(prev_exit_idx, min(prev_exit_idx + 100, len(se))):
                     if se[k]:
@@ -176,19 +176,19 @@ async def main():
                         marker = " ← ENGINE ENTRY" if k + 1 < len(candles) and candles.index[k + 1] == e_entry else ""
                         print(f"  SE=1 at bar {ts}, entry would be {entry_bar}{marker}")
                         if count >= 10:
-                            print(f"  ... (showing first 10)")
+                            print("  ... (showing first 10)")
                             break
 
                 # KEY INSIGHT: check if the signal fires on the SAME bar as prev exit
                 if prev_exit_idx < len(se) and se[prev_exit_idx]:
-                    print(f"\n*** SIGNAL ON SAME BAR AS PREV EXIT! ***")
+                    print("\n*** SIGNAL ON SAME BAR AS PREV EXIT! ***")
                     print(f"  Bar: {candles.index[prev_exit_idx]}")
                     print(
                         f"  This means: with entry_on_next_bar_open, entry would be at {candles.index[prev_exit_idx + 1]}"
                     )
-                    print(f"  But prev trade exits at this bar (pending from bar before)")
-                    print(f"  In TV: entry at bar+1 OPEN would find position still open (exit happens intra-bar)")
-                    print(f"  So TV blocks this entry (pyramiding=1), engine allows it")
+                    print("  But prev trade exits at this bar (pending from bar before)")
+                    print("  In TV: entry at bar+1 OPEN would find position still open (exit happens intra-bar)")
+                    print("  So TV blocks this entry (pyramiding=1), engine allows it")
 
 
 asyncio.run(main())

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify that VBT and Fallback are truly different engines."""
+
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -104,11 +105,11 @@ for i in range(min(3, len(fb.trades), len(vb.trades))):
 
     # Size
     size_match = abs(fb_t.size - vb_t.size) < 0.0001
-    print(f"Trade {i+1} Size:           {fb_t.size:>15.6f} {vb_t.size:>15.6f} {'✓' if size_match else '✗':>10}")
+    print(f"Trade {i + 1} Size:           {fb_t.size:>15.6f} {vb_t.size:>15.6f} {'✓' if size_match else '✗':>10}")
 
     # PnL
     pnl_match = abs(fb_t.pnl - vb_t.pnl) < 0.01
-    print(f"Trade {i+1} PnL:            ${fb_t.pnl:>14.2f} ${vb_t.pnl:>14.2f} {'✓' if pnl_match else '✗':>10}")
+    print(f"Trade {i + 1} PnL:            ${fb_t.pnl:>14.2f} ${vb_t.pnl:>14.2f} {'✓' if pnl_match else '✗':>10}")
 
 print()
 total_fb = sum(t.pnl for t in fb.trades)

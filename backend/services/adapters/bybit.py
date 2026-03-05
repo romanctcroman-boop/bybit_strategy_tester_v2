@@ -713,6 +713,15 @@ class BybitAdapter:
         - Reports progress via on_progress callback
         - Supports cancellation via cancel_check callback
 
+        Architecture note (Рек. 3):
+        This method is a SELF-CONTAINED bulk-loader for the /bybit/sync-klines-stream
+        SSE endpoint. It deliberately persists inline to support cancellation-safe
+        chunked writes. This is NOT a duplicate write path — KlineDataManager.ensure_range()
+        uses get_historical_klines() (non-chunked, no side-effects). These two methods
+        serve different purposes:
+          - get_historical_klines():         small ranges, KlineDataManager controls persist
+          - get_historical_klines_chunked(): bulk sync, adapter controls chunked persist
+
         Args:
             symbol: Trading pair (e.g. BTCUSDT)
             interval: Timeframe (e.g. '60' for 1h, 'D' for daily)

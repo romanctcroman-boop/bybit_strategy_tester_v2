@@ -153,7 +153,7 @@ async def main():
                 break
 
         if prev_exit_idx is None:
-            print(f"  Could not find prev exit bar!")
+            print("  Could not find prev exit bar!")
             continue
 
         print(f"Prev trade #{root_idx - 1}: {prev_trade.direction}, entry_price={prev_entry_price:.2f}")
@@ -189,7 +189,7 @@ async def main():
             )
 
         # KEY CHECK: SE signal at exit bar and bar before exit
-        print(f"\n  SE at bars around exit:")
+        print("\n  SE at bars around exit:")
         for k in range(max(0, tp_bar - 3), min(len(se), tp_bar + 4)):
             ts = candles.index[k]
             marker = ""

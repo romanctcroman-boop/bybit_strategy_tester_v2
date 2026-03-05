@@ -6,6 +6,7 @@ import requests
 
 API_BASE = "http://localhost:8000/api/v1"
 
+
 def test_list_strategies():
     """List all strategies"""
     print("=" * 50)
@@ -17,12 +18,12 @@ def test_list_strategies():
         # Handle both dict with 'items'/'strategies' key and direct list
         if isinstance(data, dict):
             # API returns dict - extract strategies list
-            strategies = data.get('items', data.get('strategies', list(data.values())))
+            strategies = data.get("items", data.get("strategies", list(data.values())))
             if not isinstance(strategies, list):
                 # If still not a list, try to get values
                 strategies = list(data.values()) if data else []
                 # Filter to only dicts (strategy objects)
-                strategies = [s for s in strategies if isinstance(s, dict) and 'name' in s]
+                strategies = [s for s in strategies if isinstance(s, dict) and "name" in s]
             print(f"Found {data.get('total', len(strategies))} strategies:")
         else:
             strategies = data
@@ -31,12 +32,13 @@ def test_list_strategies():
         # Safely iterate
         for s in strategies[:10]:
             if isinstance(s, dict):
-                stype = s.get('strategy_type', 'unknown')
+                stype = s.get("strategy_type", "unknown")
                 print(f"  - {s.get('name', 'unnamed')} ({stype})")
         return strategies
     else:
         print(f"ERROR: {r.status_code}")
         return []
+
 
 def test_find_dca_strategy(strategies):
     """Find DCA strategy and check its parameters"""
@@ -44,13 +46,14 @@ def test_find_dca_strategy(strategies):
     print("2. FIND DCA STRATEGY")
     print("=" * 50)
 
-    dca_strategies = [s for s in strategies if s.get('strategy_type') == 'dca']
+    dca_strategies = [s for s in strategies if s.get("strategy_type") == "dca"]
     if not dca_strategies:
         print("No DCA strategies found!")
         return None
 
     print(f"Found {len(dca_strategies)} DCA strategies")
     return dca_strategies[0]
+
 
 def test_get_strategy_details(strategy_id):
     """Get full strategy details"""
@@ -66,9 +69,9 @@ def test_get_strategy_details(strategy_id):
         print(f"Symbol: {data['symbol']}")
         print(f"Timeframe: {data['timeframe']}")
 
-        params = data.get('parameters', {})
+        params = data.get("parameters", {})
         print("\nDCA Parameters:")
-        dca_params = {k: v for k, v in params.items() if k.startswith('_dca_')}
+        dca_params = {k: v for k, v in params.items() if k.startswith("_dca_")}
         for k, v in dca_params.items():
             print(f"  {k}: {v}")
 
@@ -76,6 +79,7 @@ def test_get_strategy_details(strategy_id):
     else:
         print(f"ERROR: {r.status_code} - {r.text}")
         return None
+
 
 def test_create_dca_strategy():
     """Create a new DCA strategy with all parameters"""
@@ -103,8 +107,8 @@ def test_create_dca_strategy():
             "_dca_logarithmic": True,
             "_dca_log_coefficient": 1.4,
             "_dca_partial_grid": 4,
-            "_dca_trailing": 7.5
-        }
+            "_dca_trailing": 7.5,
+        },
     }
 
     r = requests.post(f"{API_BASE}/strategies", json=strategy_data)
@@ -118,6 +122,7 @@ def test_create_dca_strategy():
         print(f"   {r.text[:500]}")
         return None
 
+
 def test_verify_dca_params(strategy_id):
     """Verify DCA parameters were saved correctly"""
     print("\n" + "=" * 50)
@@ -130,7 +135,7 @@ def test_verify_dca_params(strategy_id):
         return False
 
     data = r.json()
-    params = data.get('parameters', {})
+    params = data.get("parameters", {})
 
     expected = {
         "_dca_coverage": 15.5,
@@ -141,7 +146,7 @@ def test_verify_dca_params(strategy_id):
         "_dca_logarithmic": True,
         "_dca_log_coefficient": 1.4,
         "_dca_partial_grid": 4,
-        "_dca_trailing": 7.5
+        "_dca_trailing": 7.5,
     }
 
     all_match = True
@@ -155,6 +160,7 @@ def test_verify_dca_params(strategy_id):
 
     return all_match
 
+
 def main():
     print("\n🔍 DCA API VERIFICATION TEST")
     print("=" * 50)
@@ -165,20 +171,21 @@ def main():
     # 2. Find existing DCA
     dca = test_find_dca_strategy(strategies)
     if dca:
-        test_get_strategy_details(dca['id'])
+        test_get_strategy_details(dca["id"])
 
     # 3. Create new DCA
     new_dca = test_create_dca_strategy()
 
     # 4. Verify parameters
     if new_dca:
-        success = test_verify_dca_params(new_dca['id'])
+        success = test_verify_dca_params(new_dca["id"])
         print("\n" + "=" * 50)
         if success:
             print("✅ ALL DCA PARAMETERS VERIFIED SUCCESSFULLY!")
         else:
             print("❌ SOME PARAMETERS DID NOT MATCH")
         print("=" * 50)
+
 
 if __name__ == "__main__":
     main()

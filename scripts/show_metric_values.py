@@ -1,4 +1,5 @@
 """Check non-zero values for 46 core metrics"""
+
 import sys
 from pathlib import Path
 
@@ -10,16 +11,19 @@ import numpy as np
 import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df = pd.read_sql("""SELECT open_time, open_price as open, high_price as high,
+df = pd.read_sql(
+    """SELECT open_time, open_price as open, high_price as high,
     low_price as low, close_price as close, volume
     FROM bybit_kline_audit WHERE symbol='BTCUSDT' AND interval='60'
-    ORDER BY open_time ASC LIMIT 1000""", conn)
-df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-df.set_index('open_time', inplace=True)
+    ORDER BY open_time ASC LIMIT 1000""",
+    conn,
+)
+df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+df.set_index("open_time", inplace=True)
 conn.close()
 
 # RSI + EMA strategy
-close = df['close']
+close = df["close"]
 delta = close.diff()
 gain = delta.where(delta > 0, 0).rolling(7).mean()
 loss = -delta.where(delta < 0, 0).rolling(7).mean()
@@ -36,42 +40,56 @@ from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, Trade
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
 
 input_data = BacktestInput(
-    candles=df, long_entries=long_entries, long_exits=long_exits,
-    short_entries=short_entries, short_exits=short_exits,
-    symbol='BTCUSDT', interval='60', initial_capital=10000,
-    position_size=0.15, leverage=10, stop_loss=0.03, take_profit=0.06,
-    direction=TradeDirection.BOTH, taker_fee=0.001, slippage=0.0005)
+    candles=df,
+    long_entries=long_entries,
+    long_exits=long_exits,
+    short_entries=short_entries,
+    short_exits=short_exits,
+    symbol="BTCUSDT",
+    interval="60",
+    initial_capital=10000,
+    position_size=0.15,
+    leverage=10,
+    stop_loss=0.03,
+    take_profit=0.06,
+    direction=TradeDirection.BOTH,
+    taker_fee=0.001,
+    slippage=0.0005,
+)
 
 result = FallbackEngineV2().run(input_data)
 ext = ExtendedMetricsCalculator().calculate_all(result.equity_curve, result.trades)
 
-print(f'Trades: {len(result.trades)}, Net Profit: ${result.metrics.net_profit:.2f}')
-print(f'Final Equity: ${result.equity_curve[-1]:.2f}')
+print(f"Trades: {len(result.trades)}, Net Profit: ${result.metrics.net_profit:.2f}")
+print(f"Final Equity: ${result.equity_curve[-1]:.2f}")
 
 # Show all metrics
-print('\n=== BacktestMetrics (32) ===')
+print("\n=== BacktestMetrics (32) ===")
 non_zero = 0
 for f in fields(BacktestMetrics):
-    if not f.name.startswith('_'):
+    if not f.name.startswith("_"):
         v = getattr(result.metrics, f.name)
         if isinstance(v, (int, np.integer)):
-            print(f'  {f.name}: {v}')
-            if v != 0: non_zero += 1
+            print(f"  {f.name}: {v}")
+            if v != 0:
+                non_zero += 1
         elif v is not None:
-            print(f'  {f.name}: {v:.6f}')
-            if abs(v) > 1e-10: non_zero += 1
+            print(f"  {f.name}: {v:.6f}")
+            if abs(v) > 1e-10:
+                non_zero += 1
         else:
-            print(f'  {f.name}: None')
+            print(f"  {f.name}: None")
 
-print('\n=== ExtendedMetrics (14) ===')
+print("\n=== ExtendedMetrics (14) ===")
 for f in fields(ExtendedMetricsResult):
-    if not f.name.startswith('_'):
+    if not f.name.startswith("_"):
         v = getattr(ext, f.name)
         if v is not None:
-            print(f'  {f.name}: {v:.6f}')
-            if abs(v) > 1e-10: non_zero += 1
+            print(f"  {f.name}: {v:.6f}")
+            if abs(v) > 1e-10:
+                non_zero += 1
         else:
-            print(f'  {f.name}: None')
+            print(f"  {f.name}: None")
 
-print('\n=== ИТОГО ===')
-print(f'Ненулевых метрик: {non_zero}/46')
+print("\n=== ИТОГО ===")
+print(f"Ненулевых метрик: {non_zero}/46")

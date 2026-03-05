@@ -16,24 +16,28 @@ def create_sample_df(n_bars=500):
     np.random.seed(42)
     prices = 100 + np.cumsum(np.random.randn(n_bars) * 0.5)
     prices = np.maximum(prices, 10)
-    return pd.DataFrame({
-        "open": prices * 0.99,
-        "high": prices * 1.01,
-        "low": prices * 0.98,
-        "close": prices,
-        "volume": np.random.rand(n_bars) * 1000000,
-    })
+    return pd.DataFrame(
+        {
+            "open": prices * 0.99,
+            "high": prices * 1.01,
+            "low": prices * 0.98,
+            "close": prices,
+            "volume": np.random.rand(n_bars) * 1000000,
+        }
+    )
 
 
 class TestTradingEnvImport:
     def test_import_trading_env(self):
         from backend.ml.rl.trading_env import TradingEnv
+
         assert TradingEnv is not None
 
 
 class TestTradingEnvCreation:
     def test_create_env(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df()
         config = TradingConfig(initial_balance=10000.0)
         env = TradingEnv(df=df, config=config)
@@ -43,6 +47,7 @@ class TestTradingEnvCreation:
 class TestTradingEnvReset:
     def test_reset_returns_observation(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df()
         env = TradingEnv(df=df, config=TradingConfig())
         obs, info = env.reset()
@@ -52,6 +57,7 @@ class TestTradingEnvReset:
 class TestTradingEnvStep:
     def test_step_returns_tuple(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df()
         env = TradingEnv(df=df, config=TradingConfig())
         env.reset()
@@ -62,6 +68,7 @@ class TestTradingEnvStep:
 class TestTradingEnvActionSpace:
     def test_action_space_size(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df()
         env = TradingEnv(df=df, config=TradingConfig())
         assert env.action_space.n == 4
@@ -72,6 +79,7 @@ class TestTradingEnvRewardFunctions:
 
     def test_reward_pnl(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df(100)
         env = TradingEnv(df=df, config=TradingConfig(), reward_function="pnl")
         obs, _ = env.reset()
@@ -80,6 +88,7 @@ class TestTradingEnvRewardFunctions:
 
     def test_reward_sharpe(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df(100)
         env = TradingEnv(df=df, config=TradingConfig(), reward_function="sharpe")
         obs, _ = env.reset()
@@ -91,6 +100,7 @@ class TestTradingEnvRewardFunctions:
 
     def test_reward_drawdown_penalty(self):
         from backend.ml.rl.trading_env import TradingConfig, TradingEnv
+
         df = create_sample_df(100)
         env = TradingEnv(df=df, config=TradingConfig(), reward_function="drawdown_penalty")
         obs, _ = env.reset()
@@ -103,6 +113,7 @@ class TestTradingEnvGymnasiumRegister:
 
     def test_register_and_make(self):
         import pytest
+
         gym = pytest.importorskip("gymnasium")
         from backend.ml.rl.trading_env import register_trading_env
 

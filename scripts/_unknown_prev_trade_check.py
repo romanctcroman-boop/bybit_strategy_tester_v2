@@ -228,15 +228,15 @@ async def main():
             tv_exit = tv_prev["exit_time"]
             exit_diff = abs(eng_exit - tv_exit)
             if exit_diff <= pd.Timedelta(minutes=30):
-                print(f"\n  ✅ Previous trades MATCH (same trade, same exit timing)")
+                print("\n  ✅ Previous trades MATCH (same trade, same exit timing)")
                 print(f"     Exit diff: {exit_diff}")
             else:
-                print(f"\n  ⚠️ Previous trades SAME but EXIT TIMING DIFFERS!")
+                print("\n  ⚠️ Previous trades SAME but EXIT TIMING DIFFERS!")
                 print(f"     Engine prev exit: {eng_exit}")
                 print(f"     TV prev exit:     {tv_exit}")
                 print(f"     Exit diff: {exit_diff}")
         else:
-            print(f"\n  ❌ Previous trades DIFFER!")
+            print("\n  ❌ Previous trades DIFFER!")
             print(f"     Engine's prev (E#{eng_num - 1}) maps to TV#{eng_prev_tv_num}")
             print(f"     TV's prev (TV#{tv_num - 1}) maps to E#{tv_prev_eng_num}")
             # This means the trade sequences are shifted — check what happened

@@ -8,9 +8,8 @@ import sys
 sys.path.insert(0, ".")
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-import numpy as np
 import pandas as pd
 
 from backend.config.database_policy import DATA_START_DATE
@@ -20,7 +19,7 @@ df = pd.read_sql("SELECT * FROM klines WHERE symbol='ETHUSDT' AND interval='30' 
 conn.close()
 df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
 df.set_index("open_time", inplace=True)
-warmup_start = datetime(2024, 12, 1, tzinfo=timezone.utc)
+warmup_start = datetime(2024, 12, 1, tzinfo=UTC)
 df = df[df.index >= warmup_start]
 warmup_bars = len(df[df.index < DATA_START_DATE])
 data_slice = df[warmup_bars:]

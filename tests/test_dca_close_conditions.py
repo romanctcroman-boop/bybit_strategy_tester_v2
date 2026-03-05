@@ -31,13 +31,15 @@ def sample_df():
 
     close = 100 + np.cumsum(np.random.randn(n) * 0.5)
 
-    df = pd.DataFrame({
-        'open': close - 0.2,
-        'high': close + np.abs(np.random.randn(n) * 0.5),
-        'low': close - np.abs(np.random.randn(n) * 0.5),
-        'close': close,
-        'volume': np.random.randint(1000, 10000, n)
-    })
+    df = pd.DataFrame(
+        {
+            "open": close - 0.2,
+            "high": close + np.abs(np.random.randn(n) * 0.5),
+            "low": close - np.abs(np.random.randn(n) * 0.5),
+            "close": close,
+            "volume": np.random.randint(1000, 10000, n),
+        }
+    )
 
     return df
 
@@ -105,7 +107,7 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_rsi(self, sample_df):
         """Test RSI calculation in DCAEngine."""
         engine = DCAEngine()
-        close = sample_df['close'].values
+        close = sample_df["close"].values
 
         rsi = engine._calculate_rsi(close, 14)
 
@@ -117,9 +119,9 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_stochastic(self, sample_df):
         """Test Stochastic calculation in DCAEngine."""
         engine = DCAEngine()
-        high = sample_df['high'].values
-        low = sample_df['low'].values
-        close = sample_df['close'].values
+        high = sample_df["high"].values
+        low = sample_df["low"].values
+        close = sample_df["close"].values
 
         stoch_k, stoch_d = engine._calculate_stochastic(high, low, close, 14, 1, 3)
 
@@ -129,7 +131,7 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_bollinger(self, sample_df):
         """Test Bollinger Bands calculation."""
         engine = DCAEngine()
-        close = sample_df['close'].values
+        close = sample_df["close"].values
 
         upper, lower = engine._calculate_bollinger(close, 20, 2.0)
 
@@ -142,9 +144,9 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_keltner(self, sample_df):
         """Test Keltner Channel calculation."""
         engine = DCAEngine()
-        high = sample_df['high'].values
-        low = sample_df['low'].values
-        close = sample_df['close'].values
+        high = sample_df["high"].values
+        low = sample_df["low"].values
+        close = sample_df["close"].values
 
         upper, lower = engine._calculate_keltner(high, low, close, 20, 2.0)
 
@@ -154,8 +156,8 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_psar(self, sample_df):
         """Test Parabolic SAR calculation."""
         engine = DCAEngine()
-        high = sample_df['high'].values
-        low = sample_df['low'].values
+        high = sample_df["high"].values
+        low = sample_df["low"].values
 
         psar = engine._calculate_psar(high, low, 0.02, 0.02, 0.2)
 
@@ -164,7 +166,7 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_ma_sma(self, sample_df):
         """Test SMA calculation."""
         engine = DCAEngine()
-        close = sample_df['close'].values
+        close = sample_df["close"].values
 
         ma = engine._calculate_ma(close, 20, "SMA")
 
@@ -173,7 +175,7 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_ma_ema(self, sample_df):
         """Test EMA calculation."""
         engine = DCAEngine()
-        close = sample_df['close'].values
+        close = sample_df["close"].values
 
         ma = engine._calculate_ma(close, 20, "EMA")
 
@@ -182,7 +184,7 @@ class TestDCAEngineIndicatorCalculations:
     def test_calculate_ma_wma(self, sample_df):
         """Test WMA calculation."""
         engine = DCAEngine()
-        close = sample_df['close'].values
+        close = sample_df["close"].values
 
         ma = engine._calculate_ma(close, 20, "WMA")
 
@@ -232,6 +234,7 @@ class TestDCAEngineCloseConditionChecks:
         result = engine._check_close_conditions(15, 100.0)
 
         from backend.backtesting.engines.dca_engine import ExitReason
+
         assert result == ExitReason.TIME_EXIT
 
 

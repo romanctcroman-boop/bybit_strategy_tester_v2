@@ -35,8 +35,12 @@ class TestMLflowAdapterImport:
 class TestMLflowAdapterAvailability:
     """Tests for MLflow server availability detection."""
 
-    def test_is_available_without_server(self):
+    @patch("backend.ml.mlflow_adapter.mlflow")
+    @patch("backend.ml.mlflow_adapter.MlflowClient")
+    def test_is_available_without_server(self, mock_client_cls, mock_mlflow):
         """is_available should handle missing server gracefully."""
+        # Make MlflowClient raise on init to simulate unreachable server
+        mock_client_cls.side_effect = Exception("Connection refused")
         from backend.ml.mlflow_adapter import MLflowAdapter
 
         adapter = MLflowAdapter(tracking_uri="http://nonexistent:9999")
@@ -198,22 +202,25 @@ class TestMLflowAdapterModels:
 class TestMLflowAdapterFallback:
     """Tests for fallback behavior when MLflow is unavailable."""
 
-    def test_fallback_mode_no_exception(self):
+    @patch("backend.ml.mlflow_adapter.mlflow")
+    @patch("backend.ml.mlflow_adapter.MlflowClient")
+    def test_fallback_mode_no_exception(self, mock_client_cls, mock_mlflow):
         """Operations should not raise when MLflow unavailable."""
         from backend.ml.mlflow_adapter import MLflowAdapter
 
         adapter = MLflowAdapter(tracking_uri="http://nonexistent:9999")
-        adapter._available = False
+        adapter._available = False  # Force unavailable — is_available will return False
 
-        # These should not raise exceptions
+        # These should not raise exceptions (is_available=False → early return)
         try:
             adapter.log_params({"param": "value"})
             adapter.log_metrics({"metric": 1.0})
         except Exception as e:
-            # If it raises, it should be caught internally
             assert False, f"Should not raise: {e}"
 
-    def test_adapter_tracks_availability(self):
+    @patch("backend.ml.mlflow_adapter.mlflow")
+    @patch("backend.ml.mlflow_adapter.MlflowClient")
+    def test_adapter_tracks_availability(self, mock_client_cls, mock_mlflow):
         """Adapter should track its availability status."""
         from backend.ml.mlflow_adapter import MLflowAdapter
 

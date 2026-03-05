@@ -275,7 +275,9 @@ def test_backtest(strategy_id: str):
     )
 
     # Бэктест может использовать синтетические данные в тестовой среде
-    assert response.status_code in [200, 201], f"Ожидался статус 200/201, получен {response.status_code}: {response.text}"
+    assert response.status_code in [200, 201], (
+        f"Ожидался статус 200/201, получен {response.status_code}: {response.text}"
+    )
 
     if response.status_code == 200:
         data = response.json()
@@ -370,11 +372,13 @@ def main():
     except AssertionError as e:
         print(f"\n❌ ОШИБКА В ТЕСТЕ: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ НЕОЖИДАННАЯ ОШИБКА: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

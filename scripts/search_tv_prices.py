@@ -1,8 +1,9 @@
 """Search TV for entries 89596 or 90810."""
+
 import pandas as pd
 
-tv = pd.read_csv('d:/TV/RSI_Strategy_with_TP_SL_(FIXED)_BYBIT_BTCUSDT.P_2026-01-24.csv')
-print(f'Total TV rows: {len(tv)}')
+tv = pd.read_csv("d:/TV/RSI_Strategy_with_TP_SL_(FIXED)_BYBIT_BTCUSDT.P_2026-01-24.csv")
+print(f"Total TV rows: {len(tv)}")
 
 # Search for entries around our key prices
 for i in range(len(tv)):

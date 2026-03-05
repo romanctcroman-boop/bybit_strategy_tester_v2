@@ -4,7 +4,6 @@
 Tests for Chromosome, Individual, Population, EvolutionHistory.
 """
 
-import numpy as np
 import pytest
 
 from backend.backtesting.genetic.models import (
@@ -113,7 +112,7 @@ class TestIndividual:
         assert copy.chromosome.genes == ind.chromosome.genes
         assert copy.fitness == ind.fitness
         assert copy.id != ind.id  # New ID
-        assert copy.parents == (ind.id,)  # Parent reference
+        assert copy.parents == (str(ind.id),)  # Parent reference stored as string for serialization
 
     def test_individual_is_evaluated(self):
         """Test evaluation check"""

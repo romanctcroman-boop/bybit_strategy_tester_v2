@@ -101,9 +101,7 @@ def test_breakeven_tp_mode_autofix():
         )
 
         # Check result
-        assert inp.tp_mode == TpMode.MULTI, (
-            f"tp_mode should be MULTI, got {inp.tp_mode}"
-        )
+        assert inp.tp_mode == TpMode.MULTI, f"tp_mode should be MULTI, got {inp.tp_mode}"
 
         # Check warning was raised
         tp_warnings = [x for x in w if "tp_mode" in str(x.message)]
@@ -209,9 +207,7 @@ def test_htf_index_map_dtype_autofix():
         assert isinstance(inp.mtf_htf_index_map, np.ndarray), (
             f"mtf_htf_index_map should be ndarray, got {type(inp.mtf_htf_index_map)}"
         )
-        assert inp.mtf_htf_index_map.dtype == np.int32, (
-            f"dtype should be int32, got {inp.mtf_htf_index_map.dtype}"
-        )
+        assert inp.mtf_htf_index_map.dtype == np.int32, f"dtype should be int32, got {inp.mtf_htf_index_map.dtype}"
 
     # Also test with wrong dtype (int64)
     htf_index_map_int64 = np.array([0, 0, 0, 0, 1, 1, 1, 1, 2, 2], dtype=np.int64)
@@ -227,9 +223,7 @@ def test_htf_index_map_dtype_autofix():
             mtf_htf_index_map=htf_index_map_int64,  # int64, should be int32
         )
 
-        assert inp2.mtf_htf_index_map.dtype == np.int32, (
-            f"dtype should be int32, got {inp2.mtf_htf_index_map.dtype}"
-        )
+        assert inp2.mtf_htf_index_map.dtype == np.int32, f"dtype should be int32, got {inp2.mtf_htf_index_map.dtype}"
 
     print("✅ PASSED: htf_index_map auto-converted to np.int32")
     return True
@@ -306,9 +300,7 @@ def test_real_backtest_with_autofixes():
 
     # Verify auto-fixes applied
     assert inp.use_bar_magnifier is False, "use_bar_magnifier should be False"
-    assert inp.tp_mode.value == "multi", (
-        f"tp_mode should be 'multi', got {inp.tp_mode.value}"
-    )
+    assert inp.tp_mode.value == "multi", f"tp_mode should be 'multi', got {inp.tp_mode.value}"
 
     # Run backtest
     engine = FallbackEngineV4()

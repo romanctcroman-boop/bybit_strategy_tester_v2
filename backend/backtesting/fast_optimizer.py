@@ -906,8 +906,8 @@ if NUMBA_AVAILABLE:
         # Actually we tracked max_drawdown in main loop.
         # To get proper Ulcer we need sum of squared drawdowns.
         # Let's re-scan equity curve logic quickly.
-        peak = initial_capital  # noqa: F841
-        curr = initial_capital  # noqa: F841
+        peak = initial_capital
+        curr = initial_capital
         sum_sq_dd = 0.0
 
         # Re-simulating equity curve just for ulcer index in separate loop is safe in JIT
@@ -1681,7 +1681,7 @@ class FastGridOptimizer:
                                     runups.append(runup)
 
                         max_runup = max(runups) if runups else 0
-                        avg_runup = sum(runups) / len(runups) if runups else 0  # noqa: F841
+                        avg_runup = sum(runups) / len(runups) if runups else 0
                         all_results[0]["max_runup"] = max_runup
                         all_results[0]["max_runup_value"] = initial_capital * max_runup / 100
 

@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, "d:\\bybit_strategy_tester_v2")
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pandas as pd
 
@@ -15,8 +15,8 @@ async def main():
     from backend.backtesting.service import BacktestService
 
     svc = BacktestService()
-    start_date = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 2, 25, tzinfo=timezone.utc)
+    start_date = datetime(2025, 1, 1, tzinfo=UTC)
+    end_date = datetime(2026, 2, 25, tzinfo=UTC)
     _btc_start = start_date - pd.Timedelta(minutes=500 * 30)
 
     btc_ohlcv = await svc._fetch_historical_data(
@@ -57,7 +57,7 @@ async def main():
         else:
             signal = ""
         marker = " <<<" if t == target else ""
-        print(f"  {str(t):25s} {close_val:10.4f} {rsi_val:10.4f} {signal:10s}{marker}")
+        print(f"  {t!s:25s} {close_val:10.4f} {rsi_val:10.4f} {signal:10s}{marker}")
 
 
 asyncio.run(main())

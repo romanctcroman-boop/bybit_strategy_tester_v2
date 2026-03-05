@@ -181,7 +181,7 @@ async def main():
             print(f"  SE count to TV:        {n_se_to_tv}")
             if n_se_to_tv > 1:
                 print(f"  TV SKIPS {n_se_to_tv - 1} crossunder(s)")
-            print(f"  SE bars in window (to TV):")
+            print("  SE bars in window (to TV):")
             for sb, rsi_p, rsi_c in rsi_at_se_bars:
                 marker = "← ENGINE" if sb == signal_bar else ""
                 marker2 = "← TV" if sb == tv_signal_bar else ""
@@ -236,7 +236,7 @@ async def main():
             se_bars = idx_arr[mask & (se == True)]
             print(f"  ⚠️ Trade #{trade_num}: {n_se} SE signals! First: {se_bars[0]}, Signal: {signal_bar}")
 
-    print(f"\nExact-match short trades:")
+    print("\nExact-match short trades:")
     print(f"  1 SE (normal):    {single_se_count}")
     print(f"  0 SE (anomaly):   {zero_se_count}")
     print(f"  >1 SE (multi):    {multi_se_count}")

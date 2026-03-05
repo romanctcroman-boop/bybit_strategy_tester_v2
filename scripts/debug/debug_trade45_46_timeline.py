@@ -35,9 +35,7 @@ for i in range(len(data)):
         print(f"Trade 45 entry at bar {i}:")
         print(f"  Open = {data[i, 0]:.2f}")
         # Signal was at bar i-1
-        print(
-            f"  Signal at bar {i - 1}: short_entries[{i - 1}] = {short_entries[i - 1]}"
-        )
+        print(f"  Signal at bar {i - 1}: short_entries[{i - 1}] = {short_entries[i - 1]}")
 
         # Calculate TP/SL for SHORT
         entry_price = 91800.00
@@ -52,9 +50,7 @@ for i in range(len(data)):
             if low <= tp_price:
                 print(f"\n  TP hits at bar {j}:")
                 print(f"  Low = {data[j, 2]:.2f} <= TP = {tp_price:.2f}")
-                print(
-                    f"  Bar {j}: O={data[j, 0]:.2f} H={data[j, 1]:.2f} L={data[j, 2]:.2f} C={data[j, 3]:.2f}"
-                )
+                print(f"  Bar {j}: O={data[j, 0]:.2f} H={data[j, 1]:.2f} L={data[j, 2]:.2f} C={data[j, 3]:.2f}")
 
                 # Check signals at this bar
                 print(f"  long_entries[{j}] = {long_entries[j]}")
@@ -134,12 +130,8 @@ if t45_exit_bar is not None and t46_signal_bar is not None:
     if t45_exit_bar == t46_signal_bar:
         print("\n*** OVERLAP: Trade 45 exit and Trade 46 signal on SAME bar! ***")
         print("This means:")
-        print(
-            f"  1. At bar {t45_exit_bar}: SHORT TP hit detected, pending_short_exit=True, in_short=False"
-        )
-        print(
-            f"  2. At bar {t45_exit_bar}: LONG signal exists, but need not in_long AND not in_short"
-        )
+        print(f"  1. At bar {t45_exit_bar}: SHORT TP hit detected, pending_short_exit=True, in_short=False")
+        print(f"  2. At bar {t45_exit_bar}: LONG signal exists, but need not in_long AND not in_short")
         print("  3. Wait... in_short was just set to False...")
     elif t45_exit_bar < t46_signal_bar:
         print("\nTrade 45 exits before Trade 46 signal - sequential (OK)")

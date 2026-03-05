@@ -20,9 +20,9 @@ from typing import Any
 
 # Force UTF-8 on Windows
 if sys.platform == "win32":
-    sys.stdin.reconfigure(encoding='utf-8', errors='replace')
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -49,74 +49,73 @@ class BybitMCPServer:
         request_id = request.get("id")
 
         if method == "initialize":
-            return self._create_response(request_id, {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {"listChanged": False}
+            return self._create_response(
+                request_id,
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": {"name": "bybit-mcp-server", "version": "1.0.0"},
                 },
-                "serverInfo": {
-                    "name": "bybit-mcp-server",
-                    "version": "1.0.0"
-                }
-            })
+            )
 
         elif method == "tools/list":
-            return self._create_response(request_id, {
-                "tools": [
-                    {
-                        "name": "get_available_symbols",
-                        "description": "Get list of available trading symbols from database",
-                        "inputSchema": {"type": "object", "properties": {}}
-                    },
-                    {
-                        "name": "get_market_data",
-                        "description": "Get OHLCV market data for a symbol",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "symbol": {"type": "string", "description": "Trading pair (e.g., BTCUSDT)"},
-                                "interval": {"type": "string", "description": "Timeframe (e.g., 1h, 4h, 1d)"},
-                                "limit": {"type": "integer", "description": "Number of candles", "default": 100}
+            return self._create_response(
+                request_id,
+                {
+                    "tools": [
+                        {
+                            "name": "get_available_symbols",
+                            "description": "Get list of available trading symbols from database",
+                            "inputSchema": {"type": "object", "properties": {}},
+                        },
+                        {
+                            "name": "get_market_data",
+                            "description": "Get OHLCV market data for a symbol",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "symbol": {"type": "string", "description": "Trading pair (e.g., BTCUSDT)"},
+                                    "interval": {"type": "string", "description": "Timeframe (e.g., 1h, 4h, 1d)"},
+                                    "limit": {"type": "integer", "description": "Number of candles", "default": 100},
+                                },
+                                "required": ["symbol", "interval"],
                             },
-                            "required": ["symbol", "interval"]
-                        }
-                    },
-                    {
-                        "name": "run_backtest",
-                        "description": "Run a backtest with specified parameters",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "strategy": {"type": "string", "description": "Strategy name (RSI, DCA, etc.)"},
-                                "symbol": {"type": "string", "description": "Trading pair"},
-                                "interval": {"type": "string", "description": "Timeframe"},
-                                "params": {"type": "object", "description": "Strategy parameters"}
+                        },
+                        {
+                            "name": "run_backtest",
+                            "description": "Run a backtest with specified parameters",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "strategy": {"type": "string", "description": "Strategy name (RSI, DCA, etc.)"},
+                                    "symbol": {"type": "string", "description": "Trading pair"},
+                                    "interval": {"type": "string", "description": "Timeframe"},
+                                    "params": {"type": "object", "description": "Strategy parameters"},
+                                },
+                                "required": ["strategy", "symbol", "interval"],
                             },
-                            "required": ["strategy", "symbol", "interval"]
-                        }
-                    },
-                    {
-                        "name": "get_strategies",
-                        "description": "List all available trading strategies",
-                        "inputSchema": {"type": "object", "properties": {}}
-                    },
-                    {
-                        "name": "get_backtest_results",
-                        "description": "Get recent backtest results",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "limit": {"type": "integer", "default": 10}
-                            }
-                        }
-                    },
-                    {
-                        "name": "get_system_status",
-                        "description": "Get current system status and health",
-                        "inputSchema": {"type": "object", "properties": {}}
-                    }
-                ]
-            })
+                        },
+                        {
+                            "name": "get_strategies",
+                            "description": "List all available trading strategies",
+                            "inputSchema": {"type": "object", "properties": {}},
+                        },
+                        {
+                            "name": "get_backtest_results",
+                            "description": "Get recent backtest results",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {"limit": {"type": "integer", "default": 10}},
+                            },
+                        },
+                        {
+                            "name": "get_system_status",
+                            "description": "Get current system status and health",
+                            "inputSchema": {"type": "object", "properties": {}},
+                        },
+                    ]
+                },
+            )
 
         elif method == "tools/call":
             tool_name = params.get("name")
@@ -125,9 +124,10 @@ class BybitMCPServer:
             if tool_name in self.tools:
                 try:
                     result = self.tools[tool_name](tool_args)
-                    return self._create_response(request_id, {
-                        "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}]
-                    })
+                    return self._create_response(
+                        request_id,
+                        {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}]},
+                    )
                 except Exception as e:
                     return self._create_error(request_id, -32000, str(e))
             else:
@@ -149,7 +149,7 @@ class BybitMCPServer:
         return {
             "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"],
             "count": 5,
-            "note": "Common trading pairs available"
+            "note": "Common trading pairs available",
         }
 
     def get_market_data(self, args: dict) -> dict:
@@ -163,7 +163,7 @@ class BybitMCPServer:
             "interval": interval,
             "limit": limit,
             "status": "Use backend API /api/v1/market-data for actual data",
-            "api_endpoint": f"/api/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+            "api_endpoint": f"/api/v1/klines?symbol={symbol}&interval={interval}&limit={limit}",
         }
 
     def run_backtest(self, args: dict) -> dict:
@@ -179,7 +179,7 @@ class BybitMCPServer:
             "symbol": symbol,
             "interval": interval,
             "params": params,
-            "api_endpoint": "/api/v1/backtests"
+            "api_endpoint": "/api/v1/backtests",
         }
 
     def get_strategies(self, args: dict) -> dict:
@@ -191,7 +191,7 @@ class BybitMCPServer:
                 {"name": "MACD", "description": "MACD crossover strategy"},
                 {"name": "BB", "description": "Bollinger Bands breakout strategy"},
                 {"name": "EMA_Cross", "description": "EMA crossover strategy"},
-                {"name": "Grid", "description": "Grid trading strategy"}
+                {"name": "Grid", "description": "Grid trading strategy"},
             ]
         }
 
@@ -202,7 +202,7 @@ class BybitMCPServer:
         return {
             "status": "Use backend API /api/v1/backtests/results for actual results",
             "limit": limit,
-            "api_endpoint": f"/api/v1/backtests/results?limit={limit}"
+            "api_endpoint": f"/api/v1/backtests/results?limit={limit}",
         }
 
     def get_system_status(self, args: dict) -> dict:
@@ -212,12 +212,7 @@ class BybitMCPServer:
             "version": "2.12",
             "python": sys.version,
             "project_root": str(PROJECT_ROOT),
-            "capabilities": [
-                "backtesting",
-                "optimization",
-                "market_data",
-                "strategy_management"
-            ]
+            "capabilities": ["backtesting", "optimization", "market_data", "strategy_management"],
         }
 
 

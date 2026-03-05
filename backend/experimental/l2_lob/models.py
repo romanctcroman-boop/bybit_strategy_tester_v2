@@ -62,3 +62,12 @@ class L2Snapshot:
         bids = [(lvl.price, lvl.size) for lvl in self.bids]
         asks = [(lvl.price, lvl.size) for lvl in self.asks]
         return bids, asks
+
+    def to_dict(self) -> dict:
+        """Serialize snapshot to a plain dict (compatible with NDJSON storage)."""
+        return {
+            "ts": self.timestamp,
+            "symbol": self.symbol,
+            "bids": [[lvl.price, lvl.size] for lvl in self.bids],
+            "asks": [[lvl.price, lvl.size] for lvl in self.asks],
+        }

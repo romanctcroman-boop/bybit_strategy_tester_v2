@@ -1,24 +1,18 @@
 """
-Live Chart Streaming Service.
+Live Chart package.
 
-Provides real-time OHLCV data via Bybit WebSocket → Server-Sent Events (SSE).
+Provides real-time chart streaming via WebSocket → SSE fan-out.
 
-Architecture:
-    Bybit WS → LiveChartSessionManager → asyncio.Queue → SSE → Browser
-
-Fan-out: one WebSocket per (symbol, interval) → N SSE subscribers.
+Exports:
+    LIVE_CHART_MANAGER  — singleton LiveChartSessionManager
+    LiveSignalService   — per-session signal computation
 """
 
-from backend.services.live_chart.session_manager import (
-    LIVE_CHART_MANAGER,
-    LiveChartSession,
-    LiveChartSessionManager,
-)
+from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER, LiveChartSessionManager
 from backend.services.live_chart.signal_service import LiveSignalService
 
 __all__ = [
     "LIVE_CHART_MANAGER",
-    "LiveChartSession",
     "LiveChartSessionManager",
     "LiveSignalService",
 ]

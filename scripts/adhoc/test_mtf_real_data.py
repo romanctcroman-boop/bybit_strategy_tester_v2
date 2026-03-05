@@ -125,9 +125,7 @@ def test_data_availability() -> TestResult:
         return TestResult("Data Availability", passed, time.time() - start, details)
 
     except Exception as e:
-        return TestResult(
-            "Data Availability", False, time.time() - start, {"error": str(e)}
-        )
+        return TestResult("Data Availability", False, time.time() - start, {"error": str(e)})
 
 
 def test_htf_index_mapping() -> TestResult:
@@ -143,9 +141,7 @@ def test_htf_index_mapping() -> TestResult:
         end_date = "2026-01-26"
 
         ltf_df = load_candles_from_db("BTCUSDT", "15", start_date, end_date)
-        htf_df = load_candles_from_db(
-            "BTCUSDT", "60", start_date, end_date
-        )  # Use 1H as HTF
+        htf_df = load_candles_from_db("BTCUSDT", "60", start_date, end_date)  # Use 1H as HTF
 
         if ltf_df.empty or htf_df.empty:
             return TestResult(
@@ -160,9 +156,7 @@ def test_htf_index_mapping() -> TestResult:
         htf_timestamps = (htf_df["timestamp"].astype(np.int64) // 10**6).values
 
         # Create index map (no lookahead)
-        index_map = create_htf_index_map(
-            ltf_timestamps, htf_timestamps, lookahead_mode="none"
-        )
+        index_map = create_htf_index_map(ltf_timestamps, htf_timestamps, lookahead_mode="none")
 
         # Validate no lookahead
         lookahead_violations = 0
@@ -269,9 +263,7 @@ def test_htf_trend_filter() -> TestResult:
         }
 
         # Passed if we have meaningful trend signals
-        passed = (
-            details["bullish_periods_sma"] > 0 or details["bearish_periods_sma"] > 0
-        )
+        passed = details["bullish_periods_sma"] > 0 or details["bearish_periods_sma"] > 0
         return TestResult("HTF Trend Filter", passed, time.time() - start, details)
 
     except Exception as e:
@@ -333,9 +325,7 @@ def test_btc_correlation_filter() -> TestResult:
         short_allowed = []
         for i in range(len(btc_closes) - 50, len(btc_closes)):
             btc_close = btc_closes[i]
-            btc_sma_val = (
-                btc_sma[i] if i < len(btc_sma) and btc_sma[i] > 0 else btc_close
-            )
+            btc_sma_val = btc_sma[i] if i < len(btc_sma) and btc_sma[i] > 0 else btc_close
             allow_long, allow_short = btc_filter.check(btc_close, btc_sma_val)
             long_allowed.append(allow_long)
             short_allowed.append(allow_short)
@@ -352,9 +342,7 @@ def test_btc_correlation_filter() -> TestResult:
 
         # Passed if filter is working (some signals allowed, some blocked)
         passed = details["longs_allowed"] > 0 and details["shorts_allowed"] > 0
-        return TestResult(
-            "BTC Correlation Filter", passed, time.time() - start, details
-        )
+        return TestResult("BTC Correlation Filter", passed, time.time() - start, details)
 
     except Exception as e:
         import traceback
@@ -396,9 +384,7 @@ def test_mtf_signal_generation() -> TestResult:
         htf_timestamps = (htf_df["timestamp"].astype(np.int64) // 10**6).values
 
         # Create index map
-        htf_index_map = create_htf_index_map(
-            ltf_timestamps, htf_timestamps, lookahead_mode="none"
-        )
+        htf_index_map = create_htf_index_map(ltf_timestamps, htf_timestamps, lookahead_mode="none")
 
         # Generate MTF RSI signals using DataFrame API
         long_entries, long_exits, short_entries, short_exits = generate_mtf_rsi_signals(
@@ -452,12 +438,8 @@ def test_fallback_engine_mtf_integration() -> TestResult:
         end_date = "2026-01-26"
 
         # Load as DataFrame with datetime index for engine
-        ltf_df = load_candles_from_db(
-            "BTCUSDT", "15", start_date, end_date, as_dataframe=True
-        )
-        htf_df = load_candles_from_db(
-            "BTCUSDT", "60", start_date, end_date, as_dataframe=True
-        )
+        ltf_df = load_candles_from_db("BTCUSDT", "15", start_date, end_date, as_dataframe=True)
+        htf_df = load_candles_from_db("BTCUSDT", "60", start_date, end_date, as_dataframe=True)
 
         if ltf_df.empty or len(ltf_df) < 200:
             return TestResult(
@@ -480,9 +462,7 @@ def test_fallback_engine_mtf_integration() -> TestResult:
         htf_timestamps_ms = (htf_df.index.astype(np.int64) // 10**6).values
 
         # Create HTF index map
-        htf_index_map = create_htf_index_map(
-            ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none"
-        )
+        htf_index_map = create_htf_index_map(ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none")
 
         # Generate simple RSI signals for testing
         closes = ltf_df["close"].values
@@ -498,9 +478,7 @@ def test_fallback_engine_mtf_integration() -> TestResult:
             for i in range(period, len(prices)):
                 avg_gain[i] = np.mean(gains[i - period : i])
                 avg_loss[i] = np.mean(losses[i - period : i])
-            rs = np.divide(
-                avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0
-            )
+            rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
             rsi = 100 - (100 / (1 + rs))
             return rsi
 
@@ -579,9 +557,7 @@ def test_fallback_engine_mtf_integration() -> TestResult:
 
         # Passed if MTF filters trades (should have fewer or equal trades)
         passed = mtf_metrics.total_trades <= no_mtf_metrics.total_trades
-        return TestResult(
-            "FallbackV4 MTF Integration", passed, time.time() - start, details
-        )
+        return TestResult("FallbackV4 MTF Integration", passed, time.time() - start, details)
 
     except Exception as e:
         import traceback
@@ -608,12 +584,8 @@ def test_mtf_long_period_backtest() -> TestResult:
         start_date = "2025-07-01"
         end_date = "2026-01-26"
 
-        ltf_df = load_candles_from_db(
-            "BTCUSDT", "15", start_date, end_date, as_dataframe=True
-        )
-        htf_df = load_candles_from_db(
-            "BTCUSDT", "60", start_date, end_date, as_dataframe=True
-        )
+        ltf_df = load_candles_from_db("BTCUSDT", "15", start_date, end_date, as_dataframe=True)
+        htf_df = load_candles_from_db("BTCUSDT", "60", start_date, end_date, as_dataframe=True)
 
         if ltf_df.empty or len(ltf_df) < 1000:
             return TestResult(
@@ -627,9 +599,7 @@ def test_mtf_long_period_backtest() -> TestResult:
         ltf_timestamps_ms = (ltf_df.index.astype(np.int64) // 10**6).values
         htf_timestamps_ms = (htf_df.index.astype(np.int64) // 10**6).values
 
-        htf_index_map = create_htf_index_map(
-            ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none"
-        )
+        htf_index_map = create_htf_index_map(ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none")
 
         # Generate RSI signals
         closes = ltf_df["close"].values
@@ -643,9 +613,7 @@ def test_mtf_long_period_backtest() -> TestResult:
             for i in range(period, len(prices)):
                 avg_gain[i] = np.mean(gains[i - period : i])
                 avg_loss[i] = np.mean(losses[i - period : i])
-            rs = np.divide(
-                avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0
-            )
+            rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
             return 100 - (100 / (1 + rs))
 
         rsi = calc_rsi(closes, 14)
@@ -761,12 +729,8 @@ def test_mtf_sma_crossover_strategy() -> TestResult:
         start_date = "2025-07-01"
         end_date = "2026-01-26"
 
-        ltf_df = load_candles_from_db(
-            "BTCUSDT", "15", start_date, end_date, as_dataframe=True
-        )
-        htf_df = load_candles_from_db(
-            "BTCUSDT", "60", start_date, end_date, as_dataframe=True
-        )
+        ltf_df = load_candles_from_db("BTCUSDT", "15", start_date, end_date, as_dataframe=True)
+        htf_df = load_candles_from_db("BTCUSDT", "60", start_date, end_date, as_dataframe=True)
 
         if ltf_df.empty or len(ltf_df) < 1000:
             return TestResult(
@@ -780,9 +744,7 @@ def test_mtf_sma_crossover_strategy() -> TestResult:
         ltf_timestamps_ms = (ltf_df.index.astype(np.int64) // 10**6).values
         htf_timestamps_ms = (htf_df.index.astype(np.int64) // 10**6).values
 
-        htf_index_map = create_htf_index_map(
-            ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none"
-        )
+        htf_index_map = create_htf_index_map(ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none")
 
         # Generate SMA crossover signals (Fast=10, Slow=30) - more frequent
         closes = ltf_df["close"].values
@@ -894,16 +856,12 @@ def test_mtf_sma_crossover_strategy() -> TestResult:
             "no_mtf_max_dd": f"{no_mtf.max_drawdown:.2f}%",
             # Comparison
             "trades_filtered": no_mtf.total_trades - mtf.total_trades,
-            "mtf_improves_winrate": mtf.win_rate > no_mtf.win_rate
-            if no_mtf.total_trades > 0
-            else False,
+            "mtf_improves_winrate": mtf.win_rate > no_mtf.win_rate if no_mtf.total_trades > 0 else False,
         }
 
         # Passed if we have trades and MTF filters some
         passed = days >= 180 and no_mtf.total_trades > 0
-        return TestResult(
-            "SMA Crossover with MTF", passed, time.time() - start, details
-        )
+        return TestResult("SMA Crossover with MTF", passed, time.time() - start, details)
 
     except Exception as e:
         import traceback

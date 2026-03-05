@@ -1,4 +1,4 @@
-﻿"""Test MarketRegimeDetector integration in FallbackEngineV4."""
+"""Test MarketRegimeDetector integration in FallbackEngineV4."""
 
 import numpy as np
 import pandas as pd
@@ -28,14 +28,16 @@ high = close * (1 + np.abs(np.random.randn(n)) * 0.005)
 low = close * (1 - np.abs(np.random.randn(n)) * 0.005)
 open_p = close + np.random.randn(n) * 50
 
-candles = pd.DataFrame({
-    "timestamp": ts,
-    "open": open_p,
-    "high": np.maximum.reduce([open_p, high, close]),
-    "low": np.minimum.reduce([open_p, low, close]),
-    "close": close,
-    "volume": np.random.randint(100, 5000, n).astype(float) * volatility,
-})
+candles = pd.DataFrame(
+    {
+        "timestamp": ts,
+        "open": open_p,
+        "high": np.maximum.reduce([open_p, high, close]),
+        "low": np.minimum.reduce([open_p, low, close]),
+        "close": close,
+        "volume": np.random.randint(100, 5000, n).astype(float) * volatility,
+    }
+)
 print(f"Created {len(candles)} candles")
 
 # Create engine
@@ -179,10 +181,18 @@ print("MARKET REGIME DETECTOR SUMMARY")
 print("=" * 60)
 print(f"{'Filter':<20} {'Trades':>8} {'WinRate':>10} {'Sharpe':>10} {'Return':>10}")
 print("-" * 60)
-print(f"{'None (baseline)':<20} {result1.metrics.total_trades:>8} {result1.metrics.win_rate:>9.1f}% {result1.metrics.sharpe_ratio:>10.2f} {result1.metrics.total_return * 100:>9.1f}%")
-print(f"{'not_volatile':<20} {result2.metrics.total_trades:>8} {result2.metrics.win_rate:>9.1f}% {result2.metrics.sharpe_ratio:>10.2f} {result2.metrics.total_return * 100:>9.1f}%")
-print(f"{'trending':<20} {result3.metrics.total_trades:>8} {result3.metrics.win_rate:>9.1f}% {result3.metrics.sharpe_ratio:>10.2f} {result3.metrics.total_return * 100:>9.1f}%")
-print(f"{'ranging':<20} {result4.metrics.total_trades:>8} {result4.metrics.win_rate:>9.1f}% {result4.metrics.sharpe_ratio:>10.2f} {result4.metrics.total_return * 100:>9.1f}%")
+print(
+    f"{'None (baseline)':<20} {result1.metrics.total_trades:>8} {result1.metrics.win_rate:>9.1f}% {result1.metrics.sharpe_ratio:>10.2f} {result1.metrics.total_return * 100:>9.1f}%"
+)
+print(
+    f"{'not_volatile':<20} {result2.metrics.total_trades:>8} {result2.metrics.win_rate:>9.1f}% {result2.metrics.sharpe_ratio:>10.2f} {result2.metrics.total_return * 100:>9.1f}%"
+)
+print(
+    f"{'trending':<20} {result3.metrics.total_trades:>8} {result3.metrics.win_rate:>9.1f}% {result3.metrics.sharpe_ratio:>10.2f} {result3.metrics.total_return * 100:>9.1f}%"
+)
+print(
+    f"{'ranging':<20} {result4.metrics.total_trades:>8} {result4.metrics.win_rate:>9.1f}% {result4.metrics.sharpe_ratio:>10.2f} {result4.metrics.total_return * 100:>9.1f}%"
+)
 print("=" * 60)
 
 # Check that regime filter reduces trades (expected behavior)

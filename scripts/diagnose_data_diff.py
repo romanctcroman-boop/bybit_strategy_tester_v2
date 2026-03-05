@@ -3,6 +3,7 @@
 =================================================
 Both claim to be from Bybit REST API.
 """
+
 import sqlite3
 from pathlib import Path
 
@@ -17,9 +18,9 @@ def load_db():
     conn = sqlite3.connect(DB_PATH)
 
     # Check all unique combinations
-    print("="*60)
+    print("=" * 60)
     print("📊 DATABASE SCHEMA CHECK")
-    print("="*60)
+    print("=" * 60)
 
     cur = conn.execute("""
         SELECT symbol, interval, market_type, COUNT(*) as cnt,
@@ -31,47 +32,53 @@ def load_db():
     """)
 
     print(f"\n{'Symbol':<15} | {'Interval':<8} | {'Market':<8} | {'Count':>8} | {'From':>20} | {'To':>20}")
-    print("-"*95)
+    print("-" * 95)
     for row in cur.fetchall():
         print(f"{row[0]:<15} | {row[1]:<8} | {row[2]:<8} | {row[3]:>8} | {row[4]:>20} | {row[5]:>20}")
 
     # Load SPOT and LINEAR samples
-    spot_df = pd.read_sql_query("""
+    spot_df = pd.read_sql_query(
+        """
         SELECT open_time, open_price, high_price, low_price, close_price, volume
         FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         ORDER BY open_time ASC
         LIMIT 10
-    """, conn)
+    """,
+        conn,
+    )
 
-    linear_df = pd.read_sql_query("""
+    linear_df = pd.read_sql_query(
+        """
         SELECT open_time, open_price, high_price, low_price, close_price, volume
         FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         ORDER BY open_time ASC
         LIMIT 10
-    """, conn)
+    """,
+        conn,
+    )
 
     conn.close()
 
-    spot_df['datetime'] = pd.to_datetime(spot_df['open_time'], unit='ms')
-    linear_df['datetime'] = pd.to_datetime(linear_df['open_time'], unit='ms')
+    spot_df["datetime"] = pd.to_datetime(spot_df["open_time"], unit="ms")
+    linear_df["datetime"] = pd.to_datetime(linear_df["open_time"], unit="ms")
 
     return spot_df, linear_df
 
 
 def load_tv(csv_path):
     df = pd.read_csv(csv_path)
-    df.columns = ['datetime', 'open', 'high', 'low', 'close']
-    df['datetime'] = pd.to_datetime(df['datetime'])
+    df.columns = ["datetime", "open", "high", "low", "close"]
+    df["datetime"] = pd.to_datetime(df["datetime"])
     return df
 
 
 def compare_timestamps(db_df, tv_df, name):
     """Compare timestamps and find alignment issues"""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"🕐 TIMESTAMP ANALYSIS: {name}")
-    print("="*60)
+    print("=" * 60)
 
     # Get first few timestamps
     print("\nFirst 5 DB timestamps:")
@@ -79,17 +86,17 @@ def compare_timestamps(db_df, tv_df, name):
         print(f"  {row['datetime']} | Open: ${row['open_price']:.2f}")
 
     print("\nFirst 5 TV timestamps:")
-    tv_df['datetime'] = tv_df['datetime'].dt.tz_localize(None) if tv_df['datetime'].dt.tz else tv_df['datetime']
+    tv_df["datetime"] = tv_df["datetime"].dt.tz_localize(None) if tv_df["datetime"].dt.tz else tv_df["datetime"]
     for i, row in tv_df.head().iterrows():
         print(f"  {row['datetime']} | Open: ${row['open']:.2f}")
 
     # Check timezone offset
     print("\n🕐 TIMEZONE CHECK:")
-    db_first = db_df['datetime'].iloc[0]
-    tv_first = tv_df['datetime'].iloc[0]
+    db_first = db_df["datetime"].iloc[0]
+    tv_first = tv_df["datetime"].iloc[0]
 
     # Try to find matching price in TV with different offsets
-    db_price = db_df['open_price'].iloc[0]
+    db_price = db_df["open_price"].iloc[0]
 
     print(f"\nDB first bar: {db_first} @ ${db_price:.2f}")
     print(f"TV first bar: {tv_first} @ ${tv_df['open'].iloc[0]:.2f}")
@@ -97,26 +104,28 @@ def compare_timestamps(db_df, tv_df, name):
     # Search for matching price in TV
     print(f"\n🔍 Searching for DB price ${db_price:.2f} in TV data...")
     for i, row in tv_df.iterrows():
-        if abs(row['open'] - db_price) < 1:
-            offset = (row['datetime'] - db_first).total_seconds() / 3600
+        if abs(row["open"] - db_price) < 1:
+            offset = (row["datetime"] - db_first).total_seconds() / 3600
             print(f"  FOUND! TV row {i}: {row['datetime']} @ ${row['open']:.2f}")
             print(f"  Time offset: {offset:.1f} hours")
             break
     else:
         # Search with tolerance
-        matches = tv_df[abs(tv_df['open'] - db_price) < 100]
+        matches = tv_df[abs(tv_df["open"] - db_price) < 100]
         if len(matches) > 0:
             print("  Closest matches (within $100):")
             for i, row in matches.head(3).iterrows():
-                offset = (row['datetime'] - db_first).total_seconds() / 3600
-                print(f"    {row['datetime']} @ ${row['open']:.2f} (Δ${abs(row['open']-db_price):.2f}, offset: {offset:.1f}h)")
+                offset = (row["datetime"] - db_first).total_seconds() / 3600
+                print(
+                    f"    {row['datetime']} @ ${row['open']:.2f} (Δ${abs(row['open'] - db_price):.2f}, offset: {offset:.1f}h)"
+                )
 
 
 def check_data_source():
     """Check how data was loaded"""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📝 DATA SOURCE CHECK")
-    print("="*60)
+    print("=" * 60)
 
     # Check if there's any audit/log info
     conn = sqlite3.connect(DB_PATH)
@@ -145,48 +154,55 @@ def check_data_source():
 
 def compare_same_timestamp(db_spot, db_linear, tv_spot, tv_linear):
     """Find same timestamp in all 4 sources and compare"""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔍 SAME TIMESTAMP COMPARISON")
-    print("="*60)
+    print("=" * 60)
 
     # Find a common timestamp that exists in all
     # Use a specific date that should exist in all
-    target_dt = pd.Timestamp('2025-10-15 12:00:00')
+    target_dt = pd.Timestamp("2025-10-15 12:00:00")
 
     # Adjust for timezones
-    tv_spot['datetime'] = tv_spot['datetime'].dt.tz_localize(None) if tv_spot['datetime'].dt.tz else tv_spot['datetime']
-    tv_linear['datetime'] = tv_linear['datetime'].dt.tz_localize(None) if tv_linear['datetime'].dt.tz else tv_linear['datetime']
+    tv_spot["datetime"] = tv_spot["datetime"].dt.tz_localize(None) if tv_spot["datetime"].dt.tz else tv_spot["datetime"]
+    tv_linear["datetime"] = (
+        tv_linear["datetime"].dt.tz_localize(None) if tv_linear["datetime"].dt.tz else tv_linear["datetime"]
+    )
 
     print(f"\nLooking for data around: {target_dt}")
 
     # Load more data from DB
     conn = sqlite3.connect(DB_PATH)
 
-    db_spot_full = pd.read_sql_query("""
+    db_spot_full = pd.read_sql_query(
+        """
         SELECT open_time, open_price FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='spot'
         AND open_time BETWEEN 1728993600000 AND 1729000800000
         ORDER BY open_time
-    """, conn)
+    """,
+        conn,
+    )
 
-    pd.read_sql_query("""
+    pd.read_sql_query(
+        """
         SELECT open_time, open_price FROM bybit_kline_audit
         WHERE symbol='BTCUSDT' AND interval='15' AND market_type='linear'
         AND open_time BETWEEN 1728993600000 AND 1729000800000
         ORDER BY open_time
-    """, conn)
+    """,
+        conn,
+    )
 
     conn.close()
 
     if len(db_spot_full) > 0:
-        db_spot_full['datetime'] = pd.to_datetime(db_spot_full['open_time'], unit='ms')
+        db_spot_full["datetime"] = pd.to_datetime(db_spot_full["open_time"], unit="ms")
         print("\nDB SPOT around Oct 15:")
         for _, row in db_spot_full.head(5).iterrows():
             print(f"  {row['datetime']} | ${row['open_price']:.2f}")
 
     # TV data around same date
-    tv_oct15_spot = tv_spot[(tv_spot['datetime'] >= '2025-10-15 10:00') &
-                           (tv_spot['datetime'] <= '2025-10-15 14:00')]
+    tv_oct15_spot = tv_spot[(tv_spot["datetime"] >= "2025-10-15 10:00") & (tv_spot["datetime"] <= "2025-10-15 14:00")]
     if len(tv_oct15_spot) > 0:
         print("\nTV SPOT around Oct 15:")
         for _, row in tv_oct15_spot.head(5).iterrows():
@@ -217,9 +233,9 @@ def main():
     # Compare same timestamp across all sources
     compare_same_timestamp(db_spot, db_linear, tv_spot, tv_linear)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("💡 HYPOTHESIS")
-    print("="*60)
+    print("=" * 60)
     print("""
 Possible reasons for data difference:
 1. TIMEZONE OFFSET: DB might be UTC, TV might be MSK (UTC+3)

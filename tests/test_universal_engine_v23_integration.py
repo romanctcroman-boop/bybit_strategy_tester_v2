@@ -402,9 +402,7 @@ class TestOrderBookBacktestIntegration:
         )
 
         # Run WITHOUT market impact
-        config_no_impact = V23IntegrationConfig(
-            order_book=OrderBookIntegrationConfig(enabled=False)
-        )
+        config_no_impact = V23IntegrationConfig(order_book=OrderBookIntegrationConfig(enabled=False))
         engine_no_impact = UniversalMathEngineV23(v23_config=config_no_impact)
 
         result_no_impact = engine_no_impact.run(

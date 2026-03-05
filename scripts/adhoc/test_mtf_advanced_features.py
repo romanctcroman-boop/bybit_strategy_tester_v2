@@ -114,9 +114,7 @@ def create_htf_data_and_map(ltf_df: pd.DataFrame, htf_df: pd.DataFrame):
     ltf_timestamps_ms = (ltf_df.index.astype(np.int64) // 10**6).values
     htf_timestamps_ms = (htf_df.index.astype(np.int64) // 10**6).values
 
-    htf_index_map = create_htf_index_map(
-        ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none"
-    )
+    htf_index_map = create_htf_index_map(ltf_timestamps_ms, htf_timestamps_ms, lookahead_mode="none")
 
     return np.array(htf_index_map, dtype=np.int32)
 
@@ -237,7 +235,10 @@ def test_mtf_with_dca() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + DCA", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + DCA", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -340,7 +341,10 @@ def test_mtf_with_trailing_stop() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Trailing", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Trailing", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -441,7 +445,10 @@ def test_mtf_with_multi_tp() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Multi-TP", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Multi-TP", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -545,7 +552,10 @@ def test_mtf_with_atr() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + ATR", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + ATR", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -653,7 +663,10 @@ def test_mtf_with_breakeven() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Breakeven", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Breakeven", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -754,7 +767,10 @@ def test_mtf_with_pyramiding() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Pyramiding", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Pyramiding", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -856,7 +872,10 @@ def test_mtf_with_time_exits() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Time Exit", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Time Exit", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -935,7 +954,10 @@ def test_mtf_with_position_sizing() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("MTF + Sizing", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "MTF + Sizing", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 # ============================================================================
@@ -1068,7 +1090,10 @@ def test_full_feature_combination() -> TestResult:
 
     except Exception as e:
         import traceback
-        return TestResult("Full Features", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()})
+
+        return TestResult(
+            "Full Features", False, time.time() - start, {"error": str(e), "traceback": traceback.format_exc()}
+        )
 
 
 def main():

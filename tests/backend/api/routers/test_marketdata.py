@@ -140,9 +140,7 @@ class TestGetBybitKlines:
 
         app.dependency_overrides[get_db] = mock_get_db_override
         try:
-            r = client.get(
-                "/api/v1/marketdata/bybit/klines?symbol=ETHUSDT&limit=50&start_time=1730000000000"
-            )
+            r = client.get("/api/v1/marketdata/bybit/klines?symbol=ETHUSDT&limit=50&start_time=1730000000000")
         finally:
             app.dependency_overrides.clear()
 
@@ -150,9 +148,7 @@ class TestGetBybitKlines:
         # Verify start_time filter was applied
         assert mock_query.filter.call_count == 2  # symbol + start_time
 
-    @pytest.mark.skip(
-        reason="Import conflict: sys.modules['backend.database'] mock conflicts with real package"
-    )
+    @pytest.mark.skip(reason="Import conflict: sys.modules['backend.database'] mock conflicts with real package")
     def test_get_klines_with_interval_filter(self, mock_db_session):
         """Ensure interval query parameter applies an extra filter."""
         mock_query = MagicMock()
@@ -170,9 +166,7 @@ class TestGetBybitKlines:
 
         app.dependency_overrides[get_db] = mock_get_db_override
         try:
-            r = client.get(
-                "/api/v1/marketdata/bybit/klines?symbol=ETHUSDT&interval=15&limit=50"
-            )
+            r = client.get("/api/v1/marketdata/bybit/klines?symbol=ETHUSDT&interval=15&limit=50")
         finally:
             app.dependency_overrides.clear()
 
@@ -254,9 +248,7 @@ class TestFetchKlines:
         try:
             with patch("asyncio.get_event_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = mock_executor
-                r = client.get(
-                    "/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=200"
-                )
+                r = client.get("/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=200")
         finally:
             app.dependency_overrides.clear()
 
@@ -274,9 +266,7 @@ class TestFetchKlines:
 
         # Mock executor to raise HTTPException
         async def mock_executor_error(*args, **kwargs):
-            raise HTTPException(
-                status_code=502, detail="Bybit fetch failed: Bybit API error"
-            )
+            raise HTTPException(status_code=502, detail="Bybit fetch failed: Bybit API error")
 
         client = TestClient(app)
 
@@ -287,9 +277,7 @@ class TestFetchKlines:
         try:
             with patch("asyncio.get_event_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = mock_executor_error
-                r = client.get(
-                    "/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=100"
-                )
+                r = client.get("/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=100")
         finally:
             app.dependency_overrides.clear()
 
@@ -322,9 +310,7 @@ class TestFetchKlines:
         try:
             with patch("asyncio.get_event_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = mock_executor
-                r = client.get(
-                    "/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=100&persist=1"
-                )
+                r = client.get("/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=100&persist=1")
         finally:
             app.dependency_overrides.clear()
 
@@ -336,9 +322,7 @@ class TestFetchKlines:
         client = TestClient(app)
 
         # Too large
-        r = client.get(
-            "/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=2000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/klines/fetch?symbol=BTCUSDT&interval=1&limit=2000")
         assert r.status_code == 422
 
 
@@ -351,9 +335,7 @@ class TestFetchRecentTrades:
     @pytest.mark.asyncio
     async def test_fetch_trades_success(self, mock_bybit_adapter, mock_db_session):
         """Test successful trade fetch."""
-        mock_trades = [
-            {"time": 1730000000000, "price": 100.5, "qty": 0.1, "side": "Buy"}
-        ]
+        mock_trades = [{"time": 1730000000000, "price": 100.5, "qty": 0.1, "side": "Buy"}]
 
         async def mock_executor(*args, **kwargs):
             return mock_trades
@@ -367,9 +349,7 @@ class TestFetchRecentTrades:
         try:
             with patch("asyncio.get_event_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = mock_executor
-                r = client.get(
-                    "/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=250"
-                )
+                r = client.get("/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=250")
         finally:
             app.dependency_overrides.clear()
 
@@ -384,9 +364,7 @@ class TestFetchRecentTrades:
         """Test trade fetch failure."""
 
         async def mock_executor_error(*args, **kwargs):
-            raise HTTPException(
-                status_code=502, detail="Bybit trades fetch failed: API timeout"
-            )
+            raise HTTPException(status_code=502, detail="Bybit trades fetch failed: API timeout")
 
         client = TestClient(app)
 
@@ -397,9 +375,7 @@ class TestFetchRecentTrades:
         try:
             with patch("asyncio.get_event_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = mock_executor_error
-                r = client.get(
-                    "/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=100"
-                )
+                r = client.get("/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=100")
         finally:
             app.dependency_overrides.clear()
 
@@ -409,9 +385,7 @@ class TestFetchRecentTrades:
     def test_fetch_trades_limit_validation(self):
         """Test limit validation."""
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=2000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/recent-trades?symbol=BTCUSDT&limit=2000")
         assert r.status_code == 422
 
 
@@ -434,9 +408,7 @@ class TestFetchWorkingSet:
         ]
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=1000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=1000")
 
         assert r.status_code == 200, r.text
         data = r.json()
@@ -457,23 +429,17 @@ class TestFetchWorkingSet:
         ]
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=500"
-        )
+        r = client.get("/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=500")
 
         assert r.status_code == 200
-        mock_candle_cache.load_initial.assert_called_once_with(
-            "BTCUSDT", "15", load_limit=500, persist=True
-        )
+        mock_candle_cache.load_initial.assert_called_once_with("BTCUSDT", "15", load_limit=500, persist=True)
 
     def test_fetch_working_set_error(self, mock_candle_cache):
         """Test working set fetch failure."""
         mock_candle_cache.get_working_set.side_effect = Exception("Cache error")
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=1000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=1000")
 
         assert r.status_code == 500
         assert "Cache error" in r.text
@@ -483,15 +449,11 @@ class TestFetchWorkingSet:
         client = TestClient(app)
 
         # Too small
-        r1 = client.get(
-            "/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=50"
-        )
+        r1 = client.get("/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=50")
         assert r1.status_code == 422
 
         # Too large
-        r2 = client.get(
-            "/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=2000"
-        )
+        r2 = client.get("/api/v1/marketdata/bybit/klines/working?symbol=BTCUSDT&interval=15&load_limit=2000")
         assert r2.status_code == 422
 
 
@@ -510,9 +472,7 @@ class TestFetchMtf:
         mock_mtf_manager.get_aligned.return_value = mock_result
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,15,60&aligned=1&load_limit=1000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,15,60&aligned=1&load_limit=1000")
 
         assert r.status_code == 200, r.text
         data = r.json()
@@ -551,9 +511,7 @@ class TestFetchMtf:
         mock_mtf_manager.get_aligned.return_value = mock_result
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,60&aligned=1&load_limit=200"
-        )
+        r = client.get("/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,60&aligned=1&load_limit=200")
 
         assert r.status_code == 200
         body = r.json()
@@ -571,9 +529,7 @@ class TestFetchMtf:
         mock_mtf_manager.get_working_sets.return_value = mock_result
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/mtf?symbol=ETHUSDT&intervals=5,60&aligned=0&load_limit=500"
-        )
+        r = client.get("/api/v1/marketdata/bybit/mtf?symbol=ETHUSDT&intervals=5,60&aligned=0&load_limit=500")
 
         assert r.status_code == 200
         mock_mtf_manager.get_working_sets.assert_called_once()
@@ -581,9 +537,7 @@ class TestFetchMtf:
     def test_fetch_mtf_empty_intervals(self):
         """Test MTF with empty intervals."""
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=&aligned=1"
-        )
+        r = client.get("/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=&aligned=1")
 
         assert r.status_code == 400
         assert "intervals is empty" in r.text
@@ -593,9 +547,7 @@ class TestFetchMtf:
         mock_mtf_manager.get_aligned.side_effect = Exception("MTF error")
 
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,15&aligned=1&load_limit=1000"
-        )
+        r = client.get("/api/v1/marketdata/bybit/mtf?symbol=BTCUSDT&intervals=1,15&aligned=1&load_limit=1000")
 
         assert r.status_code == 500
         assert "MTF error" in r.text
@@ -612,9 +564,7 @@ class TestUploadMarketData:
         monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
 
         client = TestClient(app)
-        content = (
-            b"open_time,open,high,low,close,volume\n1730000000000,100,110,90,105,1.2\n"
-        )
+        content = b"open_time,open,high,low,close,volume\n1730000000000,100,110,90,105,1.2\n"
         files = {"file": ("data.csv", BytesIO(content), "text/csv")}
         data = {"symbol": "BTCUSDT", "interval": "1"}
 

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 sys.path.insert(0, "d:\\bybit_strategy_tester_v2")
 
@@ -32,8 +32,8 @@ async def main():
     from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
     svc = BacktestService()
-    start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    end = datetime(2026, 2, 25, tzinfo=timezone.utc)
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    end = datetime(2026, 2, 25, tzinfo=UTC)
 
     # Fetch ETH data
     eth_ohlcv = await svc._fetch_historical_data("ETHUSDT", "30", start, end, market_type="linear")

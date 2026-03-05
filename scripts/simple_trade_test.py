@@ -147,7 +147,7 @@ def main() -> int:
         for i in range(min(3, len(fb_trades), len(vb_trades))):
             fb = fb_trades[i]
             vb = vb_trades[i]
-            print(f"\nTrade {i+1}:")
+            print(f"\nTrade {i + 1}:")
             print(f"  Side: FB={fb.get('side')}, VB={vb.get('side')}")
             print(f"  Size: FB={fb.get('size', 0):.6f}, VB={vb.get('size', 0):.6f}")
             print(f"  EntryPrice: FB={fb.get('entry_price', 0):.2f}, VB={vb.get('entry_price', 0):.2f}")

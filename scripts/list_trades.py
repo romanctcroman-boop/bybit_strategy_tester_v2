@@ -21,4 +21,4 @@ for i, t in enumerate(trades, 1):
     xp = t.get("exit_price", 0) or t.get("exit_price", 0)
     pnl = t.get("pnl", 0) or t.get("profit", 0)
     comment = t.get("exit_comment", "") or t.get("exit_type", "") or ""
-    print(f"{i:3d} {str(entry):20s} {side:5s} {ep:10.4f} {xp:10.4f} {pnl:10.4f} {comment}")
+    print(f"{i:3d} {entry!s:20s} {side:5s} {ep:10.4f} {xp:10.4f} {pnl:10.4f} {comment}")

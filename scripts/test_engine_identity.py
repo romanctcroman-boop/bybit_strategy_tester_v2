@@ -98,11 +98,7 @@ def extract_all_metrics(metrics: PerformanceMetrics) -> dict[str, Any]:
 
 
 def compare_metrics(
-    metrics1: dict,
-    metrics2: dict,
-    name1: str = "VectorBT",
-    name2: str = "Fallback",
-    tolerance_pct: float = 0.01
+    metrics1: dict, metrics2: dict, name1: str = "VectorBT", name2: str = "Fallback", tolerance_pct: float = 0.01
 ) -> tuple[list, list, list]:
     """Compare all metrics between two runs."""
     exact_matches = []
@@ -168,6 +164,7 @@ def run_engine_comparison(direction: str = "both"):
 
     # Generate signals once (shared between both engines)
     from backend.backtesting.strategies import get_strategy
+
     strategy = get_strategy(config.strategy_type)
     strategy.params = config.strategy_params
     strategy.direction = config.direction
@@ -202,9 +199,7 @@ def run_engine_comparison(direction: str = "both"):
     print(f"\nTotal metrics extracted: {len(metrics_vbt)}")
 
     # Compare
-    exact, tolerance, mismatches = compare_metrics(
-        metrics_vbt, metrics_fallback, "VectorBT", "Fallback"
-    )
+    exact, tolerance, mismatches = compare_metrics(metrics_vbt, metrics_fallback, "VectorBT", "Fallback")
 
     total_metrics = len(exact) + len(tolerance) + len(mismatches)
     match_rate = (len(exact) + len(tolerance)) / total_metrics * 100 if total_metrics > 0 else 0
@@ -214,7 +209,7 @@ def run_engine_comparison(direction: str = "both"):
     print("=" * 100)
 
     print(f"\n📊 Total Metrics Compared: {total_metrics}")
-    print(f"✅ Exact Matches: {len(exact)} ({len(exact)/total_metrics*100:.1f}%)")
+    print(f"✅ Exact Matches: {len(exact)} ({len(exact) / total_metrics * 100:.1f}%)")
     print(f"🔶 Within Tolerance (<1%): {len(tolerance)}")
     print(f"❌ Mismatches: {len(mismatches)}")
     print(f"\n🎯 Overall Match Rate: {match_rate:.2f}%")
@@ -262,10 +257,10 @@ def run_engine_comparison(direction: str = "both"):
             exit_match = abs(t_vbt.exit_price - t_fb.exit_price) < 0.01
 
             if pnl_match and entry_match and exit_match:
-                print(f"  Trade {i+1}: ✅ MATCH (PnL={t_vbt.pnl:.2f})")
+                print(f"  Trade {i + 1}: ✅ MATCH (PnL={t_vbt.pnl:.2f})")
             else:
                 trade_mismatches += 1
-                print(f"  Trade {i+1}: ❌ MISMATCH")
+                print(f"  Trade {i + 1}: ❌ MISMATCH")
                 print(f"    VBT: entry={t_vbt.entry_price:.2f}, exit={t_vbt.exit_price:.2f}, pnl={t_vbt.pnl:.2f}")
                 print(f"    FB:  entry={t_fb.entry_price:.2f}, exit={t_fb.exit_price:.2f}, pnl={t_fb.pnl:.2f}")
     else:
@@ -310,9 +305,11 @@ def run_all_directions():
 
     all_match = True
     for direction, r in results.items():
-        status = "✅" if r['match_rate'] >= 99.0 else "❌"
-        print(f"{direction.upper():<15} {r['total']:>10} {r['exact']:>10} {r['tolerance']:>10} {r['mismatches']:>10} {r['match_rate']:>11.2f}% {status}")
-        if r['match_rate'] < 99.0:
+        status = "✅" if r["match_rate"] >= 99.0 else "❌"
+        print(
+            f"{direction.upper():<15} {r['total']:>10} {r['exact']:>10} {r['tolerance']:>10} {r['mismatches']:>10} {r['match_rate']:>11.2f}% {status}"
+        )
+        if r["match_rate"] < 99.0:
             all_match = False
 
     print("\n")

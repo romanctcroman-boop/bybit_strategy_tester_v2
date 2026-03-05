@@ -38,10 +38,7 @@ payload = {
     "strategy_params": {
         "period": 14,
         # signals array: open at index 10, close at index 20
-        "signals": [None] * 10
-        + [{"action": "buy", "quantity": 0.01}]
-        + [None] * 9
-        + [{"action": "close"}],
+        "signals": [None] * 10 + [{"action": "buy", "quantity": 0.01}] + [None] * 9 + [{"action": "close"}],
     },
     "initial_capital": 10000.0,
     "position_size": 0.01,

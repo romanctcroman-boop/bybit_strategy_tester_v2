@@ -61,14 +61,10 @@ class TestRealisticBarSimulator:
 
     def test_path_respects_high_low(self):
         """Test that path touches high and low."""
-        config = BarSimulatorConfig(
-            ticks_per_bar=100, path_type=BarPathType.RANDOM_WALK, seed=123
-        )
+        config = BarSimulatorConfig(ticks_per_bar=100, path_type=BarPathType.RANDOM_WALK, seed=123)
         sim = RealisticBarSimulator(config)
 
-        path = sim.simulate_bar_path(
-            open_price=100.0, high_price=110.0, low_price=95.0, close_price=105.0
-        )
+        path = sim.simulate_bar_path(open_price=100.0, high_price=110.0, low_price=95.0, close_price=105.0)
 
         # Path should touch or exceed high/low
         assert np.max(path) >= 108.0  # Near high
@@ -107,9 +103,7 @@ class TestRealisticBarSimulator:
             close_price=49600.0,
         )
 
-        triggered, tick_idx, exec_price = sim.check_stop_triggered(
-            path, stop_price=49500.0, is_long=True
-        )
+        triggered, tick_idx, exec_price = sim.check_stop_triggered(path, stop_price=49500.0, is_long=True)
 
         assert triggered is True
         assert tick_idx >= 0
@@ -127,9 +121,7 @@ class TestRealisticBarSimulator:
             close_price=50400.0,
         )
 
-        triggered, tick_idx, exec_price = sim.check_stop_triggered(
-            path, stop_price=50500.0, is_long=False
-        )
+        triggered, tick_idx, exec_price = sim.check_stop_triggered(path, stop_price=50500.0, is_long=False)
 
         assert triggered is True
         assert tick_idx >= 0
@@ -141,9 +133,7 @@ class TestRealisticBarSimulator:
             config = BarSimulatorConfig(ticks_per_bar=50, path_type=path_type, seed=42)
             sim = RealisticBarSimulator(config)
 
-            path = sim.simulate_bar_path(
-                open_price=100.0, high_price=105.0, low_price=95.0, close_price=102.0
-            )
+            path = sim.simulate_bar_path(open_price=100.0, high_price=105.0, low_price=95.0, close_price=102.0)
 
             assert len(path) == 50
             assert path[0] == 100.0
@@ -173,13 +163,9 @@ class TestVolumeSlippageModel:
         """Test that large orders have more slippage."""
         model = VolumeSlippageModel()
 
-        small_slippage = model.calculate_slippage(
-            order_size_usd=1000, bar_volume_usd=100_000
-        )
+        small_slippage = model.calculate_slippage(order_size_usd=1000, bar_volume_usd=100_000)
 
-        large_slippage = model.calculate_slippage(
-            order_size_usd=50000, bar_volume_usd=100_000
-        )
+        large_slippage = model.calculate_slippage(order_size_usd=50000, bar_volume_usd=100_000)
 
         assert large_slippage > small_slippage
 
@@ -216,13 +202,9 @@ class TestVolumeSlippageModel:
         config = VolumeSlippageConfig(volatility_multiplier=2.0)
         model = VolumeSlippageModel(config)
 
-        low_vol_slippage = model.calculate_slippage(
-            order_size_usd=10000, bar_volume_usd=100_000, volatility=0.0
-        )
+        low_vol_slippage = model.calculate_slippage(order_size_usd=10000, bar_volume_usd=100_000, volatility=0.0)
 
-        high_vol_slippage = model.calculate_slippage(
-            order_size_usd=10000, bar_volume_usd=100_000, volatility=0.05
-        )
+        high_vol_slippage = model.calculate_slippage(order_size_usd=10000, bar_volume_usd=100_000, volatility=0.05)
 
         assert high_vol_slippage > low_vol_slippage
 
@@ -359,9 +341,7 @@ class TestPartialFillSimulator:
 
     def test_large_order_partial_fill(self):
         """Test that large orders may get partial fills."""
-        config = PartialFillConfig(
-            enabled=True, instant_fill_threshold=0.001, max_partial_fills=5
-        )
+        config = PartialFillConfig(enabled=True, instant_fill_threshold=0.001, max_partial_fills=5)
         sim = PartialFillSimulator(config)
 
         result = sim.simulate_market_order_fill(
@@ -513,9 +493,7 @@ class TestLiquidationEngine:
 
     def test_partial_liquidation(self):
         """Test partial liquidation when margin ratio high."""
-        config = LiquidationConfig(
-            enable_partial_liquidation=True, partial_liquidation_threshold=0.5
-        )
+        config = LiquidationConfig(enable_partial_liquidation=True, partial_liquidation_threshold=0.5)
         engine = LiquidationEngine(config)
 
         result = engine.check_liquidation(
@@ -566,16 +544,12 @@ class TestFeatureEngineering:
 
     def test_generate_features(self):
         """Test feature generation from OHLCV."""
-        close = np.array(
-            [100, 101, 102, 101, 103, 104, 103, 105, 106, 105] * 5, dtype=np.float64
-        )
+        close = np.array([100, 101, 102, 101, 103, 104, 103, 105, 106, 105] * 5, dtype=np.float64)
         high = close + 1
         low = close - 1
         volume = np.ones(50, dtype=np.float64) * 1000
 
-        features = FeatureEngineering.generate_features(
-            close, high, low, volume, lookback=10
-        )
+        features = FeatureEngineering.generate_features(close, high, low, volume, lookback=10)
 
         assert "return_1" in features
         assert "volatility" in features
@@ -704,9 +678,7 @@ class TestRealisticSimulationIntegration:
 
         # 2. Calculate volume-based slippage
         slip_model = VolumeSlippageModel()
-        slippage = slip_model.calculate_slippage(
-            order_size_usd=5000, bar_volume_usd=100_000
-        )
+        slippage = slip_model.calculate_slippage(order_size_usd=5000, bar_volume_usd=100_000)
         assert slippage > 0
 
         # 3. Check liquidation

@@ -22,7 +22,7 @@ Engines tested:
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add project root to path
@@ -161,8 +161,8 @@ from backend.backtesting.models import BacktestConfig
 config = BacktestConfig(
     symbol="ETHUSDT",
     interval="30",
-    start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-    end_date=datetime(2026, 3, 1, tzinfo=timezone.utc),
+    start_date=datetime(2025, 1, 1, tzinfo=UTC),
+    end_date=datetime(2026, 3, 1, tzinfo=UTC),
     initial_capital=10000.0,
     position_size=0.1,
     leverage=10.0,
@@ -302,13 +302,13 @@ def run_engine(name: str, fn):
                 if isinstance(et, str):
                     et = datetime.fromisoformat(et)
                 if et.tzinfo is None:
-                    et = et.replace(tzinfo=timezone.utc)
+                    et = et.replace(tzinfo=UTC)
                 first_entry = (et + timedelta(hours=3)).strftime("%Y-%m-%d %H:%M")
             elif isinstance(t0_trade, dict):
                 et_str = t0_trade.get("entry_time", "")
                 et = datetime.fromisoformat(et_str)
                 if et.tzinfo is None:
-                    et = et.replace(tzinfo=timezone.utc)
+                    et = et.replace(tzinfo=UTC)
                 first_entry = (et + timedelta(hours=3)).strftime("%Y-%m-%d %H:%M")
 
         # Normalize win_rate: engines return fraction (0.903) but TV shows percent (90.32)

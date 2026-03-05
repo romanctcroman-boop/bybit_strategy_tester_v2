@@ -4,6 +4,7 @@
 Clears existing SPOT data for BTCUSDT and reloads from Bybit API
 with correct market_type='spot'.
 """
+
 import asyncio
 import sqlite3
 import sys
@@ -30,16 +31,19 @@ async def reload_spot_data():
     interval = "15"
     market_type = "spot"
 
-    print("="*70)
+    print("=" * 70)
     print(f"🔄 RELOADING {symbol} {interval}m {market_type.upper()} DATA")
-    print("="*70)
+    print("=" * 70)
 
     # Step 1: Check current state
     conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute("""
+    cur = conn.execute(
+        """
         SELECT COUNT(*) FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
-    """, (symbol, interval, market_type))
+    """,
+        (symbol, interval, market_type),
+    )
     current_count = cur.fetchone()[0]
     conn.close()
 
@@ -48,10 +52,13 @@ async def reload_spot_data():
     # Step 2: Delete existing SPOT data
     print(f"\n🗑️ Deleting existing {market_type} data...")
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
+    conn.execute(
+        """
         DELETE FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
-    """, (symbol, interval, market_type))
+    """,
+        (symbol, interval, market_type),
+    )
     conn.commit()
     deleted = conn.total_changes
     conn.close()
@@ -59,7 +66,7 @@ async def reload_spot_data():
 
     # Step 3: Fetch fresh data from Bybit with correct market_type
     print(f"\n📡 Fetching fresh {market_type} data from Bybit API...")
-    print(f"   Range: {datetime.fromtimestamp(DATA_START_TS/1000)} to {datetime.fromtimestamp(NOW_TS/1000)}")
+    print(f"   Range: {datetime.fromtimestamp(DATA_START_TS / 1000)} to {datetime.fromtimestamp(NOW_TS / 1000)}")
 
     try:
         candles = await adapter.get_historical_klines(
@@ -89,20 +96,26 @@ async def reload_spot_data():
     # Step 4: Verify
     print("\n✅ Verifying...")
     conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute("""
+    cur = conn.execute(
+        """
         SELECT COUNT(*), MIN(datetime(open_time/1000, 'unixepoch')), MAX(datetime(open_time/1000, 'unixepoch'))
         FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
-    """, (symbol, interval, market_type))
+    """,
+        (symbol, interval, market_type),
+    )
     count, min_dt, max_dt = cur.fetchone()
 
     # Get sample prices
-    cur = conn.execute("""
+    cur = conn.execute(
+        """
         SELECT datetime(open_time/1000, 'unixepoch'), open_price
         FROM bybit_kline_audit
         WHERE symbol=? AND interval=? AND market_type=?
         ORDER BY open_time LIMIT 5
-    """, (symbol, interval, market_type))
+    """,
+        (symbol, interval, market_type),
+    )
     samples = cur.fetchall()
     conn.close()
 
@@ -113,9 +126,9 @@ async def reload_spot_data():
     for dt, price in samples:
         print(f"   {dt} | ${price:.2f}")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("✅ SPOT DATA RELOAD COMPLETE")
-    print("="*70)
+    print("=" * 70)
 
 
 if __name__ == "__main__":

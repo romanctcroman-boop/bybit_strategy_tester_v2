@@ -941,7 +941,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         # === TIME-BASED EXITS ===
         max_bars_in_trade = getattr(input_data, "max_bars_in_trade", 0)
         exit_on_session_close = getattr(input_data, "exit_on_session_close", False)
-        session_start_hour = getattr(input_data, "session_start_hour", 0)  # noqa: F841
+        session_start_hour = getattr(input_data, "session_start_hour", 0)
         session_end_hour = getattr(input_data, "session_end_hour", 24)
         no_trade_days = getattr(input_data, "no_trade_days", ())
         no_trade_hours = getattr(input_data, "no_trade_hours", ())
@@ -1044,13 +1044,13 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         # === MULTI-TIMEFRAME (MTF) FILTER ===
         mtf_enabled = getattr(input_data, "mtf_enabled", False)
-        mtf_htf_interval = getattr(input_data, "mtf_htf_interval", "60")  # noqa: F841
+        mtf_htf_interval = getattr(input_data, "mtf_htf_interval", "60")
         mtf_htf_candles = getattr(input_data, "mtf_htf_candles", None)
         mtf_htf_index_map: list[int] | None = getattr(input_data, "mtf_htf_index_map", None)
         mtf_filter_type = getattr(input_data, "mtf_filter_type", "sma")
         mtf_filter_period = getattr(input_data, "mtf_filter_period", 200)
         mtf_neutral_zone_pct = getattr(input_data, "mtf_neutral_zone_pct", 0.0)
-        mtf_lookahead_mode = getattr(input_data, "mtf_lookahead_mode", "none")  # noqa: F841 - reserved for future
+        mtf_lookahead_mode = getattr(input_data, "mtf_lookahead_mode", "none")
         # BTC Correlation filter
         mtf_btc_filter_enabled = getattr(input_data, "mtf_btc_filter_enabled", False)
         mtf_btc_candles = getattr(input_data, "mtf_btc_candles", None)
@@ -1235,10 +1235,10 @@ class FallbackEngineV4(BaseBacktestEngine):
         short_accumulated_mfe = 0.0
         short_accumulated_mae = 0.0
         # Pending MFE/MAE для записи трейда
-        pending_long_mfe = 0.0  # noqa: F841
-        pending_long_mae = 0.0  # noqa: F841
-        pending_short_mfe = 0.0  # noqa: F841
-        pending_short_mae = 0.0  # noqa: F841
+        pending_long_mfe = 0.0
+        pending_long_mae = 0.0
+        pending_short_mfe = 0.0
+        pending_short_mae = 0.0
 
         # Bar Magnifier (для будущего использования)
         _bar_magnifier_index = self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
@@ -1341,8 +1341,8 @@ class FallbackEngineV4(BaseBacktestEngine):
                 atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)
                 atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)
             else:
-                atr_tp_multiplier_local = atr_tp_multiplier  # noqa: F841
-                atr_sl_multiplier_local = atr_sl_multiplier  # noqa: F841
+                atr_tp_multiplier_local = atr_tp_multiplier
+                atr_sl_multiplier_local = atr_sl_multiplier
 
             # === MFE/MAE TRACKING ===
             # Аккумулируем MFE/MAE для открытых позиций на каждом баре
@@ -2841,7 +2841,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                         accumulated_funding -= funding_fee
                         cash += funding_fee  # Add to cash
 
-                    last_funding_bar = i  # noqa: F841 - track for debugging
+                    last_funding_bar = i
 
             # === ОБНОВЛЕНИЕ EQUITY ===
             unrealized_pnl = 0.0

@@ -79,8 +79,7 @@ class TestConnectionMethod:
 
             assert result is True
             mock_client.get.assert_called_once_with(
-                "https://api.deepseek.com/v1/models",
-                headers={"Authorization": "Bearer valid_key"}
+                "https://api.deepseek.com/v1/models", headers={"Authorization": "Bearer valid_key"}
             )
 
     @pytest.mark.asyncio

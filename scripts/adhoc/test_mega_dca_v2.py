@@ -142,15 +142,11 @@ class MegaDCATestV2:
                 details={
                     "last_vwap": float(vwap.iloc[-1]),
                     "last_price": float(candles["close"].iloc[-1]),
-                    "price_vs_vwap": "above"
-                    if candles["close"].iloc[-1] > vwap.iloc[-1]
-                    else "below",
+                    "price_vs_vwap": "above" if candles["close"].iloc[-1] > vwap.iloc[-1] else "below",
                 },
             )
         except Exception as e:
-            return TestResult(
-                "VWAP Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("VWAP Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_obv_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test On-Balance Volume indicator."""
@@ -184,9 +180,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "OBV Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("OBV Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_cmf_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test Chaikin Money Flow indicator."""
@@ -201,9 +195,7 @@ class MegaDCATestV2:
             mfm = np.zeros(len(close))
             for i in range(len(close)):
                 if high[i] != low[i]:
-                    mfm[i] = ((close[i] - low[i]) - (high[i] - close[i])) / (
-                        high[i] - low[i]
-                    )
+                    mfm[i] = ((close[i] - low[i]) - (high[i] - close[i])) / (high[i] - low[i])
 
             # Money Flow Volume
             mfv = mfm * volume
@@ -211,9 +203,7 @@ class MegaDCATestV2:
             # CMF
             cmf = np.zeros(len(close))
             for i in range(period - 1, len(close)):
-                cmf[i] = np.sum(mfv[i - period + 1 : i + 1]) / np.sum(
-                    volume[i - period + 1 : i + 1]
-                )
+                cmf[i] = np.sum(mfv[i - period + 1 : i + 1]) / np.sum(volume[i - period + 1 : i + 1])
 
             # Signal
             signal = "accumulation" if cmf[-1] > 0 else "distribution"
@@ -229,9 +219,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "CMF Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("CMF Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_supertrend_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test Supertrend indicator."""
@@ -268,19 +256,13 @@ class MegaDCATestV2:
 
             for i in range(period, len(close)):
                 # Upper band
-                if (
-                    basic_upper[i] < final_upper[i - 1]
-                    or close[i - 1] > final_upper[i - 1]
-                ):
+                if basic_upper[i] < final_upper[i - 1] or close[i - 1] > final_upper[i - 1]:
                     final_upper[i] = basic_upper[i]
                 else:
                     final_upper[i] = final_upper[i - 1]
 
                 # Lower band
-                if (
-                    basic_lower[i] > final_lower[i - 1]
-                    or close[i - 1] < final_lower[i - 1]
-                ):
+                if basic_lower[i] > final_lower[i - 1] or close[i - 1] < final_lower[i - 1]:
                     final_lower[i] = basic_lower[i]
                 else:
                     final_lower[i] = final_lower[i - 1]
@@ -305,9 +287,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Supertrend Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("Supertrend Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_cci_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test Commodity Channel Index."""
@@ -346,9 +326,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "CCI Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("CCI Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_williams_r_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test Williams %R indicator."""
@@ -363,9 +341,7 @@ class MegaDCATestV2:
                 highest_high = np.max(high[i - period + 1 : i + 1])
                 lowest_low = np.min(low[i - period + 1 : i + 1])
                 if highest_high != lowest_low:
-                    williams_r[i] = (
-                        -100 * (highest_high - close[i]) / (highest_high - lowest_low)
-                    )
+                    williams_r[i] = -100 * (highest_high - close[i]) / (highest_high - lowest_low)
 
             # Signal
             if williams_r[-1] > -20:
@@ -386,9 +362,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Williams %R Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("Williams %R Indicator", "Additional Indicators", False, {}, str(e))
 
     def test_roc_indicator(self, candles: pd.DataFrame) -> TestResult:
         """Test Rate of Change indicator."""
@@ -412,9 +386,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "ROC Indicator", "Additional Indicators", False, {}, str(e)
-            )
+            return TestResult("ROC Indicator", "Additional Indicators", False, {}, str(e))
 
     # =========================================================================
     # KELLY CRITERION TESTS
@@ -465,9 +437,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Kelly Criterion (Full)", "Position Sizing", False, {}, str(e)
-            )
+            return TestResult("Kelly Criterion (Full)", "Position Sizing", False, {}, str(e))
 
     def test_kelly_criterion_half(self) -> TestResult:
         """Test Half Kelly Criterion."""
@@ -510,9 +480,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Kelly Criterion (Half)", "Position Sizing", False, {}, str(e)
-            )
+            return TestResult("Kelly Criterion (Half)", "Position Sizing", False, {}, str(e))
 
     def test_volatility_based_sizing(self) -> TestResult:
         """Test volatility-based position sizing."""
@@ -544,9 +512,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Volatility-Based Sizing", "Position Sizing", False, {}, str(e)
-            )
+            return TestResult("Volatility-Based Sizing", "Position Sizing", False, {}, str(e))
 
     # =========================================================================
     # RISK ENGINE TESTS
@@ -591,9 +557,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Risk Engine Assessment", "Risk Management", False, {}, str(e)
-            )
+            return TestResult("Risk Engine Assessment", "Risk Management", False, {}, str(e))
 
     def test_exposure_controller(self) -> TestResult:
         """Test Exposure Controller."""
@@ -634,9 +598,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Exposure Controller", "Risk Management", False, {}, str(e)
-            )
+            return TestResult("Exposure Controller", "Risk Management", False, {}, str(e))
 
     def test_stop_loss_manager(self) -> TestResult:
         """Test Stop Loss Manager."""
@@ -712,9 +674,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Extended Metrics Calculator", "Metrics", False, {}, str(e)
-            )
+            return TestResult("Extended Metrics Calculator", "Metrics", False, {}, str(e))
 
     def test_omega_ratio(self) -> TestResult:
         """Test Omega Ratio calculation."""
@@ -781,9 +741,7 @@ class MegaDCATestV2:
                 },
             )
         except Exception as e:
-            return TestResult(
-                "Indicator Library", "Strategy Builder", False, {}, str(e)
-            )
+            return TestResult("Indicator Library", "Strategy Builder", False, {}, str(e))
 
     def test_strategy_templates(self) -> TestResult:
         """Test Strategy Templates availability."""
@@ -812,9 +770,7 @@ class MegaDCATestV2:
                 details={"note": "Templates module structure different"},
             )
         except Exception as e:
-            return TestResult(
-                "Strategy Templates", "Strategy Builder", False, {}, str(e)
-            )
+            return TestResult("Strategy Templates", "Strategy Builder", False, {}, str(e))
 
     # =========================================================================
     # CORRELATION & PORTFOLIO TESTS
@@ -832,9 +788,7 @@ class MegaDCATestV2:
 
             correlation = np.corrcoef(
                 price_changes,
-                vol_changes[:-1]
-                if len(vol_changes) > len(price_changes)
-                else vol_changes,
+                vol_changes[:-1] if len(vol_changes) > len(price_changes) else vol_changes,
             )[0, 1]
 
             return TestResult(
@@ -842,9 +796,7 @@ class MegaDCATestV2:
                 category="Portfolio",
                 passed=not np.isnan(correlation),
                 details={
-                    "price_volume_correlation": float(correlation)
-                    if not np.isnan(correlation)
-                    else 0,
+                    "price_volume_correlation": float(correlation) if not np.isnan(correlation) else 0,
                     "interpretation": "strong"
                     if abs(correlation) > 0.7
                     else "moderate"

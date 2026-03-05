@@ -2,22 +2,19 @@
 Live Chart Session Manager.
 
 Manages Bybit WebSocket connections for real-time chart streaming.
+Fan-out: одно WS соединение на (symbol, interval) → N SSE клиентов.
 
-Fan-out: one WS connection per (symbol, interval) → N SSE subscribers.
-Each SSE subscriber gets its own asyncio.Queue for event delivery.
-
-Usage:
-    from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
-
-    # In SSE endpoint:
-    session = await LIVE_CHART_MANAGER.get_or_create("BTCUSDT", "15")
-    queue = session.add_subscriber(session_id)
-    # ... stream from queue ...
-    session.remove_subscriber(session_id)
-    await LIVE_CHART_MANAGER.cleanup("BTCUSDT", "15")
+Ключевые принципы (ТЗ v1.1, D1.2):
+- Использует существующий BybitWebSocketClient.register_callback() — никакого
+  нового callback API создавать не нужно (D1.1 подтверждает существование).
+- parse_kline_message() принимает WebSocketMessage — не dict.
+- При отсутствии подписчиков WS закрывается автоматически (D5).
 """
 
+from __future__ import annotations
+
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from uuid import uuid4
@@ -30,61 +27,63 @@ from backend.services.live_trading.bybit_websocket import (
 
 logger = logging.getLogger(__name__)
 
-# Maximum SSE queue size per subscriber — drop events if browser is too slow
-_QUEUE_MAX_SIZE = 100
+# Максимальный размер очереди на одного SSE-подписчика.
+# При переполнении медленный подписчик отключается.
+# 1000 тиков ≈ 16+ минут при 1 тике/сек — достаточно для переключения вкладок
+# без потери подписки (frontend держит SSE живым через _liveChartPaused).
+_SUBSCRIBER_QUEUE_MAXSIZE = 1000
 
 
 @dataclass
 class LiveChartSession:
     """
-    One active streaming session for a (symbol × interval) pair.
+    Одна активная сессия стриминга (symbol × interval).
 
-    A single BybitWebSocketClient is shared across all SSE subscribers
-    for the same symbol+interval to avoid duplicate WS connections.
+    Содержит WS-клиент и реестр SSE-подписчиков (asyncio.Queue).
+    Метод _on_ws_message регистрируется как callback в BybitWebSocketClient.
     """
 
     session_id: str
     symbol: str
     interval: str
     ws_client: BybitWebSocketClient
-    # SSE subscriber queues: {subscriber_id → asyncio.Queue}
+    # Очереди SSE подписчиков: {subscriber_id → asyncio.Queue}
     subscribers: dict[str, asyncio.Queue] = field(default_factory=dict)
 
+    # ------------------------------------------------------------------
+    # Subscriber management
+    # ------------------------------------------------------------------
+
     def add_subscriber(self, sub_id: str) -> asyncio.Queue:
-        """Register a new SSE subscriber and return its event queue."""
-        q: asyncio.Queue = asyncio.Queue(maxsize=_QUEUE_MAX_SIZE)
+        """Добавить подписчика и вернуть его очередь."""
+        q: asyncio.Queue = asyncio.Queue(maxsize=_SUBSCRIBER_QUEUE_MAXSIZE)
         self.subscribers[sub_id] = q
-        logger.debug("[LiveChart] Subscriber %s added to %s:%s", sub_id, self.symbol, self.interval)
+        logger.debug("[LiveChart] Subscriber added: %s (session %s)", sub_id, self.session_id)
         return q
 
     def remove_subscriber(self, sub_id: str) -> None:
-        """Unregister an SSE subscriber."""
+        """Удалить подписчика."""
         self.subscribers.pop(sub_id, None)
-        logger.debug("[LiveChart] Subscriber %s removed from %s:%s", sub_id, self.symbol, self.interval)
+        logger.debug("[LiveChart] Subscriber removed: %s (session %s)", sub_id, self.session_id)
 
     @property
     def has_subscribers(self) -> bool:
-        """True when at least one SSE client is connected."""
         return bool(self.subscribers)
 
-    async def _fan_out(self, event: dict) -> None:
-        """
-        Deliver an event to all registered SSE subscribers.
+    # ------------------------------------------------------------------
+    # Fan-out: WS callback → N SSE queues
+    # ------------------------------------------------------------------
 
-        If a subscriber's queue is full (browser too slow / stale connection),
-        it is silently removed from the registry — the next SSE reconnect will
-        re-register it.
-        """
+    async def _fan_out(self, event: dict) -> None:
+        """Рассылка события всем подписчикам. Удаляет «медленные» (переполненные) очереди."""
         dead: list[str] = []
-        for sub_id, q in list(self.subscribers.items()):
+        for sub_id, q in self.subscribers.items():
             try:
                 q.put_nowait(event)
             except asyncio.QueueFull:
                 logger.warning(
-                    "[LiveChart] Queue full for subscriber %s on %s:%s — dropping and disconnecting",
+                    "[LiveChart] Queue full for subscriber %s — dropping event and disconnecting",
                     sub_id,
-                    self.symbol,
-                    self.interval,
                 )
                 dead.append(sub_id)
         for sub_id in dead:
@@ -92,123 +91,156 @@ class LiveChartSession:
 
     async def _on_ws_message(self, message: WebSocketMessage) -> None:
         """
-        Callback registered with BybitWebSocketClient.register_callback().
+        Callback для BybitWebSocketClient.register_callback().
 
-        Converts a WebSocketMessage (kline topic) into tick/bar_closed events
-        and fans them out to all SSE subscribers.
-
-        D1.2: message is WebSocketMessage, not dict — use parse_kline_message(message).
+        Принимает WebSocketMessage (не dict!) — см. D1.2 исправление ТЗ.
+        Парсит kline-сообщение и рассылает событие подписчикам.
         """
         try:
             bars = parse_kline_message(message)
         except Exception as exc:
-            logger.error("[LiveChart] Failed to parse kline message for %s:%s — %s", self.symbol, self.interval, exc)
+            logger.error("[LiveChart] Failed to parse kline message: %s", exc)
             return
 
         for bar in bars:
-            # Skip zero-volume bars (Bybit sometimes sends ticks with no trades)
-            if bar.get("volume", 0) == 0 and not bar.get("confirm", False):
-                logger.debug(
-                    "[LiveChart] Skipping empty tick (volume=0) for %s:%s at t=%s",
-                    self.symbol,
-                    self.interval,
-                    bar.get("start"),
-                )
-                continue
-
             event: dict = {
-                "type": "bar_closed" if bar["confirm"] else "tick",
+                "type": "bar_closed" if bar.get("confirm") else "tick",
                 "candle": {
-                    "time": int(bar["start"] / 1000),  # ms → seconds for LightweightCharts
-                    "open": bar["open"],
-                    "high": bar["high"],
-                    "low": bar["low"],
-                    "close": bar["close"],
-                    "volume": bar["volume"],
+                    "time": int(bar["start"] / 1000),  # мс → секунды для LightweightCharts
+                    "open": float(bar["open"]),
+                    "high": float(bar["high"]),
+                    "low": float(bar["low"]),
+                    "close": float(bar["close"]),
+                    "volume": float(bar.get("volume", 0)),
                 },
-                "confirm": bar["confirm"],
+                "confirm": bar.get("confirm", False),
             }
             await self._fan_out(event)
 
 
 class LiveChartSessionManager:
     """
-    Singleton registry of active LiveChartSession objects.
+    Синглтон-реестр активных LiveChartSession.
 
-    One WS connection per (symbol, interval) regardless of how many browsers
-    are watching the same chart.  Sessions are closed automatically once the
-    last SSE subscriber disconnects.
+    Fan-out: один WS на (symbol, interval) → N SSE клиентов.
+    Использует asyncio.Lock для безопасного создания/удаления сессий.
+
+    ВАЖНО (D5): LIVE_CHART_MANAGER — in-memory синглтон.
+    При uvicorn --workers > 1 каждый воркер имеет свой экземпляр.
+    Для локальной разработки (1 воркер) — всё работает корректно.
+    В production с несколькими воркерами требуется Redis pub/sub.
     """
 
     def __init__(self) -> None:
-        # Key: "{symbol}:{interval}"
+        # Ключ: f"{symbol}:{interval}"
         self._sessions: dict[str, LiveChartSession] = {}
         self._lock = asyncio.Lock()
 
     async def get_or_create(self, symbol: str, interval: str) -> LiveChartSession:
         """
-        Return an existing session or create a new one (opens WS to Bybit).
+        Получить существующую или создать новую сессию.
 
-        Note: kline data is PUBLIC — no api_key / api_secret required.
+        Если сессия для (symbol, interval) уже существует — возвращает её
+        (fan-out к существующему WS). Иначе создаёт новый WS и регистрирует callback.
         """
         key = f"{symbol}:{interval}"
+
+        # Fast path — session already exists (no I/O, just dict lookup)
+        async with self._lock:
+            if key in self._sessions:
+                return self._sessions[key]
+
+        # Slow path — create WS connection OUTSIDE the lock to avoid blocking
+        # other coroutines during network I/O (asyncio.Lock is not re-entrant).
+        ws_client = BybitWebSocketClient()
+        connected = await ws_client.connect()
+        if not connected:
+            raise RuntimeError(f"[LiveChart] Failed to connect WebSocket for {key}")
+
+        await ws_client.subscribe_klines(symbol, interval)
+
+        session = LiveChartSession(
+            session_id=str(uuid4()),
+            symbol=symbol,
+            interval=interval,
+            ws_client=ws_client,
+        )
+        topic = f"kline.{interval}.{symbol}"
+        ws_client.register_callback(topic, session._on_ws_message)
+
+        # Re-acquire lock to insert — check again for race (two concurrent callers)
         async with self._lock:
             if key not in self._sessions:
-                ws_client = BybitWebSocketClient()
-                await ws_client.connect()
-                await ws_client.subscribe_klines(symbol, interval)
-
-                session = LiveChartSession(
-                    session_id=str(uuid4()),
-                    symbol=symbol,
-                    interval=interval,
-                    ws_client=ws_client,
-                )
-
-                # Register per-topic callback — D1.1: use existing register_callback API
-                topic = f"kline.{interval}.{symbol}"
-                ws_client.register_callback(topic, session._on_ws_message)
-
                 self._sessions[key] = session
-                logger.info("[LiveChart] New WS session created for %s", key)
+                logger.info("[LiveChart] New session created: %s (id=%s)", key, session.session_id)
+            else:
+                # Another coroutine won the race — discard ours, use existing
+                ws_client.unregister_callback(topic, session._on_ws_message)
+                with contextlib.suppress(Exception):
+                    await ws_client.disconnect()
+                logger.debug("[LiveChart] Race resolved for %s — using existing session", key)
 
             return self._sessions[key]
 
     async def cleanup(self, symbol: str, interval: str) -> None:
         """
-        Close the WS connection for a (symbol, interval) pair if no subscribers remain.
+        Закрыть WS-соединение и удалить сессию, если подписчиков не осталось.
 
-        Call this in the SSE generator's finally block after removing the subscriber.
+        Вызывать после remove_subscriber() в finally-блоке SSE-генератора.
         """
         key = f"{symbol}:{interval}"
         async with self._lock:
             session = self._sessions.get(key)
             if session and not session.has_subscribers:
                 topic = f"kline.{interval}.{symbol}"
+                session.ws_client.unregister_callback(topic, session._on_ws_message)
                 try:
-                    session.ws_client.unregister_callback(topic, session._on_ws_message)
                     await session.ws_client.disconnect()
                 except Exception as exc:
-                    logger.warning("[LiveChart] Error closing WS for %s: %s", key, exc)
+                    logger.warning("[LiveChart] Error disconnecting WS for %s: %s", key, exc)
                 del self._sessions[key]
-                logger.info("[LiveChart] WS session closed (no subscribers): %s", key)
+                logger.info("[LiveChart] Session closed (no subscribers): %s", key)
 
     async def shutdown_all(self) -> None:
         """
-        Close all active sessions — called from application lifespan shutdown.
+        Закрыть все активные WS-соединения.
+
+        Вызывается из lifespan on_shutdown.
         """
         async with self._lock:
             keys = list(self._sessions.keys())
+
         for key in keys:
-            symbol, interval = key.split(":", 1)
-            await self.cleanup(symbol, interval)
-        logger.info("[LiveChart] All sessions shut down")
+            async with self._lock:
+                session = self._sessions.get(key)
+                if session:
+                    try:
+                        await session.ws_client.disconnect()
+                    except Exception as exc:
+                        logger.warning("[LiveChart] Error during shutdown for %s: %s", key, exc)
+                    self._sessions.pop(key, None)
+
+        logger.info("[LiveChart] All sessions closed (%d total)", len(keys))
 
     @property
     def active_session_count(self) -> int:
-        """Number of currently active WS sessions."""
         return len(self._sessions)
 
+    def get_active_sessions(self) -> list[dict]:
+        """Вернуть список активных сессий (для мониторинга)."""
+        return [
+            {
+                "key": f"{s.symbol}:{s.interval}",
+                "session_id": s.session_id,
+                "symbol": s.symbol,
+                "interval": s.interval,
+                "subscriber_count": len(s.subscribers),
+            }
+            for s in self._sessions.values()
+        ]
 
-# Module-level singleton — import this in the SSE router and lifespan
+
+# ---------------------------------------------------------------------------
+# Синглтон — импортировать в роутер и lifespan
+# ---------------------------------------------------------------------------
 LIVE_CHART_MANAGER = LiveChartSessionManager()

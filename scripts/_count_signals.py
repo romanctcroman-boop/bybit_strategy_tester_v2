@@ -64,7 +64,7 @@ async def main():
 
     print(f"Total LE signals: {le.sum()}")
     print(f"Total SE signals: {se.sum()}")
-    print(f"TV reference: 29 long entries, 121 short entries")
+    print("TV reference: 29 long entries, 121 short entries")
     print(f"Difference: LE={le.sum() - 29:+d}, SE={se.sum() - 121:+d}")
 
 

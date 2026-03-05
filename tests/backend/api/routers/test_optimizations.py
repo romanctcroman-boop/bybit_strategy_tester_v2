@@ -155,9 +155,7 @@ class TestCreateOptimization:
         "timeframe": "1h",
         "start_date": "2024-01-01",
         "end_date": "2025-01-01",
-        "param_ranges": {
-            "rsi_period": {"type": "int", "low": 5, "high": 30, "step": 5}
-        },
+        "param_ranges": {"rsi_period": {"type": "int", "low": 5, "high": 30, "step": 5}},
         "metric": "sharpe_ratio",
         "initial_capital": 10000.0,
         "n_trials": 50,
@@ -202,7 +200,7 @@ class TestCreateOptimization:
 
         db_override.refresh = fake_refresh
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=self._valid_payload)
 
         assert r.status_code == 200, r.text
@@ -252,18 +250,33 @@ class TestCreateOptimization:
         db_override.query.side_effect = query_side
 
         def fake_refresh(obj):
-            for attr in ("id", "strategy_id", "optimization_type", "symbol", "timeframe",
-                         "start_date", "end_date", "metric", "status", "progress",
-                         "best_params", "best_score", "total_combinations",
-                         "evaluated_combinations", "created_at", "started_at",
-                         "completed_at", "error_message"):
+            for attr in (
+                "id",
+                "strategy_id",
+                "optimization_type",
+                "symbol",
+                "timeframe",
+                "start_date",
+                "end_date",
+                "metric",
+                "status",
+                "progress",
+                "best_params",
+                "best_score",
+                "total_combinations",
+                "evaluated_combinations",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error_message",
+            ):
                 setattr(obj, attr, getattr(mock_opt, attr))
 
         db_override.refresh = fake_refresh
 
         payload = dict(self._valid_payload, optimization_type="bayesian", n_trials=50)
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=payload)
 
         assert r.status_code == 200, r.text
@@ -285,18 +298,33 @@ class TestCreateOptimization:
         db_override.query.side_effect = query_side
 
         def fake_refresh(obj):
-            for attr in ("id", "strategy_id", "optimization_type", "symbol", "timeframe",
-                         "start_date", "end_date", "metric", "status", "progress",
-                         "best_params", "best_score", "total_combinations",
-                         "evaluated_combinations", "created_at", "started_at",
-                         "completed_at", "error_message"):
+            for attr in (
+                "id",
+                "strategy_id",
+                "optimization_type",
+                "symbol",
+                "timeframe",
+                "start_date",
+                "end_date",
+                "metric",
+                "status",
+                "progress",
+                "best_params",
+                "best_score",
+                "total_combinations",
+                "evaluated_combinations",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error_message",
+            ):
                 setattr(obj, attr, getattr(mock_opt, attr))
 
         db_override.refresh = fake_refresh
 
         payload = dict(self._valid_payload, optimization_type="walk_forward")
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=payload)
 
         assert r.status_code == 200, r.text
@@ -431,9 +459,17 @@ class TestGetOptimization:
         assert r.status_code == 200, r.text
         data = r.json()
         required_fields = {
-            "id", "strategy_id", "optimization_type", "symbol",
-            "timeframe", "metric", "status", "progress",
-            "total_combinations", "evaluated_combinations", "created_at",
+            "id",
+            "strategy_id",
+            "optimization_type",
+            "symbol",
+            "timeframe",
+            "metric",
+            "status",
+            "progress",
+            "total_combinations",
+            "evaluated_combinations",
+            "created_at",
         }
         for field in required_fields:
             assert field in data, f"Missing field: {field}"
@@ -658,7 +694,7 @@ class TestRerunOptimization:
             q.filter.return_value = q
             call_count["n"] += 1
             if call_count["n"] == 1:
-                q.first.return_value = original   # original optimization
+                q.first.return_value = original  # original optimization
             elif call_count["n"] == 2:
                 q.first.return_value = mock_strat  # strategy lookup
             else:
@@ -689,7 +725,10 @@ class TestRerunOptimization:
 
         db_override.refresh = fake_refresh
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with (
+            patch("backend.api.routers.optimizations.crud.launch_optimization_task"),
+            patch("backend.api.routers.optimizations.results.launch_optimization_task"),
+        ):
             r = client.post(f"{BASE}/1/rerun")
 
         assert r.status_code == 200, r.text
@@ -1095,7 +1134,7 @@ class TestGetOptimizationStats:
         """Non-zero counts are reflected in the response."""
         call_count = {"n": 0}
 
-        def query_side(model_or_col):
+        def query_side(*args):
             q = MagicMock()
             q.filter.return_value = q
             q.group_by.return_value = q
@@ -1143,11 +1182,26 @@ class TestParamValueGeneration:
         db_override.query.side_effect = query_side
 
         def fake_refresh(obj):
-            for attr in ("id", "strategy_id", "optimization_type", "symbol", "timeframe",
-                         "start_date", "end_date", "metric", "status", "progress",
-                         "best_params", "best_score", "total_combinations",
-                         "evaluated_combinations", "created_at", "started_at",
-                         "completed_at", "error_message"):
+            for attr in (
+                "id",
+                "strategy_id",
+                "optimization_type",
+                "symbol",
+                "timeframe",
+                "start_date",
+                "end_date",
+                "metric",
+                "status",
+                "progress",
+                "best_params",
+                "best_score",
+                "total_combinations",
+                "evaluated_combinations",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error_message",
+            ):
                 setattr(obj, attr, getattr(mock_opt, attr))
 
         db_override.refresh = fake_refresh
@@ -1159,14 +1213,12 @@ class TestParamValueGeneration:
             "timeframe": "1h",
             "start_date": "2024-01-01",
             "end_date": "2025-01-01",
-            "param_ranges": {
-                "rsi_period": {"type": "int", "low": 5, "high": 30, "step": 5}
-            },
+            "param_ranges": {"rsi_period": {"type": "int", "low": 5, "high": 30, "step": 5}},
             "metric": "sharpe_ratio",
             "initial_capital": 10000.0,
         }
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=payload)
 
         assert r.status_code == 200, r.text
@@ -1193,11 +1245,26 @@ class TestParamValueGeneration:
         db_override.query.side_effect = query_side
 
         def fake_refresh(obj):
-            for attr in ("id", "strategy_id", "optimization_type", "symbol", "timeframe",
-                         "start_date", "end_date", "metric", "status", "progress",
-                         "best_params", "best_score", "total_combinations",
-                         "evaluated_combinations", "created_at", "started_at",
-                         "completed_at", "error_message"):
+            for attr in (
+                "id",
+                "strategy_id",
+                "optimization_type",
+                "symbol",
+                "timeframe",
+                "start_date",
+                "end_date",
+                "metric",
+                "status",
+                "progress",
+                "best_params",
+                "best_score",
+                "total_combinations",
+                "evaluated_combinations",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error_message",
+            ):
                 setattr(obj, attr, getattr(mock_opt, attr))
 
         db_override.refresh = fake_refresh
@@ -1209,15 +1276,13 @@ class TestParamValueGeneration:
             "timeframe": "1h",
             "start_date": "2024-01-01",
             "end_date": "2025-01-01",
-            "param_ranges": {
-                "rsi_period": {"type": "int", "low": 5, "high": 30}
-            },
+            "param_ranges": {"rsi_period": {"type": "int", "low": 5, "high": 30}},
             "metric": "sharpe_ratio",
             "initial_capital": 10000.0,
             "n_trials": 100,
         }
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=payload)
 
         assert r.status_code == 200, r.text
@@ -1262,11 +1327,26 @@ class TestCommissionRateIntegrity:
         db_override.query.side_effect = query_side
 
         def fake_refresh(obj):
-            for attr in ("id", "strategy_id", "optimization_type", "symbol", "timeframe",
-                         "start_date", "end_date", "metric", "status", "progress",
-                         "best_params", "best_score", "total_combinations",
-                         "evaluated_combinations", "created_at", "started_at",
-                         "completed_at", "error_message"):
+            for attr in (
+                "id",
+                "strategy_id",
+                "optimization_type",
+                "symbol",
+                "timeframe",
+                "start_date",
+                "end_date",
+                "metric",
+                "status",
+                "progress",
+                "best_params",
+                "best_score",
+                "total_combinations",
+                "evaluated_combinations",
+                "created_at",
+                "started_at",
+                "completed_at",
+                "error_message",
+            ):
                 setattr(obj, attr, getattr(mock_opt, attr))
 
         db_override.refresh = fake_refresh
@@ -1278,14 +1358,12 @@ class TestCommissionRateIntegrity:
             "timeframe": "1h",
             "start_date": "2024-01-01",
             "end_date": "2025-01-01",
-            "param_ranges": {
-                "rsi_period": {"type": "int", "low": 10, "high": 20, "step": 5}
-            },
+            "param_ranges": {"rsi_period": {"type": "int", "low": 10, "high": 20, "step": 5}},
             "metric": "sharpe_ratio",
             # initial_capital omitted — should default to 10000.0
         }
 
-        with patch("backend.api.routers.optimizations.launch_optimization_task"):
+        with patch("backend.api.routers.optimizations.crud.launch_optimization_task"):
             r = client.post(f"{BASE}/", json=payload)
 
         assert r.status_code == 200, r.text

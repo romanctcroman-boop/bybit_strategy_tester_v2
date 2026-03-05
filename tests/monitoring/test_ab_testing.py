@@ -13,10 +13,10 @@ sys.path.insert(0, "d:/bybit_strategy_tester_v2")
 import pytest
 
 from backend.monitoring.ab_testing import (
-    ABTesting,
     ABTest,
-    ABTestVariant,
+    ABTesting,
     ABTestResults,
+    ABTestVariant,
     get_ab_testing,
 )
 
@@ -39,10 +39,10 @@ class TestABTesting:
             variants=["v1", "v2"],
             traffic_split=[0.5, 0.5],
         )
-        
+
         assert test_id
         assert test_id.startswith("ab_")
-        
+
         # Verify test created
         test = ab_testing.get_test(test_id)
         assert test is not None
@@ -56,12 +56,12 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2", "v3"],
         )
-        
+
         test = ab_testing.get_test(test_id)
-        
+
         # Should have equal split
         for variant in test.variants:
-            assert abs(variant.traffic_split - 1/3) < 0.01
+            assert abs(variant.traffic_split - 1 / 3) < 0.01
 
     def test_create_test_invalid_split(self, ab_testing):
         """Test creating test with invalid traffic split."""
@@ -81,10 +81,10 @@ class TestABTesting:
             variants=["v1", "v2"],
             traffic_split=[0.5, 0.5],
         )
-        
+
         # Get variant without user_id (random assignment)
         variant = ab_testing.get_variant(test_id)
-        
+
         # Variant should be assigned (v1 or v2)
         assert variant in ["v1", "v2"]
 
@@ -95,11 +95,11 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Record conversion
         success = ab_testing.record_conversion(test_id, "v1", converted=True)
         assert success is True
-        
+
         # Verify recorded
         test = ab_testing.get_test(test_id)
         for variant in test.variants:
@@ -113,10 +113,10 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Record conversion with reward
         ab_testing.record_conversion(test_id, "v1", converted=True, reward=5.0)
-        
+
         # Verify reward recorded
         test = ab_testing.get_test(test_id)
         for variant in test.variants:
@@ -131,19 +131,19 @@ class TestABTesting:
             variants=["v1", "v2"],
             min_sample_size=10,
         )
-        
+
         # Record some data directly through variants
         test = ab_testing.get_test(test_id)
         for variant in test.variants:
             variant.impressions = 20
             variant.conversions = 10
-        
+
         # Save
         ab_testing._save()
-        
+
         # Get results
         results = ab_testing.get_results(test_id)
-        
+
         assert results is not None
         assert results.test_id == test_id
         assert results.total_impressions == 40
@@ -156,11 +156,11 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Stop test
         success = ab_testing.stop_test(test_id)
         assert success is True
-        
+
         # Verify stopped
         test = ab_testing.get_test(test_id)
         assert test.status == "completed"
@@ -174,15 +174,15 @@ class TestABTesting:
             variants=["v1", "v2"],
             min_sample_size=5,
         )
-        
+
         # Record clear winner
         for i in range(20):
             ab_testing.record_conversion(test_id, "v1", converted=True)
             ab_testing.record_conversion(test_id, "v2", converted=False)
-        
+
         # Stop with winner selection
         ab_testing.stop_test(test_id, select_winner=True)
-        
+
         test = ab_testing.get_test(test_id)
         assert test.winner_variant == "v1"
 
@@ -193,11 +193,11 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Pause test
         success = ab_testing.pause_test(test_id)
         assert success is True
-        
+
         # Verify paused
         test = ab_testing.get_test(test_id)
         assert test.status == "paused"
@@ -209,12 +209,12 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Pause then resume
         ab_testing.pause_test(test_id)
         success = ab_testing.resume_test(test_id)
         assert success is True
-        
+
         # Verify running
         test = ab_testing.get_test(test_id)
         assert test.status == "running"
@@ -224,18 +224,18 @@ class TestABTesting:
         ab_testing.create_test("Test 1", "prompt1", ["v1", "v2"])
         ab_testing.create_test("Test 2", "prompt2", ["v1", "v2"])
         ab_testing.create_test("Test 3", "prompt3", ["v1", "v2"])
-        
+
         # List all
         tests = ab_testing.list_tests()
         assert len(tests) == 3
-        
+
         # Pause one
         ab_testing.pause_test(tests[0].test_id)
-        
+
         # List running only
         running = ab_testing.list_tests(status="running")
         assert len(running) == 2
-        
+
         # List paused only
         paused = ab_testing.list_tests(status="paused")
         assert len(paused) == 1
@@ -247,11 +247,11 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Delete
         success = ab_testing.delete_test(test_id)
         assert success is True
-        
+
         # Verify deleted
         test = ab_testing.get_test(test_id)
         assert test is None
@@ -260,9 +260,9 @@ class TestABTesting:
         """Test getting statistics."""
         ab_testing.create_test("Test 1", "prompt1", ["v1", "v2"])
         ab_testing.create_test("Test 2", "prompt2", ["v1", "v2"])
-        
+
         stats = ab_testing.get_stats()
-        
+
         assert stats["total_tests"] == 2
         assert "running" in stats
         assert "paused" in stats
@@ -275,18 +275,18 @@ class TestABTesting:
             prompt_name="prompt",
             variants=["v1", "v2"],
         )
-        
+
         # Record some data
         ab_testing.record_conversion(test_id, "v1", converted=True)
-        
+
         # Create new instance (should load from disk)
         ab_testing2 = ABTesting(ab_testing.storage_path)
-        
+
         # Should have same data
         test = ab_testing2.get_test(test_id)
         assert test is not None
         assert test.name == "Persistent Test"
-        
+
         for variant in test.variants:
             if variant.prompt_version == "v1":
                 assert variant.conversions == 1
@@ -312,7 +312,7 @@ class TestABTesting:
             conversions=25,
             total_reward=25.0,
         )
-        
+
         assert variant.conversion_rate == 0.25
         assert variant.avg_reward == 0.25
 
@@ -331,9 +331,9 @@ class TestABTesting:
                 )
             ],
         )
-        
+
         data = test.to_dict()
-        
+
         assert data["test_id"] == "ab_test123"
         assert data["name"] == "Test"
         assert len(data["variants"]) == 1
@@ -357,9 +357,9 @@ class TestABTesting:
             ],
             "status": "running",
         }
-        
+
         test = ABTest.from_dict(data)
-        
+
         assert test.test_id == "ab_test123"
         assert len(test.variants) == 1
         assert test.variants[0].impressions == 100
@@ -380,9 +380,9 @@ class TestABTestResults:
             variant_results=[],
             recommendation="Deploy winner",
         )
-        
+
         data = results.to_dict()
-        
+
         assert data["test_id"] == "ab_test123"
         assert data["winner"] == "v1"
         assert data["statistical_significance"] is True
@@ -395,10 +395,10 @@ class TestGlobalABTesting:
         """Test singleton pattern."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage_path = Path(tmpdir) / "ab_tests.json"
-            
+
             ab1 = get_ab_testing(str(storage_path))
             ab2 = get_ab_testing(str(storage_path))
-            
+
             # Should be same instance
             assert ab1 is ab2
 

@@ -22,9 +22,7 @@ def _ohlcv(n: int, seed: int = 42) -> pd.DataFrame:
     open_[0] = base
     vol = np.random.randint(1000, 10000, n).astype(float)
     ts = pd.date_range(start="2025-01-01", periods=n, freq="1h")
-    return pd.DataFrame(
-        {"timestamp": ts, "open": open_, "high": high, "low": low, "close": close, "volume": vol}
-    )
+    return pd.DataFrame({"timestamp": ts, "open": open_, "high": high, "low": low, "close": close, "volume": vol})
 
 
 def test_rsi_filter_signal_memory_extends_buy():

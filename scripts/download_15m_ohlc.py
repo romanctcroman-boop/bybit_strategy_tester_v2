@@ -69,7 +69,10 @@ def download_full_period():
     batch = 0
     while current_end > start_ms:
         batch += 1
-        print(f"   Batch {batch}: fetching up to {datetime.fromtimestamp(current_end/1000, tz=UTC).strftime('%Y-%m-%d %H:%M')}...", end=" ")
+        print(
+            f"   Batch {batch}: fetching up to {datetime.fromtimestamp(current_end / 1000, tz=UTC).strftime('%Y-%m-%d %H:%M')}...",
+            end=" ",
+        )
 
         try:
             klines = fetch_klines(start_ms, current_end)
@@ -98,21 +101,21 @@ def download_full_period():
 
     # Convert to DataFrame
     # Bybit format: [timestamp, open, high, low, close, volume, turnover]
-    df = pd.DataFrame(all_candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
+    df = pd.DataFrame(all_candles, columns=["timestamp", "open", "high", "low", "close", "volume", "turnover"])
 
     # Convert types
-    df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms', utc=True)
-    for col in ['open', 'high', 'low', 'close', 'volume', 'turnover']:
+    df["timestamp"] = pd.to_datetime(df["timestamp"].astype(int), unit="ms", utc=True)
+    for col in ["open", "high", "low", "close", "volume", "turnover"]:
         df[col] = pd.to_numeric(df[col])
 
     # Sort by time (oldest first)
-    df = df.sort_values('timestamp').reset_index(drop=True)
+    df = df.sort_values("timestamp").reset_index(drop=True)
 
     # Remove duplicates
-    df = df.drop_duplicates(subset=['timestamp'], keep='first')
+    df = df.drop_duplicates(subset=["timestamp"], keep="first")
 
     # Filter to exact date range
-    df = df[(df['timestamp'] >= START_DATE) & (df['timestamp'] <= END_DATE)]
+    df = df[(df["timestamp"] >= START_DATE) & (df["timestamp"] <= END_DATE)]
 
     print(f"\n📊 Downloaded {len(df)} candles")
     print(f"   First: {df.iloc[0]['timestamp']}")

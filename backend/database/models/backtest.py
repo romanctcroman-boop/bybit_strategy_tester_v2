@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
@@ -147,6 +147,14 @@ class Backtest(Base):
     # Notes
     notes = Column(Text, nullable=True)
 
+    # --- Extend Backtest to Now (P2) ---
+    # True when this backtest was created by extending an earlier one
+    is_extended = Column(Boolean, nullable=False, default=False)
+    # Soft FK to the original backtest (no DB constraint — SQLite compat)
+    source_backtest_id = Column(String(36), nullable=True)
+    # Market type context for this backtest (spot / linear)
+    market_type = Column(String(16), nullable=True, default="linear")
+
     # Relationships
     strategy = relationship("Strategy", back_populates="backtests", foreign_keys=[strategy_id])
     trade_records = relationship("Trade", back_populates="backtest", cascade="all, delete-orphan")
@@ -216,6 +224,10 @@ class Backtest(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "notes": self.notes,
+            # Extend Backtest to Now fields
+            "is_extended": bool(self.is_extended) if self.is_extended is not None else False,
+            "source_backtest_id": self.source_backtest_id,
+            "market_type": self.market_type or "linear",
         }
         # Merge full metrics if available
         if self.metrics_json:

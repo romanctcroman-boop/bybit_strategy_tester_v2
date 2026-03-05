@@ -45,9 +45,7 @@ for i in range(entry_bar_46, len(data)):
     high = data[i, 1]
     if high >= tp_price_46:
         print(f"\nTrade 46 TP hits at bar {i}:")
-        print(
-            f"  O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}"
-        )
+        print(f"  O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}")
         print(f"  Timestamp: {df.iloc[i]['timestamp']}")
         print(f"  High {high:.2f} >= TP {tp_price_46:.2f}")
 
@@ -58,9 +56,7 @@ for i in range(entry_bar_46, len(data)):
 
         if long_entries[i]:
             next_open = data[i + 1, 0] if i + 1 < len(data) else 0
-            print(
-                f"    → LONG signal! Entry would be at next bar open = {next_open:.2f}"
-            )
+            print(f"    → LONG signal! Entry would be at next bar open = {next_open:.2f}")
             print("    → This is Trade 47 in Numba (entry=90810.90)")
 
         # Check signals around this bar

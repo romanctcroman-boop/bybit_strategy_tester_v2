@@ -82,9 +82,7 @@ class TestSLOErrorBudgetService:
 
     def test_register_slo(self, service):
         """Test registering a new SLO."""
-        slo = SLODefinition(
-            name="custom_test_slo", slo_type=SLOType.LATENCY_P99, target=100.0
-        )
+        slo = SLODefinition(name="custom_test_slo", slo_type=SLOType.LATENCY_P99, target=100.0)
 
         service.register_slo(slo)
 
@@ -122,9 +120,7 @@ class TestSLOErrorBudgetService:
 
     def test_record_failure(self, service):
         """Test recording failure event."""
-        service.record_failure(
-            slo_name="api_availability", endpoint="/test", error="Connection timeout"
-        )
+        service.record_failure(slo_name="api_availability", endpoint="/test", error="Connection timeout")
 
         state = service.get_error_budget_state("api_availability")
         assert state.total_events >= 1

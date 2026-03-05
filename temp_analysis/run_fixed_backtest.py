@@ -1,18 +1,20 @@
 """
 Бэктест Strategy_RSI_L\\S_15 после исправления и сравнение с TV
 """
-import sqlite3
-import json
-import pandas as pd
-import numpy as np
-from datetime import datetime
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-from backend.services.data_service import DataService
-from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+import json
+import sqlite3
+import sys
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.interfaces import BacktestInput
+from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+from backend.services.data_service import DataService
 
 # Параметры TV (из a5.csv)
 SYMBOL = "ETHUSDT"
@@ -47,7 +49,7 @@ DB_PATH = "d:/bybit_strategy_tester_v2/data.sqlite3"
 conn = sqlite3.connect(DB_PATH)
 row = conn.execute(
     "SELECT id, name, builder_blocks, builder_connections FROM strategies WHERE id=?",
-    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",)
+    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",),
 ).fetchone()
 conn.close()
 
@@ -63,7 +65,7 @@ print(f"\nСтратегия: {name}")
 print(f"ID: {strategy_id}")
 
 # Загружаем данные
-print(f"\nЗагрузка данных...")
+print("\nЗагрузка данных...")
 with DataService() as ds:
     eth_data = ds.get_market_data(
         symbol=SYMBOL,
@@ -84,30 +86,40 @@ print(f"  ETHUSDT баров: {len(eth_data)}")
 print(f"  BTCUSDT баров: {len(btc_data)}")
 
 # Конвертируем в DataFrame
-ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in eth_data])
+ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in eth_data
+    ]
+)
 ohlcv.index = pd.to_datetime([d.open_time_dt for d in eth_data])
-ohlcv.index.name = 'time'
+ohlcv.index.name = "time"
 
-btc_ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in btc_data])
+btc_ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in btc_data
+    ]
+)
 btc_ohlcv.index = pd.to_datetime([d.open_time_dt for d in btc_data])
-btc_ohlcv.index.name = 'time'
+btc_ohlcv.index.name = "time"
 
 print(f"  Диапазон: {ohlcv.index.min()} - {ohlcv.index.max()}")
 
 # Генерируем сигналы
-print(f"\nГенерация сигналов...")
+print("\nГенерация сигналов...")
 strategy_graph = {
     "blocks": blocks,
     "connections": connections,
@@ -127,7 +139,7 @@ print(f"  LONG сигналов (entries): {signals.entries.sum()}")
 print(f"  SHORT сигналов (short_entries): {signals.short_entries.sum() if signals.short_entries is not None else 0}")
 
 # Запускаем бэктест
-print(f"\nЗапуск бэктеста...")
+print("\nЗапуск бэктеста...")
 
 # Конвертируем сигналы в numpy массивы
 long_entries = signals.entries.values if signals.entries is not None else np.zeros(len(ohlcv), dtype=bool)
@@ -157,7 +169,7 @@ input_data = BacktestInput(
 engine = FallbackEngineV4()
 result = engine.run(input_data)
 
-print(f"\n✅ Бэктест завершен!")
+print("\n✅ Бэктест завершен!")
 print(f"  Всего сделок: {len(result.trades)}")
 
 # Считаем метрики
@@ -166,7 +178,7 @@ if result.trades:
     losing = [t for t in result.trades if t.pnl < 0]
     long_trades = [t for t in result.trades if t.direction == "long"]
     short_trades = [t for t in result.trades if t.direction == "short"]
-    
+
     net_profit = sum(t.pnl for t in result.trades)
     total_commission = sum(t.fees for t in result.trades)
     win_rate = len(winning) / len(result.trades) * 100 if result.trades else 0
@@ -175,7 +187,7 @@ if result.trades:
     gross_profit = sum(t.pnl for t in winning)
     gross_loss = abs(sum(t.pnl for t in losing))
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
-    
+
     # Считаем макс. просадку
     equity_curve = [10000]
     for t in result.trades:
@@ -188,10 +200,10 @@ if result.trades:
         dd = peak - eq
         if dd > max_dd:
             max_dd = dd
-    
+
     max_dd_pct = (max_dd / 10000) * 100
 
-    print(f"\n📊 НАШИ РЕЗУЛЬТАТЫ:")
+    print("\n📊 НАШИ РЕЗУЛЬТАТЫ:")
     print(f"  Чистая прибыль: {net_profit:.2f} USDT")
     print(f"  Чистая прибыль %: {net_profit / 10000 * 100:.2f}%")
     print(f"  Всего сделок: {len(result.trades)}")
@@ -205,7 +217,7 @@ if result.trades:
     print(f"  Макс. просадка: {max_dd:.2f} USDT ({max_dd_pct:.2f}%)")
 
 # Сравниваем с TV
-print(f"\n" + "=" * 100)
+print("\n" + "=" * 100)
 print("СРАВНЕНИЕ С TRADINGVIEW")
 print("=" * 100)
 print(f"\n{'Метрика':<30} {'TV Эталон':<15} {'Наш результат':<15} {'Разница':<15} {'Совпадает':<10}")
@@ -236,17 +248,17 @@ for metric_name, tv_val, our_val in metrics_to_compare:
     else:
         diff_pct = 0
         diff_abs = our_val
-    
+
     # Критерии совпадения
     if metric_name.startswith("Всего") or "сделок" in metric_name:
         match = abs(diff_abs) < 1  # Для кол-ва сделок - точно
     else:
         match = diff_pct < 1.0  # Для остальных - 1% погрешность
-    
+
     match_str = "✅" if match else "❌"
     if not match:
         all_match = False
-    
+
     print(f"{metric_name:<30} {tv_val:<15.2f} {our_val:<15.2f} {diff_abs:>+14.2f} {match_str:<10} ({diff_pct:.2f}%)")
 
 print("\n" + "=" * 100)
@@ -257,10 +269,16 @@ else:
 print("=" * 100)
 
 # Показываем первые несколько сделок для сравнения
-print(f"\n📊 ПЕРВЫЕ 10 СДЕЛОК:")
+print("\n📊 ПЕРВЫЕ 10 СДЕЛОК:")
 print(f"{'#':<4} {'Тип':<8} {'Время входа':<22} {'Время выхода':<22} {'PnL':<10} {'Exit Reason':<15}")
 print("-" * 100)
 for i, trade in enumerate(result.trades[:10]):
-    entry_time = trade.entry_time.strftime("%Y-%m-%d %H:%M") if hasattr(trade.entry_time, 'strftime') else str(trade.entry_time)
-    exit_time = trade.exit_time.strftime("%Y-%m-%d %H:%M") if hasattr(trade.exit_time, 'strftime') else str(trade.exit_time)
-    print(f"{i+1:<4} {trade.direction:<8} {entry_time:<22} {exit_time:<22} {trade.pnl:>+10.2f} {trade.exit_reason:<15}")
+    entry_time = (
+        trade.entry_time.strftime("%Y-%m-%d %H:%M") if hasattr(trade.entry_time, "strftime") else str(trade.entry_time)
+    )
+    exit_time = (
+        trade.exit_time.strftime("%Y-%m-%d %H:%M") if hasattr(trade.exit_time, "strftime") else str(trade.exit_time)
+    )
+    print(
+        f"{i + 1:<4} {trade.direction:<8} {entry_time:<22} {exit_time:<22} {trade.pnl:>+10.2f} {trade.exit_reason:<15}"
+    )

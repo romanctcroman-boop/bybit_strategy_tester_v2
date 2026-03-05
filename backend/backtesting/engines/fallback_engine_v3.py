@@ -150,7 +150,7 @@ class FallbackEngineV3(BaseBacktestEngine):
         dca_price_deviation = getattr(input_data, "dca_price_deviation", 0.01)
         dca_step_scale = getattr(input_data, "dca_step_scale", 1.4)
         dca_volume_scale = getattr(input_data, "dca_volume_scale", 1.0)
-        dca_base_order_size = getattr(input_data, "dca_base_order_size", 0.1)  # noqa: F841
+        dca_base_order_size = getattr(input_data, "dca_base_order_size", 0.1)
         dca_safety_order_size = getattr(input_data, "dca_safety_order_size", 0.1)
 
         # Рассчитать уровни DCA (SO1 at -1%, SO2 at -1% - 1.4% = -2.4%, etc.)
@@ -185,9 +185,7 @@ class FallbackEngineV3(BaseBacktestEngine):
         pending_short_exit_price = 0.0
 
         # Bar Magnifier индекс (reserved for intrabar simulation)
-        bar_magnifier_index = (  # noqa: F841
-            self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
-        )
+        bar_magnifier_index = self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
 
         # === ОСНОВНОЙ ЦИКЛ ===
         for i in range(1, n):

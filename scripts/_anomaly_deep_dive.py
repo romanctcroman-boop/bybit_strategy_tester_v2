@@ -63,14 +63,14 @@ for bar_str, direction, level in anomalies:
         cross = ">>> CROSS" if prev_rsi >= level and rsi_val < level else ""
         marker = "<<< TV" if ts == t else ""
         print(
-            f"{str(ts):<22} {float(btc['close'].iloc[i]):>10.2f} {rsi_val:>10.4f} {prev_rsi:>10.4f} {cross:>15} {marker}"
+            f"{ts!s:<22} {float(btc['close'].iloc[i]):>10.2f} {rsi_val:>10.4f} {prev_rsi:>10.4f} {cross:>15} {marker}"
         )
 
     print(f"\nRSI at bar T-1: {rsi_s.get(t - pd.Timedelta('30min'), float('nan')):.4f}")
     print(f"RSI at bar T  : {rsi_s.get(t, float('nan')):.4f}")
 
     # Check if there was a recent previous cross
-    print(f"\nLooking for previous crossunder within last 30 bars:")
+    print("\nLooking for previous crossunder within last 30 bars:")
     for i in range(max(0, pos - 30), pos + 1):
         ts = idx[i]
         rsi_val = rsi_s.iloc[i]

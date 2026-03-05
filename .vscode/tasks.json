@@ -285,6 +285,86 @@
 				"d:\\bybit_strategy_tester_v2\\scripts\\test_output.txt",
 				"2>&1"
 			]
+		},
+		{
+			"label": "Compare Entry Times",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
+			]
+		},
+		{
+			"label": "Compare Entry Times Out",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py",
+				">",
+				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_out.txt",
+				"2>&1"
+			]
+		},
+		{
+			"label": "Run Compare Entry",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\cmp_out.txt 2>&1"
+		},
+		{
+			"label": "Run Compare Entry 2",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
+		},
+		{
+			"label": "Run Compare Entry 3",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
+		},
+		{
+			"label": "Full Trade Compare",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\full_trade_compare.py"
+		},
+		{
+			"label": "Health Check",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests; r=requests.get('http://localhost:8000/api/v1/health', timeout=5); print(r.status_code)\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\health.txt 2>&1"
+		},
+		{
+			"label": "Full Compare After Wait",
+			"type": "shell",
+			"command": "ping -n 40 127.0.0.1 > nul && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\full_trade_compare.py",
+			"isBackground": false
+		},
+		{
+			"label": "Check Server And Run Bar Compare",
+			"type": "shell",
+			"command": "netstat -ano | findstr \":8000.*LISTEN\" && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bar_index_compare.py",
+			"isBackground": false
+		},
+		{
+			"label": "Bar Index Compare After Wait",
+			"type": "shell",
+			"command": "ping -n 25 127.0.0.1 > nul && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bar_index_compare.py",
+			"isBackground": false
+		},
+		{
+			"label": "Server Health Check",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests; r=requests.get('http://localhost:8000/api/v1/health', timeout=5); print(r.status_code, r.text[:200])\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\server_check.txt 2>&1",
+			"isBackground": false
+		},
+		{
+			"label": "Srvchk2",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests, sys; f=open('d:/bybit_strategy_tester_v2/temp_analysis/sc.txt','w'); r=requests.get('http://localhost:8000/api/v1/health',timeout=5); f.write(str(r.status_code)+' '+r.text[:300]); f.close()\"",
+			"isBackground": false
+		},
+		{
+			"label": "Run Bar Compare PS1",
+			"type": "shell",
+			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File d:\\bybit_strategy_tester_v2\\temp_analysis\\run_bar_compare.ps1",
+			"isBackground": false
 		}
 	]
 }

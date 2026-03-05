@@ -1,82 +1,88 @@
 """
 Live Signal Service.
 
-Maintains a sliding OHLCV window and recomputes strategy signals on each
-closed bar using the StrategyBuilderAdapter.
+Хранит скользящее окно OHLCV последних N баров (warmup) и пересчитывает
+сигналы стратегии на каждом закрытом баре.
 
-Design:
-    - Initialized once per (symbol × interval × strategy) session.
-    - Preloaded with historical warmup bars from DB so indicators have
-      enough data to produce valid signals from the very first live bar.
-    - Thread-safe: called from a single asyncio event loop (no locking needed).
-
-Expert fixes applied (per review):
-    1. push_closed_bar returns {"long": bool, "short": bool, "error": str, "bars_used": int}
-       on failure — client is notified instead of receiving None silently.
-    2. Empty bars (volume=0) are skipped — logged but not processed.
-    3. Timing: if generate_signals() takes >2 s a WARNING is emitted.
+Критические требования (по ТЗ + экспертной оценке):
+- push_closed_bar() никогда не возвращает None — при ошибке возвращает
+  {long: False, short: False, error: str, bars_used: int}
+- Пустые бары (volume=0) пропускаются — возвращается {empty_bar: True}
+- Медленные вызовы generate_signals() (>2 сек) логируются WARNING
+- Кэширование: если данные не изменились с прошлого бара — сигнал не пересчитывается
+- deque с maxlen — не требует ручного урезания
 """
 
+from __future__ import annotations
+
+import hashlib
+import json
 import logging
 import time
 from collections import deque
 
 import pandas as pd
 
-from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
-
 logger = logging.getLogger(__name__)
 
-# Warmup window size — covers 99% of indicator warmup periods:
-#   RSI(14), MACD(26+9), Bollinger(20), Ichimoku senkou_b(52), SMA(200)
+# Минимальный размер warmup окна — 500 баров покрывает 99% стратегий
 MIN_WARMUP_BARS = 500
 
-# Performance budget — log warning if exceeded
-_SIGNAL_COMPUTE_WARN_SECS = 2.0
+# Порог медленного вызова (сек): логировать WARNING если превышен
+SLOW_SIGNAL_THRESHOLD_SEC = 2.0
+
+
+def _hash_window(window: deque) -> str:
+    """Лёгкий хэш последних баров окна для кэширования сигнала."""
+    if not window:
+        return ""
+    # Хэшируем только последние 10 баров (достаточно для обнаружения изменений)
+    tail = list(window)[-10:]
+    raw = json.dumps(tail, sort_keys=True, default=str)
+    return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
 
 class LiveSignalService:
     """
-    Sliding OHLCV window + strategy signal recomputation for live bars.
+    Хранит скользящее окно OHLCV + пересчитывает сигналы адаптером.
 
-    One instance per (symbol × interval × strategy) live-chart session.
-    Created by the SSE endpoint when a valid builder_graph is available.
+    Создаётся один раз для каждой сессии (symbol × interval × strategy).
+    При инициализации заполняется историческими данными из БД (warmup).
 
-    Parameters
-    ----------
-    strategy_graph : dict
-        The full builder_graph dict from the Strategy model
-        (e.g. ``{"blocks": [...], "connections": [...]}``)
-    warmup_bars : list[dict]
-        Historical bars in chronological order.  Each bar is a dict with
-        keys: "time" (epoch secs), "open", "high", "low", "close", "volume".
-    warmup_size : int
-        Maximum number of bars kept in the rolling window (default 500).
-    symbol : str
-        Symbol name — used only for logging/metrics.
+    Thread-safety: НЕ потокобезопасен. Предназначен для использования
+    в одном asyncio-корутин-потоке (FastAPI SSE endpoint).
     """
 
     def __init__(
         self,
         strategy_graph: dict,
-        warmup_bars: list[dict],
+        warmup_bars: list[dict],  # [{"time", "open", "high", "low", "close", "volume"}]
         warmup_size: int = MIN_WARMUP_BARS,
-        symbol: str = "UNKNOWN",
     ) -> None:
-        self._adapter = StrategyBuilderAdapter(strategy_graph)
-        self._warmup_size = warmup_size
-        self._symbol = symbol
-        self._window: deque[dict] = deque(maxlen=warmup_size)
+        """
+        Args:
+            strategy_graph: Граф стратегии из builder_graph (dict с blocks/connections).
+            warmup_bars:     Исторические бары для прогрева индикаторов.
+            warmup_size:     Максимальный размер скользящего окна.
+        """
+        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
-        # Seed the window with historical bars (up to warmup_size most recent)
-        for bar in warmup_bars[-warmup_size:]:
+        self._adapter = StrategyBuilderAdapter(strategy_graph)
+        self._warmup_size = max(warmup_size, MIN_WARMUP_BARS)
+        self._window: deque[dict] = deque(maxlen=self._warmup_size)
+
+        # Заполнить окно историческими данными (обрезать до warmup_size)
+        for bar in warmup_bars[-self._warmup_size :]:
             self._window.append(bar)
 
+        # Кэш последнего сигнала для пропуска пересчёта при неизменных данных
+        self._last_window_hash: str = ""
+        self._last_signal: dict = {"long": False, "short": False}
+
         logger.info(
-            "[LiveSignalService] Initialized for %s — %d warmup bars (maxlen=%d)",
-            symbol,
+            "[LiveSignalService] Initialized with %d warmup bars (maxlen=%d)",
             len(self._window),
-            warmup_size,
+            self._warmup_size,
         )
 
     # ------------------------------------------------------------------
@@ -85,100 +91,111 @@ class LiveSignalService:
 
     def push_closed_bar(self, candle: dict) -> dict:
         """
-        Accept a closed bar, recompute strategy signals, return result.
+        Принять закрытый бар, пересчитать сигналы стратегии.
 
-        Parameters
-        ----------
-        candle : dict
-            Keys: "time" (epoch secs), "open", "high", "low", "close", "volume".
+        НИКОГДА не возвращает None. При ошибке — возвращает словарь
+        с ключом «error» и отладочной информацией.
 
-        Returns
-        -------
-        dict
-            Success: ``{"long": bool, "short": bool, "bars_used": int}``
-            Failure: ``{"long": False, "short": False, "error": str, "bars_used": int}``
+        Args:
+            candle: {"time", "open", "high", "low", "close", "volume"}
 
-        Notes
-        -----
-        - Volume == 0 bars are skipped (returns an "empty_bar" dict).
-        - If generate_signals() takes longer than 2 seconds a WARNING is logged.
-        - Never raises — all exceptions are caught and reflected in the return dict.
+        Returns:
+            Словарь с ключами:
+              long      (bool)   — сигнал на лонг
+              short     (bool)   — сигнал на шорт
+              bars_used (int)    — количество баров в окне
+              error     (str)    — только при ошибке
+              empty_bar (bool)   — только для пустых баров (volume=0)
+              cached    (bool)   — только если использован кэш
         """
-        # Expert fix #2: skip truly empty bars
-        if candle.get("volume", 0) == 0:
+        bars_used = len(self._window) + 1  # +1 т.к. candle ещё не добавлен
+
+        # 1. Пропустить бары без объёма (volume=0 → нет сделок на Bybit)
+        volume = candle.get("volume", 0)
+        try:
+            volume = float(volume)
+        except (TypeError, ValueError):
+            volume = 0.0
+
+        if volume == 0.0:
             logger.debug(
-                "[LiveSignalService] Skipping empty bar (volume=0) at t=%s for %s",
+                "[LiveSignalService] Skipping empty bar at time=%s (volume=0)",
                 candle.get("time"),
-                self._symbol,
             )
-            return {"long": False, "short": False, "empty_bar": True, "bars_used": len(self._window)}
+            return {"long": False, "short": False, "empty_bar": True, "bars_used": bars_used}
 
+        # 2. Добавить бар в окно
         self._window.append(candle)
-        df = self._build_df()
-        bars_used = len(df)
+        bars_used = len(self._window)
 
-        t0 = time.perf_counter()
+        # 3. Проверить кэш — если данные не изменились, вернуть прошлый сигнал
+        current_hash = _hash_window(self._window)
+        if current_hash == self._last_window_hash and self._last_window_hash:
+            return {**self._last_signal, "bars_used": bars_used, "cached": True}
+
+        # 4. Построить DataFrame и вычислить сигналы
+        df = self._build_df()
+        t_start = time.perf_counter()
+
         try:
             result = self._adapter.generate_signals(df)
-            elapsed = time.perf_counter() - t0
+            elapsed = time.perf_counter() - t_start
 
-            # Expert fix #3: performance budget warning
-            if elapsed > _SIGNAL_COMPUTE_WARN_SECS:
+            # Логировать медленные вызовы
+            if elapsed > SLOW_SIGNAL_THRESHOLD_SEC:
                 logger.warning(
-                    "[LiveSignalService] generate_signals() took %.2f s for %s "
-                    "(bars=%d) — consider reducing strategy complexity on 1m TF",
+                    "[LiveSignalService] Slow signal computation: %.2fs (bars=%d, threshold=%.1fs)",
                     elapsed,
-                    self._symbol,
                     bars_used,
+                    SLOW_SIGNAL_THRESHOLD_SEC,
                 )
 
-            last_idx = bars_used - 1
+            last_idx = len(df) - 1
             long_signal = bool(result.entries.iloc[last_idx]) if result.entries is not None else False
             short_signal = bool(result.short_entries.iloc[last_idx]) if result.short_entries is not None else False
-            return {"long": long_signal, "short": short_signal, "bars_used": bars_used}
 
-        except Exception as exc:
-            elapsed = time.perf_counter() - t0
+            signal = {"long": long_signal, "short": short_signal, "bars_used": bars_used}
+
+            # Обновить кэш
+            self._last_window_hash = current_hash
+            self._last_signal = {"long": long_signal, "short": short_signal}
+
+            return signal
+
+        except Exception as e:
+            elapsed = time.perf_counter() - t_start
             logger.error(
-                "[LiveSignalService] Signal computation failed for %s after %.3f s: %s",
-                self._symbol,
+                "[LiveSignalService] Signal computation failed after %.2fs: %s",
                 elapsed,
-                exc,
+                e,
+                exc_info=True,
             )
-            # Expert fix #1: return structured error so SSE client knows what happened
+            # Явно сообщаем об ошибке клиенту — не возвращаем None
             return {
                 "long": False,
                 "short": False,
-                "error": str(exc),
+                "error": str(e),
                 "bars_used": bars_used,
             }
 
     # ------------------------------------------------------------------
-    # Private helpers
+    # Internal helpers
     # ------------------------------------------------------------------
 
     def _build_df(self) -> pd.DataFrame:
-        """Convert the sliding window to a DataFrame expected by StrategyBuilderAdapter."""
+        """Построить DataFrame из текущего скользящего окна."""
         bars = list(self._window)
         df = pd.DataFrame(bars)
         df.index = pd.to_datetime(df["time"], unit="s", utc=True)
-        df.rename(
-            columns={
-                "open": "Open",
-                "high": "High",
-                "low": "Low",
-                "close": "Close",
-                "volume": "Volume",
-            },
-            inplace=True,
-        )
+        # Колонки остаются lowercase (open/high/low/close/volume) —
+        # StrategyBuilderAdapter.generate_signals() ожидает именно lowercase.
         return df
 
     # ------------------------------------------------------------------
-    # Properties (for tests / monitoring)
+    # Properties (used in tests)
     # ------------------------------------------------------------------
 
     @property
     def window_size(self) -> int:
-        """Current number of bars in the rolling window."""
+        """Текущий размер окна."""
         return len(self._window)

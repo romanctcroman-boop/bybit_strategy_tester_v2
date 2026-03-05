@@ -27,9 +27,9 @@ class TestMetricsCollector:
     def test_record_http_request(self, collector):
         """Test recording HTTP request."""
         collector.record_http_request(200, 0.15, method="GET", endpoint="/api/test")
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "http_requests_total" in metrics
         assert "http_request_duration_seconds" in metrics
         assert "histogram" in metrics  # Verify histogram type is declared
@@ -43,9 +43,9 @@ class TestMetricsCollector:
             tokens_used=1000,
             cost_usd=0.01,
         )
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "ai_agent_requests_total" in metrics
         assert "ai_agent_request_duration_seconds" in metrics
         assert "ai_agent_tokens_total" in metrics
@@ -57,9 +57,9 @@ class TestMetricsCollector:
         collector.record_cache_hit()
         collector.record_cache_hit()
         collector.record_cache_miss()
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "cache_hits_total" in metrics
         assert "cache_misses_total" in metrics
 
@@ -67,9 +67,9 @@ class TestMetricsCollector:
         """Test recording backtest."""
         collector.record_backtest(success=True, duration_seconds=5.0)
         collector.record_backtest(success=False, duration_seconds=0.5)
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "backtest_total" in metrics
         assert "backtest_failures_total" in metrics
 
@@ -77,18 +77,18 @@ class TestMetricsCollector:
         """Test setting gauge."""
         collector.set_gauge("active_connections", 10)
         collector.set_gauge("active_connections", 15, labels={"service": "api"})
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "active_connections" in metrics
         assert 'service="api"' in metrics
 
     def test_get_metrics_format(self, collector):
         """Test metrics format."""
         collector.record_http_request(200, 0.1)
-        
+
         metrics = collector.get_metrics()
-        
+
         # Check Prometheus format
         assert "# HELP" in metrics
         assert "# TYPE" in metrics
@@ -98,9 +98,9 @@ class TestMetricsCollector:
         """Test getting stats dict."""
         collector.record_http_request(200, 0.1)
         collector.record_cache_hit()
-        
+
         stats = collector.get_stats()
-        
+
         assert "uptime_seconds" in stats
         assert "counters" in stats
         assert "gauges" in stats
@@ -109,9 +109,9 @@ class TestMetricsCollector:
     def test_histogram_buckets(self, collector):
         """Test histogram bucket recording."""
         collector.record_http_request(200, 0.05)
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "http_request_duration_seconds_bucket" in metrics
         assert "+Inf" in metrics
         assert "http_request_duration_seconds_sum" in metrics
@@ -121,18 +121,18 @@ class TestMetricsCollector:
         """Test recording multiple requests."""
         for i in range(100):
             collector.record_http_request(200 if i % 10 != 0 else 500, 0.1 + i * 0.01)
-        
+
         stats = collector.get_stats()
-        
+
         assert stats["counters"].get("http_requests_total", 0) == 100
 
     def test_cost_tracking(self, collector):
         """Test cost tracking."""
         collector.record_ai_request("qwen", 1.0, True, cost_usd=0.01)
         collector.record_ai_request("deepseek", 1.0, True, cost_usd=0.005)
-        
+
         metrics = collector.get_metrics()
-        
+
         assert "cost_usd_total" in metrics
         assert 'agent="qwen"' in metrics
         assert 'agent="deepseek"' in metrics
@@ -145,7 +145,7 @@ class TestGlobalCollector:
         """Test singleton pattern."""
         c1 = get_metrics_collector()
         c2 = get_metrics_collector()
-        
+
         # Should be same instance
         assert c1 is c2
 

@@ -88,7 +88,7 @@ async def main():
         print(f"{bar_str:<25} | {r_2018:>12.6f} | {r_2020:>12.6f} | {r_short:>12.6f} | {diff:>+12.6f}")
 
     # Also check: how many bars of BTC 30m data do we actually have?
-    print(f"\nBTC 30m data available:")
+    print("\nBTC 30m data available:")
     print(f"  From 2018: {len(btc_from_2018)} bars, {btc_from_2018.index[0]} to {btc_from_2018.index[-1]}")
     print(f"  From 2020: {len(btc_full)} bars, {btc_full.index[0]} to {btc_full.index[-1]}")
     print(f"  Short (500): {len(btc_short)} bars, {btc_short.index[0]} to {btc_short.index[-1]}")
@@ -102,7 +102,7 @@ async def main():
     feb_check = pd.Timestamp("2025-02-01")
     r18 = rsi_from_2018.loc[feb_check] if feb_check in rsi_from_2018.index else np.nan
     r20 = rsi_from_2020.loc[feb_check] if feb_check in rsi_from_2020.index else np.nan
-    print(f"\nConvergence check at 2025-02-01:")
+    print("\nConvergence check at 2025-02-01:")
     print(f"  RSI (from 2018): {r18:.10f}")
     print(f"  RSI (from 2020): {r20:.10f}")
     print(f"  Diff: {r18 - r20:.15f}")

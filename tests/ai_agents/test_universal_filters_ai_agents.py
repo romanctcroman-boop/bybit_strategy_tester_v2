@@ -1,4 +1,4 @@
-﻿"""
+"""
 AI Agent Knowledge Test: Universal Filters (5 new instruments in "РўРµС…РЅРёС‡РµСЃРєРёРµ РРЅРґРёРєР°С‚РѕСЂС‹")
 
 Tests verify that AI agents correctly understand:

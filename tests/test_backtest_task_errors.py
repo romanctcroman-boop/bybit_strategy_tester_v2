@@ -53,20 +53,40 @@ _BybitKlineAudit = type("BybitKlineAudit", (), {})
 _db_models = types.ModuleType("backend.database.models")
 _db_models.__path__ = []
 for _attr, _val in {
-    "Backtest": _Backtest, "BacktestStatus": SimpleNamespace(),
-    "Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace(),
-    "Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace(),
-    "Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace(),
-    "ChatConversation": _ChatConversation, "StrategyVersion": _StrategyVersion,
+    "Backtest": _Backtest,
+    "BacktestStatus": SimpleNamespace(),
+    "Strategy": _Strategy,
+    "StrategyType": SimpleNamespace(),
+    "StrategyStatus": SimpleNamespace(),
+    "Optimization": _Optimization,
+    "OptimizationStatus": SimpleNamespace(),
+    "OptimizationType": SimpleNamespace(),
+    "Trade": _Trade,
+    "TradeSide": SimpleNamespace(),
+    "TradeStatus": SimpleNamespace(),
+    "ChatConversation": _ChatConversation,
+    "StrategyVersion": _StrategyVersion,
 }.items():
     setattr(_db_models, _attr, _val)
 sys.modules["backend.database.models"] = _db_models
 
 _leaf_exports = {
     "backend.database.models.backtest": {"Backtest": _Backtest, "BacktestStatus": SimpleNamespace()},
-    "backend.database.models.strategy": {"Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace()},
-    "backend.database.models.optimization": {"Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace()},
-    "backend.database.models.trade": {"Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace()},
+    "backend.database.models.strategy": {
+        "Strategy": _Strategy,
+        "StrategyType": SimpleNamespace(),
+        "StrategyStatus": SimpleNamespace(),
+    },
+    "backend.database.models.optimization": {
+        "Optimization": _Optimization,
+        "OptimizationStatus": SimpleNamespace(),
+        "OptimizationType": SimpleNamespace(),
+    },
+    "backend.database.models.trade": {
+        "Trade": _Trade,
+        "TradeSide": SimpleNamespace(),
+        "TradeStatus": SimpleNamespace(),
+    },
     "backend.database.models.chat_conversation": {"ChatConversation": _ChatConversation},
     "backend.database.models.strategy_version": {"StrategyVersion": _StrategyVersion},
 }
@@ -79,12 +99,21 @@ for _modname, _exports in _leaf_exports.items():
 _models_mod = types.ModuleType("backend.models")
 _models_mod.__path__ = []
 for _a, _v in {
-    "Backtest": _Backtest, "BacktestStatus": SimpleNamespace(),
-    "Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace(),
-    "Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace(),
-    "Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace(),
-    "ChatConversation": _ChatConversation, "StrategyVersion": _StrategyVersion,
-    "BybitKlineAudit": _BybitKlineAudit, "MarketData": _BybitKlineAudit,
+    "Backtest": _Backtest,
+    "BacktestStatus": SimpleNamespace(),
+    "Strategy": _Strategy,
+    "StrategyType": SimpleNamespace(),
+    "StrategyStatus": SimpleNamespace(),
+    "Optimization": _Optimization,
+    "OptimizationStatus": SimpleNamespace(),
+    "OptimizationType": SimpleNamespace(),
+    "Trade": _Trade,
+    "TradeSide": SimpleNamespace(),
+    "TradeStatus": SimpleNamespace(),
+    "ChatConversation": _ChatConversation,
+    "StrategyVersion": _StrategyVersion,
+    "BybitKlineAudit": _BybitKlineAudit,
+    "MarketData": _BybitKlineAudit,
     "OptimizationResult": _Optimization,
 }.items():
     setattr(_models_mod, _a, _v)

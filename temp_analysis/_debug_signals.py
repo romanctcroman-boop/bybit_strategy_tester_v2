@@ -5,7 +5,7 @@ Also check what happens if we prepend pre-2025 data from Bybit API.
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -131,7 +131,7 @@ for i, v in enumerate(se):
 
 # TV says first_entry is 2025-01-01 16:30 UTC+3 = 2025-01-01 13:30 UTC
 # That's bar index = 13:30 / 0:30 = 27
-target_utc = datetime(2025, 1, 1, 13, 30, tzinfo=timezone.utc)
+target_utc = datetime(2025, 1, 1, 13, 30, tzinfo=UTC)
 target_bar = ohlcv.index.searchsorted(target_utc)
 print()
 print(f"TV target bar (2025-01-01 16:30 UTC+3 = 13:30 UTC): index={target_bar}")

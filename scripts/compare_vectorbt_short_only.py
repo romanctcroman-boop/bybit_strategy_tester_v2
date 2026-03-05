@@ -27,9 +27,7 @@ LOGS.mkdir(exist_ok=True)
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:
-    df = pd.DataFrame(
-        data, columns=["open_time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume"])
     try:
         df["open_time"] = pd.to_datetime(df["open_time"].astype("int64"), unit="ms")
     except Exception:
@@ -99,16 +97,10 @@ def run_comparison():
             "metrics": fb_metrics,
         },
         "vectorbt": {
-            "status": "ok"
-            if isinstance(vb_res, dict) and "error" not in vb_res
-            else "error",
+            "status": "ok" if isinstance(vb_res, dict) and "error" not in vb_res else "error",
             "error": vb_res.get("error") if isinstance(vb_res, dict) else None,
-            "trades_len": len(vb_res.get("trades", []))
-            if isinstance(vb_res, dict) and "trades" in vb_res
-            else None,
-            "equity_final": vb_res.get("final_equity")
-            if isinstance(vb_res, dict)
-            else None,
+            "trades_len": len(vb_res.get("trades", [])) if isinstance(vb_res, dict) and "trades" in vb_res else None,
+            "equity_final": vb_res.get("final_equity") if isinstance(vb_res, dict) else None,
             "metrics": vb_metrics,
         },
     }

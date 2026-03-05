@@ -8,6 +8,7 @@
 Если в выводе есть /api/v1/marketdata/symbols-list и /api/v1/refresh-tickers —
 они зарегистрированы в загруженном app.
 """
+
 from __future__ import annotations
 
 import sys

@@ -62,5 +62,5 @@ print(f"H  TV(MAR=rfr, /N-1):                {dd_H:.6f} -> Sortino={(mean_m - rf
 print(f"E+rfr: {(mean_m - rfr) / dd_E:.4f}")
 print(f"E3+rfr: {(mean_m - rfr) / dd_E3:.4f}")
 
-print(f"\nTV target Sortino = 0.587")
+print("\nTV target Sortino = 0.587")
 print(f"Closest so far: E = {mean_m / dd_E:.4f} (0.5769)")

@@ -1,4 +1,5 @@
 """Quick test for NumbaEngineV2 changes"""
+
 import sys
 from pathlib import Path
 
@@ -9,16 +10,20 @@ import sqlite3
 import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df = pd.read_sql("""
+df = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC LIMIT 200
-""", conn)
-df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-df.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+df.set_index("open_time", inplace=True)
 conn.close()
+
 
 # RSI
 def rsi(close, p=14):
@@ -29,7 +34,8 @@ def rsi(close, p=14):
     al = l.rolling(p).mean()
     return 100 - (100 / (1 + ag / al))
 
-r = rsi(df['close'], 7)
+
+r = rsi(df["close"], 7)
 le = (r < 30).values
 lx = (r > 70).values
 se = (r > 70).values
@@ -40,10 +46,22 @@ from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
 from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 inp = BacktestInput(
-    candles=df, long_entries=le, long_exits=lx, short_entries=se, short_exits=sx,
-    symbol='BTCUSDT', interval='60', initial_capital=10000.0, position_size=0.1,
-    leverage=10, stop_loss=0.02, take_profit=0.04, direction=TradeDirection.BOTH,
-    taker_fee=0.001, slippage=0.0005, use_bar_magnifier=False
+    candles=df,
+    long_entries=le,
+    long_exits=lx,
+    short_entries=se,
+    short_exits=sx,
+    symbol="BTCUSDT",
+    interval="60",
+    initial_capital=10000.0,
+    position_size=0.1,
+    leverage=10,
+    stop_loss=0.02,
+    take_profit=0.04,
+    direction=TradeDirection.BOTH,
+    taker_fee=0.001,
+    slippage=0.0005,
+    use_bar_magnifier=False,
 )
 
 print("Running Fallback...")

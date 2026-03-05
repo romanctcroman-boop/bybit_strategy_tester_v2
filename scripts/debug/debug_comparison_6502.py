@@ -48,9 +48,7 @@ o, h, lo, c = data[bar]
 print(f"  O={o:.2f} H={h:.2f} L={lo:.2f} C={c:.2f}")
 tp_hit = h >= t46_tp
 print(f"  TP hit? {tp_hit} (H={h:.2f} >= TP={t46_tp:.2f})")
-print(
-    f"  Signals: long_entries[{bar}]={long_entries[bar]}, short_entries[{bar}]={short_entries[bar]}"
-)
+print(f"  Signals: long_entries[{bar}]={long_entries[bar]}, short_entries[{bar}]={short_entries[bar]}")
 print()
 
 # Simulate at bar 6502
@@ -60,9 +58,7 @@ o, h, lo, c = data[bar]
 print(f"  O={o:.2f} H={h:.2f} L={lo:.2f} C={c:.2f}")
 tp_hit = h >= t46_tp
 print(f"  TP hit? {tp_hit} (H={h:.2f} >= TP={t46_tp:.2f})")
-print(
-    f"  Signals: long_entries[{bar}]={long_entries[bar]}, short_entries[{bar}]={short_entries[bar]}"
-)
+print(f"  Signals: long_entries[{bar}]={long_entries[bar]}, short_entries[{bar}]={short_entries[bar]}")
 print()
 
 print("=== NUMBA LOGIC ===")

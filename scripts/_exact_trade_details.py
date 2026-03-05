@@ -2,6 +2,7 @@
 Get EXACT prev trade exit details for 6 UNKNOWN cases.
 KEY QUESTION: When exactly does the previous trade exit (TP price check)?
 """
+
 import asyncio
 import json
 import os
@@ -32,7 +33,9 @@ async def main():
     btc = btc[~btc.index.duplicated(keep="last")]
 
     db_conn = sqlite3.connect("data.sqlite3")
-    row = db_conn.execute("SELECT builder_blocks, builder_connections FROM strategies WHERE id='dd2969a2-bbba-410e-b190-be1e8cc50b21'").fetchone()
+    row = db_conn.execute(
+        "SELECT builder_blocks, builder_connections FROM strategies WHERE id='dd2969a2-bbba-410e-b190-be1e8cc50b21'"
+    ).fetchone()
     blocks = json.loads(row[0])
     connections = json.loads(row[1])
 
@@ -71,18 +74,18 @@ async def main():
         prev = trades[t_num - 2]  # 0-based index = t_num - 2
         curr = trades[t_num - 1]  # 0-based index = t_num - 1
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"DIVERGENT TRADE E#{t_num}")
         print(f"  Current trade (divergent): entry={curr.entry_time}, exit={curr.exit_time}, {curr.exit_reason}")
         print(f"  Entry price: {curr.entry_price:.2f}")
-        print(f"  Previous trade E#{t_num-1}: {prev.direction}")
+        print(f"  Previous trade E#{t_num - 1}: {prev.direction}")
         print(f"    entry={prev.entry_time}, price={prev.entry_price:.2f}")
         print(f"    exit={prev.exit_time}, price={prev.exit_price:.2f}")
         print(f"    exit_reason={prev.exit_reason}")
 
         # For short TP: tp_price = entry_price * (1 - take_profit)
         # For long TP: tp_price = entry_price * (1 + take_profit)
-        if str(prev.direction) in ('short', 'TradeDirection.SHORT'):
+        if str(prev.direction) in ("short", "TradeDirection.SHORT"):
             tp_price = prev.entry_price * (1 - 0.023)
             print(f"    TP level (short): {tp_price:.2f}")
         else:
@@ -91,7 +94,7 @@ async def main():
 
         # Check which bar TP actually fires on
         exit_t = pd.Timestamp(prev.exit_time)
-        if hasattr(exit_t, 'tz') and exit_t.tz:
+        if hasattr(exit_t, "tz") and exit_t.tz:
             exit_t = exit_t.tz_localize(None)
 
         # In our engine with entry_on_next_bar_open=True:
@@ -108,27 +111,31 @@ async def main():
         # Verify: check candle data at TP detection bar
         if tp_detection_bar in candles.index:
             bar_data = candles.loc[tp_detection_bar]
-            if str(prev.direction) in ('short', 'TradeDirection.SHORT'):
-                reaches = bar_data['low'] <= tp_price
+            if str(prev.direction) in ("short", "TradeDirection.SHORT"):
+                reaches = bar_data["low"] <= tp_price
                 print(f"    Bar {tp_detection_bar}: low={bar_data['low']:.2f}, TP={tp_price:.2f}, reaches={reaches}")
             else:
-                reaches = bar_data['high'] >= tp_price
+                reaches = bar_data["high"] >= tp_price
                 print(f"    Bar {tp_detection_bar}: high={bar_data['high']:.2f}, TP={tp_price:.2f}, reaches={reaches}")
 
             # Also check the bar before to make sure TP doesn't fire earlier
             prev_bar = tp_detection_bar - pd.Timedelta(minutes=30)
             if prev_bar in candles.index:
                 prev_bar_data = candles.loc[prev_bar]
-                if str(prev.direction) in ('short', 'TradeDirection.SHORT'):
-                    prev_reaches = prev_bar_data['low'] <= tp_price
-                    print(f"    Bar {prev_bar}: low={prev_bar_data['low']:.2f}, TP={tp_price:.2f}, reaches={prev_reaches}")
+                if str(prev.direction) in ("short", "TradeDirection.SHORT"):
+                    prev_reaches = prev_bar_data["low"] <= tp_price
+                    print(
+                        f"    Bar {prev_bar}: low={prev_bar_data['low']:.2f}, TP={tp_price:.2f}, reaches={prev_reaches}"
+                    )
                 else:
-                    prev_reaches = prev_bar_data['high'] >= tp_price
-                    print(f"    Bar {prev_bar}: high={prev_bar_data['high']:.2f}, TP={tp_price:.2f}, reaches={prev_reaches}")
+                    prev_reaches = prev_bar_data["high"] >= tp_price
+                    print(
+                        f"    Bar {prev_bar}: high={prev_bar_data['high']:.2f}, TP={tp_price:.2f}, reaches={prev_reaches}"
+                    )
 
         # Gap from exit to engine entry
         eng_entry_t = pd.Timestamp(curr.entry_time)
-        if hasattr(eng_entry_t, 'tz') and eng_entry_t.tz:
+        if hasattr(eng_entry_t, "tz") and eng_entry_t.tz:
             eng_entry_t = eng_entry_t.tz_localize(None)
         gap_bars = (eng_entry_t - exit_t) / pd.Timedelta(minutes=30)
         print(f"    Gap from exit to engine entry: {gap_bars:.0f} bars ({eng_entry_t - exit_t})")

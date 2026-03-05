@@ -10,6 +10,19 @@ Features:
 - Uses queue-based architecture for reliability
 - Prevents database lock issues
 - Auto-reconnect on failures
+
+Architecture decision (Рек. 8 — 2026-03-04):
+    FROZEN — Variant C. This service exists and is started by the task runner,
+    but is NOT used as a write backend by KlineDataManager or any other core path.
+    KlineDataManager uses BybitAdapter._persist_klines_to_db() directly (WAL-mode
+    SQLite, raw UPSERT). This service's write-queue architecture was evaluated but
+    not adopted because the direct UPSERT path is simpler and equally reliable.
+
+    TODO: evaluate for deletion in a future cleanup pass.
+    Blockers before deletion:
+    - Confirm no external process sends requests to its socket/queue.
+    - Remove from "Start All Services" task dependency if unused.
+    See also: docs/DECISIONS.md
 """
 
 import contextlib

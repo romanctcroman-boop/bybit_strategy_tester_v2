@@ -1,16 +1,18 @@
 """
 Запуск бэктеста Strategy_RSI_L\\S_15 и сравнение с TradingView
 """
-import sqlite3
-import json
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-from backend.services.data_service import DataService
-from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+import json
+import sqlite3
+import sys
+
+sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
+
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.models import BacktestConfig
-import pandas as pd
+from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+from backend.services.data_service import DataService
 
 # Параметры TV
 TV_PARAMS = {
@@ -49,7 +51,7 @@ DB_PATH = "d:/bybit_strategy_tester_v2/data.sqlite3"
 conn = sqlite3.connect(DB_PATH)
 row = conn.execute(
     "SELECT id, name, builder_blocks, builder_connections FROM strategies WHERE id=?",
-    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",)
+    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",),
 ).fetchone()
 conn.close()
 
@@ -77,7 +79,7 @@ print(f"  Загружено баров: {len(ohlcv)}")
 print(f"  Диапазон: {ohlcv.index.min()} — {ohlcv.index.max()}")
 
 # Загружаем BTC данные для RSI
-print(f"\n📊 Загрузка BTC данных для RSI...")
+print("\n📊 Загрузка BTC данных для RSI...")
 btc_ohlcv = data_service.load_ohlcv(
     symbol="BTCUSDT",
     interval=TV_PARAMS["interval"],
@@ -87,7 +89,7 @@ btc_ohlcv = data_service.load_ohlcv(
 print(f"  Загружено баров: {len(btc_ohlcv)}")
 
 # Создаем адаптер стратегии
-print(f"\n🔧 Генерация сигналов...")
+print("\n🔧 Генерация сигналов...")
 adapter = StrategyBuilderAdapter()
 adapter._btcusdt_30m_ohlcv = btc_ohlcv
 
@@ -107,7 +109,7 @@ print(f"  LONG сигналов: {signals['long'].sum()}")
 print(f"  SHORT сигналов: {signals['short'].sum()}")
 
 # Запускаем бэктест
-print(f"\n🚀 Запуск бэктеста...")
+print("\n🚀 Запуск бэктеста...")
 config = BacktestConfig(
     symbol=TV_PARAMS["symbol"],
     interval=TV_PARAMS["interval"],
@@ -129,11 +131,11 @@ result = engine.run(
     strategy_graph=strategy_graph,
 )
 
-print(f"\n✅ Бэктест завершен!")
+print("\n✅ Бэктест завершен!")
 print(f"  Всего сделок: {len(result.trades)}")
 
-if hasattr(result, 'metrics') and result.metrics:
-    print(f"\n📊 МЕТРИКИ:")
+if hasattr(result, "metrics") and result.metrics:
+    print("\n📊 МЕТРИКИ:")
     metrics = result.metrics
     print(f"  Чистая прибыль: {metrics.get('net_profit', 'N/A')}")
     print(f"  Чистая прибыль %: {metrics.get('net_profit_percent', 'N/A')}")

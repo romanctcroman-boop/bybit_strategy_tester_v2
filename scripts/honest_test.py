@@ -2,6 +2,7 @@
 🔬 ЧЕСТНЫЙ ТЕСТ: Реальный бэктест через существующий движок
 Используем production код, а не тестовые обёртки
 """
+
 import sys
 from pathlib import Path
 
@@ -25,32 +26,38 @@ print("\n📊 Загрузка данных из БД...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Проверим сколько данных есть
-info = pd.read_sql("""
+info = pd.read_sql(
+    """
     SELECT symbol, interval, COUNT(*) as cnt,
            MIN(open_time) as min_time, MAX(open_time) as max_time
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT'
     GROUP BY symbol, interval
     ORDER BY cnt DESC
-""", conn)
+""",
+    conn,
+)
 print("\nДоступные данные BTCUSDT:")
 for _, row in info.iterrows():
-    start = pd.to_datetime(row['min_time'], unit='ms')
-    end = pd.to_datetime(row['max_time'], unit='ms')
+    start = pd.to_datetime(row["min_time"], unit="ms")
+    end = pd.to_datetime(row["max_time"], unit="ms")
     print(f"  {row['interval']:>4}: {row['cnt']:>6} баров ({start.date()} - {end.date()})")
 
 # Загружаем 1h данные
-df = pd.read_sql("""
+df = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
-""", conn)
+""",
+    conn,
+)
 conn.close()
 
-df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-df.set_index('open_time', inplace=True)
+df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+df.set_index("open_time", inplace=True)
 print(f"\n✅ Загружено {len(df)} часовых баров для BTCUSDT")
 print(f"   Период: {df.index.min()} - {df.index.max()}")
 
@@ -72,8 +79,8 @@ config = BacktestConfig(
     leverage=1,
     taker_fee=0.0004,
     slippage=0.0001,
-    stop_loss=0.03,      # 3% SL
-    take_profit=0.06,    # 6% TP
+    stop_loss=0.03,  # 3% SL
+    take_profit=0.06,  # 6% TP
     direction="both",
     strategy_type="rsi",
     strategy_params={"period": 14, "overbought": 70, "oversold": 30},
@@ -85,10 +92,10 @@ print(f"  Interval:   {config.interval}")
 print(f"  Period:     {config.start_date} - {config.end_date}")
 print(f"  Capital:    ${config.initial_capital:,.0f}")
 print(f"  Leverage:   {config.leverage}x")
-print(f"  Fee:        {config.taker_fee*100:.2f}%")
-print(f"  Slippage:   {config.slippage*100:.2f}%")
-print(f"  Stop Loss:  {config.stop_loss*100:.1f}%")
-print(f"  Take Profit:{config.take_profit*100:.1f}%")
+print(f"  Fee:        {config.taker_fee * 100:.2f}%")
+print(f"  Slippage:   {config.slippage * 100:.2f}%")
+print(f"  Stop Loss:  {config.stop_loss * 100:.1f}%")
+print(f"  Take Profit:{config.take_profit * 100:.1f}%")
 print(f"  Direction:  {config.direction}")
 print("  Strategy:   RSI(14, 70, 30)")
 
@@ -156,8 +163,10 @@ print("=" * 80)
 if result.trades:
     for i, trade in enumerate(result.trades[:10]):
         direction = "LONG" if trade.is_long else "SHORT"
-        print(f"{i+1:>2}. {direction:>5} | Entry: ${trade.entry_price:,.2f} -> Exit: ${trade.exit_price:,.2f} | "
-              f"PnL: ${trade.pnl:>8.2f} | Exit: {trade.exit_reason}")
+        print(
+            f"{i + 1:>2}. {direction:>5} | Entry: ${trade.entry_price:,.2f} -> Exit: ${trade.exit_price:,.2f} | "
+            f"PnL: ${trade.pnl:>8.2f} | Exit: {trade.exit_reason}"
+        )
 else:
     print("   ❌ Нет сделок!")
 

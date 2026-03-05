@@ -7,6 +7,7 @@ Tests all newly implemented features:
 4. Ray Parallel Optimization
 5. Regime Detection
 """
+
 import sys
 from pathlib import Path
 
@@ -42,11 +43,11 @@ try:
 
     # Sample trades
     trades = [
-        type('Trade', (), {'pnl': 100})(),
-        type('Trade', (), {'pnl': -50})(),
-        type('Trade', (), {'pnl': 150})(),
-        type('Trade', (), {'pnl': -75})(),
-        type('Trade', (), {'pnl': 200})(),
+        type("Trade", (), {"pnl": 100})(),
+        type("Trade", (), {"pnl": -50})(),
+        type("Trade", (), {"pnl": 150})(),
+        type("Trade", (), {"pnl": -75})(),
+        type("Trade", (), {"pnl": 200})(),
     ]
 
     # Calculate metrics
@@ -81,19 +82,19 @@ try:
         # Simple test objective
         def test_objective(params):
             # Fake Sharpe based on params
-            return 1.5 + params['period'] * 0.01 - abs(params['overbought'] - 70) * 0.02
+            return 1.5 + params["period"] * 0.01 - abs(params["overbought"] - 70) * 0.02
 
         param_space = {
-            'period': {'type': 'int', 'low': 10, 'high': 20},
-            'overbought': {'type': 'int', 'low': 65, 'high': 80},
+            "period": {"type": "int", "low": 10, "high": 20},
+            "overbought": {"type": "int", "low": 65, "high": 80},
         }
 
-        optimizer = OptunaOptimizer(sampler_type='tpe')
+        optimizer = OptunaOptimizer(sampler_type="tpe")
         result = optimizer.optimize_strategy(
             objective_fn=test_objective,
             param_space=param_space,
             n_trials=20,  # Small test
-            show_progress=False
+            show_progress=False,
         )
 
         print("✅ Optuna Optimizer: LOADED")
@@ -121,11 +122,7 @@ try:
     print(f"   ValidationStatus enum: {[s.value for s in ValidationStatus]}")
 
     # Create validator
-    wfv = WalkForwardValidator(
-        in_sample_size=100,
-        out_of_sample_size=20,
-        step_size=20
-    )
+    wfv = WalkForwardValidator(in_sample_size=100, out_of_sample_size=20, step_size=20)
 
     print(f"   In-Sample Size:    {wfv.in_sample_size} bars")
     print(f"   Out-of-Sample Size:{wfv.out_of_sample_size} bars")
@@ -187,13 +184,15 @@ try:
             change = np.random.normal(0.0015, 0.012)
         prices.append(prices[-1] * (1 + change))
 
-    test_data = pd.DataFrame({
-        'close': prices,
-        'high': np.array(prices) * 1.01,
-        'low': np.array(prices) * 0.99,
-        'open': np.roll(prices, 1),
-        'volume': np.random.randint(1000, 5000, n_bars)
-    })
+    test_data = pd.DataFrame(
+        {
+            "close": prices,
+            "high": np.array(prices) * 1.01,
+            "low": np.array(prices) * 0.99,
+            "open": np.roll(prices, 1),
+            "volume": np.random.randint(1000, 5000, n_bars),
+        }
+    )
 
     # Test K-Means detector
     detector = KMeansRegimeDetector(n_regimes=3)

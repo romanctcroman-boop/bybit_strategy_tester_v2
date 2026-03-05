@@ -87,11 +87,14 @@ async def _probe_deepseek() -> tuple[bool, str]:
     }
     try:
         timeout = aiohttp.ClientTimeout(total=15)
-        async with aiohttp.ClientSession(timeout=timeout) as session, session.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            json=body,
-            headers=headers,
-        ) as resp:
+        async with (
+            aiohttp.ClientSession(timeout=timeout) as session,
+            session.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                json=body,
+                headers=headers,
+            ) as resp,
+        ):
             if resp.status == 200:
                 return True, "OK"
             text = await resp.text()
@@ -115,11 +118,14 @@ async def _probe_qwen() -> tuple[bool, str]:
     }
     try:
         timeout = aiohttp.ClientTimeout(total=15)
-        async with aiohttp.ClientSession(timeout=timeout) as session, session.post(
-            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
-            json=body,
-            headers=headers,
-        ) as resp:
+        async with (
+            aiohttp.ClientSession(timeout=timeout) as session,
+            session.post(
+                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+                json=body,
+                headers=headers,
+            ) as resp,
+        ):
             if resp.status == 200:
                 return True, "OK"
             text = await resp.text()

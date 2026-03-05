@@ -229,30 +229,20 @@ class TestTimeExit:
         features = AdvancedFeatures(time_exit_config=config)
 
         # Within limit
-        assert (
-            features.should_exit_by_time(bar_index=30, entry_bar=0, timestamp=0)
-            is False
-        )
+        assert features.should_exit_by_time(bar_index=30, entry_bar=0, timestamp=0) is False
 
         # At limit
-        assert (
-            features.should_exit_by_time(bar_index=50, entry_bar=0, timestamp=0) is True
-        )
+        assert features.should_exit_by_time(bar_index=50, entry_bar=0, timestamp=0) is True
 
         # Over limit
-        assert (
-            features.should_exit_by_time(bar_index=60, entry_bar=0, timestamp=0) is True
-        )
+        assert features.should_exit_by_time(bar_index=60, entry_bar=0, timestamp=0) is True
 
     def test_time_exit_disabled(self):
         """Test disabled time exit."""
         config = TimeExitConfig(enabled=False)
         features = AdvancedFeatures(time_exit_config=config)
 
-        assert (
-            features.should_exit_by_time(bar_index=1000, entry_bar=0, timestamp=0)
-            is False
-        )
+        assert features.should_exit_by_time(bar_index=1000, entry_bar=0, timestamp=0) is False
 
 
 # =============================================================================
@@ -314,9 +304,7 @@ class TestFunding:
         position_value = 10000.0
         hours_held = 24.0  # 3 funding intervals
 
-        funding_cost = features.calculate_funding(
-            position_value, hours_held, is_long=True
-        )
+        funding_cost = features.calculate_funding(position_value, hours_held, is_long=True)
 
         # Long pays funding: -10000 * 0.0001 * 3 = -3
         assert funding_cost == pytest.approx(-3.0)
@@ -333,9 +321,7 @@ class TestFunding:
         position_value = 10000.0
         hours_held = 24.0
 
-        funding_income = features.calculate_funding(
-            position_value, hours_held, is_long=False
-        )
+        funding_income = features.calculate_funding(position_value, hours_held, is_long=False)
 
         # Short receives funding: +10000 * 0.0001 * 3 = +3
         assert funding_income == pytest.approx(3.0)
@@ -480,9 +466,7 @@ class TestWalkForward:
         def backtest_func(data, params):
             return {"total_return": np.random.random() * 0.2 - 0.05}
 
-        result = analyzer.analyze(
-            sample_ohlcv, optimize_func, backtest_func, verbose=False
-        )
+        result = analyzer.analyze(sample_ohlcv, optimize_func, backtest_func, verbose=False)
 
         assert len(result.fold_results) > 0
         assert result.robustness_ratio is not None
@@ -643,9 +627,7 @@ class TestCorrelationManager:
 
         for i, ret in enumerate(base_returns):
             manager.add_return("BTCUSDT", ret)
-            manager.add_return(
-                "ETHUSDT", ret + np.random.randn() * 0.001
-            )  # Highly correlated
+            manager.add_return("ETHUSDT", ret + np.random.randn() * 0.001)  # Highly correlated
 
         manager.update_correlations()
 
@@ -714,9 +696,7 @@ class TestMetricsCalculator:
         assert "expectancy" in stats
         assert "kelly_criterion" in stats
         assert "risk_reward_ratio" in stats
-        assert stats["total_long_trades"] + stats["total_short_trades"] == len(
-            sample_trades
-        )
+        assert stats["total_long_trades"] + stats["total_short_trades"] == len(sample_trades)
 
     def test_streak_metrics(self, sample_trades):
         """Test streak metrics calculation."""
@@ -773,9 +753,7 @@ class TestAdvancedFeaturesIntegration:
         """Test full analysis pipeline."""
         # 1. Calculate metrics
         metrics_calc = MetricsCalculator()
-        metrics = metrics_calc.calculate_all_metrics(
-            sample_equity_curve, sample_trades, 10000.0
-        )
+        metrics = metrics_calc.calculate_all_metrics(sample_equity_curve, sample_trades, 10000.0)
 
         # 2. Monte Carlo simulation
         mc_config = MonteCarloConfig(n_simulations=50, seed=42)

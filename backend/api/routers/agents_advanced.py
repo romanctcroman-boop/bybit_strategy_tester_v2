@@ -957,6 +957,10 @@ class BuilderTaskRequest(BaseModel):
         default=False,
         description="Use AI multi-agent deliberation (DeepSeek+Perplexity) for planning",
     )
+    agent: str = Field(
+        default="qwen",
+        description="Primary LLM agent for single-agent calls: qwen | deepseek | perplexity",
+    )
     existing_strategy_id: str | None = Field(
         default=None,
         description="Existing strategy ID to optimize (skip create/blocks/connect stages)",
@@ -1024,6 +1028,7 @@ async def run_builder_task(request: BuilderTaskRequest):
             min_acceptable_sharpe=request.min_sharpe,
             min_acceptable_win_rate=request.min_win_rate,
             enable_deliberation=request.enable_deliberation,
+            agent=request.agent,
             existing_strategy_id=request.existing_strategy_id,
             use_optimizer_mode=request.use_optimizer_mode,
             evaluation_config=eval_config,
@@ -1100,6 +1105,7 @@ async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[st
         min_acceptable_sharpe=request.min_sharpe,
         min_acceptable_win_rate=request.min_win_rate,
         enable_deliberation=request.enable_deliberation,
+        agent=request.agent,
         existing_strategy_id=request.existing_strategy_id,
         use_optimizer_mode=request.use_optimizer_mode,
         evaluation_config=eval_config_sse,

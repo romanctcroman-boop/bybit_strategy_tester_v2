@@ -50,7 +50,7 @@ async def run_backtest():
             net_profit = metrics.get("net_profit", 0)
             win_rate = metrics.get("win_rate", 0)
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Total trades:  {total}")
         print(f"  Net profit:    ${net_profit:.2f}")
         print(f"  Win rate:      {win_rate:.4f}%")

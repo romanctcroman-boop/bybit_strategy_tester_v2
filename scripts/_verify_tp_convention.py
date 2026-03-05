@@ -199,7 +199,7 @@ async def main():
         )
 
     print()
-    print(f"Fast TP trades with matching entry: shown above")
+    print("Fast TP trades with matching entry: shown above")
     print(f"TV uses exact TP level: {tv_uses_tp}")
     print(f"TV uses close price:    {tv_uses_close}")
 

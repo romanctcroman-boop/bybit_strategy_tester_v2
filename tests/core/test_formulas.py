@@ -5,12 +5,8 @@ Tests for backend/core/formulas.py
 """
 
 import numpy as np
-import pandas as pd
-import pytest
 
 from backend.core.formulas import (
-    calculate_avg_loss,
-    calculate_avg_win,
     calculate_cvar,
     calculate_expectancy,
     calculate_max_drawdown,

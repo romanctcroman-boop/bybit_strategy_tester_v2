@@ -3,6 +3,7 @@
 
 Verifies 100% parity between GPUEngineV2 and FallbackEngineV2 (reference).
 """
+
 import sys
 from pathlib import Path
 
@@ -22,19 +23,23 @@ print("=" * 100)
 print("\n📊 Loading data...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
-df = pd.read_sql("""
+df = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 500
-""", conn)
-df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-df.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+df.set_index("open_time", inplace=True)
 conn.close()
 
 print(f"   Bars: {len(df)}")
+
 
 # ============================================================================
 # RSI SIGNALS
@@ -48,7 +53,8 @@ def calculate_rsi(close, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-rsi = calculate_rsi(df['close'], period=14)
+
+rsi = calculate_rsi(df["close"], period=14)
 le = (rsi < 30).values
 lx = (rsi > 70).values
 se = (rsi > 70).values
@@ -64,8 +70,8 @@ input_data = BacktestInput(
     long_exits=lx,
     short_entries=se,
     short_exits=sx,
-    symbol='BTCUSDT',
-    interval='60',
+    symbol="BTCUSDT",
+    interval="60",
     initial_capital=10000.0,
     position_size=0.10,
     leverage=10,
@@ -96,6 +102,7 @@ print("\n" + "=" * 80)
 print("📊 RESULTS COMPARISON")
 print("=" * 80)
 
+
 def compare(name, fb_val, gpu_val, tolerance=0.01):
     match = abs(fb_val - gpu_val) < tolerance
     status = "✅" if match else "❌"
@@ -103,11 +110,14 @@ def compare(name, fb_val, gpu_val, tolerance=0.01):
     print(f"   {name:20s}: FB={fb_val:12.4f}  GPU={gpu_val:12.4f}  Diff={diff:+.4f}  {status}")
     return match
 
+
 all_match = True
 
 print("\n🔸 CORE METRICS:")
 trades_match = len(fb_result.trades) == len(gpu_result.trades)
-print(f"   {'Trades':20s}: FB={len(fb_result.trades):12d}  GPU={len(gpu_result.trades):12d}  {'✅' if trades_match else '❌'}")
+print(
+    f"   {'Trades':20s}: FB={len(fb_result.trades):12d}  GPU={len(gpu_result.trades):12d}  {'✅' if trades_match else '❌'}"
+)
 all_match &= trades_match
 all_match &= compare("Net Profit", fb_result.metrics.net_profit, gpu_result.metrics.net_profit)
 all_match &= compare("Total Return", fb_result.metrics.total_return, gpu_result.metrics.total_return)
@@ -126,7 +136,9 @@ for i in range(min(5, len(fb_result.trades))):
     fees_match = abs(fb_t.fees - gpu_t.fees) < 0.01
 
     status = "✅" if (pnl_match and size_match and fees_match) else "❌"
-    print(f"   Trade {i+1}: {fb_t.direction:5s} PnL=${fb_t.pnl:8.2f} vs ${gpu_t.pnl:8.2f}  Size={fb_t.size:.4f} vs {gpu_t.size:.4f}  {status}")
+    print(
+        f"   Trade {i + 1}: {fb_t.direction:5s} PnL=${fb_t.pnl:8.2f} vs ${gpu_t.pnl:8.2f}  Size={fb_t.size:.4f} vs {gpu_t.size:.4f}  {status}"
+    )
 
     all_match &= pnl_match and size_match and fees_match
 

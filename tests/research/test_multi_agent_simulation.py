@@ -1,8 +1,5 @@
 """Tests for P3-4: Multi-agent market simulation."""
 
-import numpy as np
-import pytest
-
 from backend.research import Agent, AgentType, MarketSimulator
 
 

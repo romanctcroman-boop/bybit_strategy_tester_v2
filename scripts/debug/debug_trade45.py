@@ -46,9 +46,7 @@ nb_t45 = nb_result.trades[45]
 print(
     f"  Fallback: {fb_t45.direction} @ {fb_t45.entry_price:.2f} → {fb_t45.exit_price:.2f} ({fb_t45.exit_reason}) entry_time={fb_t45.entry_time}"
 )
-print(
-    f"  Numba:    {nb_t45.direction} @ {nb_t45.entry_price:.2f} → {nb_t45.exit_price:.2f} ({nb_t45.exit_reason})"
-)
+print(f"  Numba:    {nb_t45.direction} @ {nb_t45.entry_price:.2f} → {nb_t45.exit_price:.2f} ({nb_t45.exit_reason})")
 
 print()
 print("=== Trade 46 details ===")
@@ -57,9 +55,7 @@ nb_t46 = nb_result.trades[46]
 print(
     f"  Fallback: {fb_t46.direction} @ {fb_t46.entry_price:.2f} → {fb_t46.exit_price:.2f} ({fb_t46.exit_reason}) entry_time={fb_t46.entry_time}"
 )
-print(
-    f"  Numba:    {nb_t46.direction} @ {nb_t46.entry_price:.2f} → {nb_t46.exit_price:.2f} ({nb_t46.exit_reason})"
-)
+print(f"  Numba:    {nb_t46.direction} @ {nb_t46.entry_price:.2f} → {nb_t46.exit_price:.2f} ({nb_t46.exit_reason})")
 
 # Find signal bars for trade 46
 print()

@@ -146,11 +146,7 @@ class TestMetricsCollector:
         assert isinstance(text, str)
         assert len(text) > 0
         # Should contain some known metric names
-        assert (
-            "backfill" in text.lower()
-            or "circuit" in text.lower()
-            or "mcp" in text.lower()
-        )
+        assert "backfill" in text.lower() or "circuit" in text.lower() or "mcp" in text.lower()
 
     def test_get_content_type(self, collector):
         """Test content type string."""
@@ -197,9 +193,7 @@ class TestMetricsTimer:
 
     def test_timer_api_type(self):
         """Test timer for API metrics."""
-        with MetricsTimer(
-            "api", method="GET", endpoint="/test", status_code=200
-        ) as timer:
+        with MetricsTimer("api", method="GET", endpoint="/test", status_code=200) as timer:
             time.sleep(0.001)
 
         assert timer.duration is not None

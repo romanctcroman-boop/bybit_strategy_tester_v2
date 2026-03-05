@@ -178,7 +178,7 @@ async def main():
     exact = [m for m in matches if m[0] == "exact"]
     near = [m for m in matches if m[0] == "near"]
 
-    print(f"\n=== MATCHING RESULTS ===")
+    print("\n=== MATCHING RESULTS ===")
     print(f"Exact entry match: {len(exact)}")
     print(f"Near match (within 48h): {len(near)}")
     print(f"Unmatched ENGINE trades: {len(unmatched_eng)}")
@@ -199,7 +199,7 @@ async def main():
 
     # Near matches (shifted entry)
     if near:
-        print(f"\nNEAR MATCHES (shifted entries):")
+        print("\nNEAR MATCHES (shifted entries):")
         for m in near:
             e, t, diff = m[1], m[2], m[3]
             print(
@@ -209,7 +209,7 @@ async def main():
 
     # Unmatched engine trades (engine has, TV doesn't)
     if unmatched_eng:
-        print(f"\nENGINE-ONLY trades (engine has, TV doesn't):")
+        print("\nENGINE-ONLY trades (engine has, TV doesn't):")
         for e in unmatched_eng:
             print(
                 f"  E#{e['eng_num']:3d}: {e['direction']:5s} entry={e['entry_time']} exit={e['exit_time']} pnl={e['pnl']:.2f}"
@@ -217,7 +217,7 @@ async def main():
 
     # Unmatched TV trades (TV has, engine doesn't)
     if unmatched_tv:
-        print(f"\nTV-ONLY trades (TV has, engine doesn't):")
+        print("\nTV-ONLY trades (TV has, engine doesn't):")
         for t in unmatched_tv:
             print(
                 f"  TV#{t['tv_num']:3d}: {t['direction']:5s} entry={t['entry_time']} exit={t['exit_time']} pnl={t['pnl']:.2f}"

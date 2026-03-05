@@ -14,35 +14,31 @@ from playwright.async_api import async_playwright
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
+
 async def test_strategy_builder_ui():
     """Тестирование всех элементов UI Strategy Builder"""
 
-    results = {
-        "passed": [],
-        "failed": [],
-        "warnings": []
-    }
+    results = {"passed": [], "failed": [], "warnings": []}
 
     async with async_playwright() as p:
         try:
             # Запустить браузер
             browser = await p.chromium.launch(headless=False)  # headless=False для визуального тестирования
-            context = await browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                ignore_https_errors=True
-            )
+            context = await browser.new_context(viewport={"width": 1920, "height": 1080}, ignore_https_errors=True)
             page = await context.new_page()
 
             print("🌐 Открываю страницу Strategy Builder...")
-            await page.goto("http://localhost:8000/frontend/strategy-builder.html", wait_until="networkidle", timeout=30000)
+            await page.goto(
+                "http://localhost:8000/frontend/strategy-builder.html", wait_until="networkidle", timeout=30000
+            )
 
             # Ждем загрузки страницы
             await page.wait_for_load_state("domcontentloaded")
             await asyncio.sleep(2)  # Дополнительное время для инициализации JS
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("📋 ТЕСТИРОВАНИЕ ВКЛАДОК (Properties Panel)")
-            print("="*60)
+            print("=" * 60)
 
             # Тест 1: Проверка наличия всех вкладок
             tabs = [
@@ -71,9 +67,9 @@ async def test_strategy_builder_ui():
                     print(f"⚠️ Ошибка при тестировании вкладки '{tab_name}': {e}")
                     results["warnings"].append(f"Вкладка '{tab_name}': {e}")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("🔘 ТЕСТИРОВАНИЕ КНОПОК NAVBAR")
-            print("="*60)
+            print("=" * 60)
 
             # Тест 2: Кнопки в navbar
             navbar_buttons = [
@@ -109,7 +105,9 @@ async def test_strategy_builder_ui():
                                         await asyncio.sleep(0.3)
                                         print("   → Модальное окно закрыто")
                             except PlaywrightTimeoutError:
-                                print(f"   ⚠️ Кнопка '{btn_name}' не отвечает на клик (возможно, требует сохранения стратегии)")
+                                print(
+                                    f"   ⚠️ Кнопка '{btn_name}' не отвечает на клик (возможно, требует сохранения стратегии)"
+                                )
                                 results["warnings"].append(f"Кнопка '{btn_name}' не отвечает на клик")
                     else:
                         print(f"❌ Кнопка '{btn_name}' не найдена")
@@ -118,9 +116,9 @@ async def test_strategy_builder_ui():
                     print(f"⚠️ Ошибка при тестировании кнопки '{btn_name}': {e}")
                     results["warnings"].append(f"Кнопка '{btn_name}': {e}")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("🛠️ ТЕСТИРОВАНИЕ КНОПОК TOOLBAR")
-            print("="*60)
+            print("=" * 60)
 
             # Тест 3: Кнопки toolbar
             toolbar_buttons = [
@@ -154,9 +152,9 @@ async def test_strategy_builder_ui():
                     print(f"⚠️ Ошибка при тестировании кнопки '{btn_name}': {e}")
                     results["warnings"].append(f"Кнопка toolbar '{btn_name}': {e}")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("🔍 ТЕСТИРОВАНИЕ ZOOM КОНТРОЛОВ")
-            print("="*60)
+            print("=" * 60)
 
             # Тест 4: Zoom controls
             zoom_controls = [
@@ -184,9 +182,9 @@ async def test_strategy_builder_ui():
                     print(f"⚠️ Ошибка при тестировании контрола '{control_name}': {e}")
                     results["warnings"].append(f"Zoom контрол '{control_name}': {e}")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("📚 ТЕСТИРОВАНИЕ БИБЛИОТЕКИ БЛОКОВ")
-            print("="*60)
+            print("=" * 60)
 
             # Тест 5: Блоки библиотеки
             block_categories = [
@@ -216,9 +214,9 @@ async def test_strategy_builder_ui():
                     print(f"⚠️ Ошибка при тестировании категории '{category}': {e}")
                     results["warnings"].append(f"Категория '{category}': {e}")
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("📊 ИТОГОВЫЕ РЕЗУЛЬТАТЫ")
-            print("="*60)
+            print("=" * 60)
 
             total_passed = len(results["passed"])
             total_failed = len(results["failed"])
@@ -252,8 +250,10 @@ async def test_strategy_builder_ui():
         except Exception as e:
             print(f"\n❌ Критическая ошибка: {e}")
             import traceback
+
             traceback.print_exc()
             return 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(test_strategy_builder_ui())

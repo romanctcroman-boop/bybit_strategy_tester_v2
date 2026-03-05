@@ -553,8 +553,8 @@ async def main():
 
     if max_missing < min_extra:
         threshold = (min_extra + max_missing) / 2.0
-        print(f"\n  CLEAN SEPARATION!")
-        print(f"  Optimal threshold T such that rsi_prev <= level + T:")
+        print("\n  CLEAN SEPARATION!")
+        print("  Optimal threshold T such that rsi_prev <= level + T:")
         print(f"    T = {threshold:+.4f}")
         print(f"    Filter: rsi_prev <= {cross_short_level + threshold:.4f}")
         print(f"    Code:   cross_short = cross_short & (rsi_prev <= cross_short_level + {threshold:.4f})")

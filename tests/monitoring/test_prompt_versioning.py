@@ -13,8 +13,8 @@ sys.path.insert(0, "d:/bybit_strategy_tester_v2")
 import pytest
 
 from backend.monitoring.prompt_versioning import (
-    PromptVersioning,
     PromptVersion,
+    PromptVersioning,
     VersionComparison,
     get_prompt_versioning,
 )
@@ -33,23 +33,23 @@ class TestPromptVersioning:
     def test_create_version(self, versioning):
         """Test creating a version."""
         template = "You are a helpful assistant."
-        
+
         version_id = versioning.create_version(
             prompt_name="test_prompt",
             template=template,
         )
-        
+
         assert version_id
         assert version_id.startswith("v")
 
     def test_get_version(self, versioning):
         """Test getting a version."""
         template = "You are a helpful assistant."
-        
+
         version_id = versioning.create_version("test_prompt", template)
-        
+
         version = versioning.get_version("test_prompt", version_id)
-        
+
         assert version is not None
         assert version.template == template
         assert version.version_id == version_id
@@ -58,16 +58,16 @@ class TestPromptVersioning:
         """Test getting active version."""
         template_v1 = "Version 1"
         template_v2 = "Version 2"
-        
+
         v1 = versioning.create_version("test", template_v1)
         v2 = versioning.create_version("test", template_v2)
-        
+
         # Explicitly set v2 as active
         versioning.set_active_version("test", v2)
-        
+
         # v2 should be active
         active = versioning.get_active_version("test")
-        
+
         assert active is not None
         assert active.version_id == v2
         assert active.template == template_v2
@@ -77,12 +77,12 @@ class TestPromptVersioning:
         versioning.create_version("test", "v1")
         versioning.create_version("test", "v2")
         versioning.create_version("test", "v3")
-        
+
         versions = versioning.list_versions("test")
-        
+
         # Should have 3 versions
         assert len(versions) == 3
-        
+
         # Should be sorted newest first
         assert versions[0].template == "v3"
         assert versions[1].template == "v2"
@@ -92,9 +92,9 @@ class TestPromptVersioning:
         """Test comparing versions."""
         v1 = versioning.create_version("test", "Template version 1")
         v2 = versioning.create_version("test", "Template version 2")
-        
+
         comparison = versioning.compare_versions("test", v1, v2)
-        
+
         assert comparison is not None
         assert comparison.template_changed is True
         assert comparison.similarity_score > 0
@@ -105,9 +105,9 @@ class TestPromptVersioning:
         template = "Same template"
         v1 = versioning.create_version("test", template)
         v2 = versioning.create_version("test", template)
-        
+
         comparison = versioning.compare_versions("test", v1, v2)
-        
+
         assert comparison is not None
         assert comparison.template_changed is False
         assert comparison.similarity_score == 1.0
@@ -116,18 +116,18 @@ class TestPromptVersioning:
         """Test rolling back to previous version."""
         v1 = versioning.create_version("test", "v1")
         v2 = versioning.create_version("test", "v2")
-        
+
         # Explicitly set v2 as active
         versioning.set_active_version("test", v2)
-        
+
         # v2 should be active
         active = versioning.get_active_version("test")
         assert active.version_id == v2
-        
+
         # Rollback to v1
         success = versioning.rollback("test", v1)
         assert success is True
-        
+
         # v1 should be active now
         active = versioning.get_active_version("test")
         assert active.version_id == v1
@@ -136,10 +136,10 @@ class TestPromptVersioning:
     def test_add_tag(self, versioning):
         """Test adding tag to version."""
         version_id = versioning.create_version("test", "template")
-        
+
         success = versioning.add_tag("test", version_id, "production")
         assert success is True
-        
+
         # Verify tag added
         version = versioning.get_version("test", version_id)
         assert "production" in version.tags
@@ -147,10 +147,10 @@ class TestPromptVersioning:
     def test_remove_tag(self, versioning):
         """Test removing tag from version."""
         version_id = versioning.create_version("test", "template", tags=["production"])
-        
+
         success = versioning.remove_tag("test", version_id, "production")
         assert success is True
-        
+
         # Verify tag removed
         version = versioning.get_version("test", version_id)
         assert "production" not in version.tags
@@ -159,11 +159,11 @@ class TestPromptVersioning:
         """Test setting active version."""
         v1 = versioning.create_version("test", "v1")
         v2 = versioning.create_version("test", "v2")
-        
+
         # Set v1 as active
         success = versioning.set_active_version("test", v1)
         assert success is True
-        
+
         active = versioning.get_active_version("test")
         assert active.version_id == v1
 
@@ -171,9 +171,9 @@ class TestPromptVersioning:
         """Test getting version history."""
         v1 = versioning.create_version("test", "v1")
         v2 = versioning.create_version("test", "v2", parent_version=v1)
-        
+
         history = versioning.get_version_history("test")
-        
+
         assert len(history) == 2
         assert history[0]["version_id"] == v2
         assert history[1]["version_id"] == v1
@@ -182,16 +182,11 @@ class TestPromptVersioning:
     def test_version_metadata(self, versioning):
         """Test version metadata."""
         metadata = {"author": "John", "purpose": "testing"}
-        
-        version_id = versioning.create_version(
-            "test",
-            "template",
-            metadata=metadata,
-            created_by="test_user"
-        )
-        
+
+        version_id = versioning.create_version("test", "template", metadata=metadata, created_by="test_user")
+
         version = versioning.get_version("test", version_id)
-        
+
         assert version is not None
         assert version.metadata == metadata
         assert version.created_by == "test_user"
@@ -201,9 +196,9 @@ class TestPromptVersioning:
         v1 = versioning.create_version("test", "v1")
         v2 = versioning.create_version("test", "v2", parent_version=v1)
         v3 = versioning.create_version("test", "v3", parent_version=v2)
-        
+
         version_v3 = versioning.get_version("test", v3)
-        
+
         assert version_v3 is not None
         assert version_v3.parent_version == v2
 
@@ -212,9 +207,9 @@ class TestPromptVersioning:
         versioning.create_version("prompt1", "template")
         versioning.create_version("prompt1", "template v2")
         versioning.create_version("prompt2", "template")
-        
+
         stats = versioning.get_stats()
-        
+
         assert stats["total_prompts"] == 2
         assert stats["total_versions"] == 3
         assert "prompt1" in stats["prompts"]
@@ -223,10 +218,10 @@ class TestPromptVersioning:
     def test_persistence(self, versioning):
         """Test saving and loading from disk."""
         versioning.create_version("test", "template", tags=["production"])
-        
+
         # Create new instance (should load from disk)
         versioning2 = PromptVersioning(versioning.storage_path)
-        
+
         # Should have same data
         versions = versioning2.list_versions("test")
         assert len(versions) == 1
@@ -254,7 +249,7 @@ class TestPromptVersion:
             prompt_name="test",
             template="template",
         )
-        
+
         assert version.version_id == "v1"
         assert version.prompt_name == "test"
         assert version.template == "template"
@@ -268,9 +263,9 @@ class TestPromptVersion:
             template="template",
             tags=["production"],
         )
-        
+
         data = version.to_dict()
-        
+
         assert data["version_id"] == "v1"
         assert data["prompt_name"] == "test"
         assert data["tags"] == ["production"]
@@ -288,9 +283,9 @@ class TestPromptVersion:
             "tags": [],
             "is_active": True,
         }
-        
+
         version = PromptVersion.from_dict(data)
-        
+
         assert version.version_id == "v1"
         assert version.prompt_name == "test"
         assert version.template == "template"
@@ -309,7 +304,7 @@ class TestVersionComparison:
             tags_changed=False,
             similarity_score=0.8,
         )
-        
+
         assert comparison.version_a == "v1"
         assert comparison.version_b == "v2"
         assert comparison.template_changed is True
@@ -323,10 +318,10 @@ class TestGlobalVersioning:
         """Test singleton pattern."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage_path = Path(tmpdir) / "versions.json"
-            
+
             v1 = get_prompt_versioning(str(storage_path))
             v2 = get_prompt_versioning(str(storage_path))
-            
+
             # Should be same instance
             assert v1 is v2
 

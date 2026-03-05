@@ -36,13 +36,45 @@ def dca_strategy_data():
         "symbol": "BTCUSDT",
         "interval": "15",
         "blocks": [
-            # RSI indicator block (entry signal)
+            # RSI indicator block
             {
                 "id": "block_1",
                 "type": "rsi",
                 "category": "indicators",
                 "params": {"period": 14, "overbought": 70, "oversold": 30},
                 "position": {"x": 100, "y": 100},
+            },
+            # Comparator: RSI < 30 → entry long signal
+            {
+                "id": "block_cmp_long",
+                "type": "less_than",
+                "category": "conditions",
+                "params": {},
+                "position": {"x": 300, "y": 60},
+            },
+            # Constant 30 for oversold threshold
+            {
+                "id": "block_const_30",
+                "type": "constant",
+                "category": "values",
+                "params": {"value": 30},
+                "position": {"x": 100, "y": 200},
+            },
+            # Comparator: RSI > 70 → exit long signal
+            {
+                "id": "block_cmp_exit",
+                "type": "greater_than",
+                "category": "conditions",
+                "params": {},
+                "position": {"x": 300, "y": 160},
+            },
+            # Constant 70 for overbought threshold
+            {
+                "id": "block_const_70",
+                "type": "constant",
+                "category": "values",
+                "params": {"value": 70},
+                "position": {"x": 100, "y": 260},
             },
             # DCA block (entry refinement)
             {
@@ -57,29 +89,58 @@ def dca_strategy_data():
                     "first_order_offset": 2.0,
                     "grid_trailing": 0.5,
                 },
-                "position": {"x": 300, "y": 100},
+                "position": {"x": 500, "y": 100},
             },
-            # Stop Loss
+            # Main strategy aggregator node
             {
-                "id": "block_3",
-                "type": "stop_loss",
-                "category": "exits",
-                "params": {"percent": 5.0},
-                "position": {"x": 200, "y": 200},
-            },
-            # Take Profit
-            {
-                "id": "block_4",
-                "type": "take_profit",
-                "category": "exits",
-                "params": {"percent": 2.0},
-                "position": {"x": 400, "y": 200},
+                "id": "main_strategy",
+                "type": "strategy",
+                "category": "main",
+                "isMain": True,
+                "params": {},
+                "position": {"x": 700, "y": 200},
             },
         ],
         "connections": [
-            {"from": "block_1", "to": "block_2"},
-            {"from": "block_2", "to": "block_3"},
-            {"from": "block_2", "to": "block_4"},
+            # RSI value → comparator inputs
+            {
+                "id": "conn_1",
+                "source": {"blockId": "block_1", "portId": "value"},
+                "target": {"blockId": "block_cmp_long", "portId": "a"},
+                "type": "data",
+            },
+            {
+                "id": "conn_2",
+                "source": {"blockId": "block_const_30", "portId": "value"},
+                "target": {"blockId": "block_cmp_long", "portId": "b"},
+                "type": "data",
+            },
+            {
+                "id": "conn_3",
+                "source": {"blockId": "block_1", "portId": "value"},
+                "target": {"blockId": "block_cmp_exit", "portId": "a"},
+                "type": "data",
+            },
+            {
+                "id": "conn_4",
+                "source": {"blockId": "block_const_70", "portId": "value"},
+                "target": {"blockId": "block_cmp_exit", "portId": "b"},
+                "type": "data",
+            },
+            # Entry long signal → main_strategy
+            {
+                "id": "conn_5",
+                "source": {"blockId": "block_cmp_long", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "entry_long"},
+                "type": "data",
+            },
+            # Exit long signal → main_strategy
+            {
+                "id": "conn_6",
+                "source": {"blockId": "block_cmp_exit", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "exit_long"},
+                "type": "data",
+            },
         ],
     }
 

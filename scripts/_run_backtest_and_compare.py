@@ -274,7 +274,7 @@ if len(db_trades) == len(TV_TRADES):
             print(f"  ✅ #{i + 1:2d} {tv_dir:5s} {tv_entry_dt}  pnl={tv_pnl:+7.2f}")
     print(f"\n  Trade mismatches: {mismatches}/{len(TV_TRADES)}")
 elif db_trades:
-    print(f"\n  COUNT MISMATCH!")
+    print("\n  COUNT MISMATCH!")
     print("  First 5 DB trades:")
     for i, t in enumerate(db_trades[:5]):
         ep = t.get("entry_price", t.get("open_price", 0))

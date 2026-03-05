@@ -1,6 +1,7 @@
 """
 Test Quick Reversals Fix: Compare trade counts between VectorBT and Fallback
 """
+
 import sys
 from pathlib import Path
 
@@ -24,8 +25,10 @@ def main():
 
     # Load test data
     import sqlite3
+
     conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-    df = pd.read_sql("""
+    df = pd.read_sql(
+        """
         SELECT open_time, open_price as open, high_price as high,
                low_price as low, close_price as close, volume
         FROM bybit_kline_audit
@@ -33,15 +36,17 @@ def main():
         AND open_time >= 1735689600000
         AND open_time < 1737504000000
         ORDER BY open_time ASC
-    """, conn)
+    """,
+        conn,
+    )
     conn.close()
 
     if len(df) == 0:
         print("❌ No data found")
         return
 
-    df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-    df.set_index('open_time', inplace=True)
+    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+    df.set_index("open_time", inplace=True)
     print(f"📊 Loaded {len(df)} 1H candles")
 
     # RSI parameters
@@ -64,17 +69,19 @@ def main():
             "rsi_period": rsi_period,
             "rsi_overbought": rsi_overbought,
             "rsi_oversold": rsi_oversold,
-        }
+        },
     )
 
-    print(f"\n📋 Config: direction={config.direction}, SL={config.stop_loss*100}%, TP={config.take_profit*100}%")
+    print(f"\n📋 Config: direction={config.direction}, SL={config.stop_loss * 100}%, TP={config.take_profit * 100}%")
 
     # Generate signals using strategy
-    strategy = RSIStrategy(params={
-        "period": rsi_period,
-        "oversold": rsi_oversold,
-        "overbought": rsi_overbought,
-    })
+    strategy = RSIStrategy(
+        params={
+            "period": rsi_period,
+            "oversold": rsi_oversold,
+            "overbought": rsi_overbought,
+        }
+    )
     signals = strategy.generate_signals(df)
 
     print(f"📡 Generated signals: {signals.entries.sum()} entries, {signals.exits.sum()} exits")
@@ -88,6 +95,7 @@ def main():
     except Exception as e:
         print(f"   ❌ VectorBT error: {e}")
         import traceback
+
         traceback.print_exc()
         vbt_trades = None
 
@@ -100,6 +108,7 @@ def main():
     except Exception as e:
         print(f"   ❌ Fallback error: {e}")
         import traceback
+
         traceback.print_exc()
         fb_trades = None
 
@@ -126,6 +135,7 @@ def main():
         print(f"   Fallback Sharpe:  {fb_result.metrics.sharpe_ratio:.3f}")
         print(f"   VectorBT Return:  {vbt_result.metrics.total_return:.2f}%")
         print(f"   Fallback Return:  {fb_result.metrics.total_return:.2f}%")
+
 
 if __name__ == "__main__":
     main()

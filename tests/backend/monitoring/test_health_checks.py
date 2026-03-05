@@ -186,18 +186,22 @@ class TestHealthChecker:
     async def test_check_all_returns_report(self, checker):
         """Test that check_all returns a SystemHealthReport."""
         # Mock all checks to avoid external dependencies
-        with patch.object(
-            checker,
-            "check_database",
-            return_value=HealthCheckResult(name="database", status=HealthStatus.HEALTHY, message="OK"),
-        ), patch.object(
-            checker,
-            "check_redis",
-            return_value=HealthCheckResult(name="redis", status=HealthStatus.DEGRADED, message="Slow"),
-        ), patch.object(
-            checker,
-            "check_bybit_api",
-            return_value=HealthCheckResult(name="bybit_api", status=HealthStatus.HEALTHY, message="OK"),
+        with (
+            patch.object(
+                checker,
+                "check_database",
+                return_value=HealthCheckResult(name="database", status=HealthStatus.HEALTHY, message="OK"),
+            ),
+            patch.object(
+                checker,
+                "check_redis",
+                return_value=HealthCheckResult(name="redis", status=HealthStatus.DEGRADED, message="Slow"),
+            ),
+            patch.object(
+                checker,
+                "check_bybit_api",
+                return_value=HealthCheckResult(name="bybit_api", status=HealthStatus.HEALTHY, message="OK"),
+            ),
         ):
             # Real checks for system resources
             report = await checker.check_all(force=True)

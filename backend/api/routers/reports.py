@@ -21,7 +21,6 @@ Example request:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -32,7 +31,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/reports", tags=["Reports"])
+router = APIRouter(tags=["Reports"])
 
 # In-memory report storage (use database in production)
 _reports_cache: dict[str, dict[str, Any]] = {}
@@ -68,89 +67,120 @@ class EmailReportRequest(BaseModel):
     subject: str | None = None
 
 
-@router.post("/generate", response_model=GenerateReportResponse)
-async def generate_report(request: GenerateReportRequest):
+class MonitoringReportRequest(BaseModel):
+    """Request body for the monitoring-style report generation endpoint.
+
+    Accepts backtest results directly (no DB lookup needed).
     """
-    Generate backtest report.
 
-    Generates PDF and/or HTML report for a backtest.
+    strategy_name: str
+    backtest_results: dict[str, Any] = Field(default_factory=dict)
+    format: str = Field(default="json", description="'json' or 'html'")
+    strategy_params: dict[str, Any] = Field(default_factory=dict)
+    walk_forward: dict[str, Any] = Field(default_factory=dict)
+    benchmarks: dict[str, Any] = Field(default_factory=dict)
+
+
+def _grade_strategy(metrics: dict[str, Any]) -> str:
+    """Return a letter grade for a strategy based on its key metrics."""
+    score = 0.0
+    sharpe = float(metrics.get("sharpe_ratio", 0))
+    win_rate = float(metrics.get("win_rate", 0))
+    profit_factor = float(metrics.get("profit_factor", 0))
+    max_dd = abs(float(metrics.get("max_drawdown", 0)))
+    net_profit_pct = float(metrics.get("net_profit_pct", 0))
+
+    if sharpe >= 2.0:
+        score += 3
+    elif sharpe >= 1.5:
+        score += 2
+    elif sharpe >= 1.0:
+        score += 1
+
+    if win_rate >= 0.6:
+        score += 2
+    elif win_rate >= 0.5:
+        score += 1
+
+    if profit_factor >= 2.0:
+        score += 2
+    elif profit_factor >= 1.5:
+        score += 1
+
+    if max_dd < 0.10:
+        score += 2
+    elif max_dd < 0.20:
+        score += 1
+
+    if net_profit_pct > 0.3:
+        score += 1
+
+    if score >= 9:
+        return "A+"
+    if score >= 7:
+        return "A"
+    if score >= 5:
+        return "B"
+    if score >= 3:
+        return "C"
+    if score >= 1:
+        return "D"
+    return "F"
+
+
+@router.post("/generate")
+async def generate_report(request: MonitoringReportRequest):  # type: ignore[misc]
+    """Generate a monitoring-style strategy report.
+
+    Accepts direct backtest metrics (no DB lookup). Supports 'json' and 'html' formats.
     """
-    try:
-        from backend.reports import PDFGenerator, ReportGenerator
+    if request.format not in ("json", "html"):
+        raise HTTPException(status_code=400, detail=f"Unsupported format '{request.format}'. Use 'json' or 'html'.")
 
-        # Mock backtest data (in production, fetch from database)
-        report_data = _get_mock_backtest_data(request.backtest_id)
+    metrics = request.backtest_results.get("metrics")
+    if not metrics:
+        raise HTTPException(status_code=400, detail="'backtest_results.metrics' is required.")
 
-        # Generate report
-        generator = ReportGenerator(
-            include_charts=request.include_charts,
-            include_trades=request.include_trades,
-        )
+    grade = _grade_strategy(metrics)
 
-        report_id = f"rpt_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    report_data: dict[str, Any] = {
+        "assessment": {
+            "grade": grade,
+            "metrics_summary": metrics,
+        },
+        "trades_count": len(request.backtest_results.get("trades", [])),
+    }
 
-        result = GenerateReportResponse(
-            success=True,
-            report_id=report_id,
-            format=request.format,
-            size_bytes=0,
-        )
+    if request.walk_forward:
+        report_data["walk_forward"] = request.walk_forward
 
-        # Generate HTML
-        if request.format in ["html", "both"]:
-            html = generator.generate_html(report_data)
-            _reports_cache[f"{report_id}.html"] = {
-                "content": html,
-                "type": "text/html",
-                "size": len(html),
-            }
-            result.size_bytes += len(html)
+    if request.benchmarks:
+        report_data["benchmarks"] = request.benchmarks
 
-        # Generate PDF
-        if request.format in ["pdf", "both"]:
-            pdf_gen = PDFGenerator()
-            pdf_bytes = pdf_gen.generate(report_data.to_dict() if hasattr(report_data, "to_dict") else report_data)
-            _reports_cache[f"{report_id}.pdf"] = {
-                "content": pdf_bytes,
-                "type": "application/pdf",
-                "size": len(pdf_bytes),
-            }
-            result.size_bytes += len(pdf_bytes)
+    if request.format == "json":
+        return {
+            "success": True,
+            "strategy_name": request.strategy_name,
+            "format": "json",
+            "data": report_data,
+        }
 
-        # Send email if requested
-        if request.email:
-            try:
-                from backend.reports import EmailSender
+    # HTML format
+    from fastapi.responses import HTMLResponse
 
-                email_sender = EmailSender()
-                html_content = _reports_cache.get(f"{report_id}.html", {}).get("content", "")
-                pdf_content = _reports_cache.get(f"{report_id}.pdf", {}).get("content")
-
-                await email_sender.send_report(
-                    recipient=request.email,
-                    subject=f"Backtest Report: {report_data.strategy_name}",
-                    html_body=html_content,
-                    pdf_attachment=pdf_content,
-                )
-
-                result.email_sent = True
-            except Exception as e:
-                logger.warning(f"Email send failed: {e}")
-                result.email_sent = False
-
-        result.download_url = f"/api/v1/reports/{report_id}"
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Report generation failed: {e}", exc_info=True)
-        return GenerateReportResponse(
-            success=False,
-            report_id="",
-            format=request.format,
-            size_bytes=0,
-            error=str(e),
-        )
+    html_rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in metrics.items())
+    html = f"""<!DOCTYPE html>
+<html>
+<head><title>Strategy Report — {request.strategy_name}</title></head>
+<body>
+<h1>Strategy Report: {request.strategy_name}</h1>
+<h2>Grade: {grade}</h2>
+<h3>Metrics</h3>
+<table border="1"><thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>{html_rows}</tbody></table>
+</body>
+</html>"""
+    return HTMLResponse(content=html, media_type="text/html")
 
 
 @router.post("/email")

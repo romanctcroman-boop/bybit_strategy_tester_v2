@@ -103,6 +103,7 @@ class AgentMetricsCollector:
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
         self._redis_client: redis.Redis | None = None
+        self._redis_unavailable: bool = False  # Fast-fail flag when Redis is down
 
         # In-memory cache для быстрого доступа
         self._metrics_cache: dict[str, list[AgentMetric]] = defaultdict(list)
@@ -110,12 +111,23 @@ class AgentMetricsCollector:
 
     async def _get_redis(self) -> redis.Redis:
         """Получить Redis клиент"""
+        if self._redis_unavailable:
+            raise ConnectionError("Redis unavailable (fast-fail)")
         if self._redis_client is None:
-            self._redis_client = redis.from_url(self.redis_url, decode_responses=True)
+            self._redis_client = redis.from_url(
+                self.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=0.2,
+                socket_timeout=0.2,
+            )
         return self._redis_client
 
     async def record_metric(self, metric: AgentMetric) -> None:
         """Записать метрику"""
+        # Fast-path: skip Redis if already known unavailable
+        if self._redis_unavailable:
+            self._metrics_cache[metric.agent_name].append(metric)
+            return
         try:
             # Save to Redis
             redis_client = await self._get_redis()
@@ -140,10 +152,18 @@ class AgentMetricsCollector:
             logger.debug(f"📊 Recorded metric: {metric.agent_name} - {metric.metric_type.value} = {metric.value}")
 
         except Exception as e:
-            logger.error(
-                f"❌ Failed to record metric to Redis: {type(e).__name__}: {e}",
-                exc_info=True,
-            )
+            # Mark Redis as unavailable on connection errors so future calls skip it instantly
+            err_str = str(e).lower()
+            if any(word in err_str for word in ("connect", "connection", "timeout", "refused", "unavailable")):
+                self._redis_unavailable = True
+                logger.warning(f"⚠️ Redis unavailable, switching to in-memory-only mode: {type(e).__name__}: {e}")
+            else:
+                logger.error(
+                    f"❌ Failed to record metric to Redis: {type(e).__name__}: {e}",
+                    exc_info=True,
+                )
+            # Always fall back to in-memory cache
+            self._metrics_cache[metric.agent_name].append(metric)
 
     async def record_response_time(
         self,

@@ -33,13 +33,15 @@ def test_event_queue_fifo():
 
 def test_event_driven_engine_load_and_run():
     """EventDrivenEngine loads bars and runs event loop."""
-    df = pd.DataFrame({
-        "open": [100.0] * 10,
-        "high": [101.0] * 10,
-        "low": [99.0] * 10,
-        "close": np.linspace(100, 109, 10),
-        "volume": [1000.0] * 10,
-    })
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * 10,
+            "high": [101.0] * 10,
+            "low": [99.0] * 10,
+            "close": np.linspace(100, 109, 10),
+            "volume": [1000.0] * 10,
+        }
+    )
     orders_seen = []
 
     def on_bar(event: BarEvent):
@@ -83,17 +85,22 @@ def test_run_event_driven_with_adapter():
         "connections": [
             {"source": {"blockId": "rsi_1", "portId": "value"}, "target": {"blockId": "less_1", "portId": "left"}},
             {"source": {"blockId": "const_30", "portId": "value"}, "target": {"blockId": "less_1", "portId": "right"}},
-            {"source": {"blockId": "less_1", "portId": "result"}, "target": {"blockId": "main_strategy", "portId": "entry_long"}},
+            {
+                "source": {"blockId": "less_1", "portId": "result"},
+                "target": {"blockId": "main_strategy", "portId": "entry_long"},
+            },
         ],
     }
     n = 50
-    df = pd.DataFrame({
-        "open": 100.0 + np.arange(n) * 0.1,
-        "high": 101.0 + np.arange(n) * 0.1,
-        "low": 99.0 + np.arange(n) * 0.1,
-        "close": 100.0 + np.arange(n) * 0.2,
-        "volume": [1000.0] * n,
-    })
+    df = pd.DataFrame(
+        {
+            "open": 100.0 + np.arange(n) * 0.1,
+            "high": 101.0 + np.arange(n) * 0.1,
+            "low": 99.0 + np.arange(n) * 0.1,
+            "close": 100.0 + np.arange(n) * 0.2,
+            "volume": [1000.0] * n,
+        }
+    )
     df["open_time"] = pd.date_range("2024-01-01", periods=n, freq="1h")
 
     adapter = StrategyBuilderAdapter(graph)
@@ -106,13 +113,15 @@ def test_run_event_driven_with_adapter():
 
 def test_simulation_execution_handler():
     """SimulationExecutionHandler applies slippage and partial fills."""
-    df = pd.DataFrame({
-        "open": [100.0, 101.0],
-        "high": [102.0, 103.0],
-        "low": [99.0, 100.0],
-        "close": [101.0, 102.0],
-        "volume": [1000.0, 1000.0],
-    })
+    df = pd.DataFrame(
+        {
+            "open": [100.0, 101.0],
+            "high": [102.0, 103.0],
+            "low": [99.0, 100.0],
+            "close": [101.0, 102.0],
+            "volume": [1000.0, 1000.0],
+        }
+    )
     order = OrderEvent(
         timestamp=1000.0,
         event_type=EventType.ORDER,

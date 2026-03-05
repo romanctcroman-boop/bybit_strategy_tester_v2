@@ -1,19 +1,20 @@
 """
 Final backtest comparison: Strategy_RSI_L\\S_15 vs TradingView
 """
-import sqlite3
-import json
-import pandas as pd
-import numpy as np
-from datetime import datetime
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-from backend.services.data_service import DataService
-from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+import json
+import sqlite3
+import sys
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
 from backend.backtesting.models import BacktestConfig
-from backend.models import MarketData
+from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+from backend.services.data_service import DataService
 
 # Parameters (from TV a5.csv)
 SYMBOL = "ETHUSDT"
@@ -48,7 +49,7 @@ DB_PATH = "d:/bybit_strategy_tester_v2/data.sqlite3"
 conn = sqlite3.connect(DB_PATH)
 row = conn.execute(
     "SELECT id, name, builder_blocks, builder_connections FROM strategies WHERE id=?",
-    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",)
+    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",),
 ).fetchone()
 conn.close()
 
@@ -66,16 +67,16 @@ print(f"ID: {strategy_id}")
 # Show RSI params
 for b in blocks:
     if b["type"] == "rsi":
-        print(f"\nRSI Params:")
+        print("\nRSI Params:")
         for k, v in b["params"].items():
             print(f"  {k}: {v}")
     elif b["type"] == "static_sltp":
-        print(f"\nSL/TP Params:")
+        print("\nSL/TP Params:")
         for k, v in b["params"].items():
             print(f"  {k}: {v}")
 
 # Load data
-print(f"\nLoading data...")
+print("\nLoading data...")
 with DataService() as ds:
     eth_data = ds.get_market_data(
         symbol=SYMBOL,
@@ -96,30 +97,40 @@ print(f"  ETHUSDT bars: {len(eth_data)}")
 print(f"  BTCUSDT bars: {len(btc_data)}")
 
 # Convert to DataFrame
-ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in eth_data])
+ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in eth_data
+    ]
+)
 ohlcv.index = pd.to_datetime([d.open_time_dt for d in eth_data])
-ohlcv.index.name = 'time'
+ohlcv.index.name = "time"
 
-btc_ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in btc_data])
+btc_ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in btc_data
+    ]
+)
 btc_ohlcv.index = pd.to_datetime([d.open_time_dt for d in btc_data])
-btc_ohlcv.index.name = 'time'
+btc_ohlcv.index.name = "time"
 
 print(f"  OHLCV range: {ohlcv.index.min()} - {ohlcv.index.max()}")
 
 # Generate signals
-print(f"\nGenerating signals...")
+print("\nGenerating signals...")
 
 strategy_graph = {
     "blocks": blocks,
@@ -140,23 +151,25 @@ print(f"  LONG signals (entries): {signals.entries.sum()}")
 print(f"  SHORT signals (short_entries): {signals.short_entries.sum() if signals.short_entries is not None else 0}")
 
 # Show first few signals
-print(f"\nFirst 5 LONG signals:")
+print("\nFirst 5 LONG signals:")
 if signals.entries is not None and signals.entries.any():
     long_signal_indices = np.where(signals.entries)[0][:5]
     for i, idx in enumerate(long_signal_indices):
-        print(f"  #{i+1}: Bar {idx} - {ohlcv.index[idx]} - Close: {ohlcv.iloc[idx]['close']}")
+        print(f"  #{i + 1}: Bar {idx} - {ohlcv.index[idx]} - Close: {ohlcv.iloc[idx]['close']}")
 
-print(f"\nFirst 5 SHORT signals:")
+print("\nFirst 5 SHORT signals:")
 if signals.short_entries is not None and signals.short_entries.any():
     short_signal_indices = np.where(signals.short_entries)[0][:5]
     for i, idx in enumerate(short_signal_indices):
-        print(f"  #{i+1}: Bar {idx} - {ohlcv.index[idx]} - Close: {ohlcv.iloc[idx]['close']}")
+        print(f"  #{i + 1}: Bar {idx} - {ohlcv.index[idx]} - Close: {ohlcv.iloc[idx]['close']}")
 
 # Run backtest
-print(f"\nRunning backtest...")
+print("\nRunning backtest...")
 config = BacktestConfig(
     symbol=SYMBOL,
     interval=INTERVAL,
+    start_date=START_DATE,
+    end_date=END_DATE,
     initial_capital=10000,
     commission_value=0.0007,
     slippage_value=0.0,
@@ -185,16 +198,20 @@ input_data = BacktestInput(
     short_entries=short_entries,
     short_exits=short_exits,
     initial_capital=10000,
-    commission_value=0.0007,
-    slippage_value=0.0,
-    position_size_pct=10,
+    taker_fee=0.0007,
+    slippage=0.0,
+    position_size=0.1,  # 10% of capital
     leverage=10,
     pyramiding=1,
+    stop_loss=0.132,  # 13.2%
+    take_profit=0.023,  # 2.3%
+    sl_mode="fixed",
+    tp_mode="fixed",
 )
 
 result = engine.run(input_data)
 
-print(f"\nBacktest completed!")
+print("\nBacktest completed!")
 print(f"  Total trades: {len(result.trades)}")
 
 # Calculate metrics
@@ -203,14 +220,14 @@ if result.trades:
     losing = [t for t in result.trades if t.pnl < 0]
     long_trades = [t for t in result.trades if t.direction == "long"]
     short_trades = [t for t in result.trades if t.direction == "short"]
-    
+
     net_profit = sum(t.pnl for t in result.trades)
     total_commission = sum(t.fees for t in result.trades)
     win_rate = len(winning) / len(result.trades) * 100 if result.trades else 0
     avg_profit = sum(t.pnl for t in winning) / len(winning) if winning else 0
     avg_loss = sum(t.pnl for t in losing) / len(losing) if losing else 0
-    
-    print(f"\nOur Results:")
+
+    print("\nOur Results:")
     print(f"  Net Profit: {net_profit:.2f} USDT")
     print(f"  Net Profit %: {net_profit / 10000 * 100:.2f}%")
     print(f"  Total Trades: {len(result.trades)}")
@@ -222,7 +239,7 @@ if result.trades:
     print(f"  Long Trades: {len(long_trades)}, Short Trades: {len(short_trades)}")
 
 # Compare with TV
-print(f"\n" + "=" * 100)
+print("\n" + "=" * 100)
 print("COMPARISON WITH TRADINGVIEW")
 print("=" * 100)
 print(f"\n{'Metric':<30} {'TV Expected':<15} {'Our Result':<15} {'Match':<10}")
@@ -248,7 +265,7 @@ for metric_name, tv_val, our_val in metrics_to_compare:
         match = "OK" if diff_pct < 5 else "MISMATCH"
     else:
         match = "OK" if our_val == 0 else "MISMATCH"
-    
+
     print(f"{metric_name:<30} {tv_val:<15.2f} {our_val:<15.2f} {match:<10} ({diff_pct:.1f}%)")
 
 print("\n" + "=" * 100)

@@ -113,9 +113,7 @@ class TestSignalGenerator:
         )
 
         assert len(output.long_entries) == len(sample_candles)
-        assert (
-            "bb_upper" in output.indicator_values or "upper" in output.indicator_values
-        )
+        assert "bb_upper" in output.indicator_values or "upper" in output.indicator_values
 
 
 # =============================================================================
@@ -268,9 +266,7 @@ class TestUniversalOptimizer:
         result = optimizer.optimize(
             candles=sample_candles,
             strategy_type="rsi",
-            base_params={
-                "strategy_params": {"period": 14, "overbought": 70, "oversold": 30}
-            },
+            base_params={"strategy_params": {"period": 14, "overbought": 70, "oversold": 30}},
             param_ranges={
                 "period": [10, 14, 21],
                 "overbought": [70, 75],
@@ -295,9 +291,7 @@ class TestUniversalOptimizer:
         result = optimizer.optimize(
             candles=sample_candles,
             strategy_type="rsi",
-            base_params={
-                "strategy_params": {"period": 14, "overbought": 70, "oversold": 30}
-            },
+            base_params={"strategy_params": {"period": 14, "overbought": 70, "oversold": 30}},
             param_ranges={
                 "period": list(range(10, 31)),  # 21 values
                 "overbought": list(range(65, 86)),  # 21 values

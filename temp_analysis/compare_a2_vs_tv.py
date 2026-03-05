@@ -1,4 +1,3 @@
-import json
 import sqlite3
 
 conn = sqlite3.connect("data.sqlite3")
@@ -50,11 +49,11 @@ for i, trade in enumerate(trades[:15]):
         tv = tv_trades[i]
         delta = entry_price - tv[3]
         print(
-            f"{i + 1:>3} | {side:5} | {str(entry_time):22} | {entry_price:10.4f} | {tv[3]:10.2f} | {delta:+8.4f} | {pnl:8.2f} | {tv[6]:8.2f} | {str(exit_time):22} | {exit_sig or '':12}"
+            f"{i + 1:>3} | {side:5} | {entry_time!s:22} | {entry_price:10.4f} | {tv[3]:10.2f} | {delta:+8.4f} | {pnl:8.2f} | {tv[6]:8.2f} | {exit_time!s:22} | {exit_sig or '':12}"
         )
     else:
         print(
-            f"{i + 1:>3} | {side:5} | {str(entry_time):22} | {entry_price:10.4f} | {'N/A':10} | {'N/A':8} | {pnl:8.2f} | {'N/A':8} | {str(exit_time):22} | {exit_sig or '':12}"
+            f"{i + 1:>3} | {side:5} | {entry_time!s:22} | {entry_price:10.4f} | {'N/A':10} | {'N/A':8} | {pnl:8.2f} | {'N/A':8} | {exit_time!s:22} | {exit_sig or '':12}"
         )
 
 # Summary comparison
@@ -85,7 +84,7 @@ cur = conn.execute(
     (full_bt_id,),
 )
 bt = cur.fetchone()
-print(f"\n=== Backtest Table Metrics ===")
+print("\n=== Backtest Table Metrics ===")
 labels = [
     "net_profit",
     "total_trades",

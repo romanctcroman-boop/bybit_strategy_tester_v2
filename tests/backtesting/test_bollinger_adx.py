@@ -56,23 +56,17 @@ class TestBollingerBands:
         filter = BollingerFilter(period=20, std_dev=2.0, mode="mean_reversion")
 
         # Price at lower band -> allow LONG
-        allow_long, allow_short = filter.check(
-            htf_close=95.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=95.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is True
         assert allow_short is False
 
         # Price at upper band -> allow SHORT
-        allow_long, allow_short = filter.check(
-            htf_close=110.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=110.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is False
         assert allow_short is True
 
         # Price in middle -> allow both
-        allow_long, allow_short = filter.check(
-            htf_close=102.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=102.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is True
         assert allow_short is True
 
@@ -81,31 +75,23 @@ class TestBollingerBands:
         filter = BollingerFilter(period=20, std_dev=2.0, mode="breakout")
 
         # Price above upper -> breakout LONG
-        allow_long, allow_short = filter.check(
-            htf_close=112.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=112.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is True
         assert allow_short is False
 
         # Price below lower -> breakout SHORT
-        allow_long, allow_short = filter.check(
-            htf_close=93.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=93.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is False
         assert allow_short is True
 
         # Price inside bands -> no signals
-        allow_long, allow_short = filter.check(
-            htf_close=102.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5
-        )
+        allow_long, allow_short = filter.check(htf_close=102.0, htf_indicator=0, upper=110.0, lower=95.0, middle=102.5)
         assert allow_long is False
         assert allow_short is False
 
     def test_bollinger_filter_squeeze(self):
         """Test squeeze mode."""
-        filter = BollingerFilter(
-            period=20, std_dev=2.0, mode="squeeze", bandwidth_threshold=4.0
-        )
+        filter = BollingerFilter(period=20, std_dev=2.0, mode="squeeze", bandwidth_threshold=4.0)
 
         # Squeeze (low bandwidth) + above middle -> LONG
         allow_long, allow_short = filter.check(
@@ -175,23 +161,17 @@ class TestADX:
         filter = ADXFilter(period=14, threshold=25, mode="combined")
 
         # Strong uptrend -> LONG only
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=35.0, plus_di=30.0, minus_di=15.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=35.0, plus_di=30.0, minus_di=15.0)
         assert allow_long is True
         assert allow_short is False
 
         # Strong downtrend -> SHORT only
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=35.0, plus_di=15.0, minus_di=30.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=35.0, plus_di=15.0, minus_di=30.0)
         assert allow_long is False
         assert allow_short is True
 
         # Weak ADX -> no signals
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=20.0, plus_di=30.0, minus_di=15.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=20.0, plus_di=30.0, minus_di=15.0)
         assert allow_long is False
         assert allow_short is False
 
@@ -200,9 +180,7 @@ class TestADX:
         filter = ADXFilter(period=14, threshold=25, mode="direction")
 
         # Uptrend (ignore ADX level)
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=15.0, plus_di=30.0, minus_di=15.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=15.0, plus_di=30.0, minus_di=15.0)
         assert allow_long is True
         assert allow_short is False
 
@@ -211,16 +189,12 @@ class TestADX:
         filter = ADXFilter(period=14, threshold=25, mode="trend_only")
 
         # Strong trend -> allow both
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=35.0, plus_di=25.0, minus_di=20.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=35.0, plus_di=25.0, minus_di=20.0)
         assert allow_long is True
         assert allow_short is True
 
         # Weak trend -> no signals
-        allow_long, allow_short = filter.check(
-            htf_close=0, htf_indicator=0, adx=15.0, plus_di=25.0, minus_di=20.0
-        )
+        allow_long, allow_short = filter.check(htf_close=0, htf_indicator=0, adx=15.0, plus_di=25.0, minus_di=20.0)
         assert allow_long is False
         assert allow_short is False
 

@@ -30,12 +30,7 @@ for i in range(120):
     )
 
 # Create signals array: buy at 10, close at 20
-signals = (
-    [None] * 10
-    + [{"action": "buy", "quantity": 0.01}]
-    + [None] * 9
-    + [{"action": "close"}]
-)
+signals = [None] * 10 + [{"action": "buy", "quantity": 0.01}] + [None] * 9 + [{"action": "close"}]
 
 payload = {
     "symbol": "BTCUSDT",

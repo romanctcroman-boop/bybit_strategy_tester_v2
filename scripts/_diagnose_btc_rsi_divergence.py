@@ -130,14 +130,14 @@ async def main():
     # our engine but TV does NOT fire → TV's RSI must have a different value
     # OR TV applies a different filter like use_short_range [52..100] that
     # requires RSI to also be <= some upper threshold or just came from above)
-    print(f"\n── Engine-only signals: BTC RSI prev/cur at our data ──")
-    print(f"  (These fire in our engine but NOT in TV)")
-    print(f"  All have our crossunder=True (prev>=52, cur<52).")
-    print(f"  TV must NOT see them — possible reasons:")
-    print(f"  a) TV's BTC RSI values are different (price data difference)")
-    print(f"  b) TV applies additional range filter: short_range=[20..52] requires")
-    print(f"     RSI to have been in [20..52] before the crossunder")
-    print(f"  c) TV applies 'use_long_range' to filter short signals too")
+    print("\n── Engine-only signals: BTC RSI prev/cur at our data ──")
+    print("  (These fire in our engine but NOT in TV)")
+    print("  All have our crossunder=True (prev>=52, cur<52).")
+    print("  TV must NOT see them — possible reasons:")
+    print("  a) TV's BTC RSI values are different (price data difference)")
+    print("  b) TV applies additional range filter: short_range=[20..52] requires")
+    print("     RSI to have been in [20..52] before the crossunder")
+    print("  c) TV applies 'use_long_range' to filter short signals too")
     print()
     print(f"  {'Time (UTC)':22s}  {'prev_RSI':8s}  {'cur_RSI':8s}  delta  margin_from_52")
     for ts in ENGINE_ONLY_SHORT[:10]:
@@ -151,7 +151,7 @@ async def main():
 
     # ── 4. What if TV uses a DIFFERENT RSI period? Try period=14 on 30m but
     #       also try Wilder's using SMA init (pandas default) vs EWM ──────────
-    print(f"\n── Alternative RSI calculation at TV-only bar 2026-02-01 10:00 ──")
+    print("\n── Alternative RSI calculation at TV-only bar 2026-02-01 10:00 ──")
 
     # RMA (Wilder's Moving Average = EWM with alpha=1/period, adjust=False)
     # This is what TradingView uses — same as our current implementation.
@@ -190,9 +190,9 @@ async def main():
     # which means cur_rsi <= 52 (already satisfied by definition of crossunder)
     # and prev_rsi was >= 52 and now cur < 52
     # Maybe the range is applied to the PREVIOUS bar? Let's check all engine-only signals
-    print(f"\n── Checking use_short_range=[20,52] filter on engine-only signals ──")
-    print(f"  If TV also checks: rsi_prev MUST have been in [20..52] (not possible if >=52?)")
-    print(f"  OR: after crossunder, TV checks if current rsi is in [20..52]")
+    print("\n── Checking use_short_range=[20,52] filter on engine-only signals ──")
+    print("  If TV also checks: rsi_prev MUST have been in [20..52] (not possible if >=52?)")
+    print("  OR: after crossunder, TV checks if current rsi is in [20..52]")
     print()
     # Actually crossunder fires at bar where RSI just went below 52
     # After crossunder: cur_rsi < 52, so if range is [20..52], cur in range = cur>=20 AND cur<=52
@@ -206,20 +206,20 @@ async def main():
         cur_val = btc_rsi_30m.iloc[cur_loc]
         prev_val = btc_rsi_30m.iloc[cur_loc - 1]
         in_range = 20 <= cur_val <= 52
-        print(f"  {str(ts)[:22]:22s}  {prev_val:8.4f}  {cur_val:8.4f}  {str(in_range)}")
+        print(f"  {str(ts)[:22]:22s}  {prev_val:8.4f}  {cur_val:8.4f}  {in_range!s}")
 
     # ── 6. Summary ─────────────────────────────────────────────────────────────
-    print(f"\n══════════════════════════════════════════════════════════════")
-    print(f"SUMMARY:")
+    print("\n══════════════════════════════════════════════════════════════")
+    print("SUMMARY:")
     print(f"  TV-only signal (2026-02-01 10:00): our prev_rsi={btc_rsi_30m.loc[prev_t]:.4f}")
-    print(f"  => prev_rsi < 52 means our BTC data shows NO crossunder at this bar")
-    print(f"  => TV must have a slightly different BTC price => different RSI")
+    print("  => prev_rsi < 52 means our BTC data shows NO crossunder at this bar")
+    print("  => TV must have a slightly different BTC price => different RSI")
     print()
-    print(f"  Engine fires 21 extra signals that TV does NOT fire.")
-    print(f"  Check the 'use_short_range' filter — TV may apply it differently.")
-    print(f"  If all engine-only signals have cur_rsi in [20,52], that's not the filter.")
-    print(f"  Root cause is likely: TV uses a slightly different BTC close price stream")
-    print(f"  (TV real-time feed vs Bybit REST API historical — different rounding/aggregation)")
+    print("  Engine fires 21 extra signals that TV does NOT fire.")
+    print("  Check the 'use_short_range' filter — TV may apply it differently.")
+    print("  If all engine-only signals have cur_rsi in [20,52], that's not the filter.")
+    print("  Root cause is likely: TV uses a slightly different BTC close price stream")
+    print("  (TV real-time feed vs Bybit REST API historical — different rounding/aggregation)")
 
 
 asyncio.run(main())

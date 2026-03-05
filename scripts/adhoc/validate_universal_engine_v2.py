@@ -61,9 +61,7 @@ print(f"  ✅ Hedge PnL: {pnl:.2f} (expected: 500.0)")
 
 # 5. Test Funding Rate
 print("\n[5/6] Testing Funding Rate...")
-funding_config = FundingConfig(
-    enabled=True, funding_rate=0.0001, funding_interval_hours=8
-)
+funding_config = FundingConfig(enabled=True, funding_rate=0.0001, funding_interval_hours=8)
 features3 = AdvancedFeatures(funding_config=funding_config)
 funding_cost = features3.calculate_funding(10000.0, 24.0, is_long=True)
 assert abs(funding_cost - (-3.0)) < 0.01  # 3 intervals * 0.01% = -3
@@ -72,13 +70,9 @@ print(f"  ✅ Funding cost (24h long): {funding_cost:.2f}")
 # 6. Test Genetic Optimizer
 print("\n[6/6] Testing Genetic Algorithm...")
 ga_config = GeneticConfig(population_size=15, n_generations=8)
-ga = GeneticOptimizer(
-    config=ga_config, param_bounds={"x": (-5.0, 5.0), "y": (-5.0, 5.0)}
-)
+ga = GeneticOptimizer(config=ga_config, param_bounds={"x": (-5.0, 5.0), "y": (-5.0, 5.0)})
 result = ga.optimize(lambda p: -(p["x"] ** 2 + p["y"] ** 2), verbose=False)
-print(
-    f"  ✅ GA found x={result['best_params']['x']:.3f}, y={result['best_params']['y']:.3f}"
-)
+print(f"  ✅ GA found x={result['best_params']['x']:.3f}, y={result['best_params']['y']:.3f}")
 print("     (optimal: x=0, y=0)")
 
 # 7. Test Monte Carlo

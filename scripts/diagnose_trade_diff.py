@@ -2,6 +2,7 @@
 🔍 ДИАГНОСТИКА РАСХОЖДЕНИЯ ДВИЖКОВ
 Почему Fallback: 59 trades, Numba: 58 trades?
 """
+
 import sys
 from pathlib import Path
 
@@ -20,19 +21,23 @@ print("=" * 100)
 # ============================================================================
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
 
 print(f"Данные: {len(df_1h)} баров")
+
 
 # RSI сигналы
 def calculate_rsi(close, period=14):
@@ -45,7 +50,8 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-rsi = calculate_rsi(df_1h['close'], period=14)
+
+rsi = calculate_rsi(df_1h["close"], period=14)
 long_entries = (rsi < 30).values
 long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
@@ -101,24 +107,26 @@ print(f"Numba: {len(nb_result.trades)} сделок")
 print(f"Разница: {len(fb_result.trades) - len(nb_result.trades)} сделок")
 
 # Создадим таблицы для сравнения
-fb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name)
-             for t in fb_result.trades]
-nb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name)
-             for t in nb_result.trades]
+fb_trades = [
+    (t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name) for t in fb_result.trades
+]
+nb_trades = [
+    (t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name) for t in nb_result.trades
+]
 
 print("\n" + "-" * 100)
 print("FALLBACK TRADES (первые 10):")
 print("-" * 100)
 print(f"{'#':<3} {'Entry Time':<22} {'Dir':<6} {'Entry Price':>12} {'Exit Price':>12} {'PnL':>12} {'Reason':<12}")
 for i, t in enumerate(fb_trades[:10]):
-    print(f"{i+1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
+    print(f"{i + 1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
 
 print("\n" + "-" * 100)
 print("NUMBA TRADES (первые 10):")
 print("-" * 100)
 print(f"{'#':<3} {'Entry Time':<22} {'Dir':<6} {'Entry Price':>12} {'Exit Price':>12} {'PnL':>12} {'Reason':<12}")
 for i, t in enumerate(nb_trades[:10]):
-    print(f"{i+1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
+    print(f"{i + 1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
 
 # ============================================================================
 # НАЙТИ ОТЛИЧАЮЩУЮСЯ СДЕЛКУ

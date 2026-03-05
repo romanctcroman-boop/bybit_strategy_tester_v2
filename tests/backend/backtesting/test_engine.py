@@ -390,7 +390,4 @@ class TestPerformanceMetrics:
 
         # Winning + losing trades should approximately equal total trades
         # (may differ due to break-even trades or open positions)
-        assert (
-            result.metrics.winning_trades + result.metrics.losing_trades
-            <= result.metrics.total_trades
-        )
+        assert result.metrics.winning_trades + result.metrics.losing_trades <= result.metrics.total_trades

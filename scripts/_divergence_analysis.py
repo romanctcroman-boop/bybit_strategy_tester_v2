@@ -280,7 +280,7 @@ async def main():
             print(f"    Gap: {gap_bars} bars ({(tv_signal_ts - eng_ts).total_seconds() / 1800:.1f} x 30min)")
 
             # Show all RSI values between eng and TV signal
-            print(f"    RSI between eng_T and tv_T:")
+            print("    RSI between eng_T and tv_T:")
             for offset in range(1, min(gap_bars, 20)):
                 idx_i = eng_pos + offset
                 if 0 <= idx_i < len(candles_idx):
@@ -293,7 +293,7 @@ async def main():
                             flag = " <CROSSUNDER"
                     print(f"      +{offset:2d} {t}  RSI={r:.4f}{flag}")
         else:
-            print(f"    TV replacement: (none found in +48h window)")
+            print("    TV replacement: (none found in +48h window)")
 
 
 asyncio.run(main())

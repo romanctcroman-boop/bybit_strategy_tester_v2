@@ -149,7 +149,7 @@ async def main():
     print()
     print("Trade #142 (short):")
     entry_bar_142 = pd.Timestamp("2026-02-06 06:30:00", tz="UTC")
-    print(f"  Entry_px:   1939.46 (bar 06:30 open)")
+    print("  Entry_px:   1939.46 (bar 06:30 open)")
     print(f"  TP target:  {tp_142:.2f}")
 
     for offset in range(10):

@@ -166,7 +166,7 @@ async def main():
             print(f"    SMA raw BTC: RSI[T-1]={sma_raw_prev:.10f}  RSI[T]={sma_raw_curr:.10f}  cross={sma_raw_cross}")
 
             # Distance from boundary
-            print(f"    Distance from 52.0:")
+            print("    Distance from 52.0:")
             print(f"      EWM T-1: {ewm_prev - cross_level:+.10f}  T: {ewm_curr - cross_level:+.10f}")
             print(f"      SMA T-1: {sma_prev - cross_level:+.10f}  T: {sma_curr - cross_level:+.10f}")
 
@@ -189,7 +189,7 @@ async def main():
     print(f"  SMA-only (fires in SMA but NOT EWM): {sma_only.sum()}")
 
     if ewm_only.any():
-        print(f"\n  EWM-only crossunder bars:")
+        print("\n  EWM-only crossunder bars:")
         for ts in idx[ewm_only]:
             i = idx.get_loc(ts)
             prev_ts_local = ts - pd.Timedelta(minutes=30)
@@ -200,7 +200,7 @@ async def main():
             print(f"    {ts}: EWM {e_prev:.6f}->{e_curr:.6f}  SMA {s_prev:.6f}->{s_curr:.6f}")
 
     if sma_only.any():
-        print(f"\n  SMA-only crossunder bars:")
+        print("\n  SMA-only crossunder bars:")
         for ts in idx[sma_only]:
             prev_ts_local = ts - pd.Timedelta(minutes=30)
             e_prev = rsi_ewm_aligned.loc[prev_ts_local] if prev_ts_local in rsi_ewm_aligned.index else np.nan

@@ -21,22 +21,25 @@ def load_candles():
     end_ts = int(datetime(2025, 1, 11).timestamp() * 1000)
 
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT open_time, open_price, high_price, low_price, close_price, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '15'
         AND open_time >= ? AND open_time <= ?
         ORDER BY open_time
-    ''', (start_ts, end_ts))
+    """,
+        (start_ts, end_ts),
+    )
 
     rows = cursor.fetchall()
     conn.close()
 
-    df = pd.DataFrame(rows, columns=['open_time', 'open', 'high', 'low', 'close', 'volume'])
-    df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-    df = df.set_index('open_time')
-    for col in ['open', 'high', 'low', 'close', 'volume']:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+    df = pd.DataFrame(rows, columns=["open_time", "open", "high", "low", "close", "volume"])
+    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+    df = df.set_index("open_time")
+    for col in ["open", "high", "low", "close", "volume"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
@@ -44,20 +47,20 @@ def main():
     from backend.backtesting.engine import BacktestEngine
     from backend.backtesting.models import BacktestConfig, PerformanceMetrics
 
-    print("="*80)
+    print("=" * 80)
     print("DETAILED METRICS AUDIT - ALL 137 METRICS")
-    print("="*80)
+    print("=" * 80)
 
     df = load_candles()
 
     config = BacktestConfig(
-        symbol='BTCUSDT',
-        interval='15',
+        symbol="BTCUSDT",
+        interval="15",
         start_date=datetime(2025, 1, 1),
         end_date=datetime(2025, 1, 11),
-        strategy_type='rsi',
-        strategy_params={'period': 21, 'oversold': 30, 'overbought': 70},
-        direction='both',
+        strategy_type="rsi",
+        strategy_params={"period": 21, "oversold": 30, "overbought": 70},
+        direction="both",
         initial_capital=10000.0,
         leverage=10.0,
         position_size=1.0,
@@ -72,30 +75,96 @@ def main():
 
     # Categorize metrics
     categories = {
-        'MONETARY': ['net_profit', 'net_profit_pct', 'gross_profit', 'gross_profit_pct',
-                     'gross_loss', 'gross_loss_pct', 'total_commission', 'buy_hold_return',
-                     'total_return', 'annual_return'],
-        'RISK': ['sharpe_ratio', 'sortino_ratio', 'calmar_ratio', 'volatility',
-                 'ulcer_index', 'sqn', 'recovery_factor', 'expectancy', 'expectancy_ratio'],
-        'DRAWDOWN': ['max_drawdown', 'max_drawdown_value', 'avg_drawdown',
-                     'max_drawdown_duration_days', 'max_runup', 'avg_runup',
-                     'max_drawdown_intrabar', 'max_runup_intrabar'],
-        'TRADE_STATS': ['total_trades', 'winning_trades', 'losing_trades', 'breakeven_trades',
-                        'win_rate', 'profit_factor', 'avg_trade', 'avg_trade_value'],
-        'WIN_LOSS': ['avg_win', 'avg_win_value', 'avg_loss', 'avg_loss_value',
-                     'largest_win', 'largest_loss', 'avg_win_loss_ratio'],
-        'DURATION': ['avg_bars_in_trade', 'avg_bars_in_winning', 'avg_bars_in_losing',
-                     'exposure_time', 'avg_trade_duration_hours', 'max_trade_duration_hours',
-                     'min_trade_duration_hours'],
-        'STREAKS': ['max_consecutive_wins', 'max_consecutive_losses'],
-        'LONG_SPECIFIC': ['long_trades', 'long_win_rate', 'long_pnl', 'long_profit_factor',
-                          'long_avg_win', 'long_avg_loss', 'long_largest_win', 'long_largest_loss'],
-        'SHORT_SPECIFIC': ['short_trades', 'short_win_rate', 'short_pnl', 'short_profit_factor',
-                           'short_avg_win', 'short_avg_loss', 'short_largest_win', 'short_largest_loss'],
-        'MARGIN': ['avg_margin_used', 'max_margin_used', 'margin_efficiency', 'max_contracts_held'],
-        'TV_SPECIFIC': ['strategy_outperformance', 'largest_win_pct_of_gross',
-                        'largest_loss_pct_of_gross', 'net_profit_to_largest_loss',
-                        'account_size_required'],
+        "MONETARY": [
+            "net_profit",
+            "net_profit_pct",
+            "gross_profit",
+            "gross_profit_pct",
+            "gross_loss",
+            "gross_loss_pct",
+            "total_commission",
+            "buy_hold_return",
+            "total_return",
+            "annual_return",
+        ],
+        "RISK": [
+            "sharpe_ratio",
+            "sortino_ratio",
+            "calmar_ratio",
+            "volatility",
+            "ulcer_index",
+            "sqn",
+            "recovery_factor",
+            "expectancy",
+            "expectancy_ratio",
+        ],
+        "DRAWDOWN": [
+            "max_drawdown",
+            "max_drawdown_value",
+            "avg_drawdown",
+            "max_drawdown_duration_days",
+            "max_runup",
+            "avg_runup",
+            "max_drawdown_intrabar",
+            "max_runup_intrabar",
+        ],
+        "TRADE_STATS": [
+            "total_trades",
+            "winning_trades",
+            "losing_trades",
+            "breakeven_trades",
+            "win_rate",
+            "profit_factor",
+            "avg_trade",
+            "avg_trade_value",
+        ],
+        "WIN_LOSS": [
+            "avg_win",
+            "avg_win_value",
+            "avg_loss",
+            "avg_loss_value",
+            "largest_win",
+            "largest_loss",
+            "avg_win_loss_ratio",
+        ],
+        "DURATION": [
+            "avg_bars_in_trade",
+            "avg_bars_in_winning",
+            "avg_bars_in_losing",
+            "exposure_time",
+            "avg_trade_duration_hours",
+            "max_trade_duration_hours",
+            "min_trade_duration_hours",
+        ],
+        "STREAKS": ["max_consecutive_wins", "max_consecutive_losses"],
+        "LONG_SPECIFIC": [
+            "long_trades",
+            "long_win_rate",
+            "long_pnl",
+            "long_profit_factor",
+            "long_avg_win",
+            "long_avg_loss",
+            "long_largest_win",
+            "long_largest_loss",
+        ],
+        "SHORT_SPECIFIC": [
+            "short_trades",
+            "short_win_rate",
+            "short_pnl",
+            "short_profit_factor",
+            "short_avg_win",
+            "short_avg_loss",
+            "short_largest_win",
+            "short_largest_loss",
+        ],
+        "MARGIN": ["avg_margin_used", "max_margin_used", "margin_efficiency", "max_contracts_held"],
+        "TV_SPECIFIC": [
+            "strategy_outperformance",
+            "largest_win_pct_of_gross",
+            "largest_loss_pct_of_gross",
+            "net_profit_to_largest_loss",
+            "account_size_required",
+        ],
     }
 
     total = 0
@@ -106,9 +175,9 @@ def main():
 
     # Print by category
     for cat_name, cat_fields in categories.items():
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"  {cat_name}")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         for field in cat_fields:
             if field not in schema:
@@ -168,9 +237,9 @@ def main():
     uncategorized = [f for f in schema if f not in all_categorized]
 
     if uncategorized:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"  OTHER METRICS ({len(uncategorized)} fields)")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
 
         for field in sorted(uncategorized):
             value = getattr(metrics, field, None)
@@ -207,9 +276,9 @@ def main():
             print(f"  {status:8} {field:40} = {val_str}")
 
     # Summary
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("SUMMARY")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"  Total metrics:     {total}")
     print(f"  Filled (non-zero): {filled}")
     print(f"  Zero values:       {zero}")
@@ -221,7 +290,7 @@ def main():
         for field, issue in problematic:
             print(f"    - {field}: {issue}")
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
 
 
 if __name__ == "__main__":

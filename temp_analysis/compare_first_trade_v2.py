@@ -1,16 +1,17 @@
 """
 First trade analysis - Compare TV vs Our implementation
 """
-import sqlite3
-import json
-import pandas as pd
-from datetime import datetime
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-from backend.services.data_service import DataService
+import json
+import sqlite3
+import sys
+
+import pandas as pd
+
+sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
 from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
-from backend.models import MarketData
+from backend.services.data_service import DataService
 
 # Parameters
 SYMBOL = "ETHUSDT"
@@ -34,7 +35,7 @@ DB_PATH = "d:/bybit_strategy_tester_v2/data.sqlite3"
 conn = sqlite3.connect(DB_PATH)
 row = conn.execute(
     "SELECT id, name, builder_blocks, builder_connections FROM strategies WHERE id=?",
-    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",)
+    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",),
 ).fetchone()
 conn.close()
 
@@ -49,7 +50,7 @@ connections = json.loads(connections_json) if connections_json else []
 print(f"\nStrategy: {name}")
 
 # Load data
-print(f"\nLoading data...")
+print("\nLoading data...")
 with DataService() as ds:
     eth_data = ds.get_market_data(
         symbol=SYMBOL,
@@ -68,37 +69,48 @@ print(f"  ETHUSDT bars: {len(eth_data)}")
 print(f"  BTCUSDT bars: {len(btc_data)}")
 
 # Convert to DataFrame
-ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in eth_data])
+ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in eth_data
+    ]
+)
 ohlcv.index = pd.to_datetime([d.open_time_dt for d in eth_data])
-ohlcv.index.name = 'time'
+ohlcv.index.name = "time"
 
-btc_ohlcv = pd.DataFrame([{
-    'open': d.open_price,
-    'high': d.high_price,
-    'low': d.low_price,
-    'close': d.close_price,
-    'volume': d.volume,
-} for d in btc_data])
+btc_ohlcv = pd.DataFrame(
+    [
+        {
+            "open": d.open_price,
+            "high": d.high_price,
+            "low": d.low_price,
+            "close": d.close_price,
+            "volume": d.volume,
+        }
+        for d in btc_data
+    ]
+)
 btc_ohlcv.index = pd.to_datetime([d.open_time_dt for d in btc_data])
-btc_ohlcv.index.name = 'time'
+btc_ohlcv.index.name = "time"
 
 print(f"  OHLCV range: {ohlcv.index.min()} - {ohlcv.index.max()}")
 
 # Show bars around first TV trade
 print(f"\nETHUSDT bars around first TV trade ({TV_FIRST_SHORT['entry_time']}):")
 target_time = pd.to_datetime("2025-01-01 16:30:00+00:00")
-mask = (ohlcv.index >= pd.to_datetime("2025-01-01 15:00:00+00:00")) & \
-       (ohlcv.index <= pd.to_datetime("2025-01-01 18:00:00+00:00"))
-print(ohlcv[mask][['open', 'high', 'low', 'close']].to_string())
+mask = (ohlcv.index >= pd.to_datetime("2025-01-01 15:00:00+00:00")) & (
+    ohlcv.index <= pd.to_datetime("2025-01-01 18:00:00+00:00")
+)
+print(ohlcv[mask][["open", "high", "low", "close"]].to_string())
 
 # Generate signals
-print(f"\nGenerating signals...")
+print("\nGenerating signals...")
 adapter = StrategyBuilderAdapter()
 adapter._btcusdt_30m_ohlcv = btc_ohlcv
 
@@ -118,41 +130,41 @@ print(f"  LONG signals: {signals['long'].sum()}")
 print(f"  SHORT signals: {signals['short'].sum()}")
 
 # Show first SHORT signals
-print(f"\nFirst 5 SHORT signals:")
-short_signals = signals['short'][signals['short']]
+print("\nFirst 5 SHORT signals:")
+short_signals = signals["short"][signals["short"]]
 if len(short_signals) > 0:
     for i, (idx, _) in enumerate(short_signals.head(5).items()):
         bar = ohlcv.iloc[idx]
-        print(f"  #{i+1}: {ohlcv.index[idx]} - Price: {bar['close']}")
+        print(f"  #{i + 1}: {ohlcv.index[idx]} - Price: {bar['close']}")
 else:
     print("  No SHORT signals!")
 
 # Show first LONG signals
-print(f"\nFirst 5 LONG signals:")
-long_signals = signals['long'][signals['long']]
+print("\nFirst 5 LONG signals:")
+long_signals = signals["long"][signals["long"]]
 if len(long_signals) > 0:
     for i, (idx, _) in enumerate(long_signals.head(5).items()):
         bar = ohlcv.iloc[idx]
-        print(f"  #{i+1}: {ohlcv.index[idx]} - Price: {bar['close']}")
+        print(f"  #{i + 1}: {ohlcv.index[idx]} - Price: {bar['close']}")
 else:
     print("  No LONG signals!")
 
 # Compare with TV
-print(f"\n" + "=" * 100)
+print("\n" + "=" * 100)
 print("COMPARISON WITH TV")
 print("=" * 100)
-print(f"\nTV first trade:")
+print("\nTV first trade:")
 print(f"  Time: {TV_FIRST_SHORT['entry_time']}")
 print(f"  Price: {TV_FIRST_SHORT['entry_price']}")
 print(f"  Signal: {TV_FIRST_SHORT['signal']}")
 
-print(f"\nOur first trade:")
+print("\nOur first trade:")
 if len(short_signals) > 0:
     first_short_idx = short_signals.index[0]
     first_short_bar = ohlcv.iloc[first_short_idx]
     print(f"  Time: {ohlcv.index[first_short_idx]}")
     print(f"  Price: {first_short_bar['close']}")
-    
+
     match = "OK" if ohlcv.index[first_short_idx] == target_time else "MISMATCH"
     print(f"\n{match} Time match: TV={target_time}, Ours={ohlcv.index[first_short_idx]}")
 else:

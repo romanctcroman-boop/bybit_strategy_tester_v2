@@ -51,22 +51,16 @@ for i in range(entry_bar, min(entry_bar + 500, len(data))):
     # Check TP hit
     if high >= tp_price:
         print(f"TP hits at bar {i}:")
-        print(
-            f"  O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}"
-        )
+        print(f"  O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}")
         print(f"  TP price {tp_price:.2f} <= High {high:.2f}")
 
         # Check if there's a LONG signal at this bar
         if long_entries[i]:
             next_bar_open = data[i + 1, 0] if i + 1 < len(data) else 0
-            print(
-                f"  ** LONG signal at same bar! Next bar open = {next_bar_open:.2f} **"
-            )
+            print(f"  ** LONG signal at same bar! Next bar open = {next_bar_open:.2f} **")
         if short_entries[i]:
             next_bar_open = data[i + 1, 0] if i + 1 < len(data) else 0
-            print(
-                f"  ** SHORT signal at same bar! Next bar open = {next_bar_open:.2f} **"
-            )
+            print(f"  ** SHORT signal at same bar! Next bar open = {next_bar_open:.2f} **")
         break
 
 print()
@@ -77,9 +71,7 @@ for i in range(6495, min(6535, len(data) - 1)):
         next_bar_open = data[i + 1, 0] if i + 1 < len(data) else 0
         ts = df.iloc[i]["timestamp"]
         print(f"Bar {i}: {ts} - {direction} signal")
-        print(
-            f"  Current bar: O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}"
-        )
+        print(f"  Current bar: O={data[i, 0]:.2f} H={data[i, 1]:.2f} L={data[i, 2]:.2f} C={data[i, 3]:.2f}")
         print(f"  Next bar open (entry price): {next_bar_open:.2f}")
 
 print()

@@ -4,6 +4,7 @@ Comprehensive Engine Parity Test with Bar Magnifier (Tick Data)
 Tests VectorBT and Fallback engines with tick data for 100% parity verification.
 Compares ALL metrics including trades, equity, drawdown, and performance statistics.
 """
+
 import sys
 from pathlib import Path
 
@@ -30,7 +31,9 @@ def load_data(limit: int = 500) -> pd.DataFrame:
         f"""SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
         FROM bybit_kline_audit WHERE symbol = 'BTCUSDT' AND interval = '60'
-        ORDER BY open_time DESC LIMIT {limit}""", conn)
+        ORDER BY open_time DESC LIMIT {limit}""",
+        conn,
+    )
     conn.close()
     df = df.sort_values("open_time")
     df["datetime"] = pd.to_datetime(df["open_time"], unit="ms")
@@ -66,7 +69,7 @@ def compare_trades(vbt_trades, fb_trades, tolerance_pct: float = 0.001) -> dict:
         "exact_matches": 0,
         "close_matches": 0,
         "mismatches": 0,
-        "details": []
+        "details": [],
     }
 
     for i, (t_vbt, t_fb) in enumerate(zip(vbt_trades, fb_trades, strict=False)):
@@ -82,15 +85,17 @@ def compare_trades(vbt_trades, fb_trades, tolerance_pct: float = 0.001) -> dict:
         else:
             result["mismatches"] += 1
 
-        result["details"].append({
-            "trade": i + 1,
-            "entry_match": entry_match,
-            "exit_match": exit_match,
-            "size_match": size_match,
-            "pnl_match": pnl_match,
-            "vbt": {"entry": t_vbt.entry_price, "exit": t_vbt.exit_price, "size": t_vbt.size, "pnl": t_vbt.pnl},
-            "fb": {"entry": t_fb.entry_price, "exit": t_fb.exit_price, "size": t_fb.size, "pnl": t_fb.pnl},
-        })
+        result["details"].append(
+            {
+                "trade": i + 1,
+                "entry_match": entry_match,
+                "exit_match": exit_match,
+                "size_match": size_match,
+                "pnl_match": pnl_match,
+                "vbt": {"entry": t_vbt.entry_price, "exit": t_vbt.exit_price, "size": t_vbt.size, "pnl": t_vbt.pnl},
+                "fb": {"entry": t_fb.entry_price, "exit": t_fb.exit_price, "size": t_fb.size, "pnl": t_fb.pnl},
+            }
+        )
 
     return result
 
@@ -108,7 +113,7 @@ def compare_metrics(vbt_metrics, fb_metrics, tolerance_pct: float = 0.01) -> dic
     fb_dict = {}
 
     for field in dir(vbt_metrics):
-        if not field.startswith('_'):
+        if not field.startswith("_"):
             val = getattr(vbt_metrics, field, None)
             if isinstance(val, (int, float)) and not callable(val):
                 vbt_dict[field] = val
@@ -148,9 +153,9 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
     """Run comprehensive parity test."""
 
     bm_str = "WITH Bar Magnifier" if use_bar_magnifier else "WITHOUT Bar Magnifier"
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"COMPREHENSIVE PARITY TEST - {direction.upper()} - {bm_str}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     # Load data
     df = load_data(500)
@@ -158,6 +163,7 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
 
     # Generate signals
     from backend.backtesting.strategies import get_strategy
+
     strategy = get_strategy(config.strategy_type)
     strategy.params = config.strategy_params
     strategy.direction = config.direction
@@ -173,39 +179,49 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
     result_fb = engine._run_fallback(config, df, signals)
 
     # Compare trades
-    print(f"\n{'─'*40}")
+    print(f"\n{'─' * 40}")
     print("TRADE COMPARISON")
-    print(f"{'─'*40}")
+    print(f"{'─' * 40}")
 
     trade_comparison = compare_trades(result_vbt.trades, result_fb.trades)
 
     print(f"VBT trades: {trade_comparison['vbt_count']}")
     print(f"FB trades:  {trade_comparison['fb_count']}")
     print(f"Count match: {'✅' if trade_comparison['count_match'] else '❌'}")
-    print(f"Exact PnL matches: {trade_comparison['exact_matches']}/{min(len(result_vbt.trades), len(result_fb.trades))}")
+    print(
+        f"Exact PnL matches: {trade_comparison['exact_matches']}/{min(len(result_vbt.trades), len(result_fb.trades))}"
+    )
     print(f"Close matches: {trade_comparison['close_matches']}")
     print(f"Mismatches: {trade_comparison['mismatches']}")
 
     # Show first 5 trade details
-    if trade_comparison['details']:
+    if trade_comparison["details"]:
         print("\nFirst 5 trades:")
-        for detail in trade_comparison['details'][:5]:
-            status = "✅" if detail['pnl_match'] else "❌"
+        for detail in trade_comparison["details"][:5]:
+            status = "✅" if detail["pnl_match"] else "❌"
             print(f"  Trade {detail['trade']}: {status}")
-            print(f"    VBT: entry={detail['vbt']['entry']:.2f}, exit={detail['vbt']['exit']:.2f}, size={detail['vbt']['size']:.6f}, pnl={detail['vbt']['pnl']:.2f}")
-            print(f"    FB:  entry={detail['fb']['entry']:.2f}, exit={detail['fb']['exit']:.2f}, size={detail['fb']['size']:.6f}, pnl={detail['fb']['pnl']:.2f}")
+            print(
+                f"    VBT: entry={detail['vbt']['entry']:.2f}, exit={detail['vbt']['exit']:.2f}, size={detail['vbt']['size']:.6f}, pnl={detail['vbt']['pnl']:.2f}"
+            )
+            print(
+                f"    FB:  entry={detail['fb']['entry']:.2f}, exit={detail['fb']['exit']:.2f}, size={detail['fb']['size']:.6f}, pnl={detail['fb']['pnl']:.2f}"
+            )
 
     # Compare metrics
-    print(f"\n{'─'*40}")
+    print(f"\n{'─' * 40}")
     print("METRIC COMPARISON")
-    print(f"{'─'*40}")
+    print(f"{'─' * 40}")
 
     metric_comparison = compare_metrics(result_vbt.metrics, result_fb.metrics)
 
-    total_metrics = len(metric_comparison['exact_matches']) + len(metric_comparison['close_matches']) + len(metric_comparison['mismatches'])
-    exact_pct = len(metric_comparison['exact_matches']) / total_metrics * 100 if total_metrics > 0 else 0
-    close_pct = len(metric_comparison['close_matches']) / total_metrics * 100 if total_metrics > 0 else 0
-    mismatch_pct = len(metric_comparison['mismatches']) / total_metrics * 100 if total_metrics > 0 else 0
+    total_metrics = (
+        len(metric_comparison["exact_matches"])
+        + len(metric_comparison["close_matches"])
+        + len(metric_comparison["mismatches"])
+    )
+    exact_pct = len(metric_comparison["exact_matches"]) / total_metrics * 100 if total_metrics > 0 else 0
+    close_pct = len(metric_comparison["close_matches"]) / total_metrics * 100 if total_metrics > 0 else 0
+    mismatch_pct = len(metric_comparison["mismatches"]) / total_metrics * 100 if total_metrics > 0 else 0
 
     print(f"Total metrics compared: {total_metrics}")
     print(f"Exact matches: {len(metric_comparison['exact_matches'])} ({exact_pct:.1f}%)")
@@ -214,9 +230,19 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
 
     # Key metrics
     print("\nKey Metrics Comparison:")
-    key_metrics = ['total_trades', 'winning_trades', 'losing_trades', 'net_profit',
-                   'gross_profit', 'gross_loss', 'win_rate', 'profit_factor',
-                   'max_drawdown', 'sharpe_ratio', 'sortino_ratio']
+    key_metrics = [
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "net_profit",
+        "gross_profit",
+        "gross_loss",
+        "win_rate",
+        "profit_factor",
+        "max_drawdown",
+        "sharpe_ratio",
+        "sortino_ratio",
+    ]
 
     for metric in key_metrics:
         vbt_val = getattr(result_vbt.metrics, metric, None)
@@ -233,18 +259,20 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
                 print(f"  {metric:20s}: VBT={vbt_val:12}  FB={fb_val:12}  {status}")
 
     # Summary
-    print(f"\n{'─'*40}")
+    print(f"\n{'─' * 40}")
     print("SUMMARY")
-    print(f"{'─'*40}")
+    print(f"{'─' * 40}")
 
-    trade_pct = trade_comparison['exact_matches'] / max(1, min(len(result_vbt.trades), len(result_fb.trades))) * 100
-    trade_parity = trade_comparison['exact_matches'] == min(len(result_vbt.trades), len(result_fb.trades))
+    trade_pct = trade_comparison["exact_matches"] / max(1, min(len(result_vbt.trades), len(result_fb.trades))) * 100
+    trade_parity = trade_comparison["exact_matches"] == min(len(result_vbt.trades), len(result_fb.trades))
     metric_parity = (exact_pct + close_pct) >= 90
 
     if trade_parity:
         print("Trade Parity: ✅ 100%")
     else:
-        print(f"Trade Parity: ❌ {trade_comparison['exact_matches']}/{min(len(result_vbt.trades), len(result_fb.trades))}")
+        print(
+            f"Trade Parity: ❌ {trade_comparison['exact_matches']}/{min(len(result_vbt.trades), len(result_fb.trades))}"
+        )
 
     if metric_parity:
         print(f"Metric Parity: ✅ ({exact_pct + close_pct:.1f}%)")
@@ -259,7 +287,7 @@ def run_test(direction: str, use_bar_magnifier: bool = False):
         "bar_magnifier": use_bar_magnifier,
         "trade_parity": trade_comparison,
         "metric_parity": metric_comparison,
-        "overall_success": overall
+        "overall_success": overall,
     }
 
 
@@ -292,13 +320,15 @@ if __name__ == "__main__":
 
     # Add placeholder results for Bar Magnifier
     for direction in ["long", "short", "both"]:
-        results.append({
-            "direction": direction,
-            "bar_magnifier": True,
-            "trade_parity": {"exact_matches": 0, "vbt_count": 0, "fb_count": 0, "skipped": True},
-            "metric_parity": {"exact_matches": [], "close_matches": [], "mismatches": [], "skipped": True},
-            "overall_success": None  # N/A
-        })
+        results.append(
+            {
+                "direction": direction,
+                "bar_magnifier": True,
+                "trade_parity": {"exact_matches": 0, "vbt_count": 0, "fb_count": 0, "skipped": True},
+                "metric_parity": {"exact_matches": [], "close_matches": [], "mismatches": [], "skipped": True},
+                "overall_success": None,  # N/A
+            }
+        )
 
     # Final summary
     print("\n" + "=" * 80)
@@ -309,20 +339,23 @@ if __name__ == "__main__":
     print("-" * 65)
 
     for r in results:
-        bm = "Yes" if r['bar_magnifier'] else "No"
+        bm = "Yes" if r["bar_magnifier"] else "No"
 
-        if r.get('trade_parity', {}).get('skipped'):
+        if r.get("trade_parity", {}).get("skipped"):
             tp = "N/A (VBT)"
             mp = "N/A"
             overall = "⏭️"
         else:
             tp = f"{r['trade_parity']['exact_matches']}/{r['trade_parity']['vbt_count']}"
-            total = len(r['metric_parity']['exact_matches']) + len(r['metric_parity']['close_matches']) + len(r['metric_parity']['mismatches'])
+            total = (
+                len(r["metric_parity"]["exact_matches"])
+                + len(r["metric_parity"]["close_matches"])
+                + len(r["metric_parity"]["mismatches"])
+            )
             mp = f"{len(r['metric_parity']['exact_matches']) + len(r['metric_parity']['close_matches'])}/{total}"
-            overall = "✅" if r['overall_success'] else "❌"
+            overall = "✅" if r["overall_success"] else "❌"
 
         print(f"{r['direction']:<10} {bm:<15} {tp:<15} {mp:<15} {overall:<10}")
 
     print("\n" + "-" * 65)
     print("Legend: ✅ = Pass, ❌ = Fail, ⏭️ = Skipped (VBT doesn't support Bar Magnifier)")
-

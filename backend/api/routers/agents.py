@@ -7,7 +7,7 @@ import functools
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.agents.circuit_breaker_manager import CircuitBreakerManager
@@ -521,29 +521,148 @@ async def execute_backtest_series(request: BacktestExecutorRequest):
 
 
 @router.post("/backtest/ai-analyze", summary="AI Analyze Backtest Results")
-async def analyze_backtest_results_endpoint(results: list[dict[str, Any]] | None = None):
+async def analyze_backtest_results_endpoint(raw_request: Request):
     """
-    Ask AI to analyze backtest results and recommend best strategy
+    Ask AI to analyze backtest results and recommend best strategy.
 
-    Evaluates multiple backtest results and provides AI-driven recommendations.
+    Supports two modes:
+    - **single** (default): Fast analysis using one agent (default: qwen).
+      Pass `agent` = 'qwen' | 'deepseek' | 'perplexity'.
+    - **multi**: Full consensus analysis using all 3 agents (DeepSeek + Qwen + Perplexity).
+      Results are merged via majority-vote for grade/overfitting/regime.
+
+    Body accepts two formats:
+        # New format with mode/agent selection:
+        { "results": [...], "mode": "single", "agent": "qwen" }
+
+        # Legacy format (raw list) — backward compat:
+        [{ ...backtest_dict... }]
     """
-    if results is None:
-        results = []
-    try:
-        from backend.ml.ai_backtest_executor import AIBacktestExecutor
+    body = await raw_request.json()
 
-        executor = AIBacktestExecutor()
+    # Normalise body: accept both raw-list and new object format
+    if isinstance(body, list):
+        results = body
+        mode = "single"
+        agent = "qwen"
+    else:
+        results = body.get("results") or []
+        mode = body.get("mode", "single")
+        agent = body.get("agent", "qwen")
 
-        analysis = await executor.analyze_backtest_results(results)
+    # Determine agent list
+    valid_agents = {"qwen", "deepseek", "perplexity"}
+    agents = ["deepseek", "qwen", "perplexity"] if mode == "multi" else [agent if agent in valid_agents else "qwen"]
 
+    if not results:
         return {
-            "analysis": analysis,
-            "results_analyzed": len(results),
+            "analysis": {"error": "No backtest results provided"},
+            "results_analyzed": 0,
+            "mode": mode,
+            "agents": agents,
         }
+
+    try:
+        from backend.agents.integration.ai_backtest_integration import (
+            AIBacktestAnalyzer,
+        )
+
+        analyzer = AIBacktestAnalyzer()
+
+        # Build unified metrics dict from backtest result(s)
+        # Support both full backtest objects and metrics-only dicts
+        bt = results[0]
+        metrics = bt.get("metrics") or bt  # if already wrapped under "metrics" key
+
+        strategy_name = bt.get("strategy_name") or bt.get("name") or metrics.get("strategy_name", "Unknown Strategy")
+        symbol = bt.get("symbol") or metrics.get("symbol", "BTCUSDT")
+        timeframe = str(bt.get("timeframe") or metrics.get("timeframe", ""))
+        start = bt.get("start_date") or ""
+        end = bt.get("end_date") or ""
+        period = f"{start} – {end}" if start and end else "Unknown"
+
+        logger.info(f"AI analyze: mode={mode} agents={agents} strategy={strategy_name} symbol={symbol}")
+
+        ai_result = await analyzer.analyze_backtest(
+            metrics=metrics,
+            strategy_name=strategy_name,
+            symbol=symbol,
+            timeframe=timeframe,
+            period=period,
+            agents=agents,
+        )
+
+        ai_dict = ai_result.to_dict()
+
+        # Flatten the response to match the shape the JS already expects
+        flat = {
+            **ai_dict.get("ai_analysis", {}),
+            "metrics": ai_dict.get("metrics", {}),
+            "metadata": ai_dict.get("metadata", {}),
+            "results_analyzed": len(results),
+            "mode": mode,
+            "agents": agents,
+        }
+        return flat
 
     except Exception as e:
         logger.error(f"Error analyzing results: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to analyze results")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze results: {e}")
+
+    if not results:
+        return {
+            "analysis": {"error": "No backtest results provided"},
+            "results_analyzed": 0,
+            "mode": mode,
+            "agents": agents,
+        }
+
+    try:
+        from backend.agents.integration.ai_backtest_integration import (
+            AIBacktestAnalyzer,
+        )
+
+        analyzer = AIBacktestAnalyzer()
+
+        # Build unified metrics dict from backtest result(s)
+        # Support both a list of full backtest objects and metrics-only dicts
+        bt = results[0]
+        metrics = bt.get("metrics") or bt  # if already wrapped under "metrics" key
+
+        strategy_name = bt.get("strategy_name") or bt.get("name") or metrics.get("strategy_name", "Unknown Strategy")
+        symbol = bt.get("symbol") or metrics.get("symbol", "BTCUSDT")
+        timeframe = str(bt.get("timeframe") or metrics.get("timeframe", ""))
+        start = bt.get("start_date") or ""
+        end = bt.get("end_date") or ""
+        period = f"{start} – {end}" if start and end else "Unknown"
+
+        logger.info(f"AI analyze: mode={mode} agents={agents} strategy={strategy_name} symbol={symbol}")
+
+        ai_result = await analyzer.analyze_backtest(
+            metrics=metrics,
+            strategy_name=strategy_name,
+            symbol=symbol,
+            timeframe=timeframe,
+            period=period,
+            agents=agents,
+        )
+
+        ai_dict = ai_result.to_dict()
+
+        # Flatten the response to match the shape the JS already expects
+        flat = {
+            **ai_dict.get("ai_analysis", {}),
+            "metrics": ai_dict.get("metrics", {}),
+            "metadata": ai_dict.get("metadata", {}),
+            "results_analyzed": len(results),
+            "mode": mode,
+            "agents": agents,
+        }
+        return flat
+
+    except Exception as e:
+        logger.error(f"Error analyzing results: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to analyze results: {e}")
 
 
 # ============================================================================

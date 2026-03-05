@@ -24,9 +24,7 @@ DB_PATH = ROOT / "data.sqlite3"
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:
-    df = pd.DataFrame(
-        data, columns=["open_time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume"])
     try:
         df["open_time"] = pd.to_datetime(df["open_time"].astype("int64"), unit="ms")
     except Exception:

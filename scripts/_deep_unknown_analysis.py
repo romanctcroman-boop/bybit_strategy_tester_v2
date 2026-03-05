@@ -146,7 +146,7 @@ async def main():
                     )
 
         # NEW: Check ALL bars between engine signal and TV signal
-        print(f"\n  ALL bars from engine signal to TV signal:")
+        print("\n  ALL bars from engine signal to TV signal:")
         start_idx = eng_sig_idx if eng_sig_idx is not None else 0
         end_idx = tv_sig_idx if tv_sig_idx is not None else len(times) - 1
 

@@ -254,7 +254,7 @@ async def main():
         else:
             no_bounce_count += 1
 
-    print(f"ALL 600 short entry signals:")
+    print("ALL 600 short entry signals:")
     print(f"  RSI[T+1] >= {CROSS_LEVEL} (bounce): {bounce_count} ({bounce_count / 600 * 100:.1f}%)")
     print(f"  RSI[T+1] <  {CROSS_LEVEL} (stays):  {no_bounce_count} ({no_bounce_count / 600 * 100:.1f}%)")
 

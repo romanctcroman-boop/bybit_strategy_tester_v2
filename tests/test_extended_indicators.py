@@ -80,9 +80,7 @@ class TestLinearRegressionChannel:
         """Test basic linear regression channel calculation."""
         close = np.linspace(100, 110, 150)  # Simple uptrend
 
-        middle, upper, lower, slope = calculate_linear_regression_channel(
-            close, length=100, deviation=2.0
-        )
+        middle, upper, lower, slope = calculate_linear_regression_channel(close, length=100, deviation=2.0)
 
         assert len(middle) == len(close)
         assert len(upper) == len(close)
@@ -98,9 +96,7 @@ class TestLinearRegressionChannel:
         """Test that uptrend produces positive slope."""
         close = np.linspace(100, 120, 150)
 
-        middle, upper, lower, slope = calculate_linear_regression_channel(
-            close, length=100, deviation=2.0
-        )
+        middle, upper, lower, slope = calculate_linear_regression_channel(close, length=100, deviation=2.0)
 
         # Slope should be positive in uptrend
         assert slope[-1] > 0
@@ -109,9 +105,7 @@ class TestLinearRegressionChannel:
         """Test that downtrend produces negative slope."""
         close = np.linspace(120, 100, 150)
 
-        middle, upper, lower, slope = calculate_linear_regression_channel(
-            close, length=100, deviation=2.0
-        )
+        middle, upper, lower, slope = calculate_linear_regression_channel(close, length=100, deviation=2.0)
 
         # Slope should be negative in downtrend
         assert slope[-1] < 0
@@ -122,10 +116,10 @@ class TestLinearRegressionChannel:
         close[-10:] = 125  # Breakout above channel
 
         config = {
-            'linreg_length': 100,
-            'channel_mult': 2.0,
-            'linreg_breakout_rebound': 'Breakout',
-            'linreg_slope_direction': 'Allow_Any',
+            "linreg_length": 100,
+            "channel_mult": 2.0,
+            "linreg_breakout_rebound": "Breakout",
+            "linreg_slope_direction": "Allow_Any",
         }
 
         long_signals, short_signals = linear_regression_filter(close, config)
@@ -161,10 +155,10 @@ class TestPivotPoints:
         close = base_price
 
         config = {
-            'levels_pivot_bars': 5,
-            'levels_search_period': 50,
-            'levels_channel_width': 0.5,
-            'levels_test_count': 2,
+            "levels_pivot_bars": 5,
+            "levels_search_period": 50,
+            "levels_channel_width": 0.5,
+            "levels_test_count": 2,
         }
 
         long_signals, short_signals = levels_break_filter(high, low, close, config)
@@ -188,10 +182,10 @@ class TestAccumulationAreas:
         volume[80:120] = 3000  # High volume during consolidation
 
         config = {
-            'acc_backtrack_interval': 50,
-            'acc_min_bars': 3,
-            'volume_threshold': 2.0,
-            'price_range_percent': 1.0,
+            "acc_backtrack_interval": 50,
+            "acc_min_bars": 3,
+            "volume_threshold": 2.0,
+            "price_range_percent": 1.0,
         }
 
         long_signals, short_signals = find_accumulation_areas(close, volume, config)

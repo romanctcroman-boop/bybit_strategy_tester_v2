@@ -8,6 +8,7 @@
 При 404: обязательно перезапустите API-сервер (остановить и снова запустить),
 чтобы подхватить маршруты symbols-list и refresh-tickers из app.py.
 """
+
 from __future__ import annotations
 
 import argparse

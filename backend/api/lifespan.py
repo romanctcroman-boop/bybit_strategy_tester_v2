@@ -217,6 +217,27 @@ async def _start_kline_db_service(app: "FastAPI"):
         return None
 
 
+async def _start_kline_manager(app: "FastAPI") -> None:
+    """Initialize KlineDataManager singleton — единая точка управления свечными данными."""
+    import os
+
+    try:
+        from backend.services.adapters.bybit import BybitAdapter
+        from backend.services.kline_manager import init_kline_manager
+
+        adapter = BybitAdapter(
+            api_key=os.environ.get("BYBIT_API_KEY"),
+            api_secret=os.environ.get("BYBIT_API_SECRET"),
+        )
+        manager = init_kline_manager(adapter)
+        # Also on app.state for DI / testing
+        app.state.kline_manager = manager
+        logger.info("KlineDataManager initialized")
+    except Exception as exc:
+        logger.warning("KlineDataManager initialization failed: %s", exc)
+        app.state.kline_manager = None
+
+
 def _warmup_smart_kline_cache():
     """Pre-warm SmartKlineService cache for popular symbols."""
     import time
@@ -432,19 +453,6 @@ async def _shutdown_kline_db_service(app: "FastAPI"):
             logger.warning("⚠️ KlineDBService shutdown error: %s", e)
 
 
-async def _shutdown_live_chart_manager() -> None:
-    """Shut down all active LiveChart WebSocket sessions gracefully."""
-    try:
-        from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
-
-        if LIVE_CHART_MANAGER.active_session_count > 0:
-            logger.info("🛑 Shutting down %d live chart session(s)…", LIVE_CHART_MANAGER.active_session_count)
-            await LIVE_CHART_MANAGER.shutdown_all()
-            logger.info("✅ LiveChart sessions closed")
-    except Exception as exc:
-        logger.warning("⚠️ LiveChartManager shutdown error: %s", exc)
-
-
 def get_config():
     """Get CONFIG with fallback."""
     try:
@@ -517,6 +525,9 @@ async def lifespan(app: "FastAPI"):
     # Start KlineDBService
     await _start_kline_db_service(app)
 
+    # Initialize KlineDataManager singleton (единая точка управления свечными данными)
+    await _start_kline_manager(app)
+
     # NOTE: Daily data refresh removed from startup — syncing happens when user
     # selects a symbol in the Parameters panel (sync-all-tf-stream endpoint).
     # This avoids duplicate functionality and unnecessary API calls on boot.
@@ -539,4 +550,12 @@ async def lifespan(app: "FastAPI"):
     await _shutdown_plugin_manager(app)
     await _shutdown_websocket(app)
     await _shutdown_kline_db_service(app)
-    await _shutdown_live_chart_manager()
+
+    # Close all live chart WebSocket sessions
+    try:
+        from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
+
+        await LIVE_CHART_MANAGER.shutdown_all()
+        logger.info("✅ Live chart sessions closed")
+    except Exception as exc:
+        logger.warning("Live chart shutdown skipped: %s", exc)

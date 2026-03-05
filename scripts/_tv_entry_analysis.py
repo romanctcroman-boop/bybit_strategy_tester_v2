@@ -217,7 +217,7 @@ async def main():
 
         # Also show RSI values at ALL bars between engine signal and TV signal
         # to look for patterns
-        print(f"\n  RSI VALUES between engine_signal and TV_signal:")
+        print("\n  RSI VALUES between engine_signal and TV_signal:")
         for j in range(e_signal_idx - 2, t_signal_idx + 3):
             if j < 0 or j >= len(timestamps):
                 continue
@@ -248,22 +248,22 @@ async def main():
 
         # KEY QUESTION: Is there any SE between engine and TV where TV actually enters?
         # What's special about TV's chosen bar?
-        print(f"\n  ANALYSIS:")
+        print("\n  ANALYSIS:")
         se_between = []
         for j in range(e_signal_idx, t_signal_idx + 1):
             if se[j]:
                 se_between.append((j, timestamps[j], btc_rsi.iloc[j], 52 - btc_rsi.iloc[j]))
 
         if len(se_between) > 1:
-            print(f"    Multiple SE signals between engine and TV signal bars:")
+            print("    Multiple SE signals between engine and TV signal bars:")
             for idx, ts, rsi, margin in se_between:
                 marker = " ← ENGINE" if idx == e_signal_idx else (" ← TV" if idx == t_signal_idx else "")
                 print(f"      [{idx}] {ts} RSI={rsi:.4f} margin_below_52={margin:.4f}{marker}")
         elif len(se_between) == 1:
-            print(f"    Only 1 SE signal (engine's). TV bar has NO SE=True in our signals!")
+            print("    Only 1 SE signal (engine's). TV bar has NO SE=True in our signals!")
             # This would mean TV's signal is different from ours
             print(f"    TV fires at bar {t_signal_time} where our SE={se[t_signal_idx]}")
-            print(f"    This means TV's BTC RSI at this bar is DIFFERENT from ours!")
+            print("    This means TV's BTC RSI at this bar is DIFFERENT from ours!")
 
 
 asyncio.run(main())

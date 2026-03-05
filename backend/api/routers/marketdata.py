@@ -7,7 +7,7 @@ Upload and cache management endpoints moved to:
 - marketdata_cache.py
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 try:
     from sqlalchemy.orm import Session
@@ -380,6 +380,50 @@ def get_bybit_klines_range(
         }
         for r in rows
     ]
+
+
+@router.get("/klines/ensure")
+async def ensure_klines(
+    symbol: str = Query(..., description="Trading pair, e.g. BTCUSDT"),
+    interval: str = Query(..., description="Timeframe: 1,5,15,30,60,240,D,W,M"),
+    start_time: int = Query(..., description="Start timestamp in milliseconds (inclusive)"),
+    end_time: int = Query(..., description="End timestamp in milliseconds (inclusive)"),
+    market_type: str = Query("linear", description="Market type: 'spot' or 'linear'"),
+    overlap: int | None = Query(None, description="Override overlap candles (default: from OVERLAP_CANDLES)"),
+):
+    """
+    Ensure candles [start_time, end_time] are present in DB, fetching from Bybit if needed.
+
+    Returns the candle data in LightweightCharts format (time in seconds).
+    Replaces the combination of /bybit/klines/range + triggerBackgroundKlineSync.
+
+    Response: list of {time (sec), open, high, low, close, volume}
+    """
+    from backend.services.kline_manager import get_kline_manager
+
+    try:
+        km = get_kline_manager()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    try:
+        candles = await km.ensure_range(
+            symbol=symbol.upper(),
+            interval=interval,
+            start_ms=start_time,
+            end_ms=end_time,
+            market_type=market_type,
+            overlap=overlap,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        logger.exception("ensure_klines failed for %s/%s", symbol, interval)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return candles
 
 
 @router.get("/bybit/volatility")
@@ -1608,18 +1652,9 @@ async def refresh_symbol_data(
 ALL_TIMEFRAMES = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
 ALL_TIMEFRAMES_FULL = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
 
-# Нахлёст свечей при догрузке (5 для малых TF, меньше для больших — избегаем gaps на границе)
-OVERLAP_CANDLES = {
-    "1": 5,
-    "5": 5,
-    "15": 5,
-    "30": 5,
-    "60": 5,
-    "240": 4,
-    "D": 3,
-    "W": 2,
-    "M": 2,
-}
+# Нахлёст свечей — canonical source: backend/services/kline_manager.py
+# Реэкспортируется здесь для обратной совместимости (используется sync_all_timeframes и др.)
+from backend.services.kline_manager import OVERLAP_CANDLES
 
 
 def _get_kline_audit_state_sync(symbol: str, interval: str, market_type: str) -> tuple:
@@ -2495,50 +2530,73 @@ async def get_instrument_info(symbol: str):
 
 
 # =============================================================================
-# LIVE CHART SSE ENDPOINT
+# LIVE CHART — PERSIST CLOSED BARS
+# =============================================================================
+# _persist_live_bar_sync was removed (Рек. 7).
+# Single write path: KlineDataManager.persist_bar() (kline_manager.py).
 # =============================================================================
 
 
-@router.get(
-    "/live-chart/stream",
-    summary="Real-time live chart streaming via SSE",
-    tags=["Live Chart"],
-    response_class=None,  # StreamingResponse — not a JSON model
-)
+async def _persist_live_bar(
+    symbol: str,
+    interval: str,
+    market_type: str,
+    candle: dict,
+) -> None:
+    """
+    Fire-and-forget save of one closed live bar.
+
+    Called via asyncio.create_task() from the SSE event_generator so it
+    never blocks the streaming loop. Any DB error is logged as a warning
+    (a missed bar will be back-filled at next ensure_range call).
+
+    Single write path: KlineDataManager._persist_live_bar_sync via persist_bar().
+    """
+    try:
+        from backend.services.kline_manager import get_kline_manager
+
+        km = get_kline_manager()
+        await km.persist_bar(symbol, interval, market_type, candle)
+    except Exception as exc:
+        logger.warning(
+            "[LiveChart] Failed to persist live bar %s/%s@%d: %s",
+            symbol,
+            interval,
+            candle.get("time", 0),
+            exc,
+        )
+
+
+# =============================================================================
+# LIVE CHART SSE STREAMING
+# =============================================================================
+
+
+@router.get("/live-chart/stream")
 async def live_chart_stream(
     symbol: str = Query(..., description="Trading pair, e.g. BTCUSDT"),
-    interval: str = Query(..., description="Timeframe: 1, 5, 15, 30, 60, 240, D"),
-    session_id: str = Query(..., description="Unique browser session ID (generated client-side)"),
-    strategy_id: int | None = Query(None, description="ID of saved builder strategy (optional — enables live signals)"),
-    last_event_id: str | None = Query(
-        None, alias="lastEventId", description="Last received SSE event ID for reconnect"
+    interval: str = Query(..., description="Timeframe: 1,5,15,30,60,240,D"),
+    session_id: str = Query(..., description="Unique browser session ID (e.g. lc_<timestamp>_<rand>)"),
+    strategy_id: int | None = Query(None, description="ID of saved builder strategy (optional)"),
+    market_type: str = Query("linear", description="Market type: 'spot' or 'linear' (perpetual)"),
+    last_event_id: str | None = Header(
+        None, alias="Last-Event-ID", description="Last received SSE event ID (for reconnect, per HTTP SSE spec)"
     ),
     db: Session = Depends(get_db),
 ):
     """
-    Server-Sent Events stream for the live price chart.
+    SSE stream for live chart real-time updates.
 
-    Emits three event types:
+    Sends events:
+      data: {"type": "tick",       "candle": {time,open,high,low,close,volume}}
+      data: {"type": "bar_closed", "candle": {...}, "signals": {"long":bool,"short":bool,"bars_used":int}}
+      data: {"type": "heartbeat"}
 
-    * **tick** — open bar update (every Bybit WS tick)
-    * **bar_closed** — confirmed closed bar + optional strategy signals
-    * **heartbeat** — keepalive sent every 20 s when no data arrives
+    Fan-out: один Bybit WS на (symbol, interval) → N SSE клиентов.
+    При отключении всех клиентов WS закрывается автоматически.
 
-    Event format::
-
-        id: 42
-        data: {"type":"tick","candle":{"time":…,"open":…,"high":…,"low":…,"close":…,"volume":…},"confirm":false}
-
-        id: 43
-        data: {"type":"bar_closed","candle":{…},"confirm":true,"signals":{"long":false,"short":true,"bars_used":500}}
-
-        data: {"type":"heartbeat"}
-
-    Live signals are computed only when ``strategy_id`` is supplied and the
-    strategy was created with the Strategy Builder (``is_builder_strategy=True``).
-
-    On reconnect the browser sends ``lastEventId``; warmup bars are **skipped**
-    because the browser already has them — only new events are delivered.
+    Signals вычисляются только для builder-стратегий (is_builder_strategy=True).
+    Для остальных — только тики свечей (без маркеров сигналов).
     """
     import json as _json
 
@@ -2547,101 +2605,144 @@ async def live_chart_stream(
     from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
     from backend.services.live_chart.signal_service import LiveSignalService
 
-    symbol_upper = symbol.upper()
+    symbol = symbol.upper()
     is_reconnect = last_event_id is not None
 
-    # 1. Get-or-create shared WS session (fan-out)
+    # ------------------------------------------------------------------
+    # 1. Получить или создать WS-сессию (fan-out)
+    #    Ограничиваем wait_for 15 секундами: если Bybit WS недоступен,
+    #    сразу возвращаем 503 вместо блокировки event-loop на минуты.
+    # ------------------------------------------------------------------
     try:
-        chart_session = await LIVE_CHART_MANAGER.get_or_create(symbol_upper, interval)
+        chart_session = await asyncio.wait_for(
+            LIVE_CHART_MANAGER.get_or_create(symbol, interval),
+            timeout=15.0,
+        )
+    except TimeoutError:
+        logger.error("[LiveChart] Timeout connecting to Bybit WS for %s/%s (>15s)", symbol, interval)
+        raise HTTPException(
+            status_code=503,
+            detail="LiveChart: не удалось подключиться к Bybit WebSocket за 15 секунд. Проверьте интернет-соединение.",
+        )
     except Exception as exc:
-        logger.error("[LiveChart] Failed to create WS session for %s/%s: %s", symbol_upper, interval, exc)
-        raise HTTPException(status_code=503, detail=f"Unable to connect to Bybit WebSocket: {exc}")
+        logger.error("[LiveChart] Failed to create session for %s/%s: %s", symbol, interval, exc)
+        raise HTTPException(status_code=503, detail=f"LiveChart session failed: {exc}")
 
-    # 2. Load warmup bars from DB (skip on reconnect — browser already has them)
-    signal_service: LiveSignalService | None = None
-
-    if not is_reconnect and strategy_id:
-        try:
-            warmup_rows = await asyncio.to_thread(
-                lambda: (
-                    db.query(BybitKlineAudit)
-                    .filter(
-                        BybitKlineAudit.symbol == symbol_upper,
-                        BybitKlineAudit.interval == interval,
-                    )
-                    .order_by(BybitKlineAudit.open_time.desc())
-                    .limit(500)
-                    .all()
-                )
+    # ------------------------------------------------------------------
+    # 2. Загрузить warmup данные (последние 500 баров из БД)
+    #    При reconnect загружаем снова — старый LiveSignalService уничтожен
+    # ------------------------------------------------------------------
+    warmup_bars: list[dict] = []
+    try:
+        warmup_rows = (
+            db.query(BybitKlineAudit)
+            .filter(
+                BybitKlineAudit.symbol == symbol,
+                BybitKlineAudit.interval == interval,
             )
-            warmup_bars = [
-                {
-                    "time": int(r.open_time / 1000),
-                    "open": float(r.open_price),
-                    "high": float(r.high_price),
-                    "low": float(r.low_price),
-                    "close": float(r.close_price),
-                    "volume": float(r.volume or 0),
-                }
-                for r in reversed(warmup_rows)
-            ]
-        except Exception as exc:
-            logger.warning("[LiveChart] Failed to load warmup bars: %s", exc)
-            warmup_bars = []
+            .order_by(BybitKlineAudit.open_time.desc())
+            .limit(500)
+            .all()
+        )
+        warmup_bars = [
+            {
+                "time": int(r.open_time / 1000),
+                "open": float(r.open_price),
+                "high": float(r.high_price),
+                "low": float(r.low_price),
+                "close": float(r.close_price),
+                "volume": float(r.volume or 0),
+            }
+            for r in reversed(warmup_rows)
+        ]
+        logger.info(
+            "[LiveChart] Warmup loaded: %d bars for %s/%s (reconnect=%s)",
+            len(warmup_bars),
+            symbol,
+            interval,
+            is_reconnect,
+        )
+    except Exception as exc:
+        logger.warning("[LiveChart] Could not load warmup bars: %s", exc)
 
-        # 3. Load strategy graph (D1.3: use builder_graph, NOT strategy_config)
+    # ------------------------------------------------------------------
+    # 3. Загрузить граф стратегии (только builder-стратегии, D1.3 fix)
+    # ------------------------------------------------------------------
+    signal_service: LiveSignalService | None = None
+    if strategy_id:
         try:
             from backend.database.models.strategy import Strategy as StrategyModel
 
-            strat_obj = await asyncio.to_thread(
-                lambda: db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
-            )
+            strat_obj = db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
             if strat_obj and strat_obj.is_builder_strategy and strat_obj.builder_graph:
-                strategy_graph = strat_obj.builder_graph  # already a dict via JSON column
-                signal_service = LiveSignalService(
-                    strategy_graph=strategy_graph,
-                    warmup_bars=warmup_bars,
-                    symbol=symbol_upper,
+                # builder_graph — уже dict, json.loads не нужен (D1.3 исправление)
+                strategy_graph = strat_obj.builder_graph
+                if warmup_bars:
+                    signal_service = LiveSignalService(strategy_graph, warmup_bars)
+                    logger.info(
+                        "[LiveChart] LiveSignalService created for strategy_id=%d, warmup=%d bars",
+                        strategy_id,
+                        len(warmup_bars),
+                    )
+                else:
+                    logger.warning(
+                        "[LiveChart] No warmup bars — LiveSignalService not created for strategy_id=%d",
+                        strategy_id,
+                    )
+            else:
+                logger.info(
+                    "[LiveChart] strategy_id=%d is not a builder strategy or has no graph — signals disabled",
+                    strategy_id,
                 )
         except Exception as exc:
-            logger.warning("[LiveChart] Failed to load strategy %s: %s", strategy_id, exc)
+            logger.warning("[LiveChart] Could not load strategy %d: %s", strategy_id, exc)
 
-    # 4. Subscribe this browser to the shared session
+    # ------------------------------------------------------------------
+    # 4. Подписать браузер на события
+    # ------------------------------------------------------------------
     queue = chart_session.add_subscriber(session_id)
 
     async def event_generator():
-        event_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
-        heartbeat_interval = 20  # seconds
+        heartbeat_interval = 20  # секунд
+        event_id = 0
+        # Keep strong references to background tasks so GC doesn't kill them
+        _bg_tasks: set[asyncio.Task] = set()
 
         try:
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
                 except TimeoutError:
-                    # Keep SSE connection alive
-                    yield f"data: {_json.dumps({'type': 'heartbeat'})}\n\n"
+                    event_id += 1
+                    yield f"id: {event_id}\ndata: {_json.dumps({'type': 'heartbeat'})}\n\n"
                     continue
-                except asyncio.CancelledError:
-                    break
 
-                # For closed bars: compute strategy signals
-                if event["type"] == "bar_closed" and signal_service is not None:
-                    signals = signal_service.push_closed_bar(event["candle"])
-                    event["signals"] = signals
+                # Для закрытых баров: вычислить сигналы стратегии + сохранить в БД
+                if event["type"] == "bar_closed":
+                    if signal_service is not None:
+                        signals = signal_service.push_closed_bar(event["candle"])
+                        event["signals"] = signals  # всегда dict (никогда None)
+
+                    # Persist to BybitKlineAudit in background — does not block SSE stream
+                    _task = asyncio.create_task(_persist_live_bar(symbol, interval, market_type, event["candle"]))
+                    _bg_tasks.add(_task)
+                    _task.add_done_callback(_bg_tasks.discard)
 
                 event_id += 1
                 yield f"id: {event_id}\ndata: {_json.dumps(event)}\n\n"
 
         except asyncio.CancelledError:
             pass
-        except Exception as exc:
-            logger.error(
-                "[LiveChart] SSE generator error for %s/%s sub=%s: %s", symbol_upper, interval, session_id, exc
-            )
         finally:
             chart_session.remove_subscriber(session_id)
-            await LIVE_CHART_MANAGER.cleanup(symbol_upper, interval)
-            logger.info("[LiveChart] SSE stream closed for session=%s (%s/%s)", session_id, symbol_upper, interval)
+            # Закрыть WS если подписчиков не осталось
+            await LIVE_CHART_MANAGER.cleanup(symbol, interval)
+            logger.info(
+                "[LiveChart] SSE disconnected: session_id=%s, symbol=%s/%s",
+                session_id,
+                symbol,
+                interval,
+            )
 
     return StreamingResponse(
         event_generator(),
@@ -2649,6 +2750,20 @@ async def live_chart_stream(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable NGINX response buffering for SSE
+            "X-Accel-Buffering": "no",  # отключить nginx буферизацию для SSE
         },
     )
+
+
+@router.get("/live-chart/status")
+async def live_chart_status():
+    """
+    Статус активных live chart сессий.
+    Для мониторинга и отладки.
+    """
+    from backend.services.live_chart.session_manager import LIVE_CHART_MANAGER
+
+    return {
+        "active_sessions": LIVE_CHART_MANAGER.active_session_count,
+        "sessions": LIVE_CHART_MANAGER.get_active_sessions(),
+    }

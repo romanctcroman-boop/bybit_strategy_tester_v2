@@ -142,7 +142,7 @@ async def main():
         tp_detection_bar = prev_exit_time  # This IS the TP detection bar in current code
         exit_execution_bar = prev_exit_time + pd.Timedelta(minutes=30)
 
-        print(f"\n  TP TIMING:")
+        print("\n  TP TIMING:")
         print(f"    TP detected at bar:     {tp_detection_bar}")
         print(f"    Exit executes at bar:   {exit_execution_bar}")
         print(f"    1st SE signal bar:      {first_se}")
@@ -158,13 +158,13 @@ async def main():
         # CRITICAL CHECK: Is the engine entering on the SAME bar where the exit executes?
         if exit_execution_bar == engine_entry_bar:
             print(f"    *** SAME BAR: Exit executes AND new entry at {engine_entry_bar}")
-            print(f"    Engine order: exit first, then entry → this should work")
-            print(f"    But TV might NOT allow entry on the same bar as exit!")
+            print("    Engine order: exit first, then entry → this should work")
+            print("    But TV might NOT allow entry on the same bar as exit!")
         elif tp_detection_bar == first_se:
-            print(f"    *** TP detected on SAME bar as 1st SE signal!")
+            print("    *** TP detected on SAME bar as 1st SE signal!")
             print(f"    At bar {first_se}: TP fires → pending_exit. SE[{first_se}]=True")
             print(f"    At bar {engine_entry_bar}: exit executes. Entry reads SE[{first_se}]=True")
-            print(f"    Engine: pending_short_exit blocks entry!")
+            print("    Engine: pending_short_exit blocks entry!")
         elif tp_detection_bar + pd.Timedelta(minutes=30) == first_se:
             print(f"    TP detected at {tp_detection_bar}, 1st SE at {first_se} (one bar later)")
 
@@ -213,7 +213,7 @@ async def main():
         # Wait, but our trades show the engine DOES enter. Let me check the actual
         # trade entry time vs the TP detection bar
 
-        print(f"\n  DETAILED BAR ANALYSIS:")
+        print("\n  DETAILED BAR ANALYSIS:")
         # Show bars around the transition
         window_start = tp_detection_bar - pd.Timedelta(hours=1)
         window_end = engine_entry_bar + pd.Timedelta(hours=1)

@@ -180,7 +180,7 @@ async def main():
         eng_mark = " ← ENG" if ts in engine_fires_not_tv else ""
         tv_mark = " ← TV" if ts in tv_fires_not_engine else ""
         close = feb_window.loc[ts, "close"] if "close" in feb_window.columns else 0
-        print(f"  {str(ts):<20} {close:>10.2f} {r_full:>10.4f} {r_500:>10.4f} {diff:>+8.4f}{eng_mark}{tv_mark}")
+        print(f"  {ts!s:<20} {close:>10.2f} {r_full:>10.4f} {r_500:>10.4f} {diff:>+8.4f}{eng_mark}{tv_mark}")
 
     # Summary: how many of the "extra engine" bars cross 52 in full vs 500?
     print("\n=== Extra engine crossunders: does full-history RSI still cross 52? ===")
@@ -195,7 +195,7 @@ async def main():
         r5_prev = rsi_500.get(prev_ts, float("nan"))
         r5_cur = rsi_500.get(ts, float("nan"))
         full_cross = "YES (still)" if (rf_prev >= 52 and rf_cur < 52) else "NO (fixed!)" if (rf_prev >= 52) else "n/a"
-        print(f"  {str(ts):<20} {rf_prev:>14.4f} {rf_cur:>12.4f} {r5_prev:>14.4f} {r5_cur:>12.4f} {full_cross:>14}")
+        print(f"  {ts!s:<20} {rf_prev:>14.4f} {rf_cur:>12.4f} {r5_prev:>14.4f} {r5_cur:>12.4f} {full_cross:>14}")
 
 
 asyncio.run(main())

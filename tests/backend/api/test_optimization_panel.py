@@ -12,7 +12,6 @@ Covers:
 Naming: test_[function]_[scenario]
 """
 
-
 import pytest
 
 from backend.api.routers.optimizations import (

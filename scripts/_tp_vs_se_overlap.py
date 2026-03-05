@@ -190,9 +190,9 @@ async def main():
             tp_det_se = se[tp_det_pos]
             tp_exec_se = se[tp_det_pos + 1] if tp_det_pos + 1 < len(se) else False
             if tp_det_se:
-                print(f"  *** SE=True AT TP detect bar! Position still open when signal fires!")
+                print("  *** SE=True AT TP detect bar! Position still open when signal fires!")
             if tp_exec_se:
-                print(f"  *** SE=True AT TP exec bar!")
+                print("  *** SE=True AT TP exec bar!")
 
         # Check bars between TP exec and first SE
         if tp_det_pos is not None and first_se_pos is not None:
@@ -200,7 +200,7 @@ async def main():
             print(f"  Gap from TP exec bar to 1st SE: {gap} bars")
 
             # Show SE bars from TP detect to beyond first SE
-            print(f"  SE trace from TP detect-2 to 1st SE+2:")
+            print("  SE trace from TP detect-2 to 1st SE+2:")
             start = max(0, tp_det_pos - 2)
             end = min(len(se), first_se_pos + 3)
             for j in range(start, end):

@@ -132,7 +132,7 @@ async def main():
         print(f"    LX bars ({len(lx_bars)}): {[(str(ts), idx) for idx, ts in lx_bars]}")
 
         # For each SE bar, check RSI details
-        print(f"\n  RSI at each SE bar:")
+        print("\n  RSI at each SE bar:")
         for idx, ts in se_bars:
             rsi_val = btc_rsi_full.get(ts, float("nan"))
             rsi_prev = btc_rsi_full.get(times[idx - 1], float("nan")) if idx > 0 else float("nan")
@@ -149,7 +149,7 @@ async def main():
             sx_between = [(idx, ts) for idx, ts in sx_bars if first_se_idx < idx < second_se_idx]
             le_between = [(idx, ts) for idx, ts in le_bars if first_se_idx < idx < second_se_idx]
             lx_between = [(idx, ts) for idx, ts in lx_bars if first_se_idx < idx < second_se_idx]
-            print(f"\n  Between 1st SE and 2nd SE:")
+            print("\n  Between 1st SE and 2nd SE:")
             print(f"    SX: {[(str(ts), idx) for idx, ts in sx_between]}")
             print(f"    LE: {[(str(ts), idx) for idx, ts in le_between]}")
             print(f"    LX: {[(str(ts), idx) for idx, ts in lx_between]}")
@@ -163,7 +163,7 @@ async def main():
         if len(se_bars) >= 2:
             first_se_idx = se_bars[0][0]
             second_se_idx = se_bars[1][0]
-            print(f"\n  Crossunders ↓52 between 1st SE and 2nd SE (where SE=False):")
+            print("\n  Crossunders ↓52 between 1st SE and 2nd SE (where SE=False):")
             for i in range(first_se_idx + 1, second_se_idx):
                 rsi_val = btc_rsi_full.get(times[i], float("nan"))
                 rsi_prev = btc_rsi_full.get(times[i - 1], float("nan")) if i > 0 else float("nan")

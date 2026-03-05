@@ -35,9 +35,7 @@ entry_bar = 6320  # From previous output
 print(f"\n\nLooking for TP {tp_price:.2f} starting from bar {entry_bar}...")
 for i in range(entry_bar, min(entry_bar + 200, len(df))):
     if df["high"].iloc[i] >= tp_price:
-        print(
-            f"  TP hit at bar {i}: high={df['high'].iloc[i]:.2f}, time={df['timestamp'].iloc[i]}"
-        )
+        print(f"  TP hit at bar {i}: high={df['high'].iloc[i]:.2f}, time={df['timestamp'].iloc[i]}")
         exit_bar = i
         break
 
@@ -46,14 +44,10 @@ print(f"\n\nSignals between exit bar {exit_bar} and bars 6502-6522:")
 for i in range(exit_bar, 6525):
     if long_entries[i]:
         next_open = df["open"].iloc[i + 1] if i + 1 < len(df) else 0
-        print(
-            f"  LONG signal at bar {i}: {df['timestamp'].iloc[i]}, entry price would be {next_open:.2f}"
-        )
+        print(f"  LONG signal at bar {i}: {df['timestamp'].iloc[i]}, entry price would be {next_open:.2f}")
     if short_entries[i]:
         next_open = df["open"].iloc[i + 1] if i + 1 < len(df) else 0
-        print(
-            f"  SHORT signal at bar {i}: {df['timestamp'].iloc[i]}, entry price would be {next_open:.2f}"
-        )
+        print(f"  SHORT signal at bar {i}: {df['timestamp'].iloc[i]}, entry price would be {next_open:.2f}")
 
 # The key question: at bar 6502 when there's a long signal,
 # was Fallback still in position from trade 45?

@@ -84,9 +84,7 @@ for i in range(min_len):
         for j in range(max(0, i - 2), min(min_len, i + 5)):
             diff = abs(fb_pnls[j] - nb_pnls[j])
             marker = " <-- DIFF" if diff > 0.01 else ""
-            print(
-                f"  Trade {j + 1}: FB={fb_pnls[j]:>8.2f}  NB={nb_pnls[j]:>8.2f}{marker}"
-            )
+            print(f"  Trade {j + 1}: FB={fb_pnls[j]:>8.2f}  NB={nb_pnls[j]:>8.2f}{marker}")
         break
 else:
     print(f"First {min_len} trades have matching PnLs!")

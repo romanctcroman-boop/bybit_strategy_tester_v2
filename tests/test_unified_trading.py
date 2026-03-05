@@ -30,13 +30,15 @@ def _make_sample_klines(n: int = 50) -> pd.DataFrame:
     np.random.seed(42)
     prices = 100 + np.cumsum(np.random.randn(n) * 0.3)
     prices = np.maximum(prices, 50)
-    df = pd.DataFrame({
-        "open": prices * 0.99,
-        "high": prices * 1.02,
-        "low": prices * 0.98,
-        "close": prices,
-        "volume": np.random.rand(n) * 1e6,
-    })
+    df = pd.DataFrame(
+        {
+            "open": prices * 0.99,
+            "high": prices * 1.02,
+            "low": prices * 0.98,
+            "close": prices,
+            "volume": np.random.rand(n) * 1e6,
+        }
+    )
     df["open_time"] = pd.date_range("2024-01-01", periods=n, freq="1h")
     return df
 

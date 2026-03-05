@@ -51,7 +51,7 @@ for i, tv in enumerate(tv_trades):
         our_pnl = t["pnl"]
         tv_pnl_v = tv_pnl or 0
         price_match = "✅" if abs(delta_price) < 0.01 else f"❌({delta_price:+.2f})"
-        time_match = "✅" if our_entry_str == tv_entry else f"❌"
+        time_match = "✅" if our_entry_str == tv_entry else "❌"
         side_match = "✅" if our_side == tv_side else "❌"
         overall = "✅" if abs(delta_price) < 0.01 and our_entry_str == tv_entry else "❌"
 
@@ -63,7 +63,7 @@ for i, tv in enumerate(tv_trades):
             f"{i + 1:>3} | {tv_side:6} | {tv_entry:18} | {tv_ep:9.2f} | {'NO TRADE':18} | {'':9} | {'':7} | {tv_pnl or 0:7.2f} | {'':7} | ❌"
         )
 
-print(f"\n=== All 155 trades: entry time/price check ===")
+print("\n=== All 155 trades: entry time/price check ===")
 from datetime import datetime, timedelta
 
 mismatches = 0

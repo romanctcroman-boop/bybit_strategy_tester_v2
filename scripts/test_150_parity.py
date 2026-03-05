@@ -2,6 +2,7 @@
 🔬 MEGA PARITY TEST: 150 КОМБИНАЦИЙ ПАРАМЕТРОВ
 Сравнение FallbackEngineV2 и NumbaEngineV2
 """
+
 import sys
 from pathlib import Path
 
@@ -24,18 +25,22 @@ print(f"Время: {datetime.now()}")
 # ============================================================================
 print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
 print(f"   {len(df_1h)} баров загружено")
+
 
 # RSI функция
 def calculate_rsi(close, period=14):
@@ -48,6 +53,7 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+
 # ============================================================================
 # ПАРАМЕТРЫ ДЛЯ ТЕСТА
 # ============================================================================
@@ -59,14 +65,16 @@ take_profits = [0.01, 0.02, 0.03, 0.05]
 directions = ["long", "short", "both"]
 
 # Генерируем 150 комбинаций
-combinations = list(product(
-    rsi_periods[:3],      # 3 RSI periods
-    rsi_overbought[:2],   # 2 OB levels
-    rsi_oversold[:2],     # 2 OS levels
-    stop_losses[:3],      # 3 SL levels
-    take_profits[:2],     # 2 TP levels
-    directions            # 3 directions
-))
+combinations = list(
+    product(
+        rsi_periods[:3],  # 3 RSI periods
+        rsi_overbought[:2],  # 2 OB levels
+        rsi_oversold[:2],  # 2 OS levels
+        stop_losses[:3],  # 3 SL levels
+        take_profits[:2],  # 2 TP levels
+        directions,  # 3 directions
+    )
+)
 
 # Ограничиваем до 150
 combinations = combinations[:150]
@@ -100,7 +108,7 @@ start_time = time.time()
 
 for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     # Генерируем сигналы
-    rsi = calculate_rsi(df_1h['close'], period=rsi_period)
+    rsi = calculate_rsi(df_1h["close"], period=rsi_period)
     long_entries = (rsi < os).values
     long_exits = (rsi > ob).values
     short_entries = (rsi > ob).values
@@ -150,37 +158,39 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     trades_drift = safe_pct_diff(fb_m.total_trades, nb_m.total_trades)
     pf_drift = safe_pct_diff(fb_m.profit_factor, nb_m.profit_factor)
 
-    results.append({
-        "combo": i + 1,
-        "rsi": rsi_period,
-        "ob": ob,
-        "os": os,
-        "sl": sl,
-        "tp": tp,
-        "dir": direction,
-        "fb_trades": fb_m.total_trades,
-        "nb_trades": nb_m.total_trades,
-        "fb_profit": fb_m.net_profit,
-        "nb_profit": nb_m.net_profit,
-        "fb_sharpe": fb_m.sharpe_ratio,
-        "nb_sharpe": nb_m.sharpe_ratio,
-        "fb_dd": fb_m.max_drawdown,
-        "nb_dd": nb_m.max_drawdown,
-        "fb_wr": fb_m.win_rate,
-        "nb_wr": nb_m.win_rate,
-        "profit_drift": profit_drift,
-        "sharpe_drift": sharpe_drift,
-        "dd_drift": dd_drift,
-        "winrate_drift": winrate_drift,
-        "trades_drift": trades_drift,
-        "pf_drift": pf_drift,
-    })
+    results.append(
+        {
+            "combo": i + 1,
+            "rsi": rsi_period,
+            "ob": ob,
+            "os": os,
+            "sl": sl,
+            "tp": tp,
+            "dir": direction,
+            "fb_trades": fb_m.total_trades,
+            "nb_trades": nb_m.total_trades,
+            "fb_profit": fb_m.net_profit,
+            "nb_profit": nb_m.net_profit,
+            "fb_sharpe": fb_m.sharpe_ratio,
+            "nb_sharpe": nb_m.sharpe_ratio,
+            "fb_dd": fb_m.max_drawdown,
+            "nb_dd": nb_m.max_drawdown,
+            "fb_wr": fb_m.win_rate,
+            "nb_wr": nb_m.win_rate,
+            "profit_drift": profit_drift,
+            "sharpe_drift": sharpe_drift,
+            "dd_drift": dd_drift,
+            "winrate_drift": winrate_drift,
+            "trades_drift": trades_drift,
+            "pf_drift": pf_drift,
+        }
+    )
 
     # Прогресс
     if (i + 1) % 25 == 0:
         elapsed = time.time() - start_time
         eta = elapsed / (i + 1) * (len(combinations) - i - 1)
-        print(f"   [{i+1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
+        print(f"   [{i + 1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
 
 total_time = time.time() - start_time
 print(f"\n✅ Завершено за {total_time:.1f}s")
@@ -221,19 +231,21 @@ perfect_dd = (df["dd_drift"] < 0.001).sum()
 perfect_trades = (df["trades_drift"] == 0).sum()
 
 print("\n🎯 ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (<0.001% drift):")
-print(f"   Net Profit:    {perfect_profit}/{len(df)} ({perfect_profit/len(df)*100:.1f}%)")
-print(f"   Sharpe Ratio:  {perfect_sharpe}/{len(df)} ({perfect_sharpe/len(df)*100:.1f}%)")
-print(f"   Max Drawdown:  {perfect_dd}/{len(df)} ({perfect_dd/len(df)*100:.1f}%)")
-print(f"   Total Trades:  {perfect_trades}/{len(df)} ({perfect_trades/len(df)*100:.1f}%)")
+print(f"   Net Profit:    {perfect_profit}/{len(df)} ({perfect_profit / len(df) * 100:.1f}%)")
+print(f"   Sharpe Ratio:  {perfect_sharpe}/{len(df)} ({perfect_sharpe / len(df) * 100:.1f}%)")
+print(f"   Max Drawdown:  {perfect_dd}/{len(df)} ({perfect_dd / len(df) * 100:.1f}%)")
+print(f"   Total Trades:  {perfect_trades}/{len(df)} ({perfect_trades / len(df) * 100:.1f}%)")
 
 # Комбинации с расхождениями
 discrepancies = df[df["profit_drift"] > 0.001]
 if len(discrepancies) > 0:
     print(f"\n⚠️ Комбинации с расхождением Net Profit > 0.001%: {len(discrepancies)}")
     for _, row in discrepancies.head(5).iterrows():
-        print(f"   #{row['combo']}: RSI({row['rsi']},{row['ob']},{row['os']}) "
-              f"SL={row['sl']*100:.0f}% TP={row['tp']*100:.0f}% {row['dir']} "
-              f"drift={row['profit_drift']:.4f}%")
+        print(
+            f"   #{row['combo']}: RSI({row['rsi']},{row['ob']},{row['os']}) "
+            f"SL={row['sl'] * 100:.0f}% TP={row['tp'] * 100:.0f}% {row['dir']} "
+            f"drift={row['profit_drift']:.4f}%"
+        )
 else:
     print("\n🎉 ВСЕ КОМБИНАЦИИ ИМЕЮТ ИДЕАЛЬНОЕ СОВПАДЕНИЕ!")
 
@@ -245,10 +257,10 @@ print("🏆 ФИНАЛЬНЫЙ ВЕРДИКТ")
 print("=" * 100)
 
 all_perfect = (
-    df["profit_drift"].max() < 0.001 and
-    df["sharpe_drift"].max() < 0.001 and
-    df["dd_drift"].max() < 0.001 and
-    df["trades_drift"].max() == 0
+    df["profit_drift"].max() < 0.001
+    and df["sharpe_drift"].max() < 0.001
+    and df["dd_drift"].max() < 0.001
+    and df["trades_drift"].max() == 0
 )
 
 if all_perfect:
@@ -272,7 +284,7 @@ else:
     Средний drift Net Profit: {avg_profit_drift:.4f}%
     Средний drift Sharpe:     {avg_sharpe_drift:.4f}%
 
-    {'✅ ПРИЕМЛЕМОЕ СОВПАДЕНИЕ' if avg_profit_drift < 1.0 else '⚠️ ТРЕБУЕТСЯ ПРОВЕРКА'}
+    {"✅ ПРИЕМЛЕМОЕ СОВПАДЕНИЕ" if avg_profit_drift < 1.0 else "⚠️ ТРЕБУЕТСЯ ПРОВЕРКА"}
     """)
 
 print("=" * 100)

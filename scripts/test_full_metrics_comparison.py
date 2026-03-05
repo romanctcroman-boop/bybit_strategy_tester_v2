@@ -100,7 +100,7 @@ def compare_all_metrics(
     metrics2: dict,
     name1: str = "Standard",
     name2: str = "Magnifier",
-    tolerance_pct: float = 0.01  # 1% tolerance for floats
+    tolerance_pct: float = 0.01,  # 1% tolerance for floats
 ) -> tuple[list, list, list]:
     """
     Compare all metrics between two runs.
@@ -190,9 +190,7 @@ def run_full_comparison(direction: str = "both"):
     print(f"\nTotal metrics extracted: {len(metrics_std)}")
 
     # Compare
-    exact, tolerance, mismatches = compare_all_metrics(
-        metrics_std, metrics_mag, "Standard", "Magnifier"
-    )
+    exact, tolerance, mismatches = compare_all_metrics(metrics_std, metrics_mag, "Standard", "Magnifier")
 
     total_metrics = len(exact) + len(tolerance) + len(mismatches)
     match_rate = (len(exact) + len(tolerance)) / total_metrics * 100 if total_metrics > 0 else 0
@@ -202,7 +200,7 @@ def run_full_comparison(direction: str = "both"):
     print("=" * 100)
 
     print(f"\n📊 Total Metrics Compared: {total_metrics}")
-    print(f"✅ Exact Matches: {len(exact)} ({len(exact)/total_metrics*100:.1f}%)")
+    print(f"✅ Exact Matches: {len(exact)} ({len(exact) / total_metrics * 100:.1f}%)")
     print(f"🔶 Within Tolerance (<1%): {len(tolerance)}")
     print(f"❌ Mismatches: {len(mismatches)}")
     print(f"\n🎯 Overall Match Rate: {match_rate:.2f}%")
@@ -249,13 +247,24 @@ def run_full_comparison(direction: str = "both"):
     print("-" * 100)
 
     key_metrics = [
-        "total_trades", "winning_trades", "losing_trades",
-        "net_profit", "gross_profit", "gross_loss",
-        "win_rate", "profit_factor", "max_drawdown",
-        "sharpe_ratio", "sortino_ratio",
-        "avg_trade", "avg_win", "avg_loss",
-        "long_trades", "short_trades",
-        "long_pnl", "short_pnl",
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "net_profit",
+        "gross_profit",
+        "gross_loss",
+        "win_rate",
+        "profit_factor",
+        "max_drawdown",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "avg_trade",
+        "avg_win",
+        "avg_loss",
+        "long_trades",
+        "short_trades",
+        "long_pnl",
+        "short_pnl",
     ]
 
     print(f"{'Metric':<30} {'Standard':>15} {'Magnifier':>15} {'Status':>12}")
@@ -329,7 +338,9 @@ def run_all_directions():
     print("-" * 70)
 
     for direction, r in results.items():
-        print(f"{direction.upper():<15} {r['total']:>10} {r['exact']:>10} {r['tolerance']:>10} {r['mismatches']:>10} {r['match_rate']:>11.2f}%")
+        print(
+            f"{direction.upper():<15} {r['total']:>10} {r['exact']:>10} {r['tolerance']:>10} {r['mismatches']:>10} {r['match_rate']:>11.2f}%"
+        )
 
     return results
 

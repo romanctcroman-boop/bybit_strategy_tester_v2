@@ -704,19 +704,24 @@ class BacktestConfig(BaseModel):
     @model_validator(mode="after")
     def validate_dates(self):
         """Проверка корректности дат (DeepSeek рекомендация)"""
-        if self.end_date <= self.start_date:
+        # Normalise to naive UTC before comparing to avoid TypeError when
+        # one date is timezone-aware and the other is naive.
+        s = self.start_date.replace(tzinfo=None) if self.start_date.tzinfo else self.start_date
+        e = self.end_date.replace(tzinfo=None) if self.end_date.tzinfo else self.end_date
+
+        if e <= s:
             raise ValueError("end_date must be after start_date")
 
         # Максимум 2 года для бэктеста (разумный предел)
         max_duration = timedelta(days=730)
-        if self.end_date - self.start_date > max_duration:
+        if e - s > max_duration:
             raise ValueError("Maximum backtest duration is 2 years")
 
         # Не позволяем даты далеко в будущем (более 1 дня)
         # Разрешаем сегодняшнюю дату с учётом часовых поясов
         # Учитываем timezone-aware datetime (конвертируем в naive для сравнения)
         now = datetime.now()
-        end_date_naive = self.end_date.replace(tzinfo=None) if self.end_date.tzinfo else self.end_date
+        end_date_naive = e  # already normalised to naive above
         # Добавляем буфер 1 день для учёта часовых поясов
         if end_date_naive > now + timedelta(days=1):
             raise ValueError("end_date cannot be more than 1 day in the future")
@@ -940,7 +945,9 @@ class PerformanceMetrics(BaseModel):
     avg_loss: float = Field(default=0.0, description="Average losing trade percentage")
     avg_loss_value: float = Field(default=0.0, description="Average losing trade in currency ($)")
     avg_win_loss_ratio: float = Field(default=0.0, description="Ratio avg win / avg loss")
-    payoff_ratio: float = Field(default=0.0, description="Payoff ratio: avg winning trade / avg losing trade (absolute)")
+    payoff_ratio: float = Field(
+        default=0.0, description="Payoff ratio: avg winning trade / avg losing trade (absolute)"
+    )
     largest_win: float = Field(default=0.0, description="Largest winning trade percentage")
     largest_win_value: float = Field(default=0.0, description="Largest winning trade in currency ($)")
     largest_loss: float = Field(default=0.0, description="Largest losing trade percentage (negative)")

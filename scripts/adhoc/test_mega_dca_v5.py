@@ -59,24 +59,14 @@ def run_test(name: str, category: str):
                 result = func(*args, **kwargs)
                 elapsed = time.time() - start_time
                 if result is True or result is None:
-                    test_results.append(
-                        TestResult(
-                            name, category, True, f"OK ({elapsed:.2f}s)", elapsed
-                        )
-                    )
+                    test_results.append(TestResult(name, category, True, f"OK ({elapsed:.2f}s)", elapsed))
                     print(f"  ✅ {name} ({elapsed:.2f}s)")
                 else:
-                    test_results.append(
-                        TestResult(name, category, False, str(result), elapsed)
-                    )
+                    test_results.append(TestResult(name, category, False, str(result), elapsed))
                     print(f"  ❌ {name}: {result}")
             except Exception as e:
                 elapsed = time.time() - start_time
-                test_results.append(
-                    TestResult(
-                        name, category, False, str(e), elapsed, traceback.format_exc()
-                    )
-                )
+                test_results.append(TestResult(name, category, False, str(e), elapsed, traceback.format_exc()))
                 print(f"  ❌ {name}: {e}")
 
         return wrapper
@@ -106,9 +96,7 @@ def generate_test_ohlcv(
     vol_factor = np.ones(n_bars)
     for i in range(1, n_bars):
         # Cap vol_factor to prevent exponential explosion
-        vol_factor[i] = min(
-            5.0, 0.9 * vol_factor[i - 1] + 0.1 * abs(returns[i - 1]) * 50
-        )
+        vol_factor[i] = min(5.0, 0.9 * vol_factor[i - 1] + 0.1 * abs(returns[i - 1]) * 50)
     returns = returns * (1 + vol_factor * 0.5)
 
     # Build price series using cumprod (more stable)
@@ -657,9 +645,7 @@ def test_large_grid_1k():
     )
 
     assert result.status == "completed"
-    print(
-        f"    [INFO] 1000+ grid: {result.tested_combinations} tested, {len(result.top_results)} returned"
-    )
+    print(f"    [INFO] 1000+ grid: {result.tested_combinations} tested, {len(result.top_results)} returned")
     return True
 
 
@@ -875,9 +861,7 @@ def test_universal_auto():
 
     backend = getattr(result, "backend_used", "unknown")
     assert result.status == "completed"
-    print(
-        f"    [INFO] Universal auto: backend={backend}, {result.tested_combinations} tested"
-    )
+    print(f"    [INFO] Universal auto: backend={backend}, {result.tested_combinations} tested")
     return True
 
 
@@ -1259,9 +1243,7 @@ def test_single_params():
         direction="long",
     )
 
-    assert result.tested_combinations == 1, (
-        f"Expected 1 combination, got {result.tested_combinations}"
-    )
+    assert result.tested_combinations == 1, f"Expected 1 combination, got {result.tested_combinations}"
     print("    [INFO] Single params: 1 combination tested")
     return True
 
@@ -1396,9 +1378,7 @@ def test_optuna_pruning():
 
         return (35 - rsi_period) / 5
 
-    study = optuna.create_study(
-        direction="maximize", pruner=optuna.pruners.MedianPruner()
-    )
+    study = optuna.create_study(direction="maximize", pruner=optuna.pruners.MedianPruner())
     study.optimize(objective, n_trials=30, show_progress_bar=False)
 
     pruned = len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED])
@@ -1465,9 +1445,7 @@ def test_wf_in_sample():
     )
 
     if result.best_metrics:
-        print(
-            f"    [INFO] In-sample best: return={result.best_metrics.get('total_return', 0):.2f}%"
-        )
+        print(f"    [INFO] In-sample best: return={result.best_metrics.get('total_return', 0):.2f}%")
     return True
 
 
@@ -1557,9 +1535,7 @@ def test_mc_random_seeds():
     if results_by_seed:
         mean_return = np.mean(results_by_seed)
         std_return = np.std(results_by_seed)
-        print(
-            f"    [INFO] Returns across seeds: mean={mean_return:.2f}%, std={std_return:.2f}%"
-        )
+        print(f"    [INFO] Returns across seeds: mean={mean_return:.2f}%, std={std_return:.2f}%")
     return True
 
 
@@ -1577,18 +1553,14 @@ def test_mc_bootstrap():
 
     for _ in range(n_simulations):
         # Resample with replacement
-        resampled = np.random.choice(
-            trade_returns, size=len(trade_returns), replace=True
-        )
+        resampled = np.random.choice(trade_returns, size=len(trade_returns), replace=True)
         bootstrap_totals.append(np.sum(resampled))
 
     mean_total = np.mean(bootstrap_totals)
     percentile_5 = np.percentile(bootstrap_totals, 5)
     percentile_95 = np.percentile(bootstrap_totals, 95)
 
-    print(
-        f"    [INFO] Bootstrap: mean={mean_total:.2f}, 5%={percentile_5:.2f}, 95%={percentile_95:.2f}"
-    )
+    print(f"    [INFO] Bootstrap: mean={mean_total:.2f}, 5%={percentile_5:.2f}, 95%={percentile_95:.2f}")
     return True
 
 
@@ -1650,9 +1622,7 @@ def test_sensitivity_rsi_period():
 
     if results_by_period:
         best_period = max(results_by_period, key=results_by_period.get)
-        print(
-            f"    [INFO] Best RSI period: {best_period} ({results_by_period[best_period]:.2f}%)"
-        )
+        print(f"    [INFO] Best RSI period: {best_period} ({results_by_period[best_period]:.2f}%)")
     return True
 
 

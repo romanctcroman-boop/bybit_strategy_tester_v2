@@ -8,7 +8,6 @@ Tests cover:
 4. Market Simulation: Spread, Position Aging
 """
 
-
 from backend.backtesting.universal_engine import (
     # Risk Management
     AntiLiquidationConfig,
@@ -65,9 +64,7 @@ class TestOrderManager:
     def test_create_stop_order(self):
         """Test stop-market order creation."""
         manager = OrderManager()
-        order = manager.create_stop_order(
-            side=OrderSide.SELL, size=1.0, stop_price=48000.0
-        )
+        order = manager.create_stop_order(side=OrderSide.SELL, size=1.0, stop_price=48000.0)
 
         assert order.order_type == OrderType.STOP_MARKET
         assert order.stop_price == 48000.0
@@ -108,9 +105,7 @@ class TestOrderManager:
         manager.create_limit_order(side=OrderSide.BUY, size=1.0, price=49000.0)
 
         # Bar touches limit price
-        filled = manager.process_bar(
-            high=50100.0, low=48900.0, close=49500.0, timestamp=1000
-        )
+        filled = manager.process_bar(high=50100.0, low=48900.0, close=49500.0, timestamp=1000)
 
         assert len(filled) == 1
         assert filled[0].status == OrderStatus.FILLED
@@ -122,9 +117,7 @@ class TestOrderManager:
         manager.create_limit_order(side=OrderSide.BUY, size=1.0, price=48000.0)
 
         # Bar doesn't touch limit
-        filled = manager.process_bar(
-            high=50100.0, low=49000.0, close=49500.0, timestamp=1000
-        )
+        filled = manager.process_bar(high=50100.0, low=49000.0, close=49500.0, timestamp=1000)
 
         assert len(filled) == 0
         assert len(manager.pending_orders) == 1
@@ -135,9 +128,7 @@ class TestOrderManager:
         manager.create_stop_order(side=OrderSide.SELL, size=1.0, stop_price=49000.0)
 
         # Bar breaches stop
-        filled = manager.process_bar(
-            high=50000.0, low=48500.0, close=48800.0, timestamp=1000
-        )
+        filled = manager.process_bar(high=50000.0, low=48500.0, close=48800.0, timestamp=1000)
 
         assert len(filled) == 1
         assert filled[0].filled_price == 49000.0
@@ -178,9 +169,7 @@ class TestOrderManager:
         manager.process_bar(high=52000.0, low=51000.0, close=51500.0, timestamp=1000)
 
         # Price drops and triggers stop (stop ~50960)
-        filled = manager.process_bar(
-            high=51200.0, low=50800.0, close=50900.0, timestamp=2000
-        )
+        filled = manager.process_bar(high=51200.0, low=50800.0, close=50900.0, timestamp=2000)
 
         assert len(filled) == 1
 
@@ -220,9 +209,7 @@ class TestRiskManagement:
         config = AntiLiquidationConfig(trigger_margin_ratio=0.7)
         rm = RiskManagement(anti_liq_config=config)
 
-        result = rm.check_anti_liquidation(
-            margin_ratio=0.3, position_size=1.0, unrealized_pnl=-100
-        )
+        result = rm.check_anti_liquidation(margin_ratio=0.3, position_size=1.0, unrealized_pnl=-100)
 
         assert result.action == "allow"
 
@@ -231,9 +218,7 @@ class TestRiskManagement:
         config = AntiLiquidationConfig(trigger_margin_ratio=0.7, reduce_percent=0.25)
         rm = RiskManagement(anti_liq_config=config)
 
-        result = rm.check_anti_liquidation(
-            margin_ratio=0.8, position_size=1.0, unrealized_pnl=-500
-        )
+        result = rm.check_anti_liquidation(margin_ratio=0.8, position_size=1.0, unrealized_pnl=-500)
 
         assert result.action == "reduce"
         assert result.suggested_size == 0.25
@@ -255,9 +240,7 @@ class TestRiskManagement:
 
     def test_break_even_triggered_long(self):
         """Test break-even stop triggered for long position."""
-        config = BreakEvenConfig(
-            activation_profit=0.02, offset=0.001, min_bars_in_profit=1
-        )
+        config = BreakEvenConfig(activation_profit=0.02, offset=0.001, min_bars_in_profit=1)
         rm = RiskManagement(break_even_config=config)
 
         # 3% profit
@@ -274,9 +257,7 @@ class TestRiskManagement:
 
     def test_break_even_triggered_short(self):
         """Test break-even stop triggered for short position."""
-        config = BreakEvenConfig(
-            activation_profit=0.02, offset=0.001, min_bars_in_profit=1
-        )
+        config = BreakEvenConfig(activation_profit=0.02, offset=0.001, min_bars_in_profit=1)
         rm = RiskManagement(break_even_config=config)
 
         # 3% profit on short
@@ -310,9 +291,7 @@ class TestRiskManagement:
 
     def test_position_size_with_kelly(self):
         """Test Kelly criterion position sizing."""
-        config = RiskPerTradeConfig(
-            max_risk_percent=0.1, use_kelly=True, kelly_fraction=0.5
-        )
+        config = RiskPerTradeConfig(max_risk_percent=0.1, use_kelly=True, kelly_fraction=0.5)
         rm = RiskManagement(risk_per_trade_config=config)
 
         size, reason = rm.calculate_position_size(
@@ -445,9 +424,7 @@ class TestTradingFilters:
 
     def test_news_filter_high_impact(self):
         """Test news filter blocks during high impact news."""
-        config = NewsFilterConfig(
-            minutes_before=30, minutes_after=30, filter_impact=["high"]
-        )
+        config = NewsFilterConfig(minutes_before=30, minutes_after=30, filter_impact=["high"])
         filters = TradingFilters(news_config=config)
 
         # Add news event
@@ -475,9 +452,7 @@ class TestTradingFilters:
         config = NewsFilterConfig(filter_impact=["high"])
         filters = TradingFilters(news_config=config)
 
-        filters.load_news_events(
-            [{"timestamp": 1000000, "title": "Minor data", "impact": "low"}]
-        )
+        filters.load_news_events([{"timestamp": 1000000, "title": "Minor data", "impact": "low"}])
 
         # During low impact news
         allowed, reason = filters.check_news(timestamp=1000000)
@@ -530,9 +505,7 @@ class TestTradingFilters:
         """Test combined can_trade check."""
         session_config = SessionFilterConfig(allowed_sessions=[TradingSession.EUROPE])
         cooldown_config = CooldownConfig(enabled=False)
-        filters = TradingFilters(
-            session_config=session_config, cooldown_config=cooldown_config
-        )
+        filters = TradingFilters(session_config=session_config, cooldown_config=cooldown_config)
 
         # 10:00 UTC, no cooldown
         timestamp = 10 * 3600 * 1000
@@ -567,12 +540,8 @@ class TestSpreadSimulator:
         config = SpreadConfig(base_spread=0.001, volatility_multiplier=2.0)
         sim = SpreadSimulator(config)
 
-        bid_low_vol, ask_low_vol = sim.calculate_spread(
-            mid_price=50000.0, volatility=0.0
-        )
-        bid_high_vol, ask_high_vol = sim.calculate_spread(
-            mid_price=50000.0, volatility=0.02
-        )
+        bid_low_vol, ask_low_vol = sim.calculate_spread(mid_price=50000.0, volatility=0.0)
+        bid_high_vol, ask_high_vol = sim.calculate_spread(mid_price=50000.0, volatility=0.02)
 
         spread_low = ask_low_vol - bid_low_vol
         spread_high = ask_high_vol - bid_high_vol
@@ -589,12 +558,8 @@ class TestSpreadSimulator:
         sim = SpreadSimulator(config)
         sim.set_average_volume(1000.0)
 
-        bid_high_vol, ask_high_vol = sim.calculate_spread(
-            mid_price=50000.0, current_volume=1000.0
-        )
-        bid_low_vol, ask_low_vol = sim.calculate_spread(
-            mid_price=50000.0, current_volume=300.0
-        )
+        bid_high_vol, ask_high_vol = sim.calculate_spread(mid_price=50000.0, current_volume=1000.0)
+        bid_low_vol, ask_low_vol = sim.calculate_spread(mid_price=50000.0, current_volume=300.0)
 
         spread_high = ask_high_vol - bid_high_vol
         spread_low = ask_low_vol - bid_low_vol
@@ -715,9 +680,7 @@ class TestTradingEnhancementsIntegration:
             drawdown_config=DrawdownGuardianConfig(max_drawdown=0.1),
         )
         filters = TradingFilters(
-            session_config=SessionFilterConfig(
-                allowed_sessions=[TradingSession.EUROPE, TradingSession.US]
-            ),
+            session_config=SessionFilterConfig(allowed_sessions=[TradingSession.EUROPE, TradingSession.US]),
             cooldown_config=CooldownConfig(cooldown_after_loss=3),
         )
         spread_sim = SpreadSimulator(SpreadConfig(base_spread=0.0005))
@@ -741,9 +704,7 @@ class TestTradingEnhancementsIntegration:
         assert entry_price > 50000.0
 
         # 5. Create orders
-        order_manager.create_stop_order(
-            side=OrderSide.SELL, size=size, stop_price=49000.0
-        )
+        order_manager.create_stop_order(side=OrderSide.SELL, size=size, stop_price=49000.0)
 
         # 6. Track position
         position_tracker.open_position(

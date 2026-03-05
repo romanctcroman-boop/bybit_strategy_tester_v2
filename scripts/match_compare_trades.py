@@ -68,11 +68,7 @@ for i, ft in enumerate(fb_trades):
         )
 
 # any vb trades not matched
-unmatched_vb = [
-    {"vectorbt_idx": j, "vectorbt": vt}
-    for j, vt in enumerate(vb_trades)
-    if j not in used_vb
-]
+unmatched_vb = [{"vectorbt_idx": j, "vectorbt": vt} for j, vt in enumerate(vb_trades) if j not in used_vb]
 
 out = {
     "matches": matches,

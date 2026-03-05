@@ -121,7 +121,7 @@ async def main():
     delta_needed = (avg_gain * 13 / target_rs) - avg_loss * 13
     close_for_52 = btc_close[loc - 1] - delta_needed
 
-    print(f"\nTo get RSI exactly 52:")
+    print("\nTo get RSI exactly 52:")
     print(f"  Need |delta| = {delta_needed:.2f} (loss)")
     print(f"  Close needed = {close_for_52:.2f}")
     print(f"  Actual close = {btc_close[loc]:.2f}")

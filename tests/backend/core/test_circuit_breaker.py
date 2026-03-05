@@ -4,7 +4,6 @@ Tests for backend/core/circuit_breaker.py
 Basic tests for circuit breaker functionality.
 """
 
-
 import pytest
 
 from backend.core.circuit_breaker import (

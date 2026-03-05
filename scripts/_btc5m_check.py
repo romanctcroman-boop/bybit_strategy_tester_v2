@@ -4,8 +4,9 @@ import sys
 
 sys.path.insert(0, ".")
 import asyncio
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from loguru import logger
 
 logger.remove()
@@ -103,7 +104,7 @@ async def main():
         bar_end = bar_start + pd.Timedelta("30min")
         sub = df5[bar_start : bar_end - pd.Timedelta("1s")]
         if sub.empty:
-            print(f"    No 5m sub-bars found")
+            print("    No 5m sub-bars found")
             continue
 
         # Simulate Wilder update using each 5m close as if it were the next 30m bar

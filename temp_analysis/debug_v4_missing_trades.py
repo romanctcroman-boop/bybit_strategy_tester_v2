@@ -10,7 +10,7 @@ NumbaV2     → 155 trades (short=124)
 import json
 import sqlite3
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))

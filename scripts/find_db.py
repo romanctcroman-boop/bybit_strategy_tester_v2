@@ -16,7 +16,7 @@ for db in dbs:
         tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         print(f"   Tables: {tables}")
 
-        if 'bybit_kline_audit' in tables:
+        if "bybit_kline_audit" in tables:
             # Count rows
             count = conn.execute("SELECT COUNT(*) FROM bybit_kline_audit").fetchone()[0]
             print(f"   Rows in bybit_kline_audit: {count}")
@@ -26,7 +26,9 @@ for db in dbs:
             print(f"   SPOT rows: {spot_count}")
 
             # Sample data
-            sample = conn.execute("SELECT symbol, interval, market_type, COUNT(*) as cnt FROM bybit_kline_audit GROUP BY symbol, interval, market_type LIMIT 10").fetchall()
+            sample = conn.execute(
+                "SELECT symbol, interval, market_type, COUNT(*) as cnt FROM bybit_kline_audit GROUP BY symbol, interval, market_type LIMIT 10"
+            ).fetchall()
             print("   Data summary:")
             for row in sample:
                 print(f"      {row}")

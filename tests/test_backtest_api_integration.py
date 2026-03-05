@@ -273,9 +273,7 @@ class TestBacktestMetrics:
                 found_metrics.append(metric)
                 logger.info(f"{metric}: {metrics[metric]}")
 
-        logger.info(
-            f"Found {len(found_metrics)}/{len(expected_metrics)} expected metrics"
-        )
+        logger.info(f"Found {len(found_metrics)}/{len(expected_metrics)} expected metrics")
 
     def test_trades_in_response(self, client, backtest_config):
         """Test that backtest returns trade list."""

@@ -10,7 +10,7 @@ This module provides thorough testing coverage for:
 
 Run with pytest:
     pytest tests/test_agent_system_comprehensive.py -v
-    
+
 Or run directly:
     python tests/test_agent_system_comprehensive.py
 """
@@ -32,6 +32,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Test Fixtures and Helpers
 # =============================================================================
 
+
 def generate_test_id() -> str:
     """Generate unique test ID"""
     return f"test_{uuid.uuid4().hex[:8]}"
@@ -42,18 +43,21 @@ def generate_mock_market_data(n_samples: int = 100) -> np.ndarray:
     np.random.seed(42)
     prices = 100 + np.cumsum(np.random.randn(n_samples) * 0.5)
 
-    return np.column_stack([
-        prices,  # Open
-        prices + np.abs(np.random.randn(n_samples) * 0.5),  # High
-        prices - np.abs(np.random.randn(n_samples) * 0.5),  # Low
-        prices + np.random.randn(n_samples) * 0.2,  # Close
-        np.random.randint(1000, 10000, n_samples),  # Volume
-    ])
+    return np.column_stack(
+        [
+            prices,  # Open
+            prices + np.abs(np.random.randn(n_samples) * 0.5),  # High
+            prices - np.abs(np.random.randn(n_samples) * 0.5),  # Low
+            prices + np.random.randn(n_samples) * 0.2,  # Close
+            np.random.randint(1000, 10000, n_samples),  # Volume
+        ]
+    )
 
 
 # =============================================================================
 # Memory System Tests
 # =============================================================================
+
 
 class TestHierarchicalMemory:
     """Tests for HierarchicalMemory"""
@@ -174,6 +178,7 @@ class TestVectorStore:
 # =============================================================================
 # Self-Improvement Engine Tests
 # =============================================================================
+
 
 class TestRLHFModule:
     """Tests for RLHFModule"""
@@ -348,6 +353,7 @@ class TestPerformanceEvaluator:
 # Consensus Mechanism Tests
 # =============================================================================
 
+
 class TestMultiAgentDeliberation:
     """Tests for MultiAgentDeliberation"""
 
@@ -422,10 +428,12 @@ class TestDomainAgents:
 
         agent = TradingStrategyAgent()
 
-        analysis = await agent.analyze({
-            "strategy": {"type": "RSI", "period": 14},
-            "results": {"sharpe_ratio": 1.5, "win_rate": 0.55},
-        })
+        analysis = await agent.analyze(
+            {
+                "strategy": {"type": "RSI", "period": 14},
+                "results": {"sharpe_ratio": 1.5, "win_rate": 0.55},
+            }
+        )
 
         assert analysis.score is not None, "Should have score"
         assert analysis.risk_level, "Should have risk level"
@@ -470,6 +478,7 @@ class TestDomainAgents:
 # =============================================================================
 # Local ML Integration Tests
 # =============================================================================
+
 
 class TestRLIntegration:
     """Tests for RL-AI Integration"""
@@ -581,6 +590,7 @@ class TestPredictionEngine:
 # Monitoring & Observability Tests
 # =============================================================================
 
+
 class TestMetricsCollector:
     """Tests for MetricsCollector"""
 
@@ -595,11 +605,13 @@ class TestMetricsCollector:
 
         collector = MetricsCollector(auto_register_defaults=False)
 
-        collector.register(Metric(
-            name="test_counter",
-            description="Test counter",
-            type=MetricType.COUNTER,
-        ))
+        collector.register(
+            Metric(
+                name="test_counter",
+                description="Test counter",
+                type=MetricType.COUNTER,
+            )
+        )
 
         collector.increment("test_counter", 1)
         collector.increment("test_counter", 2)
@@ -620,11 +632,13 @@ class TestMetricsCollector:
 
         collector = MetricsCollector(auto_register_defaults=False)
 
-        collector.register(Metric(
-            name="test_gauge",
-            description="Test gauge",
-            type=MetricType.GAUGE,
-        ))
+        collector.register(
+            Metric(
+                name="test_gauge",
+                description="Test gauge",
+                type=MetricType.GAUGE,
+            )
+        )
 
         collector.set("test_gauge", 42)
         collector.set("test_gauge", 100)
@@ -646,12 +660,14 @@ class TestMetricsCollector:
 
         collector = MetricsCollector(auto_register_defaults=False)
 
-        collector.register(Metric(
-            name="test_histogram",
-            description="Test histogram",
-            type=MetricType.HISTOGRAM,
-            buckets=[10, 50, 100, 500],
-        ))
+        collector.register(
+            Metric(
+                name="test_histogram",
+                description="Test histogram",
+                type=MetricType.HISTOGRAM,
+                buckets=[10, 50, 100, 500],
+            )
+        )
 
         for v in [5, 25, 75, 200, 300]:
             collector.observe("test_histogram", v)
@@ -711,10 +727,8 @@ class TestDistributedTracer:
         async with tracer.start_span("parent") as parent, tracer.start_span("child") as child:
             pass
 
-        assert child.context.parent_span_id == parent.context.span_id, \
-            "Child should have parent span ID"
-        assert child.context.trace_id == parent.context.trace_id, \
-            "Should share trace ID"
+        assert child.context.parent_span_id == parent.context.span_id, "Child should have parent span ID"
+        assert child.context.trace_id == parent.context.trace_id, "Should share trace ID"
 
         return True
 
@@ -752,14 +766,16 @@ class TestAlertManager:
 
         manager = AlertManager(notifiers=[], auto_add_defaults=False)
 
-        manager.add_rule(AlertRule(
-            name="test_high_value",
-            description="Value too high",
-            metric_name="test_metric",
-            operator=ComparisonOperator.GREATER_THAN,
-            threshold=100,
-            severity=AlertSeverity.WARNING,
-        ))
+        manager.add_rule(
+            AlertRule(
+                name="test_high_value",
+                description="Value too high",
+                metric_name="test_metric",
+                operator=ComparisonOperator.GREATER_THAN,
+                threshold=100,
+                severity=AlertSeverity.WARNING,
+            )
+        )
 
         # Below threshold - no alert
         alerts = await manager.evaluate({"test_metric": 50})
@@ -783,14 +799,16 @@ class TestAlertManager:
 
         manager = AlertManager(notifiers=[], auto_add_defaults=False)
 
-        manager.add_rule(AlertRule(
-            name="test_rule",
-            description="Test",
-            metric_name="test_metric",
-            operator=ComparisonOperator.GREATER_THAN,
-            threshold=100,
-            severity=AlertSeverity.WARNING,
-        ))
+        manager.add_rule(
+            AlertRule(
+                name="test_rule",
+                description="Test",
+                metric_name="test_metric",
+                operator=ComparisonOperator.GREATER_THAN,
+                threshold=100,
+                severity=AlertSeverity.WARNING,
+            )
+        )
 
         # Fire alert
         await manager.evaluate({"test_metric": 150})
@@ -832,14 +850,16 @@ class TestAlertManager:
 
         manager = AlertManager(notifiers=[], auto_add_defaults=False)
 
-        manager.add_rule(AlertRule(
-            name="test_rule",
-            description="Test",
-            metric_name="test_metric",
-            operator=ComparisonOperator.GREATER_THAN,
-            threshold=100,
-            severity=AlertSeverity.WARNING,
-        ))
+        manager.add_rule(
+            AlertRule(
+                name="test_rule",
+                description="Test",
+                metric_name="test_metric",
+                operator=ComparisonOperator.GREATER_THAN,
+                threshold=100,
+                severity=AlertSeverity.WARNING,
+            )
+        )
 
         # Silence the rule
         result = manager.silence("test_rule", duration_minutes=60)
@@ -898,6 +918,7 @@ class TestDashboard:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests combining multiple components"""
 
@@ -910,12 +931,14 @@ class TestIntegration:
         collector = MetricsCollector(auto_register_defaults=False)
 
         # Register custom metric for this test
-        collector.register(Metric(
-            name="memory_operations",
-            description="Memory operations",
-            type=MetricType.COUNTER,
-            labels=["operation"],
-        ))
+        collector.register(
+            Metric(
+                name="memory_operations",
+                description="Memory operations",
+                type=MetricType.COUNTER,
+                labels=["operation"],
+            )
+        )
 
         memory = HierarchicalMemory(persist_path=None)  # No persistence
 
@@ -1001,6 +1024,7 @@ class TestIntegration:
 # =============================================================================
 # Test Runner
 # =============================================================================
+
 
 async def run_all_tests() -> dict[str, dict[str, bool]]:
     """Run all tests and return results"""
@@ -1346,7 +1370,7 @@ async def main():
     total = total_passed + total_failed
 
     print("\n" + "-" * 70)
-    print(f"📊 Total: {total_passed}/{total} passed ({100*total_passed/total:.1f}%)")
+    print(f"📊 Total: {total_passed}/{total} passed ({100 * total_passed / total:.1f}%)")
     print(f"⏱️ Duration: {duration:.2f}s")
     print("=" * 70)
 

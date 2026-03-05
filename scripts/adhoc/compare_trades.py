@@ -112,9 +112,7 @@ for i in range(min(len(fb_entries), len(nb_entries))):
         break
 else:
     if len(fb_entries) != len(nb_entries):
-        print(
-            f"Trade counts differ but first {min(len(fb_entries), len(nb_entries))} match"
-        )
+        print(f"Trade counts differ but first {min(len(fb_entries), len(nb_entries))} match")
         print(f"Extra FB trades starting at {len(nb_entries)}:")
         for i in range(len(nb_entries), len(fb_entries)):
             bar, dir = fb_entries[i]

@@ -111,7 +111,7 @@ print()
 # Наша eq_close[1913]
 eq_c_ours = cum_before_1896 + (close_arr[bar_hwm] - ep1896) * qty1896
 print(f"eq_close[1913] (ours)    = {eq_c_ours:.4f}  (matches 10197.9098)")
-print(f"TV needed HWM            = 10193.5745")
+print("TV needed HWM            = 10193.5745")
 print(f"Difference               = {eq_c_ours - 10193.5745:.4f}")
 print()
 

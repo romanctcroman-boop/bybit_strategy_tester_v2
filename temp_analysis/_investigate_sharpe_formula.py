@@ -27,7 +27,7 @@ notional = capital * 0.1  # = 1000 USDT per trade
 # ── 1. Trade-by-trade: pnl / capital ─────────────────────────────────────────
 r = np.array([p / capital for p in pnls])
 mean_r, std_r = np.mean(r), np.std(r, ddof=1)
-print(f"\n1. Trade-by-trade (pnl/capital):")
+print("\n1. Trade-by-trade (pnl/capital):")
 print(f"   mean={mean_r:.6f}  std={std_r:.6f}")
 print(f"   Sharpe (raw, no rfr):           {mean_r / std_r:.4f}")
 print(f"   Sharpe * sqrt(12):              {mean_r / std_r * np.sqrt(12):.4f}")
@@ -36,7 +36,7 @@ print(f"   Sharpe * sqrt(155):             {mean_r / std_r * np.sqrt(155):.4f}")
 # ── 2. Trade-by-trade: pnl / notional ────────────────────────────────────────
 r2 = np.array([p / notional for p in pnls])
 mean_r2, std_r2 = np.mean(r2), np.std(r2, ddof=1)
-print(f"\n2. Trade-by-trade (pnl/notional=1000):")
+print("\n2. Trade-by-trade (pnl/notional=1000):")
 print(f"   Sharpe raw: {mean_r2 / std_r2:.4f}")
 
 # ── 3. Monthly equity returns ─────────────────────────────────────────────────
@@ -60,7 +60,7 @@ print(f"   Sharpe monthly * sqrt(12) (rfr):   {(mean_m - rfr_m) / std_m * np.sqr
 print(f"   Sharpe monthly * sqrt(12) (no rfr): {mean_m / std_m * np.sqrt(12):.4f}")
 
 # ── 4. TV formula: SQN-like (sqrt(N) * mean/std) ─────────────────────────────
-print(f"\n4. TV SQN-like formula (sqrt(N) * mean/std):")
+print("\n4. TV SQN-like formula (sqrt(N) * mean/std):")
 print(f"   trade returns: {np.sqrt(len(pnls)) * mean_r / std_r:.4f}")
 
 # ── 5. BacktestEngine uses MetricsCalculator with HOURLY equity curve ─────────
@@ -96,5 +96,5 @@ if row2 and row2[0]:
 else:
     print("\n5. No equity_curve in DB for this backtest")
 
-print(f"\nTV Gold Standard Sharpe = 0.35")
-print(f"TV Gold Standard Sortino = 0.587")
+print("\nTV Gold Standard Sharpe = 0.35")
+print("TV Gold Standard Sortino = 0.587")

@@ -76,7 +76,7 @@ async def main():
         i = idx.get_loc(ts)
         row = candles.iloc[i]
         print(
-            f"{str(ts):>25s}  {row['open']:10.2f}  {row['high']:10.2f}  {row['low']:10.2f}  {row['close']:10.2f}  {se[i]:5}  {sx[i]:5}  {le[i]:5}  {lx[i]:5}"
+            f"{ts!s:>25s}  {row['open']:10.2f}  {row['high']:10.2f}  {row['low']:10.2f}  {row['close']:10.2f}  {se[i]:5}  {sx[i]:5}  {le[i]:5}  {lx[i]:5}"
         )
 
     # Also check BTC RSI at these bars

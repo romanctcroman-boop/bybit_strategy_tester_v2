@@ -113,15 +113,17 @@ def compare_trades(trades1: list[TradeRecord], trades2: list[TradeRecord], toler
         elif abs(t1.pnl - t2.pnl) < 10.0 if t1.pnl and t2.pnl else False:
             result["close_matches"] += 1
         else:
-            result["mismatches"].append({
-                "trade_idx": i,
-                "t1_pnl": t1.pnl,
-                "t2_pnl": t2.pnl,
-                "t1_entry": t1.entry_price,
-                "t2_entry": t2.entry_price,
-                "t1_exit": t1.exit_price,
-                "t2_exit": t2.exit_price,
-            })
+            result["mismatches"].append(
+                {
+                    "trade_idx": i,
+                    "t1_pnl": t1.pnl,
+                    "t2_pnl": t2.pnl,
+                    "t1_entry": t1.entry_price,
+                    "t2_entry": t2.entry_price,
+                    "t1_exit": t1.exit_price,
+                    "t2_exit": t2.exit_price,
+                }
+            )
 
     return result
 
@@ -157,12 +159,9 @@ def compare_metrics_detailed(m1: dict, m2: dict, tolerance: float = 0.001) -> di
             elif abs(v1 - v2) / max(abs(v1), abs(v2), 1e-10) < tolerance:
                 result["close_matches"].append(key)
             else:
-                result["mismatches"].append({
-                    "key": key,
-                    "v1": v1,
-                    "v2": v2,
-                    "diff_pct": abs(v1 - v2) / max(abs(v1), abs(v2), 1e-10) * 100
-                })
+                result["mismatches"].append(
+                    {"key": key, "v1": v1, "v2": v2, "diff_pct": abs(v1 - v2) / max(abs(v1), abs(v2), 1e-10) * 100}
+                )
         else:
             result["mismatches"].append({"key": key, "v1": v1, "v2": v2, "diff_pct": None})
 
@@ -191,6 +190,7 @@ def run_parity_test(direction: str, use_bar_magnifier: bool = False):
 
     # Generate signals once
     from backend.backtesting.strategies import get_strategy
+
     strategy = get_strategy(config.strategy_type)
     strategy.params = config.strategy_params
     strategy.direction = config.direction
@@ -227,9 +227,9 @@ def run_parity_test(direction: str, use_bar_magnifier: bool = False):
     print(f"Close matches: {trade_comparison['close_matches']}")
     print(f"Mismatches: {len(trade_comparison['mismatches'])}")
 
-    if trade_comparison['mismatches'][:3]:
+    if trade_comparison["mismatches"][:3]:
         print("\nFirst 3 mismatches:")
-        for m in trade_comparison['mismatches'][:3]:
+        for m in trade_comparison["mismatches"][:3]:
             print(f"  Trade {m['trade_idx']}: VBT PnL={m['t1_pnl']:.2f}, FB PnL={m['t2_pnl']:.2f}")
 
     # Compare metrics
@@ -243,12 +243,12 @@ def run_parity_test(direction: str, use_bar_magnifier: bool = False):
     metric_comparison = compare_metrics_detailed(metrics_vbt, metrics_fallback)
 
     total_metrics = len(metrics_vbt)
-    exact = len(metric_comparison['exact_matches'])
-    close = len(metric_comparison['close_matches'])
-    mismatch = len(metric_comparison['mismatches'])
+    exact = len(metric_comparison["exact_matches"])
+    close = len(metric_comparison["close_matches"])
+    mismatch = len(metric_comparison["mismatches"])
 
     print(f"Total metrics: {total_metrics}")
-    print(f"Exact matches: {exact} ({exact/total_metrics*100:.1f}%)")
+    print(f"Exact matches: {exact} ({exact / total_metrics * 100:.1f}%)")
     print(f"Close matches (< 0.1% diff): {close}")
     print(f"Mismatches: {mismatch}")
 
@@ -257,15 +257,15 @@ def run_parity_test(direction: str, use_bar_magnifier: bool = False):
 
     if mismatch > 0:
         print("\nTop 5 mismatched metrics:")
-        sorted_mismatches = sorted(metric_comparison['mismatches'],
-                                   key=lambda x: x.get('diff_pct', 0) or 0,
-                                   reverse=True)[:5]
+        sorted_mismatches = sorted(
+            metric_comparison["mismatches"], key=lambda x: x.get("diff_pct", 0) or 0, reverse=True
+        )[:5]
         for m in sorted_mismatches:
             print(f"  {m['key']}: VBT={m['v1']}, FB={m['v2']}, diff={m.get('diff_pct', 'N/A'):.2f}%")
 
     # Final verdict
     print("\n" + "=" * 50)
-    if parity_pct >= 99.0 and trade_comparison['count_match']:
+    if parity_pct >= 99.0 and trade_comparison["count_match"]:
         print("✅ SUCCESS: 99%+ parity achieved!")
     elif parity_pct >= 90.0:
         print("⚠️ GOOD: 90%+ parity - minor differences")
@@ -302,8 +302,10 @@ def main():
     print(f"{'Direction':<12} {'Bar Magnifier':<15} {'Trade Match':<15} {'Metric Parity':<15}")
     print("-" * 60)
     for r in results:
-        trade_match = "✅" if r['trade_parity']['count_match'] else "❌"
-        print(f"{r['direction']:<12} {'ON' if r['bar_magnifier'] else 'OFF':<15} {trade_match:<15} {r['metric_parity_pct']:.1f}%")
+        trade_match = "✅" if r["trade_parity"]["count_match"] else "❌"
+        print(
+            f"{r['direction']:<12} {'ON' if r['bar_magnifier'] else 'OFF':<15} {trade_match:<15} {r['metric_parity_pct']:.1f}%"
+        )
 
 
 if __name__ == "__main__":

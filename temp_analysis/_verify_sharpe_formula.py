@@ -37,7 +37,7 @@ rfr_m = 0.02 / 12  # 2% annual → monthly
 
 # TV Sharpe (no annualization multiplier — stays monthly)
 sharpe = (mean_m - rfr_m) / std_m
-print(f"TV Sharpe formula: (mean - rfr/12) / std_monthly")
+print("TV Sharpe formula: (mean - rfr/12) / std_monthly")
 print(f"  mean_monthly={mean_m:.6f}, std={std_m:.6f}, rfr_m={rfr_m:.6f}")
 print(f"  Sharpe = {sharpe:.4f}  (TV=0.35)")
 
@@ -47,7 +47,7 @@ neg = np.minimum(0, m - mar)
 downside_var = np.sum(neg**2) / len(m)  # TV: divide by ALL N
 downside_dev = np.sqrt(downside_var)
 sortino = (mean_m - mar) / downside_dev
-print(f"\nTV Sortino formula: mean / sqrt(sum(min(0,r)^2) / N)")
+print("\nTV Sortino formula: mean / sqrt(sum(min(0,r)^2) / N)")
 print(f"  downside_dev={downside_dev:.6f}")
 print(f"  Sortino = {sortino:.4f}  (TV=0.587)")
 

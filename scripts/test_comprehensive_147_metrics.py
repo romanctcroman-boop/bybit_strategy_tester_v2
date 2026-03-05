@@ -12,6 +12,7 @@ Full Parameter Support:
 - Leverage, Bar Magnifier, Order execution, Drawdown limit
 - Strategy type, Date range, OHLC Path Model, Subticks
 """
+
 import sys
 from pathlib import Path
 
@@ -40,35 +41,28 @@ STRATEGY_CONFIG = {
     "trading_pair": "BTCUSDT",
     "timeframe": "60",  # 1 hour
     "strategy_type": "Mean Reversion",
-
     # CAPITAL
     "initial_capital": 10000.0,
     "order_size_type": "percent",  # percent, fixed, risk_based
-    "position_size_pct": 10.0,     # 10% of capital
-
+    "position_size_pct": 10.0,  # 10% of capital
     # RISK
-    "stop_loss_pct": 2.0,          # 2%
-    "take_profit_pct": 4.0,        # 4%
-    "drawdown_limit_pct": 50.0,    # Max 50% drawdown
-
+    "stop_loss_pct": 2.0,  # 2%
+    "take_profit_pct": 4.0,  # 4%
+    "drawdown_limit_pct": 50.0,  # Max 50% drawdown
     # POSITION
-    "position_mode": "both",       # long, short, both
-    "pyramiding": 1,               # Max 1 position
-
+    "position_mode": "both",  # long, short, both
+    "pyramiding": 1,  # Max 1 position
     # FEES
-    "commission_pct": 0.10,        # 0.1% taker fee
-    "slippage_pct": 0.05,          # 0.05% slippage
+    "commission_pct": 0.10,  # 0.1% taker fee
+    "slippage_pct": 0.05,  # 0.05% slippage
     "leverage": 10,
-
     # BAR MAGNIFIER
     "bar_magnifier": True,
     "ohlc_path_model": "sequential_inclusive",  # Sequential Inclusive Checks
-    "subticks": 60,                # 60 1-minute subticks per hour
-
+    "subticks": 60,  # 60 1-minute subticks per hour
     # EXECUTION
-    "order_execution": "market",   # market, limit
+    "order_execution": "market",  # market, limit
     "two_stage_optimization": False,
-
     # DATE RANGE
     "date_start": "2025-01-01",
     "date_end": "2025-01-21",
@@ -84,7 +78,8 @@ print("=" * 80)
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Load main timeframe data
-df_60m = pd.read_sql(f"""
+df_60m = pd.read_sql(
+    f"""
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
@@ -92,15 +87,18 @@ df_60m = pd.read_sql(f"""
       AND interval = '{STRATEGY_CONFIG["timeframe"]}'
     ORDER BY open_time ASC
     LIMIT 500
-""", conn)
-df_60m['open_time'] = pd.to_datetime(df_60m['open_time'], unit='ms')
-df_60m.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_60m["open_time"] = pd.to_datetime(df_60m["open_time"], unit="ms")
+df_60m.set_index("open_time", inplace=True)
 
 # Load 1-minute data for Bar Magnifier
 start_ts = int(df_60m.index[0].timestamp() * 1000)
 end_ts = int(df_60m.index[-1].timestamp() * 1000) + 60 * 60 * 1000
 
-df_1m = pd.read_sql(f"""
+df_1m = pd.read_sql(
+    f"""
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
@@ -108,15 +106,18 @@ df_1m = pd.read_sql(f"""
       AND interval = '1'
       AND open_time >= {start_ts} AND open_time <= {end_ts}
     ORDER BY open_time ASC
-""", conn)
-df_1m['open_time'] = pd.to_datetime(df_1m['open_time'], unit='ms')
-df_1m.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1m["open_time"] = pd.to_datetime(df_1m["open_time"], unit="ms")
+df_1m.set_index("open_time", inplace=True)
 conn.close()
 
 print(f"   Main TF ({STRATEGY_CONFIG['timeframe']}m): {len(df_60m)} bars")
 print(f"   Bar Magnifier (1m): {len(df_1m)} bars")
 print(f"   Subticks per bar: {len(df_1m) // max(1, len(df_60m)):.0f}")
 print(f"   Date range: {df_60m.index[0]} to {df_60m.index[-1]}")
+
 
 # =============================================================================
 # GENERATE SIGNALS (RSI Strategy)
@@ -130,7 +131,8 @@ def calculate_rsi(close, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-rsi = calculate_rsi(df_60m['close'], period=14)
+
+rsi = calculate_rsi(df_60m["close"], period=14)
 long_entries = (rsi < 30).values
 long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
@@ -200,7 +202,9 @@ for name, engine in engines.items():
     print(f"   Running {name}...")
     result = engine.run(input_data)
     results[name] = result
-    print(f"      Trades: {len(result.trades)}, Net Profit: ${result.metrics.net_profit:,.2f}, Time: {result.execution_time:.3f}s")
+    print(
+        f"      Trades: {len(result.trades)}, Net Profit: ${result.metrics.net_profit:,.2f}, Time: {result.execution_time:.3f}s"
+    )
 
 # =============================================================================
 # COLLECT ALL 147 METRICS
@@ -208,6 +212,7 @@ for name, engine in engines.items():
 print("\n" + "=" * 80)
 print("COLLECTING 147 METRICS")
 print("=" * 80)
+
 
 def collect_all_metrics(result, equity_curve, initial_capital):
     """Collect all 147 metrics from a backtest result."""
@@ -301,6 +306,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
 
         # Exit reasons
         from collections import Counter
+
         exit_reasons = Counter(t.exit_reason.name for t in result.trades)
         for reason, count in exit_reasons.items():
             metrics[f"exit.{reason}"] = count
@@ -393,7 +399,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     metrics["risk.cvar_95"] = np.mean(returns[var_95_idx]) * 100 if np.any(var_95_idx) else 0
 
     # Ulcer Index
-    sq_dd = dd ** 2
+    sq_dd = dd**2
     metrics["risk.ulcer_index"] = np.sqrt(np.mean(sq_dd))
 
     # Pain Index
@@ -477,8 +483,12 @@ def collect_all_metrics(result, equity_curve, initial_capital):
 
     # Tail ratios
     if len(returns) > 10:
-        metrics["adv.tail_ratio_95"] = abs(np.percentile(returns, 95) / np.percentile(returns, 5)) if np.percentile(returns, 5) != 0 else 0
-        metrics["adv.tail_ratio_99"] = abs(np.percentile(returns, 99) / np.percentile(returns, 1)) if np.percentile(returns, 1) != 0 else 0
+        metrics["adv.tail_ratio_95"] = (
+            abs(np.percentile(returns, 95) / np.percentile(returns, 5)) if np.percentile(returns, 5) != 0 else 0
+        )
+        metrics["adv.tail_ratio_99"] = (
+            abs(np.percentile(returns, 99) / np.percentile(returns, 1)) if np.percentile(returns, 1) != 0 else 0
+        )
     else:
         metrics["adv.tail_ratio_95"] = 0
         metrics["adv.tail_ratio_99"] = 0
@@ -527,14 +537,11 @@ def collect_all_metrics(result, equity_curve, initial_capital):
 
     return metrics
 
+
 # Collect metrics for all engines
 all_metrics = {}
 for name, result in results.items():
-    all_metrics[name] = collect_all_metrics(
-        result,
-        result.equity_curve,
-        STRATEGY_CONFIG["initial_capital"]
-    )
+    all_metrics[name] = collect_all_metrics(result, result.equity_curve, STRATEGY_CONFIG["initial_capital"])
 
 # =============================================================================
 # COMPARE 147 METRICS
@@ -607,7 +614,7 @@ print(f"""
 if mismatches:
     print("   MISMATCHES:")
     for engine, metric, fb, other in mismatches[:10]:
-        print(f"      [{engine}] {metric}: FB={fb:.4f} vs {other:.4f} (diff={other-fb:+.4f})")
+        print(f"      [{engine}] {metric}: FB={fb:.4f} vs {other:.4f} (diff={other - fb:+.4f})")
     if len(mismatches) > 10:
         print(f"      ... and {len(mismatches) - 10} more")
 
@@ -651,6 +658,8 @@ print("-" * 100)
 print(f"{'Engine':<25} {'Trades':>10} {'Net Profit':>15} {'Win Rate':>12} {'Sharpe':>10} {'Time':>10}")
 print("-" * 100)
 for name, result in results.items():
-    print(f"{name:<25} {len(result.trades):>10} ${result.metrics.net_profit:>13,.2f} {result.metrics.win_rate*100:>11.2f}% {result.metrics.sharpe_ratio:>10.4f} {result.execution_time:>9.3f}s")
+    print(
+        f"{name:<25} {len(result.trades):>10} ${result.metrics.net_profit:>13,.2f} {result.metrics.win_rate * 100:>11.2f}% {result.metrics.sharpe_ratio:>10.4f} {result.execution_time:>9.3f}s"
+    )
 print("-" * 100)
 print("=" * 120)

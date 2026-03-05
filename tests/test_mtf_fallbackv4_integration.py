@@ -14,22 +14,16 @@ from backend.backtesting.interfaces import BacktestInput
 from backend.backtesting.mtf.index_mapper import create_htf_index_map
 
 
-def create_test_candles(
-    n_bars: int = 200, base_price: float = 100.0, trend: str = "up"
-) -> pd.DataFrame:
+def create_test_candles(n_bars: int = 200, base_price: float = 100.0, trend: str = "up") -> pd.DataFrame:
     """Create test OHLCV data with specified trend."""
-    timestamps = [
-        datetime(2025, 1, 1) + timedelta(minutes=15 * i) for i in range(n_bars)
-    ]
+    timestamps = [datetime(2025, 1, 1) + timedelta(minutes=15 * i) for i in range(n_bars)]
 
     if trend == "up":
         closes = np.linspace(base_price, base_price * 1.2, n_bars)
     elif trend == "down":
         closes = np.linspace(base_price * 1.2, base_price, n_bars)
     else:  # sideways
-        closes = (
-            base_price + np.sin(np.linspace(0, 4 * np.pi, n_bars)) * base_price * 0.05
-        )
+        closes = base_price + np.sin(np.linspace(0, 4 * np.pi, n_bars)) * base_price * 0.05
 
     # Add some noise
     noise = np.random.normal(0, base_price * 0.002, n_bars)
@@ -144,9 +138,7 @@ class TestMTFIntegration:
     def test_mtf_filter_blocks_counter_trend_longs(self):
         """MTF filter should block long entries in downtrend."""
         ltf_candles = create_test_candles(200, trend="up")
-        long_entries, long_exits, short_entries, short_exits = create_signals(
-            ltf_candles
-        )
+        long_entries, long_exits, short_entries, short_exits = create_signals(ltf_candles)
 
         htf_candles = create_htf_candles(ltf_candles)
         # Force HTF into downtrend by lowering closes
@@ -188,9 +180,7 @@ class TestMTFIntegration:
         """MTF filter should allow trades that follow HTF trend."""
         ltf_candles = create_test_candles(200, trend="up")
         htf_candles = create_htf_candles(ltf_candles)
-        long_entries, long_exits, short_entries, short_exits = create_signals(
-            ltf_candles
-        )
+        long_entries, long_exits, short_entries, short_exits = create_signals(ltf_candles)
 
         htf_index_map = create_htf_index_map(
             ltf_candles["timestamp"].values,
@@ -245,9 +235,7 @@ class TestMTFIntegration:
         """Test that neutral zone creates buffer around indicator."""
         ltf_candles = create_test_candles(200, trend="sideways")
         htf_candles = create_htf_candles(ltf_candles)
-        long_entries, long_exits, short_entries, short_exits = create_signals(
-            ltf_candles
-        )
+        long_entries, long_exits, short_entries, short_exits = create_signals(ltf_candles)
 
         htf_index_map = create_htf_index_map(
             ltf_candles["timestamp"].values,
@@ -285,9 +273,7 @@ class TestMTFIntegration:
         """Test that EMA filter is faster to react than SMA."""
         ltf_candles = create_test_candles(200, trend="up")
         htf_candles = create_htf_candles(ltf_candles)
-        long_entries, long_exits, short_entries, short_exits = create_signals(
-            ltf_candles
-        )
+        long_entries, long_exits, short_entries, short_exits = create_signals(ltf_candles)
 
         htf_index_map = create_htf_index_map(
             ltf_candles["timestamp"].values,
@@ -345,9 +331,7 @@ class TestMTFIntegration:
     def test_mtf_with_missing_htf_data(self):
         """Engine should handle missing HTF data gracefully."""
         ltf_candles = create_test_candles(200, trend="up")
-        long_entries, long_exits, short_entries, short_exits = create_signals(
-            ltf_candles
-        )
+        long_entries, long_exits, short_entries, short_exits = create_signals(ltf_candles)
 
         input_data = BacktestInput(
             candles=ltf_candles,

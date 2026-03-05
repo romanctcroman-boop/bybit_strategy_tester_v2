@@ -143,7 +143,7 @@ class ReportExportService:
         currency_format = workbook.add_format({"num_format": "$#,##0.00"})
         positive_format = workbook.add_format({"num_format": "$#,##0.00", "font_color": "green"})
         negative_format = workbook.add_format({"num_format": "$#,##0.00", "font_color": "red"})
-        date_format = workbook.add_format({"num_format": "yyyy-mm-dd hh:mm"})  # noqa: F841
+        date_format = workbook.add_format({"num_format": "yyyy-mm-dd hh:mm"})
 
         # --- Summary Sheet ---
         summary = workbook.add_worksheet("Summary")

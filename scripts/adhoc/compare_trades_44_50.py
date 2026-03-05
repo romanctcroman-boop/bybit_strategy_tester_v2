@@ -60,17 +60,13 @@ print()
 print("Fallback:")
 for i in range(43, min(52, len(fb_result.trades))):
     t = fb_result.trades[i]
-    print(
-        f"  {i + 1}: {t.direction:5} entry={t.entry_price:.2f} exit={t.exit_price:.2f} {t.exit_reason.name}"
-    )
+    print(f"  {i + 1}: {t.direction:5} entry={t.entry_price:.2f} exit={t.exit_price:.2f} {t.exit_reason.name}")
 
 print()
 print("Numba:")
 for i in range(43, min(52, len(nb_result.trades))):
     t = nb_result.trades[i]
-    print(
-        f"  {i + 1}: {t.direction:5} entry={t.entry_price:.2f} exit={t.exit_price:.2f} {t.exit_reason.name}"
-    )
+    print(f"  {i + 1}: {t.direction:5} entry={t.entry_price:.2f} exit={t.exit_price:.2f} {t.exit_reason.name}")
 
 # Find first differing trade
 print()

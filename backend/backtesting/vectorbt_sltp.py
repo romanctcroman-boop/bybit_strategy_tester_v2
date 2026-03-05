@@ -128,16 +128,16 @@ def flex_order_func_nb(
     tracked_cash = state[0]
     current_entry_price = state[1]
     current_entry_size = state[2]
-    current_is_long = state[3] > 0.5  # noqa: F841
+    current_is_long = state[3] > 0.5
     peak_equity = state[4]
     is_stopped = state[5] > 0.5  # Trading stopped due to max drawdown
     current_margin_locked = state[6]  # Exact margin saved at entry
-    current_entry_fees = state[7]  # Exact entry fees saved at entry  # noqa: F841
+    current_entry_fees = state[7]  # Exact entry fees saved at entry
 
     close_now = c.close[i, col]
     high_now = high_arr[i, 0]
     low_now = low_arr[i, 0]
-    open_now = open_arr[i, 0] if i < len(open_arr) else close_now  # noqa: F841
+    open_now = open_arr[i, 0] if i < len(open_arr) else close_now
 
     # Calculate current equity and check max drawdown
     current_equity = tracked_cash
@@ -196,7 +196,7 @@ def flex_order_func_nb(
     # fill_mode: 0 = bar_close, 1 = next_bar_open
     fill_price = close_now
     if fill_mode == 1 and i + 1 < len(open_arr):
-        fill_price = open_arr[i + 1, 0]  # noqa: F841 - Use next bar's open
+        fill_price = open_arr[i + 1, 0]
 
     # Signals
     long_entry = entries[i, 0]

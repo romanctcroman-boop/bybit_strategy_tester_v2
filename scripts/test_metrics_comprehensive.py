@@ -91,26 +91,21 @@ def extract_metrics(result: BacktestResult) -> dict[str, Any]:
         "win_rate": round(m.win_rate, 4),
         "avg_trade": round(m.avg_trade, 4) if m.avg_trade else 0,
         "max_drawdown": round(m.max_drawdown, 4),
-
         # Trade counts
         "winning_trades": m.winning_trades,
         "losing_trades": m.losing_trades,
         "long_trades": getattr(m, "long_trades", 0),
         "short_trades": getattr(m, "short_trades", 0),
-
         # Averages
         "avg_winning_trade": round(getattr(m, "avg_winning_trade", 0) or 0, 4),
         "avg_losing_trade": round(getattr(m, "avg_losing_trade", 0) or 0, 4),
         "largest_winning_trade": round(getattr(m, "largest_winning_trade", 0) or 0, 4),
         "largest_losing_trade": round(getattr(m, "largest_losing_trade", 0) or 0, 4),
-
         # Ratios
         "sharpe_ratio": round(getattr(m, "sharpe_ratio", 0) or 0, 4),
         "sortino_ratio": round(getattr(m, "sortino_ratio", 0) or 0, 4),
-
         # Commissions
         "total_commission": round(getattr(m, "total_commission", 0) or 0, 4),
-
         # Returns
         "total_return": round(getattr(m, "total_return", 0) or 0, 4),
     }
@@ -120,26 +115,24 @@ def extract_trade_details(result: BacktestResult) -> list[dict]:
     """Extract trade details for comparison."""
     trades = []
     for i, t in enumerate(result.trades):
-        trades.append({
-            "trade_num": i + 1,
-            "side": str(t.side),
-            "entry_price": round(t.entry_price, 2),
-            "exit_price": round(t.exit_price, 2),
-            "pnl": round(t.pnl, 4),
-            "fees": round(t.fees, 4),
-            "exit_comment": getattr(t, "exit_comment", ""),
-            "mfe_pct": round(getattr(t, "mfe_pct", 0), 4),
-            "mae_pct": round(getattr(t, "mae_pct", 0), 4),
-        })
+        trades.append(
+            {
+                "trade_num": i + 1,
+                "side": str(t.side),
+                "entry_price": round(t.entry_price, 2),
+                "exit_price": round(t.exit_price, 2),
+                "pnl": round(t.pnl, 4),
+                "fees": round(t.fees, 4),
+                "exit_comment": getattr(t, "exit_comment", ""),
+                "mfe_pct": round(getattr(t, "mfe_pct", 0), 4),
+                "mae_pct": round(getattr(t, "mae_pct", 0), 4),
+            }
+        )
     return trades
 
 
 def compare_metrics(
-    metrics1: dict,
-    metrics2: dict,
-    name1: str = "Engine1",
-    name2: str = "Engine2",
-    tolerance: float = 0.01
+    metrics1: dict, metrics2: dict, name1: str = "Engine1", name2: str = "Engine2", tolerance: float = 0.01
 ) -> tuple[int, int, list[str]]:
     """Compare two metrics dicts and return match stats."""
     matches = 0
@@ -157,7 +150,7 @@ def compare_metrics(
             else:
                 mismatches += 1
                 mismatch_details.append(
-                    f"  ❌ {key}: {name1}={val1:.4f} vs {name2}={val2:.4f} (diff={abs(val1-val2):.4f})"
+                    f"  ❌ {key}: {name1}={val1:.4f} vs {name2}={val2:.4f} (diff={abs(val1 - val2):.4f})"
                 )
         else:
             # Exact comparison for ints/strings
@@ -165,18 +158,13 @@ def compare_metrics(
                 matches += 1
             else:
                 mismatches += 1
-                mismatch_details.append(
-                    f"  ❌ {key}: {name1}={val1} vs {name2}={val2}"
-                )
+                mismatch_details.append(f"  ❌ {key}: {name1}={val1} vs {name2}={val2}")
 
     return matches, mismatches, mismatch_details
 
 
 def run_engine_test(
-    engine: BacktestEngine,
-    config: BacktestConfig,
-    data: pd.DataFrame,
-    use_vectorbt: bool
+    engine: BacktestEngine, config: BacktestConfig, data: pd.DataFrame, use_vectorbt: bool
 ) -> BacktestResult:
     """Run backtest with specific engine mode."""
     # Force engine mode
@@ -194,16 +182,12 @@ def run_engine_test(
     return engine._run_fallback(config, data, silent=True)
 
 
-def test_direction(
-    direction: str,
-    data: pd.DataFrame,
-    use_bar_magnifier: bool = True
-) -> dict:
+def test_direction(direction: str, data: pd.DataFrame, use_bar_magnifier: bool = True) -> dict:
     """Test a specific direction and return comparison results."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing Direction: {direction.upper()}")
     print(f"Bar Magnifier: {'ON' if use_bar_magnifier else 'OFF'}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Create config
     config_dict = create_config(direction, use_bar_magnifier)
@@ -327,7 +311,9 @@ def run_comprehensive_test():
 
     # Compare first 10 trades
     print("\nFirst 10 trades comparison:")
-    print(f"{'#':<3} {'Side':<6} {'Entry':>10} {'Exit':>10} {'PnL Std':>12} {'PnL Mag':>12} {'Exit Std':<8} {'Exit Mag':<8}")
+    print(
+        f"{'#':<3} {'Side':<6} {'Entry':>10} {'Exit':>10} {'PnL Std':>12} {'PnL Mag':>12} {'Exit Std':<8} {'Exit Mag':<8}"
+    )
     print("-" * 85)
 
     for i in range(min(10, len(trades_std), len(trades_mag))):
@@ -337,9 +323,11 @@ def run_comprehensive_test():
         pnl_match = "✓" if abs(t_std["pnl"] - t_mag["pnl"]) < 0.01 else "✗"
         exit_match = "✓" if t_std["exit_comment"] == t_mag["exit_comment"] else "✗"
 
-        print(f"{i+1:<3} {t_std['side']:<6} {t_std['entry_price']:>10.2f} {t_std['exit_price']:>10.2f} "
-              f"{t_std['pnl']:>12.2f} {t_mag['pnl']:>12.2f} {t_std['exit_comment']:<8} {t_mag['exit_comment']:<8} "
-              f"{pnl_match}{exit_match}")
+        print(
+            f"{i + 1:<3} {t_std['side']:<6} {t_std['entry_price']:>10.2f} {t_std['exit_price']:>10.2f} "
+            f"{t_std['pnl']:>12.2f} {t_mag['pnl']:>12.2f} {t_std['exit_comment']:<8} {t_mag['exit_comment']:<8} "
+            f"{pnl_match}{exit_match}"
+        )
 
     # Summary of exit type differences
     print("\n" + "=" * 80)

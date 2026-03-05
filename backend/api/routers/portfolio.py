@@ -67,11 +67,11 @@ class PortfolioOptimizationRequest(BaseModel):
     @classmethod
     def validate_dates(cls, values):
         """Validate date range"""
-        start = values.get('start_date')
-        end = values.get('end_date')
+        start = values.get("start_date")
+        end = values.get("end_date")
         if start and end:
-            start_date = datetime.strptime(start, '%Y-%m-%d')
-            end_date = datetime.strptime(end, '%Y-%m-%d')
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+            end_date = datetime.strptime(end, "%Y-%m-%d")
             if (end_date - start_date).days > MAX_DATE_RANGE_DAYS:
                 raise ValueError(f"Date range cannot exceed {MAX_DATE_RANGE_DAYS} days")
         return values

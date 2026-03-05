@@ -217,7 +217,7 @@ async def main():
     import statistics
 
     if time_diffs:
-        print(f"Entry time diff stats (engine - TV, minutes):")
+        print("Entry time diff stats (engine - TV, minutes):")
         print(
             f"  min={min(time_diffs):.0f}  max={max(time_diffs):.0f}  mean={statistics.mean(time_diffs):.1f}  median={statistics.median(time_diffs):.0f}"
         )
@@ -237,7 +237,7 @@ async def main():
         exit_diffs.append(diff)
 
     if exit_diffs:
-        print(f"Exit time diff stats (engine - TV, minutes):")
+        print("Exit time diff stats (engine - TV, minutes):")
         from collections import Counter
 
         cnt = Counter(int(d) for d in exit_diffs)

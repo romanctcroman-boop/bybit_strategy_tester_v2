@@ -26,7 +26,7 @@ if trades_raw:
     print(f"Number of trades: {len(trades)}")
     if trades:
         print(f"\nFirst trade keys: {list(trades[0].keys())}")
-        print(f"\nFirst 3 trades:")
+        print("\nFirst 3 trades:")
         for t in trades[:3]:
             print(f"  {t}")
 else:

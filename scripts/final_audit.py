@@ -35,9 +35,7 @@ def audit_project(root_dir: Path):
             if except_pass_matches:
                 rel_path = py_file.relative_to(root_dir)
                 stats["except_pass_count"] += len(except_pass_matches)
-                stats["files_with_except_pass"].append(
-                    (str(rel_path), len(except_pass_matches))
-                )
+                stats["files_with_except_pass"].append((str(rel_path), len(except_pass_matches)))
 
             # Count TODOs
             todo_matches = re.findall(r"#\s*TODO:", content, re.IGNORECASE)
@@ -68,17 +66,13 @@ if __name__ == "__main__":
 
     if stats["files_with_except_pass"]:
         print("\nTop 10 files with except:pass:")
-        sorted_files = sorted(
-            stats["files_with_except_pass"], key=lambda x: x[1], reverse=True
-        )
+        sorted_files = sorted(stats["files_with_except_pass"], key=lambda x: x[1], reverse=True)
         for filepath, count in sorted_files[:10]:
             print(f"  {filepath}: {count}")
 
     if stats["files_with_todos"]:
         print("\nTop 10 files with TODOs:")
-        sorted_todos = sorted(
-            stats["files_with_todos"], key=lambda x: x[1], reverse=True
-        )
+        sorted_todos = sorted(stats["files_with_todos"], key=lambda x: x[1], reverse=True)
         for filepath, count in sorted_todos[:10]:
             print(f"  {filepath}: {count}")
 

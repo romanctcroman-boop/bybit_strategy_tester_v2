@@ -1,4 +1,5 @@
 """Find Trade 46 entry bar discrepancy."""
+
 import sys
 from pathlib import Path
 
@@ -8,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 # Load data
-ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
-ohlc['timestamp'] = pd.to_datetime(ohlc['timestamp'], utc=True).dt.tz_localize(None)
-long_signals = np.load('d:/TV/long_signals.npy')
-short_signals = np.load('d:/TV/short_signals.npy')
+ohlc = pd.read_csv("d:/TV/BYBIT_BTCUSDT.P_15m_full.csv")
+ohlc["timestamp"] = pd.to_datetime(ohlc["timestamp"], utc=True).dt.tz_localize(None)
+long_signals = np.load("d:/TV/long_signals.npy")
+short_signals = np.load("d:/TV/short_signals.npy")
 
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
@@ -19,11 +20,18 @@ from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 candles = ohlc.reset_index(drop=True)
 input_data = BacktestInput(
-    candles=candles, candles_1m=None, initial_capital=1_000_000.0,
-    use_fixed_amount=True, fixed_amount=100.0, leverage=10,
-    take_profit=0.015, stop_loss=0.03, taker_fee=0.0007,
+    candles=candles,
+    candles_1m=None,
+    initial_capital=1_000_000.0,
+    use_fixed_amount=True,
+    fixed_amount=100.0,
+    leverage=10,
+    take_profit=0.015,
+    stop_loss=0.03,
+    taker_fee=0.0007,
     direction=TradeDirection.BOTH,
-    long_entries=long_signals, short_entries=short_signals,
+    long_entries=long_signals,
+    short_entries=short_signals,
     use_bar_magnifier=False,
 )
 
@@ -55,11 +63,11 @@ print(f"  duration_bars: {t3.duration_bars}")
 # Find bar indices for these prices
 print("\n=== OHLC Analysis ===")
 # V2 entry at 90810.90
-v2_entry_bars = ohlc[abs(ohlc['open'] - 90810.90) < 1].index.tolist()
+v2_entry_bars = ohlc[abs(ohlc["open"] - 90810.90) < 1].index.tolist()
 print(f"Bars with open near 90810.90: {v2_entry_bars}")
 
 # V3 entry at 89596.40
-v3_entry_bars = ohlc[abs(ohlc['open'] - 89596.40) < 1].index.tolist()
+v3_entry_bars = ohlc[abs(ohlc["open"] - 89596.40) < 1].index.tolist()
 print(f"Bars with open near 89596.40: {v3_entry_bars}")
 
 # Trades 44-47 for context
@@ -67,4 +75,6 @@ print("\n=== Trades 44-47 context ===")
 for i in range(43, 47):
     t2_ = r2.trades[i]
     t3_ = r3.trades[i]
-    print(f"Trade {i+1}: V2 entry={t2_.entry_price:.2f} ({t2_.direction}), V3 entry={t3_.entry_price:.2f} ({t3_.direction})")
+    print(
+        f"Trade {i + 1}: V2 entry={t2_.entry_price:.2f} ({t2_.direction}), V3 entry={t3_.entry_price:.2f} ({t3_.direction})"
+    )

@@ -69,7 +69,7 @@ for num, side, sig_str in tv_signals:
         range_ok = 10 <= rsi_cur <= 40
         cross_ok = rsi_prev <= 18 and rsi_cur > 18
     print(
-        f"{num:<4} {side:<7} {sig_str:<22} {rsi_prev:>10.2f} {rsi_cur:>10.2f} {close_cur:>10.1f} {str(range_ok):<10} {cross_ok}"
+        f"{num:<4} {side:<7} {sig_str:<22} {rsi_prev:>10.2f} {rsi_cur:>10.2f} {close_cur:>10.1f} {range_ok!s:<10} {cross_ok}"
     )
 
 print()
@@ -93,7 +93,7 @@ short_or = short_range_only | cross_short
 long_and = long_range_only & cross_long
 short_and = short_range_only & cross_short
 
-print(f"Signal counts (Jan-Feb data):")
+print("Signal counts (Jan-Feb data):")
 print(f"  Long range-only:  {long_range_only.sum()}")
 print(f"  Short range-only: {short_range_only.sum()}")
 print(f"  Long OR:          {long_or.sum()}")

@@ -1,4 +1,4 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Прокси для DeepSeek API: добавляет поле model в запросы, если Cursor его не передаёт.
 
@@ -85,11 +85,7 @@ class DeepSeekProxyHandler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(
-                json.dumps(
-                    {"error": {"message": "Invalid JSON", "type": "invalid_request"}}
-                ).encode()
-            )
+            self.wfile.write(json.dumps({"error": {"message": "Invalid JSON", "type": "invalid_request"}}).encode())
             return
         # DeepSeek всегда требует поле "model". Принудительно подставляем из URL, body или по умолчанию.
         model_before = data.get("model") or data.get("deployment")
@@ -179,7 +175,10 @@ def main():
         get_api_key()
     except SystemExit as e:
         print("Ошибка:", e, file=sys.stderr)
-        print("Задайте DEEPSEEK_API_KEY в .env (скопируйте из .env.example и вставьте ключ с https://platform.deepseek.com)", file=sys.stderr)
+        print(
+            "Задайте DEEPSEEK_API_KEY в .env (скопируйте из .env.example и вставьте ключ с https://platform.deepseek.com)",
+            file=sys.stderr,
+        )
         sys.exit(1)
     print("[proxy] DEEPSEEK_API_KEY задан, прокси готов.")
     try:

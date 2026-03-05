@@ -140,9 +140,7 @@ def test_enhanced_monte_carlo():
         print("  Return Statistics:")
         print(f"    Mean: {data['return_mean']:.1%}")
         print(f"    Median: {data['return_median']:.1%}")
-        print(
-            f"    95% CI: [{data['return_ci_lower']:.1%}, {data['return_ci_upper']:.1%}]"
-        )
+        print(f"    95% CI: [{data['return_ci_lower']:.1%}, {data['return_ci_upper']:.1%}]")
         print()
         print("  Drawdown Statistics:")
         print(f"    Mean Max DD: {data['max_drawdown_mean']:.1%}")
@@ -150,9 +148,7 @@ def test_enhanced_monte_carlo():
         print()
         print("  Sharpe Statistics:")
         print(f"    Mean Sharpe: {data['sharpe_mean']:.2f}")
-        print(
-            f"    95% CI: [{data['sharpe_ci_lower']:.2f}, {data['sharpe_ci_upper']:.2f}]"
-        )
+        print(f"    95% CI: [{data['sharpe_ci_lower']:.2f}, {data['sharpe_ci_upper']:.2f}]")
         print()
         print("  Probabilities:")
         print(f"    P(Profit): {data['probability_of_profit']:.1%}")

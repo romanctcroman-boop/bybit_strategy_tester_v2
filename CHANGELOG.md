@@ -7,31 +7,202 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **[BUGFIX] FallbackEngine: TV parity — qty truncation to 4dp, intrabar TP timing** (2026-03-04)
+
+    File: `backend/backtesting/engine.py` (`_run_fallback`)
+
+    Three bugs fixed to achieve exact TradingView parity on `Strategy_RSI_L\S_15` (154 trades, ETH/30m):
+
+    **Bug 1 — Intrabar TP timing (off by 1 bar):**
+    - TP/SL check condition was `i >= tp_sl_active_from + 1`, which skipped the check on the entry bar.
+    - Fixed to `i >= tp_sl_active_from` (TP/SL can fire on the same bar as entry, matching TV behaviour).
+    - Affected trades: #47 and #105 (TP exits delayed 30 min vs TV).
+
+    **Bug 2 — Quantity truncation to 4 decimal places:**
+    - TV truncates `qty = floor(notional / entry_price, 4)` using floor (not round).
+    - Our engine used full floating-point precision: `entry_size = position_value / entry_price`.
+    - When the 5th decimal ≥ 5, our qty was slightly larger → PnL magnitude slightly higher on SL trades.
+    - Fixed: `entry_size = math.floor((position_value / entry_price) * 10000) / 10000`.
+    - Added `import math` to engine.py.
+    - Affected trades: #77, #78 (short SL, diff=0.03 USDT), #97, #109 (long SL, diff=0.05 USDT).
+
+    **Result:** All 154 trades now match TV exactly (entry, exit, PnL, direction). Metrics match:
+    - Net profit: 1001.72 (TV: 1001.98, diff < 0.03%)
+    - Win rate: 90.26%, Profit factor: 1.50
+
+- **[BUGFIX] Live Chart: дисконект при переключении вкладок + свеча останавливается через ~1 мин** (2026-03-04)
+
+    Файлы: `frontend/js/pages/backtest_results.js`, `backend/services/live_chart/session_manager.py`
+
+    **Причина 1 (дисконект):** `_onPageVisibilityChange` закрывал SSE при скрытии вкладки.
+    `finally`-блок эндпоинта вызывал `remove_subscriber` → `cleanup()` → закрытие Bybit WebSocket.
+    При возврате требовался полный реконнект (до 15 с).
+
+    **Причина 2 (свеча останавливается через ~1 мин):** `_SUBSCRIBER_QUEUE_MAXSIZE = 100`.
+    Пока вкладка скрыта, Bybit шлёт ~1 тик/сек → очередь заполнялась за ~100 сек → `QueueFull`
+    → подписчик удалялся → SSE получал `onerror` → после `_LIVE_MAX_RETRIES = 3` ошибок
+    `stopLiveChart(false)` останавливал стриминг навсегда.
+
+    **Исправление:**
+    - **Frontend**: SSE больше **не закрывается** при скрытии вкладки. Вместо этого устанавливается
+      флаг `_liveChartPaused = true`, который заставляет `_handleLiveChartEvent` пропускать
+      обновления графика (SSE-соединение живёт, очередь дренируется бесшумно).
+      При возврате: `_liveChartPaused = false`, `_liveChartRetryCount = 0`,
+      `_fetchMissingBars()` для догрузки пропущенных баров.
+    - **Backend**: `_SUBSCRIBER_QUEUE_MAXSIZE` увеличен с `100` до `1000`
+      (~16+ минут буфера при 1 тик/сек) — исключает `QueueFull` при переключении вкладок.
+
+- **[BUGFIX] Live Chart: свеча залипала при возврате на вкладку браузера** (2026-03-04)
+
+    `_onPageVisibilityChange()` в `frontend/js/pages/backtest_results.js`:
+
+    **Причина:** При скрытии вкладки SSE закрывался, но флаг `_liveChartActive`
+    оставался `true`. При возврате на вкладку `startLiveChart()` вызывался, но
+    сразу делал `return` из-за guard-а `if (_liveChartActive) return` — стриминг
+    не перезапускался, бар застывал навсегда.
+
+    **Исправление:** при скрытии вкладки `_liveChartActive` сбрасывается в `false`
+    (флаг «хотим возобновить» больше не нужен — условие возврата изменено на
+    `!_liveChartActive && !_liveChartSource`). При возврате `startLiveChart()`
+    запускается корректно, `_fetchMissingBars` догружает пропущенные бары.
+
+- **[BUGFIX] Live Chart: свеча и price plot зависали после скролла/зума** (2026-03-04, исправление v2)
+
+    `_handleLiveChartEvent()` и `setPriceChartCachedCandles()` в `frontend/js/pages/backtest_results.js`:
+
+    **Причина:** предыдущий фикс писал в `StateManager` на **каждый тик** (несколько раз в секунду).
+    `StateManager.set()` выполняет `_deepClone` всего state + `_pushHistory` (сохранение полной копии).
+    С массивом из тысяч свечей это блокировало JS main thread на десятки мс → и свеча зависала,
+    и price plot переставал двигаться.
+
+    **Исправления:**
+    1. На каждом `tick` **не пишем в StateManager** — только `btCandleSeries.update()` и
+       `_btLiveCandle = {...}`. StateManager вызывается редко: при новом баре и при `bar_closed`.
+    2. `setPriceChartCachedCandles` теперь использует `{ silent: true }` — пропускает
+       `_pushHistory` и `_notify`, убирая deep clone при обновлении кэша свечей.
+    3. Уточнена логика stitching: на `tick` существующего бара — только chart update,
+       на новый бар — добавление в локальный кэш + один write в store.
+
+- **[BUGFIX] Live Chart: последняя свеча "залипала" после движения графика** (2026-03-04)
+
+    `_handleLiveChartEvent()` в `frontend/js/pages/backtest_results.js`:
+
+    **Причина бага:** При появлении нового живого бара (`candle.time > lastHistoricalTime`)
+    массив `_btCachedCandles` обновлялся только при `bar_closed`, но не при промежуточных
+    `tick` событиях. Дополнительно: изменение `_btCachedCandles` не писалось в StateManager
+    (`setPriceChartCachedCandles`). При каждом тике store-подписка могла перезаписывать
+    `_btCachedCandles` старым значением → живой бар терялся → следующие тики снова пытались
+    добавить бар с тем же временем → LightweightCharts зависал / бар переставал обновляться.
+
+    **Исправления:**
+    1. Новый живой бар добавляется в `_btCachedCandles` **немедленно** на первом `tick`, а не
+       только при `bar_closed`. Это гарантирует, что все последующие тики попадают в ветку
+       "обновление существующего бара" (`candle.time <= lastCachedTime`).
+    2. Каждое изменение `_btCachedCandles` теперь синхронизируется с StateManager через
+       `setPriceChartCachedCandles(...)`, чтобы store-подписка не затирала обновления.
+    3. Обновление последнего бара в кэше использует `.slice()` + замену элемента вместо
+       мутации исходного массива (иммутабельность).
+
 ### Added
 
-- **Real-Time Live Chart MVP** (2026-03-04)
+- **[FEATURE] Live Chart Extension — P1: Persist live bars + P2: Extend Backtest to Now** (2026-03-04)
 
-    Full streaming pipeline: Bybit WebSocket → `LiveChartSessionManager` (fan-out)
-    → SSE endpoint → Browser `EventSource` → LightweightCharts live candle/marker updates.
+    Extends the Live Chart MVP with persistent bar storage and a "Extend to Now" capability.
+
+    **P1 — Save closed bars to `BybitKlineAudit` on each `bar_closed` event:**
+    - New `_persist_live_bar_sync(symbol, interval, market_type, candle, open_time_ms)` — synchronous
+      UPSERT into `bybit_kline_audit` using dialect-aware SQL (PostgreSQL `GREATEST/LEAST`,
+      SQLite `MAX/MIN`). Runs in thread pool.
+    - New `_persist_live_bar(symbol, interval, market_type, candle)` — async fire-and-forget wrapper
+      via `asyncio.to_thread`. Logs warning on error (non-critical; missed bars backfilled at next sync).
+    - `live_chart_stream()` SSE endpoint: added `market_type: str = Query("linear")` parameter.
+      Each `bar_closed` event now fires `asyncio.create_task(_persist_live_bar(...))` with proper
+      `_bg_tasks` set to hold strong references and prevent GC.
+
+    **P2 — `POST /api/v1/backtests/{backtest_id}/extend`:**
+    - Determines gap from `orig.end_date` to now, rejects if gap < 2 candles or > 730 days.
+    - Fetches missing candles from Bybit with `OVERLAP_CANDLES` overlap → persists via
+      `_persist_klines_sync`.
+    - Runs gap + full-period backtests via `BacktestService.run_backtest()`.
+    - Merges original trades + new gap trades, saves as new `BacktestModel` with
+      `is_extended=True`, `source_backtest_id=<orig.id>`.
+    - Returns `{status, new_backtest_id, new_trades, gap_start, gap_end, new_metrics}`.
+
+    **Database migration** (`20260304_backtest_extend`):
+    - `backtests.is_extended` — Boolean, NOT NULL, default False.
+    - `backtests.source_backtest_id` — String(36), nullable (soft FK, SQLite-compatible).
+    - `backtests.market_type` — String(16), nullable, default 'linear'.
+
+    **Frontend:**
+    - `startLiveChart()` now passes `market_type` in SSE URL query params.
+    - New `⟳ Extend` button (`#btExtendBtn`) rendered next to `● Live` button.
+    - `extendBacktestToNow()` JS function: calls `POST /backtests/{id}/extend`, shows
+      notification, reloads extended backtest via `selectBacktest(data.new_backtest_id)`.
+    - Extended backtests show `Extended` blue badge in the results list.
+    - CSS: `.bt-extend-btn`, `.bt-extend-btn:hover`, `.bt-extend-btn.loading`, `.badge-extended`.
+
+    **Tests** (27 new tests across 2 files):
+    - `tests/backend/api/routers/test_live_chart_persist.py` — P1: sync insert, OHLCV mapping,
+      raw=`{}`, turnover approximation, error propagation, async wrapper, open_time ms conversion,
+      fire-and-forget error swallowing, SSE signature inspection.
+    - `tests/backend/api/routers/test_backtests_extend.py` — P2: 404, already_current,
+      gap > 730 days, unsupported timeframe, Bybit 503, happy path (is_extended, source_backtest_id,
+      market_type forwarding), overlap-candles offset verification.
+
+- **[FEATURE] Live Chart MVP — Real-time streaming from Bybit WS to chart** (2026-03-XX)
+
+    Fully implemented real-time chart streaming architecture per ТЗ v1.1 with all expert review
+    fixes applied (D1.1–D1.3, D3, D5, D7, D8.4).
+
+    **Architecture:**
+
+    ```
+    Bybit WS → LiveChartSession (fan-out) → SSE endpoint → EventSource → LightweightCharts
+    ```
 
     **New files:**
-    - `backend/services/live_chart/session_manager.py` — `LiveChartSessionManager` with 1-WS-per-(symbol×interval) fan-out to N SSE subscriber queues
-    - `backend/services/live_chart/signal_service.py` — sliding OHLCV window (deque maxlen=500) + `StrategyBuilderAdapter` signal recompute on each closed bar
-    - `backend/services/live_chart/__init__.py` — package exports + `LIVE_CHART_MANAGER` singleton
-    - `tests/backend/services/test_live_chart_session.py` — 15 unit tests
-    - `tests/backend/services/test_live_signal_service.py` — 14 unit tests
+    - `backend/services/live_chart/signal_service.py` — `LiveSignalService`: sliding OHLCV window,
+      signal recomputation per closed bar. Never returns None. Empty-bar skip, >2s slow-call warning,
+      MD5 hash cache to skip recompute if window unchanged.
+    - `backend/services/live_chart/session_manager.py` — `LiveChartSession`, `LiveChartSessionManager`,
+      `LIVE_CHART_MANAGER` singleton. Fan-out: 1 WS connection per (symbol, interval) → N SSE clients.
+      Slow subscriber eviction on QueueFull. WS auto-disconnect on 0 subscribers (D5).
+    - `backend/services/live_chart/__init__.py` — package exports.
 
-    **Modified:**
-    - `backend/api/routers/marketdata.py` — `GET /api/v1/marketdata/live-chart/stream` SSE endpoint (500-bar warmup, heartbeat every 20 s, reconnect via `Last-Event-ID`)
-    - `backend/api/lifespan.py` — `LIVE_CHART_MANAGER.shutdown_all()` registered in app shutdown
-    - `frontend/backtest-results.html` — `#btLiveChartBtn` in `.bt-price-chart-controls`
-    - `frontend/css/backtest_results.css` — `.bt-live-btn` with 5 states (idle/connecting/active/reconnecting/error) + `@keyframes live-pulse`
-    - `frontend/js/pages/backtest_results.js` — EventSource state machine, `_applyLiveSignals()` (500-marker cap), Page Visibility API pause/resume, REST backfill on reconnect
+    **Modified files:**
+    - `backend/api/routers/marketdata.py` — 2 new endpoints:
+        - `GET /api/v1/marketdata/live-chart/stream` — SSE stream with heartbeat every 20s,
+          numbered event IDs (`id: N`), `builder_graph` loading fix (D1.3).
+        - `GET /api/v1/marketdata/live-chart/status` — monitoring: active sessions + subscriber counts.
+    - `backend/api/lifespan.py` — `LIVE_CHART_MANAGER.shutdown_all()` on application shutdown.
+    - `frontend/backtest-results.html` — `#btLiveChartBtn` button in price chart header.
+    - `frontend/css/backtest_results.css` — `.bt-live-btn` with 5 states (idle/connecting/streaming/
+      reconnecting/error), pulse animation.
+    - `frontend/js/pages/backtest_results.js` — Full live chart JS implementation:
+        - `startLiveChart(backtest)` — "hot start" guard, EventSource setup, auto-retry up to 3x.
+        - `stopLiveChart()` — cleanup EventSource, reset markers.
+        - `_handleLiveChartEvent(event)` — D3 bar stitching (tick vs bar_closed).
+        - `_applyLiveSignals(timeSec, signals)` — marker dedupe, 500-marker limit (D8.4).
+        - `_fetchMissingBars(symbol, interval)` — reconnect gap fill.
+        - Page Visibility API pause/resume (D7).
+        - Button wired in `updatePriceChart()` via `cloneNode` to prevent listener leak.
 
-    **Expert fixes applied:**
-    1. `push_closed_bar` returns `{"error": ..., "long": False, "short": False, "bars_used": N}` on failure — never raises
-    2. Empty bars (volume=0) are skipped before calling the adapter
-    3. Timing warning emitted if `generate_signals()` takes >2 s
+    **Tests:**
+    - `tests/backend/services/test_live_signal_service.py` — 22 tests (init, signals, empty bars,
+      error handling, cache, slow warning, window overflow).
+    - `tests/backend/services/test_live_chart_session.py` — 20 tests (subscribers, fan-out,
+      WS routing, session manager lifecycle, shutdown_all).
+
+    **Expert review fixes applied:**
+    - D1.1: No refactoring of `bybit_websocket.py` needed — `register_callback` already exists.
+    - D1.2: `parse_kline_message(WebSocketMessage)` — correct type used.
+    - D1.3: `strat_obj.builder_graph` (not `strategy_config` which doesn't exist).
+    - D3: Bar stitching in `_handleLiveChartEvent` (tick updates current bar, bar_closed adds new).
+    - D5: WS auto-disconnects when subscriber count drops to 0.
+    - D7: Page Visibility API — pause stream on hidden tab, resume on visible.
+    - D8.4: Live marker limit = 500, merged with historical markers for `setMarkers`.
 
 ### Fixed
 
@@ -77,15 +248,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     **Entry Conditions** — `tests/ai_agents/test_entry_conditions_ai_agents.py` (new, ~280 tests):
 
     Covers all 29 previously-uncovered `BLOCK_REGISTRY` indicator blocks:
-    | Group | Blocks |
-    |---|---|
+
+    | Group               | Blocks                                         |
+    | ------------------- | ---------------------------------------------- |
     | Moving Averages (6) | `ema`, `sma`, `wma`, `dema`, `tema`, `hull_ma` |
-    | Bands/Channels (3) | `bollinger`, `keltner`, `donchian` |
-    | Volatility (3) | `atr`, `atrp`, `stddev` |
-    | Trend (4) | `adx`, `ichimoku`, `parabolic_sar`, `aroon` |
-    | Volume (6) | `mfi`, `obv`, `vwap`, `cmf`, `ad_line`, `pvt` |
-    | Oscillators (5) | `cci`, `cmo`, `roc`, `williams_r`, `stoch_rsi` |
-    | Special (2) | `mtf`, `pivot_points` |
+    | Bands/Channels (3)  | `bollinger`, `keltner`, `donchian`             |
+    | Volatility (3)      | `atr`, `atrp`, `stddev`                        |
+    | Trend (4)           | `adx`, `ichimoku`, `parabolic_sar`, `aroon`    |
+    | Volume (6)          | `mfi`, `obv`, `vwap`, `cmf`, `ad_line`, `pvt`  |
+    | Oscillators (5)     | `cci`, `cmo`, `roc`, `williams_r`, `stoch_rsi` |
+    | Special (2)         | `mtf`, `pivot_points`                          |
 
     Each block tested for: category in `_BLOCK_CATEGORY_MAP` == "indicator", all registry `outputs`
     keys present, numeric pd.Series output, valid data after warmup, E2E via `generate_signals()`.
@@ -95,16 +267,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     **Exit Conditions** — `tests/ai_agents/test_exit_conditions_extended_ai_agents.py` (new, ~150 tests):
 
     Covers all 8 previously-uncovered `_execute_exit` types:
-    | Exit Type | Key Tests |
-    |---|---|
-    | `atr_stop` | use_atr_sl=True, atr_sl Series positive, multiplier clamped [0.1–4.0], period clamped [1–150], 4 smoothing methods |
-    | `time_exit` | all-False exit, max_bars constant Series, default bars=10 |
-    | `breakeven_exit` / `break_even_exit` | breakeven_trigger float, both aliases equivalent |
-    | `chandelier_exit` | exit_long\|exit_short union, fires real signals over 1000 bars |
-    | `session_exit` | fires only at matching hour, ~41 exits per hour on hourly data |
-    | `signal_exit` | signal_exit_mode=True, all-False exit |
-    | `indicator_exit` | 7 indicators (rsi/cci/mfi/roc/obv/macd/stochastic) × 4 modes (above/below/cross_above/cross_below) = 28 combos, no NaN |
-    | `partial_close` | partial_targets list structure, empty targets, defaults |
+
+    | Exit Type                            | Key Tests                                                                                                              |
+    | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+    | `atr_stop`                           | use_atr_sl=True, atr_sl Series positive, multiplier clamped [0.1–4.0], period clamped [1–150], 4 smoothing methods     |
+    | `time_exit`                          | all-False exit, max_bars constant Series, default bars=10                                                              |
+    | `breakeven_exit` / `break_even_exit` | breakeven_trigger float, both aliases equivalent                                                                       |
+    | `chandelier_exit`                    | exit_long\|exit_short union, fires real signals over 1000 bars                                                         |
+    | `session_exit`                       | fires only at matching hour, ~41 exits per hour on hourly data                                                         |
+    | `signal_exit`                        | signal_exit_mode=True, all-False exit                                                                                  |
+    | `indicator_exit`                     | 7 indicators (rsi/cci/mfi/roc/obv/macd/stochastic) × 4 modes (above/below/cross_above/cross_below) = 28 combos, no NaN |
+    | `partial_close`                      | partial_targets list structure, empty targets, defaults                                                                |
 
     Also includes: `TestExitEntryIntegration` (7 E2E combos) + `TestExitBlockCompleteness`
     (all 13 exit types return `exit` pd.Series of correct length).
@@ -139,23 +312,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-        **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-        instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-        **price-change percentage** (6.6%), not the USDT amount.
+              **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+              instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+              **price-change percentage** (6.6%), not the USDT amount.
 
-        **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-        `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+              **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+              `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
 
     m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
 
-        **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-        (no fallback chain) for all four long/short largest fields.
+              **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+              (no fallback chain) for all four long/short largest fields.
 
-        **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-        TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-        (bars_in_trade now uses inclusive counting to match TV).
+              **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+              TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+              (bars_in_trade now uses inclusive counting to match TV).
 
-        **File:** `scripts/_tv_calibration_check.py`
+              **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

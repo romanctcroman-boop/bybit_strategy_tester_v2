@@ -39,18 +39,14 @@ def check_env_permissions():
 
     try:
         # Check Windows ACL
-        result = subprocess.run(
-            ["icacls", str(env_file)], capture_output=True, text=True, shell=True
-        )
+        result = subprocess.run(["icacls", str(env_file)], capture_output=True, text=True, shell=True)
 
         print(f"\n.env permissions:\n{result.stdout}")
 
         # Check if too permissive
         if "Everyone" in result.stdout or "Users" in result.stdout:
             print("❌ WARNING: .env file has too permissive permissions!")
-            print(
-                '   Recommended: icacls .env /inheritance:r /grant:r "$($env:USERNAME):(R,W)"'
-            )
+            print('   Recommended: icacls .env /inheritance:r /grant:r "$($env:USERNAME):(R,W)"')
             return False
         else:
             print("✅ .env permissions look restricted")
@@ -109,16 +105,12 @@ def scan_git_history():
             for pattern, name in SENSITIVE_PATTERNS:
                 matches = re.findall(pattern, diff_result.stdout, re.IGNORECASE)
                 if matches:
-                    issues_found.append(
-                        {"commit": commit_hash[:7], "type": name, "count": len(matches)}
-                    )
+                    issues_found.append({"commit": commit_hash[:7], "type": name, "count": len(matches)})
 
         if issues_found:
             print(f"\n❌ Found {len(issues_found)} potential issues:")
             for issue in issues_found[:10]:  # Show first 10
-                print(
-                    f"   - {issue['type']} in commit {issue['commit']} ({issue['count']} matches)"
-                )
+                print(f"   - {issue['type']} in commit {issue['commit']} ({issue['count']} matches)")
             return False
         else:
             print("✅ No obvious secrets found in recent git history")
@@ -141,9 +133,7 @@ def scan_current_code():
     # Scan Python files
     for py_file in PROJECT_ROOT.rglob("*.py"):
         # Skip virtual environments and cache
-        if any(
-            skip in str(py_file) for skip in [".venv", "__pycache__", "node_modules"]
-        ):
+        if any(skip in str(py_file) for skip in [".venv", "__pycache__", "node_modules"]):
             continue
 
         try:
@@ -157,10 +147,7 @@ def scan_current_code():
                     real_matches = [
                         m
                         for m in matches
-                        if not any(
-                            test in m.lower()
-                            for test in ["test", "example", "dummy", "xxx", "***"]
-                        )
+                        if not any(test in m.lower() for test in ["test", "example", "dummy", "xxx", "***"])
                     ]
 
                     if real_matches:
@@ -204,9 +191,7 @@ def check_sensitive_files():
     ]
 
     try:
-        result = subprocess.run(
-            ["git", "ls-files"], capture_output=True, text=True, cwd=PROJECT_ROOT
-        )
+        result = subprocess.run(["git", "ls-files"], capture_output=True, text=True, cwd=PROJECT_ROOT)
 
         tracked_files = result.stdout.strip().split("\n")
         issues = []
@@ -252,9 +237,7 @@ def generate_report():
     }
 
     # Save report
-    report_file = (
-        PROJECT_ROOT / f"security_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    )
+    report_file = PROJECT_ROOT / f"security_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with open(report_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 

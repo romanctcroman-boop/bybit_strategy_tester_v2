@@ -128,7 +128,7 @@ async def main():
 
     # Show the bars with largest differences
     top_diffs = diff.abs().nlargest(20)
-    print(f"\n  Top 20 bars with largest RSI difference:")
+    print("\n  Top 20 bars with largest RSI difference:")
     for ts, d in top_diffs.items():
         actual_diff = diff[ts]
         print(f"    {ts}: Δ={actual_diff:.10f}")

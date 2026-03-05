@@ -8,7 +8,6 @@
 4. Сравнение метрик с ожидаемыми значениями
 """
 
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

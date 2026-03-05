@@ -1,10 +1,11 @@
 """
 Сравнение Strategy_RSI_L\\S_15 с TradingView
 """
-import sqlite3
+
 import json
+import sqlite3
+
 import requests
-import pandas as pd
 
 DB_PATH = "d:/bybit_strategy_tester_v2/data.sqlite3"
 API_URL = "http://localhost:8000/api/v1/strategy-builder/run"
@@ -27,7 +28,7 @@ TV_PARAMS = {
 conn = sqlite3.connect(DB_PATH)
 row = conn.execute(
     "SELECT id, name, builder_blocks, builder_connections FROM strategies WHERE id=?",
-    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",)
+    ("2e5bb802-572b-473f-9ee9-44d38bf9c531",),
 ).fetchone()
 conn.close()
 
@@ -77,10 +78,10 @@ try:
     response = requests.post(API_URL, json=payload, timeout=120)
     response.raise_for_status()
     result = response.json()
-    
+
     print("\n✅ Бэктест завершен!")
     print("\n📊 МЕТРИКИ:")
-    
+
     if "metrics" in result:
         metrics = result["metrics"]
         print(f"  Чистая прибыль: {metrics.get('net_profit', 'N/A')}")
@@ -93,12 +94,12 @@ try:
         print(f"  Профит фактор: {metrics.get('profit_factor', 'N/A')}")
         print(f"  Макс. просадка: {metrics.get('max_drawdown', 'N/A')}")
         print(f"  Комиссия: {metrics.get('total_commission', 'N/A')}")
-    
+
     print("\n📊 СРАВНЕНИЕ С TRADINGVIEW:")
     print("-" * 80)
     print(f"{'Метрика':<40} {'TV Эталон':<20} {'Наш результат':<20}")
     print("-" * 80)
-    
+
     tv_metrics = {
         "Чистая прибыль (USDT)": "1001.98",
         "Чистая прибыль (%)": "10.02",
@@ -111,13 +112,15 @@ try:
         "LONG сделок": "30",
         "SHORT сделок": "124",
     }
-    
+
     if "metrics" in result:
         for metric, tv_val in tv_metrics.items():
-            our_val = result["metrics"].get(metric.lower().replace(" ", "_").replace("(usdt)", "").replace("(%)", ""), "N/A")
+            our_val = result["metrics"].get(
+                metric.lower().replace(" ", "_").replace("(usdt)", "").replace("(%)", ""), "N/A"
+            )
             match = "✅" if str(our_val) == tv_val else "❌"
             print(f"{match} {metric:<38} {tv_val:<20} {our_val:<20}")
-    
+
 except requests.exceptions.ConnectionError:
     print("❌ Ошибка подключения к API. Запустите сервер: python main.py server")
 except requests.exceptions.Timeout:

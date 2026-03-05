@@ -54,9 +54,7 @@ def run_test(name: str, category: str):
                     test_results.append(TestResult(name, category, False, str(result)))
                     print(f"  ❌ {name}: {result}")
             except Exception as e:
-                test_results.append(
-                    TestResult(name, category, False, str(e), traceback.format_exc())
-                )
+                test_results.append(TestResult(name, category, False, str(e), traceback.format_exc()))
                 print(f"  ❌ {name}: {e}")
 
         return wrapper
@@ -110,9 +108,7 @@ def test_sma_strategy():
     result = strategy.generate_signals(ohlcv)
 
     # Validate result type
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
 
     # Validate signal arrays
     assert len(result.entries) == len(ohlcv), "entries length mismatch"
@@ -122,9 +118,7 @@ def test_sma_strategy():
 
     # Should have some signals after warmup period
     warmup = 20  # slow_period
-    assert result.entries.iloc[warmup:].any() or True, (
-        "SMA may not generate signals in random data"
-    )
+    assert result.entries.iloc[warmup:].any() or True, "SMA may not generate signals in random data"
 
     return True
 
@@ -139,9 +133,7 @@ def test_rsi_strategy():
 
     result = strategy.generate_signals(ohlcv)
 
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
     assert len(result.entries) == len(ohlcv)
 
     # Warmup check - no signals in warmup period
@@ -155,16 +147,12 @@ def test_macd_strategy():
     """Test MACDStrategy generates valid signals."""
     from backend.backtesting.strategies import MACDStrategy, SignalResult
 
-    strategy = MACDStrategy(
-        params={"fast_period": 12, "slow_period": 26, "signal_period": 9}
-    )
+    strategy = MACDStrategy(params={"fast_period": 12, "slow_period": 26, "signal_period": 9})
     ohlcv = generate_test_ohlcv(n_bars=100)
 
     result = strategy.generate_signals(ohlcv)
 
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
     assert len(result.entries) == len(ohlcv)
 
     return True
@@ -180,9 +168,7 @@ def test_bollinger_strategy():
 
     result = strategy.generate_signals(ohlcv)
 
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
     assert len(result.entries) == len(ohlcv)
 
     # Warmup check
@@ -196,16 +182,12 @@ def test_grid_strategy():
     """Test GridStrategy generates valid signals."""
     from backend.backtesting.strategies import GridStrategy, SignalResult
 
-    strategy = GridStrategy(
-        params={"grid_levels": 5, "grid_spacing": 1.0, "take_profit": 1.5}
-    )
+    strategy = GridStrategy(params={"grid_levels": 5, "grid_spacing": 1.0, "take_profit": 1.5})
     ohlcv = generate_test_ohlcv(n_bars=100)
 
     result = strategy.generate_signals(ohlcv)
 
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
     assert len(result.entries) == len(ohlcv)
 
     # Grid strategy should generate signals in trending data
@@ -233,9 +215,7 @@ def test_dca_strategy():
 
     result = strategy.generate_signals(ohlcv)
 
-    assert isinstance(result, SignalResult), (
-        f"Expected SignalResult, got {type(result)}"
-    )
+    assert isinstance(result, SignalResult), f"Expected SignalResult, got {type(result)}"
     assert len(result.entries) == len(ohlcv)
 
     return True
@@ -264,9 +244,7 @@ def test_strategy_default_params():
 
     for strategy_class in strategies:
         params = strategy_class.get_default_params()
-        assert isinstance(params, dict), (
-            f"{strategy_class.__name__} default params must be dict"
-        )
+        assert isinstance(params, dict), f"{strategy_class.__name__} default params must be dict"
         assert len(params) > 0, f"{strategy_class.__name__} should have default params"
 
     return True
@@ -473,9 +451,7 @@ def test_paper_trading_market_order():
     engine.update_price("BTCUSDT", 50000.0)
 
     # Place market buy order
-    order = engine.place_order(
-        symbol="BTCUSDT", side=OrderSide.BUY, qty=0.1, order_type=OrderType.MARKET
-    )
+    order = engine.place_order(symbol="BTCUSDT", side=OrderSide.BUY, qty=0.1, order_type=OrderType.MARKET)
 
     assert order is not None
     assert order.symbol == "BTCUSDT"
@@ -648,9 +624,7 @@ def test_validation_report():
         ValidationResult,
     )
 
-    request = TradeRequest(
-        symbol="BTCUSDT", side="BUY", order_type="MARKET", quantity=0.1
-    )
+    request = TradeRequest(symbol="BTCUSDT", side="BUY", order_type="MARKET", quantity=0.1)
 
     # Test approved
     approved = ValidationReport.approve(request, warnings=["Test warning"])
@@ -659,9 +633,7 @@ def test_validation_report():
     assert len(approved.warnings) == 1
 
     # Test rejected
-    rejected = ValidationReport.reject(
-        request, reasons=[RejectionReason.INSUFFICIENT_BALANCE]
-    )
+    rejected = ValidationReport.reject(request, reasons=[RejectionReason.INSUFFICIENT_BALANCE])
     assert rejected.approved is False
     assert rejected.result == ValidationResult.REJECTED
     assert len(rejected.rejection_reasons) == 1

@@ -1,9 +1,10 @@
 """
 Тест пирамидинга - проверка корректной работы multiple entries
 """
+
 import sys
 
-sys.path.insert(0, r'd:\bybit_strategy_tester_v2')
+sys.path.insert(0, r"d:\bybit_strategy_tester_v2")
 
 from datetime import datetime, timedelta
 
@@ -60,7 +61,7 @@ def test_pyramiding_manager():
     mgr.add_entry("long", 52000, 100, 1000, 2, datetime.now())
 
     # Expected: (100*50000 + 100*51000 + 100*52000) / 300 = 51000
-    expected_avg = (100*50000 + 100*51000 + 100*52000) / 300
+    expected_avg = (100 * 50000 + 100 * 51000 + 100 * 52000) / 300
     actual_avg = mgr.get_avg_entry_price("long")
 
     print(f"   Expected avg: ${expected_avg:.2f}")
@@ -72,7 +73,7 @@ def test_pyramiding_manager():
     print("\n4. TP/SL from Average Price")
 
     tp_price = mgr.get_tp_price("long", 0.015)  # 1.5% TP
-    sl_price = mgr.get_sl_price("long", 0.03)   # 3% SL
+    sl_price = mgr.get_sl_price("long", 0.03)  # 3% SL
 
     expected_tp = 51000 * 1.015
     expected_sl = 51000 * 0.97
@@ -104,7 +105,7 @@ def test_pyramiding_manager():
     print(f"   Remaining entries: {mgr.get_entry_count('long')}")
 
     assert len(closed) == 1, "Should close 1 trade"
-    assert closed[0]['entry_price'] == 50000, "Should close FIRST entry"
+    assert closed[0]["entry_price"] == 50000, "Should close FIRST entry"
     assert mgr.get_entry_count("long") == 2, "Should have 2 remaining"
     print("   ✓ Passed")
 
@@ -139,21 +140,24 @@ def test_fallback_engine_v3_pyramiding():
 
     # Создаём тестовые данные с 3 последовательными LONG сигналами
     n = 50
-    dates = pd.date_range(start='2025-01-01', periods=n, freq='1h')
+    dates = pd.date_range(start="2025-01-01", periods=n, freq="1h")
 
     # Цена растёт для проверки пирамидинга
     prices = 50000 + np.arange(n) * 100  # От 50000 до 54900
 
-    candles = pd.DataFrame({
-        'open': prices,
-        'high': prices + 50,
-        'low': prices - 50,
-        'close': prices + 25,
-    }, index=dates)
+    candles = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices + 50,
+            "low": prices - 50,
+            "close": prices + 25,
+        },
+        index=dates,
+    )
 
     # 3 LONG сигнала подряд
     long_entries = np.zeros(n, dtype=bool)
-    long_entries[5] = True   # Сигнал 1
+    long_entries[5] = True  # Сигнал 1
     long_entries[10] = True  # Сигнал 2
     long_entries[15] = True  # Сигнал 3
 
@@ -211,7 +215,7 @@ def test_fallback_engine_v3_pyramiding():
     print("=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_pyramiding_manager()
     test_fallback_engine_v3_pyramiding()
 

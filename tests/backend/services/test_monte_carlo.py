@@ -95,9 +95,7 @@ class TestMonteCarloSimulator:
 
     def test_analyze_strategy_permutation(self, simulator, sample_backtest_results):
         """Test permutation method simulation."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="permutation"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="permutation")
 
         assert isinstance(result, MonteCarloResult)
         assert result.n_simulations == 100
@@ -108,45 +106,35 @@ class TestMonteCarloSimulator:
 
     def test_analyze_strategy_bootstrap(self, simulator, sample_backtest_results):
         """Test bootstrap method simulation."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="bootstrap"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="bootstrap")
 
         assert isinstance(result, MonteCarloResult)
         assert result.n_simulations == 100
 
     def test_analyze_strategy_block_bootstrap(self, simulator, sample_backtest_results):
         """Test block bootstrap method simulation."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="block_bootstrap"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="block_bootstrap")
 
         assert isinstance(result, MonteCarloResult)
         assert result.n_simulations == 100
 
     def test_probability_of_positive_return(self, simulator, sample_backtest_results):
         """Test probability calculation."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="permutation"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="permutation")
 
         prob = result.probability_of_return(0.0)
         assert 0 <= prob <= 1
 
     def test_var_calculation(self, simulator, sample_backtest_results):
         """Test VaR is calculated."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="permutation"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="permutation")
 
         assert result.var_95 is not None
         assert isinstance(result.var_95, float)
 
     def test_cvar_calculation(self, simulator, sample_backtest_results):
         """Test CVaR is calculated."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="permutation"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="permutation")
 
         assert result.cvar_95 is not None
         assert isinstance(result.cvar_95, float)
@@ -159,9 +147,7 @@ class TestMonteCarloSimulator:
 
     def test_result_to_dict(self, simulator, sample_backtest_results):
         """Test result serialization to dict."""
-        result = simulator.analyze_strategy(
-            backtest_results=sample_backtest_results, method="permutation"
-        )
+        result = simulator.analyze_strategy(backtest_results=sample_backtest_results, method="permutation")
 
         data = result.to_dict()
         assert "n_simulations" in data

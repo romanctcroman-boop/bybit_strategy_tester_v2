@@ -169,7 +169,7 @@ async def main():
     cross_alt1 = (rsi_prev > 52) & (rsi <= 52)
     cross_alt2 = (rsi_prev >= 52) & (rsi <= 52)
     cross_alt3 = (rsi_prev > 52) & (rsi < 52)
-    print(f"\nCross variants:")
+    print("\nCross variants:")
     print(f"  prev>=52 & curr<52  (ours): {np.nansum(cross_short)}")
     print(f"  prev>52  & curr<=52:        {np.nansum(cross_alt1)}")
     print(f"  prev>=52 & curr<=52:        {np.nansum(cross_alt2)}")

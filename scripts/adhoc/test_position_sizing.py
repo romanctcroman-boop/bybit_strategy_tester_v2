@@ -119,9 +119,7 @@ def test_monte_carlo():
     print(f"\n2. Simulation Results ({results['n_simulations']} simulations):")
     print(f"   Expected Return: {results['return_mean']:.1%}")
     print(f"   Return Std Dev: {results['return_std']:.1%}")
-    print(
-        f"   95% CI: [{results['return_ci_lower']:.1%}, {results['return_ci_upper']:.1%}]"
-    )
+    print(f"   95% CI: [{results['return_ci_lower']:.1%}, {results['return_ci_upper']:.1%}]")
 
     print("\n3. Risk Metrics:")
     print(f"   Mean Max Drawdown: {results['max_drawdown_mean']:.1%}")
@@ -131,9 +129,7 @@ def test_monte_carlo():
 
     print("\n4. Sharpe Ratio:")
     print(f"   Mean: {results['sharpe_mean']:.2f}")
-    print(
-        f"   95% CI: [{results['sharpe_ci_lower']:.2f}, {results['sharpe_ci_upper']:.2f}]"
-    )
+    print(f"   95% CI: [{results['sharpe_ci_lower']:.2f}, {results['sharpe_ci_upper']:.2f}]")
 
     print("\n5. Probability Metrics:")
     print(f"   P(Profit): {results['probability_of_profit']:.1%}")
@@ -143,9 +139,7 @@ def test_monte_carlo():
     # Test path simulation
     print("\n6. Running path simulation...")
     paths = mc.run_path_simulation(trades, initial_capital=10000, n_paths=100)
-    print(
-        f"   Final equity range: ${paths['final_equity_range'][0]:.0f} - ${paths['final_equity_range'][1]:.0f}"
-    )
+    print(f"   Final equity range: ${paths['final_equity_range'][0]:.0f} - ${paths['final_equity_range'][1]:.0f}")
 
     print("\n✅ Monte Carlo Analyzer test PASSED!")
 

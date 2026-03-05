@@ -4,9 +4,7 @@ from backend.services.advanced_backtesting.engine import (
 )
 
 
-def make_candle(
-    close: float, high: float = None, low: float = None, symbol: str = "BTCUSDT"
-):
+def make_candle(close: float, high: float = None, low: float = None, symbol: str = "BTCUSDT"):
     return {
         "symbol": symbol,
         "open": close,
@@ -200,11 +198,7 @@ def test_funding_long_pays_short_receives():
         # buy на первой свече, закрытие через две свечи (учитываем задержку исполнения)
         if not _state.get("position") and len(engine.trades) == 0:
             return {"action": "buy"}
-        if (
-            _state.get("position")
-            and len(engine.trades) == 0
-            and not state["close_sent"]
-        ):
+        if _state.get("position") and len(engine.trades) == 0 and not state["close_sent"]:
             state["close_sent"] = True
             return {"action": "close"}
         return None
@@ -230,11 +224,7 @@ def test_funding_long_pays_short_receives():
         # short на первой свече, закрытие через две свечи
         if not _state.get("position") and len(engine_short.trades) == 0:
             return {"action": "short"}
-        if (
-            _state.get("position")
-            and len(engine_short.trades) == 0
-            and not state_short["close_sent"]
-        ):
+        if _state.get("position") and len(engine_short.trades) == 0 and not state_short["close_sent"]:
             state_short["close_sent"] = True
             return {"action": "close"}
         return None

@@ -43,9 +43,7 @@ def main() -> int:
         "limit": str(limit),
         "source": "db",
     }
-    url = (
-        f"{BASE}/api/v1/marketdata/bybit/klines/smart?{urllib.parse.urlencode(params)}"
-    )
+    url = f"{BASE}/api/v1/marketdata/bybit/klines/smart?{urllib.parse.urlencode(params)}"
 
     duration_s = 90
     every_s = 3

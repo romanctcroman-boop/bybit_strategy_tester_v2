@@ -3,6 +3,7 @@
 Сравнение FallbackEngineV2 и NumbaEngineV2 на 150+ метриках
 Использует ExtendedMetricsCalculator для полной проверки
 """
+
 import sys
 from pathlib import Path
 
@@ -26,18 +27,22 @@ print(f"Время: {datetime.now()}")
 # ============================================================================
 print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
 print(f"   {len(df_1h)} баров загружено")
+
 
 # RSI функция
 def calculate_rsi(close, period=14):
@@ -50,6 +55,7 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+
 # ============================================================================
 # ПАРАМЕТРЫ
 # ============================================================================
@@ -60,14 +66,9 @@ stop_losses = [0.01, 0.02, 0.03, 0.05]
 take_profits = [0.01, 0.02, 0.03, 0.05]
 directions = ["long", "short", "both"]
 
-combinations = list(product(
-    rsi_periods[:3],
-    rsi_overbought[:2],
-    rsi_oversold[:2],
-    stop_losses[:3],
-    take_profits[:2],
-    directions
-))[:150]
+combinations = list(
+    product(rsi_periods[:3], rsi_overbought[:2], rsi_oversold[:2], stop_losses[:3], take_profits[:2], directions)
+)[:150]
 
 print(f"\n📝 {len(combinations)} комбинаций для тестирования")
 
@@ -84,7 +85,7 @@ numba = NumbaEngineV2()
 metrics_calc = ExtendedMetricsCalculator(
     risk_free_rate=0.02,
     periods_per_year=8760,  # Hourly
-    target_return=0.0
+    target_return=0.0,
 )
 
 dir_map = {
@@ -140,7 +141,7 @@ start_time = time.time()
 
 for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     # Генерируем сигналы
-    rsi = calculate_rsi(df_1h['close'], period=rsi_period)
+    rsi = calculate_rsi(df_1h["close"], period=rsi_period)
     long_entries = (rsi < os).values
     long_exits = (rsi > ob).values
     short_entries = (rsi > ob).values
@@ -175,9 +176,17 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     nb_ext = metrics_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
 
     # Extended metrics names that should be read from ext_metrics first
-    EXT_METRICS = {"sortino_ratio", "calmar_ratio", "omega_ratio", "recovery_factor",
-                   "ulcer_index", "tail_ratio", "downside_deviation",
-                   "upside_potential_ratio", "gain_to_pain_ratio"}
+    EXT_METRICS = {
+        "sortino_ratio",
+        "calmar_ratio",
+        "omega_ratio",
+        "recovery_factor",
+        "ulcer_index",
+        "tail_ratio",
+        "downside_deviation",
+        "upside_potential_ratio",
+        "gain_to_pain_ratio",
+    }
 
     def get_metric(result, ext_metrics, name):
         # For extended metrics, read from ext_metrics first
@@ -209,15 +218,12 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         combo_drifts[metric] = drift
         metric_drifts[metric].append(drift)
 
-    results.append({
-        "combo": i + 1,
-        **combo_drifts
-    })
+    results.append({"combo": i + 1, **combo_drifts})
 
     if (i + 1) % 30 == 0:
         elapsed = time.time() - start_time
         eta = elapsed / (i + 1) * (len(combinations) - i - 1)
-        print(f"   [{i+1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
+        print(f"   [{i + 1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
 
 total_time = time.time() - start_time
 print(f"\n✅ Завершено за {total_time:.1f}s")
@@ -263,7 +269,7 @@ total_comparisons = len(METRICS) * len(combinations)
 perfect_comparisons = sum(sum(1 for d in metric_drifts[m] if d < 0.001) for m in METRICS)
 
 print(f"\n🎯 Всего сравнений: {total_comparisons:,}")
-print(f"   Идеальных совпадений: {perfect_comparisons:,} ({perfect_comparisons/total_comparisons*100:.2f}%)")
+print(f"   Идеальных совпадений: {perfect_comparisons:,} ({perfect_comparisons / total_comparisons * 100:.2f}%)")
 print(f"   Метрик с 100% совпадением: {perfect_count}/{total_metrics}")
 
 # ============================================================================

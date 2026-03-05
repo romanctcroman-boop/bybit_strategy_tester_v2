@@ -4,11 +4,8 @@
 Tests for portfolio engine, correlation analysis, risk parity.
 """
 
-from datetime import datetime, timedelta
-
 import numpy as np
 import pandas as pd
-import pytest
 
 from backend.backtesting.portfolio import (
     CorrelationAnalysis,

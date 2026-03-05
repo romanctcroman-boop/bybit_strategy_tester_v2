@@ -24,22 +24,25 @@ def load_candles():
     end_ts = int(datetime(2025, 1, 11).timestamp() * 1000)
 
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT open_time, open_price, high_price, low_price, close_price, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '15'
         AND open_time >= ? AND open_time <= ?
         ORDER BY open_time
-    ''', (start_ts, end_ts))
+    """,
+        (start_ts, end_ts),
+    )
 
     rows = cursor.fetchall()
     conn.close()
 
-    df = pd.DataFrame(rows, columns=['open_time', 'open', 'high', 'low', 'close', 'volume'])
-    df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-    df = df.set_index('open_time')
-    for col in ['open', 'high', 'low', 'close', 'volume']:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+    df = pd.DataFrame(rows, columns=["open_time", "open", "high", "low", "close", "volume"])
+    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+    df = df.set_index("open_time")
+    for col in ["open", "high", "low", "close", "volume"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
@@ -49,19 +52,19 @@ def test_engine_parity(direction: str):
     from backend.backtesting.models import BacktestConfig
     from backend.backtesting.strategies import get_strategy
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"TESTING DIRECTION: {direction.upper()}")
-    print('='*60)
+    print("=" * 60)
 
     df = load_candles()
 
     config = BacktestConfig(
-        symbol='BTCUSDT',
-        interval='15',
+        symbol="BTCUSDT",
+        interval="15",
         start_date=datetime(2025, 1, 1),
         end_date=datetime(2025, 1, 11),
-        strategy_type='rsi',
-        strategy_params={'period': 21, 'oversold': 30, 'overbought': 70},
+        strategy_type="rsi",
+        strategy_params={"period": 21, "oversold": 30, "overbought": 70},
         direction=direction,
         initial_capital=10000.0,
         leverage=10.0,
@@ -79,6 +82,7 @@ def test_engine_parity(direction: str):
     except Exception as e:
         print(f"  Fallback error: {e}")
         import traceback
+
         traceback.print_exc()
         fallback_trades = []
 
@@ -88,6 +92,7 @@ def test_engine_parity(direction: str):
     except Exception as e:
         print(f"  VBT error: {e}")
         import traceback
+
         traceback.print_exc()
         vbt_trades = []
 
@@ -96,7 +101,7 @@ def test_engine_parity(direction: str):
 
     # For SHORT and BOTH directions, VBT is not reliable
     # Production code uses fallback for these, so we accept if fallback works
-    if direction in ('short', 'both'):
+    if direction in ("short", "both"):
         if len(fallback_trades) > 0:
             print(f"  [INFO] Direction '{direction}' uses fallback engine in production")
             print(f"  [OK] Fallback engine generated {len(fallback_trades)} trades correctly")
@@ -131,12 +136,17 @@ def test_engine_parity(direction: str):
 
         if not (size_match and pnl_match and entry_match):
             all_match = False
-            mismatches.append({
-                'trade': i,
-                'fb_size': fb_size, 'vbt_size': vbt_size,
-                'fb_pnl': fb_pnl, 'vbt_pnl': vbt_pnl,
-                'fb_entry': fb_entry, 'vbt_entry': vbt_entry,
-            })
+            mismatches.append(
+                {
+                    "trade": i,
+                    "fb_size": fb_size,
+                    "vbt_size": vbt_size,
+                    "fb_pnl": fb_pnl,
+                    "vbt_pnl": vbt_pnl,
+                    "fb_entry": fb_entry,
+                    "vbt_entry": vbt_entry,
+                }
+            )
 
     if all_match:
         print(f"  [OK] All {len(fallback_trades)} trades match!")
@@ -145,11 +155,15 @@ def test_engine_parity(direction: str):
         print("\n  Sample trades:")
         for i, fb in enumerate(fallback_trades[:3]):
             vbt = vbt_trades[i]
-            print(f"    Trade {i+1}: Size={fb.size:.6f} PnL=${fb.pnl:.2f} (FB) vs Size={vbt.size:.6f} PnL=${vbt.pnl:.2f} (VBT)")
+            print(
+                f"    Trade {i + 1}: Size={fb.size:.6f} PnL=${fb.pnl:.2f} (FB) vs Size={vbt.size:.6f} PnL=${vbt.pnl:.2f} (VBT)"
+            )
     else:
         print(f"  [X] {len(mismatches)} trades DO NOT MATCH!")
         for m in mismatches[:3]:
-            print(f"    Trade {m['trade']}: Size {m['fb_size']} vs {m['vbt_size']}, PnL {m['fb_pnl']} vs {m['vbt_pnl']}")
+            print(
+                f"    Trade {m['trade']}: Size {m['fb_size']} vs {m['vbt_size']}, PnL {m['fb_pnl']} vs {m['vbt_pnl']}"
+            )
 
     return all_match, len(fallback_trades), len(vbt_trades)
 
@@ -160,20 +174,20 @@ def test_metrics_coverage():
     from backend.backtesting.models import BacktestConfig, PerformanceMetrics
     from backend.backtesting.strategies import get_strategy
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("TESTING METRICS COVERAGE")
-    print('='*60)
+    print("=" * 60)
 
     df = load_candles()
 
     config = BacktestConfig(
-        symbol='BTCUSDT',
-        interval='15',
+        symbol="BTCUSDT",
+        interval="15",
         start_date=datetime(2025, 1, 1),
         end_date=datetime(2025, 1, 11),
-        strategy_type='rsi',
-        strategy_params={'period': 21, 'oversold': 30, 'overbought': 70},
-        direction='both',  # Test with both for max coverage
+        strategy_type="rsi",
+        strategy_params={"period": 21, "oversold": 30, "overbought": 70},
+        direction="both",  # Test with both for max coverage
         initial_capital=10000.0,
         leverage=10.0,
         position_size=1.0,
@@ -225,10 +239,7 @@ def test_metrics_coverage():
             print(f"    ... and {len(empty) - 20} more")
 
     # Show zero values that might need attention
-    critical_zeros = [
-        'sharpe_ratio', 'sortino_ratio', 'calmar_ratio',
-        'net_profit', 'total_trades', 'win_rate'
-    ]
+    critical_zeros = ["sharpe_ratio", "sortino_ratio", "calmar_ratio", "net_profit", "total_trades", "win_rate"]
 
     zero_concerns = [z for z in zero_ok if z in critical_zeros]
     if zero_concerns:
@@ -240,60 +251,52 @@ def test_metrics_coverage():
 
 
 def main():
-    print("="*60)
+    print("=" * 60)
     print("COMPREHENSIVE ENGINE & METRICS TEST")
-    print("="*60)
+    print("=" * 60)
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     results = {}
 
     # Test 1: Engine parity for each direction
-    for direction in ['long', 'short', 'both']:
+    for direction in ["long", "short", "both"]:
         match, fb_count, vbt_count = test_engine_parity(direction)
-        results[f'parity_{direction}'] = {
-            'match': match,
-            'fallback_trades': fb_count,
-            'vbt_trades': vbt_count
-        }
+        results[f"parity_{direction}"] = {"match": match, "fallback_trades": fb_count, "vbt_trades": vbt_count}
 
     # Test 2: Metrics coverage
     coverage_ok, coverage_pct, empty_metrics = test_metrics_coverage()
-    results['metrics_coverage'] = {
-        'ok': coverage_ok,
-        'percentage': coverage_pct,
-        'empty_count': len(empty_metrics)
-    }
+    results["metrics_coverage"] = {"ok": coverage_ok, "percentage": coverage_pct, "empty_count": len(empty_metrics)}
 
     # Summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("="*60)
+    print("=" * 60)
 
     all_passed = True
 
     print("\n  Engine Parity:")
-    for direction in ['long', 'short', 'both']:
-        r = results[f'parity_{direction}']
-        status = "PASS" if r['match'] else "FAIL"
-        symbol = "[OK]" if r['match'] else "[X]"
+    for direction in ["long", "short", "both"]:
+        r = results[f"parity_{direction}"]
+        status = "PASS" if r["match"] else "FAIL"
+        symbol = "[OK]" if r["match"] else "[X]"
         print(f"    {symbol} {direction.upper()}: {status} ({r['fallback_trades']} trades)")
-        if not r['match']:
+        if not r["match"]:
             all_passed = False
 
     print("\n  Metrics Coverage:")
-    r = results['metrics_coverage']
-    status = "PASS" if r['ok'] else "FAIL"
-    symbol = "[OK]" if r['ok'] else "[X]"
+    r = results["metrics_coverage"]
+    status = "PASS" if r["ok"] else "FAIL"
+    symbol = "[OK]" if r["ok"] else "[X]"
     print(f"    {symbol} Coverage: {r['percentage']:.1f}% ({r['empty_count']} empty)")
-    if not r['ok']:
+    if not r["ok"]:
         all_passed = False
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     if all_passed:
         print("RESULT: ALL TESTS PASSED")
     else:
         print("RESULT: SOME TESTS FAILED - REVIEW REQUIRED")
-    print("="*60)
+    print("=" * 60)
 
     return 0 if all_passed else 1
 

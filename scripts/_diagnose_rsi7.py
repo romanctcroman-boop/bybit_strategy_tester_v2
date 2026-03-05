@@ -71,7 +71,7 @@ async def main():
     window_end = pd.Timestamp("2025-02-12 14:00")
     btc_window = btc.loc[window_start:window_end]
 
-    print(f"\n=== BTC RSI around Feb 12 (engine fires short at 07:30) ===")
+    print("\n=== BTC RSI around Feb 12 (engine fires short at 07:30) ===")
     print(f"{'Timestamp':<22} {'BTC Close':>12} {'RSI':>10} {'Cross<52?':>10}")
     for i, (ts, row) in enumerate(btc_window.iterrows()):
         rsi_val = row["rsi"]
@@ -83,7 +83,7 @@ async def main():
                 cross = " <<< CROSSUNDER"
             elif prev_rsi < 52 and rsi_val >= 52:
                 cross = " >>> CROSS ABOVE"
-        print(f"  {str(ts):<20} {row['close']:>12.2f} {rsi_val:>10.4f}{cross}")
+        print(f"  {ts!s:<20} {row['close']:>12.2f} {rsi_val:>10.4f}{cross}")
 
     # Now look at multiple extra trades to find pattern
     # Extra trades in engine but not TV (from _find_extra5.py output):
@@ -95,7 +95,7 @@ async def main():
         ("2025-02-19 18:00", "TV ep=2617.00 at somewhere"),
     ]
 
-    print(f"\n=== All crossunders below 52 in our engine (Feb 1 - Mar 1) ===")
+    print("\n=== All crossunders below 52 in our engine (Feb 1 - Mar 1) ===")
     feb_start = pd.Timestamp("2025-02-01 00:00")
     feb_end = pd.Timestamp("2025-03-01 00:00")
     btc_feb = btc.loc[feb_start:feb_end]

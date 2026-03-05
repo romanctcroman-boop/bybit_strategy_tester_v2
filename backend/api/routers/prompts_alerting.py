@@ -12,7 +12,7 @@ Provides REST API for alerting:
 
 from fastapi import APIRouter, HTTPException
 
-from backend.monitoring.prompts_alerting import PromptsAlerting, Alert
+from backend.monitoring.prompts_alerting import PromptsAlerting
 
 router = APIRouter(prefix="/api/v1/prompts/alerts", tags=["Prompts Alerting"])
 
@@ -32,13 +32,13 @@ def get_alerting() -> PromptsAlerting:
 def get_alerts() -> dict:
     """
     Get active alerts.
-    
+
     Returns:
         List of active alerts
     """
     alerting = get_alerting()
     alerts = alerting.get_active_alerts()
-    
+
     return {
         "total": len(alerts),
         "alerts": [a.to_dict() for a in alerts],
@@ -49,7 +49,7 @@ def get_alerts() -> dict:
 def get_alert_summary() -> dict:
     """
     Get alert summary.
-    
+
     Returns:
         Summary statistics
     """
@@ -61,13 +61,13 @@ def get_alert_summary() -> dict:
 def check_alerts() -> dict:
     """
     Check alerts now.
-    
+
     Returns:
         Triggered alerts
     """
     alerting = get_alerting()
     alerts = alerting.check_alerts()
-    
+
     return {
         "triggered": len(alerts),
         "alerts": [a.to_dict() for a in alerts],
@@ -78,18 +78,18 @@ def check_alerts() -> dict:
 def acknowledge_alert(alert_id: str) -> dict:
     """
     Acknowledge an alert.
-    
+
     Args:
         alert_id: Alert ID
-    
+
     Returns:
         Status
     """
     alerting = get_alerting()
-    
+
     if not alerting.acknowledge_alert(alert_id):
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
-    
+
     return {
         "success": True,
         "alert_id": alert_id,
@@ -101,18 +101,18 @@ def acknowledge_alert(alert_id: str) -> dict:
 def resolve_alert(alert_id: str) -> dict:
     """
     Resolve an alert.
-    
+
     Args:
         alert_id: Alert ID
-    
+
     Returns:
         Status
     """
     alerting = get_alerting()
-    
+
     if not alerting.resolve_alert(alert_id):
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
-    
+
     return {
         "success": True,
         "alert_id": alert_id,
@@ -124,13 +124,13 @@ def resolve_alert(alert_id: str) -> dict:
 def clear_resolved_alerts() -> dict:
     """
     Clear resolved alerts.
-    
+
     Returns:
         Number of cleared alerts
     """
     alerting = get_alerting()
     count = alerting.clear_resolved_alerts()
-    
+
     return {
         "success": True,
         "cleared": count,
@@ -141,16 +141,16 @@ def clear_resolved_alerts() -> dict:
 def get_alert_history(limit: int = 100) -> dict:
     """
     Get alert history.
-    
+
     Args:
         limit: Maximum alerts to return
-    
+
     Returns:
         Alert history
     """
     alerting = get_alerting()
     history = alerting.get_alert_history(limit)
-    
+
     return {
         "total": len(history),
         "alerts": [a.to_dict() for a in history],

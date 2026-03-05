@@ -236,18 +236,14 @@ class TestStrategyValidation:
 
         assert not result.is_valid, "Empty graph should be invalid"
         assert len(result.errors) > 0, "Should have validation errors"
-        assert any(
-            e.code == "EMPTY_GRAPH" for e in result.errors
-        ), "Should have EMPTY_GRAPH error"
+        assert any(e.code == "EMPTY_GRAPH" for e in result.errors), "Should have EMPTY_GRAPH error"
 
     def test_no_entry_signals_validation(self, validator, graph_without_entry_signals):
         """Test validation when main node has no entry signals"""
         result = validator.validate(graph_without_entry_signals)
 
         assert not result.is_valid, "Graph without entry signals should be invalid"
-        assert any(
-            e.code == "NO_ENTRY_SIGNALS" for e in result.errors
-        ), "Should have NO_ENTRY_SIGNALS error"
+        assert any(e.code == "NO_ENTRY_SIGNALS" for e in result.errors), "Should have NO_ENTRY_SIGNALS error"
 
     def test_valid_graph_validation(self, validator, valid_graph):
         """Test validation of valid graph"""
@@ -258,10 +254,9 @@ class TestStrategyValidation:
             pytest.fail(f"Validation failed with errors: {error_messages}")
 
         assert result.is_valid, "Valid graph should pass validation"
-        assert (
-            len([e for e in result.errors if e.severity == ValidationSeverity.ERROR])
-            == 0
-        ), f"Should have no errors, but got: {[e.message for e in result.errors if e.severity == ValidationSeverity.ERROR]}"
+        assert len([e for e in result.errors if e.severity == ValidationSeverity.ERROR]) == 0, (
+            f"Should have no errors, but got: {[e.message for e in result.errors if e.severity == ValidationSeverity.ERROR]}"
+        )
 
     def test_parameter_validation(self, validator):
         """Test parameter range validation"""

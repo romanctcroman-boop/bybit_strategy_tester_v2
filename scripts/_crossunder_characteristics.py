@@ -125,7 +125,7 @@ async def main():
             print(f"  RSI at exit bar: {rsi_at_exit:.4f} {'< 52' if rsi_at_exit < 52 else '>= 52'}")
 
         # Check bars between exit and 1st SE with RSI path
-        print(f"  RSI path from exit to 1st SE:")
+        print("  RSI path from exit to 1st SE:")
         transition_mask = (idx >= prev_exit) & (idx <= first_se)
         below_52_consecutive = 0
         max_below_52_consecutive = 0
@@ -170,7 +170,7 @@ async def main():
     rsi_prev_s = btc_rsi.shift(1)
     cross_all = (rsi_prev_s >= 52) & (btc_rsi < 52) & (btc_rsi >= 50) & (btc_rsi <= 70)
     drops_all = (rsi_prev_s - btc_rsi)[cross_all]
-    print(f"\n  ALL SE crossunder drops distribution:")
+    print("\n  ALL SE crossunder drops distribution:")
     print(f"    Count: {len(drops_all)}")
     print(f"    Mean: {drops_all.mean():.4f}")
     print(f"    Min: {drops_all.min():.4f}")

@@ -25,6 +25,7 @@ from backend.backtesting.models import (
     BacktestResult,
     BacktestStatus,
     EquityCurve,
+    PerformanceMetrics,
     StrategyType,
 )
 from backend.database import get_db
@@ -52,24 +53,28 @@ def _minimal_config(**overrides) -> BacktestConfig:
     return BacktestConfig(**defaults)
 
 
-def _minimal_metrics():
-    """Return a MagicMock that satisfies all PerformanceMetrics attribute accesses in the router."""
-    m = MagicMock()
-    # Set concrete numeric values so float()/int() conversions succeed
-    for attr in (
-        "net_profit", "net_profit_pct", "total_return", "annual_return",
-        "sharpe_ratio", "sortino_ratio", "calmar_ratio", "max_drawdown",
-        "win_rate", "profit_factor", "total_trades", "winning_trades",
-        "losing_trades", "gross_profit", "gross_loss", "total_commission",
-        "buy_hold_return", "buy_hold_return_pct", "cagr", "recovery_factor",
-        "expectancy", "max_consecutive_wins", "max_consecutive_losses",
-    ):
-        setattr(m, attr, 0.0)
-    m.total_trades = 5
-    m.winning_trades = 3
-    m.losing_trades = 2
-    m.model_dump = MagicMock(return_value={})
-    return m
+def _minimal_metrics() -> PerformanceMetrics:
+    """Return a real PerformanceMetrics instance with minimal valid values."""
+    return PerformanceMetrics(
+        net_profit=500.0,
+        net_profit_pct=5.0,
+        total_return=5.0,
+        annual_return=10.0,
+        sharpe_ratio=1.2,
+        sortino_ratio=1.5,
+        calmar_ratio=0.8,
+        max_drawdown=5.0,
+        win_rate=60.0,
+        profit_factor=1.5,
+        total_trades=5,
+        winning_trades=3,
+        losing_trades=2,
+        gross_profit=600.0,
+        gross_loss=100.0,
+        total_commission=7.0,
+        buy_hold_return=300.0,
+        buy_hold_return_pct=3.0,
+    )
 
 
 def _make_result(status: BacktestStatus = BacktestStatus.COMPLETED) -> BacktestResult:
@@ -93,6 +98,9 @@ def mock_db():
     db = MagicMock()
     db.query.return_value.order_by.return_value.limit.return_value.all.return_value = []
     db.query.return_value.filter.return_value.first.return_value = None
+    # scalar() used for COUNT queries — must return 0 (not a truthy MagicMock)
+    db.query.return_value.filter.return_value.scalar.return_value = 0
+    db.query.return_value.scalar.return_value = 0
     app.dependency_overrides[get_db] = lambda: db
     yield db
     app.dependency_overrides.pop(get_db, None)
@@ -120,71 +128,86 @@ class TestHelpers:
 
     def test_safe_float_converts_int(self):
         from backend.api.routers.backtests import _safe_float
+
         assert _safe_float(42) == 42.0
 
     def test_safe_float_none_returns_default(self):
         from backend.api.routers.backtests import _safe_float
+
         assert _safe_float(None) == 0.0
         assert _safe_float(None, default=99.9) == 99.9
 
     def test_safe_float_invalid_returns_default(self):
         from backend.api.routers.backtests import _safe_float
+
         assert _safe_float("bad", default=-1.0) == -1.0
 
     def test_safe_int_converts_float(self):
         from backend.api.routers.backtests import _safe_int
+
         assert _safe_int(3.7) == 3
 
     def test_safe_int_none_returns_default(self):
         from backend.api.routers.backtests import _safe_int
+
         assert _safe_int(None) == 0
 
     def test_safe_str_converts_value(self):
         from backend.api.routers.backtests import _safe_str
+
         assert _safe_str(123) == "123"
 
     def test_safe_str_none_returns_default(self):
         from backend.api.routers.backtests import _safe_str
+
         assert _safe_str(None) == ""
 
     def test_ensure_utc_naive_datetime(self):
         from backend.api.routers.backtests import _ensure_utc
+
         naive = datetime(2024, 3, 1)
         result = _ensure_utc(naive)
         assert result.tzinfo is not None
 
     def test_ensure_utc_aware_passthrough(self):
         from backend.api.routers.backtests import _ensure_utc
+
         aware = datetime(2024, 3, 1, tzinfo=UTC)
         assert _ensure_utc(aware) == aware
 
     def test_ensure_utc_string(self):
         from backend.api.routers.backtests import _ensure_utc
+
         result = _ensure_utc("2024-03-01T00:00:00Z")
         assert isinstance(result, datetime)
 
     def test_ensure_utc_none_returns_now(self):
         from backend.api.routers.backtests import _ensure_utc
+
         result = _ensure_utc(None)
         assert isinstance(result, datetime)
 
     def test_get_side_value_enum(self):
         from backend.api.routers.backtests import _get_side_value
+
         side = MagicMock()
         side.value = "long"
         assert _get_side_value(side) == "long"
 
     def test_get_side_value_none(self):
         from backend.api.routers.backtests import _get_side_value
+
         assert _get_side_value(None) == "unknown"
 
     def test_downsample_list_short(self):
         from backend.api.routers.backtests import downsample_list
+
         data = list(range(10))
         assert downsample_list(data, max_points=500) == data
 
     def test_downsample_list_long(self):
         from backend.api.routers.backtests import downsample_list
+
         data = list(range(1000))
         result = downsample_list(data, max_points=100)
         assert len(result) == 100
@@ -193,10 +216,12 @@ class TestHelpers:
 
     def test_downsample_list_empty(self):
         from backend.api.routers.backtests import downsample_list
+
         assert downsample_list([], max_points=100) == []
 
     def test_build_equity_curve_no_trades(self):
         from backend.api.routers.backtests import build_equity_curve_response
+
         ec = EquityCurve(
             timestamps=[START, END],
             equity=[10000.0, 10500.0],
@@ -209,6 +234,7 @@ class TestHelpers:
 
     def test_build_equity_curve_empty_ec(self):
         from backend.api.routers.backtests import build_equity_curve_response
+
         assert build_equity_curve_response(None) is None
 
 

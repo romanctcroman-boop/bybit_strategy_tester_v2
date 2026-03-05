@@ -246,9 +246,7 @@ class TestMetricsSummary:
         mock_db_session.query.side_effect = query_side_effect
 
         # Mock aggregation queries
-        mock_db_session.query.return_value.filter.return_value.scalar.return_value = (
-            45.2  # avg duration
-        )
+        mock_db_session.query.return_value.filter.return_value.scalar.return_value = 45.2  # avg duration
         mock_db_session.query.return_value.join.return_value.filter.return_value.scalar.return_value = 1254  # trades
 
         # Make request
@@ -289,9 +287,7 @@ class TestMetricsSummary:
         mock_query.count.side_effect = [100, 85, 5, 10, 50, 45, 20, 3, 15]
 
         mock_db_session.query.return_value = mock_query
-        mock_db_session.query.return_value.filter.return_value.scalar.return_value = (
-            60.5
-        )
+        mock_db_session.query.return_value.filter.return_value.scalar.return_value = 60.5
         mock_db_session.query.return_value.join.return_value.filter.return_value.scalar.return_value = 50000
 
         response = client.get("/api/v1/dashboard/metrics/summary?period=all")
@@ -303,9 +299,7 @@ class TestMetricsSummary:
     @pytest.mark.integration
     @pytest.mark.skip(reason="Requires database - run with: pytest -m integration")
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_metrics_summary_empty_database(
-        self, mock_session_local, mock_db_session
-    ):
+    def test_get_metrics_summary_empty_database(self, mock_session_local, mock_db_session):
         """Test metrics summary with no data"""
         mock_session_local.return_value = mock_db_session
 
@@ -314,9 +308,7 @@ class TestMetricsSummary:
         mock_query.count.return_value = 0
 
         mock_db_session.query.return_value = mock_query
-        mock_db_session.query.return_value.filter.return_value.scalar.return_value = (
-            None
-        )
+        mock_db_session.query.return_value.filter.return_value.scalar.return_value = None
         mock_db_session.query.return_value.join.return_value.filter.return_value.scalar.return_value = 0
 
         response = client.get("/api/v1/dashboard/metrics/summary?period=7d")
@@ -335,9 +327,7 @@ class TestTopPerformers:
     @pytest.mark.integration
     @pytest.mark.skip(reason="Requires database - run with: pytest -m integration")
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_top_performers_by_sharpe(
-        self, mock_session_local, mock_db_session, sample_backtests
-    ):
+    def test_get_top_performers_by_sharpe(self, mock_session_local, mock_db_session, sample_backtests):
         """Test top performers ranked by Sharpe ratio"""
         mock_session_local.return_value = mock_db_session
 
@@ -353,9 +343,7 @@ class TestTopPerformers:
 
         mock_db_session.query.return_value = mock_query
 
-        response = client.get(
-            "/api/v1/dashboard/metrics/top-performers?limit=5&metric=sharpe_ratio"
-        )
+        response = client.get("/api/v1/dashboard/metrics/top-performers?limit=5&metric=sharpe_ratio")
 
         assert response.status_code == 200
         data = response.json()
@@ -375,15 +363,11 @@ class TestTopPerformers:
         assert "win_rate" in top
 
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_top_performers_invalid_metric(
-        self, mock_session_local, mock_db_session
-    ):
+    def test_get_top_performers_invalid_metric(self, mock_session_local, mock_db_session):
         """Test top performers with invalid metric"""
         mock_session_local.return_value = mock_db_session
 
-        response = client.get(
-            "/api/v1/dashboard/metrics/top-performers?metric=invalid_metric"
-        )
+        response = client.get("/api/v1/dashboard/metrics/top-performers?metric=invalid_metric")
 
         assert response.status_code == 400
         assert "Invalid metric" in response.json()["detail"]
@@ -391,9 +375,7 @@ class TestTopPerformers:
     @pytest.mark.integration
     @pytest.mark.skip(reason="Requires database - run with: pytest -m integration")
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_top_performers_by_return(
-        self, mock_session_local, mock_db_session, sample_backtests
-    ):
+    def test_get_top_performers_by_return(self, mock_session_local, mock_db_session, sample_backtests):
         """Test top performers ranked by total return"""
         mock_session_local.return_value = mock_db_session
 
@@ -408,9 +390,7 @@ class TestTopPerformers:
 
         mock_db_session.query.return_value = mock_query
 
-        response = client.get(
-            "/api/v1/dashboard/metrics/top-performers?limit=10&metric=total_return"
-        )
+        response = client.get("/api/v1/dashboard/metrics/top-performers?limit=10&metric=total_return")
 
         assert response.status_code == 200
         data = response.json()
@@ -430,11 +410,7 @@ class TestStrategyMetrics:
         mock_session_local.return_value = mock_db_session
 
         strategy = sample_strategies[0]
-        backtests = [
-            bt
-            for bt in sample_backtests
-            if bt.strategy_id == strategy.id and bt.status == "completed"
-        ]
+        backtests = [bt for bt in sample_backtests if bt.strategy_id == strategy.id and bt.status == "completed"]
 
         # Mock strategy query
         mock_strategy_query = Mock()
@@ -454,9 +430,7 @@ class TestStrategyMetrics:
 
         mock_db_session.query.side_effect = query_side_effect
 
-        response = client.get(
-            f"/api/v1/dashboard/metrics/strategy/{strategy.id}?period=30d"
-        )
+        response = client.get(f"/api/v1/dashboard/metrics/strategy/{strategy.id}?period=30d")
 
         assert response.status_code == 200
         data = response.json()
@@ -493,9 +467,7 @@ class TestStrategyMetrics:
     @pytest.mark.integration
     @pytest.mark.skip(reason="Requires database - run with: pytest -m integration")
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_strategy_metrics_no_backtests(
-        self, mock_session_local, mock_db_session, sample_strategies
-    ):
+    def test_get_strategy_metrics_no_backtests(self, mock_session_local, mock_db_session, sample_strategies):
         """Test strategy metrics with no completed backtests"""
         mock_session_local.return_value = mock_db_session
 
@@ -517,9 +489,7 @@ class TestStrategyMetrics:
 
         mock_db_session.query.side_effect = query_side_effect
 
-        response = client.get(
-            f"/api/v1/dashboard/metrics/strategy/{strategy.id}?period=all"
-        )
+        response = client.get(f"/api/v1/dashboard/metrics/strategy/{strategy.id}?period=all")
 
         assert response.status_code == 200
         data = response.json()
@@ -531,13 +501,9 @@ class TestStrategyMetrics:
 class TestSystemHealth:
     """Test /dashboard/metrics/system-health endpoint"""
 
-    @pytest.mark.skip(
-        reason="Requires real ORM models - Backtest.status is not defined in stub"
-    )
+    @pytest.mark.skip(reason="Requires real ORM models - Backtest.status is not defined in stub")
     @patch("backend.api.routers.dashboard_metrics.SessionLocal")
-    def test_get_system_health_success(
-        self, mock_session_local, mock_db_session, agent_breaker_snapshot
-    ):
+    def test_get_system_health_success(self, mock_session_local, mock_db_session, agent_breaker_snapshot):
         """Test system health check success"""
         mock_session_local.return_value = mock_db_session
 
@@ -572,9 +538,7 @@ class TestSystemHealth:
         )
 
     @patch("backend.api.routers.dashboard_metrics.get_db")
-    def test_get_system_health_database_error(
-        self, mock_get_db, agent_breaker_snapshot
-    ):
+    def test_get_system_health_database_error(self, mock_get_db, agent_breaker_snapshot):
         """Test system health check with database error"""
         mock_db_session = MagicMock()
         mock_get_db.return_value = mock_db_session
@@ -612,6 +576,4 @@ class TestIntegration:
         for endpoint in endpoints:
             response = client.get(endpoint)
             # 404 would mean route not found, 500 is acceptable (no DB)
-            assert response.status_code in [200, 404, 500], (
-                f"Endpoint {endpoint} not properly registered"
-            )
+            assert response.status_code in [200, 404, 500], f"Endpoint {endpoint} not properly registered"

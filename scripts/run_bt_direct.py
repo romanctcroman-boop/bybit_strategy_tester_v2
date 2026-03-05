@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, "d:\\bybit_strategy_tester_v2")
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pandas as pd
 
@@ -50,8 +50,8 @@ async def main():
 
     # Load BTC OHLCV with warmup
     svc = BacktestService()
-    start_date = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 2, 25, tzinfo=timezone.utc)
+    start_date = datetime(2025, 1, 1, tzinfo=UTC)
+    end_date = datetime(2026, 2, 25, tzinfo=UTC)
 
     _btc_start = start_date - pd.Timedelta(minutes=500 * 30)
     btc_ohlcv = await svc._fetch_historical_data(
@@ -118,7 +118,7 @@ async def main():
         exit_time = getattr(t, "exit_time", None)
         exit_comment = getattr(t, "exit_comment", "") or ""
         print(
-            f"{i:3d} {side_str:5s} {entry_price:10.4f} {exit_price:10.4f} {pnl:10.4f} {str(entry_time):25s} {str(exit_time):25s} {exit_comment:20s}"
+            f"{i:3d} {side_str:5s} {entry_price:10.4f} {exit_price:10.4f} {pnl:10.4f} {entry_time!s:25s} {exit_time!s:25s} {exit_comment:20s}"
         )
 
 

@@ -1,6 +1,5 @@
 """Tests for ExecutionSimulator."""
 
-
 from backend.backtesting.execution_simulator import (
     ExecutionSimulator,
     FillResult,

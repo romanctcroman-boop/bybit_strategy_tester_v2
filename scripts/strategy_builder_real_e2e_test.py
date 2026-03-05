@@ -130,10 +130,7 @@ def run_single(direction: str) -> None:
         return
 
     results = payload.get("results", {})
-    summary = {
-        k: results.get(k)
-        for k in ("total_return", "sharpe_ratio", "win_rate", "total_trades", "max_drawdown")
-    }
+    summary = {k: results.get(k) for k in ("total_return", "sharpe_ratio", "win_rate", "total_trades", "max_drawdown")}
     print(f"[{direction.upper()}] METRICS:", summary)
 
     # Persist metrics to JSON for later analysis/audits
@@ -170,4 +167,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

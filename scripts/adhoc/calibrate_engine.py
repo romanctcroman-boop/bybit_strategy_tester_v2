@@ -22,9 +22,7 @@ logger.add(
 )
 
 
-def load_btc_data(
-    start_date: datetime, end_date: datetime, interval: str = "15"
-) -> pd.DataFrame:
+def load_btc_data(start_date: datetime, end_date: datetime, interval: str = "15") -> pd.DataFrame:
     """Load BTCUSDT data from database."""
     db_path = Path("data.sqlite3")
     conn = sqlite3.connect(str(db_path))
@@ -213,9 +211,7 @@ def main():
     end_price = candles.iloc[-1]["close"]
     price_change = ((end_price / start_price) - 1) * 100
     logger.info(f"BTC: ${start_price:.2f} -> ${end_price:.2f} ({price_change:+.2f}%)")
-    logger.info(
-        f"📉 Period trend: {'BEARISH' if price_change < -5 else 'BULLISH' if price_change > 5 else 'SIDEWAYS'}"
-    )
+    logger.info(f"📉 Period trend: {'BEARISH' if price_change < -5 else 'BULLISH' if price_change > 5 else 'SIDEWAYS'}")
 
     # Test configurations
     configs = [
@@ -345,17 +341,12 @@ def main():
                 f"Sharpe: {r['sharpe_ratio']:.2f}"
             )
     else:
-        logger.warning(
-            "\n⚠️ No profitable strategies found - market conditions unfavorable"
-        )
+        logger.warning("\n⚠️ No profitable strategies found - market conditions unfavorable")
         # Show best performers even if unprofitable
         results.sort(key=lambda x: x.get("net_profit", -float("inf")), reverse=True)
         logger.info("\n📈 Best performing (least loss):")
         for i, r in enumerate(results[:3], 1):
-            logger.info(
-                f"  {i}. {r['strategy']}: ${r['net_profit']:.2f} | "
-                f"WR: {r['win_rate']:.1f}%"
-            )
+            logger.info(f"  {i}. {r['strategy']}: ${r['net_profit']:.2f} | WR: {r['win_rate']:.1f}%")
 
     # Recommendations
     logger.info("\n" + "=" * 70)

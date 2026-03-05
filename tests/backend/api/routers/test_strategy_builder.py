@@ -142,12 +142,15 @@ class TestCreateStrategy:
         # After db.add + commit + refresh, the mock object is what the
         # router uses, so wire the mock_strat to the session mock.
         def fake_refresh(obj):
-            # Copy attributes from mock_strat into obj so router reads them
+            # Copy attributes from mock_strat into obj so router reads them.
+            # Preserve name/symbol set by router before refresh (from request payload).
+            if not getattr(obj, "name", None):
+                obj.name = mock_strat.name
             obj.id = mock_strat.id
-            obj.name = mock_strat.name
             obj.description = mock_strat.description
             obj.timeframe = mock_strat.timeframe
-            obj.symbol = mock_strat.symbol
+            if not getattr(obj, "symbol", None):
+                obj.symbol = mock_strat.symbol
             obj.initial_capital = mock_strat.initial_capital
             obj.position_size = mock_strat.position_size
             obj.parameters = mock_strat.parameters
@@ -307,6 +310,7 @@ class TestCreateStrategy:
         (it belongs to the backtest engine, not the strategy definition).
         The endpoint should not require or expose this field.
         """
+
         def fake_refresh(obj):
             obj.id = "strat-abc"
             obj.name = "Commission Check"
@@ -1332,15 +1336,13 @@ class TestSymbolsCacheRefresh:
 
     def test_cache_refresh_success(self, client):
         """Successful refresh returns ok=True with symbol counts."""
-        with patch("backend.api.routers.strategy_builder.BybitAdapter") as MockAdapter:
+        with patch("backend.api.routers.strategy_builder.router.BybitAdapter") as MockAdapter:
             adapter_instance = MockAdapter.return_value
             adapter_instance.get_symbols_list.return_value = ["BTCUSDT", "ETHUSDT"]
 
             with patch("asyncio.get_event_loop") as mock_loop:
                 # run_in_executor returns a coroutine-like value
-                mock_loop.return_value.run_in_executor = MagicMock(
-                    side_effect=lambda _, fn: fn()
-                )
+                mock_loop.return_value.run_in_executor = MagicMock(side_effect=lambda _, fn: fn())
 
                 r = client.post(f"{BASE}/symbols/cache-refresh")
                 # May be 200 (success) or 500 (adapter import fails in test env)
@@ -1349,7 +1351,7 @@ class TestSymbolsCacheRefresh:
     def test_cache_refresh_error_returns_500(self, client):
         """Adapter error returns 500."""
         with patch(
-            "backend.api.routers.strategy_builder.BybitAdapter",
+            "backend.api.routers.strategy_builder.router.BybitAdapter",
             side_effect=Exception("Connection refused"),
         ):
             r = client.post(f"{BASE}/symbols/cache-refresh")

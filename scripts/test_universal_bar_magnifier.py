@@ -37,18 +37,20 @@ def test_intrabar_engine():
     print("=" * 60)
 
     # Create test 1m data
-    m1_data = pd.DataFrame({
-        "open_time": [
-            1000000,   # 0:00
-            1060000,   # 1:00
-            1120000,   # 2:00
-        ],
-        "open": [100.0, 101.0, 100.5],
-        "high": [102.0, 103.0, 101.5],
-        "low": [99.0, 100.0, 99.5],
-        "close": [101.0, 100.5, 101.0],
-        "volume": [1000, 1500, 1200],
-    })
+    m1_data = pd.DataFrame(
+        {
+            "open_time": [
+                1000000,  # 0:00
+                1060000,  # 1:00
+                1120000,  # 2:00
+            ],
+            "open": [100.0, 101.0, 100.5],
+            "high": [102.0, 103.0, 101.5],
+            "low": [99.0, 100.0, 99.5],
+            "close": [101.0, 100.5, 101.0],
+            "volume": [1000, 1500, 1200],
+        }
+    )
 
     # Test different OHLC paths
     for path in OHLCPath:
@@ -174,14 +176,16 @@ def test_integration():
         else:
             base = 50500 - (i - 40) * 50  # Falling faster
 
-        prices.append({
-            "open_time": timestamps[i],
-            "open": base,
-            "high": base + 50,
-            "low": base - 50,
-            "close": base + 25,
-            "volume": 100,
-        })
+        prices.append(
+            {
+                "open_time": timestamps[i],
+                "open": base,
+                "high": base + 50,
+                "low": base - 50,
+                "close": base + 25,
+                "volume": 100,
+            }
+        )
 
     m1_data = pd.DataFrame(prices)
 
@@ -259,14 +263,16 @@ def test_ohlc_path_comparison():
     # Long position with SL=49500, TP=50800
     # Path determines which triggers first
 
-    m1_data = pd.DataFrame({
-        "open_time": [1000000],
-        "open": [50000.0],
-        "high": [51000.0],
-        "low": [49000.0],
-        "close": [50500.0],
-        "volume": [1000],
-    })
+    m1_data = pd.DataFrame(
+        {
+            "open_time": [1000000],
+            "open": [50000.0],
+            "high": [51000.0],
+            "low": [49000.0],
+            "close": [50500.0],
+            "volume": [1000],
+        }
+    )
 
     results = {}
 

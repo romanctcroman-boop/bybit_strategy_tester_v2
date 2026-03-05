@@ -861,7 +861,23 @@ class TestBuilderWorkflow:
                 new_callable=AsyncMock,
                 return_value={"error": "Database error"},
             ),
+            patch(
+                "backend.agents.workflows.builder_workflow._get_a2a_communicator",
+            ) as mock_a2a_factory,
+            patch(
+                "backend.agents.workflows.builder_workflow._get_workflow_memory",
+            ) as mock_mem_factory,
         ):
+            mock_a2a = AsyncMock()
+            mock_a2a.parallel_consensus = AsyncMock(
+                return_value={"consensus": "[]", "confidence_score": 0.9, "individual_responses": []}
+            )
+            mock_a2a_factory.return_value = mock_a2a
+            mock_mem = AsyncMock()
+            mock_mem.store = AsyncMock(return_value=AsyncMock(id="mem_test"))
+            mock_mem.recall = AsyncMock(return_value=[])
+            mock_mem_factory.return_value = mock_mem
+
             workflow = BuilderWorkflow()
             result = await workflow.run(config)
 
@@ -968,7 +984,23 @@ class TestBuilderWorkflow:
                 new_callable=AsyncMock,
                 return_value=mock_backtest,
             ),
+            patch(
+                "backend.agents.workflows.builder_workflow._get_a2a_communicator",
+            ) as mock_a2a_factory,
+            patch(
+                "backend.agents.workflows.builder_workflow._get_workflow_memory",
+            ) as mock_mem_factory,
         ):
+            mock_a2a = AsyncMock()
+            mock_a2a.parallel_consensus = AsyncMock(
+                return_value={"consensus": "[]", "confidence_score": 0.9, "individual_responses": []}
+            )
+            mock_a2a_factory.return_value = mock_a2a
+            mock_mem = AsyncMock()
+            mock_mem.store = AsyncMock(return_value=AsyncMock(id="mem_test"))
+            mock_mem.recall = AsyncMock(return_value=[])
+            mock_mem_factory.return_value = mock_mem
+
             workflow = BuilderWorkflow()
             result = await workflow.run(config)
 
@@ -1237,7 +1269,22 @@ class TestIterativeOptimization:
                 "backend.agents.workflows.builder_workflow.builder_run_backtest",
                 new_callable=AsyncMock,
             ) as mock_bt_wf,
+            patch(
+                "backend.agents.workflows.builder_workflow._get_a2a_communicator",
+            ) as mock_a2a_factory,
+            patch(
+                "backend.agents.workflows.builder_workflow._get_workflow_memory",
+            ) as mock_mem_factory,
         ):
+            mock_a2a = AsyncMock()
+            mock_a2a.parallel_consensus = AsyncMock(
+                return_value={"consensus": "[]", "confidence_score": 0.9, "individual_responses": []}
+            )
+            mock_a2a_factory.return_value = mock_a2a
+            mock_mem = AsyncMock()
+            mock_mem.store = AsyncMock(return_value=AsyncMock(id="mem_test"))
+            mock_mem.recall = AsyncMock(return_value=[])
+            mock_mem_factory.return_value = mock_mem
             mock_bt.return_value = mock_backtest_result
             mock_bt_wf.return_value = mock_backtest_result
             mock_get.return_value = {

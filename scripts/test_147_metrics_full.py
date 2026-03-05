@@ -2,6 +2,7 @@
 🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ: 147 МЕТРИК × ВСЕ ПАРАМЕТРЫ
 С детальным анализом расхождений
 """
+
 import sys
 from pathlib import Path
 
@@ -25,19 +26,23 @@ print(f"Время: {datetime.now()}")
 print("\n📊 Загрузка данных...")
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 2000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 
 # 1M для Bar Magnifier (ограничено для скорости)
-df_1m = pd.read_sql(f"""
+df_1m = pd.read_sql(
+    f"""
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
@@ -45,18 +50,21 @@ df_1m = pd.read_sql(f"""
     AND open_time >= {int(df_1h.index[0].timestamp() * 1000)}
     AND open_time <= {int(df_1h.index[-1].timestamp() * 1000)}
     ORDER BY open_time ASC
-""", conn)
-df_1m['open_time'] = pd.to_datetime(df_1m['open_time'], unit='ms')
-df_1m.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1m["open_time"] = pd.to_datetime(df_1m["open_time"], unit="ms")
+df_1m.set_index("open_time", inplace=True)
 conn.close()
 
-start_date = df_1h.index[0].strftime('%Y-%m-%d')
-end_date = df_1h.index[-1].strftime('%Y-%m-%d')
+start_date = df_1h.index[0].strftime("%Y-%m-%d")
+end_date = df_1h.index[-1].strftime("%Y-%m-%d")
 
 print(f"   📅 Дата начала:    {start_date}")
 print(f"   📅 Дата окончания: {end_date}")
 print(f"   📊 1H баров: {len(df_1h):,}")
 print(f"   📊 1M баров: {len(df_1m):,}")
+
 
 # ============================================================================
 # RSI ФУНКЦИЯ
@@ -69,6 +77,7 @@ def calculate_rsi(close, period=14):
     avg_loss = loss.rolling(window=period).mean()
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
+
 
 # ============================================================================
 # ИМПОРТЫ
@@ -191,6 +200,7 @@ CONFIGS = [
 
 DIR_MAP = {"long": TradeDirection.LONG, "short": TradeDirection.SHORT, "both": TradeDirection.BOTH}
 
+
 # ============================================================================
 # ФУНКЦИИ СРАВНЕНИЯ
 # ============================================================================
@@ -210,39 +220,56 @@ def safe_compare(fb_val, nb_val, tolerance=1e-6):
             return True
     return False
 
+
 def get_all_metrics(result, ext_metrics, trade_metrics, risk_metrics, long_short):
     all_metrics = {}
     for f in fields(BacktestMetrics):
-        if not f.name.startswith('_'):
+        if not f.name.startswith("_"):
             all_metrics[f"backtest.{f.name}"] = getattr(result.metrics, f.name, None)
     for f in fields(ExtendedMetricsResult):
-        if not f.name.startswith('_'):
+        if not f.name.startswith("_"):
             all_metrics[f"extended.{f.name}"] = getattr(ext_metrics, f.name, None)
     for f in fields(TradeMetrics):
-        if not f.name.startswith('_'):
+        if not f.name.startswith("_"):
             all_metrics[f"trade.{f.name}"] = getattr(trade_metrics, f.name, None)
     for f in fields(RiskMetrics):
-        if not f.name.startswith('_'):
+        if not f.name.startswith("_"):
             all_metrics[f"risk.{f.name}"] = getattr(risk_metrics, f.name, None)
     for f in fields(LongShortMetrics):
-        if not f.name.startswith('_'):
+        if not f.name.startswith("_"):
             all_metrics[f"longshort.{f.name}"] = getattr(long_short, f.name, None)
     return all_metrics
 
+
 # Метрики зависящие от точных fees/pnl_pct (ожидаемые расхождения)
 FEE_DEPENDENT_METRICS = {
-    "trade.total_commission", "trade.gross_profit", "trade.gross_loss",
-    "trade.profit_factor", "trade.avg_win_pct", "trade.avg_loss_pct",
-    "trade.avg_trade_pct", "trade.largest_win_pct", "trade.largest_loss_pct",
-    "longshort.long_commission", "longshort.short_commission",
-    "longshort.long_avg_win_pct", "longshort.long_avg_loss_pct",
-    "longshort.short_avg_win_pct", "longshort.short_avg_loss_pct",
-    "longshort.long_avg_trade_pct", "longshort.short_avg_trade_pct",
-    "longshort.long_largest_win_pct", "longshort.long_largest_loss_pct",
-    "longshort.short_largest_win_pct", "longshort.short_largest_loss_pct",
-    "longshort.long_gross_profit", "longshort.long_gross_loss",
-    "longshort.short_gross_profit", "longshort.short_gross_loss",
-    "longshort.long_profit_factor", "longshort.short_profit_factor",
+    "trade.total_commission",
+    "trade.gross_profit",
+    "trade.gross_loss",
+    "trade.profit_factor",
+    "trade.avg_win_pct",
+    "trade.avg_loss_pct",
+    "trade.avg_trade_pct",
+    "trade.largest_win_pct",
+    "trade.largest_loss_pct",
+    "longshort.long_commission",
+    "longshort.short_commission",
+    "longshort.long_avg_win_pct",
+    "longshort.long_avg_loss_pct",
+    "longshort.short_avg_win_pct",
+    "longshort.short_avg_loss_pct",
+    "longshort.long_avg_trade_pct",
+    "longshort.short_avg_trade_pct",
+    "longshort.long_largest_win_pct",
+    "longshort.long_largest_loss_pct",
+    "longshort.short_largest_win_pct",
+    "longshort.short_largest_loss_pct",
+    "longshort.long_gross_profit",
+    "longshort.long_gross_loss",
+    "longshort.short_gross_profit",
+    "longshort.short_gross_loss",
+    "longshort.long_profit_factor",
+    "longshort.short_profit_factor",
 }
 
 # ============================================================================
@@ -264,62 +291,62 @@ extended_total = 0
 extended_match = 0
 
 for cfg in CONFIGS:
-    print(f"\n{'='*100}")
+    print(f"\n{'=' * 100}")
     print(f"📋 {cfg['name']}")
-    print(f"{'='*100}")
+    print(f"{'=' * 100}")
 
     # Параметры
     print(f"""
-   ├─ Название стратегии:      {cfg['name']}
-   ├─ Торговая пара:           {cfg['symbol']}
-   ├─ Таймфрейм:               {cfg['timeframe']}
-   ├─ Начальный капитал:       ${cfg['initial_capital']:,}
-   ├─ Тип размера ордера:      {cfg['order_size_type']}
-   ├─ Размер позиции:          {cfg['position_size']*100:.1f}%
-   ├─ Стоп-лосс:               {cfg['stop_loss']*100:.1f}%
-   ├─ Тейк-профит:             {cfg['take_profit']*100:.1f}%
-   ├─ Режим позиций:           {cfg['direction'].upper()}
-   ├─ Пирамидинг:              {cfg['pyramiding']}
-   ├─ Комиссия:                {cfg['commission']*100:.3f}%
-   ├─ Проскальзывание:         {cfg['slippage']*100:.3f}%
-   ├─ Плечо:                   {cfg['leverage']}x
-   ├─ Bar Magnifier:           {'✅ ON' if cfg['bar_magnifier'] else '❌ OFF'}
-   ├─ Precise Intrabar:        {'✅' if cfg['bar_magnifier_precise'] else '❌'}
-   ├─ Исполнение ордеров:      {cfg['order_execution']}
-   ├─ Лимит просадки:          {cfg['drawdown_limit']*100:.0f}%
-   ├─ Тип стратегии:           {cfg['strategy_type']}
+   ├─ Название стратегии:      {cfg["name"]}
+   ├─ Торговая пара:           {cfg["symbol"]}
+   ├─ Таймфрейм:               {cfg["timeframe"]}
+   ├─ Начальный капитал:       ${cfg["initial_capital"]:,}
+   ├─ Тип размера ордера:      {cfg["order_size_type"]}
+   ├─ Размер позиции:          {cfg["position_size"] * 100:.1f}%
+   ├─ Стоп-лосс:               {cfg["stop_loss"] * 100:.1f}%
+   ├─ Тейк-профит:             {cfg["take_profit"] * 100:.1f}%
+   ├─ Режим позиций:           {cfg["direction"].upper()}
+   ├─ Пирамидинг:              {cfg["pyramiding"]}
+   ├─ Комиссия:                {cfg["commission"] * 100:.3f}%
+   ├─ Проскальзывание:         {cfg["slippage"] * 100:.3f}%
+   ├─ Плечо:                   {cfg["leverage"]}x
+   ├─ Bar Magnifier:           {"✅ ON" if cfg["bar_magnifier"] else "❌ OFF"}
+   ├─ Precise Intrabar:        {"✅" if cfg["bar_magnifier_precise"] else "❌"}
+   ├─ Исполнение ордеров:      {cfg["order_execution"]}
+   ├─ Лимит просадки:          {cfg["drawdown_limit"] * 100:.0f}%
+   ├─ Тип стратегии:           {cfg["strategy_type"]}
    ├─ Дата начала:             {start_date}
    ├─ Дата окончания:          {end_date}
-   ├─ OHLC Path Model:         {cfg['ohlc_path_model']}
-   ├─ Subticks:                {cfg['subticks']}
-   └─ Two-Stage Optimization:  {'✅' if cfg['two_stage_opt'] else '❌'}
+   ├─ OHLC Path Model:         {cfg["ohlc_path_model"]}
+   ├─ Subticks:                {cfg["subticks"]}
+   └─ Two-Stage Optimization:  {"✅" if cfg["two_stage_opt"] else "❌"}
     """)
 
     # Сигналы
-    rsi = calculate_rsi(df_1h['close'], period=cfg['rsi_period'])
-    long_entries = (rsi < cfg['rsi_oversold']).values
-    long_exits = (rsi > cfg['rsi_overbought']).values
-    short_entries = (rsi > cfg['rsi_overbought']).values
-    short_exits = (rsi < cfg['rsi_oversold']).values
+    rsi = calculate_rsi(df_1h["close"], period=cfg["rsi_period"])
+    long_entries = (rsi < cfg["rsi_oversold"]).values
+    long_exits = (rsi > cfg["rsi_overbought"]).values
+    short_entries = (rsi > cfg["rsi_overbought"]).values
+    short_exits = (rsi < cfg["rsi_oversold"]).values
 
     input_data = BacktestInput(
         candles=df_1h,
-        candles_1m=df_1m if cfg['bar_magnifier'] else None,
+        candles_1m=df_1m if cfg["bar_magnifier"] else None,
         long_entries=long_entries,
         long_exits=long_exits,
         short_entries=short_entries,
         short_exits=short_exits,
-        symbol=cfg['symbol'],
+        symbol=cfg["symbol"],
         interval="60",
-        initial_capital=float(cfg['initial_capital']),
-        position_size=cfg['position_size'],
-        leverage=cfg['leverage'],
-        stop_loss=cfg['stop_loss'],
-        take_profit=cfg['take_profit'],
-        direction=DIR_MAP[cfg['direction']],
-        taker_fee=cfg['commission'],
-        slippage=cfg['slippage'],
-        use_bar_magnifier=cfg['bar_magnifier'],
+        initial_capital=float(cfg["initial_capital"]),
+        position_size=cfg["position_size"],
+        leverage=cfg["leverage"],
+        stop_loss=cfg["stop_loss"],
+        take_profit=cfg["take_profit"],
+        direction=DIR_MAP[cfg["direction"]],
+        taker_fee=cfg["commission"],
+        slippage=cfg["slippage"],
+        use_bar_magnifier=cfg["bar_magnifier"],
     )
 
     # Запуск
@@ -333,12 +360,20 @@ for cfg in CONFIGS:
     # Trade/Risk/LongShort
     fb_trade = metrics_calc.calculate_trade_metrics(fb_result.trades)
     nb_trade = metrics_calc.calculate_trade_metrics(nb_result.trades)
-    fb_returns = np.diff(fb_result.equity_curve) / fb_result.equity_curve[:-1] if len(fb_result.equity_curve) > 1 else np.array([])
-    nb_returns = np.diff(nb_result.equity_curve) / nb_result.equity_curve[:-1] if len(nb_result.equity_curve) > 1 else np.array([])
-    fb_risk = metrics_calc.calculate_risk_metrics(fb_result.equity_curve, fb_returns, cfg['initial_capital'])
-    nb_risk = metrics_calc.calculate_risk_metrics(nb_result.equity_curve, nb_returns, cfg['initial_capital'])
-    fb_ls = metrics_calc.calculate_long_short_metrics(fb_result.trades, cfg['initial_capital'])
-    nb_ls = metrics_calc.calculate_long_short_metrics(nb_result.trades, cfg['initial_capital'])
+    fb_returns = (
+        np.diff(fb_result.equity_curve) / fb_result.equity_curve[:-1]
+        if len(fb_result.equity_curve) > 1
+        else np.array([])
+    )
+    nb_returns = (
+        np.diff(nb_result.equity_curve) / nb_result.equity_curve[:-1]
+        if len(nb_result.equity_curve) > 1
+        else np.array([])
+    )
+    fb_risk = metrics_calc.calculate_risk_metrics(fb_result.equity_curve, fb_returns, cfg["initial_capital"])
+    nb_risk = metrics_calc.calculate_risk_metrics(nb_result.equity_curve, nb_returns, cfg["initial_capital"])
+    fb_ls = metrics_calc.calculate_long_short_metrics(fb_result.trades, cfg["initial_capital"])
+    nb_ls = metrics_calc.calculate_long_short_metrics(nb_result.trades, cfg["initial_capital"])
 
     fb_all = get_all_metrics(fb_result, fb_ext, fb_trade, fb_risk, fb_ls)
     nb_all = get_all_metrics(nb_result, nb_ext, nb_trade, nb_risk, nb_ls)
@@ -383,23 +418,27 @@ for cfg in CONFIGS:
     print(f"   ├─ Trades: {len(fb_result.trades)}")
     print(f"   ├─ Net Profit: ${fb_result.metrics.net_profit:,.2f}")
     print(f"   ├─ Ненулевых метрик: {non_zero}/147")
-    print(f"   ├─ Core метрики (46): {core_matches}/{core_count} ({'100%' if core_matches == core_count else f'{core_matches/core_count*100:.1f}%'})")
-    print(f"   └─ Extended метрики (101): {ext_matches}/{ext_count} ({ext_matches/ext_count*100:.1f}%)")
+    print(
+        f"   ├─ Core метрики (46): {core_matches}/{core_count} ({'100%' if core_matches == core_count else f'{core_matches / core_count * 100:.1f}%'})"
+    )
+    print(f"   └─ Extended метрики (101): {ext_matches}/{ext_count} ({ext_matches / ext_count * 100:.1f}%)")
 
     if mismatches and len(mismatches) <= 5:
         print("\n   ⚠️ Неожиданные расхождения:")
         for name, _fb_v, _nb_v in mismatches[:5]:
             print(f"      - {name}")
 
-    all_results.append({
-        "name": cfg['name'],
-        "core": core_matches,
-        "core_total": core_count,
-        "ext": ext_matches,
-        "ext_total": ext_count,
-        "trades": len(fb_result.trades),
-        "non_zero": non_zero,
-    })
+    all_results.append(
+        {
+            "name": cfg["name"],
+            "core": core_matches,
+            "core_total": core_count,
+            "ext": ext_matches,
+            "ext_total": ext_count,
+            "trades": len(fb_result.trades),
+            "non_zero": non_zero,
+        }
+    )
 
 # ============================================================================
 # ФИНАЛЬНЫЙ ОТЧЁТ
@@ -410,7 +449,7 @@ print("=" * 120)
 
 core_pct = core_match / core_total * 100 if core_total > 0 else 0
 ext_pct = extended_match / extended_total * 100 if extended_total > 0 else 0
-total_non_zero = sum(r['non_zero'] for r in all_results)
+total_non_zero = sum(r["non_zero"] for r in all_results)
 
 print(f"""
    📋 ИТОГИ:
@@ -428,8 +467,10 @@ print(f"""
 """)
 
 for r in all_results:
-    core_status = "✅" if r['core'] == r['core_total'] else "⚠️"
-    print(f"   {core_status} {r['name']}: Core {r['core']}/{r['core_total']}, Ext {r['ext']}/{r['ext_total']}, trades={r['trades']}, non-zero={r['non_zero']}")
+    core_status = "✅" if r["core"] == r["core_total"] else "⚠️"
+    print(
+        f"   {core_status} {r['name']}: Core {r['core']}/{r['core_total']}, Ext {r['ext']}/{r['ext_total']}, trades={r['trades']}, non-zero={r['non_zero']}"
+    )
 
 if core_pct >= 99:
     print(f"""

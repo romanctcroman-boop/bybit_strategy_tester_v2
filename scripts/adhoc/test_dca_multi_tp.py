@@ -220,9 +220,7 @@ class DCAMultiTPTester:
 
         return df
 
-    def build_htf_index_map(
-        self, ltf_df: pd.DataFrame, htf_df: pd.DataFrame
-    ) -> np.ndarray:
+    def build_htf_index_map(self, ltf_df: pd.DataFrame, htf_df: pd.DataFrame) -> np.ndarray:
         """
         Build index mapping from LTF to HTF.
 
@@ -253,25 +251,15 @@ class DCAMultiTPTester:
             )
 
             # Prepare signals
-            long_entries = (
-                signals.entries.values
-                if hasattr(signals, "entries")
-                else np.zeros(len(candles), dtype=bool)
-            )
-            long_exits = (
-                signals.exits.values
-                if hasattr(signals, "exits")
-                else np.zeros(len(candles), dtype=bool)
-            )
+            long_entries = signals.entries.values if hasattr(signals, "entries") else np.zeros(len(candles), dtype=bool)
+            long_exits = signals.exits.values if hasattr(signals, "exits") else np.zeros(len(candles), dtype=bool)
             short_entries = (
                 signals.short_entries.values
                 if signals.short_entries is not None
                 else np.zeros(len(candles), dtype=bool)
             )
             short_exits = (
-                signals.short_exits.values
-                if signals.short_exits is not None
-                else np.zeros(len(candles), dtype=bool)
+                signals.short_exits.values if signals.short_exits is not None else np.zeros(len(candles), dtype=bool)
             )
 
             # Determine direction
@@ -338,9 +326,7 @@ class DCAMultiTPTester:
                 "sharpe_ratio": metrics.sharpe_ratio,
                 "profit_factor": metrics.profit_factor,
                 "final_equity": final_equity,
-                "execution_time_ms": output.execution_time * 1000
-                if output.execution_time
-                else 0,
+                "execution_time_ms": output.execution_time * 1000 if output.execution_time else 0,
             }
 
         except ImportError as e:
@@ -404,9 +390,7 @@ class DCAMultiTPTester:
         logger.info(f"Generated {entry_count} entries, {exit_count} exits")
 
         # Run backtest
-        result = self.run_backtest_with_engine(
-            "DCA Long Multi-TP", candles, signals, htf_candles, htf_index_map
-        )
+        result = self.run_backtest_with_engine("DCA Long Multi-TP", candles, signals, htf_candles, htf_index_map)
 
         self._print_result(result)
         return result
@@ -455,17 +439,11 @@ class DCAMultiTPTester:
         strategy = DCAMultiTPStrategy(config)
         signals = strategy.generate_signals(candles, htf_candles, htf_index_map)
 
-        entry_count = (
-            int(signals.short_entries.sum()) if signals.short_entries is not None else 0
-        )
-        exit_count = (
-            int(signals.short_exits.sum()) if signals.short_exits is not None else 0
-        )
+        entry_count = int(signals.short_entries.sum()) if signals.short_entries is not None else 0
+        exit_count = int(signals.short_exits.sum()) if signals.short_exits is not None else 0
         logger.info(f"Generated {entry_count} short entries, {exit_count} short exits")
 
-        result = self.run_backtest_with_engine(
-            "DCA Short Multi-TP", candles, signals, htf_candles, htf_index_map
-        )
+        result = self.run_backtest_with_engine("DCA Short Multi-TP", candles, signals, htf_candles, htf_index_map)
 
         self._print_result(result)
         return result
@@ -518,9 +496,7 @@ class DCAMultiTPTester:
         exit_count = int(signals.exits.sum())
         logger.info(f"Generated {entry_count} entries, {exit_count} exits")
 
-        result = self.run_backtest_with_engine(
-            "DCA Long ATR", candles, signals, htf_candles, htf_index_map
-        )
+        result = self.run_backtest_with_engine("DCA Long ATR", candles, signals, htf_candles, htf_index_map)
 
         self._print_result(result)
         return result
@@ -569,17 +545,11 @@ class DCAMultiTPTester:
         strategy = DCAMultiTPStrategy(config)
         signals = strategy.generate_signals(candles, htf_candles, htf_index_map)
 
-        entry_count = (
-            int(signals.short_entries.sum()) if signals.short_entries is not None else 0
-        )
-        exit_count = (
-            int(signals.short_exits.sum()) if signals.short_exits is not None else 0
-        )
+        entry_count = int(signals.short_entries.sum()) if signals.short_entries is not None else 0
+        exit_count = int(signals.short_exits.sum()) if signals.short_exits is not None else 0
         logger.info(f"Generated {entry_count} short entries, {exit_count} short exits")
 
-        result = self.run_backtest_with_engine(
-            "DCA Short ATR", candles, signals, htf_candles, htf_index_map
-        )
+        result = self.run_backtest_with_engine("DCA Short ATR", candles, signals, htf_candles, htf_index_map)
 
         self._print_result(result)
         return result
@@ -631,9 +601,7 @@ class DCAMultiTPTester:
         exit_count = int(signals.exits.sum())
         logger.info(f"Generated {entry_count} entries, {exit_count} exits")
 
-        result = self.run_backtest_with_engine(
-            "DCA Long Trailing", candles, signals, htf_candles, htf_index_map
-        )
+        result = self.run_backtest_with_engine("DCA Long Trailing", candles, signals, htf_candles, htf_index_map)
 
         self._print_result(result)
         return result
@@ -647,9 +615,7 @@ class DCAMultiTPTester:
         logger.info(f"Strategy: {result.get('strategy', 'Unknown')}")
         logger.info(f"Total Trades: {result.get('total_trades', 0)}")
         logger.info(f"Win Rate: {result.get('win_rate', 0):.2f}%")
-        logger.info(
-            f"Total PnL: ${result.get('total_pnl', 0):.2f} ({result.get('total_pnl_pct', 0):.2f}%)"
-        )
+        logger.info(f"Total PnL: ${result.get('total_pnl', 0):.2f} ({result.get('total_pnl_pct', 0):.2f}%)")
         logger.info(f"Max Drawdown: {result.get('max_drawdown', 0):.2f}%")
         logger.info(f"Sharpe Ratio: {result.get('sharpe_ratio', 0):.2f}")
         logger.info(f"Profit Factor: {result.get('profit_factor', 0):.2f}")
@@ -662,23 +628,17 @@ class DCAMultiTPTester:
         """
         logger.info("=" * 70)
         logger.info("🚀 DCA MULTI-TP STRATEGY TEST SUITE")
-        logger.info(
-            f"📅 Test Period: {self.start_date.date()} to {self.end_date.date()} (~8 months)"
-        )
+        logger.info(f"📅 Test Period: {self.start_date.date()} to {self.end_date.date()} (~8 months)")
         logger.info(f"💰 Initial Capital: ${self.initial_capital:,.2f}")
         logger.info(f"📊 Symbol: {self.symbol}")
-        logger.info(
-            f"⏰ Timeframes: {self.ltf_interval}m (signals), {self.htf_interval}m (MTF filter)"
-        )
+        logger.info(f"⏰ Timeframes: {self.ltf_interval}m (signals), {self.htf_interval}m (MTF filter)")
         logger.info("=" * 70)
 
         # Load data
         logger.info("\n📥 Loading market data...")
 
         # Try loading LTF candles
-        ltf_candles = self.load_candles_direct(
-            self.symbol, self.ltf_interval, self.start_date, self.end_date
-        )
+        ltf_candles = self.load_candles_direct(self.symbol, self.ltf_interval, self.start_date, self.end_date)
 
         if ltf_candles is None or len(ltf_candles) < 100:
             logger.warning("Using generated sample data")
@@ -703,13 +663,9 @@ class DCAMultiTPTester:
                 htf_candles = None
 
         logger.info("\n📊 Data Summary:")
-        logger.info(
-            f"  LTF candles: {len(ltf_candles)} ({ltf_candles.index[0]} to {ltf_candles.index[-1]})"
-        )
+        logger.info(f"  LTF candles: {len(ltf_candles)} ({ltf_candles.index[0]} to {ltf_candles.index[-1]})")
         if htf_candles is not None:
-            logger.info(
-                f"  HTF candles: {len(htf_candles)} ({htf_candles.index[0]} to {htf_candles.index[-1]})"
-            )
+            logger.info(f"  HTF candles: {len(htf_candles)} ({htf_candles.index[0]} to {htf_candles.index[-1]})")
         else:
             logger.warning("  HTF candles: Not available (MTF filter disabled)")
 
@@ -751,9 +707,7 @@ class DCAMultiTPTester:
             win_rate = result.get("win_rate", 0)
             trades = result.get("total_trades", 0)
 
-            logger.info(
-                f"{status} {name}: {trades} trades, {win_rate:.1f}% WR, ${pnl:+.2f}"
-            )
+            logger.info(f"{status} {name}: {trades} trades, {win_rate:.1f}% WR, ${pnl:+.2f}")
 
         logger.info("-" * 70)
         logger.info(f"Total: {success_count}/{len(self.results)} tests passed")

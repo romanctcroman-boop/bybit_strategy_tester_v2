@@ -102,9 +102,9 @@ async def main():
         graph["main_strategy"] = ms
 
     print(f"Strategy: {name}  (ID: {STRATEGY_ID})")
-    print(f"  Symbol: ETHUSDT  TF: 30m  Period: 2025-01-01..2026-02-24")
-    print(f"  Capital: 1,000,000  Size: 10%  Leverage: 10x  Commission: 0.07%")
-    print(f"  TP: 2.3%  SL: 13.2%  Pyramiding: 1")
+    print("  Symbol: ETHUSDT  TF: 30m  Period: 2025-01-01..2026-02-24")
+    print("  Capital: 1,000,000  Size: 10%  Leverage: 10x  Commission: 0.07%")
+    print("  TP: 2.3%  SL: 13.2%  Pyramiding: 1")
     print()
 
     # ── Fetch ETH candles (main chart instrument) ─────────────────────────────

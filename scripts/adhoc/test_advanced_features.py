@@ -331,15 +331,11 @@ def test_funding_rate():
     print(f"  Without Funding: ${result_no_funding.metrics.net_profit:.2f}")
     print(f"  With Funding:    ${result_with_funding.metrics.net_profit:.2f}")
 
-    profit_diff = (
-        result_no_funding.metrics.net_profit - result_with_funding.metrics.net_profit
-    )
+    profit_diff = result_no_funding.metrics.net_profit - result_with_funding.metrics.net_profit
     print(f"  Funding Cost:    ${profit_diff:.2f}")
 
     assert result_no_funding.is_valid, f"Error: {result_no_funding.validation_errors}"
-    assert result_with_funding.is_valid, (
-        f"Error: {result_with_funding.validation_errors}"
-    )
+    assert result_with_funding.is_valid, f"Error: {result_with_funding.validation_errors}"
     print("  ✓ PASSED")
 
 

@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, "d:\\bybit_strategy_tester_v2")
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pandas as pd
 
@@ -42,8 +42,8 @@ async def main():
         strategy_graph["main_strategy"] = builder_graph["main_strategy"]
 
     svc = BacktestService()
-    start_date = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 2, 25, tzinfo=timezone.utc)
+    start_date = datetime(2025, 1, 1, tzinfo=UTC)
+    end_date = datetime(2026, 2, 25, tzinfo=UTC)
     _btc_start = start_date - pd.Timedelta(minutes=500 * 30)
 
     btc_ohlcv = await svc._fetch_historical_data(

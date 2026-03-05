@@ -57,24 +57,14 @@ def run_test(name: str, category: str):
                 result = func(*args, **kwargs)
                 elapsed = time.time() - start_time
                 if result is True or result is None:
-                    test_results.append(
-                        TestResult(
-                            name, category, True, f"OK ({elapsed:.2f}s)", elapsed
-                        )
-                    )
+                    test_results.append(TestResult(name, category, True, f"OK ({elapsed:.2f}s)", elapsed))
                     print(f"  ✅ {name} ({elapsed:.2f}s)")
                 else:
-                    test_results.append(
-                        TestResult(name, category, False, str(result), elapsed)
-                    )
+                    test_results.append(TestResult(name, category, False, str(result), elapsed))
                     print(f"  ❌ {name}: {result}")
             except Exception as e:
                 elapsed = time.time() - start_time
-                test_results.append(
-                    TestResult(
-                        name, category, False, str(e), elapsed, traceback.format_exc()
-                    )
-                )
+                test_results.append(TestResult(name, category, False, str(e), elapsed, traceback.format_exc()))
                 print(f"  ❌ {name}: {e}")
 
         return wrapper
@@ -260,10 +250,7 @@ def test_btc_15m_long_gpu():
 
     assert result.status == "completed"
     best = result.best_metrics
-    print(
-        f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, "
-        f"Trades={best.get('total_trades', 0)}"
-    )
+    print(f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, Trades={best.get('total_trades', 0)}")
     return True
 
 
@@ -388,10 +375,7 @@ def test_btc_15m_short_gpu():
 
     assert result.status == "completed"
     best = result.best_metrics
-    print(
-        f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, "
-        f"Trades={best.get('total_trades', 0)}"
-    )
+    print(f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, Trades={best.get('total_trades', 0)}")
     return True
 
 
@@ -488,10 +472,7 @@ def test_eth_1h_long():
 
     assert result.status == "completed"
     best = result.best_metrics
-    print(
-        f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, "
-        f"Trades={best.get('total_trades', 0)}"
-    )
+    print(f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, Trades={best.get('total_trades', 0)}")
     return True
 
 
@@ -517,10 +498,7 @@ def test_eth_1h_short():
 
     assert result.status == "completed"
     best = result.best_metrics
-    print(
-        f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, "
-        f"Trades={best.get('total_trades', 0)}"
-    )
+    print(f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, Trades={best.get('total_trades', 0)}")
     return True
 
 
@@ -618,9 +596,7 @@ def test_sol_15m_long_large():
     combos = result.total_combinations
     assert result.status == "completed"
     best = result.best_metrics
-    print(
-        f"    [INFO] {combos:,} combos tested. Best: Return={best.get('total_return', 0):.1f}%"
-    )
+    print(f"    [INFO] {combos:,} combos tested. Best: Return={best.get('total_return', 0):.1f}%")
     return True
 
 
@@ -669,9 +645,7 @@ def test_multi_symbol_long():
 
     # Print comparison
     for sym, data in results_summary.items():
-        print(
-            f"    {sym}: Return={data['return']:.1f}%, Trades={data['trades']}, WR={data['win_rate']:.1f}%"
-        )
+        print(f"    {sym}: Return={data['return']:.1f}%, Trades={data['trades']}, WR={data['win_rate']:.1f}%")
 
     assert len(results_summary) >= 2, "At least 2 symbols should have results"
     return True
@@ -835,10 +809,7 @@ def test_btc_large_grid_long():
     assert combos > 2000, f"Expected >2000 combos, got {combos}"
 
     best = result.best_metrics
-    print(
-        f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, "
-        f"Sharpe={best.get('sharpe_ratio', 0):.2f}"
-    )
+    print(f"    [INFO] Best: Return={best.get('total_return', 0):.1f}%, Sharpe={best.get('sharpe_ratio', 0):.2f}")
     return True
 
 
@@ -866,9 +837,7 @@ def test_btc_large_grid_short():
     assert result.status == "completed"
 
     best = result.best_metrics
-    print(
-        f"    [INFO] {combos:,} combos. Best: Return={best.get('total_return', 0):.1f}%"
-    )
+    print(f"    [INFO] {combos:,} combos. Best: Return={best.get('total_return', 0):.1f}%")
     return True
 
 
@@ -896,9 +865,7 @@ def test_eth_large_grid_both():
     assert result.status == "completed"
 
     best = result.best_metrics
-    print(
-        f"    [INFO] {combos:,} combos. Best: Return={best.get('total_return', 0):.1f}%"
-    )
+    print(f"    [INFO] {combos:,} combos. Best: Return={best.get('total_return', 0):.1f}%")
     return True
 
 
@@ -981,9 +948,7 @@ def test_trades_mfe_mae():
             required_fields = ["entry_time", "exit_time", "pnl", "mfe", "mae"]
             for field in required_fields:
                 assert field in trade, f"Missing trade field: {field}"
-            print(
-                f"    [INFO] Trade has all fields. MFE={trade['mfe']:.2f}, MAE={trade['mae']:.2f}"
-            )
+            print(f"    [INFO] Trade has all fields. MFE={trade['mfe']:.2f}, MAE={trade['mae']:.2f}")
 
     return True
 

@@ -1,11 +1,13 @@
 """
 Debug data loading
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+
+sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+
 
 from backend.services.data_service import DataService
-from datetime import datetime
 
 SYMBOL = "ETHUSDT"
 INTERVAL = "30m"
@@ -24,11 +26,11 @@ with DataService() as ds:
         limit=100000,
     )
     print(f"  ETHUSDT bars (timeframe='30'): {len(eth_data)}")
-    
+
     if len(eth_data) > 0:
         print(f"  First bar: {eth_data[0].open_time_dt} - O={eth_data[0].open_price}")
         print(f"  Last bar: {eth_data[-1].open_time_dt} - C={eth_data[-1].close_price}")
-    
+
     # Also try BTC
     btc_data = ds.get_market_data(
         symbol="BTCUSDT",
@@ -38,7 +40,7 @@ with DataService() as ds:
         limit=100000,
     )
     print(f"  BTCUSDT bars (timeframe='30'): {len(btc_data)}")
-    
+
     if len(btc_data) > 0:
         print(f"  First bar: {btc_data[0].open_time_dt} - O={btc_data[0].open_price}")
         print(f"  Last bar: {btc_data[-1].open_time_dt} - C={btc_data[-1].close_price}")

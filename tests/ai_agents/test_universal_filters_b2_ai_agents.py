@@ -1,4 +1,4 @@
-﻿"""
+"""
 AI Agent Knowledge Test: Universal Filters Batch 2
 (Keltner/Bollinger Channel, RVI, MFI, CCI, Momentum)
 
@@ -274,9 +274,7 @@ class TestBollingerBands:
         r_bb = _run(adapter, "keltner_bollinger", {**base, "channel_type": "Bollinger Bands"}, ohlcv_data)
         r_kc = _run(adapter, "keltner_bollinger", {**base, "channel_type": "Keltner Channel"}, ohlcv_data)
         # Different calculation methods в†’ different signals (unless all False)
-        assert (not r_bb["long"].equals(r_kc["long"])) or (
-            not r_bb["long"].any() and not r_kc["long"].any()
-        )
+        assert (not r_bb["long"].equals(r_kc["long"])) or (not r_bb["long"].any() and not r_kc["long"].any())
 
 
 class TestChannelEnterConditions:

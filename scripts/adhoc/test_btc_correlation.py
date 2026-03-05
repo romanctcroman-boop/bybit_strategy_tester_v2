@@ -27,9 +27,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 _DB_PATH = os.environ.get("DATABASE_PATH", str(_PROJECT_ROOT / "data.sqlite3"))
 
 
-def load_candles(
-    symbol: str, interval: str, start_date: str, end_date: str
-) -> pd.DataFrame:
+def load_candles(symbol: str, interval: str, start_date: str, end_date: str) -> pd.DataFrame:
     """Load candles from database."""
     conn = sqlite3.connect(_DB_PATH)
     query = f"""

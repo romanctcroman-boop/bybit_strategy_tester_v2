@@ -13,7 +13,7 @@ Provides REST API for monitoring AI prompt system:
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.monitoring.prompts_monitor import PromptsMonitor, DashboardMetrics
+from backend.monitoring.prompts_monitor import PromptsMonitor
 
 router = APIRouter(prefix="/api/v1/prompts/monitoring", tags=["Prompts Monitoring"])
 
@@ -33,16 +33,16 @@ def get_monitor() -> PromptsMonitor:
 def get_dashboard(period_hours: int = Query(default=24, ge=1, le=720)) -> dict:
     """
     Get full monitoring dashboard.
-    
+
     Args:
         period_hours: Period for statistics (1-720 hours)
-    
+
     Returns:
         Complete dashboard metrics
     """
     monitor = get_monitor()
     metrics = monitor.get_dashboard(period_hours)
-    
+
     return {
         "timestamp": metrics.timestamp,
         "period_hours": metrics.period_hours,
@@ -74,10 +74,10 @@ def get_dashboard(period_hours: int = Query(default=24, ge=1, le=720)) -> dict:
 def get_validation_stats(period_hours: int = Query(default=24, ge=1, le=720)) -> dict:
     """
     Get validation statistics.
-    
+
     Args:
         period_hours: Period for statistics
-    
+
     Returns:
         Validation stats
     """
@@ -89,10 +89,10 @@ def get_validation_stats(period_hours: int = Query(default=24, ge=1, le=720)) ->
 def get_logging_stats(period_hours: int = Query(default=24, ge=1, le=720)) -> dict:
     """
     Get logging statistics.
-    
+
     Args:
         period_hours: Period for statistics
-    
+
     Returns:
         Logging stats
     """
@@ -104,7 +104,7 @@ def get_logging_stats(period_hours: int = Query(default=24, ge=1, le=720)) -> di
 def get_cache_stats() -> dict:
     """
     Get cache statistics.
-    
+
     Returns:
         Cache stats
     """
@@ -116,10 +116,10 @@ def get_cache_stats() -> dict:
 def get_cost_breakdown(period_hours: int = Query(default=24, ge=1, le=720)) -> dict:
     """
     Get cost breakdown by agent and task.
-    
+
     Args:
         period_hours: Period for statistics
-    
+
     Returns:
         Cost breakdown with projections
     """
@@ -134,11 +134,11 @@ def get_performance_trends(
 ) -> dict:
     """
     Get performance trends over time.
-    
+
     Args:
         period_hours: Total period
         intervals: Number of intervals
-    
+
     Returns:
         Time series data
     """
@@ -153,18 +153,18 @@ def export_dashboard(
 ) -> dict:
     """
     Export dashboard to JSON file.
-    
+
     Args:
         output_path: Output file path
         period_hours: Period for statistics
-    
+
     Returns:
         Export status
     """
     try:
         monitor = get_monitor()
         file_path = monitor.export_dashboard(output_path, period_hours)
-        
+
         return {
             "success": True,
             "file_path": file_path,
@@ -178,14 +178,14 @@ def export_dashboard(
 def monitoring_health() -> dict:
     """
     Get monitoring service health status.
-    
+
     Returns:
         Health status
     """
     try:
         monitor = get_monitor()
         metrics = monitor.get_dashboard(period_hours=1)
-        
+
         return {
             "status": "healthy",
             "monitor_initialized": True,

@@ -2,6 +2,7 @@
 Final trade comparison for RSI_L/S_7: match by timestamp proximity (±30 min).
 This correctly identifies which engine trades correspond to TV trades.
 """
+
 import asyncio
 import csv
 import json
@@ -45,8 +46,12 @@ def load_graph():
     gp = json.loads(gr) if isinstance(gr, str) else (gr or {})
     ms = gp.get("main_strategy", {})
     return {
-        "name": name, "blocks": blocks, "connections": conns,
-        "market_type": "linear", "direction": "both", "interval": "30",
+        "name": name,
+        "blocks": blocks,
+        "connections": conns,
+        "market_type": "linear",
+        "direction": "both",
+        "interval": "30",
         **({"main_strategy": ms} if ms else {}),
     }
 
@@ -87,9 +92,14 @@ async def run_engine():
     )
     if raw_warmup:
         df_w = pd.DataFrame(raw_warmup)
-        for old, new in {"startTime": "timestamp", "open_time": "timestamp",
-                         "openPrice": "open", "highPrice": "high",
-                         "lowPrice": "low", "closePrice": "close"}.items():
+        for old, new in {
+            "startTime": "timestamp",
+            "open_time": "timestamp",
+            "openPrice": "open",
+            "highPrice": "high",
+            "lowPrice": "low",
+            "closePrice": "close",
+        }.items():
             if old in df_w.columns and new not in df_w.columns:
                 df_w = df_w.rename(columns={old: new})
         for col in ["open", "high", "low", "close", "volume"]:
@@ -107,15 +117,38 @@ async def run_engine():
     adapter = StrategyBuilderAdapter(graph, btcusdt_ohlcv=btc_candles)
     signals = adapter.generate_signals(candles)
     le = np.asarray(signals.entries.values, dtype=bool)
-    se = np.asarray(signals.short_entries.values, dtype=bool) if signals.short_entries is not None else np.zeros(len(le), dtype=bool)
+    se = (
+        np.asarray(signals.short_entries.values, dtype=bool)
+        if signals.short_entries is not None
+        else np.zeros(len(le), dtype=bool)
+    )
     lx = np.asarray(signals.exits.values, dtype=bool) if signals.exits is not None else np.zeros(len(le), dtype=bool)
-    sx = np.asarray(signals.short_exits.values, dtype=bool) if signals.short_exits is not None else np.zeros(len(le), dtype=bool)
-    result = FallbackEngineV4().run(BacktestInput(
-        candles=candles, long_entries=le, long_exits=lx, short_entries=se, short_exits=sx,
-        initial_capital=10_000.0, position_size=0.10, use_fixed_amount=True, fixed_amount=100.0,
-        leverage=10, stop_loss=0.132, take_profit=0.023, taker_fee=0.0007, slippage=0.0,
-        direction=TradeDirection.BOTH, pyramiding=1, interval="30",
-    ))
+    sx = (
+        np.asarray(signals.short_exits.values, dtype=bool)
+        if signals.short_exits is not None
+        else np.zeros(len(le), dtype=bool)
+    )
+    result = FallbackEngineV4().run(
+        BacktestInput(
+            candles=candles,
+            long_entries=le,
+            long_exits=lx,
+            short_entries=se,
+            short_exits=sx,
+            initial_capital=10_000.0,
+            position_size=0.10,
+            use_fixed_amount=True,
+            fixed_amount=100.0,
+            leverage=10,
+            stop_loss=0.132,
+            take_profit=0.023,
+            taker_fee=0.0007,
+            slippage=0.0,
+            direction=TradeDirection.BOTH,
+            pyramiding=1,
+            interval="30",
+        )
+    )
     return result.trades, candles
 
 
@@ -160,7 +193,7 @@ async def main():
 
     # Entry price accuracy on matched trades
     ep_diffs = [abs(em[0].entry_price - em[1]["ep"]) for em in eng_matched]
-    print(f"Matched trades entry price diff: max={max(ep_diffs):.2f}  mean={sum(ep_diffs)/len(ep_diffs):.2f}")
+    print(f"Matched trades entry price diff: max={max(ep_diffs):.2f}  mean={sum(ep_diffs) / len(ep_diffs):.2f}")
     print()
 
     print("=== EXTRA ENGINE TRADES (no TV match within ±30min) ===")
@@ -181,8 +214,10 @@ async def main():
     offsets.sort(key=lambda x: -x[0].total_seconds())
     for diff, et, tv in offsets[:15]:
         et_ts = pd.Timestamp(et.entry_time)
-        print(f"  {et.direction:5s} Eng={str(et_ts)[:16]}  TV={str(tv['entry_ts'])[:16]}  offset={diff}  "
-              f"ep_eng={et.entry_price:.2f}  ep_tv={tv['ep']:.2f}")
+        print(
+            f"  {et.direction:5s} Eng={str(et_ts)[:16]}  TV={str(tv['entry_ts'])[:16]}  offset={diff}  "
+            f"ep_eng={et.entry_price:.2f}  ep_tv={tv['ep']:.2f}"
+        )
 
 
 asyncio.run(main())

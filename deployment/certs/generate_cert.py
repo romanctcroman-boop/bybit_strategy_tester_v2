@@ -14,9 +14,7 @@ from cryptography.x509.oid import NameOID
 
 def generate_certificate():
     # Generate private key
-    private_key = rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
-    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
 
     # Generate certificate
     subject = issuer = x509.Name(
@@ -36,9 +34,7 @@ def generate_certificate():
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.now(datetime.UTC))
-        .not_valid_after(
-            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=365)
-        )
+        .not_valid_after(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=365))
         .add_extension(
             x509.SubjectAlternativeName(
                 [

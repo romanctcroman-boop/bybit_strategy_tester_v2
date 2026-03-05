@@ -37,9 +37,7 @@ def load_real_data(
     conn.close()
 
     if len(df) == 0:
-        raise ValueError(
-            f"No data found for {symbol} {interval} from {start_date} to {end_date}"
-        )
+        raise ValueError(f"No data found for {symbol} {interval} from {start_date} to {end_date}")
 
     # Convert timestamp to datetime index
     df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
@@ -53,9 +51,7 @@ def load_real_data(
     return df
 
 
-def generate_signals(
-    candles: pd.DataFrame, fast_period: int = 10, slow_period: int = 30
-) -> tuple:
+def generate_signals(candles: pd.DataFrame, fast_period: int = 10, slow_period: int = 30) -> tuple:
     """Генерировать сигналы с помощью SMA кроссовер стратегии."""
     close = candles["close"].values
     n = len(close)
@@ -133,14 +129,10 @@ def main():
     )
 
     # Generate signals with SMA crossover (fast=10, slow=30)
-    long_entries, long_exits, short_entries, short_exits = generate_signals(
-        candles, fast_period=10, slow_period=30
-    )
+    long_entries, long_exits, short_entries, short_exits = generate_signals(candles, fast_period=10, slow_period=30)
 
     signal_count = np.sum(long_entries) + np.sum(short_entries)
-    print(
-        f"Generated {signal_count} entry signals ({np.sum(long_entries)} long, {np.sum(short_entries)} short)"
-    )
+    print(f"Generated {signal_count} entry signals ({np.sum(long_entries)} long, {np.sum(short_entries)} short)")
     print()
 
     results = []
@@ -502,9 +494,7 @@ def main():
 
     valid_results = [r for r in results if r is not None]
 
-    print(
-        f"\n{'Test':<25} {'Trades':>8} {'Win%':>8} {'Net Profit':>12} {'MaxDD':>8} {'Sharpe':>8}"
-    )
+    print(f"\n{'Test':<25} {'Trades':>8} {'Win%':>8} {'Net Profit':>12} {'MaxDD':>8} {'Sharpe':>8}")
     print("-" * 70)
 
     for r in valid_results:

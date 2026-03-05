@@ -135,7 +135,7 @@ async def main():
         cross = btc_p >= 52 and btc_r < 52
 
         print(
-            f"  {label:15s}  {ts_str:20s}  {str(se_val):6s} {str(le_val):6s} "
+            f"  {label:15s}  {ts_str:20s}  {se_val!s:6s} {le_val!s:6s} "
             f"{btc_r:10.4f}  {btc_p:10.4f}  {'YES' if in_range else 'NO':10s}  {'YES' if cross else 'NO'}"
         )
 

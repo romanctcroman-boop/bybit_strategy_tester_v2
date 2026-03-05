@@ -69,11 +69,7 @@ def analyze_css_rules(css: str) -> dict:
         # Categorize by selector
         if ":root" in selector or "[data-theme" in selector or "--" in properties:
             categories["variables"].append(full_rule)
-        elif (
-            selector in ["*", "html", "body"]
-            or selector.startswith("html")
-            or selector.startswith("body")
-        ):
+        elif selector in ["*", "html", "body"] or selector.startswith("html") or selector.startswith("body"):
             categories["base"].append(full_rule)
         elif "@keyframes" in selector:
             categories["animations"].append(full_rule)
@@ -93,10 +89,7 @@ def analyze_css_rules(css: str) -> dict:
             ]
         ):
             categories["components"].append(full_rule)
-        elif any(
-            layout in selector
-            for layout in [".container", "-grid", ".row", ".col-", ".flex"]
-        ):
+        elif any(layout in selector for layout in [".container", "-grid", ".row", ".col-", ".flex"]):
             categories["layout"].append(full_rule)
         else:
             categories["page_specific"].append(full_rule)
@@ -227,9 +220,7 @@ def extract_css_from_file(filepath: Path, dry_run: bool = False) -> dict:
     }
 
 
-def update_html_with_css_link(
-    filepath: Path, css_filename: str, dry_run: bool = False
-) -> bool:
+def update_html_with_css_link(filepath: Path, css_filename: str, dry_run: bool = False) -> bool:
     """
     Update HTML file to link external CSS and optionally remove inline styles.
 
@@ -270,13 +261,9 @@ def update_html_with_css_link(
 
 def main():
     parser = argparse.ArgumentParser(description="Extract inline CSS from HTML files")
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show changes without applying"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Show changes without applying")
     parser.add_argument("--file", type=str, help="Process single file")
-    parser.add_argument(
-        "--analyze-duplicates", action="store_true", help="Analyze duplicate rules"
-    )
+    parser.add_argument("--analyze-duplicates", action="store_true", help="Analyze duplicate rules")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -320,9 +307,7 @@ def main():
     print("=" * 60)
 
     extracted_count = sum(
-        1
-        for r in results.values()
-        if r["status"] in ["extracted", "dry_run"] and r.get("lines_extracted", 0) > 0
+        1 for r in results.values() if r["status"] in ["extracted", "dry_run"] and r.get("lines_extracted", 0) > 0
     )
     print(f"✅ Files with inline CSS: {extracted_count}/{len(html_files)}")
     print(f"📜 Total CSS lines extracted: {total_lines}")

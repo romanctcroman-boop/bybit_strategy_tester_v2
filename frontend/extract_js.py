@@ -242,9 +242,7 @@ def extract_js_from_file(filepath: Path, dry_run: bool = False) -> dict:
     }
 
 
-def update_html_with_js_link(
-    filepath: Path, js_filename: str, dry_run: bool = False
-) -> bool:
+def update_html_with_js_link(filepath: Path, js_filename: str, dry_run: bool = False) -> bool:
     """
     Update HTML file to link external JS module.
 
@@ -259,9 +257,7 @@ def update_html_with_js_link(
         return False
 
     # Add script tag before </body>
-    script_tag = (
-        f'    <script type="module" src="/frontend/js/{js_filename}"></script>\n'
-    )
+    script_tag = f'    <script type="module" src="/frontend/js/{js_filename}"></script>\n'
 
     html = html.replace("</body>", f"{script_tag}</body>")
 
@@ -315,19 +311,11 @@ def remove_inline_scripts(filepath: Path, dry_run: bool = False) -> tuple[bool, 
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Extract inline JavaScript from HTML files"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show changes without applying"
-    )
+    parser = argparse.ArgumentParser(description="Extract inline JavaScript from HTML files")
+    parser.add_argument("--dry-run", action="store_true", help="Show changes without applying")
     parser.add_argument("--file", type=str, help="Process single file")
-    parser.add_argument(
-        "--analyze", action="store_true", help="Analyze only, do not extract"
-    )
-    parser.add_argument(
-        "--keep-inline", action="store_true", help="Do not remove inline scripts"
-    )
+    parser.add_argument("--analyze", action="store_true", help="Analyze only, do not extract")
+    parser.add_argument("--keep-inline", action="store_true", help="Do not remove inline scripts")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -377,17 +365,13 @@ def main():
     print("=" * 60)
 
     extracted_count = sum(
-        1
-        for r in results.values()
-        if r["status"] in ["extracted", "dry_run"] and r.get("lines_extracted", 0) > 0
+        1 for r in results.values() if r["status"] in ["extracted", "dry_run"] and r.get("lines_extracted", 0) > 0
     )
     print(f"✅ Files with inline JS: {extracted_count}/{len(html_files)}")
     print(f"📜 Total JS lines extracted: {total_lines}")
 
     if total_bytes_removed > 0:
-        print(
-            f"📉 Total bytes removed from HTML: {total_bytes_removed:,} ({total_bytes_removed / 1024:.1f} KB)"
-        )
+        print(f"📉 Total bytes removed from HTML: {total_bytes_removed:,} ({total_bytes_removed / 1024:.1f} KB)")
 
     # Show function summary
     all_functions = []

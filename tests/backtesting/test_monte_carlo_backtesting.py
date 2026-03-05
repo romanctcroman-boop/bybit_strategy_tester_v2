@@ -153,9 +153,7 @@ class TestMonteCarloSimulator:
         """Test probability of ruin with losing strategy."""
         # Create trades that definitely lead to ruin (lose 80% of capital)
         heavy_losing_trades = [{"pnl": -200} for _ in range(100)]
-        sim = MonteCarloSimulator(
-            trades=heavy_losing_trades, initial_capital=10000, ruin_threshold=0.5
-        )
+        sim = MonteCarloSimulator(trades=heavy_losing_trades, initial_capital=10000, ruin_threshold=0.5)
         result = sim.run_simulation(n_simulations=1000, seed=42)
 
         # With consistent heavy losses (-$200 x 100 = -$20,000), equity should go negative

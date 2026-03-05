@@ -34,9 +34,7 @@ def create_test_candles(
     elif trend == "down":
         closes = np.linspace(base_price * 1.3, base_price, n_bars)
     else:
-        closes = (
-            base_price + np.sin(np.linspace(0, 4 * np.pi, n_bars)) * base_price * 0.1
-        )
+        closes = base_price + np.sin(np.linspace(0, 4 * np.pi, n_bars)) * base_price * 0.1
 
     # Add noise
     noise = np.random.normal(0, base_price * volatility, n_bars)
@@ -60,9 +58,7 @@ def create_test_candles(
     )
 
 
-def create_multi_asset_data(
-    symbols: list[str], n_bars: int = 200
-) -> dict[str, pd.DataFrame]:
+def create_multi_asset_data(symbols: list[str], n_bars: int = 200) -> dict[str, pd.DataFrame]:
     """Create test data for multiple assets."""
     np.random.seed(42)
     data = {}

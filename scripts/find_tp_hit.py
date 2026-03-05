@@ -1,7 +1,7 @@
 """Find when ETH hit TP for last long trade (entry=1859.70, TP=1902.54)."""
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 # TP target: 1859.70 * 1.023 = 1902.54
 TP_TARGET = 1859.70 * 1.023
@@ -27,10 +27,10 @@ c.execute(
 )
 rows = c.fetchall()
 
-print(f"\nETH bars from 2026-02-25 00:00 onwards:")
+print("\nETH bars from 2026-02-25 00:00 onwards:")
 print(f"{'Time':20s} {'Open':10s} {'High':10s} {'Low':10s} {'Close':10s}")
 for row in rows:
-    dt = datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc)
+    dt = datetime.fromtimestamp(row[0] / 1000, tz=UTC)
     flag = " *** TP HIT!" if row[2] >= TP_TARGET else ""
     print(f"  {dt.strftime('%Y-%m-%d %H:%M'):20s} {row[1]:10.4f} {row[2]:10.4f} {row[3]:10.4f} {row[4]:10.4f}{flag}")
     if row[2] >= TP_TARGET:

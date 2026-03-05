@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 # Production imports
 from backend.agents.prompts import (
-    PromptValidator,
-    PromptLogger,
-    TemperatureAdapter,
-    PromptCompressor,
     ContextCache,
+    PromptCompressor,
+    PromptLogger,
+    PromptValidator,
+    TemperatureAdapter,
 )
 
 
@@ -283,10 +283,10 @@ class AIStrategyGenerator:
     AI-powered strategy generation service.
 
     Uses DeepSeek to generate trading strategies based on user specifications.
-    
+
     Production Features (v2.0):
     - Prompt validation for security
-    - Prompt logging for audit trails  
+    - Prompt logging for audit trails
     - Adaptive temperature for better results
     - Prompt compression for cost optimization
     - Context caching for performance
@@ -296,14 +296,14 @@ class AIStrategyGenerator:
         self._agent_interface = None
         self._generation_cache: dict[str, GeneratedStrategy] = {}
         self._active_generations: dict[str, asyncio.Task] = {}
-        
+
         # Production components
         self._validator = PromptValidator()
         self._logger = PromptLogger()
         self._temperature_adapter = TemperatureAdapter()
         self._compressor = PromptCompressor()
         self._context_cache = ContextCache()
-        
+
         logger.info("✅ AIStrategyGenerator initialized with production features")
 
     async def _get_agent(self):
@@ -399,7 +399,7 @@ class AIStrategyGenerator:
 
     async def _generate_code(self, request: GenerationRequest) -> str:
         """Generate strategy code using AI.
-        
+
         Production v2.0:
         - Prompt validation before sending
         - Prompt logging for audit
@@ -434,13 +434,13 @@ class AIStrategyGenerator:
             multi_timeframe="Yes" if request.multi_timeframe else "No",
             custom_conditions=request.custom_conditions or "None",
         )
-        
+
         # P0: Validate prompt before sending
         is_valid, errors = self._validator.validate_prompt(prompt)
         if not is_valid:
             logger.error(f"🚫 Prompt validation failed: {errors}")
             raise ValueError(f"Invalid prompt: {'; '.join(errors)}")
-        
+
         # P0: Log prompt for audit
         prompt_id = self._logger.log_prompt(
             agent_type="deepseek",
@@ -450,21 +450,21 @@ class AIStrategyGenerator:
                 "request_id": request.request_id,
                 "pattern_type": request.pattern_type.value,
                 "indicators": [i.value for i in request.indicators],
-            }
+            },
         )
         logger.debug(f"📝 Prompt logged: {prompt_id[:8]}...")
-        
+
         # P1: Compress prompt if too long
         if len(prompt) > 10000:  # Compress if > 10K chars
             prompt = self._compressor.compress(prompt, max_tokens=2500)
             logger.info(f"✂️ Prompt compressed: {len(prompt)} chars")
-        
+
         # P1: Adaptive temperature based on request complexity
         confidence = self._estimate_confidence(request)
         temperature = self._temperature_adapter.get_temperature(
             confidence=confidence,
             task_type="strategy_generation",
-            market_regime="ranging"  # Can be enhanced with market data
+            market_regime="ranging",  # Can be enhanced with market data
         )
         logger.debug(f"🌡️ Temperature: {temperature:.3f} (confidence={confidence:.2f})")
 
@@ -478,15 +478,15 @@ class AIStrategyGenerator:
 
         # Extract code from response
         code = self._extract_code_block(response.get("response", ""))
-        
+
         # P0: Log response
         self._logger.log_response(
             prompt_id=prompt_id,
             response=code,
             tokens_used=response.get("usage", {}).get("total_tokens", 0),
-            success=True
+            success=True,
         )
-        
+
         return code
 
     async def _validate_code(self, code: str) -> dict[str, Any]:
@@ -614,42 +614,42 @@ class AIStrategyGenerator:
     def _estimate_confidence(self, request: GenerationRequest) -> float:
         """
         Estimate confidence level for strategy generation.
-        
+
         P1: Used for adaptive temperature calculation.
-        
+
         Args:
             request: Generation request
-        
+
         Returns:
             Confidence score (0.0-1.0)
         """
         confidence = 0.5  # Base confidence
-        
+
         # More indicators = higher confidence
         if len(request.indicators) >= 3:
             confidence += 0.15
         elif len(request.indicators) >= 2:
             confidence += 0.1
-        
+
         # Clear pattern type = higher confidence
         if request.pattern_description:
             confidence += 0.1
-        
+
         # Specific risk parameters = higher confidence
         if request.max_drawdown and request.risk_per_trade:
             confidence += 0.05
-        
+
         # Multi-timeframe = more complex, lower confidence
         if request.multi_timeframe:
             confidence -= 0.1
-        
+
         # Custom conditions = more complex, lower confidence
         if request.custom_conditions:
             confidence -= 0.05
-        
+
         # Clamp to [0.0, 1.0]
         return max(0.0, min(1.0, confidence))
-    
+
     def _extract_code_block(self, response: str) -> str:
         """Extract Python code from markdown code blocks."""
         # Try to find ```python ... ``` blocks

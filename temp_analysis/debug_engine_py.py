@@ -12,7 +12,7 @@ import pandas as pd
 
 sys.path.insert(0, r"d:\bybit_strategy_tester_v2")
 
-from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter  # noqa: E402
+from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
 # ---- Load OHLCV from DB (same as calibrate_engines.py) ----
 print("Loading OHLCV data...")
@@ -229,9 +229,7 @@ for i in range(len(close)):
             exit_reason = "take_profit"
             tp_target = signal_price * (1 + take_profit) if is_long else signal_price * (1 - take_profit)
             bar_open = open_prices[i]
-            if is_long and bar_open >= tp_target:
-                exit_price = bar_open
-            elif not is_long and bar_open <= tp_target:
+            if (is_long and bar_open >= tp_target) or (not is_long and bar_open <= tp_target):
                 exit_price = bar_open
             else:
                 exit_price = tp_target

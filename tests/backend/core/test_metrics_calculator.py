@@ -180,9 +180,7 @@ class TestCalculateMetricsNumba:
         daily_returns = np.diff(equity_array) / equity_array[:-1]
         initial_capital = 10000.0
 
-        result = calculate_metrics_numba(
-            pnl_array, equity_array, daily_returns, initial_capital
-        )
+        result = calculate_metrics_numba(pnl_array, equity_array, daily_returns, initial_capital)
 
         total_return, sharpe, max_dd, win_rate, n_trades, profit_factor, calmar = result
 
@@ -207,9 +205,7 @@ class TestCalculateMetricsNumba:
         daily_returns = np.array([0.0])
         initial_capital = 10000.0
 
-        result = calculate_metrics_numba(
-            pnl_array, equity_array, daily_returns, initial_capital
-        )
+        result = calculate_metrics_numba(pnl_array, equity_array, daily_returns, initial_capital)
 
         total_return, sharpe, max_dd, win_rate, n_trades, profit_factor, calmar = result
 

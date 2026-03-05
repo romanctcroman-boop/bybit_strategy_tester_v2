@@ -1,6 +1,7 @@
 """
 Direct DeepSeek API call for VectorBT consultation (simplified version)
 """
+
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ PROMPT = """# VectorBT vs Fallback Engine: Консультация
 Дай краткие, практичные рекомендации с примерами кода где возможно.
 """
 
+
 def main():
     print("=" * 70)
     print("DEEPSEEK DIRECT API CALL")
@@ -56,7 +58,10 @@ def main():
     payload = {
         "model": "deepseek-chat",  # Use chat model (faster than reasoner)
         "messages": [
-            {"role": "system", "content": "You are an expert Python developer specializing in quantitative finance, backtesting, and VectorBT library."},
+            {
+                "role": "system",
+                "content": "You are an expert Python developer specializing in quantitative finance, backtesting, and VectorBT library.",
+            },
             {"role": "user", "content": PROMPT},
         ],
         "max_tokens": 4000,
@@ -73,10 +78,7 @@ def main():
             response = client.post(
                 "https://api.deepseek.com/v1/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
 
         print(f"\n📥 Response received: {response.status_code}")
@@ -106,7 +108,9 @@ def main():
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

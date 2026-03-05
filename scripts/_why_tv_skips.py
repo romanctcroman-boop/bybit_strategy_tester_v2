@@ -81,7 +81,7 @@ def main():
         gap = eng_ts - prev_exit
 
         marker = "YES ←" if still_open else "no"
-        print(f"{desc:<18s}  {str(prev_exit):19s}  {str(eng_ts):19s}  {str(tv_ts):19s}  {marker:11s}  {gap}")
+        print(f"{desc:<18s}  {prev_exit!s:19s}  {eng_ts!s:19s}  {tv_ts!s:19s}  {marker:11s}  {gap}")
 
         if still_open:
             # Show the previous trade details

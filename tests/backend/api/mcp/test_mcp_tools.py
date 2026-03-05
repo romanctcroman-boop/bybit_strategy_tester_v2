@@ -10,12 +10,13 @@ from pathlib import Path
 import pytest
 
 # Configure pytest-asyncio
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 # ==============================================================================
 # Test Fixtures
 # ==============================================================================
+
 
 @pytest.fixture
 def project_root():
@@ -26,6 +27,7 @@ def project_root():
 @pytest.fixture
 def mock_mcp():
     """Create a mock MCP server for testing."""
+
     class MockMCP:
         def __init__(self):
             self.registered_tools = []
@@ -34,6 +36,7 @@ def mock_mcp():
             def decorator(func):
                 self.registered_tools.append(func.__name__)
                 return func
+
             return decorator
 
     return MockMCP()
@@ -42,6 +45,7 @@ def mock_mcp():
 # ==============================================================================
 # File Tools Tests
 # ==============================================================================
+
 
 class TestFileTools:
     """Tests for file_tools.py."""
@@ -168,6 +172,7 @@ class TestFileTools:
 # Agent Tools Tests
 # ==============================================================================
 
+
 class TestAgentTools:
     """Tests for agent_tools.py."""
 
@@ -218,6 +223,7 @@ class TestAgentTools:
 # ==============================================================================
 # Integration Tests
 # ==============================================================================
+
 
 class TestMCPToolsIntegration:
     """Integration tests that verify tools work together."""

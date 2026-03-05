@@ -110,14 +110,14 @@ class PromptEngineer:
 
         if include_examples:
             prompt += "\n\nEXAMPLE STRATEGIES FOR REFERENCE:\n"
-            
+
             if dynamic_examples:
                 # P1: Dynamic examples based on market regime + volatility
                 examples = self._get_dynamic_examples(context)
             else:
                 # Legacy: regime-based only
                 examples = self._get_legacy_examples(context)
-            
+
             prompt += "\n\n".join(examples)
 
         logger.debug(
@@ -127,23 +127,23 @@ class PromptEngineer:
         )
 
         return prompt
-    
+
     def _get_dynamic_examples(self, context: MarketContext) -> list[str]:
         """
         P1: Get examples dynamically matched to market regime and volatility.
-        
+
         Args:
             context: Market context
-        
+
         Returns:
             List of example strategy JSONs
         """
         regime = context.market_regime
         volatility = context.historical_volatility
         trend_strength = context.trend_strength
-        
+
         examples = []
-        
+
         # Primary example: Match regime
         if regime in ("trending_up", "trending_down"):
             if trend_strength == "strong":
@@ -161,7 +161,7 @@ class PromptEngineer:
         else:
             # Default fallback
             examples.append(STRATEGY_EXAMPLE_RSI_MEAN_REVERSION)
-        
+
         # Secondary example: Complementary strategy
         if len(examples) == 1:
             # Add a different approach for diversification
@@ -171,16 +171,16 @@ class PromptEngineer:
                 examples.append(STRATEGY_EXAMPLE_MACD_TREND)
             elif "Stochastic" in examples[0]:
                 examples.append(STRATEGY_EXAMPLE_QQE_MOMENTUM)
-        
+
         return examples
-    
+
     def _get_legacy_examples(self, context: MarketContext) -> list[str]:
         """
         Legacy example selection (regime-based only).
-        
+
         Args:
             context: Market context
-        
+
         Returns:
             List of example strategy JSONs
         """

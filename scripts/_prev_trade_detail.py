@@ -200,7 +200,7 @@ async def main():
                 break
 
         if tv_exit_idx and tv_exit_idx != exit_idx:
-            print(f"\n  TV exits at different bar!")
+            print("\n  TV exits at different bar!")
             print(f"  TV exit bar {tv_exit}:")
             k = tv_exit_idx
             print(

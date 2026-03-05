@@ -126,14 +126,14 @@ async def main():
 
             se_flag = "TRUE" if crossunder and in_range else "-"
             print(
-                f"{str(ts):>25s}  {rsi_val:12.6f}  {rsi_prev:12.6f}  "
+                f"{ts!s:>25s}  {rsi_val:12.6f}  {rsi_prev:12.6f}  "
                 f"{'YES' if in_range else 'no':>8s}  "
                 f"{'CROSS!' if crossunder else '-':>8s}  "
                 f"{se_flag:>6s}  "
                 f"{'  '.join(notes)}"
             )
 
-        print(f"\n  Between 1st and 2nd SE:")
+        print("\n  Between 1st and 2nd SE:")
         print(f"    RSI went above 52? {rsi_went_above_52}")
         print(f"    Bars above 52: {bars_above_52}, Bars below 52: {bars_below_52}")
         if max_rsi > 0:

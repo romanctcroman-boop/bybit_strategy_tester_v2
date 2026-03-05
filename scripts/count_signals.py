@@ -67,7 +67,7 @@ mask = (df["dt"] >= strategy_start) & (df["dt"] <= strategy_end)
 signals_in_period = df[mask & cross_short_with_range]
 
 print(f"Total BTC RSI crosses below 52 (with range [50-70]) in strategy period: {len(signals_in_period)}")
-print(f"\nAll signal bars:")
+print("\nAll signal bars:")
 print(f"{'#':3s} {'Date/Time':22s} {'RSI_prev':10s} {'RSI':10s}")
 for i, (_, row) in enumerate(signals_in_period.iterrows(), 1):
     print(f"{i:3d} {row['dt'].strftime('%Y-%m-%d %H:%M'):22s} {row['rsi_prev']:10.4f} {row['rsi']:10.4f}")

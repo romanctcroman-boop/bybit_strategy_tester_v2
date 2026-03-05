@@ -14,9 +14,7 @@ from backend.services.walk_forward import (
 )
 
 
-def simple_strategy_runner(
-    candles: list, params: dict, initial_capital: float = 10000.0
-) -> dict:
+def simple_strategy_runner(candles: list, params: dict, initial_capital: float = 10000.0) -> dict:
     """Simple test strategy runner."""
     if not candles:
         return {"return": 0, "sharpe": 0, "max_drawdown": 0, "trades": 0}
@@ -24,9 +22,7 @@ def simple_strategy_runner(
     # Simple moving average crossover simulation
     returns = []
     for i in range(1, len(candles)):
-        change = (
-            candles[i].get("close", 100) - candles[i - 1].get("close", 100)
-        ) / candles[i - 1].get("close", 100)
+        change = (candles[i].get("close", 100) - candles[i - 1].get("close", 100)) / candles[i - 1].get("close", 100)
         returns.append(change)
 
     total_return = sum(returns) if returns else 0
@@ -177,10 +173,7 @@ class TestWalkForwardOptimizer:
 
     def test_small_data(self, optimizer, param_grid):
         """Test with small data set raises error."""
-        small_candles = [
-            {"open": 100, "high": 101, "low": 99, "close": 100, "volume": 100}
-            for _ in range(20)
-        ]
+        small_candles = [{"open": 100, "high": 101, "low": 99, "close": 100, "volume": 100} for _ in range(20)]
 
         # Should raise ValueError with insufficient data
         with pytest.raises(ValueError, match="Insufficient data"):

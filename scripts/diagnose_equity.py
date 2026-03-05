@@ -2,6 +2,7 @@
 🔍 ДИАГНОСТИКА РАСХОЖДЕНИЯ EQUITY CURVE
 Fallback Sharpe=5.13 vs Numba Sharpe=-4.15
 """
+
 import sys
 from pathlib import Path
 
@@ -20,17 +21,21 @@ print("=" * 100)
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
-df_1h = pd.read_sql("""
+df_1h = pd.read_sql(
+    """
     SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
+
 
 # RSI сигналы
 def calculate_rsi(close, period=14):
@@ -43,7 +48,8 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-rsi = calculate_rsi(df_1h['close'], period=14)
+
+rsi = calculate_rsi(df_1h["close"], period=14)
 long_entries = (rsi < 30).values
 long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
@@ -125,6 +131,7 @@ print("\n" + "=" * 100)
 print("📊 ВЫЧИСЛЕНИЕ SHARPE ВРУЧНУЮ")
 print("=" * 100)
 
+
 def calc_sharpe(equity):
     returns = np.diff(equity) / equity[:-1]
     returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
@@ -132,6 +139,7 @@ def calc_sharpe(equity):
         sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)
         return sharpe, returns
     return 0, returns
+
 
 fb_sharpe, fb_returns = calc_sharpe(fb_eq)
 nb_sharpe, nb_returns = calc_sharpe(nb_eq)

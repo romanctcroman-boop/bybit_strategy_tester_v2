@@ -134,8 +134,10 @@ def summarize_results(results: list[dict], max_chars: int = 12000) -> str:
 
     return "\n\n".join(chunks)
 
+
 PERPLEXITY_API_KEY = get_decrypted_key("PERPLEXITY_API_KEY")
 DEEPSEEK_API_KEY = get_decrypted_key("DEEPSEEK_API_KEY")
+
 
 class MultiAgentChannel:
     """Канал связи между DeepSeek и Perplexity"""
@@ -149,59 +151,36 @@ class MultiAgentChannel:
         messages = [
             {
                 "role": "system",
-                "content": "Ты технический эксперт по архитектуре и кодогенерации. Работаешь в команде с Perplexity AI."
+                "content": "Ты технический эксперт по архитектуре и кодогенерации. Работаешь в команде с Perplexity AI.",
             }
         ]
 
         if context:
-            prompt = (
-                f"КОНТЕКСТ:\n{context}\n\n---\n\n"
-                f"ЗАДАНИЕ:\n{prompt}"
-            )
+            prompt = f"КОНТЕКСТ:\n{context}\n\n---\n\nЗАДАНИЕ:\n{prompt}"
 
-        messages.append({
-            "role": "user",
-            "content": prompt
-        })
+        messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": "deepseek-chat",
-            "messages": messages,
-            "temperature": 0.2,
-            "max_tokens": 4000
-        }
+        payload = {"model": "deepseek-chat", "messages": messages, "temperature": 0.2, "max_tokens": 4000}
 
         try:
             response = requests.post(
                 "https://api.deepseek.com/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                    "Content-Type": "application/json"
-                },
+                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
                 json=payload,
-                timeout=60
+                timeout=60,
             )
         except requests.RequestException as exc:
-            return {
-                "success": False,
-                "error": f"DeepSeek request failed: {exc}",
-                "agent": "DeepSeek"
-            }
+            return {"success": False, "error": f"DeepSeek request failed: {exc}", "agent": "DeepSeek"}
 
         if response.status_code == 200:
             result = response.json()
-            content = result['choices'][0]['message']['content']
-            return {
-                "success": True,
-                "content": content,
-                "agent": "DeepSeek",
-                "timestamp": datetime.now().isoformat()
-            }
+            content = result["choices"][0]["message"]["content"]
+            return {"success": True, "content": content, "agent": "DeepSeek", "timestamp": datetime.now().isoformat()}
         else:
             return {
                 "success": False,
                 "error": f"DeepSeek error {response.status_code}: {response.text}",
-                "agent": "DeepSeek"
+                "agent": "DeepSeek",
             }
 
     def perplexity_call(self, prompt: str, context: str | None = None) -> dict:
@@ -209,61 +188,43 @@ class MultiAgentChannel:
         messages = [
             {
                 "role": "system",
-                "content": "Ты стратегический эксперт по бизнес-анализу и приоритизации. Работаешь в команде с DeepSeek."
+                "content": "Ты стратегический эксперт по бизнес-анализу и приоритизации. Работаешь в команде с DeepSeek.",
             }
         ]
 
         if context:
-            prompt = (
-                f"КОНТЕКСТ:\n{context}\n\n---\n\n"
-                f"ЗАДАНИЕ:\n{prompt}"
-            )
+            prompt = f"КОНТЕКСТ:\n{context}\n\n---\n\nЗАДАНИЕ:\n{prompt}"
 
-        messages.append({
-            "role": "user",
-            "content": prompt
-        })
+        messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": "sonar-pro",
-            "messages": messages,
-            "temperature": 0.2,
-            "max_tokens": 4000
-        }
+        payload = {"model": "sonar-pro", "messages": messages, "temperature": 0.2, "max_tokens": 4000}
 
         try:
             response = requests.post(
                 "https://api.perplexity.ai/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                    "Content-Type": "application/json"
-                },
+                headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}", "Content-Type": "application/json"},
                 json=payload,
-                timeout=60
+                timeout=60,
             )
         except requests.RequestException as exc:
-            return {
-                "success": False,
-                "error": f"Perplexity request failed: {exc}",
-                "agent": "Perplexity"
-            }
+            return {"success": False, "error": f"Perplexity request failed: {exc}", "agent": "Perplexity"}
 
         if response.status_code == 200:
             result = response.json()
-            content = result['choices'][0]['message']['content']
-            citations = result.get('citations', [])
+            content = result["choices"][0]["message"]["content"]
+            citations = result.get("citations", [])
             return {
                 "success": True,
                 "content": content,
                 "citations": citations,
                 "agent": "Perplexity",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         else:
             return {
                 "success": False,
                 "error": f"Perplexity error {response.status_code}: {response.text}",
-                "agent": "Perplexity"
+                "agent": "Perplexity",
             }
 
     def collaborative_analysis(
@@ -332,7 +293,7 @@ class MultiAgentChannel:
             print("📤 DeepSeek: Технические уточнения на основе стратегии Perplexity...")
             deepseek_result = self.deepseek_call(
                 deepseek_followup,
-                context=perplexity_result["content"][:2000]  # Первые 2000 символов
+                context=perplexity_result["content"][:2000],  # Первые 2000 символов
             )
             results.append(deepseek_result)
 
@@ -352,10 +313,7 @@ class MultiAgentChannel:
 Как приоритизировать реализацию? Какие риски?"""
 
             print("📤 Perplexity: Стратегические уточнения на основе технического анализа...")
-            perplexity_result = self.perplexity_call(
-                perplexity_followup,
-                context=deepseek_result["content"][:2000]
-            )
+            perplexity_result = self.perplexity_call(perplexity_followup, context=deepseek_result["content"][:2000])
             results.append(perplexity_result)
 
             if perplexity_result["success"]:
@@ -368,19 +326,15 @@ class MultiAgentChannel:
 
     def save_session(self, results: list[dict], filename: str):
         """Сохранение сессии совместной работы"""
-        report = {
-            "session_id": self.session_id,
-            "timestamp": datetime.now().isoformat(),
-            "results": results
-        }
+        report = {"session_id": self.session_id, "timestamp": datetime.now().isoformat(), "results": results}
 
         output_path = Path(filename)
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
 
         # Создаём также markdown версию
-        md_path = output_path.with_suffix('.md')
-        with open(md_path, 'w', encoding='utf-8') as f:
+        md_path = output_path.with_suffix(".md")
+        with open(md_path, "w", encoding="utf-8") as f:
             f.write("# Multi-Agent Collaboration Session\n\n")
             f.write(f"**Session ID:** {self.session_id}\n")
             f.write(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
@@ -489,7 +443,7 @@ class MultiAgentChannel:
         deepseek_prompt = f"""Ты технический архитектор. На основе отчёта Perplexity и истории предыдущей сессии предложи план самоусовершенствования.
 
 <Выводы Perplexity>
-{perplexity_analysis.get('content', '')[:6000]}
+{perplexity_analysis.get("content", "")[:6000]}
 
 <Резюме предыдущей сессии>
 {previous_session_summary[:6000]}
@@ -526,10 +480,7 @@ def main():
 
     shared_context = "Сводка ключевых ТЗ (укороченные версии):\n" + tz_context
     if previous_spec_text and previous_spec_path:
-        shared_context += (
-            "\n\n<Последняя версия ТЗ>\n"
-            f"Файл: {previous_spec_path.name}\n\n{previous_spec_text[:8000]}"
-        )
+        shared_context += f"\n\n<Последняя версия ТЗ>\nФайл: {previous_spec_path.name}\n\n{previous_spec_text[:8000]}"
 
     channel = MultiAgentChannel()
 

@@ -14,6 +14,7 @@ as the single source of truth. This ensures consistency across:
 REFACTORED: 2026-01-25 - Now uses MetricsCalculator.calculate_all()
 """
 
+import math
 import uuid
 import warnings
 from datetime import datetime
@@ -1237,18 +1238,16 @@ class BacktestEngine:
             signals = strategy.generate_signals(ohlcv)
 
             # Check if TP/SL are configured (reserved for future conditional logic)
-            has_tp_sl = getattr(config, "stop_loss", None) or getattr(  # noqa: F841
-                config, "take_profit", None
-            )
-            has_trailing = getattr(config, "trailing_stop_activation", None)  # noqa: F841
+            has_tp_sl = getattr(config, "stop_loss", None) or getattr(config, "take_profit", None)
+            has_trailing = getattr(config, "trailing_stop_activation", None)
 
             # Check if bidirectional trading (requires fallback engine)
             direction = getattr(config, "direction", "both")
-            is_bidirectional = direction == "both"  # noqa: F841
-            is_short_only = direction == "short"  # noqa: F841  # VBT doesn't handle shorts reliably
+            is_bidirectional = direction == "both"
+            is_short_only = direction == "short"  # VBT doesn't handle shorts reliably
 
             # Check if force_fallback is enabled (for 100% parity guarantee)
-            force_fallback = getattr(config, "force_fallback", False)  # noqa: F841
+            force_fallback = getattr(config, "force_fallback", False)
 
             # Run simulation
             # ALWAYS use fallback engine for regular backtests to ensure 100% consistent,
@@ -1898,7 +1897,8 @@ class BacktestEngine:
                         # This matches TV "Объём заявки = 10% от капитала", recalculate=OFF.
                         position_value = config.initial_capital * config.position_size  # fixed notional
                         margin_allocated = position_value / leverage  # margin locked from cash
-                        entry_size = position_value / entry_price  # quantity in base currency
+                        # TradingView truncates quantity to 4 decimal places (floor) for parity
+                        entry_size = math.floor((position_value / entry_price) * 10000) / 10000
 
                         fees = position_value * config.commission_value  # use commission_value (0.07%)
 
@@ -1941,7 +1941,8 @@ class BacktestEngine:
                         # TradingView "% of equity" sizing with recalculate=OFF (fixed notional).
                         position_value = config.initial_capital * config.position_size  # fixed notional
                         margin_allocated = position_value / leverage  # margin locked from cash
-                        entry_size = position_value / entry_price  # quantity in base currency
+                        # TradingView truncates quantity to 4 decimal places (floor) for parity
+                        entry_size = math.floor((position_value / entry_price) * 10000) / 10000
 
                         fees = position_value * config.commission_value  # use commission_value (0.07%)
 
@@ -2252,9 +2253,10 @@ class BacktestEngine:
 
                     # Check Stop Loss using worst price within bar (TradingView style)
                     # SL/TP = % price movement, matches FallbackEngineV4
-                    # TradingView: limit/stop orders (TP/SL) do NOT fill on the entry bar or
-                    # the bar immediately after entry. They activate on bar entry_idx+2 onward.
-                    if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss and i >= tp_sl_active_from + 1:
+                    # TradingView: TP/SL orders activate on the entry bar itself (tp_sl_active_from).
+                    # TV allows same-bar TP/SL: if entry fills at open[i] and TP/SL is hit within
+                    # that same bar, the trade exits on that bar (entry_time == exit_time).
+                    if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss and i >= tp_sl_active_from:
                         should_exit = True
                         exit_reason = "stop_loss"
                         # Calculate exact SL price using sl_ref_price (average or last order)
@@ -2264,10 +2266,11 @@ class BacktestEngine:
                         apply_slippage = True  # SL is market order
 
                     # Check Take Profit using best price within bar (TradingView style)
-                    # TradingView: signal bar = N (entry fills at close[N]).
-                    # TP order activates starting bar N+2 (tp_sl_active_from + 1).
+                    # TradingView: TP/SL orders activate on the entry bar itself (tp_sl_active_from).
+                    # TV allows same-bar TP/SL: if entry fills at open[i] and TP is hit within
+                    # that same bar, the trade exits on that bar (entry_time == exit_time).
                     # On gap-through bars (open past TP), TV fills at open price (not TP price).
-                    if not should_exit and take_profit and best_pnl_pct >= take_profit and i >= tp_sl_active_from + 1:
+                    if not should_exit and take_profit and best_pnl_pct >= take_profit and i >= tp_sl_active_from:
                         should_exit = True
                         exit_reason = "take_profit"
                         apply_slippage = False  # TP is limit order -> no slippage

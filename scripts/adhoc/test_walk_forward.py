@@ -84,11 +84,7 @@ def simple_backtest(data: pd.DataFrame, params: dict) -> dict:
         # Mark-to-market
         if position == 1:
             unrealized = (close[i] - entry_price) / entry_price * equity[-1]
-            equity.append(
-                equity[-1] + unrealized - (equity[-1] - 10000)
-                if len(equity) > 1
-                else 10000 + unrealized
-            )
+            equity.append(equity[-1] + unrealized - (equity[-1] - 10000) if len(equity) > 1 else 10000 + unrealized)
         else:
             equity.append(equity[-1])
 
@@ -100,9 +96,7 @@ def simple_backtest(data: pd.DataFrame, params: dict) -> dict:
     if len(returns) < 2 or np.std(returns) == 0:
         sharpe = 0
     else:
-        sharpe = (
-            np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)
-        )  # Hourly to annual
+        sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252 * 24)  # Hourly to annual
 
     total_return = (equity[-1] - equity[0]) / equity[0]
 
@@ -121,9 +115,7 @@ def test_walk_forward_rolling():
 
     # Create sample data
     data = create_sample_data(2000)
-    print(
-        f"Data: {len(data)} bars, {data['timestamp'].iloc[0]} to {data['timestamp'].iloc[-1]}"
-    )
+    print(f"Data: {len(data)} bars, {data['timestamp'].iloc[0]} to {data['timestamp'].iloc[-1]}")
 
     # Define parameter grid
     param_grid = {
@@ -231,9 +223,7 @@ def test_robustness_metrics():
     print(f"  Parameter Stability: {result.parameter_stability:.1f}%")
 
     # Check that metrics are calculated
-    assert result.avg_is_sharpe != 0 or result.avg_oos_sharpe != 0, (
-        "Metrics should be non-zero"
-    )
+    assert result.avg_is_sharpe != 0 or result.avg_oos_sharpe != 0, "Metrics should be non-zero"
 
     print("\n✅ Robustness metrics test PASSED")
 

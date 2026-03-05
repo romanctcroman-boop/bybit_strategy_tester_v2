@@ -65,7 +65,7 @@ async def main():
         pd.Timestamp("2025-02-06 14:00:00"),  # Root #12 engine signal bar
     ]
 
-    print(f"RSI at target bars with different warmup starts:")
+    print("RSI at target bars with different warmup starts:")
     print(f"{'Warmup start':>15s}  {'warmup bars':>11s}  ", end="")
     for tb in target_bars:
         print(f"{'RSI@' + str(tb)[:16]:>25s}  ", end="")
@@ -97,9 +97,9 @@ async def main():
 
     # Also test: what if BTC started from the very beginning on Bybit?
     # Bybit BTCUSDT linear started around 2020-03-30
-    print(f"\n\nNOTE: Bybit BTCUSDT linear perpetual started ~2020-03-30.")
-    print(f"TV likely starts from the first available bar.")
-    print(f"Convergence difference between warmup starts tells us if this matters.")
+    print("\n\nNOTE: Bybit BTCUSDT linear perpetual started ~2020-03-30.")
+    print("TV likely starts from the first available bar.")
+    print("Convergence difference between warmup starts tells us if this matters.")
 
 
 asyncio.run(main())

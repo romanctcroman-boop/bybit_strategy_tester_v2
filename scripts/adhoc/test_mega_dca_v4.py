@@ -58,24 +58,14 @@ def run_test(name: str, category: str):
                 result = func(*args, **kwargs)
                 elapsed = time.time() - start_time
                 if result is True or result is None:
-                    test_results.append(
-                        TestResult(
-                            name, category, True, f"OK ({elapsed:.2f}s)", elapsed
-                        )
-                    )
+                    test_results.append(TestResult(name, category, True, f"OK ({elapsed:.2f}s)", elapsed))
                     print(f"  ✅ {name} ({elapsed:.2f}s)")
                 else:
-                    test_results.append(
-                        TestResult(name, category, False, str(result), elapsed)
-                    )
+                    test_results.append(TestResult(name, category, False, str(result), elapsed))
                     print(f"  ❌ {name}: {result}")
             except Exception as e:
                 elapsed = time.time() - start_time
-                test_results.append(
-                    TestResult(
-                        name, category, False, str(e), elapsed, traceback.format_exc()
-                    )
-                )
+                test_results.append(TestResult(name, category, False, str(e), elapsed, traceback.format_exc()))
                 print(f"  ❌ {name}: {e}")
 
         return wrapper
@@ -177,9 +167,7 @@ def test_fast_optimizer_small_grid():
     assert "rsi_period" in result.best_params
     assert len(result.top_results) > 0
 
-    print(
-        f"    [INFO] Best Sharpe: {result.best_score:.2f}, Trades: {result.best_metrics.get('total_trades', 0)}"
-    )
+    print(f"    [INFO] Best Sharpe: {result.best_score:.2f}, Trades: {result.best_metrics.get('total_trades', 0)}")
 
     return True
 
@@ -215,9 +203,7 @@ def test_fast_optimizer_medium_grid():
     assert result.tested_combinations >= 1000  # Should test many combinations
 
     speed = result.tested_combinations / result.execution_time_seconds
-    print(
-        f"    [INFO] Speed: {speed:,.0f} combos/sec, Time: {result.execution_time_seconds:.2f}s"
-    )
+    print(f"    [INFO] Speed: {speed:,.0f} combos/sec, Time: {result.execution_time_seconds:.2f}s")
 
     return True
 
@@ -472,9 +458,7 @@ def test_gpu_optimizer_small():
         )
 
         assert result.status == "completed"
-        print(
-            f"    [INFO] GPU Speed: {result.tested_combinations / result.execution_time_seconds:,.0f} combos/sec"
-        )
+        print(f"    [INFO] GPU Speed: {result.tested_combinations / result.execution_time_seconds:,.0f} combos/sec")
 
         return True
     except Exception as e:
@@ -510,9 +494,7 @@ def test_gpu_optimizer_large():
 
         assert result.status == "completed"
         speed = result.tested_combinations / result.execution_time_seconds
-        print(
-            f"    [INFO] GPU tested {result.tested_combinations:,} combos at {speed:,.0f}/sec"
-        )
+        print(f"    [INFO] GPU tested {result.tested_combinations:,} combos at {speed:,.0f}/sec")
 
         return True
     except Exception as e:
@@ -928,9 +910,7 @@ def test_long_series():
     )
 
     assert result.status == "completed"
-    print(
-        f"    [INFO] Processed {len(candles):,} candles in {result.execution_time_seconds:.2f}s"
-    )
+    print(f"    [INFO] Processed {len(candles):,} candles in {result.execution_time_seconds:.2f}s")
 
     return True
 

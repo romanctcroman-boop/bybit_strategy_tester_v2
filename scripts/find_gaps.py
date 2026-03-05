@@ -37,7 +37,7 @@ for i, t in enumerate(trades, 1):
             pass
 
     if gap_str.startswith("***") or i <= 3 or i >= len(trades) - 2:
-        print(f"{i:3d} {str(entry):20s} {str(exit_time):20s} {pnl:10.4f} {gap_str}")
+        print(f"{i:3d} {entry!s:20s} {exit_time!s:20s} {pnl:10.4f} {gap_str}")
 
     prev_exit = exit_time
 

@@ -29,25 +29,25 @@ def load_ohlc_data(filepath: Path) -> pd.DataFrame:
     df = pd.read_csv(filepath)
 
     column_map = {
-        'time': 'timestamp',
-        'Time': 'timestamp',
-        'Open': 'open',
-        'High': 'high',
-        'Low': 'low',
-        'Close': 'close',
-        'Volume': 'volume',
+        "time": "timestamp",
+        "Time": "timestamp",
+        "Open": "open",
+        "High": "high",
+        "Low": "low",
+        "Close": "close",
+        "Volume": "volume",
     }
     df.rename(columns=column_map, inplace=True)
 
-    if 'timestamp' in df.columns:
-        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-        df['timestamp'] = df['timestamp'].dt.tz_localize(None)
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        df["timestamp"] = df["timestamp"].dt.tz_localize(None)
     elif isinstance(df.index, pd.DatetimeIndex):
-        df['timestamp'] = df.index.to_numpy()
+        df["timestamp"] = df.index.to_numpy()
 
-    for col in ['open', 'high', 'low', 'close', 'volume']:
+    for col in ["open", "high", "low", "close", "volume"]:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
 
@@ -79,13 +79,13 @@ def run_with_engine(
         input_data = BacktestInput(
             candles=candles,
             candles_1m=None,
-            initial_capital=config['initial_capital'],
+            initial_capital=config["initial_capital"],
             use_fixed_amount=True,
-            fixed_amount=config['fixed_amount'],
-            leverage=config['leverage'],
-            take_profit=config['take_profit'],
-            stop_loss=config['stop_loss'],
-            taker_fee=config['commission'],
+            fixed_amount=config["fixed_amount"],
+            leverage=config["leverage"],
+            take_profit=config["take_profit"],
+            stop_loss=config["stop_loss"],
+            taker_fee=config["commission"],
             direction=TradeDirection.BOTH,
             long_entries=long_entries,
             short_entries=short_entries,
@@ -99,22 +99,22 @@ def run_with_engine(
         print(f"✅ {elapsed:.3f}s")
 
         return {
-            'engine': engine_name,
-            'elapsed': elapsed,
-            'metrics': result.metrics,
-            'trades': result.trades,
-            'success': True,
-            'error': None,
+            "engine": engine_name,
+            "elapsed": elapsed,
+            "metrics": result.metrics,
+            "trades": result.trades,
+            "success": True,
+            "error": None,
         }
     except Exception as e:
         print(f"❌ {e}")
         return {
-            'engine': engine_name,
-            'elapsed': 0,
-            'metrics': None,
-            'trades': [],
-            'success': False,
-            'error': str(e),
+            "engine": engine_name,
+            "elapsed": 0,
+            "metrics": None,
+            "trades": [],
+            "success": False,
+            "error": str(e),
         }
 
 
@@ -123,7 +123,7 @@ def compare_results(results: list[dict[str, Any]]) -> dict[str, bool]:
     # Найдём первый успешный результат как эталон
     baseline = None
     for r in results:
-        if r['success']:
+        if r["success"]:
             baseline = r
             break
 
@@ -135,32 +135,32 @@ def compare_results(results: list[dict[str, Any]]) -> dict[str, bool]:
     parity = {}
 
     for r in results:
-        if not r['success']:
-            parity[r['engine']] = False
+        if not r["success"]:
+            parity[r["engine"]] = False
             continue
 
-        if r['engine'] == baseline['engine']:
-            parity[r['engine']] = True
+        if r["engine"] == baseline["engine"]:
+            parity[r["engine"]] = True
             continue
 
         # Сравним метрики
-        bm = baseline['metrics']
-        rm = r['metrics']
+        bm = baseline["metrics"]
+        rm = r["metrics"]
 
         matches = True
         diffs = []
 
         # Ключевые метрики для сравнения
         metrics_to_check = [
-            ('total_trades', 'Всего сделок', 0),
-            ('net_profit', 'Net Profit', 0.01),
-            ('gross_profit', 'Gross Profit', 0.01),
-            ('gross_loss', 'Gross Loss', 0.01),
-            ('winning_trades', 'Winning Trades', 0),
-            ('losing_trades', 'Losing Trades', 0),
-            ('win_rate', 'Win Rate', 0.01),
-            ('profit_factor', 'Profit Factor', 0.001),
-            ('max_drawdown', 'Max Drawdown', 0.01),
+            ("total_trades", "Всего сделок", 0),
+            ("net_profit", "Net Profit", 0.01),
+            ("gross_profit", "Gross Profit", 0.01),
+            ("gross_loss", "Gross Loss", 0.01),
+            ("winning_trades", "Winning Trades", 0),
+            ("losing_trades", "Losing Trades", 0),
+            ("win_rate", "Win Rate", 0.01),
+            ("profit_factor", "Profit Factor", 0.001),
+            ("max_drawdown", "Max Drawdown", 0.01),
         ]
 
         for attr, name, tolerance in metrics_to_check:
@@ -176,7 +176,7 @@ def compare_results(results: list[dict[str, Any]]) -> dict[str, bool]:
                     matches = False
                     diffs.append(f"{name}: {bv:.4f} vs {rv:.4f}")
 
-        parity[r['engine']] = matches
+        parity[r["engine"]] = matches
 
         if not matches:
             print(f"\n⚠️ {r['engine']} расхождения:")
@@ -193,31 +193,31 @@ def print_comparison_table(results: list[dict[str, Any]]):
     print("=" * 100)
 
     # Заголовок
-    headers = ['Метрика'] + [r['engine'] for r in results if r['success']]
+    headers = ["Метрика"] + [r["engine"] for r in results if r["success"]]
     header_line = f"{'Метрика':<25}" + "".join(f"{h:>18}" for h in headers[1:])
     print(f"\n{header_line}")
     print("-" * 100)
 
     # Метрики
     metrics_display = [
-        ('total_trades', 'Всего сделок', 0),
-        ('net_profit', 'Net Profit', 2),
-        ('gross_profit', 'Gross Profit', 2),
-        ('gross_loss', 'Gross Loss', 2),
-        ('winning_trades', 'Прибыльных', 0),
-        ('losing_trades', 'Убыточных', 0),
-        ('win_rate', 'Win Rate %', 2),
-        ('profit_factor', 'Profit Factor', 3),
-        ('max_drawdown', 'Max Drawdown', 2),
-        ('avg_trade', 'Avg Trade', 2),
+        ("total_trades", "Всего сделок", 0),
+        ("net_profit", "Net Profit", 2),
+        ("gross_profit", "Gross Profit", 2),
+        ("gross_loss", "Gross Loss", 2),
+        ("winning_trades", "Прибыльных", 0),
+        ("losing_trades", "Убыточных", 0),
+        ("win_rate", "Win Rate %", 2),
+        ("profit_factor", "Profit Factor", 3),
+        ("max_drawdown", "Max Drawdown", 2),
+        ("avg_trade", "Avg Trade", 2),
     ]
 
     for attr, name, decimals in metrics_display:
         row = f"{name:<25}"
         for r in results:
-            if not r['success']:
+            if not r["success"]:
                 continue
-            val = getattr(r['metrics'], attr, 0) or 0
+            val = getattr(r["metrics"], attr, 0) or 0
             if decimals == 0:
                 row += f"{int(val):>18}"
             else:
@@ -229,7 +229,7 @@ def print_comparison_table(results: list[dict[str, Any]]):
     # Время выполнения
     print("\n⏱️ Время выполнения:")
     for r in results:
-        if r['success']:
+        if r["success"]:
             print(f"   {r['engine']}: {r['elapsed']:.3f}s")
 
 
@@ -261,21 +261,21 @@ def main():
 
     # Конфигурация стратегии
     config = {
-        'initial_capital': 1_000_000.0,
-        'fixed_amount': 100.0,
-        'leverage': 10,
-        'take_profit': 0.015,
-        'stop_loss': 0.03,
-        'commission': 0.0007,
+        "initial_capital": 1_000_000.0,
+        "fixed_amount": 100.0,
+        "leverage": 10,
+        "take_profit": 0.015,
+        "stop_loss": 0.03,
+        "commission": 0.0007,
     }
 
     print("\n📋 Параметры стратегии:")
-    print(f"   TP: {config['take_profit']*100}%, SL: {config['stop_loss']*100}%")
-    print(f"   Leverage: {config['leverage']}x, Commission: {config['commission']*100}%")
+    print(f"   TP: {config['take_profit'] * 100}%, SL: {config['stop_loss'] * 100}%")
+    print(f"   Leverage: {config['leverage']}x, Commission: {config['commission'] * 100}%")
 
     # Подготовка данных для движков
     candles = ohlc_df.reset_index(drop=True)
-    if 'timestamp' not in candles.columns and candles.index.name == 'timestamp':
+    if "timestamp" not in candles.columns and candles.index.name == "timestamp":
         candles = candles.reset_index()
 
     results = []
@@ -283,10 +283,9 @@ def main():
     # === FALLBACK ENGINE V2 ===
     try:
         from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+
         engine = FallbackEngineV2()
-        result = run_with_engine(
-            engine, "FallbackEngineV2", candles, long_entries, short_entries, config
-        )
+        result = run_with_engine(engine, "FallbackEngineV2", candles, long_entries, short_entries, config)
         results.append(result)
     except ImportError as e:
         print(f"\n⚠️ FallbackEngineV2 не доступен: {e}")
@@ -294,10 +293,9 @@ def main():
     # === NUMBA ENGINE V2 ===
     try:
         from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+
         engine = NumbaEngineV2()
-        result = run_with_engine(
-            engine, "NumbaEngineV2", candles, long_entries, short_entries, config
-        )
+        result = run_with_engine(engine, "NumbaEngineV2", candles, long_entries, short_entries, config)
         results.append(result)
     except ImportError as e:
         print(f"\n⚠️ NumbaEngineV2 не доступен: {e}")
@@ -307,10 +305,9 @@ def main():
     # === GPU ENGINE V2 ===
     try:
         from backend.backtesting.engines.gpu_engine_v2 import GPUEngineV2
+
         engine = GPUEngineV2()
-        result = run_with_engine(
-            engine, "GPUEngineV2", candles, long_entries, short_entries, config
-        )
+        result = run_with_engine(engine, "GPUEngineV2", candles, long_entries, short_entries, config)
         results.append(result)
     except ImportError as e:
         print(f"\n⚠️ GPUEngineV2 не доступен: {e}")
@@ -320,10 +317,9 @@ def main():
     # === FALLBACK ENGINE V3 ===
     try:
         from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+
         engine = FallbackEngineV3()
-        result = run_with_engine(
-            engine, "FallbackEngineV3", candles, long_entries, short_entries, config
-        )
+        result = run_with_engine(engine, "FallbackEngineV3", candles, long_entries, short_entries, config)
         results.append(result)
     except ImportError as e:
         print(f"\n⚠️ FallbackEngineV3 не доступен: {e}")

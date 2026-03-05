@@ -133,7 +133,7 @@ async def main():
 
         if idx < len(tv_trades):
             tv_t = tv_trades[idx]
-            t_str = f"{tv_t['direction']:6s} {tv_t['entry_time'][:19]:20s} {tv_t['exit_time'][:19]:20s} {str(tv_t['profit']):>8s}"
+            t_str = f"{tv_t['direction']:6s} {tv_t['entry_time'][:19]:20s} {tv_t['exit_time'][:19]:20s} {tv_t['profit']!s:>8s}"
 
         # Check if entries match
         if idx < len(trades) and idx < len(tv_trades):

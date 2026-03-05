@@ -57,9 +57,7 @@ class TestAIAgentBackgroundServiceInit:
     @pytest.mark.asyncio
     async def test_init_creates_interface(self):
         """Test __init__ creates unified agent interface"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_get.return_value = mock_interface
 
@@ -93,9 +91,7 @@ class TestAIAgentBackgroundServiceInit:
     @pytest.mark.asyncio
     async def test_init_fails_if_interface_unavailable(self):
         """Test __init__ raises error if interface initialization fails"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_get.side_effect = RuntimeError("Interface init failed")
 
             with pytest.raises(RuntimeError, match="Interface init failed"):
@@ -137,9 +133,7 @@ class TestServiceStartStop:
     @pytest.mark.asyncio
     async def test_start_initial_flow(self):
         """Test start() initial flow: sets running=True, logs info, runs health check"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = [Mock(), Mock()]
             mock_interface.key_manager.perplexity_keys = [Mock()]
@@ -156,9 +150,7 @@ class TestServiceStartStop:
                     check_count += 1
                     service.running = False  # Stop after first check
 
-                service._comprehensive_health_check = AsyncMock(
-                    side_effect=mock_health_check
-                )
+                service._comprehensive_health_check = AsyncMock(side_effect=mock_health_check)
 
                 # Run service (will stop after first health check)
                 await service.start()
@@ -198,9 +190,7 @@ class TestServiceStartStop:
     @pytest.mark.asyncio
     async def test_start_awaits_health_check_in_loop(self):
         """Test start() awaits health checks with sleep interval"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = []
             mock_interface.key_manager.perplexity_keys = []
@@ -217,9 +207,7 @@ class TestServiceStartStop:
                 if check_count >= 2:  # Stop after 2 checks
                     service.running = False
 
-            service._comprehensive_health_check = AsyncMock(
-                side_effect=mock_health_check
-            )
+            service._comprehensive_health_check = AsyncMock(side_effect=mock_health_check)
 
             await service.start()
 
@@ -302,9 +290,7 @@ class TestHealthCheckOrchestration:
         """Test _comprehensive_health_check handles exceptions"""
         with patch("backend.agents.agent_background_service.get_agent_interface"):
             service = AIAgentBackgroundService()
-            service._check_api_keys = AsyncMock(
-                side_effect=RuntimeError("Check failed")
-            )
+            service._check_api_keys = AsyncMock(side_effect=RuntimeError("Check failed"))
 
             # Should not raise, but increment failure counter
             await service._comprehensive_health_check()
@@ -323,9 +309,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_counts_active_keys(self):
         """Test _check_api_keys counts active and total keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = [
                 create_api_key(
@@ -363,9 +347,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_resets_all_disabled_deepseek(self):
         """Test _check_api_keys resets all disabled DeepSeek keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             key1 = create_api_key(
                 value="key1",
@@ -399,9 +381,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_resets_all_disabled_perplexity(self):
         """Test _check_api_keys resets all disabled Perplexity keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             key1 = create_api_key(
                 value="key1",
@@ -426,9 +406,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_no_reset_if_any_active(self):
         """Test _check_api_keys doesn't reset if any key is active"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             key1 = create_api_key(
                 value="key1",
@@ -461,9 +439,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_resets_and_increments_stat(self):
         """Test _check_api_keys resets keys and increments rotation stat"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             key1 = create_api_key(
                 value="key1",
@@ -489,9 +465,7 @@ class TestAPIKeyChecks:
     @pytest.mark.asyncio
     async def test_check_api_keys_handles_empty_key_lists(self):
         """Test _check_api_keys handles empty key lists"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = []
             mock_interface.key_manager.perplexity_keys = []
@@ -517,9 +491,7 @@ class TestMCPServerChecks:
     @pytest.mark.asyncio
     async def test_check_mcp_server_sets_available_on_success(self):
         """_check_mcp_server marks MCP available when health endpoint responds"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = False
             mock_interface.circuit_manager = None
@@ -553,9 +525,7 @@ class TestMCPServerChecks:
     @pytest.mark.asyncio
     async def test_check_mcp_server_sets_unavailable_on_error(self):
         """_check_mcp_server marks MCP unavailable when probe fails"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = True
             mock_interface.circuit_manager = None
@@ -579,9 +549,7 @@ class TestMCPServerChecks:
     @pytest.mark.asyncio
     async def test_check_mcp_server_no_stat_change_when_state_same(self):
         """No stat increment if availability doesn't change"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = False
             mock_interface.circuit_manager = None
@@ -610,9 +578,7 @@ class TestMCPServerChecks:
     @pytest.mark.asyncio
     async def test_check_mcp_server_logs_status(self):
         """_check_mcp_server logs current MCP status"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = False
             mock_interface.circuit_manager = None
@@ -632,9 +598,12 @@ class TestMCPServerChecks:
             mock_client.__aenter__.return_value = mock_client
             mock_client.get.return_value = mock_response
 
-            with patch("backend.agents.agent_background_service.logger") as mock_logger, patch(
-                "backend.agents.agent_background_service.httpx.AsyncClient",
-                return_value=mock_client,
+            with (
+                patch("backend.agents.agent_background_service.logger") as mock_logger,
+                patch(
+                    "backend.agents.agent_background_service.httpx.AsyncClient",
+                    return_value=mock_client,
+                ),
             ):
                 service = AIAgentBackgroundService()
                 await service._check_mcp_server()
@@ -645,9 +614,7 @@ class TestMCPServerChecks:
     @pytest.mark.asyncio
     async def test_check_mcp_server_respects_open_breaker(self):
         """Breaker open state skips probe and increments stat"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = True
             circuit_manager = MagicMock()
@@ -664,17 +631,13 @@ class TestMCPServerChecks:
             circuit_manager.call_with_breaker.assert_not_called()
             assert service.stats["mcp_breaker_rejections"] == 1
             assert service.interface.mcp_available is False
-            warn_calls = " ".join(
-                str(call) for call in mock_logger.warning.call_args_list
-            )
+            warn_calls = " ".join(str(call) for call in mock_logger.warning.call_args_list)
             assert "circuit breaker" in warn_calls.lower()
 
     @pytest.mark.asyncio
     async def test_check_mcp_server_uses_breaker_when_available(self):
         """Health probe executes via circuit breaker manager when configured"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.mcp_available = False
             circuit_manager = MagicMock()
@@ -716,9 +679,7 @@ class TestDeepSeekConnectionTests:
     @pytest.mark.asyncio
     async def test_test_deepseek_connection_with_active_keys(self):
         """Test _test_deepseek_connection with active keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = [
                 create_api_key(
@@ -746,9 +707,7 @@ class TestDeepSeekConnectionTests:
     @pytest.mark.asyncio
     async def test_test_deepseek_connection_with_no_active_keys(self):
         """Test _test_deepseek_connection with no active keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.deepseek_keys = [
                 create_api_key(
@@ -769,9 +728,7 @@ class TestDeepSeekConnectionTests:
     @pytest.mark.asyncio
     async def test_test_deepseek_connection_full_with_success(self):
         """Test _test_deepseek_connection_full with successful response"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.send_request = AsyncMock(
                 return_value=AgentResponse(
@@ -792,14 +749,10 @@ class TestDeepSeekConnectionTests:
     @pytest.mark.asyncio
     async def test_test_deepseek_connection_full_with_failure(self):
         """Test _test_deepseek_connection_full with failed response"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.send_request = AsyncMock(
-                return_value=AgentResponse(
-                    success=False, content="", error="API timeout", channel="direct"
-                )
+                return_value=AgentResponse(success=False, content="", error="API timeout", channel="direct")
             )
             mock_get.return_value = mock_interface
 
@@ -820,9 +773,7 @@ class TestPerplexityConnectionTests:
     @pytest.mark.asyncio
     async def test_test_perplexity_connection_with_active_keys(self):
         """Test _test_perplexity_connection with active keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.perplexity_keys = [
                 create_api_key(
@@ -843,9 +794,7 @@ class TestPerplexityConnectionTests:
     @pytest.mark.asyncio
     async def test_test_perplexity_connection_with_no_active_keys(self):
         """Test _test_perplexity_connection with no active keys"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.key_manager.perplexity_keys = [
                 create_api_key(
@@ -866,9 +815,7 @@ class TestPerplexityConnectionTests:
     @pytest.mark.asyncio
     async def test_test_perplexity_connection_full_with_success(self):
         """Test _test_perplexity_connection_full with successful response"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.send_request = AsyncMock(
                 return_value=AgentResponse(
@@ -889,9 +836,7 @@ class TestPerplexityConnectionTests:
     @pytest.mark.asyncio
     async def test_test_perplexity_connection_full_with_failure(self):
         """Test _test_perplexity_connection_full with failed response"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.send_request = AsyncMock(
                 return_value=AgentResponse(
@@ -920,9 +865,7 @@ class TestHealthSummary:
     @pytest.mark.asyncio
     async def test_print_health_summary_logs_uptime(self):
         """Test _print_health_summary logs uptime"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.get_stats.return_value = {
                 "total_requests": 10,
@@ -945,9 +888,7 @@ class TestHealthSummary:
     @pytest.mark.asyncio
     async def test_print_health_summary_logs_statistics(self):
         """Test _print_health_summary logs statistics"""
-        with patch(
-            "backend.agents.agent_background_service.get_agent_interface"
-        ) as mock_get:
+        with patch("backend.agents.agent_background_service.get_agent_interface") as mock_get:
             mock_interface = MagicMock()
             mock_interface.get_stats.return_value = {
                 "total_requests": 42,

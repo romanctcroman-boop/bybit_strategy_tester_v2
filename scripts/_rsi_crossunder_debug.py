@@ -46,7 +46,7 @@ async def main():
         c = btc["close"].iloc[i]
         cross = bool(rp >= 52 and r < 52)
         marker = "  <<< TV signal bar" if i == loc else ""
-        print(f"{str(ts)[:22]:22s}  {c:10.2f}  {r:8.4f}  {str(cross):12s}{marker}")
+        print(f"{str(ts)[:22]:22s}  {c:10.2f}  {r:8.4f}  {cross!s:12s}{marker}")
 
     rsi_prev = rsi.shift(1)
     crossunder_52 = (rsi_prev >= 52) & (rsi < 52)
@@ -59,7 +59,7 @@ async def main():
     rp_t = rsi.iloc[loc - 1]
     rc_t = rsi.iloc[loc]
 
-    print(f"\nAt 2026-02-01 10:00:")
+    print("\nAt 2026-02-01 10:00:")
     print(f"  prev RSI = {rp_t:.6f}  (>= 52? {rp_t >= 52})")
     print(f"  curr RSI = {rc_t:.6f}  (< 52? {rc_t < 52})")
     print(f"  Standard crossunder(52): {bool(rp_t >= 52 and rc_t < 52)}")
@@ -93,16 +93,16 @@ async def main():
     print("\n--- Summary ---")
     print(f"The TV signal at 2026-02-01 10:00 has prev_rsi={rp_t:.4f}")
     print(f"This is {52 - rp_t:.4f} points BELOW 52 threshold.")
-    print(f"Standard crossunder(52) = False.")
-    print(f"TV somehow fires here despite prev_rsi < 52.")
-    print(f"Possible explanations:")
-    print(f"  1. TV uses a different RSI value for the prev bar (data diff)")
-    print(f"     But we proved data is identical => RSI is identical")
-    print(f"  2. TV script uses a looser condition:")
-    print(f"     e.g. 'rsi < 52' (no crossunder, just level check)")
-    print(f"  3. TV applies 'short_range [50..70]' as the only condition")
-    print(f"     (RSI just needs to be in [50..70], no crossunder required)")
-    print(f"  4. Repainting: TV show signal 1 bar earlier/later in list")
+    print("Standard crossunder(52) = False.")
+    print("TV somehow fires here despite prev_rsi < 52.")
+    print("Possible explanations:")
+    print("  1. TV uses a different RSI value for the prev bar (data diff)")
+    print("     But we proved data is identical => RSI is identical")
+    print("  2. TV script uses a looser condition:")
+    print("     e.g. 'rsi < 52' (no crossunder, just level check)")
+    print("  3. TV applies 'short_range [50..70]' as the only condition")
+    print("     (RSI just needs to be in [50..70], no crossunder required)")
+    print("  4. Repainting: TV show signal 1 bar earlier/later in list")
 
 
 asyncio.run(main())

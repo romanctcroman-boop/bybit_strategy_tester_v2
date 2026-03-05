@@ -178,7 +178,7 @@ async def main():
     short_signal_times = [candles.index[i] for i in range(len(candles)) if se[i]]
     long_signal_times = [candles.index[i] for i in range(len(candles)) if le[i]]
 
-    print(f"\nEngine entries that match signal times:")
+    print("\nEngine entries that match signal times:")
     print(f"  All signal times count: short={len(short_signal_times)}, long={len(long_signal_times)}")
 
     # For each engine trade, check if its entry_time is in signal_times

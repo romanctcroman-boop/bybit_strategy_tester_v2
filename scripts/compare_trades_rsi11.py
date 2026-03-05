@@ -52,7 +52,7 @@ tv_trades = [
     (10, "short", "2025-01-29T06:00", "2025-02-02T12:30", 3122.65, 3050.82, 21.62, 2.16),
 ]
 
-print(f"\nTradingView first 10 trades (UTC+3):")
+print("\nTradingView first 10 trades (UTC+3):")
 for t in tv_trades:
     print(f"  {t[0]}. {t[1]} entry={t[2]} exit={t[3]} ep={t[4]:.2f} xp={t[5]:.2f} pnl={t[6]:.2f} pnl%={t[7]:.2f}")
 

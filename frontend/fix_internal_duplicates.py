@@ -18,9 +18,7 @@ def find_all_functions(content):
     for match in re.finditer(pattern, content):
         func_name = match.group(1)
         line_num = content[: match.start()].count("\n") + 1
-        functions[func_name].append(
-            {"line": line_num, "start": match.start(), "end": match.end()}
-        )
+        functions[func_name].append({"line": line_num, "start": match.start(), "end": match.end()})
 
     return functions
 
@@ -71,9 +69,7 @@ def remove_duplicate_function(content, func_name, occurrences):
                 func_keyword_start = search_back + last_newline + 1
 
         # Replace the duplicate with a comment
-        replacement = (
-            f"\n        // REMOVED DUPLICATE: {func_name} (was at line {line})\n"
-        )
+        replacement = f"\n        // REMOVED DUPLICATE: {func_name} (was at line {line})\n"
 
         # Make the replacement
         new_content = content[:func_keyword_start] + replacement + content[func_end:]

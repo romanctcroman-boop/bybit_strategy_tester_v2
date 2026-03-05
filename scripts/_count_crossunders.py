@@ -143,7 +143,7 @@ async def main():
     from collections import Counter
 
     count_dist = Counter(crossunder_counts)
-    print(f"\n\nDISTRIBUTION OF SE COUNT BETWEEN PREV EXIT AND ENTRY:")
+    print("\n\nDISTRIBUTION OF SE COUNT BETWEEN PREV EXIT AND ENTRY:")
     for k in sorted(count_dist.keys()):
         print(f"  {k} SE signals: {count_dist[k]} trades ({100 * count_dist[k] / len(short_trades):.1f}%)")
 

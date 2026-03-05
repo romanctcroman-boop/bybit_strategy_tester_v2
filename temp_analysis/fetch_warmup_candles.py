@@ -11,14 +11,14 @@ import sqlite3
 import sys
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # ── Config ────────────────────────────────────────────────────────────────────
-WARMUP_START = datetime(2024, 12, 1, tzinfo=timezone.utc)  # fetch from here
-WARMUP_END = datetime(2025, 1, 1, tzinfo=timezone.utc)  # up to (exclusive)
+WARMUP_START = datetime(2024, 12, 1, tzinfo=UTC)  # fetch from here
+WARMUP_END = datetime(2025, 1, 1, tzinfo=UTC)  # up to (exclusive)
 
 SYMBOLS = ["ETHUSDT", "BTCUSDT"]
 INTERVAL = "30"
@@ -115,7 +115,7 @@ def insert_warmup_candles(conn: sqlite3.Connection, symbol: str, rows: list[dict
     skipped = 0
     for r in rows:
         open_time_ms = r["open_time"]
-        open_time_dt = datetime.fromtimestamp(open_time_ms / 1000, tz=timezone.utc).isoformat()
+        open_time_dt = datetime.fromtimestamp(open_time_ms / 1000, tz=UTC).isoformat()
 
         # Check if exists
         cur = conn.execute(
@@ -143,7 +143,7 @@ def insert_warmup_candles(conn: sqlite3.Connection, symbol: str, rows: list[dict
                 r["volume"],
                 r["turnover"],
                 json.dumps(r),
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         inserted += 1
@@ -171,8 +171,8 @@ for symbol in SYMBOLS:
         print(f"  WARNING: No data returned for {symbol}!")
         continue
 
-    first_dt = datetime.fromtimestamp(rows[0]["open_time"] / 1000, tz=timezone.utc)
-    last_dt = datetime.fromtimestamp(rows[-1]["open_time"] / 1000, tz=timezone.utc)
+    first_dt = datetime.fromtimestamp(rows[0]["open_time"] / 1000, tz=UTC)
+    last_dt = datetime.fromtimestamp(rows[-1]["open_time"] / 1000, tz=UTC)
     print(f"  Range: {first_dt} → {last_dt}")
 
     ins, skip = insert_warmup_candles(conn, symbol, rows)
