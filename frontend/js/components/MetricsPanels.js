@@ -70,11 +70,13 @@ export function formatTVPercent(value, showSign = true) {
 export function updateTVSummaryCards(metrics) {
     if (!metrics) return;
 
-    // Net Profit
+    // Net Profit (TV-style: closed net profit + unrealized open position PnL)
     const netProfit = document.getElementById('tvNetProfit');
     const netProfitPct = document.getElementById('tvNetProfitPct');
     if (netProfit) {
-        const val = metrics.net_profit || 0;
+        const closedVal = metrics.net_profit || 0;
+        const openVal = metrics.open_pnl || 0;
+        const val = closedVal + openVal;
         const valFormatted = val.toLocaleString('ru-RU', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
@@ -84,21 +86,25 @@ export function updateTVSummaryCards(metrics) {
         netProfit.className = `tv-summary-card-value ${val >= 0 ? 'tv-value-positive' : 'tv-value-negative'}`;
     }
     if (netProfitPct) {
-        const pct = metrics.net_profit_pct ?? 0;
+        const closedPct = metrics.net_profit_pct ?? 0;
+        const openPct = metrics.open_pnl_pct ?? 0;
+        const pct = closedPct + openPct;
         const pctFormatted = pct.toFixed(2);
         const cleanPct = pctFormatted === '-0.00' ? '0.00' : pctFormatted;
         netProfitPct.textContent = `${pct > 0 ? '+' : ''}${cleanPct}%`;
     }
 
-    // Max Drawdown
+    // Max Drawdown (TV-style: intrabar drawdown, same as TradingView's "Max Drawdown" display)
     const maxDD = document.getElementById('tvMaxDrawdown');
     const maxDDPct = document.getElementById('tvMaxDrawdownPct');
     if (maxDD) {
-        const val = metrics.max_drawdown_value || 0;
+        // Use intrabar value when available (matches TradingView), fall back to close-to-close
+        const val = metrics.max_drawdown_intrabar_value || metrics.max_drawdown_value || 0;
         maxDD.textContent = `${Math.abs(val).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
     }
     if (maxDDPct) {
-        const pct = metrics.max_drawdown || 0;
+        // Use intrabar % when available (matches TradingView), fall back to close-to-close
+        const pct = metrics.max_drawdown_intrabar || metrics.max_drawdown || 0;
         maxDDPct.textContent = `${Math.abs(pct).toFixed(2)}%`;
     }
 
@@ -209,12 +215,13 @@ export function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     setValue('dyn-buy-hold', { val: buyHoldValue, pct: buyHoldPct }, 'currency-pct');
 
     // Strategy vs Buy & Hold
-    let strategyOutperformance = metrics.strategy_outperformance || 0;
-    if (strategyOutperformance === 0) {
-        const strategyReturn = metrics.net_profit_pct || ((metrics.net_profit || 0) / initialCapital) * 100;
-        strategyOutperformance = strategyReturn - buyHoldPct;
+    // TV "Опережающая динамика" = net_profit_usd - buy_hold_return_usd (absolute USD value)
+    let strategyOutperformance = metrics.strategy_outperformance;
+    if (strategyOutperformance == null || strategyOutperformance === 0) {
+        // Fallback: net_profit minus buy_hold_return in USD
+        strategyOutperformance = (metrics.net_profit || 0) - buyHoldValue;
     }
-    setValue('dyn-strategy-vs-bh', strategyOutperformance, 'percent');
+    setValue('dyn-strategy-vs-bh', strategyOutperformance, 'currency');
 
     // CAGR
     setValue('dyn-cagr', metrics.cagr || 0, 'percent');

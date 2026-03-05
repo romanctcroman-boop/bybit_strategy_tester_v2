@@ -17,7 +17,7 @@ REFACTORED: 2026-01-25 - Now uses MetricsCalculator.calculate_all()
 import math
 import uuid
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -145,13 +145,21 @@ def compute_period_analysis(
     return results
 
 
-def compute_buy_hold_equity(ohlcv: pd.DataFrame, initial_capital: float) -> tuple[list[float], list[float]]:
+def compute_buy_hold_equity(
+    ohlcv: pd.DataFrame,
+    initial_capital: float,
+    trades: list | None = None,
+) -> tuple[list[float], list[float]]:
     """
     Compute Buy & Hold equity curve and drawdown.
+
+    TV parity: the buy-in price is the close of the first trade's entry bar
+    (start of the trading range), not the first bar of loaded data.
 
     Args:
         ohlcv: DataFrame with 'close' column
         initial_capital: Starting capital
+        trades: Optional list of trades to determine trading range start
 
     Returns:
         Tuple of (equity_list, drawdown_list)
@@ -161,8 +169,17 @@ def compute_buy_hold_equity(ohlcv: pd.DataFrame, initial_capital: float) -> tupl
 
     close = ohlcv["close"]
 
-    # Calculate equity as if we bought at first bar and held
-    first_price = close.iloc[0]
+    # TV: first_price = close at the first trade's entry bar (trading range start)
+    first_bar = 0
+    if trades:
+        all_sorted = sorted(trades, key=lambda t: getattr(t, "entry_bar_index", 0))
+        if all_sorted:
+            candidate = getattr(all_sorted[0], "entry_bar_index", None)
+            if candidate is not None and 0 <= candidate < len(close):
+                first_bar = candidate
+
+    # Calculate equity as if we bought at first_bar and held
+    first_price = close.iloc[first_bar]
     shares = initial_capital / first_price
     equity = shares * close
 
@@ -360,14 +377,31 @@ def _build_performance_metrics(
         pass  # Fall back to MetricsCalculator Sharpe/Sortino
 
     # Buy & Hold calculations (not in MetricsCalculator as it's context-specific)
+    # TV uses first bar of the TRADING RANGE (first trade entry bar), not first bar of loaded data.
+    # last_price = close of last bar of trading range (last trade exit bar or last bar with data).
     if len(close) > 1:
         # Handle both pandas Series and numpy arrays
-        if hasattr(close, "iloc"):
-            first_price = float(close.iloc[0])
-            last_price = float(close.iloc[-1])
-        else:
-            first_price = float(close[0])
-            last_price = float(close[-1])
+        last_price = float(close.iloc[-1]) if hasattr(close, "iloc") else float(close[-1])
+
+        # TV: first_price = close of the first bar in the trading range.
+        # Trading range starts at the entry bar of the first trade (closed or open).
+        first_price = None
+        all_trades_sorted = sorted(
+            trades,
+            key=lambda t: getattr(t, "entry_bar_index", 0),
+        )
+        if all_trades_sorted:
+            first_entry_bar = getattr(all_trades_sorted[0], "entry_bar_index", None)
+            if first_entry_bar is not None and 0 <= first_entry_bar < len(close):
+                if hasattr(close, "iloc"):
+                    first_price = float(close.iloc[first_entry_bar])
+                else:
+                    first_price = float(close[first_entry_bar])
+
+        # Fallback to close[0] if no trade entry bar available
+        if first_price is None or first_price == 0:
+            first_price = float(close.iloc[0]) if hasattr(close, "iloc") else float(close[0])
+
         buy_hold_return = ((last_price - first_price) / first_price) * initial_capital
         buy_hold_return_pct = ((last_price - first_price) / first_price) * 100
     else:
@@ -940,7 +974,7 @@ def _build_performance_metrics(
         kelly_percent=calc_metrics.get("kelly_percent", 0.0),
         kelly_percent_long=calc_metrics.get("kelly_percent_long", 0.0),
         kelly_percent_short=calc_metrics.get("kelly_percent_short", 0.0),
-        open_trades=calc_metrics.get("open_trades", 0),
+        open_trades=len(open_trades_list),  # Count from actual open trades list
         # Open (unrealized) PnL — TV: "Нереализованная ПР/УБ"
         open_pnl=open_pnl,
         open_pnl_pct=open_pnl_pct,
@@ -996,7 +1030,8 @@ def _build_performance_metrics(
         avg_runup=avg_runup_tv,
         avg_runup_value=avg_runup_value_tv,
         # TradingView comparison metrics
-        strategy_outperformance=(total_return * 100) - buy_hold_return_pct,
+        # TV "Опережающая динамика" = net_profit_usd - buy_hold_return_usd (absolute USD difference)
+        strategy_outperformance=calc_metrics["net_profit"] - buy_hold_return,
         net_profit_to_largest_loss=calc_metrics["net_profit"] / abs(calc_metrics["largest_loss_value"])
         if calc_metrics["largest_loss_value"] != 0
         else 0.0,
@@ -2539,8 +2574,34 @@ class BacktestEngine:
             equity.append(current_equity)
 
         # ========== CLOSE REMAINING POSITION AT END OF BACKTEST ==========
-        # TradingView closes all positions at the end of the backtest period
-        if position > 0:
+        # TradingView closes all positions at the end of the backtest period.
+        # IMPORTANT: Only force-close if data covers the full backtest period.
+        # If the last available bar is earlier than config.end_date, it means
+        # data ran out (Live / partial day) — position stays open, just like TV.
+        _last_ts = timestamps[-1]
+        _cfg_end = config.end_date
+        # Normalize both to tz-naive for comparison using pd.Timestamp
+        _last_ts_naive = (
+            pd.Timestamp(_last_ts).tz_localize(None)
+            if pd.Timestamp(_last_ts).tzinfo is None
+            else pd.Timestamp(_last_ts).tz_convert("UTC").tz_localize(None)
+        )
+        _cfg_end_naive = (
+            pd.Timestamp(_cfg_end).tz_localize(None)
+            if pd.Timestamp(_cfg_end).tzinfo is None
+            else pd.Timestamp(_cfg_end).tz_convert("UTC").tz_localize(None)
+        )
+
+        # Allow a 1-bar tolerance (last bar open_time vs end_date):
+        # if last bar is more than one bar-duration before end_date → data ran out early
+        try:
+            _bar_minutes = int(config.interval)
+        except (ValueError, TypeError):
+            _bar_minutes = 1440  # daily fallback
+        _bar_duration = timedelta(minutes=_bar_minutes)
+        _data_ended_early = (_cfg_end_naive - _last_ts_naive) > _bar_duration
+
+        if position > 0 and not _data_ended_early:
             exit_price = close[-1]  # Close at last bar's close price
             exit_time = timestamps[-1]
 
@@ -2623,6 +2684,67 @@ class BacktestEngine:
 
             position = 0.0
 
+        elif position > 0 and _data_ended_early:
+            # Data ran out before end_date (e.g. Live mode / intraday run).
+            # TV keeps the position open — we record it as open too.
+            # Use last available close as mark-to-market price (no forced exit).
+            mark_price = close[-1]
+            mark_time = timestamps[-1]
+            if is_long:
+                open_pnl_gross = (mark_price - entry_price) * entry_size
+            else:
+                open_pnl_gross = (entry_price - mark_price) * entry_size
+            open_pnl_net = open_pnl_gross - entry_fees_paid  # exit fee not charged yet
+            if entry_price > 0:
+                if is_long:
+                    open_pnl_pct = (mark_price - entry_price) / entry_price * 100
+                else:
+                    open_pnl_pct = (entry_price - mark_price) / entry_price * 100
+            else:
+                open_pnl_pct = 0.0
+
+            if is_long:
+                mfe_pct = (max_favorable_price - entry_price) / entry_price * 100
+                mae_pct = (entry_price - max_adverse_price) / entry_price * 100
+                mfe_value = (max_favorable_price - entry_price) * entry_size
+                mae_value = (entry_price - max_adverse_price) * entry_size
+            else:
+                mfe_pct = (entry_price - max_favorable_price) / entry_price * 100
+                mae_pct = (max_adverse_price - entry_price) / entry_price * 100
+                mfe_value = (entry_price - max_favorable_price) * entry_size
+                mae_value = (max_adverse_price - entry_price) * entry_size
+
+            logger.debug(
+                f"Position left OPEN (data ended early): is_long={is_long}, entry={entry_price:.2f}, "
+                f"mark={mark_price:.2f}, open_pnl={open_pnl_net:.2f}"
+            )
+
+            trades.append(
+                TradeRecord(
+                    entry_time=entry_time if entry_time is not None else mark_time,
+                    exit_time=mark_time,  # mark-to-market timestamp
+                    side=OrderSide.BUY if is_long else OrderSide.SELL,
+                    entry_price=entry_price,
+                    exit_price=mark_price,
+                    size=entry_size,
+                    pnl=open_pnl_net,
+                    pnl_pct=open_pnl_pct,
+                    fees=entry_fees_paid,  # only entry fee paid so far
+                    duration_hours=(mark_time - entry_time).total_seconds() / 3600 if entry_time else 0,
+                    bars_in_trade=len(ohlcv)
+                    - (ohlcv.index.get_loc(entry_time) if entry_time and entry_time in ohlcv.index else 0),
+                    entry_bar_index=ohlcv.index.get_loc(entry_time) if entry_time and entry_time in ohlcv.index else 0,
+                    exit_bar_index=len(ohlcv) - 1,
+                    mfe=mfe_value,
+                    mae=mae_value,
+                    mfe_pct=mfe_pct,
+                    mae_pct=mae_pct,
+                    exit_comment="open_position",  # TV: position still open
+                    is_open=True,
+                )
+            )
+            position = 0.0
+
         # Calculate metrics
         equity_series = pd.Series(equity[1:], index=timestamps)
         returns = equity_series.pct_change().dropna()
@@ -2692,7 +2814,8 @@ class BacktestEngine:
         )
 
         # Calculate Buy & Hold equity curve for TradingView comparison
-        bh_equity, bh_drawdown = compute_buy_hold_equity(ohlcv, config.initial_capital)
+        # Pass trades so BH curve starts from first trade's entry bar (TV parity)
+        bh_equity, bh_drawdown = compute_buy_hold_equity(ohlcv, config.initial_capital, trades=trades)
 
         equity_curve = EquityCurve(
             timestamps=timestamps,

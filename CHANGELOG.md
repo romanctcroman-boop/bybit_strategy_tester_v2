@@ -9,7 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **[BUGFIX] FallbackEngine: TV parity — qty truncation to 4dp, intrabar TP timing** (2026-03-04)
+- **[BUGFIX] Metrics: TV-parity для Gross Profit/Loss, Buy&Hold, Опережающая динамика** (2026-03-06)
+
+    Файлы: `backend/core/metrics_calculator.py`, `backend/backtesting/engine.py`, `frontend/js/components/MetricsPanels.js`
+
+    **Fix #1 — Gross Profit/Loss** (`metrics_calculator.py`):
+    - Старый код: `gross_pnl = pnl + fees` — добавлял комиссию обратно, завышая gross_profit (~+53$)
+    - TV использует **net PnL** напрямую: `gross_profit = Σ(pnl) для winning trades`
+    - Исправлено: убрано `gross_pnl = pnl + fees`, теперь `metrics.gross_profit += pnl` напрямую
+    - Profit Factor упрощён (нет дублирующего суммирования)
+
+    **Fix #2 — Buy & Hold** (`engine.py`):
+    - TV `first_price` = close первого бара ТОРГОВОГО диапазона (entry bar первой сделки)
+    - Старый код: `close.iloc[0]` = первый бар всех загруженных данных (2025-01-01 00:00)
+    - Исправлено: `close[first_trade.entry_bar_index]` как `first_price`
+    - `compute_buy_hold_equity()` теперь принимает `trades` и тоже использует entry bar
+
+    **Fix #3 — Опережающая динамика** (`engine.py` + `MetricsPanels.js`):
+    - TV показывает в **USD**: `net_profit − buy_hold_return` = 1787 − (−4269) = +6056$
+    - Старый код: считал в % и показывал 55.84%
+    - Исправлено: `strategy_outperformance = net_profit - buy_hold_return` (USD)
+    - Frontend: формат изменён с `'percent'` на `'currency'`
+
+    **Fix #4 — enrich_metrics_with_percentages** (`metrics_calculator.py`):
+    - Функция перезаписывала `strategy_outperformance` обратно на % разницу
+    - Исправлено: теперь вычисляет `net_profit - buy_hold_return` (USD)
+
+    **Fix #5 — test_margin_fee_parity.py**:
+    - `_cfg()` имел `end_date = 2025-06-02`, что вызывало `_data_ended_early=True` для 10-барных тестов
+    - Исправлено: `end_date = 2025-06-01 02:30` (совпадает с последним баром)
+
+    **Sharpe/Sortino**: расхождение TV=0.939 vs наш=0.917 (~2.4%) — не исправляется.
+    TV включает unrealized PnL в monthly equity, наш алгоритм откалиброван (0.9336 vs TV 0.934 для ETHUSDT).
+
+- **[BUGFIX] Strategy Builder: Save без переименования создавала дубликат стратегии** (2026-03-05)
+
+    Файл: `frontend/js/components/SaveLoadModule.js` (`loadStrategy`)
+
+    **Проблема:** При открытии стратегии через "My Strategies" (`loadStrategy(id)`) URL страницы
+    не обновлялся. Если страница была открыта без `?id=` или с другим `?id=`, то после открытия
+    стратегии кнопка Save делала `POST` (создание новой) вместо `PUT` (обновление существующей).
+    В результате при сохранении без изменения имени появлялась вторая запись в списке стратегий.
+
+    **Исправление:** `loadStrategy()` теперь вызывает `window.history.pushState()` для обновления
+    URL на `?id=<загруженный_id>`. Это гарантирует что `getStrategyIdFromURL()` возвращает
+    правильный ID и `saveStrategy()` делает `PUT` вместо `POST`.
+
+    Также: кнопка "Versions" (`#btnVersions`) теперь показывается при загрузке стратегии через
+    `loadStrategy()`, а не только при начальной загрузке страницы с `?id=` в URL.
 
     File: `backend/backtesting/engine.py` (`_run_fallback`)
 
@@ -312,23 +359,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-              **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-              instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-              **price-change percentage** (6.6%), not the USDT amount.
+                **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+                instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+                **price-change percentage** (6.6%), not the USDT amount.
 
-              **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-              `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+                **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+                `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
 
     m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
 
-              **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-              (no fallback chain) for all four long/short largest fields.
+                **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+                (no fallback chain) for all four long/short largest fields.
 
-              **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-              TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-              (bars_in_trade now uses inclusive counting to match TV).
+                **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+                TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+                (bars_in_trade now uses inclusive counting to match TV).
 
-              **File:** `scripts/_tv_calibration_check.py`
+                **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

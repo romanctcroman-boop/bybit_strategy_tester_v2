@@ -18,7 +18,9 @@ def _cfg(**kw):
         "symbol": "BTCUSDT",
         "interval": "15",
         "start_date": datetime(2025, 6, 1, tzinfo=UTC),
-        "end_date": datetime(2025, 6, 2, tzinfo=UTC),
+        # end_date aligns with last generated bar (10 bars × 15min from 2025-06-01 00:00)
+        # Last bar opens at 02:15, so end_date = 02:30 keeps data_ended_early = False.
+        "end_date": datetime(2025, 6, 1, 2, 30, tzinfo=UTC),
         "strategy_type": StrategyType.SMA_CROSSOVER,
         "strategy_params": {"fast_period": 2, "slow_period": 5},
         "initial_capital": 10000.0,

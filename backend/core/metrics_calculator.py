@@ -850,16 +850,14 @@ class MetricsCalculator:
 
                 logger.debug(f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}")
 
-            # Gross profit/loss — TV definition: pre-fee price-move PnL.
-            # TV gross_profit = sum of (pnl + fees) for winning trades (price move before commission).
-            # TV gross_loss   = sum of |pnl + fees| for losing trades.
-            # Our TradeRecord.pnl is already net-of-fees, so restore: gross = pnl + fees.
-            # Identity: gross_profit - gross_loss - total_commission = net_profit  (matches TV)
-            gross_pnl = pnl + fees
-
+            # Gross profit/loss — TV definition: net PnL per trade (after commission).
+            # TV gross_profit = sum(pnl) for winning trades (net, same as profit_factor numerator).
+            # TV gross_loss   = sum(|pnl|) for losing trades.
+            # Verified: TV gross_profit 2454.49 = sum of 38 winning net PnLs.
+            # Commission is reported separately (total_commission field).
             if pnl > 0:
                 metrics.winning_trades += 1
-                metrics.gross_profit += gross_pnl
+                metrics.gross_profit += pnl
                 win_pnl.append(pnl)
                 win_pnl_pct.append(pnl_pct)
                 win_bars.append(bars)
@@ -869,7 +867,7 @@ class MetricsCalculator:
                     metrics.largest_win_pct = pnl_pct
             elif pnl < 0:
                 metrics.losing_trades += 1
-                metrics.gross_loss += abs(gross_pnl)
+                metrics.gross_loss += abs(pnl)
                 loss_pnl.append(pnl)
                 loss_pnl_pct.append(pnl_pct)
                 loss_bars.append(bars)
@@ -885,11 +883,8 @@ class MetricsCalculator:
         # Derived metrics (win rate excludes breakeven trades from denominator)
         meaningful_trades = metrics.winning_trades + metrics.losing_trades
         metrics.win_rate = calculate_win_rate(metrics.winning_trades, meaningful_trades)
-        # Profit factor — TV definition: sum(net_wins) / sum(|net_losses|)
-        # (uses net PnL, not pre-fee gross — confirmed by TV calibration: 2390.34/666.91=3.584)
-        net_gross_profit = sum(p for p in pnl_list if p > 0)
-        net_gross_loss = sum(abs(p) for p in pnl_list if p < 0)
-        metrics.profit_factor = calculate_profit_factor(net_gross_profit, net_gross_loss)
+        # Profit factor = gross_profit / gross_loss (both already net PnL sums, TV-compatible)
+        metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         # Averages
         metrics.avg_win = float(np.mean(win_pnl)) if win_pnl else 0.0
@@ -1397,7 +1392,13 @@ class MetricsCalculator:
             "kelly_percent": kelly_percent,
             "kelly_percent_long": kelly_percent_long,
             "kelly_percent_short": kelly_percent_short,
-            "open_trades": 0,  # All trades are closed in backtests
+            "open_trades": sum(
+                1
+                for t in trades
+                if (t.get("is_open", False) if isinstance(t, dict) else getattr(t, "is_open", False))
+                or (t.get("exit_comment", "") if isinstance(t, dict) else getattr(t, "exit_comment", ""))
+                == "open_position"
+            ),
             "expectancy": expectancy,
             "expectancy_ratio": expectancy_ratio,
             "expectancy_pct": expectancy_pct,
@@ -1550,14 +1551,17 @@ def enrich_metrics_with_percentages(metrics: dict, initial_capital: float) -> di
     if "short_net_profit" in metrics and metrics["short_net_profit"] is not None:
         result["short_return_pct"] = (metrics["short_net_profit"] / initial_capital) * 100
 
-    # Strategy outperformance vs Buy & Hold
-    strategy_return = result.get("net_profit_pct", result.get("total_return", 0))
+    # Strategy outperformance vs Buy & Hold (TV parity: absolute USD = net_profit - buy_hold_return)
+    # Only compute buy_hold_return_pct for informational purposes.
     buy_hold_pct = result.get("buy_hold_return_pct", 0)
     if buy_hold_pct == 0 and "buy_hold_return" in metrics:
         buy_hold_pct = (metrics["buy_hold_return"] / initial_capital) * 100
         result["buy_hold_return_pct"] = buy_hold_pct
-
-    result["strategy_outperformance"] = strategy_return - buy_hold_pct
+    # strategy_outperformance stays as USD (set by engine.py or computed here)
+    if "strategy_outperformance" not in result or result.get("strategy_outperformance") == 0:
+        net_profit_usd = metrics.get("net_profit", 0) or 0
+        buy_hold_usd = metrics.get("buy_hold_return", 0) or 0
+        result["strategy_outperformance"] = net_profit_usd - buy_hold_usd
 
     # Ensure all key percentage fields exist (with 0 default)
     REQUIRED_PCT_FIELDS = [
