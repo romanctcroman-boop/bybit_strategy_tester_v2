@@ -329,60 +329,44 @@ def _build_performance_metrics(
         frequency=TimeFrequency.HOURLY,  # Default for crypto
     )
 
-    # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
-    # KEY: TradingView uses TRADE-CLOSE equity (not bar-level / unrealized PnL).
-    # Steps:
-    #   1. Build equity series at each trade-close timestamp.
-    #   2. Prepend initial_capital as month-0 anchor (MonthEnd before first trade).
-    #   3. Resample to month-end (last trade-close equity in that month, or carry forward).
-    #   4. Compute monthly returns via pct_change().
+    # ─── TV-parity Sharpe & Sortino: BAR-LEVEL monthly equity ─────────────────
+    # TV builds equity on EVERY bar (including unrealized PnL for open positions),
+    # then resamples to month-end for Sharpe/Sortino calculation.
+    # build_equity_from_trades() already produces this bar-level equity with
+    # unrealized PnL — we just need to resample it to monthly and compute ratios.
     # Sharpe: (mean - rfr) / std(ddof=0)   — population std, RFR=2%/yr
     # Sortino: (mean - rfr) / sqrt(sum(min(0,r-rfr)^2) / N)  — N denominator, RFR=2%/yr
-    # Calibrated: ETHUSDT 15m 2025-01-01→2026-02-23: Sharpe=0.9336 (TV=0.934), Sortino=4.190 (TV=4.19)
     sortino_tv = calc_metrics.get("sortino_ratio", 0.0)
     sharpe_tv = calc_metrics.get("sharpe_ratio", 0.0)
     try:
-        _closed = [t for t in trades if not getattr(t, "is_open", False)]
-        if len(_closed) >= 3:
-            # Build trade-close equity series
-            _tc_times = []
-            _tc_equity = []
-            _cum_pnl = 0.0
-            for _t in _closed:
-                _cum_pnl += float(getattr(_t, "pnl", 0.0))
-                _exit_ts = getattr(_t, "exit_time", None)
-                if _exit_ts is not None:
-                    _tc_times.append(pd.Timestamp(_exit_ts))
-                    _tc_equity.append(initial_capital + _cum_pnl)
+        # Use bar-level equity (already includes unrealized PnL) + bar timestamps
+        if len(timestamps) >= 3 and len(equity) >= 3:
+            _bar_ts = [pd.Timestamp(t) for t in timestamps]
+            # equity list may have initial_capital prepended (len = n_bars + 1)
+            # Align: use last n_bars values to match timestamps
+            _eq_vals = equity[-len(_bar_ts) :]
+            _bar_series = pd.Series(_eq_vals, index=pd.DatetimeIndex(_bar_ts))
+            # Normalize timezone to tz-naive
+            if _bar_series.index.tz is not None:
+                _bar_series.index = _bar_series.index.tz_localize(None)
+            # Resample to month-end (last bar-close equity per month)
+            _monthly_eq = _bar_series.resample("ME").last().ffill()
+            _monthly_r = _monthly_eq.pct_change().dropna().values
+            _rfr_m = 0.02 / 12  # 2% annual risk-free rate
+            _N = len(_monthly_r)
+            _mean = float(np.mean(_monthly_r))
 
-            if len(_tc_times) >= 3:
-                _tc_series = pd.Series(_tc_equity, index=pd.DatetimeIndex(_tc_times))
-                # Normalize timezone to tz-naive
-                if _tc_series.index.tz is not None:
-                    _tc_series.index = _tc_series.index.tz_localize(None)
-                # Prepend initial capital as month-0 anchor
-                _first_tc = _tc_series.index[0]
-                _anchor_tc = pd.Series(
-                    [initial_capital],
-                    index=[_first_tc - pd.offsets.MonthEnd(1)],
-                )
-                _monthly_eq = pd.concat([_anchor_tc, _tc_series]).resample("ME").last().ffill()
-                _monthly_r = _monthly_eq.pct_change().dropna().values
-                _rfr_m = 0.02 / 12  # 2% annual risk-free rate
-                _N = len(_monthly_r)
-                _mean = float(np.mean(_monthly_r))
+            if _N >= 3:
+                # Sharpe: population std (ddof=0)
+                _std0 = float(np.std(_monthly_r, ddof=0))
+                if _std0 > 1e-10:
+                    sharpe_tv = float(np.clip((_mean - _rfr_m) / _std0, -100, 100))
 
-                if _N >= 3:
-                    # Sharpe: population std (ddof=0)
-                    _std0 = float(np.std(_monthly_r, ddof=0))
-                    if _std0 > 1e-10:
-                        sharpe_tv = float(np.clip((_mean - _rfr_m) / _std0, -100, 100))
-
-                    # Sortino: N denominator (not N-1)
-                    _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
-                    _sdd = float(np.sqrt(np.sum(_sneg**2) / _N))
-                    if _sdd > 1e-10:
-                        sortino_tv = float(np.clip((_mean - _rfr_m) / _sdd, -100, 100))
+                # Sortino: N denominator (not N-1)
+                _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
+                _sdd = float(np.sqrt(np.sum(_sneg**2) / _N))
+                if _sdd > 1e-10:
+                    sortino_tv = float(np.clip((_mean - _rfr_m) / _sdd, -100, 100))
     except Exception:
         pass  # Fall back to MetricsCalculator Sharpe/Sortino
 
@@ -786,6 +770,9 @@ def _build_performance_metrics(
     #   Algorithm: at each new equity high, measure rise from the deepest trough since
     #   the previous high. Result ≈ TV 856.80.
     max_dd_close_value_tv = calc_metrics.get("max_drawdown_value", 0.0)
+    # Save bar-level (unrealized PnL) max DD for Recovery Factor — TV uses this,
+    # not the trade-exit-only DD or the intrabar (OHLC high/low) DD.
+    max_dd_bar_level_value = calc_metrics.get("max_drawdown_value", 0.0)
     max_runup_close_value_tv = calc_metrics.get("max_runup_value", 0.0)
     max_runup_close_pct_tv = calc_metrics.get("max_runup", 0.0)
 
@@ -940,13 +927,17 @@ def _build_performance_metrics(
         except Exception:
             pass  # Fall back to MetricsCalculator values
 
-    # ─── TV-parity Recovery Factor (uses intrabar DD, not close-to-close) ────────
-    # TV: recovery_factor = net_profit / max_dd_intrabar_value
-    # Confirmed: 1001.98 / 670.46 = 1.494 ≈ TV 1.490 ✓
+    # ─── TV-parity Recovery Factor ─────────────────────────────────────────────
+    # TV: recovery_factor = net_profit / max_drawdown_value
+    # TV uses the bar-close equity max DD (which includes unrealized PnL),
+    # NOT the intrabar (OHLC high/low) DD or trade-exit-only DD.
+    # build_equity_from_trades() already computes bar-level equity with unrealized PnL.
+    # MetricsCalculator.calculate_all() derives max_drawdown_value from this bar-level equity.
+    # This value is preserved in max_dd_bar_level_value before the trade-exit override.
     _net_profit_tv = calc_metrics.get("net_profit", 0.0)
     recovery_factor_tv = (
-        _net_profit_tv / max_drawdown_intrabar_value
-        if max_drawdown_intrabar_value > 0
+        _net_profit_tv / max_dd_bar_level_value
+        if max_dd_bar_level_value > 0
         else calc_metrics.get("recovery_factor", 0.0)
     )
 
