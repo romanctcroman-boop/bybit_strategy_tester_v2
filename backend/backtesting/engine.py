@@ -1272,18 +1272,6 @@ class BacktestEngine:
             # Generate signals
             signals = strategy.generate_signals(ohlcv)
 
-            # Check if TP/SL are configured (reserved for future conditional logic)
-            has_tp_sl = getattr(config, "stop_loss", None) or getattr(config, "take_profit", None)
-            has_trailing = getattr(config, "trailing_stop_activation", None)
-
-            # Check if bidirectional trading (requires fallback engine)
-            direction = getattr(config, "direction", "both")
-            is_bidirectional = direction == "both"
-            is_short_only = direction == "short"  # VBT doesn't handle shorts reliably
-
-            # Check if force_fallback is enabled (for 100% parity guarantee)
-            force_fallback = getattr(config, "force_fallback", False)
-
             # Run simulation
             # ALWAYS use fallback engine for regular backtests to ensure 100% consistent,
             # accurate results. VectorBT has architectural differences that cause metric
