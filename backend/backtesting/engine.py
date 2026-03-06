@@ -297,7 +297,17 @@ def _build_performance_metrics(
     initial_capital = config.initial_capital
 
     # Calculate years for CAGR
-    if len(timestamps) > 1:
+    # TV uses config.start_date → config.end_date (full backtest window),
+    # NOT first/last trade close timestamp (which would be shorter → higher CAGR).
+    _cfg_start = getattr(config, "start_date", None)
+    _cfg_end = getattr(config, "end_date", None)
+    if _cfg_start is not None and _cfg_end is not None:
+        # Normalize to naive UTC for subtraction
+        _s = _cfg_start.replace(tzinfo=None) if hasattr(_cfg_start, "tzinfo") and _cfg_start.tzinfo else _cfg_start
+        _e = _cfg_end.replace(tzinfo=None) if hasattr(_cfg_end, "tzinfo") and _cfg_end.tzinfo else _cfg_end
+        years = (_e - _s).total_seconds() / (365.25 * 24 * 60 * 60)
+        years = max(years, 0.001)
+    elif len(timestamps) > 1:
         first_ts = timestamps[0]
         last_ts = timestamps[-1]
         if hasattr(first_ts, "timestamp") and hasattr(last_ts, "timestamp"):
