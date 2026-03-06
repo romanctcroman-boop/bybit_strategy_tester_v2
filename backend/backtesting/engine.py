@@ -329,6 +329,17 @@ def _build_performance_metrics(
         frequency=TimeFrequency.HOURLY,  # Default for crypto
     )
 
+    # ─── TV-parity CAGR override ─────────────────────────────────────────────────
+    # MetricsCalculator.calculate_all uses equity[-1] as final_capital, which
+    # includes unrealized PnL from open positions (via build_equity_from_trades).
+    # TV CAGR uses CLOSED-trade net profit only (no unrealized PnL).
+    # Fix: recalculate CAGR with final_capital = initial + sum(closed PnL).
+    # Verified: TV 15.00% ≈ (11786.98/10000)^(365.25/430) - 1 = 14.99%
+    _closed_net = sum(float(getattr(t, "pnl", 0.0)) for t in closed_trades_for_metrics)
+    _closed_final = initial_capital + _closed_net
+    from backend.core.metrics_calculator import calculate_cagr
+    calc_metrics["cagr"] = calculate_cagr(initial_capital, _closed_final, years)
+
     # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
     # TV includes ALL trades (including end-of-backtest open position) in the
     # monthly equity series used for Sharpe/Sortino calculation.
@@ -944,11 +955,12 @@ def _build_performance_metrics(
             pass  # Fall back to MetricsCalculator values
 
     # ─── TV-parity Recovery Factor (uses intrabar DD, not close-to-close) ────────
-    # TV: recovery_factor = net_profit / max_dd_intrabar_value
-    # Confirmed: 1001.98 / 670.46 = 1.494 ≈ TV 1.490 ✓
-    _net_profit_tv = calc_metrics.get("net_profit", 0.0)
+    # TV "Доходность на макс. просадку" = total_pnl / max_dd_intrabar_value
+    # where total_pnl = closed net profit + unrealized PnL (equity[-1] - initial)
+    # Verified: TV 6.44 = $1823.56 / $283.03 (total PnL includes unrealized)
+    _total_pnl_tv = float(equity_arr[-1] - initial_capital) if len(equity_arr) > 0 else 0.0
     recovery_factor_tv = (
-        _net_profit_tv / max_drawdown_intrabar_value
+        _total_pnl_tv / max_drawdown_intrabar_value
         if max_drawdown_intrabar_value > 0
         else calc_metrics.get("recovery_factor", 0.0)
     )
