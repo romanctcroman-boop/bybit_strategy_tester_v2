@@ -102,29 +102,29 @@ def dca_strategy_data():
             },
         ],
         "connections": [
-            # RSI value → comparator inputs
+            # RSI value → comparator inputs (use 'left'/'right' — current frontend port IDs)
             {
                 "id": "conn_1",
                 "source": {"blockId": "block_1", "portId": "value"},
-                "target": {"blockId": "block_cmp_long", "portId": "a"},
+                "target": {"blockId": "block_cmp_long", "portId": "left"},
                 "type": "data",
             },
             {
                 "id": "conn_2",
                 "source": {"blockId": "block_const_30", "portId": "value"},
-                "target": {"blockId": "block_cmp_long", "portId": "b"},
+                "target": {"blockId": "block_cmp_long", "portId": "right"},
                 "type": "data",
             },
             {
                 "id": "conn_3",
                 "source": {"blockId": "block_1", "portId": "value"},
-                "target": {"blockId": "block_cmp_exit", "portId": "a"},
+                "target": {"blockId": "block_cmp_exit", "portId": "left"},
                 "type": "data",
             },
             {
                 "id": "conn_4",
                 "source": {"blockId": "block_const_70", "portId": "value"},
-                "target": {"blockId": "block_cmp_exit", "portId": "b"},
+                "target": {"blockId": "block_cmp_exit", "portId": "right"},
                 "type": "data",
             },
             # Entry long signal → main_strategy
@@ -140,6 +140,13 @@ def dca_strategy_data():
                 "source": {"blockId": "block_cmp_exit", "portId": "result"},
                 "target": {"blockId": "main_strategy", "portId": "exit_long"},
                 "type": "data",
+            },
+            # DCA config block → main_strategy.dca_grid port
+            {
+                "id": "conn_7",
+                "source": {"blockId": "block_2", "portId": "config"},
+                "target": {"blockId": "main_strategy", "portId": "dca_grid"},
+                "type": "config",
             },
         ],
     }
