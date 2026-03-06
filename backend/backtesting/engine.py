@@ -330,25 +330,28 @@ def _build_performance_metrics(
     )
 
     # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
-    # KEY: TradingView uses TRADE-CLOSE equity (not bar-level / unrealized PnL).
+    # TV includes ALL trades (including end-of-backtest open position) in the
+    # monthly equity series used for Sharpe/Sortino calculation.
+    # Verified: with open trade #44 included → Sharpe 0.944 vs TV 0.942 (+0.2%).
+    #           without open trade            → Sharpe 0.917 vs TV 0.942 (-2.6%).
     # Steps:
-    #   1. Build equity series at each trade-close timestamp.
+    #   1. Build equity series at each trade exit timestamp (ALL trades incl. open).
     #   2. Prepend initial_capital as month-0 anchor (MonthEnd before first trade).
-    #   3. Resample to month-end (last trade-close equity in that month, or carry forward).
+    #   3. Resample to month-end (last trade equity in that month, or carry forward).
     #   4. Compute monthly returns via pct_change().
     # Sharpe: (mean - rfr) / std(ddof=0)   — population std, RFR=2%/yr
     # Sortino: (mean - rfr) / sqrt(sum(min(0,r-rfr)^2) / N)  — N denominator, RFR=2%/yr
-    # Calibrated: ETHUSDT 15m 2025-01-01→2026-02-23: Sharpe=0.9336 (TV=0.934), Sortino=4.190 (TV=4.19)
     sortino_tv = calc_metrics.get("sortino_ratio", 0.0)
     sharpe_tv = calc_metrics.get("sharpe_ratio", 0.0)
     try:
-        _closed = [t for t in trades if not getattr(t, "is_open", False)]
-        if len(_closed) >= 3:
-            # Build trade-close equity series
+        # TV includes open trades in monthly equity for Sharpe/Sortino
+        _all_trades_for_sharpe = list(trades)
+        if len(_all_trades_for_sharpe) >= 3:
+            # Build trade-exit equity series (all trades including open)
             _tc_times = []
             _tc_equity = []
             _cum_pnl = 0.0
-            for _t in _closed:
+            for _t in _all_trades_for_sharpe:
                 _cum_pnl += float(getattr(_t, "pnl", 0.0))
                 _exit_ts = getattr(_t, "exit_time", None)
                 if _exit_ts is not None:
