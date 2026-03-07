@@ -28,10 +28,42 @@
             href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css"
             rel="stylesheet"
         />
-        <script src="js/core/auto-event-binding.js"></script>
+        <script src="js/core/auto-event-binding.js?v=20260305"></script>
     </head>
     <body>
-        <!-- Navigation -->
+        <!-- JS Error Banner — injected immediately so it catches all runtime errors -->
+        <div
+            id="_jserrBanner"
+            style="
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 99999;
+                background: #c0392b;
+                color: #fff;
+                font: 12px monospace;
+                padding: 8px 12px;
+                white-space: pre-wrap;
+                word-break: break-all;
+                max-height: 150px;
+                overflow: auto;
+            "
+        ></div>
+        <script>
+            window.addEventListener('error', function (e) {
+                var b = document.getElementById('_jserrBanner');
+                b.style.display = 'block';
+                b.textContent +=
+                    '[ERR] ' + (e.filename || '').split('/').pop() + ':' + e.lineno + '  ' + e.message + '\n';
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+                var b = document.getElementById('_jserrBanner');
+                b.style.display = 'block';
+                b.textContent += '[REJ] ' + (e.reason?.message || e.reason) + '\n';
+            });
+        </script>
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" href="dashboard.html">
@@ -248,15 +280,51 @@
                                     <i class="bi bi-columns-gap"></i>
                                     <span>Compare</span>
                                 </button>
-                                <button
-                                    class="tv-action-btn"
-                                    id="btnExportReport"
-                                    onclick="exportResults()"
-                                    title="Export"
-                                >
-                                    <i class="bi bi-download"></i>
-                                    <span>Export</span>
-                                </button>
+                                <div class="dropdown">
+                                    <button
+                                        class="tv-action-btn dropdown-toggle"
+                                        id="btnExportReport"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false"
+                                        title="Export"
+                                    >
+                                        <i class="bi bi-download"></i>
+                                        <span>Export</span>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="btnExportReport">
+                                        <li><h6 class="dropdown-header">Экспорт данных</h6></li>
+                                        <li>
+                                            <button class="dropdown-item" type="button" onclick="exportTabDynamics()">
+                                                <i class="bi bi-table me-2"></i>Динамика (CSV)
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button
+                                                class="dropdown-item"
+                                                type="button"
+                                                onclick="exportTabTradeAnalysis()"
+                                            >
+                                                <i class="bi bi-bar-chart me-2"></i>Анализ сделок (CSV)
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item" type="button" onclick="exportTabRiskReturn()">
+                                                <i class="bi bi-shield-check me-2"></i>Доходность с учётом рисков (CSV)
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li>
+                                            <button class="dropdown-item" type="button" onclick="exportTrades()">
+                                                <i class="bi bi-list-ul me-2"></i>Список сделок (CSV)
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item" type="button" onclick="exportResults()">
+                                                <i class="bi bi-collection me-2"></i>Список бэктестов (CSV)
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
                                 <div class="tv-report-date-range">
                                     <i class="bi bi-calendar3"></i>
                                     <span id="tvReportDateRange">--</span>
@@ -328,6 +396,13 @@
                                                 <span class="tv-legend-color tv-legend-color-runup"></span>
                                                 Trades excursions
                                             </label>
+                                            <div class="tv-bar-size-toggle" title="Высота баров MFE/MAE">
+                                                <button class="tv-bar-size-btn" data-bar-scale="1.00">100%</button>
+                                                <button class="tv-bar-size-btn active" data-bar-scale="0.65">
+                                                    65%
+                                                </button>
+                                                <button class="tv-bar-size-btn" data-bar-scale="0.35">35%</button>
+                                            </div>
                                         </div>
                                         <div class="tv-chart-mode-toggle">
                                             <button class="tv-mode-btn active" id="btnAbsoluteMode">
@@ -726,6 +801,21 @@
                                         </div>
                                     </div>
                                 </div>
+                                <!-- MFE / MAE bar chart — TV-style per-trade excursion bars -->
+                                <div style="margin-top: 1.25rem">
+                                    <div class="tv-profit-chart" style="width: 100%; height: 280px">
+                                        <div
+                                            class="tv-chart-title"
+                                            style="display: flex; align-items: center; gap: 0.75rem"
+                                        >
+                                            <span>MFE &amp; MAE по сделкам</span>
+                                            <span style="font-size: 0.7rem; color: #8b949e; font-weight: 400">
+                                                Макс. благоприятное / неблагоприятное отклонение от цены входа (%)</span
+                                            >
+                                        </div>
+                                        <canvas id="mfeMaeChart"></canvas>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -882,6 +972,9 @@
                                                 title="Сортировать по совокупному ПР/УБ"
                                             >
                                                 Совокупные ПР/УБ<span class="sort-icon"> ⇅</span>
+                                            </th>
+                                            <th id="tvTradesDcaHeader" class="tv-dca-header" style="display: none">
+                                                DCA<span class="sort-icon"> ⇅</span>
                                             </th>
                                         </tr>
                                     </thead>
@@ -1518,7 +1611,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
         <!-- TradingView Lightweight Charts Equity Component -->
-        <script src="./js/components/TradingViewEquityChart.js?v=20260305b"></script>
+        <script src="./js/components/TradingViewEquityChart.js?v=20260307an"></script>
 
         <!-- Custom plugin for donut center text -->
         <script>
@@ -1591,7 +1684,7 @@
                 .catch((e) => console.error('API error:', e));
         </script>
 
-        <script type="module" src="./js/pages/backtest_results.js?v=20260305g"></script>
+        <script type="module" src="./js/pages/backtest_results.js?v=20260305i"></script>
 
         <!-- Fallback: if module fails, load data manually after 2 seconds -->
         <script>

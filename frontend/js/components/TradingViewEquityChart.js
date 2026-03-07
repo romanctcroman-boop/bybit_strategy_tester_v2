@@ -54,6 +54,7 @@ class TradingViewEquityChart {
     this._resizeObserver = null;
     this._regimeRects = new Map();
     this._regimeAnnotations = {};  // Chart.js compat shim
+    this._barScale = 0.65;         // default 65%; buttons: 1.0 / 0.65 / 0.35
   }
 
   // ─── PUBLIC API ────────────────────────────────────────────────────────────
@@ -114,10 +115,16 @@ class TradingViewEquityChart {
       return;
     }
 
-    const h = this.options.height || this.container.clientHeight || 400;
+    const w = this.container.clientWidth || this.container.offsetWidth || 900;
+    const h = this.options.height || this.container.clientHeight || this.container.offsetHeight || 400;
+
+    // Ensure container is measurable — set explicit size if DOM reports 0
+    if (this.container.clientHeight === 0 && !this.options.height) {
+      this.container.style.height = '400px';
+    }
 
     this._lwChart = LightweightCharts.createChart(this.container, {
-      width: this.container.clientWidth,
+      width: w,
       height: h,
       layout: {
         background: { color: '#0d1117' },
@@ -141,12 +148,19 @@ class TradingViewEquityChart {
         }
       },
       rightPriceScale: {
-        borderColor: 'rgba(48,54,61,0.8)'
+        borderColor: 'rgba(48,54,61,0.8)',
+        autoScale: true
       },
       timeScale: {
         borderColor: 'rgba(48,54,61,0.8)',
         timeVisible: true,
-        secondsVisible: false
+        secondsVisible: false,
+        fixLeftEdge: true,      // cannot scroll left beyond first bar
+        fixRightEdge: true,     // cannot scroll right beyond last bar
+        lockVisibleTimeRangeOnResize: true,
+        rightBarStaysOnScroll: false,
+        minBarSpacing: 2,       // minimum zoom-out bar spacing (px)
+        maxBarSpacing: 80       // maximum zoom-in bar spacing (px)
       },
       localization: {
         timeFormatter: (unixSeconds) => {
@@ -162,7 +176,8 @@ class TradingViewEquityChart {
         }
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true }
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+      autoSize: true   // LWC watches the container via ResizeObserver — fills available space
     });
 
     // ── Current time indicator (bottom-right, like TradingView "00:56:53 UTC+3") ──
@@ -226,24 +241,9 @@ class TradingViewEquityChart {
 
     if (timestamps.length === 0) return;
 
-    // ── 0. MFE/MAE histogram series — added FIRST so they render BEHIND equity ──
-    // Bars share the same 'right' scale as equity so their zero IS the equity
-    // zero line (TradingView-style anchoring).  The equity autoscaleInfoProvider
-    // reserves ±budget space so bars stay visible even when equity is deeply
-    // negative.
-    if (this.options.showTradeExcursions) {
-      this._mfeSeries = this._lwChart.addHistogramSeries({
-        priceScaleId: 'right',
-        lastValueVisible: false,
-        priceLineVisible: false
-      });
-      this._maeSeries = this._lwChart.addHistogramSeries({
-        priceScaleId: 'right',
-        lastValueVisible: false,
-        priceLineVisible: false
-      });
-    }
-
+    // ── 0. MFE/MAE — canvas overlay, added AFTER chart is ready ──
+    // Wide trade-duration rectangles drawn on a canvas overlay (TV style).
+    // No histogram series needed here — _buildExcursionSeries handles everything.
     // ── 1. Equity as BASELINE series — added AFTER bars so it draws ON TOP ──
     // We ALWAYS display P&L (equity − initialCapital), so baseValue = 0.
     this._equitySeries = this._lwChart.addBaselineSeries({
@@ -275,10 +275,8 @@ class TradingViewEquityChart {
 
     // autoscaleInfoProvider — locks the visible Y range to the equity P&L.
     // Always includes 0 (break-even line) with 3% breathing room at the edges.
-    // The MFE/MAE bars are on the same 'right' scale and grow from zero, so
-    // we extend the price range to always include ±budgetMfe/Mae (set after
-    // _buildExcursionSeries runs).  Before bars are built _budgetMfe = 0 so
-    // the range is just the equity range — this is fine.
+    // MFE/MAE bars are drawn via canvas overlay with normalized pixel heights
+    // so they don't need to influence the Y-axis scale.
     this._equitySeries.applyOptions({
       autoscaleInfoProvider: () => {
         const vals = equityPoints.map(p => p.value);
@@ -287,20 +285,21 @@ class TradingViewEquityChart {
         const minV = Math.min(...vals, 0);   // always ≤ 0
         const range = Math.max(maxV - minV, 1);
         const pad = range * 0.03;            // 3% breathing room
-        const budgetMfe = this._budgetMfe || 0;
-        const budgetMae = this._budgetMae || 0;
         return {
           priceRange: {
-            minValue: Math.min(minV - pad, -budgetMae),
-            maxValue: Math.max(maxV + pad, budgetMfe)
+            minValue: minV - pad,
+            maxValue: maxV + pad
           },
           margins: { above: 2, below: 2 }
         };
       }
     });
-    // scaleMargins: reserve top 18% for MFE bars, bottom 18% for MAE bars.
+    // scaleMargins: leave some room at the top for the last-value label,
+    // and at the bottom so the zero-line sits visually above the time axis.
+    // Bars grow from the zero-line (price=0) downward/upward via canvas — no
+    // extra bottom margin needed; priceToCoordinate(0) gives the exact pixel.
     this._equitySeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.18, bottom: 0.18 }
+      scaleMargins: { top: 0.08, bottom: 0.12 }
     });
 
     // ── Zero line — dashed separator ───────────────────────────────────────
@@ -316,39 +315,49 @@ class TradingViewEquityChart {
     });
 
     // ── 2. Trade-exit circle markers ────────────────────────────────────────
-    // Shown only when trades < 200 (strictly: 199 shown, 200 hidden).
-    // size:0 is the smallest marker TV supports — roughly half of size:1.
-    if (this.trades.length > 0 && this.trades.length < 200) {
-      const markers = [];
-      // Build a sorted array of EC times for binary search
-      const ecTimesForMarkers = equityPoints.map(p => p.time);
-
-      this.trades.forEach((trade) => {
-        const exitSec = this._toUnixSec(trade.exit_time);
-        if (!exitSec) return;
-
-        // Binary search: find closest EC timestamp to trade exit_time
-        let lo = 0, hi = ecTimesForMarkers.length - 1;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          if (ecTimesForMarkers[mid] < exitSec) lo = mid + 1; else hi = mid;
-        }
-        if (lo > 0 && Math.abs(ecTimesForMarkers[lo - 1] - exitSec) < Math.abs(ecTimesForMarkers[lo] - exitSec)) lo--;
-        const markerTime = ecTimesForMarkers[lo];
-        if (!markerTime) return;
-
-        const pnl = trade.pnl || 0;
-        markers.push({
-          time: markerTime,
-          position: 'inBar',
-          color: pnl >= 0 ? '#26a69a' : '#ef5350',
-          shape: 'circle',
-          size: 0
-        });
+    // Shown only when trades < 200.
+    // Each marker is placed at a unique timestamp so LWC doesn't discard duplicates.
+    // When two trades exit on the same bar, the later one gets +1 sec nudge.
+    // _tradeMarkerTimes[i] stores the final (possibly nudged) time for trade[i].
+    this._tradeExitSecs = [];
+    this._tradeMarkerTimes = [];
+    {
+      const n = this.trades.length;
+      // Build _tradeMarkerTimes: prefer exact equityPoints time (1:1 case), else exitSec
+      const useIndex = (n === equityPoints.length);
+      this.trades.forEach((trade, i) => {
+        this._tradeExitSecs[i] = this._toUnixSec(trade.exit_time) || null;
+        this._tradeMarkerTimes[i] = useIndex
+          ? (equityPoints[i]?.time || null)
+          : (this._tradeExitSecs[i] || null);
       });
-      if (markers.length > 0) {
-        markers.sort((a, b) => a.time - b.time);
-        this._equitySeries.setMarkers(markers);
+
+      // Nudge duplicate times so every marker has a unique timestamp
+      const usedTimes = new Map();
+      this.trades.forEach((trade, i) => {
+        let t = this._tradeMarkerTimes[i];
+        if (!t) return;
+        while (usedTimes.has(t)) { t += 1; }
+        usedTimes.set(t, 1);
+        this._tradeMarkerTimes[i] = t;
+      });
+
+      if (n > 0 && n < 200) {
+        const markers = this.trades
+          .map((trade, i) => {
+            const t = this._tradeMarkerTimes[i];
+            if (!t) return null;
+            return {
+              time: t,
+              position: 'inBar',
+              color: (trade.pnl || 0) >= 0 ? '#26a69a' : '#ef5350',
+              shape: 'circle',
+              size: 0
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.time - b.time);
+        if (markers.length) this._equitySeries.setMarkers(markers);
       }
     }
 
@@ -359,6 +368,40 @@ class TradingViewEquityChart {
 
     // ── 4. Fit view, then fill bar data ─────────────────────────────────────
     this._lwChart.timeScale().fitContent();
+
+    // ── Clamp vertical scroll so equity line can't go fully off-screen ──────
+    // Subscribe to price-scale changes and enforce a max pan range:
+    // never let the visible price range drift more than 2× the data range
+    // away from the data, so bars and equity line always stay visible.
+    {
+      const ps = this._equitySeries.priceScale();
+      const clampPriceScale = () => {
+        if (!this._equitySeries || !this._equityPoints?.length) return;
+        const vals = this._equityPoints.map(p => p.value);
+        const dataMax = Math.max(...vals, 0);
+        const dataMin = Math.min(...vals, 0);
+        const dataRange = Math.max(dataMax - dataMin, 1);
+        const maxPad = dataRange * 2.5; // allow panning 2.5× range beyond data edges
+        try {
+          const visRange = ps.getVisiblePriceRange?.();
+          if (!visRange) return;
+          const { minValue, maxValue } = visRange;
+          const clampedMin = Math.max(minValue, dataMin - maxPad);
+          const clampedMax = Math.min(maxValue, dataMax + maxPad);
+          if (clampedMin !== minValue || clampedMax !== maxValue) {
+            ps.applyOptions({ autoScale: false });
+            // LWC v4: use setVisiblePriceRange if available
+            if (typeof ps.setVisiblePriceRange === 'function') {
+              ps.setVisiblePriceRange({ minValue: clampedMin, maxValue: clampedMax });
+            }
+          }
+        } catch (_e) { /* ignore */ }
+      };
+      this._lwChart.subscribeCrosshairMove(clampPriceScale);
+      this._priceClampUnsub = () => {
+        try { this._lwChart.unsubscribeCrosshairMove(clampPriceScale); } catch (_e) { /* gone */ }
+      };
+    }
 
     if (this.options.showTradeExcursions) {
       requestAnimationFrame(() => requestAnimationFrame(() => this._buildExcursionSeries()));
@@ -421,7 +464,6 @@ class TradingViewEquityChart {
     this._bhSeries.setData(points);
 
     // Same autoscale logic as equity: always include 0 with 3% padding.
-    // Also includes ±budget to match equity's reserved bar space.
     this._bhSeries.applyOptions({
       autoscaleInfoProvider: () => {
         const pvals = points.map(p => p.value);
@@ -430,12 +472,10 @@ class TradingViewEquityChart {
         const minV = Math.min(...pvals, 0);
         const range = Math.max(maxV - minV, 1);
         const pad = range * 0.03;
-        const budgetMfe = this._budgetMfe || 0;
-        const budgetMae = this._budgetMae || 0;
         return {
           priceRange: {
-            minValue: Math.min(minV - pad, -budgetMae),
-            maxValue: Math.max(maxV + pad, budgetMfe)
+            minValue: minV - pad,
+            maxValue: maxV + pad
           },
           margins: { above: 2, below: 2 }
         };
@@ -460,203 +500,264 @@ class TradingViewEquityChart {
 
   _buildExcursionSeries() {
     if (!this._lwChart || !this.trades.length || !this._equityPoints?.length) return;
-
-    // In percent mode the equity axis shows % P&L, so use mfe_pct/mae_pct.
-    // In absolute mode use mfe/mae (USDT) — same units as equity axis.
-    const isPercent = this.options.displayMode === 'percent';
-
-    // ── TEMPORARY DIAGNOSTIC (remove after diagnosis) ──
-    // Check in DevTools Console for the mfe/mae split distribution.
-    if (!this._dbgLogged) {
-      this._dbgLogged = true;
-      const mfes = this.trades.map((t, i) => ({
-        i: i + 1,
-        mfe: isPercent ? (t.mfe_pct ?? t.mfe_percent ?? 0) : (t.mfe ?? 0),
-        mae: isPercent ? (t.mae_pct ?? t.mae_percent ?? 0) : (t.mae ?? 0)
-      }));
-      const split = Math.min(62, mfes.length);
-      const avg = (arr, key) => arr.reduce((s, v) => s + Math.abs(v[key]), 0) / arr.length;
-      console.group('[TVEquityChart] MFE/MAE diagnostic');
-      console.log(`Mode: ${isPercent ? 'percent' : 'absolute'}, total trades: ${mfes.length}`);
-      console.log(`Trades 1-${split}:  avg MFE=${avg(mfes.slice(0, split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(0, split), 'mae').toFixed(3)}`);
-      console.log(`Trades ${split + 1}-${mfes.length}: avg MFE=${avg(mfes.slice(split), 'mfe').toFixed(3)}  avg MAE=${avg(mfes.slice(split), 'mae').toFixed(3)}`);
-      console.log('First 5:', mfes.slice(0, 5));
-      console.log('Around 62:', mfes.slice(59, 65));
-      console.log('Last 5:', mfes.slice(-5));
-      console.groupEnd();
+    // Prevent double-build: if already building, cancel and restart
+    if (this._excursionBuildPending) return;
+    this._excursionBuildPending = true;
+    // Tear down everything from any previous build before creating new canvas
+    this._removeExcursionSeries();
+    if (this.container) {
+      this.container.querySelectorAll('canvas[data-excursion]').forEach(c => c.remove());
     }
-
-    // CRITICAL: Always use the correct field for the mode — never mix units!
-    // In absolute mode: use mfe/mae (USD values from backend)
-    // In percent mode: use mfe_pct/mae_pct (percentage values from backend)
-    const getMfe = (t) => Math.abs(Number(isPercent
-      ? (t.mfe_pct ?? t.mfe_percent ?? 0)  // Percent mode: use percentage fields only
-      : (t.mfe ?? 0)));                     // Absolute mode: use USD fields only
-    const getMae = (t) => Math.abs(Number(isPercent
-      ? (t.mae_pct ?? t.mae_percent ?? 0)  // Percent mode: use percentage fields only
-      : (t.mae ?? 0)));                     // Absolute mode: use USD fields only
-
-    // Fixed chart-height budget for MFE/MAE bars (in price-axis units = equity P&L units).
-    // We use the FULL equity axis range so bars always occupy the same visual fraction
-    // of the chart regardless of which half of trades they belong to.
-    const equityValues = this._equityPoints.map(p => p.value);
-    const equityMax = Math.max(...equityValues, 0);
-    const equityMin = Math.min(...equityValues, 0);
-    const equityRange = Math.max(equityMax - equityMin, 1);
-
-    // Each bar occupies up to 20% of the full equity axis height.
-    const maxBarHeight = equityRange * 0.20;
-
-    // ── Normalization: P95-based outlier-resistant LINEAR scaling ──
-    // Normalise against P95 instead of absolute max so a single outlier trade
-    // doesn't collapse all other bars to the same minimum floor.
-    // E.g. if one trade has MFE=1000 but most are 10-50, using max=1000 would
-    // force both a 37 USDT and a 0.27 USDT trade to render at identical 4% floor.
-    // With P95 normalisation each non-outlier trade retains its proportional height.
-    // Values above the P95 anchor (outliers) are clipped to 1.0 (full bar height).
-    // Minimum visible floor lowered to 1% — enough to see a bar without misleading.
-    const allMfeRaw = this.trades.map(getMfe);
-    const allMaeRaw = this.trades.map(getMae);
-
-    const getP95 = (arr) => {
-      const pos = arr.filter(v => v > 0).sort((a, b) => a - b);
-      if (!pos.length) return 1e-9;
-      return pos[Math.min(Math.floor(pos.length * 0.95), pos.length - 1)];
+    // Use mfe_pct / mae_pct so bars are proportional regardless of position size
+    // and robust against zero/negative absolute values in old cached backtests.
+    // Fallback: derive pct from absolute USD ÷ initial_capital if pct absent.
+    const ic = this.initialCapital || 10000;
+    const getMfePct = (t) => {
+      const pct = Math.abs(Number(t.mfe_pct ?? 0));
+      if (pct > 0) return pct;
+      const abs = Math.abs(Number(t.mfe ?? 0));
+      return abs > 0 ? (abs / ic * 100) : 0;
     };
-    // SHARED reference: MFE and MAE normalised against the same anchor so their
-    // bars are directly comparable in height.  With separate maxMfe/maxMae the
-    // tallest MFE bar and tallest MAE bar always look equal even when one side
-    // is 10× larger than the other — a misleading visual.
-    const maxExcursion = Math.max(getP95(allMfeRaw), getP95(allMaeRaw), 1e-9);
-    const minFloor = 0.01; // 1% of maxBarHeight — minimal visibility hint
-
-    // Linear-scale a raw value to [minFloor..1] × maxBarHeight.
-    // Outliers above the P95 anchor are clipped to 1.0 (full bar, not overflow).
-    const linearScale = (val) => {
-      if (val <= 0) return 0;
-      const ratio = val / maxExcursion;
-      return Math.min(Math.max(ratio, minFloor), 1.0);
+    const getMaePct = (t) => {
+      const pct = Math.abs(Number(t.mae_pct ?? 0));
+      if (pct > 0) return pct;
+      const abs = Math.abs(Number(t.mae ?? 0));
+      return abs > 0 ? (abs / ic * 100) : 0;
     };
 
-    // Store for equity/BH autoscaleInfoProvider so they reserve the right gap.
-    this._budgetMfe = maxBarHeight;
-    this._budgetMae = maxBarHeight;
+    const allMfePct = this.trades.map(getMfePct);
+    const allMaePct = this.trades.map(getMaePct);
+    const maxMfePct = allMfePct.length ? Math.max(...allMfePct.filter(v => v > 0), 0) : 0;
+    const maxMaePct = allMaePct.length ? Math.max(...allMaePct.filter(v => v > 0), 0) : 0;
 
-    // LWC histogram bars must use timestamps that exist in the chart's timeScale.
-    // The timeScale is defined by the equity series (EC timestamps = bar open times).
-    // Using arbitrary exit_time values causes bars to disappear because LWC can't
-    // place them on unknown time positions.
-    //
-    // Strategy: map each trade to its closest EC timestamp (binary search).
-    // Collision handling: if two trades map to the same EC slot, assign the second
-    // trade to the nearest FREE adjacent EC slot (walk forward/backward).
-    // This ensures every trade gets a visible bar with no overwrites.
+    // ── Do NOT extend the equity Y-axis for bars ──
+    // The old approach expanded the axis to fit MAE in USD which compressed
+    // the equity scale and made bars look tiny. Instead we use a normalized
+    // pixel zone anchored at the zero line — matching TradingView's appearance.
 
-    // Build sorted array of EC unix-sec times for fast lookup
-    const ecTimes = this._equityPoints.map(p => p.time).sort((a, b) => a - b);
+    // ── Canvas overlay ──
+    const canvas = document.createElement('canvas');
+    canvas.dataset.excursion = '1';
+    canvas.style.cssText = [
+      'position:absolute', 'top:0', 'left:0',
+      'width:100%', 'height:100%',
+      'pointer-events:none', 'z-index:2'
+    ].join(';');
+    this.container.appendChild(canvas);
+    this._excursionCanvas = canvas;
+    this._excursionBuildPending = false; // allow future rebuilds
 
-    // Binary search: index of closest EC time to targetSec
-    const closestEcIdx = (targetSec) => {
-      let lo = 0, hi = ecTimes.length - 1;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (ecTimes[mid] < targetSec) lo = mid + 1; else hi = mid;
+    // ── Percentage-based bar heights (TV-parity) ──
+    const chart = this._lwChart;
+    const trades = this.trades;
+    const self = this;
+
+    const draw = () => {
+      if (!self._excursionCanvas || !chart) return;
+
+      const W = self.container.clientWidth;
+      const H = self.container.clientHeight;
+      if (W === 0 || H === 0) return;
+      const tsWidth = chart.timeScale().width() || W;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+
+      // ── Zero Y: use actual price-axis coordinate of price=0 from equity series ──
+      // This aligns the bar zero-line exactly with the equity chart's break-even line.
+      // Fallback to a fixed bottom band if the price scale isn't ready yet.
+      const equitySeries = self._equitySeries;
+      let zeroY = null;
+      if (equitySeries) {
+        try { zeroY = equitySeries.priceToCoordinate(0); } catch (_e) { zeroY = null; }
       }
-      if (lo > 0 && Math.abs(ecTimes[lo - 1] - targetSec) <= Math.abs(ecTimes[lo] - targetSec)) lo--;
-      return lo;
-    };
+      // If price=0 is off-screen (above chart top or below time-axis), clamp to
+      // a reasonable default so bars are still visible.
+      if (zeroY == null || zeroY < 0 || zeroY > H) {
+        zeroY = H * 0.925; // fallback: near the bottom
+      }
+      // halfBand: fixed pixel height calculated from the "ideal" zero position
+      // (zeroY ≈ 72% of chart height — where bars look tallest and symmetric).
+      // Using H * 0.72 as the reference so the band size never changes when
+      // the user pans up/down; only zeroY (the anchor point) moves.
+      // _barScale (1.0 / 0.65 / 0.35) is set by the size toggle buttons.
+      const idealZeroY = H * 0.72;
+      const halfBand = Math.max(Math.min(H - idealZeroY, idealZeroY * 0.4), 8) * 0.50 * (self._barScale ?? 1.0);
 
-    // Find next free EC slot starting from idx, searching outward
-    const usedSlots = new Set();
-    const claimSlot = (startIdx) => {
-      // Search forward then backward for a free EC slot
-      for (let delta = 0; delta < ecTimes.length; delta++) {
-        const fwd = startIdx + delta;
-        if (fwd < ecTimes.length && !usedSlots.has(ecTimes[fwd])) {
-          usedSlots.add(ecTimes[fwd]);
-          return ecTimes[fwd];
+      // Centre-line separator across the time-scale pane only
+      ctx.strokeStyle = 'rgba(120,123,134,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, zeroY);
+      ctx.lineTo(tsWidth, zeroY);
+      ctx.stroke();
+
+      // ── Growth / Drawdown strips (TV-style segments below time axis) ──────
+      // Drawn as thin coloured rectangles just below the time scale bar.
+      // Green = growth segment, Red = drawdown segment.
+      // Position: bottom 6px of the canvas (below LWC time axis ~34px tall).
+      const tsApi = chart.timeScale();
+      const ecPts = self._equityPoints || []; // [{time, value}] sorted asc
+      {
+        const segs = self._gdSegments || [];
+        if (segs.length > 0) {
+          const stripH = 5;           // height of each strip in px
+          const stripY = H - stripH;  // just above the very bottom edge
+
+          segs.forEach(seg => {
+            const tStart = self._toUnixSec(seg.startTime);
+            const tEnd = self._toUnixSec(seg.endTime);
+            if (!tStart || !tEnd) return;
+            const xStart = tsApi.timeToCoordinate(tStart);
+            const xEnd = tsApi.timeToCoordinate(tEnd);
+            if (xStart == null || xEnd == null) return;
+            const x1 = Math.min(xStart, xEnd);
+            const x2 = Math.max(xStart, xEnd);
+            if (x2 < 0 || x1 > tsWidth) return;
+            const clampedX1 = Math.max(x1, 0);
+            const clampedX2 = Math.min(x2, tsWidth);
+            ctx.fillStyle = seg.kind === 'growth'
+              ? 'rgba(38,166,154,0.90)'
+              : 'rgba(239,83,80,0.90)';
+            ctx.fillRect(clampedX1, stripY, clampedX2 - clampedX1, stripH);
+          });
         }
-        const bwd = startIdx - delta;
-        if (delta > 0 && bwd >= 0 && !usedSlots.has(ecTimes[bwd])) {
-          usedSlots.add(ecTimes[bwd]);
-          return ecTimes[bwd];
+      }
+
+      const n = trades.length;
+      if (n === 0) return;
+
+      // interpolateX: get pixel X for any unix-sec timestamp.
+      // timeToCoordinate works only for exact series timestamps.
+      // For trade exit times (not in series) we interpolate between the two
+      // surrounding EC points that DO have valid pixel coords.
+      const interpolateX = (targetSec) => {
+        if (!targetSec) return null;
+        // Try direct first (works if exitSec happens to be an EC timestamp)
+        const direct = tsApi.timeToCoordinate(targetSec);
+        if (direct != null) return direct;
+        // Binary search for surrounding EC points
+        let lo = 0, hi = ecPts.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (ecPts[mid].time < targetSec) lo = mid + 1; else hi = mid;
         }
+        // lo = first EC point >= targetSec
+        const iR = lo, iL = lo - 1;
+        const xR = iR < ecPts.length ? tsApi.timeToCoordinate(ecPts[iR].time) : null;
+        const xL = iL >= 0 ? tsApi.timeToCoordinate(ecPts[iL].time) : null;
+        if (xL != null && xR != null) {
+          const tL = ecPts[iL].time, tR = ecPts[iR].time;
+          const frac = tR === tL ? 0 : (targetSec - tL) / (tR - tL);
+          return xL + frac * (xR - xL);
+        }
+        return xL ?? xR ?? null;
+      };
+
+      // ── Step 1: get X for each trade ────────────────────────────────────
+      // _tradeMarkerTimes[i] = equityPoints[i].time (exact EC series timestamp)
+      // when trades.length === equityPoints.length (1:1 case).
+      // timeToCoordinate knows these times → returns exact pixel X.
+      // interpolateX is the fallback for the rare case they differ.
+      const markerTimes = self._tradeMarkerTimes || [];
+      const allXs = trades.map((_, idx) => interpolateX(markerTimes[idx]));
+
+      // ── Step 2: compute bar width based on trade count + gap table ──────
+      // Gap between bars (px):  ≤50→4, ≤100→3, ≤150→3, ≤200→2, >250→1
+      // barWidth = pixelGapBetweenBars − gapPx  (fills available slot minus gap)
+      const onScreenXs = allXs
+        .filter(x => x != null && x >= 0 && x <= tsWidth)
+        .sort((a, b) => a - b);
+      const uniqueXs = onScreenXs.filter((x, i) => i === 0 || Math.abs(x - onScreenXs[i - 1]) > 0.5);
+
+      // Gap px by trade count
+      const gapPx = n <= 50 ? 4
+        : n <= 100 ? 3
+          : n <= 200 ? 2
+            : 1;
+
+      // Pixel distance between neighbouring bars (median of visible gaps)
+      let slotPx = 0;
+      if (uniqueXs.length >= 2) {
+        const gaps = [];
+        for (let i = 1; i < uniqueXs.length; i++) gaps.push(uniqueXs[i] - uniqueXs[i - 1]);
+        gaps.sort((a, b) => a - b);
+        slotPx = gaps[Math.floor(gaps.length * 0.50)] ?? gaps[0]; // median
+      } else if (uniqueXs.length === 1 && n > 0) {
+        slotPx = tsWidth / n; // single bar visible — estimate
       }
-      return null; // shouldn't happen (more trades than EC points is impossible)
+
+      // barW = slot minus gap, clamped to [2, 40]
+      const globalBarW = slotPx > 0
+        ? Math.min(Math.max(Math.round(slotPx - gapPx), 2), 40)
+        : Math.max(Math.round(tsWidth / Math.max(n, 1) * 0.6), 2);
+
+      // ── Step 3: draw each trade bar centred on its marker X ───────────────
+      trades.forEach((trade, idx) => {
+        const cx = allXs[idx];
+        if (cx == null) return;
+        if (cx < -(globalBarW * 2) || cx > tsWidth + globalBarW * 2) return;
+
+        const left = cx - globalBarW / 2;
+        const barW = globalBarW;
+
+        const mfePct = getMfePct(trade);
+        const maePct = getMaePct(trade);
+
+        if (mfePct > 0 && maxMfePct > 0) {
+          const bh = Math.max((mfePct / maxMfePct) * halfBand, 1);
+          ctx.fillStyle = 'rgba(38,166,154,0.70)';
+          ctx.fillRect(left, zeroY - bh, barW, bh);
+        }
+        if (maePct > 0 && maxMaePct > 0) {
+          const bh = Math.max((maePct / maxMaePct) * halfBand, 1);
+          ctx.fillStyle = 'rgba(239,83,80,0.70)';
+          ctx.fillRect(left, zeroY, barW, bh);
+        }
+      });
+
+      if (!self._excursionLogged) {
+        self._excursionLogged = true;
+        const vis = allXs.filter(x => x != null && x >= 0 && x <= tsWidth).length;
+        console.log(`[EX] tsWidth=${tsWidth} uniqueXs=${uniqueXs.length} globalBarW=${globalBarW} visible=${vis}/${n}`);
+      }
     };
 
-    const mfeData = [];
-    const maeData = [];
-
-    this.trades.forEach((trade) => {
-      const exitSec = this._toUnixSec(trade.exit_time);
-      if (!exitSec) return;
-
-      const idx = closestEcIdx(exitSec);
-      const slot = claimSlot(idx);
-      if (!slot) return;
-
-      const mfe = getMfe(trade);
-      const mae = getMae(trade);
-
-      const scaledMfe = mfe > 0 ? linearScale(mfe) * maxBarHeight : 0;
-      const scaledMae = mae > 0 ? linearScale(mae) * maxBarHeight : 0;
-
-      // TV uses a single uniform color for all MFE bars and a single color for
-      // all MAE bars — no realized/unrealized tonal split.
-      if (scaledMfe > 0) {
-        mfeData.push({
-          time: slot,
-          value: scaledMfe,
-          color: 'rgba(38,166,154,0.75)'   // teal — all MFE bars same color
-        });
-      }
-      if (scaledMae > 0) {
-        maeData.push({
-          time: slot,
-          value: -scaledMae,
-          color: 'rgba(239,83,80,0.75)'    // red — all MAE bars same color
-        });
-      }
-    });
-
-    mfeData.sort((a, b) => a.time - b.time);
-    maeData.sort((a, b) => a.time - b.time);
-
-    // Both series on 'right' scale — same axis as equity.
-    // autoscaleInfoProvider locks the data range to ±maxBarHeight so LWC
-    // doesn't auto-zoom based on bar values (bars stay consistent height).
-    const barOpts = {
-      priceScaleId: 'right',
-      lastValueVisible: false,
-      priceLineVisible: false,
-      autoscaleInfoProvider: () => ({
-        priceRange: { minValue: -maxBarHeight, maxValue: maxBarHeight }
-      })
+    // Redraw on every scroll/scale change
+    const scheduleRedraw = () => {
+      if (self._excursionRAF) cancelAnimationFrame(self._excursionRAF);
+      self._excursionRAF = requestAnimationFrame(draw);
     };
 
-    if (this._mfeSeries) {
-      this._mfeSeries.applyOptions(barOpts);
-      this._mfeSeries.setData(mfeData);
-    } else {
-      this._mfeSeries = this._lwChart.addHistogramSeries(barOpts);
-      this._mfeSeries.setData(mfeData);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleRedraw);
+    chart.subscribeCrosshairMove(scheduleRedraw);
+    this._excursionRedraw = scheduleRedraw;
+    this._excursionUnsubscribe = () => {
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(scheduleRedraw); } catch (_e) { /* gone */ }
+      try { chart.unsubscribeCrosshairMove(scheduleRedraw); } catch (_e) { /* gone */ }
+    };
+
+    // Also redraw on container resize
+    if (this._resizeObserver) {
+      this._resizeObserver.observe(this.container);
     }
 
-    if (this._maeSeries) {
-      this._maeSeries.applyOptions({ ...barOpts });
-      this._maeSeries.setData(maeData);
-    } else {
-      this._maeSeries = this._lwChart.addHistogramSeries({ ...barOpts });
-      this._maeSeries.setData(maeData);
-    }
-
-    if (this._equitySeries) {
-      this._equitySeries.applyOptions({});
-    }
+    // Initial draw
+    requestAnimationFrame(() => requestAnimationFrame(draw));
   }
 
   _removeExcursionSeries() {
+    if (this._excursionUnsubscribe) {
+      this._excursionUnsubscribe();
+      this._excursionUnsubscribe = null;
+    }
+    if (this._excursionRAF) {
+      cancelAnimationFrame(this._excursionRAF);
+      this._excursionRAF = null;
+    }
     if (this._excursionCanvas) {
       this._excursionCanvas.remove();
       this._excursionCanvas = null;
@@ -680,6 +781,7 @@ class TradingViewEquityChart {
 
   _buildTooltip(data, isPercent) {
     if (!this._lwChart) return;
+    const self = this;  // capture for callbacks below
 
     let tt = this.container.querySelector('.lwc-tt');
     if (!tt) {
@@ -831,6 +933,10 @@ class TradingViewEquityChart {
       return segments;
     })();
 
+    // Save segments so the canvas overlay can draw growth/drawdown strips
+    this._gdSegments = gdSegments;
+    this._gdTimestamps = timestamps;
+
     // Map each equity point index to its growth/drawdown segment
     const gdIndexToSeg = new Array(timestamps.length).fill(null);
     gdSegments.forEach((seg) => {
@@ -839,27 +945,42 @@ class TradingViewEquityChart {
       }
     });
 
-    // Pre-compute: for each equity point index, which trade is it?
-    // EC timestamps are bar open times (not exact exit times), so we use
-    // closest-exit-time matching (within one timeframe bar = 4h window) rather
-    // than the range check that misses points between trades.
-    const ecIndexToTrade = new Array(timestamps.length).fill(null);
-    if (this.trades && this.trades.length) {
-      timestamps.forEach((ts, i) => {
-        const ecMs = new Date(ts).getTime();
-        let bestTrade = null;
-        let bestDiff = Infinity;
-        this.trades.forEach((t) => {
-          if (!t.exit_time) return;
-          const tMs = this._toEpochMs(t.exit_time);
-          const diff = Math.abs(tMs - ecMs);
-          // Max window: 6 hours (covers ±1 bar on any supported timeframe up to 4h)
-          if (diff < bestDiff && diff <= 6 * 3600 * 1000) {
-            bestDiff = diff;
-            bestTrade = t;
+    // Pre-compute: marker time → { trade, tradeNum, cumPnl, segIdx }
+    // _tradeMarkerTimes[i] is already nudged (unique). We use it as the key.
+    // cumPnl and segIdx are derived from the original equity[]/timestamps[] arrays.
+    //
+    // When trades.length === timestamps.length (1:1), trade[i] ↔ equity[i] by index.
+    // Otherwise we find the closest timestamp to the trade's exit_time.
+    const timeToTrade = new Map(); // nudgedMarkerTime → { trade, tradeNum, cumPnl, segIdx }
+
+    if (this._tradeMarkerTimes && this._tradeMarkerTimes.length === this.trades.length) {
+      const oneToOne = (this.trades.length === timestamps.length);
+      this.trades.forEach((trade, i) => {
+        const mt = this._tradeMarkerTimes[i];
+        if (!mt) return;
+
+        let cumPnl = 0;
+        let segIdx = 0;
+
+        if (oneToOne) {
+          // Direct index alignment: trade[i] ↔ timestamps[i] ↔ equity[i]
+          cumPnl = (equity[i] != null ? equity[i] : 0) - base;
+          segIdx = i;
+        } else {
+          // Find the timestamps index closest to this trade's exit_time
+          const exitMs = trade.exit_time ? this._toEpochMs(trade.exit_time) : null;
+          if (exitMs != null) {
+            let bestIdx = 0, bestDiff = Infinity;
+            for (let j = 0; j < timestamps.length; j++) {
+              const diff = Math.abs(new Date(timestamps[j]).getTime() - exitMs);
+              if (diff < bestDiff) { bestDiff = diff; bestIdx = j; }
+            }
+            cumPnl = (equity[bestIdx] != null ? equity[bestIdx] : 0) - base;
+            segIdx = bestIdx;
           }
-        });
-        ecIndexToTrade[i] = bestTrade;
+        }
+
+        timeToTrade.set(mt, { trade, tradeNum: i + 1, cumPnl, segIdx });
       });
     }
 
@@ -881,30 +1002,29 @@ class TradingViewEquityChart {
         return;
       }
 
-      // Find closest equity index
-      // param.time is pre-shifted by +10800 (UTC+3 display), subtract to get real UTC ms
-      const ms = (param.time - 10800) * 1000;
-      let ci = 0, minD = Infinity;
-      for (let i = 0; i < timestamps.length; i++) {
-        const d = Math.abs(new Date(timestamps[i]).getTime() - ms);
-        if (d < minD) { minD = d; ci = i; }
+      // param.time is in seconds (LWC internal time).
+      // Find the trade marker whose time is closest to the crosshair.
+      // No threshold — always show tooltip for the nearest marker, same as TV.
+      const cursorSec = param.time;
+      const mts = self._tradeMarkerTimes || [];
+      let bestIdx = -1, minD = Infinity;
+      for (let i = 0; i < mts.length; i++) {
+        if (!mts[i]) continue;
+        const d = Math.abs(mts[i] - cursorSec);
+        if (d < minD) { minD = d; bestIdx = i; }
       }
+      if (bestIdx === -1) { tt.style.display = 'none'; return; }
 
-      const trade = ecIndexToTrade[ci];
-      if (!trade) { tt.style.display = 'none'; return; }
+      const bestMarkerTime = mts[bestIdx];
+      const entry = timeToTrade.get(bestMarkerTime);
+      if (!entry) { tt.style.display = 'none'; return; }
 
-      // ── TV-style header: "Trade #N Long/Short" centred ──
-      const ev = equity[ci];
-      const rawPnl = ev - base;   // cumulative P&L from start
+      const { trade, tradeNum, cumPnl, segIdx } = entry;
+      const rawPnl = cumPnl;
       const side = (trade.direction || trade.side || 'long');
       const sideLabel = side === 'long' ? 'Long' : 'Short';
 
-      // Find trade index for numbering
-      const tradeIdx = this.trades.indexOf(trade);
-      const tradeNum = tradeIdx >= 0 ? tradeIdx + 1 : '?';
-
       // Exit datetime in TV format: "Mon, Mar 10, 2025, 21:30"
-      // Normalize to UTC before parsing (backend stores UTC without 'Z')
       const exitDate = trade.exit_time ? new Date(this._toEpochMs(trade.exit_time)) : null;
       const exitDateStr = exitDate
         ? exitDate.toLocaleString('en-US', {
@@ -934,7 +1054,7 @@ class TradingViewEquityChart {
         ? `-${maePct.toFixed(2)}%`
         : (maeUsdt > 0 ? `-${this._fmtUsdt(maeUsdt)}` : '0.00 USDT');
 
-      const seg = gdIndexToSeg[ci];
+      const seg = gdIndexToSeg[segIdx];
 
       let html = '';
       // Header
@@ -1094,6 +1214,19 @@ class TradingViewEquityChart {
         this.toggleTradeExcursions(exCb.checked);
       };
     }
+
+    // ── Bar size toggle buttons (100% / 65% / 35%) ──────────────────────────
+    const barSizeBtns = document.querySelectorAll('.tv-bar-size-btn');
+    barSizeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const scale = parseFloat(btn.dataset.barScale ?? '1');
+        this._barScale = scale;
+        // Update active state
+        barSizeBtns.forEach(b => b.classList.toggle('active', b === btn));
+        // Redraw bars immediately
+        if (this._excursionRedraw) this._excursionRedraw();
+      });
+    });
   }
 
   // ─── CLEANUP ───────────────────────────────────────────────────────────────
@@ -1102,7 +1235,14 @@ class TradingViewEquityChart {
     if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
     if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
     if (this._clockEl && this._clockEl.parentNode) { this._clockEl.parentNode.removeChild(this._clockEl); this._clockEl = null; }
-    this._excursionCanvas = null;  // canvas no longer used
+    if (this._priceClampUnsub) { this._priceClampUnsub(); this._priceClampUnsub = null; }
+    // Properly remove ALL excursion canvases from the DOM (not just null the ref).
+    // Without this, re-render() leaves orphaned canvases that produce duplicate bars.
+    this._removeExcursionSeries();
+    // Also nuke any stray canvas elements left by previous renders
+    if (this.container) {
+      this.container.querySelectorAll('canvas[data-excursion]').forEach(c => c.remove());
+    }
     this._mfeSeries = null;
     this._maeSeries = null;
     this._budgetMfe = 0;

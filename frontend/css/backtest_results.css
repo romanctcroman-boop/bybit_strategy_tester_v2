@@ -914,6 +914,41 @@ body {
     text-align: left !important;
 }
 
+/* DCA Orders Column - TradingView Style */
+.tv-dca-cell {
+    text-align: center !important;
+    vertical-align: middle;
+    min-width: 80px;
+}
+
+.tv-dca-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background-color: rgba(38, 166, 154, 0.15);
+    color: #26a69a;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: inherit;
+    border: 1px solid rgba(38, 166, 154, 0.3);
+    cursor: help;
+    white-space: nowrap;
+}
+
+.tv-dca-details {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+}
+
+.tv-dca-none {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    opacity: 0.5;
+}
+
 /* Exit row styling */
 .tv-trade-exit-row {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -1336,6 +1371,42 @@ body {
 }
 
 .tv-mode-btn.active {
+    background: #2962ff;
+    color: #ffffff;
+}
+
+/* Bar Size Toggle (100% / 65% / 35%) */
+.tv-bar-size-toggle {
+    display: flex;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-left: 8px;
+}
+
+.tv-bar-size-btn {
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border-color);
+    color: #787b86;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tv-bar-size-btn:last-child {
+    border-right: none;
+}
+
+.tv-bar-size-btn:hover {
+    color: #d1d4dc;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.tv-bar-size-btn.active {
     background: #2962ff;
     color: #ffffff;
 }
