@@ -602,10 +602,13 @@ class TradingViewEquityChart {
       const tsApi = chart.timeScale();
       const ecPts = self._equityPoints || []; // [{time, value}] sorted asc
 
-      const stripH = 5;             // height of colour strip at very bottom
-      const ddHistH = 24;           // height of drawdown histogram zone (px)
-      const stripY = H - stripH;    // Y of the colour strip
-      const ddHistBottom = stripY;  // histogram grows upward from here
+      const timeAxisH = 34;         // LWC time-scale row height (px)
+      const stripH = 5;             // height of colour strip (sits INSIDE the time-axis zone)
+      const ddHistH = 36;           // height of drawdown histogram zone (px) — +50%
+      // Growth/drawdown colour strips go BELOW the time axis (last stripH px of canvas)
+      const stripY = H - stripH;
+      // DD histogram sits ABOVE the time axis
+      const ddHistBottom = H - timeAxisH;
 
       {
         const segs = self._gdSegments || [];
@@ -967,23 +970,22 @@ class TradingViewEquityChart {
               pctChange
             });
           } else {
+            // Drawdown segment: find the deepest point for absChange/pctChange,
+            // but extend the visual strip all the way to the last data point
+            // so the colour doesn't cut off mid-chart.
             let minV = startV;
-            let minIdx = start;
             for (let j = start; j <= end; j += 1) {
               const vj = num(equity[j]);
-              if (vj <= minV) {
-                minV = vj;
-                minIdx = j;
-              }
+              if (vj < minV) minV = vj;
             }
             const absChange = startV - minV;
             const pctChange = startV !== 0 ? absChange / startV : 0;
             segments.push({
               kind: 'drawdown',
               startIndex: start,
-              endIndex: minIdx,
+              endIndex: end,          // extend to last point, not just the minimum
               startTime: timestamps[start],
-              endTime: timestamps[minIdx],
+              endTime: timestamps[end],
               absChange,
               pctChange
             });
