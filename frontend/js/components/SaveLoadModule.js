@@ -128,7 +128,7 @@ export function createSaveLoadModule({
                 const timeoutId = setTimeout(() => {
                     wsTimedOut = true;
                     resolve({ valid: true, fallback: true });
-                }, 3000);
+                }, 8000);
                 wsValidation.validateStrategy(strategy.blocks, strategy.connections, (result) => {
                     clearTimeout(timeoutId);
                     resolve(result);
@@ -233,10 +233,16 @@ export function createSaveLoadModule({
                     showNotification('Стратегия «' + _loadedStrategyName + '» перезаписана!', 'success');
                     if (savedId) _clearLocalStorageDraft(savedId);
                 } else {
-                    // Normal overwrite → same name, same ID
+                    // Normal save → same name, same or new ID
                     _loadedStrategyName = currentName;
                     showNotification('Стратегия успешно сохранена!', 'success');
-                    if (savedId) _clearLocalStorageDraft(savedId);
+                    if (savedId) {
+                        _clearLocalStorageDraft(savedId);
+                        // Update URL with strategy ID if it wasn't there before (new strategy POST)
+                        if (!strategyId) {
+                            window.history.pushState({}, '', '?id=' + savedId);
+                        }
+                    }
                 }
             } else {
                 const errorText = await response.text();
@@ -457,6 +463,17 @@ export function createSaveLoadModule({
 
             // Track the loaded name so saveStrategy() can detect a rename ("Save As")
             _loadedStrategyName = (strategy.name || 'New Strategy').trim();
+
+            // Update URL so that Save button uses PUT (not POST) for this strategy.
+            // Without this, opening a strategy from My Strategies while on a URL
+            // without ?id= (or with a different ?id=) would cause Save to create a
+            // duplicate record instead of updating the opened strategy.
+            if (window.history && window.location.search !== `?id=${strategyId}`) {
+                window.history.pushState({}, '', `?id=${strategyId}`);
+            }
+            // Show the Versions button now that a saved strategy is loaded
+            const btnVersions = document.getElementById('btnVersions');
+            if (btnVersions) btnVersions.style.display = '';
 
             // Populate form fields
             document.getElementById('strategyName').value = _loadedStrategyName;

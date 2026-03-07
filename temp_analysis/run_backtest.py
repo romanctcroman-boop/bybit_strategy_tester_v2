@@ -1,10 +1,67 @@
 """
-Запуск бэктеста Strategy_RSI_L\\S_15 и сравнение с TradingView
+Run backtest for Strategy_MACD_07 via builder endpoint, verify open position fix.
 """
 
-import json
-import sqlite3
 import sys
+
+import requests
+
+strategy_id = "963da4df-8e09-4c8e-a361-3143914b3581"
+
+payload = {
+    "symbol": "ETHUSDT",
+    "interval": "30",
+    "start_date": "2025-01-01T00:00:00",
+    "end_date": "2026-03-05T23:59:59",
+    "initial_capital": 10000,
+    "leverage": 10,
+    "commission": 0.0007,
+    "direction": "both",
+    "position_size": 0.1,
+    "position_size_type": "percent",
+    "stop_loss_pct": 0.132,
+    "take_profit_pct": 0.066,
+    "market_type": "linear",
+    "pyramiding": 1,
+}
+
+url = f"http://localhost:8000/api/v1/strategy-builder/strategies/{strategy_id}/backtest"
+print(f"POST {url}", flush=True)
+r = requests.post(url, json=payload, timeout=180)
+print("Status:", r.status_code, flush=True)
+
+if r.status_code == 200:
+    data = r.json()
+    bt = data.get("backtest", data)
+    print("Backtest ID:", bt.get("id"))
+    print("Status:", bt.get("status"))
+    print("Total trades:", bt.get("total_trades"))
+    trades = bt.get("trades", [])
+    print("Trades in response:", len(trades))
+    if trades:
+        last = trades[-1]
+        print("--- Last trade ---")
+        print("  exit_comment:", last.get("exit_comment"))
+        print("  is_open:", last.get("is_open"))
+        print("  entry_time:", last.get("entry_time"))
+        print("  entry_price:", last.get("entry_price"))
+        print("  exit_time:", last.get("exit_time"))
+        print("  exit_price:", last.get("exit_price"))
+        print("  direction:", last.get("direction"))
+        print("  pnl:", last.get("pnl"))
+    metrics = bt.get("metrics", {})
+    if metrics:
+        print("\n--- Key metrics ---")
+        print("  net_profit:", metrics.get("net_profit"))
+        print("  total_trades:", metrics.get("total_trades"))
+        print("  open_trades:", metrics.get("open_trades"))
+else:
+    print("Error:", r.text[:2000])
+
+sys.exit(0)
+
+# --- OLD CODE BELOW ---
+import sqlite3
 
 sys.path.insert(0, "d:/bybit_strategy_tester_v2")
 

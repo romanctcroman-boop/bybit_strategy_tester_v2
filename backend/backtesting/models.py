@@ -607,6 +607,18 @@ class BacktestConfig(BaseModel):
         le=50.0,
         description="Grid trailing percentage. When > 0, grid levels trail the price movement.",
     )
+    partial_grid_orders: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Partial grid placement: 1 = place all orders at once, 2-4 = place N orders at a time.",
+    )
+    grid_pullback_percent: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=50.0,
+        description="Grid pullback: shift grid when price moves X% away without fills. 0 = disabled.",
+    )
 
     # ===== ENGINE SELECTION =====
     engine_type: str = Field(
@@ -850,6 +862,28 @@ class TradeRecord(BaseModel):
 
     # Trade number
     trade_number: int = Field(default=0, description="Sequential trade number")
+
+    # ===== DCA-specific fields =====
+    dca_orders_filled: int = Field(
+        default=0,
+        description="Number of DCA grid orders filled in this position (1=entry only, 2=entry+1 DCA, ..., up to 10). 0 for non-DCA trades.",
+    )
+    dca_avg_entry_price: float = Field(
+        default=0.0,
+        description="Average entry price across all DCA orders (weighted by size). 0 for non-DCA trades.",
+    )
+    dca_total_size_usd: float = Field(
+        default=0.0,
+        description="Total position size in USD across all DCA orders. 0 for non-DCA trades.",
+    )
+    dca_total_size_coins: float = Field(
+        default=0.0,
+        description="Total position size in coins across all DCA orders. 0 for non-DCA trades.",
+    )
+    dca_grid_levels: list[float] = Field(
+        default_factory=list,
+        description="List of DCA grid trigger prices for this position. Empty for non-DCA trades.",
+    )
 
     # ===== NEW: Entry/Exit bar indices (TradingView) =====
     entry_bar_index: int = Field(default=0, description="Bar index at entry")

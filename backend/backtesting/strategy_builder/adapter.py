@@ -2988,6 +2988,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Manual Grid (custom orders)
             "custom_orders": None,
             "grid_trailing_percent": 0.0,
+            # Partial grid placement (1 = all orders at once, 2-4 = place N orders at a time)
+            "partial_grid_orders": 1,
+            # Grid pullback: re-place grid if price moves this % away without fills (0 = disabled)
+            "grid_pullback_percent": 0.0,
         }
 
         for _block_id, block in self.blocks.items():
@@ -2995,8 +2999,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
 
-            # Support for Manual Grid (grid_orders) block from entry_mgmt/entry_refinement category
-            if category in ("entry_refinement", "entry_mgmt") and block_type == "grid_orders":
+            # Support for Manual Grid (grid_orders) block.
+            # Match by block_type regardless of category — category may be missing
+            # or inferred incorrectly for blocks saved without explicit category field.
+            if block_type == "grid_orders":
                 custom_orders = params.get("orders", [])
                 if custom_orders and len(custom_orders) > 0:
                     dca_config["dca_enabled"] = True
@@ -3018,12 +3024,22 @@ class StrategyBuilderAdapter(BaseStrategy):
                     dca_config["grid_trailing_percent"] = grid_trailing
                     dca_config["grid_trailing"] = grid_trailing
 
-            # Support for unified 'dca' block from entry_mgmt/entry_refinement category (new format)
-            elif category in ("entry_refinement", "entry_mgmt") and block_type == "dca":
+            # Support for unified 'dca' block (new format).
+            # Match by block_type alone — category may be missing, inferred as
+            # "dca_grid" (via _BLOCK_CATEGORY_MAP), or correctly set to
+            # "entry_mgmt"/"entry_refinement".  Old-format DCA blocks use distinct
+            # types (dca_grid_enable, dca_grid_settings, etc.) handled below.
+            elif block_type == "dca":
                 dca_config["dca_enabled"] = True
                 dca_config["dca_grid_size_percent"] = params.get("grid_size_percent", 15.0)
                 dca_config["dca_order_count"] = params.get("order_count", 5)
                 dca_config["dca_martingale_coef"] = params.get("martingale_coefficient", 1.0)
+                # Read direction from block params — this is critical so that a "Long" DCA
+                # strategy doesn't accidentally open short positions.
+                # Falls back to "both" (the safe default when direction is unspecified).
+                block_direction = params.get("direction", params.get("dca_direction", None))
+                if block_direction in ("long", "short", "both"):
+                    dca_config["dca_direction"] = block_direction
                 # Map log_steps_coefficient to dca_log_step_coef
                 log_coef = params.get("log_steps_coefficient", 1.0)
                 if log_coef != 1.0:
@@ -3037,10 +3053,19 @@ class StrategyBuilderAdapter(BaseStrategy):
                         "indent_percent": first_offset,
                         "cancel_after_bars": 10,
                     }
-                # grid_trailing - store for future use (not yet implemented in backend)
+                # Partial grid: how many orders to place initially (1-4, 1=all orders at once)
+                partial_grid = params.get("partial_grid_orders", 1)
+                if partial_grid and int(partial_grid) > 1:
+                    dca_config["partial_grid_orders"] = int(partial_grid)
+                # Grid pullback: shift grid if price moves X% without fills (0=disabled)
+                grid_pullback = params.get("grid_pullback_percent", 0)
+                if grid_pullback and float(grid_pullback) > 0:
+                    dca_config["grid_pullback_percent"] = float(grid_pullback)
+                # grid_trailing — use canonical key "grid_trailing_percent" (router reads this key)
                 grid_trailing = params.get("grid_trailing", 0)
                 if grid_trailing > 0:
-                    dca_config["grid_trailing"] = grid_trailing
+                    dca_config["grid_trailing_percent"] = float(grid_trailing)
+                    dca_config["grid_trailing"] = float(grid_trailing)  # backward compat
 
             elif category == "dca_grid":
                 if block_type == "dca_grid_enable":
@@ -3167,17 +3192,22 @@ class StrategyBuilderAdapter(BaseStrategy):
         Check if strategy contains any DCA grid blocks.
 
         Returns:
-            True if any block has category="dca_grid" or is 'dca' type from entry_mgmt/entry_refinement
+            True if any block has category="dca_grid" or is 'dca'/'grid_orders' type
+            from entry_mgmt/entry_refinement, OR if extract_dca_config() would set
+            dca_enabled=True. Kept in sync with extract_dca_config() logic.
         """
         for block in self.blocks.values():
             category = block.get("category", "")
             block_type = block.get("type", "")
 
-            # New format: 'dca' block from entry_mgmt/entry_refinement category
-            if category in ("entry_refinement", "entry_mgmt") and block_type == "dca":
+            # New format: unified 'dca' block OR manual 'grid_orders' block.
+            # Check by block_type regardless of category — category may be missing
+            # in blocks saved before explicit category field was added, or may be
+            # inferred as "dca_grid" for type="dca" via _BLOCK_CATEGORY_MAP.
+            if block_type in ("dca", "grid_orders"):
                 return True
 
-            # Old format: dca_grid category
+            # Old format: dca_grid category — only the enable block counts
             if category == "dca_grid" and block_type == "dca_grid_enable":
                 params = block.get("params") or block.get("config") or {}
                 if params.get("enabled", True):

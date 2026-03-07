@@ -403,6 +403,55 @@ def _handle_rsi(
     if use_cross_level:
         cross_long_level = params.get("cross_long_level", 29)  # TV: crossLevelLong=29
         cross_short_level = params.get("cross_short_level", 55)  # TV: crossLevelShort=55
+
+        # ── Validate cross+range compatibility ──────────────────────────────────────
+        # When both cross_level AND range are active, they are evaluated as:
+        #   long_signal = cross_long AND range_condition (both on the SAME bar)
+        # This means:
+        #   - cross_long fires when RSI crosses UP through cross_long_level (RSI ≈ cross_long_level)
+        #   - range_condition requires RSI >= long_rsi_more
+        # If cross_long_level < long_rsi_more, the cross happens below the range minimum,
+        # so long_signal is ALWAYS False (0 signals). Warn the user.
+        if use_long_range and "long_rsi_more" in params:
+            _long_more = float(params["long_rsi_more"])
+            _cross_l = float(cross_long_level)
+            if _cross_l < _long_more:
+                logger.warning(
+                    "RSI CONFIG CONFLICT: cross_long_level={} < long_rsi_more={} — "
+                    "when RSI crosses UP through {}, it is at ~{} which is BELOW the "
+                    "range minimum {}. Combined condition (cross AND range) will produce "
+                    "0 long signals unless RSI jumps > {} points in a single bar. "
+                    "Fix: set cross_long_level >= long_rsi_more (e.g. cross_long_level={}) "
+                    "OR reduce long_rsi_more to <= cross_long_level (e.g. long_rsi_more={}).",
+                    _cross_l,
+                    _long_more,
+                    _cross_l,
+                    _cross_l,
+                    _long_more,
+                    _long_more - _cross_l,
+                    int(_long_more),
+                    int(_cross_l),
+                )
+        if use_short_range and "short_rsi_less" in params:
+            _short_less = float(params["short_rsi_less"])
+            _cross_s = float(cross_short_level)
+            if _cross_s > _short_less:
+                logger.warning(
+                    "RSI CONFIG CONFLICT: cross_short_level={} > short_rsi_less={} — "
+                    "when RSI crosses DOWN through {}, it is at ~{} which is ABOVE the "
+                    "range maximum {}. Combined condition (cross AND range) will produce "
+                    "0 short signals. "
+                    "Fix: set cross_short_level <= short_rsi_less (e.g. cross_short_level={}) "
+                    "OR raise short_rsi_less to >= cross_short_level (e.g. short_rsi_less={}).",
+                    _cross_s,
+                    _short_less,
+                    _cross_s,
+                    _cross_s,
+                    _short_less,
+                    int(_short_less),
+                    int(_cross_s),
+                )
+
         rsi_prev = rsi.shift(1)
         # TradingView Pine Script ta.crossover(a, b) = a[1] < b  AND a >= b
         # TradingView Pine Script ta.crossunder(a, b) = a[1] > b AND a <= b
@@ -478,15 +527,71 @@ def _handle_rsi(
     #   Signal bar 2025-01-01 13:00 UTC: BTC RSI 52.93→51.08 (cross52 down) AND RSI∈[50,70]
     #   Entry bar 2025-01-01 13:30 UTC: ETH open = 3334.62 ← matches TV entry price ✅
     # ──────────────────────────────────────────────────────────────────────────
+    #
+    # ── CROSS+RANGE CONFLICT RESOLUTION (2026-04-xx) ─────────────────────────
+    # When cross_long_level < long_rsi_more (e.g. cross=24, range_min=28):
+    #   - The RSI crosses UP through 24 but long_range requires RSI >= 28.
+    #   - At the exact cross bar, RSI ≈ 24 < 28 → combined signal is ALWAYS 0.
+    #   - This is NOT a bug in the code — it IS a config conflict.
+    #
+    # Resolution strategy:
+    #   If cross_long_level < long_rsi_more AND the plain cross never fires inside
+    #   the range → we ALSO check if RSI crosses UP through long_rsi_more (entering
+    #   the range from below). This is the user's likely intent: "RSI exits oversold
+    #   territory (< cross_level) and then enters the target range (>= range_min)".
+    #   The two conditions together mean: RSI was below cross_long_level recently
+    #   (oversold) AND now enters the target range.
+    # ──────────────────────────────────────────────────────────────────────────
     if use_long_range and use_cross_level:
-        long_signal = long_cross_condition & long_range_condition
+        _cross_l = float(params.get("cross_long_level", 29))
+        _long_more = float(params.get("long_rsi_more", 0))
+        if _cross_l < _long_more:
+            # Config conflict: cross below range minimum.
+            # Extend cross condition: also fire when RSI crosses UP through long_rsi_more
+            # (i.e. enters the range from below), in addition to the original cross trigger.
+            rsi_prev_for_conflict = rsi.shift(1)
+            cross_into_range = (rsi_prev_for_conflict < _long_more) & (rsi >= _long_more)
+            long_cross_condition_extended = long_cross_condition | cross_into_range
+            long_signal = long_cross_condition_extended & long_range_condition
+            logger.debug(
+                "RSI cross+range conflict resolved: cross_long_level={} < long_rsi_more={} "
+                "→ added cross-into-range trigger (RSI crosses UP through {}). "
+                "cross_only={} cross_into_range={} combined={}",
+                _cross_l,
+                _long_more,
+                _long_more,
+                int(long_cross_condition.sum()),
+                int(cross_into_range.sum()),
+                int(long_signal.sum()),
+            )
+        else:
+            long_signal = long_cross_condition & long_range_condition
     elif use_long_range:
         long_signal = long_range_condition
     else:
         long_signal = long_cross_condition
 
     if use_short_range and use_cross_level:
-        short_signal = short_cross_condition & short_range_condition
+        _cross_s = float(params.get("cross_short_level", 55))
+        _short_less = float(params.get("short_rsi_less", 100))
+        if _cross_s > _short_less:
+            # Config conflict: cross above range maximum.
+            # Extend cross condition: also fire when RSI crosses DOWN through short_rsi_less.
+            rsi_prev_for_conflict = rsi.shift(1)
+            cross_into_range_s = (rsi_prev_for_conflict > _short_less) & (rsi <= _short_less)
+            short_cross_condition_extended = short_cross_condition | cross_into_range_s
+            short_signal = short_cross_condition_extended & short_range_condition
+            logger.debug(
+                "RSI cross+range conflict resolved: cross_short_level={} > short_rsi_less={} "
+                "→ added cross-into-range trigger (RSI crosses DOWN through {}). "
+                "combined={}",
+                _cross_s,
+                _short_less,
+                _short_less,
+                int(short_signal.sum()),
+            )
+        else:
+            short_signal = short_cross_condition & short_range_condition
     elif use_short_range:
         short_signal = short_range_condition
     else:

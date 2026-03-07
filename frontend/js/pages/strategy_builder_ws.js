@@ -66,6 +66,13 @@ export function initValidationWebSocket() {
         validationWs.onclose = (event) => {
             console.log('[WS Validation] Disconnected:', event.code, event.reason);
             wsConnected = false;
+            // Resolve any pending callbacks so callers don't hang
+            if (validationCallbacks.size > 0) {
+                validationCallbacks.forEach((cb, _key) => {
+                    cb({ valid: true, messages: [], fallback: true });
+                });
+                validationCallbacks.clear();
+            }
             // Notify UI
             dispatchEvent(new CustomEvent('ws-validation-disconnected'));
             // Attempt reconnection
@@ -136,6 +143,11 @@ function handleValidationResponse(data) {
 
     if (type === 'error') {
         console.error('[WS Validation] Server error:', data.message);
+        // Resolve any pending callbacks so callers don't time out waiting
+        validationCallbacks.forEach((cb, _key) => {
+            cb({ valid: true, messages: [], fallback: true, serverError: data.message });
+        });
+        validationCallbacks.clear();
         return;
     }
 

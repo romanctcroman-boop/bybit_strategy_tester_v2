@@ -109,6 +109,7 @@ let monthlyChart = null;
 // Trade Analysis Charts
 let tradeDistributionChart = null;
 let winLossDonutChart = null;
+let mfeMaeChart = null;
 // Dynamics Charts
 let waterfallChart = null;
 let benchmarkingChart = null;
@@ -968,6 +969,22 @@ function initCharts() {
     // Keep equityChart as thin shim so legacy code that checks `equityChart` still passes truthy
     equityChart = { _tvChart: _brTVEquityChart, canvas: equityContainer, _tradeMap: {}, _tradeRanges: [], _equityData: [], _initialCapital: 10000, _showTradeExcursions: true };
     setChart('equity', equityChart);
+
+    // ── Click-to-trade: equity chart click scrolls the trades list ───────────
+    equityContainer.addEventListener('equityChartTradeClick', (e) => {
+      const { tradeNum } = e.detail;
+      // Try to scroll the trade row in the "List of Trades" table
+      // The trades table rows have data-trade-index or id="trade-row-N"
+      const row = document.querySelector(
+        `tr.tv-trade-exit-row[data-trade-num="${tradeNum}"]`
+      );
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief highlight
+        row.classList.add('trade-row-highlight');
+        setTimeout(() => row.classList.remove('trade-row-highlight'), 1500);
+      }
+    });
   }
 
   // Drawdown Chart
@@ -1163,6 +1180,117 @@ function initCharts() {
           centerLabel: {
             text: '0',
             subText: 'Всего сделок'
+          }
+        }
+      }
+    });
+  }
+
+  // MFE / MAE Chart (in Trade Analysis tab) — TV-style per-trade excursion bars
+  const mfeMaeCanvas = document.getElementById('mfeMaeChart');
+  if (mfeMaeCanvas) {
+    mfeMaeChart = chartManager.init('mfeMae', mfeMaeCanvas, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'MFE %',
+            data: [],
+            backgroundColor: 'rgba(38,166,154,0.75)',
+            borderWidth: 0,
+            barPercentage: 0.6,
+            categoryPercentage: 1.0,
+            order: 2
+          },
+          {
+            label: 'MAE %',
+            data: [],
+            backgroundColor: 'rgba(239,83,80,0.75)',
+            borderWidth: 0,
+            barPercentage: 0.6,
+            categoryPercentage: 1.0,
+            order: 2
+          },
+          {
+            type: 'scatter',
+            label: 'P&L %',
+            data: [],
+            backgroundColor: '#ffffff',
+            borderColor: '#ffffff',
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: {
+              color: '#c9d1d9',
+              usePointStyle: true,
+              padding: 15,
+              font: { size: 11 }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+            titleColor: '#c9d1d9',
+            bodyColor: '#c9d1d9',
+            borderColor: '#30363d',
+            borderWidth: 1,
+            callbacks: {
+              title: (items) => `Сделка #${items[0]?.label ?? ''}`,
+              label: (ctx) => {
+                if (ctx.dataset.label === 'P&L %') {
+                  const v = ctx.parsed.y;
+                  return `P&L: ${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+                }
+                const val = ctx.dataset.data[ctx.dataIndex];
+                if (Array.isArray(val)) {
+                  const range = Math.abs(val[1] - val[0]);
+                  return `${ctx.dataset.label}: ${range.toFixed(2)}%`;
+                }
+                return `${ctx.dataset.label}: ${(ctx.parsed.y || 0).toFixed(2)}%`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: '#8b949e',
+              font: { size: 10 },
+              maxTicksLimit: 20,
+              autoSkip: true
+            },
+            title: {
+              display: true,
+              text: 'Номер сделки',
+              color: '#8b949e',
+              font: { size: 11 }
+            }
+          },
+          y: {
+            grid: { color: '#30363d' },
+            ticks: {
+              color: '#8b949e',
+              font: { size: 11 },
+              callback: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
+            },
+            title: {
+              display: true,
+              text: '%',
+              color: '#8b949e',
+              font: { size: 11 }
+            }
           }
         }
       }
@@ -1759,6 +1887,11 @@ function updateTVTradesListTab(trades, config) {
   tradesCurrentPage = 0;
   setTradesCachedRows(tradesCachedRows);
   setTradesCurrentPage(0);
+
+  // Update table header if DCA trades detected
+  const hasDcaTrades = trades.some((t) => (t.dca_orders_filled ?? 0) > 0);
+  updateDcaColumnHeader(hasDcaTrades);
+
   renderTradesPageUtil(tbody, tradesCachedRows, tradesCurrentPage);
   updatePaginationControls(tradesCachedRows.length, tradesCurrentPage);
   const container = document.getElementById('tvTradesContainer') ||
@@ -1772,6 +1905,25 @@ function renderTradesPage(tbody) {
   if (!tgt) return;
   renderTradesPageUtil(tgt, tradesCachedRows, tradesCurrentPage);
   updatePaginationControls(tradesCachedRows.length, tradesCurrentPage);
+}
+
+/**
+ * Update DCA column header visibility based on trade data.
+ * Shows/hides the DCA column header only when DCA trades are present.
+ * @param {boolean} hasDca - True if backtest contains DCA trades
+ */
+function updateDcaColumnHeader(hasDca) {
+  const dcaHeader = document.getElementById('tvTradesDcaHeader');
+  if (!dcaHeader) return;
+
+  // Show/hide header
+  dcaHeader.style.display = hasDca ? 'table-cell' : 'none';
+
+  // Also need to show/hide DCA cells in rows
+  const dcaCells = document.querySelectorAll('.tv-dca-cell');
+  dcaCells.forEach(cell => {
+    cell.style.display = hasDca ? 'table-cell' : 'none';
+  });
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -2711,14 +2863,14 @@ function updateMetrics(metrics) {
   // Dual format metrics (TradingView style)
   setDualMetric(
     'metricDrawdown',
-    -(metrics.max_drawdown_value || 0),
-    -(metrics.max_drawdown || 0),
+    -(metrics.max_drawdown_intrabar_value || metrics.max_drawdown_value || 0),
+    -(metrics.max_drawdown_intrabar || metrics.max_drawdown || 0),
     0
   );
   setDualMetric(
     'metricNetProfit',
-    metrics.net_profit || 0,
-    metrics.net_profit_pct || 0,
+    (metrics.net_profit || 0) + (metrics.open_pnl || 0),
+    (metrics.net_profit_pct || 0) + (metrics.open_pnl_pct || 0),
     0
   );
   setDualMetric(
@@ -3288,6 +3440,31 @@ function updateCharts(backtest) {
       winLossDonutChart.update('none');
     } catch (e) {
       console.warn('[updateCharts] winLossDonutChart error:', e.message);
+    }
+  }
+
+  // MFE / MAE Chart (in Trade Analysis tab)
+  if (backtest.trades && backtest.trades.length > 0 && mfeMaeChart && mfeMaeChart.canvas) {
+    try {
+      const trades = backtest.trades;
+      const labels = trades.map((_, i) => String(i + 1));
+
+      // Floating bars: MFE grows up [0, +mfe_pct], MAE grows down [-mae_pct, 0]
+      const mfeData = trades.map((t) => [0, Math.abs(t.mfe_pct ?? 0)]);
+      const maeData = trades.map((t) => [-Math.abs(t.mae_pct ?? 0), 0]);
+      // Scatter: actual P&L % — white dot at close return
+      const pnlData = trades.map((t, i) => ({
+        x: String(i + 1),
+        y: Number(t.return_pct ?? t.pnl_pct ?? 0)
+      }));
+
+      mfeMaeChart.data.labels = labels;
+      mfeMaeChart.data.datasets[0].data = mfeData;
+      mfeMaeChart.data.datasets[1].data = maeData;
+      mfeMaeChart.data.datasets[2].data = pnlData;
+      mfeMaeChart.update('none');
+    } catch (e) {
+      console.warn('[updateCharts] mfeMaeChart error:', e.message);
     }
   }
 
@@ -4143,34 +4320,176 @@ function exportTrades() {
     return;
   }
 
+  let cumPnl = 0;
   const csv = [
-    [
-      '#',
-      'Entry Time',
-      'Exit Time',
-      'Side',
-      'Entry Price',
-      'Exit Price',
-      'Size',
-      'P&L',
-      'Return %'
-    ].join(','),
-    ...currentBacktest.trades.map((t, i) =>
-      [
+    ['#', 'Entry Time', 'Exit Time', 'Side', 'Entry Price', 'Exit Price', 'Size', 'P&L', 'Return %', 'Commission', 'MFE', 'MAE', 'Cumulative P&L'].join(','),
+    ...currentBacktest.trades.map((t, i) => {
+      cumPnl += (t.pnl || 0);
+      return [
         i + 1,
-        t.entry_time,
-        t.exit_time,
-        t.side,
-        t.entry_price,
-        t.exit_price,
-        t.size,
-        t.pnl?.toFixed(2),
-        t.return_pct?.toFixed(2)
-      ].join(',')
-    )
+        t.entry_time || '',
+        t.exit_time || '',
+        t.side || '',
+        t.entry_price != null ? t.entry_price : '',
+        t.exit_price != null ? t.exit_price : '',
+        t.size != null ? t.size : '',
+        t.pnl != null ? t.pnl.toFixed(4) : '',
+        t.return_pct != null ? t.return_pct.toFixed(4) : '',
+        t.commission != null ? t.commission.toFixed(4) : '',
+        t.mfe != null ? t.mfe.toFixed(4) : '',
+        t.mae != null ? t.mae.toFixed(4) : '',
+        cumPnl.toFixed(4)
+      ].join(',');
+    })
   ].join('\n');
 
-  downloadFile(csv, `trades_${currentBacktest.backtest_id}.csv`, 'text/csv');
+  downloadFile(csv, `trades_${currentBacktest.backtest_id || currentBacktest.id}.csv`, 'text/csv;charset=utf-8;');
+  showToast('Экспорт сделок выполнен', 'success');
+}
+
+// ============================
+// Tab Export Functions
+// ============================
+
+/**
+ * Helper: escape a CSV cell value (quote if contains comma, quote, or newline)
+ */
+function csvCell(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+/**
+ * Helper: read text content from a DOM element by id, stripping HTML tags
+ */
+function getCellText(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  return el.textContent.trim();
+}
+
+/**
+ * Core download helper — must be called directly from a click handler (user gesture)
+ */
+function triggerCsvDownload(csv, filename) {
+  const BOM = '\uFEFF'; // UTF-8 BOM for Excel
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+function buildDynamicsCSV() {
+  const rows = [
+    ['Показатель', 'Все', 'Длинная', 'Короткая'],
+    ['Исходный капитал', getCellText('dyn-initial-capital'), '', ''],
+    ['Нереализованная ПР/УБ', getCellText('dyn-unrealized'), '', ''],
+    ['Net P&L', getCellText('dyn-net-profit'), getCellText('dyn-net-profit-long'), getCellText('dyn-net-profit-short')],
+    ['Валовая прибыль', getCellText('dyn-gross-profit'), getCellText('dyn-gross-profit-long'), getCellText('dyn-gross-profit-short')],
+    ['Валовый убыток', getCellText('dyn-gross-loss'), getCellText('dyn-gross-loss-long'), getCellText('dyn-gross-loss-short')],
+    ['Фактор прибыли', getCellText('dyn-profit-factor'), getCellText('dyn-profit-factor-long'), getCellText('dyn-profit-factor-short')],
+    ['Выплаченная комиссия', getCellText('dyn-commission'), getCellText('dyn-commission-long'), getCellText('dyn-commission-short')],
+    ['Ожидаемая прибыль', getCellText('dyn-expectancy'), getCellText('dyn-expectancy-long'), getCellText('dyn-expectancy-short')],
+    ['Прибыль от покупки и удержания', getCellText('dyn-buy-hold'), '', ''],
+    ['Опережающая динамика стратегии', getCellText('dyn-strategy-vs-bh'), '', ''],
+    ['Годовая доходность (CAGR)', getCellText('dyn-cagr'), getCellText('dyn-cagr-long'), getCellText('dyn-cagr-short')],
+    ['Доходность на исходный капитал', getCellText('dyn-return-capital'), getCellText('dyn-return-capital-long'), getCellText('dyn-return-capital-short')],
+    ['Сред. продолж. роста капитала', getCellText('dyn-avg-growth-duration'), '', ''],
+    ['Сред. рост капитала', getCellText('dyn-avg-equity-growth'), '', ''],
+    ['Макс. рост капитала', getCellText('dyn-max-equity-growth'), '', ''],
+    ['Сред. продолж. просадки капитала', getCellText('dyn-avg-dd-duration'), '', ''],
+    ['Сред. просадка капитала', getCellText('dyn-avg-drawdown'), '', ''],
+    ['Макс. просадка капитала', getCellText('dyn-max-drawdown'), '', ''],
+    ['Макс. просадка капитала (внутри бара)', getCellText('dyn-max-dd-intrabar'), '', ''],
+    ['Доходность на макс. просадку', getCellText('dyn-return-on-dd'), getCellText('dyn-return-on-dd-long'), getCellText('dyn-return-on-dd-short')],
+    ['Чистая прибыль в % от наибольшего убытка', getCellText('dyn-profit-vs-max-loss'), getCellText('dyn-profit-vs-max-loss-long'), getCellText('dyn-profit-vs-max-loss-short')]
+  ];
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+function buildTradeAnalysisCSV() {
+  const rows = [
+    ['Показатель', 'Все', 'Длинная', 'Короткая'],
+    ['Всего открытых сделок', getCellText('ta-open-trades'), getCellText('ta-open-trades-long'), getCellText('ta-open-trades-short')],
+    ['Всего сделок', getCellText('ta-total-trades'), getCellText('ta-total-trades-long'), getCellText('ta-total-trades-short')],
+    ['Прибыльные сделки', getCellText('ta-winning-trades'), getCellText('ta-winning-trades-long'), getCellText('ta-winning-trades-short')],
+    ['Убыточные сделки', getCellText('ta-losing-trades'), getCellText('ta-losing-trades-long'), getCellText('ta-losing-trades-short')],
+    ['Сделки в безубыток', getCellText('ta-breakeven-trades'), getCellText('ta-breakeven-trades-long'), getCellText('ta-breakeven-trades-short')],
+    ['Процент прибыльных', getCellText('ta-win-rate'), getCellText('ta-win-rate-long'), getCellText('ta-win-rate-short')],
+    ['Средние ПР/УБ', getCellText('ta-avg-pnl'), getCellText('ta-avg-pnl-long'), getCellText('ta-avg-pnl-short')],
+    ['Средняя прибыль по сделке', getCellText('ta-avg-win'), getCellText('ta-avg-win-long'), getCellText('ta-avg-win-short')],
+    ['Средний убыток по сделке', getCellText('ta-avg-loss'), getCellText('ta-avg-loss-long'), getCellText('ta-avg-loss-short')],
+    ['Коэф. средней прибыли / убытка', getCellText('ta-payoff-ratio'), getCellText('ta-payoff-ratio-long'), getCellText('ta-payoff-ratio-short')],
+    ['Самая прибыльная сделка', getCellText('ta-largest-win'), getCellText('ta-largest-win-long'), getCellText('ta-largest-win-short')],
+    ['Самая прибыльная сделка %', getCellText('ta-largest-win-pct'), getCellText('ta-largest-win-pct-long'), getCellText('ta-largest-win-pct-short')],
+    ['Самая убыточная сделка', getCellText('ta-largest-loss'), getCellText('ta-largest-loss-long'), getCellText('ta-largest-loss-short')],
+    ['Самая убыточная сделка %', getCellText('ta-largest-loss-pct'), getCellText('ta-largest-loss-pct-long'), getCellText('ta-largest-loss-pct-short')],
+    ['Среднее баров в позиции', getCellText('ta-avg-bars'), getCellText('ta-avg-bars-long'), getCellText('ta-avg-bars-short')],
+    ['Среднее баров в прибыльной', getCellText('ta-avg-bars-win'), getCellText('ta-avg-bars-win-long'), getCellText('ta-avg-bars-win-short')],
+    ['Среднее баров в убыточной', getCellText('ta-avg-bars-loss'), getCellText('ta-avg-bars-loss-long'), getCellText('ta-avg-bars-loss-short')],
+    ['Макс последовательных выигрышей', getCellText('ta-max-consec-wins'), getCellText('ta-max-consec-wins-long'), getCellText('ta-max-consec-wins-short')],
+    ['Макс последовательных проигрышей', getCellText('ta-max-consec-losses'), getCellText('ta-max-consec-losses-long'), getCellText('ta-max-consec-losses-short')]
+  ];
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+function buildRiskReturnCSV() {
+  const rows = [
+    ['Показатель', 'Все', 'Длинная', 'Короткая'],
+    ['Коэффициент Шарпа', getCellText('rr-sharpe'), getCellText('rr-sharpe-long'), getCellText('rr-sharpe-short')],
+    ['Коэффициент Сортино', getCellText('rr-sortino'), getCellText('rr-sortino-long'), getCellText('rr-sortino-short')],
+    ['Фактор прибыли', getCellText('rr-profit-factor'), getCellText('rr-profit-factor-long'), getCellText('rr-profit-factor-short')],
+    ['Коэффициент Кальмара', getCellText('rr-calmar'), getCellText('rr-calmar-long'), getCellText('rr-calmar-short')],
+    ['Фактор восстановления', getCellText('rr-recovery'), getCellText('rr-recovery-long'), getCellText('rr-recovery-short')],
+    ['Индекс язвы (Ulcer Index)', getCellText('rr-ulcer'), getCellText('rr-ulcer-long'), getCellText('rr-ulcer-short')],
+    ['Эффективность маржи (%)', getCellText('rr-margin-eff'), getCellText('rr-margin-eff-long'), getCellText('rr-margin-eff-short')],
+    ['Стабильность (R2)', getCellText('rr-stability'), getCellText('rr-stability-long'), getCellText('rr-stability-short')],
+    ['SQN', getCellText('rr-sqn'), getCellText('rr-sqn-long'), getCellText('rr-sqn-short')],
+    ['Коэф. Kelly (%)', getCellText('rr-kelly'), getCellText('rr-kelly-long'), getCellText('rr-kelly-short')],
+    ['Payoff Ratio', getCellText('rr-payoff'), getCellText('rr-payoff-long'), getCellText('rr-payoff-short')],
+    ['Макс послед. выигрышей', getCellText('rr-max-consec-wins'), getCellText('rr-max-consec-wins-long'), getCellText('rr-max-consec-wins-short')],
+    ['Макс послед. проигрышей', getCellText('rr-max-consec-losses'), getCellText('rr-max-consec-losses-long'), getCellText('rr-max-consec-losses-short')]
+  ];
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+/**
+ * Export "Динамика" tab as CSV — called directly from button onclick (user gesture)
+ */
+function exportTabDynamics() {
+  const sym = currentBacktest?.config?.symbol || 'export';
+  const ts = new Date().toISOString().slice(0, 10);
+  triggerCsvDownload(buildDynamicsCSV(), `dynamics_${sym}_${ts}.csv`);
+}
+
+/**
+ * Export "Анализ сделок" tab as CSV
+ */
+function exportTabTradeAnalysis() {
+  const sym = currentBacktest?.config?.symbol || 'export';
+  const ts = new Date().toISOString().slice(0, 10);
+  triggerCsvDownload(buildTradeAnalysisCSV(), `trade_analysis_${sym}_${ts}.csv`);
+}
+
+/**
+ * Export "Доходность с учётом рисков" tab as CSV
+ */
+function exportTabRiskReturn() {
+  const sym = currentBacktest?.config?.symbol || 'export';
+  const ts = new Date().toISOString().slice(0, 10);
+  triggerCsvDownload(buildRiskReturnCSV(), `risk_return_${sym}_${ts}.csv`);
 }
 
 function refreshData() {
@@ -4206,7 +4525,10 @@ function downloadFile(content, filename, type) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
@@ -4683,7 +5005,7 @@ async function updatePriceChart(backtest) {
  * ENTRY:
  *   Long  → blue ↑ arrow BELOW the wick, text: "buy\n+0.002939"
  *   Short → red  ↓ arrow ABOVE the wick, text: "sell\n-0.001234"
- *   Grid/DCA → "G1"..."G15" instead of "buy"
+ *   Grid/DCA → "#1"..."#21" instead of "buy" (sequential trade number)
  *
  * EXIT:
  *   Long exit  → purple ↓ arrow ABOVE the wick, text: "-0.002939\nTP" or "SL"
@@ -4729,10 +5051,12 @@ function buildTradeMarkers(trades, candles, options = {}) {
     const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
 
     // --- Determine entry label ---
-    // Grid/DCA: "G1"..."G15", normal: "buy"/"sell"
-    const entryLabel = trade.grid_level
-      ? `G${trade.grid_level}`
-      : (isLong ? 'buy' : 'sell');
+    // DCA/Grid: show number of orders filled (e.g., "DCA×3")
+    const dcaOrders = trade.dca_orders_filled ?? 0;
+    const isDcaTrade = dcaOrders > 1; // More than just entry order
+    const entryLabel = isDcaTrade
+      ? `DCA×${dcaOrders}`
+      : (trade.grid_level ? `#${trade.grid_level}` : (isLong ? 'buy' : 'sell'));
 
     // --- Determine exit reason (try exit_comment first, then exit_reason) ---
     const exitReason = (trade.exit_comment || trade.exit_reason || '').toLowerCase();
@@ -4766,17 +5090,30 @@ function buildTradeMarkers(trades, candles, options = {}) {
     if (showEntryPrice && trade.entry_price) {
       entryText += ` ${trade.entry_price.toFixed(2)}`;
     }
-    markers.push({
+
+    // Build tooltip for DCA trades
+    let entryTooltip = null;
+    if (isDcaTrade) {
+      const dcaAvgEntry = trade.dca_avg_entry_price?.toFixed(2) || 'N/A';
+      const dcaSizeUsd = trade.dca_total_size_usd?.toFixed(2) || '0';
+      entryTooltip = `DCA Orders: ${dcaOrders}\nAvg Entry: ${dcaAvgEntry}\nTotal Size: ${dcaSizeUsd} USD`;
+    }
+
+    const entryMarker = {
       time: entryTimeSec,
       position: isLong ? 'belowBar' : 'aboveBar',
       color: isLong ? ENTRY_LONG_COLOR : ENTRY_SHORT_COLOR,
       shape: isLong ? 'arrowUp' : 'arrowDown',
       text: entryText,
       size: 2
-    });
+    };
+    if (entryTooltip) entryMarker.tooltip = entryTooltip;
+    markers.push(entryMarker);
 
     // --- EXIT MARKER ---
-    if (exitTimeSec >= firstCandleTime && exitTimeSec <= lastCandleTime) {
+    // Skip exit marker for open (unrealized) positions — no exit has occurred yet
+    const isOpenPosition = trade.is_open === true || exitReason === 'open_position';
+    if (!isOpenPosition && exitTimeSec >= firstCandleTime && exitTimeSec <= lastCandleTime) {
       // Build exit text: "TP" + optional PnL
       let exitText = exitLabel;
       if (showPnl) {
@@ -5607,6 +5944,9 @@ if (typeof window !== 'undefined') {
   window.compareWithAI = compareWithAI;
   window.exportResults = exportResults;
   window.exportTrades = exportTrades;
+  window.exportTabDynamics = exportTabDynamics;
+  window.exportTabTradeAnalysis = exportTabTradeAnalysis;
+  window.exportTabRiskReturn = exportTabRiskReturn;
   window.refreshData = refreshData;
   window.selectBacktest = selectBacktest;
   window.deleteBacktest = deleteBacktest;

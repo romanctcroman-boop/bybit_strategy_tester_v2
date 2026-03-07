@@ -29,27 +29,75 @@
   const DEBUG = false;
 
   /**
-   * Convert onclick string to function call
-   * Handles: "fn()", "fn('arg')", "fn(this)", "this.classList.toggle('x')"
+   * Convert onclick string to function call — CSP-safe (no new Function / eval).
+   * Handles patterns:
+   *   "fnName()"
+   *   "fnName('string', 123)"
+   *   "fnName(this)"
+   *   "obj.method()"  — falls back to window lookup on dotted names
+   *
+   * For simple no-arg and string/number-arg calls the handler resolves the
+   * function from window. Complex expressions (e.g. chained calls, ternary)
+   * are left unprocessed so the original onclick remains in place.
    */
   function parseOnclickHandler(onclickStr) {
     if (!onclickStr) return null;
 
-    // Clean up the string
-    const cleanStr = onclickStr.trim();
+    const cleanStr = onclickStr.trim().replace(/;\s*$/, '');
 
-    // Return a function that executes the onclick code
-    return function (event) {
+    // Match: funcName(optionalArgs)
+    const match = cleanStr.match(/^([\w$.]+)\s*\((.*)\)\s*$/s);
+    if (!match) {
+      // Cannot safely parse — leave onclick as-is (will be handled by inline)
+      return null;
+    }
+
+    const funcPath = match[1];   // e.g. "exportTabDynamics" or "obj.method"
+    const argsStr = match[2].trim(); // e.g. "" or "'foo', 123" or "this"
+
+    // Resolve function from window (supports single-level dot notation)
+    function resolveFunc() {
+      const parts = funcPath.split('.');
+      let obj = window;
+      for (const part of parts) {
+        if (obj == null) return null;
+        obj = obj[part];
+      }
+      return typeof obj === 'function' ? obj : null;
+    }
+
+    // Parse simple argument list: empty, 'string', "string", number, true/false/null/undefined
+    // Special token: "this" → the element itself
+    function parseArgs(str, element) {
+      if (!str) return [];
+      const tokens = str.split(',').map((s) => s.trim());
+      return tokens.map((token) => {
+        if (token === 'this') return element;
+        if (token === 'true') return true;
+        if (token === 'false') return false;
+        if (token === 'null') return null;
+        if (token === 'undefined') return undefined;
+        // Quoted string
+        if (/^(['"]).*\1$/.test(token)) return token.slice(1, -1);
+        // Number
+        const num = Number(token);
+        if (!isNaN(num) && token !== '') return num;
+        // Unknown — return as string
+        return token;
+      });
+    }
+
+    return function (_event) {
+      const fn = resolveFunc();
+      if (!fn) {
+        console.warn('[AutoEventBinding] Function not found in window:', funcPath);
+        return;
+      }
       try {
-        // Create a function with 'this' bound to the element
-        const fn = new Function('event', cleanStr);
-        fn.call(this, event);
+        const args = parseArgs(argsStr, this);
+        fn.apply(this, args);
       } catch (e) {
-        console.error(
-          '[AutoEventBinding] Error executing handler:',
-          cleanStr,
-          e
-        );
+        console.error('[AutoEventBinding] Error executing handler:', cleanStr, e);
       }
     };
   }

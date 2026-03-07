@@ -1,0 +1,1 @@
+PORT= PID= LOG=INFO:     рџ›‘ KlineDBService stopped||INFO:     вњ… Live chart sessions closed||INFO:     Application shutdown complete.

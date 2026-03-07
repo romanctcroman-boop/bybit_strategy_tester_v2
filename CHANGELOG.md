@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **[BUGFIX] RSI индикатор: конфликт cross_long_level < long_rsi_more → 0 сигналов** (2026-03-06)
+
+    Файлы: `backend/backtesting/indicator_handlers.py`  
+     Тест: `tests/test_rsi_cross_range_conflict.py` (4 новых теста)
+
+    **Симптом:** Стратегия `Strategy_DCA_RSI_02` (и любая стратегия с RSI) не генерировала ни одного лонгового сигнала когда `cross_long_level < long_rsi_more`.
+
+    **Корневая причина:**  
+     Логика `long_signal = cross_long AND long_range_condition` оценивается на одном баре.  
+     При `cross_long_level=24` RSI пересекает 24 снизу вверх — на этом баре RSI ≈ 24.  
+     Но `long_range_condition = (rsi >= 28)` — `24 >= 28 = False`.  
+     Результат: `long_signal = True AND False = 0` сигналов.
+
+    **Исправление:**  
+     Когда `cross_long_level < long_rsi_more` (конфликт конфигурации), добавляем дополнительный триггер:  
+     RSI пересекает вверх через `long_rsi_more` (нижнюю границу диапазона) = "RSI входит в диапазон снизу".  
+     `long_cross_condition_extended = cross_long | cross_into_range`  
+     `long_signal = long_cross_condition_extended & long_range_condition`
+
+    Аналогично для шорт: `cross_short_level > short_rsi_less` → добавляет триггер на пересечение `short_rsi_less` сверху вниз.
+
+    Также добавлено подробное **предупреждение** в лог при обнаружении конфликта с конкретными рекомендациями по исправлению настроек.
+
 - **[BUGFIX] Metrics: TV-parity для Gross Profit/Loss, Buy&Hold, Опережающая динамика** (2026-03-06)
 
     Файлы: `backend/core/metrics_calculator.py`, `backend/backtesting/engine.py`, `frontend/js/components/MetricsPanels.js`
@@ -359,23 +382,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-                **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-                instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-                **price-change percentage** (6.6%), not the USDT amount.
+    **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+    instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+    **price-change percentage** (6.6%), not the USDT amount.
 
-                **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-                `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+    **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+    `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+  m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
 
-    m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
+    **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+    (no fallback chain) for all four long/short largest fields.
 
-                **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-                (no fallback chain) for all four long/short largest fields.
+    **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+    TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+    (bars_in_trade now uses inclusive counting to match TV).
 
-                **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-                TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-                (bars_in_trade now uses inclusive counting to match TV).
-
-                **File:** `scripts/_tv_calibration_check.py`
+    **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

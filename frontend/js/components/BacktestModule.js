@@ -414,7 +414,7 @@ export function renderTradesTable(trades) {
         <td class="${isLong ? 'trade-side-long' : 'trade-side-short'}">${isLong ? 'LONG' : 'SHORT'}</td>
         <td>${formatPrice(trade.entry_price || trade.open_price)}</td>
         <td>${formatPrice(trade.exit_price || trade.close_price)}</td>
-        <td>${(trade.quantity || trade.qty || 0).toFixed(4)}</td>
+        <td>${((trade.size || trade.quantity || trade.qty || 0)).toFixed(4)}</td>
         <td class="${pnl >= 0 ? 'trade-pnl-positive' : 'trade-pnl-negative'}">${formatCurrency(pnl)}</td>
         <td class="${pnlPct >= 0 ? 'trade-pnl-positive' : 'trade-pnl-negative'}">${pnlPct.toFixed(2)}%</td>
         <td>${mfe.toFixed(2)}%</td>
@@ -922,13 +922,28 @@ export function createBacktestModule(deps) {
                 }, 50);
             } else if (chartData && typeof TVChart !== 'undefined') {
                 setTimeout(() => {
+                    const container = document.getElementById('equityChartContainer');
                     const showBH = document.getElementById('legendBuyHold')?.checked ?? false;
+                    // Ensure container has an explicit height so LWC can measure it
+                    if (container && !container.style.height) {
+                        container.style.height = '360px';
+                    }
                     window._sbEquityChart = new TVChart('equityChartContainer', {
                         showBuyHold: showBH,
                         showTradeExcursions: true,
-                        height: 320
+                        height: 360
                     });
                     window._sbEquityChart.render(chartData);
+                    // Force resize after DOM settles — LWC reads clientWidth=0 when tab is hidden
+                    setTimeout(() => {
+                        try {
+                            if (window._sbEquityChart?.chart) window._sbEquityChart.chart.resize();
+                            if (window._sbEquityChart?._lwChart) {
+                                const c = document.getElementById('equityChartContainer');
+                                if (c) window._sbEquityChart._lwChart.resize(c.clientWidth || 900, 360);
+                            }
+                        } catch (_e) { /* ignore */ }
+                    }, 80);
                 }, 100);
             }
         }

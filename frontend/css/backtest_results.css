@@ -960,6 +960,28 @@ body {
     padding-bottom: 0.3rem;
 }
 
+/* ── Trade row highlight: fired when equity-chart click scrolls to this row ── */
+@keyframes tradeRowFlash {
+    0%   { background-color: rgba(38, 166, 154, 0.30); }
+    60%  { background-color: rgba(38, 166, 154, 0.15); }
+    100% { background-color: transparent; }
+}
+
+.trade-row-highlight,
+.trade-row-highlight + .tv-trade-entry-row {
+    animation: tradeRowFlash 1.5s ease-out forwards;
+}
+
+/* ── Equity chart container flash on click ── */
+@keyframes equityClickFlash {
+    0%   { outline: 2px solid rgba(38, 166, 154, 0.60); }
+    100% { outline: 2px solid transparent; }
+}
+
+.equity-click-flash {
+    animation: equityClickFlash 0.3s ease-out forwards;
+}
+
 /* Entry row styling - dimmer */
 .tv-trade-entry-row {
     background-color: rgba(0, 0, 0, 0.15);

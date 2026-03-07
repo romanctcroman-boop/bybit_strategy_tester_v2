@@ -23,9 +23,10 @@ export const TRADES_PAGE_SIZE = 100000; // Large enough to show all trades
  * @param {number} tradeNum        - 1-based trade number
  * @param {number} cumulativePnL   - Running P&L up to this trade (in USD)
  * @param {number} initialCapital  - Used for cumulative P&L % calculation
+ * @param {boolean} hasDcaTrades   - True if backtest contains DCA trades
  * @returns {{ _date, _pnl, _mfe, _mae, _cumPnl, html: string }}
  */
-export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 10000) {
+export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 10000, hasDcaTrades = false) {
     const isLong = _isLongTrade(trade);
     const typeText = isLong ? 'Long' : 'Short';
     const typeClass = isLong ? 'tv-trade-long' : 'tv-trade-short';
@@ -36,6 +37,8 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
 
     const exitSignal = trade.exit_reason || trade.exit_signal ||
         (isLong ? 'Long SL/TP' : 'Short SL/TP');
+    const isOpenTrade = trade.is_open === true || (trade.exit_comment || '').toLowerCase() === 'open_position';
+    const exitSignalDisplay = isOpenTrade ? '🔓 Open' : exitSignal;
     const entrySignal = isLong ? 'Long' : 'Short';
 
     const positionValue = (trade.size || 0) * (trade.entry_price || 0);
@@ -48,6 +51,35 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
     const mae = Math.abs(trade.mae ?? trade.mae_value ?? 0);
     const maePct = Math.abs(trade.mae_pct ?? 0);
 
+    // DCA orders filled (only shown if backtest has DCA trades)
+    const dcaOrdersFilled = trade.dca_orders_filled ?? 0;
+    const dcaAvgEntry = trade.dca_avg_entry_price ?? 0;
+    const dcaTotalSizeUsd = trade.dca_total_size_usd ?? 0;
+    const dcaGridLevels = trade.dca_grid_levels ?? [];
+
+    const showDca = hasDcaTrades && dcaOrdersFilled > 0;
+
+    // Format DCA display with tooltip
+    let dcaHtml = '';
+    if (showDca) {
+        const gridLevelsText = dcaGridLevels.length > 0
+            ? dcaGridLevels.map(l => l.toFixed(1)).join(' | ')
+            : 'N/A';
+        const dcaTooltip = `DCA Orders: ${dcaOrdersFilled}
+Avg Entry: ${dcaAvgEntry.toFixed(2)}
+Total Size: ${dcaTotalSizeUsd.toFixed(2)} USD
+Grid Levels: ${gridLevelsText}`;
+
+        dcaHtml = `<td class="tv-dca-cell">
+            <div class="tv-dca-badge" title="${dcaTooltip.replace(/\n/g, '\\n')}">
+                📊 ${dcaOrdersFilled} ord.
+            </div>
+            <div class="tv-dca-details">${dcaAvgEntry > 0 ? `@ ${dcaAvgEntry.toFixed(1)}` : ''}</div>
+        </td>`;
+    } else {
+        dcaHtml = '<td class="tv-dca-cell"><span class="tv-dca-none">—</span></td>';
+    }
+
     const exitDate = trade.exit_time ? new Date(trade.exit_time).getTime() : 0;
 
     return {
@@ -57,14 +89,14 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
         _mae: mae,
         _cumPnl: cumulativePnL,
         html: `
-      <tr class="tv-trade-exit-row">
+      <tr class="tv-trade-exit-row" data-trade-num="${tradeNum}">
         <td rowspan="2" class="tv-trade-num-cell">
           <span class="tv-trade-number">${tradeNum}</span>
           <span class="${typeClass}">${typeText}</span>
         </td>
-        <td class="tv-trade-type-cell">Exit</td>
+        <td class="tv-trade-type-cell">${isOpenTrade ? 'Open' : 'Exit'}</td>
         <td>${_formatTradeDate(trade.exit_time)}</td>
-        <td>${exitSignal}</td>
+        <td>${exitSignalDisplay}</td>
         <td>${(trade.exit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
         <td>
           <div>${trade.size?.toFixed(2) || '0.01'}</div>
@@ -86,13 +118,14 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
           <div>${cumulativePnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <small>USD</small></div>
           <div class="tv-trade-secondary">${cumulativePnLPct.toFixed(2)}%</div>
         </td>
+        ${dcaHtml}
       </tr>
       <tr class="tv-trade-entry-row">
         <td class="tv-trade-type-cell">Entry</td>
         <td>${_formatTradeDate(trade.entry_time)}</td>
         <td>${entrySignal}</td>
         <td>${(trade.entry_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
-        <td colspan="5"></td>
+        <td colspan="${showDca ? '6' : '5'}"></td>
       </tr>`
     };
 }
@@ -114,10 +147,13 @@ export function buildTradeRows(trades, initialCapital = 10000, sortKey = null, s
         return runningPnL;
     });
 
+    // Detect if this backtest has DCA trades (any trade with dca_orders_filled > 0)
+    const hasDcaTrades = trades.some((t) => (t.dca_orders_filled ?? 0) > 0);
+
     // Build rows array — newest first (reverse chronological default)
     const rows = [];
     for (let i = trades.length - 1; i >= 0; i--) {
-        rows.push(buildTradeRow(trades[i], i + 1, cumulativePnLs[i], initialCapital));
+        rows.push(buildTradeRow(trades[i], i + 1, cumulativePnLs[i], initialCapital, hasDcaTrades));
     }
 
     // Apply sort if active

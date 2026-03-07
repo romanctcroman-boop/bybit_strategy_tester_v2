@@ -601,12 +601,15 @@ class TradingViewEquityChart {
       // Position: bottom 6px of the canvas (below LWC time axis ~34px tall).
       const tsApi = chart.timeScale();
       const ecPts = self._equityPoints || []; // [{time, value}] sorted asc
+
+      const stripH = 5;             // height of colour strip at very bottom
+      const ddHistH = 24;           // height of drawdown histogram zone (px)
+      const stripY = H - stripH;    // Y of the colour strip
+      const ddHistBottom = stripY;  // histogram grows upward from here
+
       {
         const segs = self._gdSegments || [];
         if (segs.length > 0) {
-          const stripH = 5;           // height of each strip in px
-          const stripY = H - stripH;  // just above the very bottom edge
-
           segs.forEach(seg => {
             const tStart = self._toUnixSec(seg.startTime);
             const tEnd = self._toUnixSec(seg.endTime);
@@ -624,6 +627,64 @@ class TradingViewEquityChart {
               : 'rgba(239,83,80,0.90)';
             ctx.fillRect(clampedX1, stripY, clampedX2 - clampedX1, stripH);
           });
+        }
+      }
+
+      // ── Drawdown histogram (TV-style column plot below equity zero-line) ───
+      // Shows the per-bar drawdown from the equity peak as a column chart.
+      // Rendered in a dedicated band (ddHistH px tall) just above the colour strip.
+      // Each column: red (darker) proportional to drawdown depth (0–maxDD %).
+      // Right-side label: "0%" at top, "-maxDD%" at bottom (drawn as small text).
+      {
+        const ddPts = self._ddPoints;  // [{time, ddPct}] precomputed, 0 ≤ ddPct
+        if (ddPts && ddPts.length > 1) {
+          const maxDDPct = self._ddMaxPct || 1;  // avoid /0
+
+          // Thin separator line above the histogram zone
+          ctx.strokeStyle = 'rgba(120,123,134,0.25)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, ddHistBottom - ddHistH);
+          ctx.lineTo(tsWidth, ddHistBottom - ddHistH);
+          ctx.stroke();
+
+          // Right-side scale labels
+          ctx.font = '9px -apple-system,BlinkMacSystemFont,sans-serif';
+          ctx.fillStyle = 'rgba(120,123,134,0.75)';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'top';
+          ctx.fillText('0%', tsWidth - 2, ddHistBottom - ddHistH + 1);
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`-${maxDDPct.toFixed(1)}%`, tsWidth - 2, ddHistBottom - 1);
+
+          // Draw each column
+          for (let di = 0; di < ddPts.length; di++) {
+            const pt = ddPts[di];
+            const x = tsApi.timeToCoordinate(pt.time);
+            if (x == null || x < 0 || x > tsWidth) continue;
+
+            const ratio = Math.min(pt.ddPct / maxDDPct, 1);
+            if (ratio < 0.001) continue;
+
+            const colH = Math.max(ratio * ddHistH, 1);
+            const colY = ddHistBottom - colH;
+
+            // Width: match MFE/MAE bar width logic (at least 1px, max 4px)
+            const colW = Math.max(
+              di + 1 < ddPts.length
+                ? (() => {
+                  const xNext = tsApi.timeToCoordinate(ddPts[di + 1].time);
+                  return xNext != null ? Math.max(Math.round(Math.abs(xNext - x) - 1), 1) : 2;
+                })()
+                : 2,
+              1
+            );
+
+            // Colour intensity: deeper drawdown = more opaque red
+            const alpha = 0.35 + ratio * 0.50;
+            ctx.fillStyle = `rgba(239,83,80,${alpha.toFixed(2)})`;
+            ctx.fillRect(x - colW / 2, colY, colW, colH);
+          }
         }
       }
 
@@ -937,6 +998,28 @@ class TradingViewEquityChart {
     this._gdSegments = gdSegments;
     this._gdTimestamps = timestamps;
 
+    // ── Pre-compute per-point drawdown series for the histogram ──────────────
+    // ddPct[i] = (peak_equity - equity[i]) / peak_equity * 100  (always ≥ 0)
+    // Stored as [{time (unix sec), ddPct}] aligned with _equityPoints.
+    {
+      const n = Math.min(timestamps.length, equity.length);
+      const ddPts = [];
+      let peak = Number(equity[0]) || 0;
+      let maxDDPct = 0;
+      const num = (v) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+      for (let i = 0; i < n; i++) {
+        const v = num(equity[i]);
+        if (v > peak) peak = v;
+        const t = this._toUnixSec(timestamps[i]);
+        if (!t) continue;
+        const ddPct = peak > 0 ? Math.max((peak - v) / peak * 100, 0) : 0;
+        ddPts.push({ time: t, ddPct });
+        if (ddPct > maxDDPct) maxDDPct = ddPct;
+      }
+      this._ddPoints = ddPts;
+      this._ddMaxPct = maxDDPct > 0 ? maxDDPct : 1;
+    }
+
     // Map each equity point index to its growth/drawdown segment
     const gdIndexToSeg = new Array(timestamps.length).fill(null);
     gdSegments.forEach((seg) => {
@@ -1115,6 +1198,44 @@ class TradingViewEquityChart {
       tt.style.left = `${leftX}px`;
       tt.style.top = `${topY}px`;
     });
+
+    // ── Click on chart → highlight trade row in list + cursor flash ──────────
+    // LWC v4 exposes subscribeClick(handler) on the chart instance.
+    // On click we find the nearest trade marker and dispatch a custom DOM event
+    // so backtest_results.js can scroll the trades list to the matching row.
+    if (typeof this._lwChart.subscribeClick === 'function') {
+      this._lwChart.subscribeClick((param) => {
+        if (!param.time) return;
+        const cursorSec = param.time;
+        const mts = self._tradeMarkerTimes || [];
+        let bestIdx = -1, minD = Infinity;
+        for (let i = 0; i < mts.length; i++) {
+          if (!mts[i]) continue;
+          const d = Math.abs(mts[i] - cursorSec);
+          if (d < minD) { minD = d; bestIdx = i; }
+        }
+        if (bestIdx === -1) return;
+
+        const bestTime = mts[bestIdx];
+        const entry = timeToTrade.get(bestTime);
+        if (!entry) return;
+
+        // Dispatch custom event — backtest_results.js listens on document
+        self.container.dispatchEvent(new CustomEvent('equityChartTradeClick', {
+          bubbles: true,
+          detail: {
+            tradeIndex: bestIdx,          // 0-based index in trades array
+            tradeNum: entry.tradeNum,     // 1-based display number
+            trade: entry.trade,
+            exitTime: entry.trade.exit_time || null
+          }
+        }));
+
+        // Flash the clicked marker: brief highlight via CSS class on container
+        self.container.classList.add('equity-click-flash');
+        setTimeout(() => self.container.classList.remove('equity-click-flash'), 300);
+      });
+    }
   }
 
   // ─── REGIME OVERLAY COMPAT ─────────────────────────────────────────────────

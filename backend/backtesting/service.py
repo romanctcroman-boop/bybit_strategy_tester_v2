@@ -136,7 +136,19 @@ class BacktestService:
                 assert isinstance(_base_engine, DCAEngine), (
                     "Expected DCAEngine from select_engine with dca_enabled=True"
                 )
-                result = _base_engine.run_from_config(config, ohlcv)
+                # For Strategy Builder strategies, build an adapter from strategy_params
+                # so the DCA engine uses the visual graph for signal generation instead
+                # of falling back to the built-in RSI generator.
+                custom_strategy = None
+                _strategy_type = getattr(config, "strategy_type", None)
+                _strategy_type_str = getattr(_strategy_type, "value", str(_strategy_type)) if _strategy_type else ""
+                if _strategy_type_str in ("builder", "advanced"):
+                    _strategy_params = getattr(config, "strategy_params", None) or {}
+                    if isinstance(_strategy_params, dict) and "blocks" in _strategy_params:
+                        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+                        custom_strategy = StrategyBuilderAdapter(_strategy_params)
+                        logger.info("DCAEngine: constructed StrategyBuilderAdapter from strategy_params")
+                result = _base_engine.run_from_config(config, ohlcv, custom_strategy=custom_strategy)
             else:
                 # Standard engine (BacktestEngine) uses run(config, ohlcv)
                 result = self.engine.run(config, ohlcv)

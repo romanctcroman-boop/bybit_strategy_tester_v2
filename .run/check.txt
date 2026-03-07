@@ -1,0 +1,1 @@
+PORT=  TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING       12920 PID= LOG=INFO:     🛑 Config watcher stopped|INFO:     🔌 Shutting down Plugin Manager...|INFO:     🔌 Plugin Manager shut down|INFO:     🛑 KlineDBService stopped|INFO:     ✅ Live chart sessions closed|INFO:     Application shutdown complete.

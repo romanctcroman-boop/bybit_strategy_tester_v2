@@ -1,0 +1,56 @@
+============================================================
+Strategy: Strategy_DCA_RSI_02  id=f46c7cc3-1098-483a-a177-67b7867dd72e
+builder_blocks:      4
+builder_connections: 3
+builder_graph keys:  ['blocks', 'connections', 'market_type', 'direction']
+
+=== Blocks (4) from builder_blocks ===
+  [0] type='strategy'                category='main'
+  [1] type='static_sltp'             category='exit'
+       params: {'take_profit_percent': 1.5, 'stop_loss_percent': 10, 'sl_type': 'average_price', 'close_only_in_profit': False, 'activate_breakeven': False, 'breakeven_activation_percent': 0.5, 'new_breakeven_sl_percent': 0.1}
+  [2] type='rsi'                     category='indicator'
+       params: {'period': 14, 'source': 'close', 'timeframe': 30, 'use_btc_source': False, 'use_long_range': False, 'long_rsi_more': 28, 'long_rsi_less': 70, 'use_short_range': False, 'short_rsi_more': 50, 'short_rsi_less': 70, 'use_cross_level': True, 'cross_long_level': 30, 'cross_short_level': 70, 'opposite_signal': False, 'use_cross_memory': False, 'cross_memory_bars': 5}
+  [3] type='dca'                     category='entry_mgmt'
+       params: {'grid_size_percent': 6, 'order_count': 5, 'martingale_coefficient': 1, 'log_steps_coefficient': 1.2, 'first_order_offset': 0.1, 'grid_trailing': 0.1, 'partial_grid_orders': 1, 'grid_pullback_percent': 0}
+
+=== Connections (3) ===
+  {"id": "conn_1772373074491_6gfbv", "source": {"blockId": "block_1772373047215_7t4fr", "portId": "config"}, "target": {"blockId": "main_strategy", "portId": "sl_tp"}, "type": "config"}
+  {"id": "conn_1772799224040_cyn3a", "source": {"blockId": "block_1772799215164_lx705", "portId": "long"}, "target": {"blockId": "main_strategy", "portId": "entry_long"}, "type": "condition"}
+  {"id": "conn_1772799515225_ubvvm", "source": {"blockId": "block_1772799507688_6ba33", "portId": "config"}, "target": {"blockId": "main_strategy", "portId": "dca_grid"}, "type": "config"}
+
+============================================================
+Adapter DCA detection
+============================================================
+Import: backend.backtesting.strategy_builder.adapter  OK
+has_dca_blocks():        True
+extract_dca_config():
+   dca_enabled = True
+   dca_direction = 'both'
+   dca_order_count = 5
+   dca_grid_size_percent = 6
+   dca_martingale_coef = 1
+   dca_martingale_mode = 'multiply_each'
+   dca_log_step_enabled = True
+   dca_log_step_coef = 1.2
+   dca_drawdown_threshold = 30.0
+   dca_safety_close_enabled = True
+   dca_tp1_percent = 0.5
+   dca_tp1_close_percent = 25.0
+   dca_tp2_percent = 1.0
+   dca_tp2_close_percent = 25.0
+   dca_tp3_percent = 2.0
+   dca_tp3_close_percent = 25.0
+   dca_tp4_percent = 3.0
+   dca_tp4_close_percent = 25.0
+   partial_grid_orders = 1
+   grid_trailing = 0.1
+   dca_enabled = True
+
+dca_enabled_final = True
+>>> DCAEngine would be used ✓
+
+=== adapter.blocks ===
+  id='main_strategy'                type='strategy'                category='main'
+  id='block_1772373047215_7t4fr'    type='static_sltp'             category='exit'
+  id='block_1772799215164_lx705'    type='rsi'                     category='indicator'
+  id='block_1772799507688_6ba33'    type='dca'                     category='entry_mgmt'

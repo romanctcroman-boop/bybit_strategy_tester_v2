@@ -757,8 +757,16 @@ async def list_backtests(
             opt_metrics: dict[str, Any] = {}
 
             # First, try metrics_json (contains complete metrics snapshot)
-            if bt.metrics_json and isinstance(bt.metrics_json, dict):
-                opt_metrics = dict(bt.metrics_json)
+            if bt.metrics_json:
+                if isinstance(bt.metrics_json, dict):
+                    opt_metrics = dict(bt.metrics_json)
+                elif isinstance(bt.metrics_json, str):
+                    try:
+                        import json as _json
+
+                        opt_metrics = _json.loads(bt.metrics_json)
+                    except Exception:
+                        opt_metrics = {}
 
             # Merge with optimization_metrics from parameters (legacy support)
             if bt.parameters and isinstance(bt.parameters, dict):
@@ -801,6 +809,8 @@ async def list_backtests(
                 avg_drawdown=_safe_float(opt_metrics.get("avg_drawdown", 0)),
                 avg_drawdown_value=_safe_float(opt_metrics.get("avg_drawdown_value", 0)),
                 max_drawdown_duration_days=_safe_float(opt_metrics.get("max_drawdown_duration_days", 0)),
+                max_drawdown_intrabar=_safe_float(opt_metrics.get("max_drawdown_intrabar", 0)),
+                max_drawdown_intrabar_value=_safe_float(opt_metrics.get("max_drawdown_intrabar_value", 0)),
                 total_trades=_safe_int(total_trades_count),
                 winning_trades=_safe_int(winning_trades_count),
                 losing_trades=_safe_int(losing_trades_count),
@@ -944,6 +954,10 @@ async def list_backtests(
                 avg_drawdown_duration_bars=_safe_float(opt_metrics.get("avg_drawdown_duration_bars", 0)),
                 best_trade=_safe_float(opt_metrics.get("best_trade", 0)),
                 worst_trade=_safe_float(opt_metrics.get("worst_trade", 0)),
+                # Open position PnL (unrealized) - from metrics_json SSoT
+                open_pnl=_safe_float(opt_metrics.get("open_pnl", 0)),
+                open_pnl_pct=_safe_float(opt_metrics.get("open_pnl_pct", 0)),
+                open_trades=_safe_int(opt_metrics.get("open_trades", 0)),
             )
 
             # Get trades and equity curve from DB if available
@@ -1088,8 +1102,16 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         opt_metrics: dict[str, Any] = {}
 
         # First, try metrics_json (contains complete metrics snapshot)
-        if bt.metrics_json and isinstance(bt.metrics_json, dict):
-            opt_metrics = dict(bt.metrics_json)
+        if bt.metrics_json:
+            if isinstance(bt.metrics_json, dict):
+                opt_metrics = dict(bt.metrics_json)
+            elif isinstance(bt.metrics_json, str):
+                try:
+                    import json as _json
+
+                    opt_metrics = _json.loads(bt.metrics_json)
+                except Exception:
+                    opt_metrics = {}
 
         # Merge with optimization_metrics from parameters (legacy support)
         if bt.parameters and isinstance(bt.parameters, dict):
@@ -1285,6 +1307,8 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             kelly_percent_long=_safe_float(opt_metrics.get("kelly_percent_long", 0)),
             kelly_percent_short=_safe_float(opt_metrics.get("kelly_percent_short", 0)),
             open_trades=_safe_int(opt_metrics.get("open_trades", 0)),
+            open_pnl=_safe_float(opt_metrics.get("open_pnl", 0)),
+            open_pnl_pct=_safe_float(opt_metrics.get("open_pnl_pct", 0)),
             breakeven_trades=_safe_int(opt_metrics.get("breakeven_trades", 0)),
             closed_trades=_safe_int(opt_metrics.get("closed_trades", 0)),
             best_trade=_safe_float(opt_metrics.get("best_trade", 0)),

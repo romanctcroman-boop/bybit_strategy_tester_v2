@@ -772,7 +772,7 @@ function initWebSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/dashboard/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/dashboard/ws/pnl`;
 
     try {
         const newWs = new WebSocket(wsUrl);
@@ -860,7 +860,7 @@ function startPingInterval() {
     const intervalId = setInterval(() => {
         const ws = getWebSocket();
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            ws.send(JSON.stringify({ action: 'ping', timestamp: Date.now() }));
 
             // Set timeout for pong response
             const timeoutId = setTimeout(() => {
@@ -1261,7 +1261,9 @@ function initializeNewCharts() {
 async function loadPortfolioHistory() {
     try {
         const days = getPortfolioDays();
-        const response = await fetch(`${API_BASE}/dashboard/portfolio/history?days=${days}`);
+        const periodMap = { 1: '1d', 7: '7d', 30: '30d', 90: '90d' };
+        const period = periodMap[days] || `${days}d`;
+        const response = await fetch(`${API_BASE}/dashboard/portfolio/history?period=${period}`);
         if (!response.ok) throw new Error('Failed to load portfolio history');
 
         const data = await response.json();

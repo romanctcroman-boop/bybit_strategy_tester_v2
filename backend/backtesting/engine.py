@@ -338,6 +338,7 @@ def _build_performance_metrics(
     _closed_net = sum(float(getattr(t, "pnl", 0.0)) for t in closed_trades_for_metrics)
     _closed_final = initial_capital + _closed_net
     from backend.core.metrics_calculator import calculate_cagr
+
     calc_metrics["cagr"] = calculate_cagr(initial_capital, _closed_final, years)
 
     # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
@@ -2436,6 +2437,11 @@ class BacktestEngine:
                         # Absolute values (USDT) = price difference x size (already leveraged)
                         mfe_value = (entry_price - max_favorable_price) * entry_size
                         mae_value = (max_adverse_price - entry_price) * entry_size
+                    # Guard: clamp to non-negative (can go negative if price tracked before full entry)
+                    mfe_value = max(0.0, mfe_value)
+                    mae_value = max(0.0, mae_value)
+                    mfe_pct = max(0.0, mfe_pct)
+                    mae_pct = max(0.0, mae_pct)
 
                     logger.debug(
                         f"Trade closed: is_long={is_long}, entry={entry_price:.2f}, "
@@ -2726,6 +2732,11 @@ class BacktestEngine:
                 mae_pct = (max_adverse_price - entry_price) / entry_price * 100
                 mfe_value = (entry_price - max_favorable_price) * entry_size
                 mae_value = (max_adverse_price - entry_price) * entry_size
+            # Guard: clamp to non-negative (can go negative if price tracked before full entry)
+            mfe_value = max(0.0, mfe_value)
+            mae_value = max(0.0, mae_value)
+            mfe_pct = max(0.0, mfe_pct)
+            mae_pct = max(0.0, mae_pct)
 
             logger.debug(
                 f"Position left OPEN (data ended early): is_long={is_long}, entry={entry_price:.2f}, "

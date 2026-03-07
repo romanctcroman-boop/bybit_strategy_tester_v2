@@ -3925,12 +3925,14 @@ function getDefaultParams(blockType) {
     // ENTRY MANAGEMENT (DCA / Grid)
     // =============================================
     dca: {
-      grid_size_percent: 15,
+      grid_size_percent: 10,
       order_count: 5,
-      martingale_coefficient: 1.0,
+      martingale_coefficient: 1,
       log_steps_coefficient: 1.0,
       first_order_offset: 0,
-      grid_trailing: 0
+      grid_trailing: 0,
+      partial_grid_orders: 1,
+      grid_pullback_percent: 0
     },
     grid_orders: {
       // Manual grid - array of orders with offset % and volume %
@@ -4801,11 +4803,13 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
     dca: {
       title: 'DCA (Dollar Cost Averaging)',
       fields: [
-        { key: 'grid_size_percent', label: 'Grid Size (%)', type: 'number', step: 1, min: 1, max: 100, optimizable: true },
-        { key: 'order_count', label: 'Number of orders in the grid (3-15)', type: 'number', step: 1, min: 3, max: 15, optimizable: true },
-        { key: 'martingale_coefficient', label: 'Orders Value Martingale (1.0-1.8)', type: 'number', step: 0.1, min: 1.0, max: 1.8, optimizable: true },
-        { key: 'log_steps_coefficient', label: 'Logarithmic Orders Steps (0.8-1.4)', type: 'number', step: 0.1, min: 0.8, max: 1.4, optimizable: true },
-        { key: 'first_order_offset', label: 'Indent / Offset (0=Market, 0.01-10%)', type: 'number', step: 0.01, min: 0, max: 10, optimizable: true },
+        { key: 'grid_size_percent', label: 'Перекрытие / Grid Size (0.5-99%)', type: 'number', step: 0.5, min: 0.5, max: 99, optimizable: true },
+        { key: 'order_count', label: 'Перекрытие / Orders in grid (2-20)', type: 'number', step: 1, min: 2, max: 20, optimizable: true },
+        { key: 'martingale_coefficient', label: '% Мартингейла / Martingale (1-200%)', type: 'number', step: 1, min: 1, max: 200, optimizable: true },
+        { key: 'log_steps_coefficient', label: 'Лог. распределение / Log Steps (0.1-2.9)', type: 'number', step: 0.1, min: 0.1, max: 2.9, optimizable: true },
+        { key: 'first_order_offset', label: 'Отступ / Indent (0=По маркету/Market, 0.01-10%)', type: 'number', step: 0.01, min: 0, max: 10, optimizable: true },
+        { key: 'partial_grid_orders', label: 'Частичное выставление сетки / Partial Grid (1-4)', type: 'number', step: 1, min: 1, max: 4, optimizable: false },
+        { key: 'grid_pullback_percent', label: 'Подтяжка сетки ордеров / Grid Pullback (0=выкл, 0.1-200%)', type: 'number', step: 0.1, min: 0, max: 200, optimizable: true },
         { key: 'grid_trailing', label: 'Grid Trailing / Cancel (0.1-30%)', type: 'number', step: 0.1, min: 0, max: 30, optimizable: true }
       ]
     },
@@ -5637,7 +5641,10 @@ function getCompactParamHint(params, blockType) {
   }
 
   if (blockType === 'dca') {
-    return `Grid: ${params.grid_size_percent || 0}% | ${params.order_count || 0} orders | M:${params.martingale_coefficient || 1}`;
+    const parts = [`Grid:${params.grid_size_percent || 0}% | ${params.order_count || 0} ord | M:${params.martingale_coefficient || 1}`];
+    if (params.partial_grid_orders && params.partial_grid_orders > 1) parts.push(`Part:${params.partial_grid_orders}`);
+    if (params.grid_pullback_percent && params.grid_pullback_percent > 0) parts.push(`PB:${params.grid_pullback_percent}%`);
+    return parts.join(' | ');
   }
 
   if (blockType === 'rsi') {

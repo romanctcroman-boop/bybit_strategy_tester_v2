@@ -46,7 +46,7 @@ class DCAGridConfig:
     deposit: float = 10000.0  # Total deposit for the grid
     leverage: int = 1
     grid_size_percent: float = 10.0  # Total grid size as % of price
-    order_count: int = 5  # Number of orders (3-15)
+    order_count: int = 5  # Number of orders (2-20)
 
     # Order distribution
     first_order_percent: float = 10.0  # First order as % of deposit
@@ -56,6 +56,14 @@ class DCAGridConfig:
     # When custom_orders is set, use these instead of calculated orders
     custom_orders: list[dict[str, Any]] | None = None  # [{"offset": 0.5, "volume": 25}, ...]
     grid_trailing_percent: float = 0.0  # Grid trailing/cancel percent (0 = disabled)
+
+    # Partial grid placement: place only first N orders initially, add more as each fills
+    # 1 = place all orders at once (default), 2-4 = place N orders at a time
+    partial_grid_orders: int = 1
+
+    # Grid pullback: if price moves this % away from grid base without any fill, shift the grid
+    # 0.0 = disabled, >0 = shift grid when price moves X% without fills
+    grid_pullback_percent: float = 0.0
 
     # Martingale
     use_martingale: bool = True
@@ -204,6 +212,11 @@ class DCAOrder:
     filled: bool = False
     fill_time: int | None = None  # Bar index when filled
     fill_price: float = 0.0
+    # Whether this order is currently active (visible) in the partial grid scheme
+    # When partial_grid_orders < order_count, only the first N orders are active at a time
+    active_in_grid: bool = True
+    # Human-readable order number: 1 = first (market entry), 2 = first DCA, ..., up to 10
+    order_number: int = 1
 
 
 @dataclass
@@ -219,7 +232,8 @@ class DCAPosition:
 
     # Position aggregates
     total_size_coins: float = 0.0
-    total_cost_usd: float = 0.0
+    total_cost_usd: float = 0.0  # Margin (un-leveraged capital spent)
+    total_notional_usd: float = 0.0  # Notional value = size_coins × fill_price (leveraged)
     average_entry_price: float = 0.0
 
     # Current state
@@ -235,6 +249,9 @@ class DCAPosition:
     # Timing
     entry_bar: int = 0
     last_order_bar: int = 0
+
+    # DCA order tracking: how many grid orders have been filled (1 = only entry order)
+    orders_filled_count: int = 1
 
 
 @dataclass
@@ -260,6 +277,13 @@ class DCATradeRecord:
     mfe_pct: float = 0.0  # MFE as percent
     mae_pct: float = 0.0  # MAE as percent
     bars_held: int = 0
+    # How many DCA grid orders were filled during this position (1 = only entry, 2 = entry + 1 DCA, etc.)
+    orders_filled_count: int = 1
+    # DCA-specific metrics
+    avg_entry_price: float = 0.0  # Weighted average across all DCA orders
+    total_size_usd: float = 0.0  # Total USD across all DCA orders
+    total_size_coins: float = 0.0  # Total coins across all DCA orders
+    grid_levels: list[float] = field(default_factory=list)  # DCA grid trigger prices
 
 
 class DCAGridCalculator:
@@ -331,7 +355,14 @@ class DCAGridCalculator:
             size_coins = size_usd_leveraged / trigger_price if trigger_price > 0 else 0
 
             orders.append(
-                DCAOrder(level=i, price=trigger_price, size_percent=sizes[i], size_usd=size_usd, size_coins=size_coins)
+                DCAOrder(
+                    level=i,
+                    price=trigger_price,
+                    size_percent=sizes[i],
+                    size_usd=size_usd,
+                    size_coins=size_coins,
+                    order_number=i + 1,
+                )
             )
 
         return orders
@@ -389,6 +420,7 @@ class DCAGridCalculator:
                     size_percent=volume_percent,
                     size_usd=size_usd,
                     size_coins=size_coins,
+                    order_number=i + 1,
                 )
             )
 
@@ -510,6 +542,15 @@ class DCAEngine(BaseBacktestEngine):
         self.total_signals = 0
         self.total_orders_filled = 0
 
+        # Fee / TP / SL from config (set by _configure_from_config)
+        self._taker_fee: float = 0.0007  # default 0.07%
+        self._take_profit_pct: float | None = None  # None = use DCA multi-tp only
+        self._stop_loss_pct: float | None = None  # None = use drawdown safety close
+        # Realized equity for correct equity curve (unrealized PnL is NOT accumulated)
+        self._realized_equity: float = 0.0
+        # Grid pullback tracking: price at which the grid was last placed/shifted
+        self._pullback_base_price: float = 0.0
+
     # ===== Abstract method implementations =====
 
     @property
@@ -603,6 +644,7 @@ class DCAEngine(BaseBacktestEngine):
         # Initialize
         initial_capital = input_data.initial_capital
         equity = initial_capital
+        self._realized_equity = initial_capital
         self.equity_curve = [equity]
         self.trades = []
         self.position = DCAPosition()
@@ -623,11 +665,11 @@ class DCAEngine(BaseBacktestEngine):
 
             # Check for DCA order fills
             if self.position.is_open:
-                equity = self._process_open_position(i, high, low, close, equity)
+                self._process_open_position(i, high, low, close, equity)
 
             # Check pending indent order fill
             elif self.pending_indent is not None:
-                equity = self._check_indent_order_fill(i, high, low, close, equity)
+                self._check_indent_order_fill(i, high, low, close, equity)
 
             # Check for new entry signal
             elif signals[i] != 0:
@@ -642,12 +684,18 @@ class DCAEngine(BaseBacktestEngine):
 
                 self.total_signals += 1
 
-            # Update equity curve
-            self.equity_curve.append(equity)
+            # Equity curve: realized + current unrealized
+            if self.position.is_open:
+                self.equity_curve.append(self._realized_equity + self.position.unrealized_pnl)
+            else:
+                self.equity_curve.append(self._realized_equity)
 
         # Close any remaining position
         if self.position.is_open:
-            equity = self._close_position(len(df) - 1, float(df.iloc[-1]["close"]), ExitReason.END_OF_DATA)
+            self._close_position(len(df) - 1, float(df.iloc[-1]["close"]), ExitReason.END_OF_DATA)
+
+        # Final equity after all trades closed
+        equity = self._realized_equity
 
         # Calculate metrics
         execution_time = time.time() - start_time
@@ -717,6 +765,10 @@ class DCAEngine(BaseBacktestEngine):
         # Manual Grid (custom orders) from BacktestConfig
         self.grid_config.custom_orders = getattr(config, "dca_custom_orders", None)
         self.grid_config.grid_trailing_percent = getattr(config, "dca_grid_trailing_percent", 0.0)
+        # Partial grid placement (1 = all at once, 2-4 = place N at a time)
+        self.grid_config.partial_grid_orders = int(getattr(config, "partial_grid_orders", 1) or 1)
+        # Grid pullback percent (0 = disabled)
+        self.grid_config.grid_pullback_percent = float(getattr(config, "grid_pullback_percent", 0.0) or 0.0)
 
         # Multi-TP settings from BacktestConfig
         self.multi_tp.enabled = getattr(config, "dca_multi_tp_enabled", False)
@@ -744,6 +796,14 @@ class DCAEngine(BaseBacktestEngine):
             for key, value in indent_order_params.items():
                 if hasattr(io, key):
                     setattr(io, key, value)
+
+        # Fee / TP / SL from BacktestConfig
+        raw_fee = getattr(config, "taker_fee", None) or getattr(config, "maker_fee", None) or 0.0007
+        self._taker_fee = float(raw_fee)
+        raw_tp = getattr(config, "take_profit", None)
+        self._take_profit_pct = float(raw_tp) if raw_tp is not None and raw_tp > 0 else None
+        raw_sl = getattr(config, "stop_loss", None)
+        self._stop_loss_pct = float(raw_sl) if raw_sl is not None and raw_sl > 0 else None
 
     def run_from_config(self, config: Any, ohlcv: pd.DataFrame, custom_strategy: Any = None) -> Any:
         """
@@ -790,9 +850,11 @@ class DCAEngine(BaseBacktestEngine):
         # Initialize
         initial_capital = getattr(config, "initial_capital", 10000.0)
         equity = initial_capital
+        self._realized_equity = initial_capital  # tracks equity after each closed trade
         self.equity_curve = [equity]
         self.trades = []
         self.position = DCAPosition()
+        self._ohlcv_index = ohlcv.index  # used by _build_performance_metrics for Sharpe/Sortino
 
         # Pre-calculate indicator caches for close conditions
         self._precompute_close_condition_indicators(ohlcv)
@@ -834,12 +896,19 @@ class DCAEngine(BaseBacktestEngine):
                         self._open_dca_position(i, close, direction)
                     self.total_signals += 1
 
-            # Update equity curve
-            self.equity_curve.append(equity)
+            # Equity curve: realized + current unrealized (no position → just realized)
+            if self.position.is_open:
+                bar_equity = self._realized_equity + self.position.unrealized_pnl
+            else:
+                bar_equity = self._realized_equity
+            self.equity_curve.append(bar_equity)
 
         # Close any remaining position
         if self.position.is_open:
             equity = self._close_position(len(ohlcv) - 1, float(ohlcv.iloc[-1]["close"]), ExitReason.END_OF_DATA)
+
+        # Final equity is realized equity after all trades are closed
+        equity = self._realized_equity
 
         # Calculate metrics (execution_time kept for future use)
         _ = time.time() - start_time
@@ -892,7 +961,7 @@ class DCAEngine(BaseBacktestEngine):
                     if hasattr(result, "entries") and hasattr(result, "short_entries"):
                         # SignalResult object
                         entries_count = int(result.entries.sum())
-                        short_count = int(result.short_entries.sum())
+                        short_count = int(result.short_entries.sum()) if result.short_entries is not None else 0
                         logger.info(f"DCAEngine: SignalResult entries={entries_count}, short_entries={short_count}")
                         for i in range(len(df)):
                             if i < len(result.entries) and result.entries.iloc[i]:
@@ -978,55 +1047,132 @@ class DCAEngine(BaseBacktestEngine):
                     entry_bar_index=trade.entry_bar_idx,
                     exit_bar_index=trade.exit_bar_idx,
                     exit_comment=trade.exit_reason.value if hasattr(trade.exit_reason, "value") else "close",
+                    dca_orders_filled=trade.orders_filled_count,
+                    dca_avg_entry_price=trade.avg_entry_price,
+                    dca_total_size_usd=trade.total_size_usd,
+                    dca_total_size_coins=trade.total_size_coins,
+                    dca_grid_levels=trade.grid_levels,
                 )
             )
 
         return model_trades
 
     def _build_performance_metrics(self, initial_capital: float, final_equity: float, trades: list) -> Any:
-        """Build PerformanceMetrics from trades."""
+        """Build PerformanceMetrics (models.py) using TV-parity logic from FallbackEngineV4.
+
+        Delegates to FallbackEngineV4._calculate_metrics (which returns BacktestMetrics from
+        interfaces.py), then converts to PerformanceMetrics (models.py) as required by
+        BacktestResult. This ensures DCA results include Sharpe, Sortino, CAGR, long/short
+        breakdown etc. identical to all other engines.
+        """
+        from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
+        from backend.backtesting.interfaces import TradeRecord as IfaceTradeRecord
         from backend.backtesting.models import PerformanceMetrics
 
-        total_trades = len(trades)
-        if total_trades == 0:
+        if not trades:
             return PerformanceMetrics()
 
-        winning_trades = [t for t in trades if t.pnl > 0]
-        losing_trades = [t for t in trades if t.pnl <= 0]
+        # Convert ModelTradeRecord → interfaces.TradeRecord for metric calculation
+        iface_trades: list[IfaceTradeRecord] = []
+        for t in trades:
+            # side field: "long"/"short" string (already set in _convert_trades_to_model)
+            direction = str(getattr(t, "side", getattr(t, "direction", "long"))).lower()
+            fees = float(getattr(t, "commission", 0.0) or 0.0)
+            bars = int(getattr(t, "bars_in_trade", getattr(t, "duration_bars", 0)) or 0)
+            iface_trades.append(
+                IfaceTradeRecord(
+                    entry_time=getattr(t, "entry_time", None),
+                    exit_time=getattr(t, "exit_time", None),
+                    direction=direction,
+                    entry_price=float(getattr(t, "entry_price", 0.0)),
+                    exit_price=float(getattr(t, "exit_price", 0.0)),
+                    size=float(getattr(t, "size", 0.0)),
+                    pnl=float(getattr(t, "pnl", 0.0)),
+                    pnl_pct=float(getattr(t, "pnl_pct", 0.0)),
+                    fees=fees,
+                    exit_reason=getattr(t, "exit_reason", None),
+                    duration_bars=bars,
+                    mfe=float(getattr(t, "mfe", 0.0)),
+                    mae=float(getattr(t, "mae", 0.0)),
+                    mfe_pct=float(getattr(t, "mfe_pct", 0.0)),
+                    mae_pct=float(getattr(t, "mae_pct", 0.0)),
+                )
+            )
 
-        gross_profit = sum(t.pnl for t in winning_trades)
-        gross_loss = abs(sum(t.pnl for t in losing_trades))
+        # Build equity curve array for Sharpe/Sortino (bar-by-bar)
+        equity_arr = list(self.equity_curve) if self.equity_curve else [initial_capital, final_equity]
 
-        win_rate = len(winning_trades) / total_trades * 100 if total_trades > 0 else 0
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf") if gross_profit > 0 else 0
+        # Use FallbackEngineV4._calculate_metrics (static-like: no self state needed).
+        # Returns BacktestMetrics (interfaces.py) with win_rate as fraction 0–1.
+        engine_v4 = FallbackEngineV4.__new__(FallbackEngineV4)
+        bm = engine_v4._calculate_metrics(
+            trades=iface_trades,
+            equity_curve=equity_arr,
+            initial_capital=initial_capital,
+            candles_index=self._ohlcv_index,
+        )
 
-        net_profit = final_equity - initial_capital
-        net_profit_pct = net_profit / initial_capital * 100
+        # Convert BacktestMetrics → PerformanceMetrics.
+        # Key difference: PerformanceMetrics.win_rate stores percent (0–100),
+        # BacktestMetrics.win_rate stores fraction (0–1).
+        long_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "long"]
+        short_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "short"]
+        long_pnls = [float(getattr(t, "pnl", 0.0)) for t in long_trades_list]
+        short_pnls = [float(getattr(t, "pnl", 0.0)) for t in short_trades_list]
 
-        # Calculate max drawdown from equity curve
-        max_dd = 0.0
-        peak = initial_capital
-        for eq in self.equity_curve:
-            if eq > peak:
-                peak = eq
-            dd = (peak - eq) / peak * 100
-            if dd > max_dd:
-                max_dd = dd
+        def _safe_wr_pct(win: int, total: int) -> float:
+            return (win / total * 100.0) if total > 0 else 0.0
+
+        long_wins = sum(1 for p in long_pnls if p > 0)
+        short_wins = sum(1 for p in short_pnls if p > 0)
 
         return PerformanceMetrics(
-            total_trades=total_trades,
-            winning_trades=len(winning_trades),
-            losing_trades=len(losing_trades),
-            win_rate=win_rate,
-            profit_factor=profit_factor,
-            net_profit=net_profit,
-            net_profit_pct=net_profit_pct,
-            gross_profit=gross_profit,
-            gross_loss=gross_loss,
-            max_drawdown=max_dd,
-            avg_trade_value=net_profit / total_trades if total_trades > 0 else 0,
-            avg_win_value=gross_profit / len(winning_trades) if winning_trades else 0,
-            avg_loss_value=gross_loss / len(losing_trades) if losing_trades else 0,
+            # P&L
+            net_profit=float(getattr(bm, "net_profit", 0.0)),
+            net_profit_pct=float(getattr(bm, "total_return", 0.0)),
+            gross_profit=float(getattr(bm, "gross_profit", 0.0)),
+            gross_loss=float(getattr(bm, "gross_loss", 0.0)),
+            total_commission=float(getattr(bm, "commission_paid", 0.0)),
+            # Returns
+            total_return=float(getattr(bm, "total_return", 0.0)),
+            annual_return=float(getattr(bm, "annual_return", 0.0)),
+            cagr=float(getattr(bm, "cagr", 0.0)),
+            # Risk ratios
+            sharpe_ratio=float(getattr(bm, "sharpe_ratio", 0.0)),
+            sortino_ratio=float(getattr(bm, "sortino_ratio", 0.0)),
+            calmar_ratio=float(getattr(bm, "calmar_ratio", 0.0)),
+            # Drawdown
+            max_drawdown=float(getattr(bm, "max_drawdown", 0.0)),
+            max_drawdown_value=float(getattr(bm, "max_drawdown_value", 0.0)),
+            # Trade stats — win_rate as percent (0–100) per PerformanceMetrics contract
+            total_trades=int(getattr(bm, "total_trades", len(trades))),
+            winning_trades=int(getattr(bm, "winning_trades", 0)),
+            losing_trades=int(getattr(bm, "losing_trades", 0)),
+            win_rate=float(getattr(bm, "win_rate", 0.0)) * 100.0,  # fraction→percent
+            profit_factor=float(getattr(bm, "profit_factor", 0.0)),
+            avg_win=float(getattr(bm, "avg_win", 0.0)),
+            avg_loss=float(getattr(bm, "avg_loss", 0.0)),
+            avg_trade=float(getattr(bm, "avg_trade", 0.0)),
+            avg_trade_value=float(getattr(bm, "avg_trade", 0.0)),
+            largest_win=float(getattr(bm, "largest_win", 0.0)),
+            largest_loss=float(getattr(bm, "largest_loss", 0.0)),
+            payoff_ratio=float(getattr(bm, "payoff_ratio", 0.0)),
+            expectancy=float(getattr(bm, "expectancy", 0.0)),
+            recovery_factor=float(getattr(bm, "recovery_factor", 0.0)),
+            max_consecutive_wins=int(getattr(bm, "max_consecutive_wins", 0)),
+            max_consecutive_losses=int(getattr(bm, "max_consecutive_losses", 0)),
+            avg_bars_in_trade=float(getattr(bm, "avg_trade_duration", 0.0)),
+            # Long/short breakdown (win_rate as percent)
+            long_trades=len(long_trades_list),
+            short_trades=len(short_trades_list),
+            long_pnl=sum(long_pnls),
+            short_pnl=sum(short_pnls),
+            long_win_rate=_safe_wr_pct(long_wins, len(long_trades_list)),
+            short_win_rate=_safe_wr_pct(short_wins, len(short_trades_list)),
+            long_winning_trades=long_wins,
+            short_winning_trades=short_wins,
+            long_net_profit=sum(long_pnls),
+            short_net_profit=sum(short_pnls),
         )
 
     def _generate_signals(self, input_data: BacktestInput, df: pd.DataFrame) -> np.ndarray:
@@ -1090,10 +1236,28 @@ class DCAEngine(BaseBacktestEngine):
         # Calculate grid orders
         orders = DCAGridCalculator.calculate_grid_orders(self.grid_config, price, direction)
 
-        # Fill the first order immediately
+        # Partial grid logic:
+        #   partial=1  → place ALL grid orders immediately (classic DCA: all levels visible)
+        #   partial=2+ → place only N unfilled orders at a time (activate more after each fill)
+        partial = max(1, self.grid_config.partial_grid_orders)
+        if partial == 1:
+            # All orders active at once
+            for order in orders:
+                order.active_in_grid = True
+        else:
+            # Only mark first `partial` unfilled orders as active.
+            # Order 0 will be immediately filled, so we need partial+1 active
+            # to ensure `partial` orders remain visible in the grid after entry.
+            for i, order in enumerate(orders):
+                order.active_in_grid = i < (partial + 1)
+
+        # Fill the first order immediately (market entry)
         orders[0].filled = True
         orders[0].fill_time = bar_index
         orders[0].fill_price = price
+
+        # Initialize grid pullback tracking from current price
+        self._pullback_base_price = price
 
         # Initialize position
         self.position = DCAPosition(
@@ -1103,6 +1267,8 @@ class DCAEngine(BaseBacktestEngine):
             active_orders_count=1,
             total_size_coins=orders[0].size_coins,
             total_cost_usd=orders[0].size_usd,
+            # Notional = coins × fill_price (leveraged volume)
+            total_notional_usd=orders[0].size_coins * price,
             average_entry_price=price,
             entry_bar=bar_index,
             last_order_bar=bar_index,
@@ -1112,6 +1278,16 @@ class DCAEngine(BaseBacktestEngine):
 
     def _process_open_position(self, bar_index: int, high: float, low: float, close: float, equity: float) -> float:
         """Process open position: check for DCA fills, TPs, SL."""
+
+        # Grid pullback: if price moves away X% from base without any new fill, shift the grid
+        if self.grid_config.grid_pullback_percent > 0 and self._pullback_base_price > 0:
+            pullback_threshold = self.grid_config.grid_pullback_percent / 100.0
+            price_move = abs(close - self._pullback_base_price) / self._pullback_base_price
+            any_active_unfilled = any(not o.filled and o.active_in_grid for o in self.position.orders)
+            if price_move >= pullback_threshold and any_active_unfilled:
+                # Shift the entire unfilled grid to new base price
+                self._shift_grid_to_price(close)
+                self._pullback_base_price = close
 
         # Check for new DCA order fills
         for order in self.position.orders:
@@ -1134,17 +1310,23 @@ class DCAEngine(BaseBacktestEngine):
         if self.multi_tp.enabled:
             result = self._check_multi_tp(bar_index, high, low, close)
             if result is not None:
-                equity = result
+                return result
         else:
             # Single TP check
             if self._check_single_tp(high, low):
                 return self._close_position(bar_index, close, ExitReason.TAKE_PROFIT)
 
-        # Update equity with unrealized PnL
-        return equity + self.position.unrealized_pnl
+        # Check SL from BacktestConfig (stop_loss_pct = fraction, e.g. 0.015 for 1.5%)
+        if self._stop_loss_pct is not None and self._stop_loss_pct > 0 and self._check_config_stop_loss(high, low):
+            return self._close_position(bar_index, close, ExitReason.STOP_LOSS)
+
+        # Return current realized equity; unrealized PnL will be added in the main loop
+        return self._realized_equity
 
     def _should_fill_order(self, order: DCAOrder, high: float, low: float) -> bool:
-        """Check if a DCA order should be filled."""
+        """Check if a DCA order should be filled (must be active in grid)."""
+        if not order.active_in_grid:
+            return False
         if self.position.direction == "long":
             return low <= order.price
         else:
@@ -1159,14 +1341,57 @@ class DCAEngine(BaseBacktestEngine):
         # Update position
         self.position.total_cost_usd += order.size_usd
         self.position.total_size_coins += order.size_coins
+        # Notional = coins × fill_price for this order
+        self.position.total_notional_usd += order.size_coins * order.price
         self.position.active_orders_count += 1
         self.position.last_order_bar = bar_index
 
-        # Recalculate average entry
+        # Recalculate average entry price: total_notional / total_coins
         if self.position.total_size_coins > 0:
-            self.position.average_entry_price = self.position.total_cost_usd / self.position.total_size_coins
+            self.position.average_entry_price = self.position.total_notional_usd / self.position.total_size_coins
 
         self.total_orders_filled += 1
+        # Track how many grid orders have been filled in this position (entry=1, first DCA=2, ...)
+        self.position.orders_filled_count += 1
+
+        # Partial grid: after filling an order, activate the next unfilled N orders
+        partial = max(1, self.grid_config.partial_grid_orders)
+        if partial > 1:
+            # Count currently active (unfilled) orders
+            currently_active = sum(1 for o in self.position.orders if not o.filled and o.active_in_grid)
+            # Activate more orders to keep `partial` active unfilled orders in grid
+            needed = partial - currently_active
+            if needed > 0:
+                for o in self.position.orders:
+                    if needed <= 0:
+                        break
+                    if not o.filled and not o.active_in_grid:
+                        o.active_in_grid = True
+                        needed -= 1
+
+    def _shift_grid_to_price(self, new_base_price: float) -> None:
+        """Shift all unfilled grid orders to a new base price (grid pullback).
+
+        Recalculates the price levels of all unfilled orders relative to the
+        new base price, preserving the original step distribution.
+        """
+        if not self.position.is_open:
+            return
+
+        direction = self.position.direction
+        unfilled_orders = [o for o in self.position.orders if not o.filled]
+        if not unfilled_orders:
+            return
+
+        # Re-calculate prices for unfilled orders preserving relative step distribution
+        # Collect original relative offsets (as fraction of grid_size_percent)
+        total_grid_fraction = self.grid_config.grid_size_percent / 100.0
+        step = total_grid_fraction / max(len(self.position.orders) - 1, 1)
+        for i, order in enumerate(unfilled_orders, start=1):
+            if direction == "long":
+                order.price = new_base_price * (1.0 - step * i)
+            else:
+                order.price = new_base_price * (1.0 + step * i)
 
     def _update_position_state(self, current_price: float) -> None:
         """Update position PnL and statistics."""
@@ -1207,8 +1432,15 @@ class DCAEngine(BaseBacktestEngine):
         return self.grid_config.drawdown_threshold_amount > 0 and drawdown >= self.grid_config.drawdown_threshold_amount
 
     def _check_single_tp(self, high: float, low: float) -> bool:
-        """Check single take profit (default 2%)."""
-        tp_percent = 0.02  # 2% default
+        """Check single take profit from BacktestConfig (take_profit field)."""
+        # Only close if a TP percent was explicitly configured
+        if self._take_profit_pct is None or self._take_profit_pct <= 0:
+            return False
+        if self.multi_tp.enabled:
+            # multi_tp path handles its own checks; single check not needed
+            return False
+
+        tp_percent = self._take_profit_pct
 
         if self.position.direction == "long":
             tp_price = self.position.average_entry_price * (1 + tp_percent)
@@ -1216,6 +1448,17 @@ class DCAEngine(BaseBacktestEngine):
         else:
             tp_price = self.position.average_entry_price * (1 - tp_percent)
             return low <= tp_price
+
+    def _check_config_stop_loss(self, high: float, low: float) -> bool:
+        """Check stop loss from BacktestConfig (stop_loss field, fraction e.g. 0.015)."""
+        if self._stop_loss_pct is None or self._stop_loss_pct <= 0:
+            return False
+        if self.position.direction == "long":
+            sl_price = self.position.average_entry_price * (1 - self._stop_loss_pct)
+            return low <= sl_price
+        else:
+            sl_price = self.position.average_entry_price * (1 + self._stop_loss_pct)
+            return high >= sl_price
 
     def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> float | None:
         """Check multi-level take profits and execute partial closes."""
@@ -1667,13 +1910,27 @@ class DCAEngine(BaseBacktestEngine):
     def _close_position(self, bar_index: int, close_price: float, reason: ExitReason) -> float:
         """Close position and record trade."""
         if not self.position.is_open:
-            return 0.0
+            return self._realized_equity
 
-        # Calculate final PnL
+        # Calculate gross PnL (price difference × size)
         if self.position.direction == "long":
-            pnl = (close_price - self.position.average_entry_price) * self.position.total_size_coins
+            pnl_gross = (close_price - self.position.average_entry_price) * self.position.total_size_coins
         else:
-            pnl = (self.position.average_entry_price - close_price) * self.position.total_size_coins
+            pnl_gross = (self.position.average_entry_price - close_price) * self.position.total_size_coins
+
+        # Calculate commission: entry cost + exit cost, both as taker fee on notional
+        # Entry notional = total_notional_usd (sum of size_coins × fill_price for all filled orders)
+        # Exit notional  = close_price × total_size_coins
+        entry_commission = self.position.total_notional_usd * self._taker_fee
+        exit_commission = close_price * self.position.total_size_coins * self._taker_fee
+        total_commission = entry_commission + exit_commission
+        pnl_net = pnl_gross - total_commission
+
+        # Collect filled DCA grid levels
+        filled_grid_levels = [
+            order.price for order in self.position.orders
+            if order.filled and order.active_in_grid
+        ]
 
         # Record trade
         trade = DCATradeRecord(
@@ -1683,20 +1940,28 @@ class DCAEngine(BaseBacktestEngine):
             exit_price=close_price,
             direction=TradeDirection.LONG if self.position.direction == "long" else TradeDirection.SHORT,
             position_size=self.position.total_size_coins,
-            pnl=pnl,
-            pnl_pct=(pnl / self.position.total_cost_usd * 100) if self.position.total_cost_usd > 0 else 0,
+            pnl=pnl_net,
+            pnl_pct=(pnl_net / self.position.total_cost_usd * 100) if self.position.total_cost_usd > 0 else 0,
             exit_reason=reason,
+            commission=total_commission,
             mfe=self.position.max_favorable_excursion,
             mae=self.position.max_adverse_excursion,
             bars_held=bar_index - self.position.entry_bar,
+            orders_filled_count=self.position.orders_filled_count,
+            avg_entry_price=self.position.average_entry_price,
+            total_size_usd=self.position.total_notional_usd,
+            total_size_coins=self.position.total_size_coins,
+            grid_levels=filled_grid_levels,
         )
         self.trades.append(trade)
 
+        # Update realized equity: add net PnL (commission already deducted)
+        self._realized_equity += pnl_net
+
         # Reset position
-        equity_after = self.position.total_cost_usd + pnl
         self.position = DCAPosition()
 
-        return equity_after
+        return self._realized_equity
 
     def _calculate_metrics(self, initial_capital: float, final_equity: float) -> BacktestMetrics:
         """Calculate backtest performance metrics."""

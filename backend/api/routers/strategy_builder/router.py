@@ -563,8 +563,8 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
         leverage=float(lev) if lev is not None else None,
         position_size=db_strategy.position_size,  # type: ignore[arg-type]
         parameters=params,
-        blocks=db_strategy.builder_blocks or [],  # type: ignore[arg-type]
-        connections=db_strategy.builder_connections or [],  # type: ignore[arg-type]
+        blocks=(db_strategy.builder_blocks or (db_strategy.builder_graph or {}).get("blocks", [])),  # type: ignore[arg-type]
+        connections=(db_strategy.builder_connections or (db_strategy.builder_graph or {}).get("connections", [])),  # type: ignore[arg-type]
         builder_graph=db_strategy.builder_graph,  # type: ignore[arg-type]
         is_builder_strategy=db_strategy.is_builder_strategy,  # type: ignore[arg-type]
         version=db_strategy.version,  # type: ignore[arg-type]
@@ -2565,8 +2565,13 @@ async def run_backtest_from_builder(
             detail=f"Strategy Builder strategy {strategy_id} not found",
         )
 
-    # Validate strategy has blocks and connections
-    if not db_strategy.builder_blocks or len(db_strategy.builder_blocks) == 0:
+    # Validate strategy has blocks and connections.
+    # Accept builder_graph["blocks"] as fallback when builder_blocks is NULL
+    # (e.g. strategy was saved in old format or migrated without populating the column).
+    _has_blocks = bool(db_strategy.builder_blocks and len(db_strategy.builder_blocks) > 0)
+    if not _has_blocks and db_strategy.builder_graph:
+        _has_blocks = bool(db_strategy.builder_graph.get("blocks"))
+    if not _has_blocks:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Strategy has no blocks. Add blocks before running backtest.",
@@ -2598,8 +2603,14 @@ async def run_backtest_from_builder(
     # =============================================
     # 3-PART VALIDATION: Parameters, Entry, Exit
     # =============================================
-    blocks: list[dict] = list(db_strategy.builder_blocks or [])
-    conns: list[dict] = list(db_strategy.builder_connections or [])
+    # Use builder_graph["blocks"] as fallback when builder_blocks is NULL
+    _val_blocks = db_strategy.builder_blocks
+    _val_conns = db_strategy.builder_connections
+    if not _val_blocks and db_strategy.builder_graph:
+        _val_blocks = db_strategy.builder_graph.get("blocks", [])
+        _val_conns = db_strategy.builder_graph.get("connections", [])
+    blocks: list[dict] = list(_val_blocks or [])
+    conns: list[dict] = list(_val_conns or [])
     validation_errors: list[str] = []
 
     # Helper: extract target port from connection (supports all 5 formats
@@ -2674,12 +2685,26 @@ async def run_backtest_from_builder(
         position_size = max(0.01, min(1.0, position_size))
 
     try:
-        # Build strategy graph from DB data
+        # Build strategy graph from DB data.
+        # Fallback: if builder_blocks is NULL (strategy imported via builder_graph only),
+        # use builder_graph["blocks"] and builder_graph["connections"] instead.
+        _blocks = db_strategy.builder_blocks
+        _connections = db_strategy.builder_connections
+        if not _blocks and db_strategy.builder_graph:
+            _blocks = db_strategy.builder_graph.get("blocks", [])
+            _connections = db_strategy.builder_graph.get("connections", [])
+            logger.info(
+                "backtest: builder_blocks is empty, falling back to builder_graph['blocks'] "
+                "({} blocks, {} connections)",
+                len(_blocks or []),
+                len(_connections or []),
+            )
+
         strategy_graph: dict[str, Any] = {
             "name": db_strategy.name,
             "description": db_strategy.description or "",
-            "blocks": db_strategy.builder_blocks or [],
-            "connections": db_strategy.builder_connections or [],
+            "blocks": _blocks or [],
+            "connections": _connections or [],
             "market_type": market_type,
             "direction": direction,
             # Main chart interval from Properties panel — used to resolve
@@ -2743,8 +2768,13 @@ async def run_backtest_from_builder(
         block_dca_config = adapter.extract_dca_config()
         has_dca_blocks = adapter.has_dca_blocks()
 
-        # Merge DCA config: request params override block config
-        dca_enabled = request.dca_enabled or has_dca_blocks
+        # Merge DCA config: request params override block config.
+        # Three sources of truth for dca_enabled (any one is sufficient):
+        # 1. Frontend request explicitly enables DCA
+        # 2. has_dca_blocks() found a recognised DCA block pattern
+        # 3. extract_dca_config() already resolved dca_enabled=True (covers
+        #    block types that has_dca_blocks doesn't scan, e.g. grid_orders)
+        dca_enabled = request.dca_enabled or has_dca_blocks or block_dca_config.get("dca_enabled", False)
 
         # Build BacktestConfig
         from backend.backtesting.models import BacktestConfig, StrategyType
@@ -2806,6 +2836,16 @@ async def run_backtest_from_builder(
         else:
             # Use block config but ensure enabled flag is set correctly
             final_dca_config["dca_enabled"] = dca_enabled
+
+        # Sync dca_direction with strategy direction:
+        # If the DCA block did NOT specify an explicit direction (i.e. still "both"),
+        # use the strategy-level direction so a "Long" strategy never opens short DCA
+        # positions and vice-versa.  This also covers the case where the user picks
+        # direction from the Properties panel (request.direction) but the DCA block
+        # has no direction field.
+        if final_dca_config.get("dca_direction", "both") == "both" and direction in ("long", "short"):
+            final_dca_config["dca_direction"] = direction
+            logger.info("[DCA] dca_direction synced from strategy direction: %s", direction)
 
         # strategy_params for DCAEngine: close_conditions and indent_order from graph (grid/multi_tp are on config)
         strategy_params_for_dca: dict[str, Any] = {
@@ -2917,6 +2957,9 @@ async def run_backtest_from_builder(
             # DCA Manual Grid (custom orders from grid_orders block)
             dca_custom_orders=final_dca_config.get("custom_orders"),
             dca_grid_trailing_percent=final_dca_config.get("grid_trailing_percent", 0.0),
+            # Partial grid + pullback from dca block params
+            partial_grid_orders=int(final_dca_config.get("partial_grid_orders", 1) or 1),
+            grid_pullback_percent=float(final_dca_config.get("grid_pullback_percent", 0.0) or 0.0),
             # DCA Multi-TP settings
             dca_multi_tp_enabled=final_dca_config["dca_multi_tp_enabled"],
             dca_tp1_percent=final_dca_config["dca_tp1_percent"],
@@ -3144,15 +3187,41 @@ async def run_backtest_from_builder(
             except (TypeError, ValueError):
                 return default
 
+        def _interval_to_hours(interval: str) -> float:
+            """Convert Bybit interval string to hours per bar."""
+            _map = {
+                "1": 1 / 60,
+                "5": 5 / 60,
+                "15": 0.25,
+                "30": 0.5,
+                "60": 1.0,
+                "240": 4.0,
+                "D": 24.0,
+                "W": 168.0,
+                "M": 720.0,
+            }
+            return _map.get(str(interval), 0.0)
+
         # Normalize trades into dicts suitable for DB storage
         trades_source = result.trades or []
         trades_list = []
-        for t in trades_source:
+        # Pre-compute bar size in hours (for duration_hours calculation)
+        _interval_hours = _interval_to_hours(backtest_config.interval)
+
+        for trade_idx, t in enumerate(trades_source):
             if hasattr(t, "__dict__") and not isinstance(t, dict):
                 entry_time = getattr(t, "entry_time", None)
                 exit_time = getattr(t, "exit_time", None)
                 side = getattr(t, "side", None)
-                trade_fees = _sf(getattr(t, "fees", 0))
+                # Prefer explicit fees; fall back to commission field (DCA engine stores it there)
+                trade_fees = _sf(getattr(t, "fees", None) or getattr(t, "commission", 0))
+                _trade_number = int(getattr(t, "trade_number", 0) or 0) or (trade_idx + 1)
+                _dca_orders_filled = int(getattr(t, "dca_orders_filled", 0) or 0)
+                _bars = int(getattr(t, "bars_in_trade", 0) or getattr(t, "duration_bars", 0) or 0)
+                # Compute duration_hours from bar count when not set by engine
+                _dur_h = _sf(getattr(t, "duration_hours", 0))
+                if _dur_h == 0.0 and _bars > 0 and _interval_hours > 0:
+                    _dur_h = round(_bars * _interval_hours, 4)
                 trades_list.append(
                     {
                         "entry_time": entry_time.isoformat() if entry_time else None,
@@ -3165,20 +3234,33 @@ async def run_backtest_from_builder(
                         "pnl_pct": _sf(getattr(t, "pnl_pct", 0)),
                         "fees": trade_fees,
                         "commission": trade_fees,
-                        "duration_bars": int(getattr(t, "bars_in_trade", 0) or getattr(t, "duration_bars", 0) or 0),
-                        "bars_in_trade": int(getattr(t, "bars_in_trade", 0) or 0),
-                        "duration_hours": _sf(getattr(t, "duration_hours", 0)),
+                        "duration_bars": _bars,
+                        "bars_in_trade": _bars,
+                        "duration_hours": _dur_h,
                         "entry_bar_index": int(getattr(t, "entry_bar_index", 0) or 0),
                         "exit_bar_index": int(getattr(t, "exit_bar_index", 0) or 0),
                         "exit_comment": str(getattr(t, "exit_comment", "") or ""),
+                        "is_open": bool(getattr(t, "is_open", False)),
+                        "direction": str(getattr(t, "side", "") or getattr(t, "direction", "")),
                         "mfe": _sf(getattr(t, "mfe", 0)),
                         "mae": _sf(getattr(t, "mae", 0)),
                         "mfe_pct": _sf(getattr(t, "mfe_pct", 0)),
                         "mae_pct": _sf(getattr(t, "mae_pct", 0)),
+                        "trade_number": _trade_number,
+                        "dca_orders_filled": _dca_orders_filled,
+                        # For DCA trades: grid_level = sequential trade number (1-N)
+                        # so the chart renders "G1"..."G21" instead of plain "buy"
+                        "grid_level": _trade_number if _dca_orders_filled > 0 else None,
                     }
                 )
             elif isinstance(t, dict):
                 trade_fees = _sf(t.get("fees") or t.get("commission"))
+                _trade_number = int(t.get("trade_number", 0) or 0) or (trade_idx + 1)
+                _dca_orders_filled = int(t.get("dca_orders_filled", 0) or 0)
+                _bars_d = int(t.get("duration_bars", t.get("bars_in_trade", 0)) or 0)
+                _dur_h_d = _sf(t.get("duration_hours", 0))
+                if _dur_h_d == 0.0 and _bars_d > 0 and _interval_hours > 0:
+                    _dur_h_d = round(_bars_d * _interval_hours, 4)
                 trades_list.append(
                     {
                         "entry_time": t.get("entry_time"),
@@ -3191,16 +3273,21 @@ async def run_backtest_from_builder(
                         "pnl_pct": _sf(t.get("pnl_pct", 0)),
                         "fees": trade_fees,
                         "commission": trade_fees,
-                        "duration_bars": int(t.get("duration_bars", t.get("bars_in_trade", 0)) or 0),
+                        "duration_bars": _bars_d,
                         "bars_in_trade": int(t.get("bars_in_trade", 0) or 0),
-                        "duration_hours": _sf(t.get("duration_hours", 0)),
+                        "duration_hours": _dur_h_d,
                         "entry_bar_index": int(t.get("entry_bar_index", 0) or 0),
                         "exit_bar_index": int(t.get("exit_bar_index", 0) or 0),
                         "exit_comment": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
+                        "is_open": bool(t.get("is_open", False)),
+                        "direction": str(t.get("side", t.get("direction", "")) or ""),
                         "mfe": _sf(t.get("mfe", 0)),
                         "mae": _sf(t.get("mae", 0)),
                         "mfe_pct": _sf(t.get("mfe_pct", 0)),
                         "mae_pct": _sf(t.get("mae_pct", 0)),
+                        "trade_number": _trade_number,
+                        "dca_orders_filled": _dca_orders_filled,
+                        "grid_level": _trade_number if _dca_orders_filled > 0 else None,
                     }
                 )
 
@@ -3338,7 +3425,13 @@ async def run_backtest_from_builder(
             "long_commission": _sf(getattr(_m, "long_commission", None) if _m else None),
             "short_commission": _sf(getattr(_m, "short_commission", None) if _m else None),
             "exposure_time": _sf(getattr(_m, "exposure_time", None) if _m else None),
+            "open_trades": int(getattr(_m, "open_trades", 0) or 0) if _m else 0,
             "initial_capital": float(backtest_config.initial_capital),
+            "final_equity": _sf(
+                result.final_equity if result.final_equity is not None else backtest_config.initial_capital
+            ),
+            "final_pnl": _sf(result.final_pnl if result.final_pnl is not None else 0.0),
+            "final_pnl_pct": _sf(result.final_pnl_pct if result.final_pnl_pct is not None else 0.0),
         }
 
         # Return response with full inline data — allows frontend modal to open without second fetch

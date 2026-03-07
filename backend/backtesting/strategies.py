@@ -824,8 +824,9 @@ class DCAStrategy(BaseStrategy):
                             entry_count = 1
                             base_entry_price = close.iloc[i]
                             last_entry_price = close.iloc[i]
-                            cumulative_cost = close.iloc[i]
-                            cumulative_qty = 1
+                            # FIX: weight cumulative_cost by order volume for correct avg_price
+                            cumulative_cost = close.iloc[i] * self.base_order_size
+                            cumulative_qty = self.base_order_size
                     else:
                         # SAFETY ORDER: triggered by price deviation
                         so_index = entry_count - 1  # 0-indexed SO
@@ -841,12 +842,14 @@ class DCAStrategy(BaseStrategy):
                             so_trigger_price = base_entry_price * (1 - so_deviation)
 
                             if low.iloc[i] <= so_trigger_price:
+                                so_vol = self.so_volumes[so_index]
                                 long_entries.iloc[i] = True
-                                entry_sizes.iloc[i] = self.so_volumes[so_index]  # Volume Scale: scaled SO size
+                                entry_sizes.iloc[i] = so_vol  # Volume Scale: scaled SO size
                                 entry_count += 1
                                 last_entry_price = close.iloc[i]
-                                cumulative_cost += close.iloc[i]
-                                cumulative_qty += 1
+                                # FIX: weight by volume so avg_price accounts for martingale
+                                cumulative_cost += close.iloc[i] * so_vol
+                                cumulative_qty += so_vol
 
         elif self.direction == "short":
             # SHORT DCA logic - 3commas style
@@ -951,8 +954,9 @@ class DCAStrategy(BaseStrategy):
                             entry_count = 1
                             base_entry_price = close.iloc[i]
                             last_entry_price = close.iloc[i]
-                            cumulative_cost = close.iloc[i]
-                            cumulative_qty = 1
+                            # FIX: weight cumulative_cost by order volume for correct avg_price
+                            cumulative_cost = close.iloc[i] * self.base_order_size
+                            cumulative_qty = self.base_order_size
                     else:
                         # SAFETY ORDER: triggered by price deviation UP
                         so_index = entry_count - 1
@@ -961,12 +965,14 @@ class DCAStrategy(BaseStrategy):
                             so_trigger_price = base_entry_price * (1 + so_deviation)
 
                             if high.iloc[i] >= so_trigger_price:
+                                so_vol = self.so_volumes[so_index]
                                 short_entries.iloc[i] = True
-                                short_entry_sizes.iloc[i] = self.so_volumes[so_index]  # Volume Scale
+                                short_entry_sizes.iloc[i] = so_vol  # Volume Scale
                                 entry_count += 1
                                 last_entry_price = close.iloc[i]
-                                cumulative_cost += close.iloc[i]
-                                cumulative_qty += 1
+                                # FIX: weight by volume so avg_price accounts for martingale
+                                cumulative_cost += close.iloc[i] * so_vol
+                                cumulative_qty += so_vol
 
         return SignalResult(
             entries=long_entries,

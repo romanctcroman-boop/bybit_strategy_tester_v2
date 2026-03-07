@@ -1,0 +1,1 @@
+PORT=[  TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING       12920] PID=[] LOG=[INFO:     рџ”Њ Plugin Manager shut down||INFO:     рџ›‘ KlineDBService stopped||INFO:     вњ… Live chart sessions closed||INFO:     Application shutdown complete.]

@@ -2126,5 +2126,397 @@
     },
     "acknowledged": false,
     "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:32:24.879079",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:32:24.879092",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:32:26.992242",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:32:26.992273",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:32:27.008501",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:32:27.008521",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:32:27.024467",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:32:27.024488",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:46:45.916755",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:46:45.916770",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:46:45.938819",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:46:45.938834",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:46:45.955336",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:46:45.955353",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:46:45.971706",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:46:45.971722",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:56:08.585697",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:56:08.585722",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:56:08.641309",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:56:08.641344",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:56:08.674156",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:56:08.674171",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T20:56:08.695562",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T20:56:08.695574",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:05:46.181690",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:05:46.181704",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:05:46.203219",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:05:46.203233",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:05:46.222804",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:05:46.222816",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:05:46.241751",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:05:46.241767",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:10:11.028391",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:10:11.028432",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:10:11.059589",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:10:11.059602",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:10:11.082742",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:10:11.082753",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:10:11.103230",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:10:11.103247",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:18:58.775999",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:18:58.776034",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:18:58.829266",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:18:58.829284",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:18:58.865945",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:18:58.865959",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-05T21:18:58.899624",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-05T21:18:58.899639",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-06T11:32:39.945764",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-06T11:32:39.945840",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-06T11:32:42.038372",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-06T11:32:42.038387",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-06T11:32:42.059369",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-06T11:32:42.059380",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
+  },
+  {
+    "alert_id": "cache_low_2026-03-06T11:32:42.079081",
+    "alert_type": "low_cache_hit",
+    "severity": "warning",
+    "message": "Low cache hit rate: 0% (minimum: 50%)",
+    "timestamp": "2026-03-06T11:32:42.079092",
+    "details": {
+      "cache_hit_rate": 0.0,
+      "minimum": 0.5,
+      "cache_size": 0
+    },
+    "acknowledged": false,
+    "resolved": false
   }
 ]
