@@ -114,7 +114,8 @@ async def get_portfolio_history(
 
     try:
         # Calculate time window
-        now = utc_now()
+        # Use naive UTC so SQLite comparison works (DB stores naive datetimes)
+        now = utc_now().replace(tzinfo=None)
         period_map = {
             "1d": timedelta(days=1),
             "7d": timedelta(days=7),
@@ -156,9 +157,12 @@ async def get_portfolio_history(
         # Group backtests by time buckets
         time_buckets = {}
         for bt in backtests:
-            # Round to resolution bucket
-            bucket_time = bt.completed_at.replace(
-                minute=(bt.completed_at.minute // res_minutes) * res_minutes,
+            # Round to resolution bucket; strip tzinfo to keep all keys naive
+            ca = bt.completed_at
+            if ca.tzinfo is not None:
+                ca = ca.replace(tzinfo=None)
+            bucket_time = ca.replace(
+                minute=(ca.minute // res_minutes) * res_minutes,
                 second=0,
                 microsecond=0,
             )
