@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+### 2026-03-13 — DCA Chart Visualization + Engine Fixes (commit f714f1fd6)
+
+**Feature: DCA Chart Rendering Fields**
+- `models.TradeRecord`: new fields `dca_levels` (per-order fills), `dca_grid_prices` (planned G2..GN),
+  `grid_level`, `tp_price`, `sl_price` for chart rendering
+- `dca_engine.DCATradeRecord`: new fields `order_fills`, `planned_grid_prices`, `tp_price`, `sl_price`
+- `dca_engine`: fixed grid price calculation — G1 is always market entry at signal bar price;
+  G2..GN spaced from G1 by cumulative `grid_size_percent` steps (was: all levels offset from base)
+- `dca_engine`: `position_size` (0.01–1.0) now correctly controls DCA capital allocation;
+  previously engine always deployed 100% of `initial_capital`
+- `dca_engine`: `sl_type` support (`average_price` / `last_order`) via `_get_sl_base_price()`
+- `backtests.py`: DCA chart fields added to trade deserialization (`get_backtest` endpoint)
+- `strategy_builder/router.py`: added `exit_reason`, `avg_price`, `dca_avg_entry_price`,
+  `dca_total_size_usd`, `dca_levels`, `dca_grid_prices`, `tp_price`, `sl_price` to trade serialization
+
+**Feature: Frontend Chart Enhancements**
+- Volume histogram (bottom 20% of chart pane, green/red coloured, toggleable via checkbox)
+- DCA grid lines G1..GN on chart (blue=filled, planned grid lines for unfilled levels)
+- Chart type toggle buttons: Candlestick / Bar / Line
+- HTML trade tooltip on crosshair hover near trade marker
+- TV-style chart colors (`#26a69a` teal green, `#ef5350` muted red)
+- `autoSize: true` for responsive chart (replaces fixed width/height)
+- CSS classes extracted from inline styles: `bt-chart-type-toggle`, `mfe-mae-section`, etc.
+
+**Fix: `fallback_engine_v4.py`**
+- Renamed unused local vars with `_` prefix to suppress F841 linter warnings
+- Added `max_consecutive_wins` / `max_consecutive_losses` calculation in `_calculate_metrics`
+
+**Fix: `dca_engine.py`**
+- `datetime.utcnow()` → `datetime.now(timezone.utc)` (DeprecationWarning removed)
+
+**Tests: 47 new tests in `test_dca_chart_fields.py`**
+- `TestDCATradeRecordDataclass`: new fields exist with correct defaults
+- `TestModelTradeRecordSchema`: Pydantic schema has tp/sl/dca_levels/dca_grid_prices
+- `TestDcaLevelsStructure`: dca_levels keys, sequential levels, ISO timestamps
+- `TestDcaLevelsCountConsistency`: `len(dca_levels) == dca_orders_filled`
+- `TestDcaGridPrices`: count=order_count-1, descending, below G1 entry
+- `TestTPPriceLong` / `TestSLPriceLong`: formula verification, direction
+- `TestTPSLNoneWhenOmitted`: None when not configured
+- `TestShortTradeTPSL`: reversed directions for shorts
+- `TestSingleOrderTrade`: G1-only trade has exactly 1 dca_level
+- `TestSlTypeConfiguration` / `TestSlTypeLastOrderPriceDifference` / `TestGetSlBasePriceHelper`
+
+**Cleanup**
+- `temp_analysis/`: deleted 217 debug/analysis scripts accumulated over dev sessions
+- `pyproject.toml`: added `temp_analysis`, `TempState`, `ScreenClip`, `AppData` to mypy excludes
+
 ### 2026-03-13 — Infrastructure Fixes (5 issues)
 
 **Fix 1 — `/api/v1/dashboard/market/tickers` performance (12-14s → <1s)**
