@@ -164,6 +164,49 @@ let _btLiveCandle = null;
 let _candleCountdownTimer = null;  // setInterval id — null when stopped  // eslint-disable-line prefer-const
 let _countdownInterval = '60';     // current chart interval string (e.g. '15', '60', 'D')  // eslint-disable-line prefer-const
 
+function _ensureStore() {
+  return getStore();
+}
+
+function _getBacktestId(backtest) {
+  if (!backtest) return null;
+  return backtest.backtest_id || backtest.id || null;
+}
+
+function _setPriceChartTitle(symbolText) {
+  const titleEl = document.getElementById('priceChartTitle');
+  if (!titleEl) return;
+  titleEl.textContent = '';
+
+  const icon = document.createElement('i');
+  icon.className = 'bi bi-graph-up-arrow me-1';
+  titleEl.appendChild(icon);
+  titleEl.appendChild(document.createTextNode(symbolText));
+
+  const badges = document.createElement('span');
+  badges.id = '_priceChartBadges';
+  badges.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-left:10px;';
+  titleEl.appendChild(badges);
+
+  const markerBadge = document.createElement('span');
+  markerBadge.id = '_markerCountBadge';
+  markerBadge.style.cssText = 'display:none;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;';
+  badges.appendChild(markerBadge);
+}
+
+function _getPriceChartBadgesContainer() {
+  const titleEl = document.getElementById('priceChartTitle');
+  if (!titleEl) return null;
+  let badges = document.getElementById('_priceChartBadges');
+  if (!badges) {
+    badges = document.createElement('span');
+    badges.id = '_priceChartBadges';
+    badges.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-left:10px;';
+    titleEl.appendChild(badges);
+  }
+  return badges;
+}
+
 /**
  * Return the candle period in seconds for a given interval string.
  * Supports all 9 project timeframes: 1 5 15 30 60 240 D W M
@@ -518,9 +561,13 @@ let tradesTable = null;
  * Initialize backtest results state slice
  */
 function initializeBacktestResultsState() {
-  const store = getStore();
+  const store = _ensureStore();
   if (!store) {
-    console.warn('[initializeBacktestResultsState] Store not initialized');
+    return;
+  }
+
+  // Avoid state initialization when charts are already mounted in a non-serializable state.
+  if (store.get('backtestResults.__initialized')) {
     return;
   }
 
@@ -563,6 +610,7 @@ function initializeBacktestResultsState() {
 
   // Other state
   initState('backtestResults.chartDisplayMode', 'absolute');
+  initState('backtestResults.__initialized', true);
 
   // Connect legacy shim variables to the store (bidirectional sync)
   _setupLegacyShimSync();
@@ -768,9 +816,8 @@ function setTradesTable(table) {
 // ============================
 
 function setupBacktestResultsSubscriptions() {
-  const store = getStore();
+  const store = _ensureStore();
   if (!store) {
-    console.warn('[setupBacktestResultsSubscriptions] Store not initialized');
     return;
   }
 
@@ -797,10 +844,11 @@ function setupBacktestResultsSubscriptions() {
 
   // Current backtest changes → update UI
   store.subscribe('backtestResults.currentBacktest', (backtest) => {
-    console.log('[BacktestResults] Current backtest changed:', backtest?.id);
+    const activeId = _getBacktestId(backtest);
+    console.log('[BacktestResults] Current backtest changed:', activeId);
     // Highlight selected result in list
     document.querySelectorAll('.result-item').forEach(item => {
-      if (item.dataset.id === backtest?.id) {
+      if (item.dataset.id === activeId) {
         item.classList.add('selected');
       } else {
         item.classList.remove('selected');
@@ -821,6 +869,8 @@ function setupBacktestResultsSubscriptions() {
 // Initialization
 // ============================
 document.addEventListener('DOMContentLoaded', () => {
+  _setPriceChartTitle('График цены');
+
   // Initialize StateManager
   initializeBacktestResultsState();
   setupBacktestResultsSubscriptions();
@@ -1129,14 +1179,16 @@ function initCharts() {
           },
           datalabels: {
             display: (ctx) => {
-              const val = ctx.dataset.data[ctx.dataIndex];
+              const val = ctx?.dataset?.data?.[ctx.dataIndex];
               return typeof val === 'number' && val > 0;
             },
             anchor: 'end',
             align: 'top',
             color: '#c9d1d9',
             font: { size: 11 },
-            formatter: (val) => (val > 0 ? val : '')
+            formatter: (val) => {
+              return Number.isFinite(val) && val > 0 ? val : '';
+            }
           }
         },
         scales: {
@@ -1928,7 +1980,12 @@ function updateTVTradesListTab(trades, config) {
   setTradesCurrentPage(0);
 
   // Update table header if DCA trades detected
-  const hasDcaTrades = trades.some((t) => (t.dca_orders_filled ?? 0) > 0);
+  const hasDcaTrades = trades.some((t) => {
+    if (Number.isFinite(t.dca_orders_filled) && t.dca_orders_filled > 0) return true;
+    if (Array.isArray(t.dca_levels) && t.dca_levels.length > 0) return true;
+    if (Array.isArray(t.dca_grid_prices) && t.dca_grid_prices.length > 0) return true;
+    return false;
+  });
   updateDcaColumnHeader(hasDcaTrades);
 
   renderTradesPageUtil(tbody, tradesCachedRows, tradesCurrentPage);
@@ -1957,6 +2014,7 @@ function updateDcaColumnHeader(hasDca) {
 
   // Show/hide header
   dcaHeader.style.display = hasDca ? 'table-cell' : 'none';
+  dcaHeader.classList.toggle('tv-dca-header-hidden', !hasDca);
 
   // Also need to show/hide DCA cells in rows
   const dcaCells = document.querySelectorAll('.tv-dca-cell');
@@ -2413,7 +2471,7 @@ function clearAllDisplayData() {
   // Reset price chart title
   const priceTitle = document.getElementById('priceChartTitle');
   if (priceTitle) {
-    priceTitle.innerHTML = '<i class="bi bi-graph-up-arrow me-1"></i>График цены';
+    _setPriceChartTitle('График цены');
   }
 
   // --- TradingView Equity Chart (custom component) ---
@@ -2701,18 +2759,25 @@ function populateFilters() {
 // ============================
 function renderResultsList(results) {
   const container = document.getElementById('resultsList');
+  const currentId = _getBacktestId(currentBacktest);
   container.innerHTML = results
     .map((r) => {
       const isProfitable = (r.metrics?.total_return || 0) >= 0;
-      const isSelected = currentBacktest?.backtest_id === r.backtest_id;
-      const isCompareSelected = selectedForCompare.includes(r.backtest_id);
+      const rowId = r.backtest_id || r.id;
+      const isSelected = currentId === rowId;
+      const isCompareSelected = selectedForCompare.includes(rowId);
 
-      // Get direction from config or parameters (DCA strategies store in strategy_params._direction)
-      const direction =
-        r.config?.direction ||
-        r.config?.strategy_params?._direction ||
-        r.direction ||
-        'both';
+      // Determine direction: prefer actual trade counts over config (DCA always-long shows "both" in config)
+      const _lt = r.metrics?.long_trades ?? 0;
+      const _st = r.metrics?.short_trades ?? 0;
+      const direction = (_lt > 0 && _st === 0)
+        ? 'long'
+        : (_st > 0 && _lt === 0)
+          ? 'short'
+          : (r.config?.direction ||
+             r.config?.strategy_params?._direction ||
+             r.direction ||
+             'both');
       let directionBadge = '';
       if (direction === 'long') {
         directionBadge =
@@ -2725,11 +2790,11 @@ function renderResultsList(results) {
           '<span class="direction-badge direction-both">L&S</span>';
       }
 
-      const isCheckedForDelete = selectedForDelete.has(r.backtest_id);
+      const isCheckedForDelete = selectedForDelete.has(rowId);
 
       return `
                     <div class="result-item ${isSelected ? 'selected' : ''} ${isCheckedForDelete ? 'marked-for-delete' : ''}" 
-                         data-id="${r.backtest_id}">
+                         data-id="${rowId}">
                         ${compareMode
           ? `
                             <input type="checkbox" class="form-check-input compare-checkbox me-2" 
@@ -4770,11 +4835,7 @@ async function updatePriceChart(backtest) {
 
   // Update title — use DOM manipulation to avoid XSS (symbol comes from server data)
   if (titleEl) {
-    const icon = document.createElement('i');
-    icon.className = 'bi bi-graph-up-arrow me-1';
-    titleEl.textContent = '';
-    titleEl.appendChild(icon);
-    titleEl.appendChild(document.createTextNode(`${symbol} — ${formatInterval(interval)}`));
+    _setPriceChartTitle(`${symbol} — ${formatInterval(interval)}`);
   }
 
   try {
@@ -5155,10 +5216,11 @@ async function updatePriceChart(backtest) {
       console.log(`[PriceChart] markers built: ${btPriceChartMarkers.length}, trades: ${backtest.trades.length}, candles: ${candles.length}`);
 
       // Visual debug badge so we can see marker count without DevTools
-      const _dbgEl = document.getElementById('priceChartTitle');
-      if (_dbgEl) {
+      const badgesHost = _getPriceChartBadgesContainer();
+      if (badgesHost) {
         let badge = document.getElementById('_markerCountBadge');
-        if (!badge) { badge = document.createElement('span'); badge.id = '_markerCountBadge'; badge.style.cssText = 'margin-left:8px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;'; _dbgEl.appendChild(badge); }
+        if (!badge) { badge = document.createElement('span'); badge.id = '_markerCountBadge'; badge.style.cssText = 'padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;'; badgesHost.appendChild(badge); }
+        badge.style.display = 'inline-block';
         badge.textContent = `${btPriceChartMarkers.length} markers`;
         badge.style.background = btPriceChartMarkers.length > 0 ? '#1b4332' : '#5c1a1a';
         badge.style.color = btPriceChartMarkers.length > 0 ? '#52c41a' : '#ff4d4f';
@@ -5168,12 +5230,12 @@ async function updatePriceChart(backtest) {
         try {
           btCandleSeries.setMarkers(btPriceChartMarkers);
           console.log(`[PriceChart] setMarkers OK: ${btPriceChartMarkers.length} markers`);
-          if (_dbgEl) { const b = document.getElementById('_markerCountBadge'); if (b) b.title = 'setMarkers OK'; }
+          if (badgesHost) { const b = document.getElementById('_markerCountBadge'); if (b) b.title = 'setMarkers OK'; }
         } catch (e) {
           console.error('[PriceChart] setMarkers ERROR:', e.message);
           console.error('First marker:', JSON.stringify(btPriceChartMarkers[0]));
           console.error('Last marker:', JSON.stringify(btPriceChartMarkers[btPriceChartMarkers.length - 1]));
-          if (_dbgEl) { const b = document.getElementById('_markerCountBadge'); if (b) { b.textContent = 'ERROR: ' + e.message; b.style.background = '#5c1a1a'; b.style.color = '#ff4d4f'; } }
+          if (badgesHost) { const b = document.getElementById('_markerCountBadge'); if (b) { b.textContent = 'ERROR: ' + e.message; b.style.background = '#5c1a1a'; b.style.color = '#ff4d4f'; } }
         }
       } else {
         console.warn('[PriceChart] 0 markers or no series. trades:', backtest.trades.length, 'candles:', candles.length);
@@ -5340,11 +5402,12 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
   // ── G1 line (entry order) ──────────────────────────────────────────────────
   // G1 is always filled (it's the trade entry). Use fill_price from dca_levels[level=1]
   // or fall back to trade.entry_price.
+  // Yellow = triggered/filled (G1 is always filled by definition).
   const g1Fill = filledMap[1];
   const g1Price = g1Fill ? g1Fill.price : trade.entry_price;
   if (g1Price && g1Price > 0) {
     const g1s = chart.addLineSeries({
-      color: '#2196F3',   // blue — same as entry marker
+      color: '#FFD700',   // yellow — filled/triggered level
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
       priceLineVisible: false,
@@ -5370,7 +5433,7 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
       // this is "the price set for the order to fire", which is what the user expects.
       // For filled orders the marker already shows the actual fill; the line marks the trigger.
       const levelPrice = gridPrice;
-      const lineColor = isFilled ? '#f9a825' : '#2196F3';  // yellow=filled, blue=pending
+      const lineColor = isFilled ? '#FFD700' : '#2196F3';  // yellow=filled/triggered, blue=pending
 
       const gs = chart.addLineSeries({
         color: lineColor,
@@ -5491,6 +5554,10 @@ function buildTradeMarkers(trades, candles, options = {}) {
     if (multiTpMatch) {
       const tpNum = multiTpMatch[1] || multiTpMatch[2];
       exitLabel = `TP${tpNum}`;
+    } else if (exitReason.includes('atr_tp')) {
+      exitLabel = 'ATR TP';
+    } else if (exitReason.includes('atr_sl')) {
+      exitLabel = 'ATR SL';
     } else if (exitReason === 'tp' || exitReason.startsWith('tp ') || exitReason.startsWith('tp(') || exitReason.includes('take_profit')) {
       exitLabel = 'TP';
     } else if (exitReason === 'sl' || exitReason.startsWith('sl ') || exitReason.startsWith('sl(') || exitReason.includes('stop_loss')) {
@@ -5503,6 +5570,16 @@ function buildTradeMarkers(trades, candles, options = {}) {
       exitLabel = 'Signal';
     } else if (exitReason.includes('time_exit') || exitReason.includes('session') || exitReason.includes('weekend')) {
       exitLabel = 'Time';
+    } else if (exitReason.includes('channel_close')) {
+      exitLabel = 'Channel';
+    } else if (exitReason.includes('rsi_close')) {
+      exitLabel = 'RSI';
+    } else if (exitReason.includes('stoch_close')) {
+      exitLabel = 'Stoch';
+    } else if (exitReason.includes('ma_close')) {
+      exitLabel = 'MA';
+    } else if (exitReason.includes('psar_close')) {
+      exitLabel = 'PSAR';
     } else if (exitReason.includes('end_of_data') || exitReason === 'eod') {
       exitLabel = 'EOD';
     } else {
@@ -5521,7 +5598,7 @@ function buildTradeMarkers(trades, candles, options = {}) {
         if (!lvlTimeSec || lvlTimeSec < firstCandleTime || lvlTimeSec > lastCandleTime) return;
         const snappedTime = snapToCandle(lvlTimeSec, candles);
 
-        // G1 = blue (initial entry), G2+ = cyan (DCA additions)
+        // G1 = blue (initial entry marker), G2+ = cyan (DCA addition markers)
         const lvlColor = lvl.level === 1 ? ENTRY_LONG_COLOR : '#00BCD4';
         let lvlText = `G${lvl.level}`;
         if (showEntryPrice && lvl.price) {
@@ -5796,7 +5873,16 @@ function parseTradeTime(time) {
     return (time > 1e12 ? Math.floor(time / 1000) : time) + TZ;
   }
   if (typeof time === 'string') {
-    const d = new Date(time);
+    // Python pandas isoformat() on tz-naive DatetimeIndex omits timezone suffix
+    // (e.g. "2026-01-28T06:00:00" instead of "2026-01-28T06:00:00Z").
+    // Browsers treat such strings as LOCAL time, causing a 3h offset for UTC+3 users.
+    // All backend timestamps are UTC, so we force UTC interpretation by appending 'Z'
+    // when no timezone info is present.
+    let s = time;
+    if (!s.endsWith('Z') && !s.match(/[+-]\d{2}:?\d{2}$/)) {
+      s += 'Z';
+    }
+    const d = new Date(s);
     return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000) + TZ;
   }
   return null;
@@ -5840,10 +5926,10 @@ function _getLiveChartSessionId() {
  */
 function _updateLiveButton(state) {
   // No dedicated Live button anymore — show status as a badge in the chart title bar
-  const titleEl = document.getElementById('priceChartTitle');
-  if (titleEl) {
+  const badgesHost = _getPriceChartBadgesContainer();
+  if (badgesHost) {
     // Remove any previous live badge
-    const prev = titleEl.querySelector('.bt-live-status');
+    const prev = badgesHost.querySelector('.bt-live-status');
     if (prev) prev.remove();
 
     if (state !== 'idle') {
@@ -5858,8 +5944,8 @@ function _updateLiveButton(state) {
         const badge = document.createElement('span');
         badge.className = 'bt-live-status';
         badge.textContent = b.text;
-        badge.style.cssText = `margin-left:10px;font-size:11px;font-weight:700;color:${b.color};letter-spacing:.03em;`;
-        titleEl.appendChild(badge);
+        badge.style.cssText = `font-size:11px;font-weight:700;color:${b.color};letter-spacing:.03em;`;
+        badgesHost.appendChild(badge);
       }
     }
   }

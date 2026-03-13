@@ -35,10 +35,10 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
     const pnlPct = trade.return_pct || trade.pnl_pct || 0;
     const cumulativePnLPct = (cumulativePnL / initialCapital) * 100;
 
-    const exitSignal = trade.exit_reason || trade.exit_signal ||
-        (isLong ? 'Long SL/TP' : 'Short SL/TP');
-    const isOpenTrade = trade.is_open === true || (trade.exit_comment || '').toLowerCase() === 'open_position';
-    const exitSignalDisplay = isOpenTrade ? '🔓 Open' : exitSignal;
+    const rawExit = trade.exit_comment || trade.exit_reason || trade.exit_signal || '';
+    const exitSignal = rawExit || (isLong ? 'Long SL/TP' : 'Short SL/TP');
+    const isOpenTrade = trade.is_open === true || (rawExit || '').toLowerCase() === 'open_position';
+    const exitSignalDisplay = isOpenTrade ? '🔓 Open' : _formatExitReason(exitSignal);
     const entrySignal = isLong ? 'Long' : 'Short';
 
     const positionValue = (trade.size || 0) * (trade.entry_price || 0);
@@ -52,10 +52,16 @@ export function buildTradeRow(trade, tradeNum, cumulativePnL, initialCapital = 1
     const maePct = Math.abs(trade.mae_pct ?? 0);
 
     // DCA orders filled (only shown if backtest has DCA trades)
-    const dcaOrdersFilled = trade.dca_orders_filled ?? 0;
+    const dcaOrdersFilled = Number.isFinite(trade.dca_orders_filled)
+        ? trade.dca_orders_filled
+        : Array.isArray(trade.dca_levels)
+            ? trade.dca_levels.length
+            : Array.isArray(trade.dca_grid_prices)
+                ? trade.dca_grid_prices.length
+                : 0;
     const dcaAvgEntry = trade.dca_avg_entry_price ?? 0;
     const dcaTotalSizeUsd = trade.dca_total_size_usd ?? 0;
-    const dcaGridLevels = trade.dca_grid_levels ?? [];
+    const dcaGridLevels = trade.dca_grid_levels ?? trade.dca_grid_prices ?? [];
 
     const showDca = hasDcaTrades && dcaOrdersFilled > 0;
 
@@ -148,7 +154,12 @@ export function buildTradeRows(trades, initialCapital = 10000, sortKey = null, s
     });
 
     // Detect if this backtest has DCA trades (any trade with dca_orders_filled > 0)
-    const hasDcaTrades = trades.some((t) => (t.dca_orders_filled ?? 0) > 0);
+    const hasDcaTrades = trades.some((t) => {
+        if (Number.isFinite(t.dca_orders_filled) && t.dca_orders_filled > 0) return true;
+        if (Array.isArray(t.dca_levels) && t.dca_levels.length > 0) return true;
+        if (Array.isArray(t.dca_grid_prices) && t.dca_grid_prices.length > 0) return true;
+        return false;
+    });
 
     // Build rows array — newest first (reverse chronological default)
     const rows = [];
@@ -268,6 +279,34 @@ function _isLongTrade(t) {
 
 /**
  * Format date string like TradingView: "Nov 17, 2025, 21:15"
+/**
+ * Map raw exit_reason/exit_comment to short display label (matches chart markers).
+ * @param {string} raw
+ * @returns {string}
+ */
+function _formatExitReason(raw) {
+    if (!raw) return '--';
+    const r = String(raw).toLowerCase();
+    const tpMatch = r.match(/tp[_\s]?(\d+)|take_profit[_\s]?(\d+)/);
+    if (tpMatch) return `TP${tpMatch[1] || tpMatch[2]}`;
+    if (r.includes('atr_tp')) return 'ATR TP';
+    if (r.includes('atr_sl')) return 'ATR SL';
+    if (r.includes('take_profit') || r === 'tp') return 'TP';
+    if (r.includes('stop_loss') || r === 'sl') return 'SL';
+    if (r.includes('trailing') || r === 'tsl') return 'TSL';
+    if (r.includes('breakeven') || r === 'be') return 'BE';
+    if (r.includes('time_exit') || r.includes('session') || r.includes('weekend')) return 'Time';
+    if (r.includes('channel_close')) return 'Channel';
+    if (r.includes('rsi_close')) return 'RSI';
+    if (r.includes('stoch_close')) return 'Stoch';
+    if (r.includes('ma_close')) return 'MA';
+    if (r.includes('psar_close')) return 'PSAR';
+    if (r.includes('end_of_data') || r === 'eod') return 'EOD';
+    if (r.includes('signal')) return 'Signal';
+    return raw;
+}
+
+/**
  * Backend returns UTC timestamps without timezone suffix (e.g. "2026-02-28T08:00:00").
  * Appending "Z" ensures new Date() treats it as UTC and toLocaleString() converts
  * it to the user's local timezone — matching TradingView's UTC+local display.

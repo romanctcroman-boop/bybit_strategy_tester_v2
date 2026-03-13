@@ -121,15 +121,24 @@ class ExitReason(Enum):
     """Причина закрытия позиции"""
 
     STOP_LOSS = "stop_loss"
+    BREAKEVEN_SL = "breakeven_sl"  # SL moved to breakeven, closed at entry+offset
     TAKE_PROFIT = "take_profit"
+    ATR_TP = "atr_tp"  # ATR-based take profit
+    ATR_SL = "atr_sl"  # ATR-based stop loss
     SIGNAL = "signal"
     END_OF_DATA = "end_of_data"
     MAX_DRAWDOWN = "max_drawdown"
     TRAILING_STOP = "trailing_stop"
     # Time-based exits
-    TIME_EXIT = "time_exit"  # max_bars_in_trade
+    TIME_EXIT = "time_exit"  # max_bars_in_trade, Close by Time
     SESSION_CLOSE = "session_close"  # exit_on_session_close
     WEEKEND_CLOSE = "weekend_close"  # exit_end_of_week
+    # Indicator-based close conditions (DCA Strategy Builder)
+    CHANNEL_CLOSE = "channel_close"  # Keltner/BB band touch
+    RSI_CLOSE = "rsi_close"  # RSI reach/cross level
+    STOCH_CLOSE = "stoch_close"  # Stochastic reach/cross
+    MA_CLOSE = "ma_close"  # Two MAs cross
+    PSAR_CLOSE = "psar_close"  # Parabolic SAR reversal
     # Order-related
     LIMIT_TIMEOUT = "limit_timeout"  # Лимитный ордер истёк
     # Fallback

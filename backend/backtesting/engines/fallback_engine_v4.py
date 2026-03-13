@@ -2004,11 +2004,11 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # Проверка условий
                 if sl_price_long and low_price <= sl_price_long:
                     pending_long_exit = True
-                    pending_long_exit_reason = ExitReason.STOP_LOSS
+                    pending_long_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
                     pending_long_exit_price = sl_price_long
                 elif tp_price_long and high_price >= tp_price_long:
                     pending_long_exit = True
-                    pending_long_exit_reason = ExitReason.TAKE_PROFIT
+                    pending_long_exit_reason = ExitReason.ATR_TP if tp_mode == TpMode.ATR else ExitReason.TAKE_PROFIT
                     pending_long_exit_price = tp_price_long
 
             # === СТАНДАРТНАЯ ПРОВЕРКА SL/TP ДЛЯ SHORT ===
@@ -2042,11 +2042,11 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                 if sl_price_short and high_price >= sl_price_short:
                     pending_short_exit = True
-                    pending_short_exit_reason = ExitReason.STOP_LOSS
+                    pending_short_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
                     pending_short_exit_price = sl_price_short
                 elif tp_price_short and low_price <= tp_price_short:
                     pending_short_exit = True
-                    pending_short_exit_reason = ExitReason.TAKE_PROFIT
+                    pending_short_exit_reason = ExitReason.ATR_TP if tp_mode == TpMode.ATR else ExitReason.TAKE_PROFIT
                     pending_short_exit_price = tp_price_short
 
             # === СИГНАЛЬНЫЕ ВЫХОДЫ ===
