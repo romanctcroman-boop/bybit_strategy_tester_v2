@@ -74,6 +74,7 @@ def configure_middleware(app: FastAPI) -> None:
         long_running_paths=[
             "/api/v1/marketdata/symbols",  # instrument-info, symbols-list
             "/api/v1/refresh-tickers",
+            "/api/v1/dashboard/market/tickers",  # live Bybit API call, can be slow
         ],
     )
 

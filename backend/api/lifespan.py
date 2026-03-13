@@ -485,6 +485,26 @@ async def lifespan(app: "FastAPI"):
         app.state.symbols_cache = {}
 
     # =========================================================================
+    # WINDOWS: suppress benign ProactorEventLoop ConnectionResetError (WinError 10054)
+    # Happens when remote clients forcibly close connections — not a real error.
+    # =========================================================================
+    import sys
+    if sys.platform == "win32":
+        _loop = asyncio.get_event_loop()
+        _orig_exception_handler = _loop.get_exception_handler()
+
+        def _win32_exception_handler(loop, context):
+            exc = context.get("exception")
+            if isinstance(exc, ConnectionResetError) and getattr(exc, "winerror", None) == 10054:
+                return  # silently ignore WinError 10054
+            if _orig_exception_handler:
+                _orig_exception_handler(loop, context)
+            else:
+                loop.default_exception_handler(context)
+
+        _loop.set_exception_handler(_win32_exception_handler)
+
+    # =========================================================================
     # STARTUP
     # =========================================================================
 

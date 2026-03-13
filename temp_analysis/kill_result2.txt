@@ -1,4 +1,0 @@
-Method1 taskkill /T:  | ЋиЁЎЄ : ЌҐ г¤ Ґвбп ­ ©вЁ Їа®жҐбб "12920".
-Method2 wmic: Ћвбгвбвўгов нЄ§Ґ¬Ї«пал. | 
-Method3 os.kill PERMISSION: [WinError 5] Отказано в доступе
-Still: ['TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING       12920']

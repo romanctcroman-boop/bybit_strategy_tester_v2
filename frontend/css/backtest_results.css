@@ -1753,6 +1753,7 @@ body {
     display: flex;
     gap: 16px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .bt-price-chart-controls label {
@@ -1772,6 +1773,57 @@ body {
 .bt-price-chart-controls input[type='checkbox'] {
     accent-color: #58a6ff;
     cursor: pointer;
+}
+
+/* ── Chart type toggle buttons ──────────────────────────────────── */
+.bt-chart-type-toggle {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    background: rgba(33, 38, 45, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 2px;
+    margin-right: 4px;
+}
+
+.bt-chart-type-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-family: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+    white-space: nowrap;
+}
+
+.bt-chart-type-btn:hover {
+    background: rgba(88, 166, 255, 0.12);
+    color: var(--text-primary);
+}
+
+.bt-chart-type-btn.active {
+    background: rgba(88, 166, 255, 0.18);
+    color: #58a6ff;
+}
+
+.bt-chart-type-btn svg {
+    flex-shrink: 0;
+    color: inherit;
+}
+
+/* ── Price chart trade tooltip ──────────────────────────────────── */
+#btPriceChartTooltip {
+    pointer-events: none;
+    transition: opacity 0.1s;
 }
 
 /* Small alert text used in MTF/Optimizer settings panels */
@@ -2177,4 +2229,49 @@ body {
     border-radius: 3px;
     margin-left: 4px;
     vertical-align: middle;
+}
+
+/* ---- JS Error Banner (previously inline) ---- */
+#_jserrBanner {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 99999;
+    background: #c0392b;
+    color: #fff;
+    font: 12px monospace;
+    padding: 8px 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 150px;
+    overflow: auto;
+}
+
+/* ---- MFE/MAE chart wrapper (previously inline) ---- */
+.mfe-mae-section {
+    margin-top: 1.25rem;
+}
+
+.mfe-mae-chart-wrap {
+    width: 100%;
+    height: 280px;
+}
+
+.mfe-mae-chart-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mfe-mae-subtitle {
+    font-size: 0.7rem;
+    color: #8b949e;
+    font-weight: 400;
+}
+
+/* ---- DCA header column (previously inline) ---- */
+.tv-dca-header-hidden {
+    display: none;
 }

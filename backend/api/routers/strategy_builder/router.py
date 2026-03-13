@@ -3240,6 +3240,8 @@ async def run_backtest_from_builder(
                         "entry_bar_index": int(getattr(t, "entry_bar_index", 0) or 0),
                         "exit_bar_index": int(getattr(t, "exit_bar_index", 0) or 0),
                         "exit_comment": str(getattr(t, "exit_comment", "") or ""),
+                        # exit_reason mirrors exit_comment (used by frontend & analytics scripts)
+                        "exit_reason": str(getattr(t, "exit_comment", "") or ""),
                         "is_open": bool(getattr(t, "is_open", False)),
                         "direction": str(getattr(t, "side", "") or getattr(t, "direction", "")),
                         "mfe": _sf(getattr(t, "mfe", 0)),
@@ -3248,9 +3250,24 @@ async def run_backtest_from_builder(
                         "mae_pct": _sf(getattr(t, "mae_pct", 0)),
                         "trade_number": _trade_number,
                         "dca_orders_filled": _dca_orders_filled,
+                        # For DCA trades: avg_price = average entry price across all DCA orders
+                        "avg_price": _sf(getattr(t, "dca_avg_entry_price", None) or getattr(t, "avg_price", None)),
+                        # Alias used by frontend JS (trade.dca_avg_entry_price)
+                        "dca_avg_entry_price": _sf(
+                            getattr(t, "dca_avg_entry_price", None) or getattr(t, "avg_price", None)
+                        ),
+                        # Total USD notional across all DCA orders (used by frontend tooltip)
+                        "dca_total_size_usd": _sf(getattr(t, "dca_total_size_usd", None)),
                         # For DCA trades: grid_level = sequential trade number (1-N)
                         # so the chart renders "G1"..."G21" instead of plain "buy"
                         "grid_level": _trade_number if _dca_orders_filled > 0 else None,
+                        # DCA chart: per-order fill details [{level, time, price, size_usd}]
+                        "dca_levels": getattr(t, "dca_levels", None) or [],
+                        # DCA chart: planned unfilled grid prices for pending level lines
+                        "dca_grid_prices": getattr(t, "dca_grid_prices", None) or [],
+                        # DCA chart: TP / SL horizontal price lines
+                        "tp_price": _sf(getattr(t, "tp_price", None)),
+                        "sl_price": _sf(getattr(t, "sl_price", None)),
                     }
                 )
             elif isinstance(t, dict):
@@ -3279,6 +3296,8 @@ async def run_backtest_from_builder(
                         "entry_bar_index": int(t.get("entry_bar_index", 0) or 0),
                         "exit_bar_index": int(t.get("exit_bar_index", 0) or 0),
                         "exit_comment": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
+                        # exit_reason mirrors exit_comment
+                        "exit_reason": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
                         "is_open": bool(t.get("is_open", False)),
                         "direction": str(t.get("side", t.get("direction", "")) or ""),
                         "mfe": _sf(t.get("mfe", 0)),
@@ -3287,7 +3306,19 @@ async def run_backtest_from_builder(
                         "mae_pct": _sf(t.get("mae_pct", 0)),
                         "trade_number": _trade_number,
                         "dca_orders_filled": _dca_orders_filled,
+                        "avg_price": _sf(t.get("dca_avg_entry_price") or t.get("avg_price")),
+                        # Alias used by frontend JS (trade.dca_avg_entry_price)
+                        "dca_avg_entry_price": _sf(t.get("dca_avg_entry_price") or t.get("avg_price")),
+                        # Total USD notional across all DCA orders (used by frontend tooltip)
+                        "dca_total_size_usd": _sf(t.get("dca_total_size_usd")),
                         "grid_level": _trade_number if _dca_orders_filled > 0 else None,
+                        # DCA chart: per-order fill details [{level, time, price, size_usd}]
+                        "dca_levels": t.get("dca_levels") or [],
+                        # DCA chart: planned unfilled grid prices for pending level lines
+                        "dca_grid_prices": t.get("dca_grid_prices") or [],
+                        # DCA chart: TP / SL horizontal price lines
+                        "tp_price": _sf(t.get("tp_price")),
+                        "sl_price": _sf(t.get("sl_price")),
                     }
                 )
 

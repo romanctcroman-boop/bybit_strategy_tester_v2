@@ -170,7 +170,11 @@
     "**/node_modules/**",
     "**/logs/**",
     "**/data/**",
-    "**/screenshots/**"
+    "**/screenshots/**",
+    "**/temp_analysis/**",
+    // Exclude Windows TempState paths (VS Code chat screenshot attachments cause Mypy storm)
+    "c:/Users/**",
+    "C:/Users/**"
   ],
   // Suppress SQLAlchemy 1.x Column[] type mismatches (pervasive false positives)
   "python.analysis.diagnosticSeverityOverrides": {
@@ -220,5 +224,32 @@
     "json": true,
     "yaml": true
   },
-  "claudeCode.useTerminal": true
+  "claudeCode.useTerminal": true,
+  "cursorpyright.analysis.diagnosticSeverityOverrides": {
+    "reportArgumentType": "none",
+    "reportReturnType": "none",
+    "reportCallIssue": "warning",
+    "reportAssignmentType": "warning"
+  },
+  "cursorpyright.analysis.exclude": [
+    "**/*.md",
+    "**/*.MD",
+    "mcp-server/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/.mypy_cache/**",
+    "test_e2e_test_*/**",
+    "test_eval_test_*/**",
+    "test_memory_test_*/**",
+    "**/agent_memory/**",
+    "**/journal/**",
+    "**/node_modules/**",
+    "**/logs/**",
+    "**/data/**",
+    "**/screenshots/**",
+    "**/temp_analysis/**",
+    "c:/Users/**",
+    "C:/Users/**"
+  ],
+  "cursorpyright.analysis.typeCheckingMode": "basic"
 }

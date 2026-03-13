@@ -24,6 +24,8 @@ from typing import Any
 import numpy as np
 
 logger = logging.getLogger(__name__)
+from datetime import UTC
+
 import pandas as pd
 
 from backend.backtesting.interfaces import (
@@ -283,7 +285,15 @@ class DCATradeRecord:
     avg_entry_price: float = 0.0  # Weighted average across all DCA orders
     total_size_usd: float = 0.0  # Total USD across all DCA orders
     total_size_coins: float = 0.0  # Total coins across all DCA orders
-    grid_levels: list[float] = field(default_factory=list)  # DCA grid trigger prices
+    grid_levels: list[float] = field(default_factory=list)  # DCA grid trigger prices (legacy)
+    # Per-order fill details for chart rendering: [{level, bar_idx, price, size_usd}, ...]
+    # level=1 = initial entry (G1), level=2 = first DCA order (G2), etc.
+    order_fills: list[dict] = field(default_factory=list)
+    # Planned (unfilled) grid prices for G2..GN — used to draw pending grid lines on chart
+    planned_grid_prices: list[float] = field(default_factory=list)
+    # TP / SL price levels for chart line drawing (None if not configured)
+    tp_price: float | None = None
+    sl_price: float | None = None
 
 
 class DCAGridCalculator:
@@ -308,14 +318,13 @@ class DCAGridCalculator:
         if config.custom_orders and len(config.custom_orders) > 0:
             return DCAGridCalculator._calculate_custom_orders(config, base_price, direction)
 
-        # Calculate step distances
-        _total_grid_size = base_price * (config.grid_size_percent / 100)
-
+        # Steps define spacing between G2..GN — N-1 intervals for N orders.
+        # G1 is always a market entry at base_price; only N-1 intervals need spacing.
+        _grid_intervals = max(config.order_count - 1, 1)
         if config.use_log_steps:
-            steps = DCAGridCalculator._calculate_log_steps(config.order_count, config.log_coefficient)
+            grid_steps = DCAGridCalculator._calculate_log_steps(_grid_intervals, config.log_coefficient)
         else:
-            # Linear steps
-            steps = DCAGridCalculator._calculate_linear_steps(config.order_count)
+            grid_steps = DCAGridCalculator._calculate_linear_steps(_grid_intervals)
 
         # Calculate order sizes with martingale
         sizes = DCAGridCalculator._calculate_order_sizes(
@@ -330,18 +339,22 @@ class DCAGridCalculator:
         sizes = [s * 100 / total_size for s in sizes]
 
         # Create orders
+        # G1 (i=0): market entry at base_price (filled immediately at signal bar close).
+        # G2..GN (i=1..N-1): limit orders below/above base_price by cumulative grid steps.
+        # grid_steps[0] = first interval (G1→G2), grid_steps[1] = G2→G3, etc.
         cumulative_step = 0.0
         for i in range(config.order_count):
-            # Calculate trigger price
-            step_percent = steps[i] * (config.grid_size_percent / 100)
-            cumulative_step += step_percent
-
-            if direction == "long":
-                # Long grid: orders below base price
-                trigger_price = base_price * (1 - cumulative_step)
+            if i == 0:
+                # G1: market entry — always at signal price
+                trigger_price = base_price
             else:
-                # Short grid: orders above base price
-                trigger_price = base_price * (1 + cumulative_step)
+                # G2..GN: accumulate from the (i-1)-th interval step
+                step_percent = grid_steps[i - 1] * (config.grid_size_percent / 100)
+                cumulative_step += step_percent
+                if direction == "long":
+                    trigger_price = base_price * (1 - cumulative_step)
+                else:
+                    trigger_price = base_price * (1 + cumulative_step)
 
             # Calculate USD size
             size_usd = config.deposit * (sizes[i] / 100)
@@ -546,6 +559,9 @@ class DCAEngine(BaseBacktestEngine):
         self._taker_fee: float = 0.0007  # default 0.07%
         self._take_profit_pct: float | None = None  # None = use DCA multi-tp only
         self._stop_loss_pct: float | None = None  # None = use drawdown safety close
+        # SL reference price mode: "average_price" (default) or "last_order"
+        # "last_order" → SL is measured from the last filled DCA order price
+        self._sl_type: str = "average_price"
         # Realized equity for correct equity curve (unrealized PnL is NOT accumulated)
         self._realized_equity: float = 0.0
         # Grid pullback tracking: price at which the grid was last placed/shifted
@@ -718,7 +734,9 @@ class DCAEngine(BaseBacktestEngine):
         if grid:
             self.grid_config.enabled = grid.get("enabled", False)
             self.grid_config.direction = grid.get("direction", "long")
-            self.grid_config.deposit = input_data.initial_capital
+            _pos_size = float(getattr(input_data, "position_size", 1.0) or 1.0)
+            _pos_size = max(0.01, min(1.0, _pos_size))
+            self.grid_config.deposit = input_data.initial_capital * _pos_size
             self.grid_config.leverage = input_data.leverage or 1
             self.grid_config.grid_size_percent = grid.get("grid_size_percent", 10.0)
             self.grid_config.order_count = grid.get("order_count", 5)
@@ -750,7 +768,13 @@ class DCAEngine(BaseBacktestEngine):
         # Grid settings from BacktestConfig
         self.grid_config.enabled = getattr(config, "dca_enabled", False)
         self.grid_config.direction = getattr(config, "dca_direction", "long")
-        self.grid_config.deposit = getattr(config, "initial_capital", 10000.0)
+        # position_size (0.01-1.0) controls what fraction of capital is allocated to the
+        # DCA grid.  Without this the engine always deploys 100% of initial_capital which,
+        # combined with leverage and martingale, easily exceeds account equity.
+        _initial_capital = getattr(config, "initial_capital", 10000.0)
+        _position_size = float(getattr(config, "position_size", 1.0) or 1.0)
+        _position_size = max(0.01, min(1.0, _position_size))  # clamp to valid range
+        self.grid_config.deposit = _initial_capital * _position_size
         self.grid_config.leverage = getattr(config, "leverage", 1)
         self.grid_config.grid_size_percent = getattr(config, "dca_grid_size_percent", 10.0)
         self.grid_config.order_count = getattr(config, "dca_order_count", 5)
@@ -804,6 +828,9 @@ class DCAEngine(BaseBacktestEngine):
         self._take_profit_pct = float(raw_tp) if raw_tp is not None and raw_tp > 0 else None
         raw_sl = getattr(config, "stop_loss", None)
         self._stop_loss_pct = float(raw_sl) if raw_sl is not None and raw_sl > 0 else None
+        # SL reference price mode: "average_price" (default) or "last_order"
+        raw_sl_type = getattr(config, "sl_type", "average_price") or "average_price"
+        self._sl_type = raw_sl_type if raw_sl_type in ("average_price", "last_order") else "average_price"
 
     def run_from_config(self, config: Any, ohlcv: pd.DataFrame, custom_strategy: Any = None) -> Any:
         """
@@ -842,7 +869,7 @@ class DCAEngine(BaseBacktestEngine):
             return BacktestResult(
                 id=backtest_id,
                 status=BacktestStatus.FAILED,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
                 config=config,
                 error_message="No market data for DCA backtest",
             )
@@ -922,8 +949,8 @@ class DCAEngine(BaseBacktestEngine):
         return BacktestResult(
             id=backtest_id,
             status=BacktestStatus.COMPLETED,
-            created_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
             config=config,
             trades=model_trades,
             metrics=metrics,
@@ -1052,6 +1079,23 @@ class DCAEngine(BaseBacktestEngine):
                     dca_total_size_usd=trade.total_size_usd,
                     dca_total_size_coins=trade.total_size_coins,
                     dca_grid_levels=trade.grid_levels,
+                    # Per-order fill details: convert bar_idx → ISO timestamp for frontend
+                    dca_levels=[
+                        {
+                            "level": f["level"],
+                            "time": ohlcv.index[min(f["bar_idx"], len(ohlcv) - 1)].isoformat()
+                            if f.get("bar_idx") is not None
+                            else None,
+                            "price": f["price"],
+                            "size_usd": f["size_usd"],
+                        }
+                        for f in trade.order_fills
+                    ],
+                    # Planned unfilled grid prices (G2..GN pending lines)
+                    dca_grid_prices=trade.planned_grid_prices,
+                    # TP / SL price levels for chart horizontal lines
+                    tp_price=trade.tp_price,
+                    sl_price=trade.sl_price,
                 )
             )
 
@@ -1449,15 +1493,39 @@ class DCAEngine(BaseBacktestEngine):
             tp_price = self.position.average_entry_price * (1 - tp_percent)
             return low <= tp_price
 
+    def _get_sl_base_price(self) -> float:
+        """Return the price to use as SL base depending on _sl_type.
+
+        - "average_price" (default): use weighted average entry price of all filled orders.
+        - "last_order": use the fill_price of the most-recently filled DCA order.
+          Falls back to average_entry_price if no filled orders are found.
+        """
+        if self._sl_type == "last_order":
+            filled = [o for o in self.position.orders if o.filled]
+            if filled:
+                # Sort by fill_time (ascending), take the last one
+                last = max(
+                    filled,
+                    key=lambda o: (
+                        o.fill_time if o.fill_time is not None else 0,
+                        o.level,
+                    ),
+                )
+                p = last.fill_price if last.fill_price and last.fill_price > 0 else last.price
+                if p > 0:
+                    return p
+        return self.position.average_entry_price
+
     def _check_config_stop_loss(self, high: float, low: float) -> bool:
         """Check stop loss from BacktestConfig (stop_loss field, fraction e.g. 0.015)."""
         if self._stop_loss_pct is None or self._stop_loss_pct <= 0:
             return False
+        sl_base = self._get_sl_base_price()
         if self.position.direction == "long":
-            sl_price = self.position.average_entry_price * (1 - self._stop_loss_pct)
+            sl_price = sl_base * (1 - self._stop_loss_pct)
             return low <= sl_price
         else:
-            sl_price = self.position.average_entry_price * (1 + self._stop_loss_pct)
+            sl_price = sl_base * (1 + self._stop_loss_pct)
             return high >= sl_price
 
     def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> float | None:
@@ -1927,10 +1995,41 @@ class DCAEngine(BaseBacktestEngine):
         pnl_net = pnl_gross - total_commission
 
         # Collect filled DCA grid levels
-        filled_grid_levels = [
-            order.price for order in self.position.orders
-            if order.filled and order.active_in_grid
-        ]
+        filled_grid_levels = [order.price for order in self.position.orders if order.filled and order.active_in_grid]
+
+        # Build per-order fill details for chart rendering (G1=entry, G2..GN=DCA fills)
+        _order_fills: list[dict] = []
+        _fill_level = 1
+        for _o in self.position.orders:
+            if _o.filled:
+                _order_fills.append(
+                    {
+                        "level": _fill_level,
+                        "bar_idx": _o.fill_time if _o.fill_time is not None else self.position.entry_bar,
+                        "price": _o.fill_price if _o.fill_price > 0 else _o.price,
+                        "size_usd": _o.size_usd,
+                    }
+                )
+                _fill_level += 1
+
+        # Planned grid prices for all UNFILLED orders (G2..GN pending lines)
+        _planned_prices: list[float] = [_o.price for _o in self.position.orders if not _o.filled]
+
+        # All G2..GN planned trigger prices (filled + unfilled) for frontend grid line rendering
+        # Index 0 = G2, index 1 = G3, ... (G1 = entry, never included here)
+        _all_grid_prices: list[float] = [_o.price for _o in self.position.orders if _o.order_number >= 2]
+
+        # TP / SL prices based on final avg entry price (for chart horizontal lines)
+        _avg_p = self.position.average_entry_price
+        _is_long = self.position.direction == "long"
+        _tp_price: float | None = None
+        _sl_price: float | None = None
+        if self._take_profit_pct and self._take_profit_pct > 0 and _avg_p > 0:
+            _tp_price = _avg_p * (1 + self._take_profit_pct) if _is_long else _avg_p * (1 - self._take_profit_pct)
+        if self._stop_loss_pct and self._stop_loss_pct > 0 and _avg_p > 0:
+            # SL reference price depends on _sl_type: average_entry_price or last filled order
+            _sl_base = self._get_sl_base_price()
+            _sl_price = _sl_base * (1 - self._stop_loss_pct) if _is_long else _sl_base * (1 + self._stop_loss_pct)
 
         # Record trade
         trade = DCATradeRecord(
@@ -1952,6 +2051,10 @@ class DCAEngine(BaseBacktestEngine):
             total_size_usd=self.position.total_notional_usd,
             total_size_coins=self.position.total_size_coins,
             grid_levels=filled_grid_levels,
+            order_fills=_order_fills,
+            planned_grid_prices=_all_grid_prices,
+            tp_price=_tp_price,
+            sl_price=_sl_price,
         )
         self.trades.append(trade)
 

@@ -11,6 +11,7 @@ Additional endpoints for:
 import asyncio
 import contextlib
 import random
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -25,6 +26,13 @@ from backend.database.models import Backtest, BacktestStatus, Strategy
 from backend.utils.time import utc_now
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard Improvements"])
+
+# In-memory cache for market tickers (reduces Bybit API calls)
+# Single shared cache for the full tickers list — all top:N and symbols requests share it
+_tickers_cache: dict[str, Any] = {}
+_TICKERS_CACHE_TTL = 60  # seconds — matches dashboard polling interval
+_ALL_TICKERS_KEY = "__all_usdt__"  # shared key for the full USDT tickers list
+_all_tickers_lock = asyncio.Lock()  # prevent thundering herd on cache miss
 
 
 def get_db() -> Session:
@@ -914,8 +922,6 @@ async def get_market_tickers(
     """
     from backend.services.adapters.bybit import BybitAdapter
 
-    adapter = BybitAdapter()
-
     # Metadata for known coins (icons and colors)
     metadata = {
         "BTCUSDT": {"name": "Bitcoin", "icon": "₿", "color": "#F7931A"},
@@ -947,57 +953,73 @@ async def get_market_tickers(
         "AAVEUSDT": {"name": "Aave", "icon": "👻", "color": "#B6509E"},
     }
 
-    try:
-        if symbols:
-            # If specific symbols requested
-            symbol_list = [s.strip().upper() for s in symbols.split(",")]
-            tickers = adapter.get_tickers(symbols=symbol_list)
-        else:
-            # Get ALL tickers and sort by volume (dynamic top)
-            tickers = adapter.get_tickers(symbols=None)
+    now_ts = time.monotonic()
+    adapter = BybitAdapter()
 
-            # Filter only USDT pairs and sort by turnover (volume in USD)
-            tickers = [t for t in tickers if t.get("symbol", "").endswith("USDT")]
-            tickers.sort(key=lambda x: float(x.get("turnover_24h") or 0), reverse=True)
+    async def _get_all_tickers_cached() -> list[dict]:
+        """Fetch all USDT tickers with shared cache + mutex to prevent thundering herd."""
+        cached_all = _tickers_cache.get(_ALL_TICKERS_KEY)
+        if cached_all and (now_ts - cached_all["ts"]) < _TICKERS_CACHE_TTL:
+            return cached_all["data"]
 
-            # Take top N
-            tickers = tickers[:top]
+        async with _all_tickers_lock:
+            # Double-check after acquiring lock
+            cached_all = _tickers_cache.get(_ALL_TICKERS_KEY)
+            if cached_all and (now_ts - cached_all["ts"]) < _TICKERS_CACHE_TTL:
+                return cached_all["data"]
 
+            raw = await asyncio.to_thread(adapter.get_tickers, None)
+            filtered = [t for t in raw if t.get("symbol", "").endswith("USDT")]
+            filtered.sort(key=lambda x: float(x.get("turnover_24h") or 0), reverse=True)
+            _tickers_cache[_ALL_TICKERS_KEY] = {"ts": time.monotonic(), "data": filtered}
+            return filtered
+
+    def _build_result(tickers: list[dict]) -> list[dict]:
         result = []
         for ticker in tickers:
             sym = ticker.get("symbol", "")
-            # Generate default metadata for unknown coins
             default_name = sym.replace("USDT", "")
-            meta = metadata.get(
-                sym,
-                {
-                    "name": default_name,
-                    "icon": default_name[0] if default_name else "•",
-                    "color": "#888888",
-                },
-            )
-            result.append(
-                {
-                    "symbol": sym,
-                    "name": meta["name"],
-                    "icon": meta["icon"],
-                    "color": meta["color"],
-                    "price": ticker.get("price"),
-                    "change": ticker.get("change_24h", 0),
-                    "volume_24h": ticker.get("volume_24h"),
-                    "turnover_24h": ticker.get("turnover_24h"),
-                    "high_24h": ticker.get("high_24h"),
-                    "low_24h": ticker.get("low_24h"),
-                }
-            )
+            meta = metadata.get(sym, {"name": default_name, "icon": default_name[0] if default_name else "•", "color": "#888888"})
+            result.append({
+                "symbol": sym,
+                "name": meta["name"],
+                "icon": meta["icon"],
+                "color": meta["color"],
+                "price": ticker.get("price"),
+                "change": ticker.get("change_24h", 0),
+                "volume_24h": ticker.get("volume_24h"),
+                "turnover_24h": ticker.get("turnover_24h"),
+                "high_24h": ticker.get("high_24h"),
+                "low_24h": ticker.get("low_24h"),
+            })
+        return result
 
-        return {
+    try:
+        if symbols:
+            symbol_list = [s.strip().upper() for s in symbols.split(",")]
+            # Try to serve from cached full list first
+            all_tickers = await _get_all_tickers_cached()
+            sym_set = set(symbol_list)
+            tickers = [t for t in all_tickers if t.get("symbol") in sym_set]
+            if not tickers:
+                # Fallback: direct API fetch for specific symbols
+                tickers = await asyncio.to_thread(adapter.get_tickers, symbol_list)
+            sorted_by = "requested"
+        else:
+            all_tickers = await _get_all_tickers_cached()
+            tickers = all_tickers[:top]
+            sorted_by = "turnover_24h"
+
+        result = _build_result(tickers)
+
+        response = {
             "success": True,
             "tickers": result,
             "count": len(result),
-            "sorted_by": "turnover_24h" if not symbols else "requested",
+            "sorted_by": sorted_by,
             "timestamp": utc_now().isoformat(),
         }
+        return response
 
     except Exception as e:
         logger.error(f"Failed to fetch market tickers: {e}")

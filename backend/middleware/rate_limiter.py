@@ -319,6 +319,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if redis_url and REDIS_AVAILABLE:
             try:
                 self._redis_limiter = RedisRateLimiter(redis_url)
+                self._redis_limiter._get_client()  # force eager connection
                 if self._redis_limiter.is_connected():
                     logger.info("Rate limiter using Redis backend")
                 else:

@@ -1383,6 +1383,11 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                         mae=t.get("mae", 0),
                         mfe_pct=t.get("mfe_pct", 0),
                         mae_pct=t.get("mae_pct", 0),
+                        dca_orders_filled=t.get("dca_orders_filled", 0),
+                        grid_level=t.get("grid_level"),
+                        dca_levels=t.get("dca_levels", []),
+                        dca_grid_prices=t.get("dca_grid_prices", []),
+                        is_open=t.get("is_open", False),
                     )
                 )
 

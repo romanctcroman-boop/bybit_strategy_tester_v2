@@ -116,12 +116,29 @@ let benchmarkingChart = null;
 // Price Chart (LightweightCharts candlestick)
 let btPriceChart = null;
 let btCandleSeries = null;
+// eslint-disable-next-line prefer-const -- reassigned on chart rebuild
+let _btVolumeSeries = null;          // histogram volume series (same chart, separate scale)
+// eslint-disable-next-line prefer-const -- populated on chart rebuild
+let _btVolumeData = [];              // cached volume data for toggle rebuild
 let btPriceChartMarkers = [];
 let btTradeLineSeries = []; // eslint-disable-line no-unused-vars -- entry→exit price lines (cleaned on chart destroy)
 let _btCachedCandles = [];  // cached candles for marker rebuild on checkbox toggle
 let btPriceChartPending = false; // true when chart needs (re-)creation on tab show
 let _priceChartGeneration = 0; // generation counter to cancel stale async renders
 let _priceChartResizeObserver = null; // stored so we can disconnect on chart rebuild
+// eslint-disable-next-line prefer-const -- reassigned when trade is open
+let _btOpenPositionLine = null;      // LineSeries for open/unrealized trade entry price (starts at entry candle)
+// eslint-disable-next-line prefer-const -- assigned on chart build
+let _btDcaGridLines = [];            // Array of LineSeries for DCA grid levels G2..GN (blue=pending, yellow=filled)
+// eslint-disable-next-line prefer-const -- assigned on chart build
+let _dcaSeriesData = [];             // [{tradeIdx, lineStart, lineEnd, trade}] — source data for DCA grid lines
+let _activeDcaTradeIdx = -1;         // Index into _dcaSeriesData for the currently visible DCA grid set
+// eslint-disable-next-line prefer-const -- assigned on chart build
+let _btTooltipEl = null;             // HTML tooltip overlay for trade marker hover
+// eslint-disable-next-line prefer-const -- toggled by chart type buttons
+let _btChartType = 'candlestick';    // 'candlestick' | 'bar' | 'line'
+// eslint-disable-next-line prefer-const -- toggled by volume checkbox
+let _btShowVolume = true;            // volume histogram visibility state
 
 // Live Chart streaming state
 let _liveChartSource = null;       // EventSource instance (null = not streaming)
@@ -823,6 +840,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const priceCb = document.getElementById('markerShowEntryPrice');
   if (pnlCb) pnlCb.addEventListener('change', rebuildTradeMarkers);
   if (priceCb) priceCb.addEventListener('change', rebuildTradeMarkers);
+
+  // Volume toggle checkbox
+  const volumeCb = document.getElementById('markerShowVolume');
+  if (volumeCb) {
+    volumeCb.addEventListener('change', () => {
+      _btShowVolume = volumeCb.checked;
+      if (_btVolumeSeries) {
+        _btVolumeSeries.setData(_btShowVolume ? _btVolumeData : []);
+      }
+    });
+  }
+
+  // Chart type toggle buttons (Свечи / Бары / Линия)
+  document.querySelectorAll('.bt-chart-type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const newType = btn.dataset.type;
+      if (!newType || newType === _btChartType) return;
+      switchPriceChartType(newType);
+      document.querySelectorAll('.bt-chart-type-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
 });
 
 // Handle URL changes (back/forward navigation or redirect with ?id=)
@@ -4804,6 +4843,16 @@ async function updatePriceChart(backtest) {
       low: parseFloat(k.low),
       close: parseFloat(k.close)
     }));
+    // Volume data aligned with candles (shifted times)
+    const _volumeBars = data.map(k => {
+      const openV = parseFloat(k.open);
+      const closeV = parseFloat(k.close);
+      return {
+        time: Math.floor(k.open_time / 1000) + _TZ,
+        value: parseFloat(k.volume || 0),
+        color: closeV >= openV ? 'rgba(38,166,154,0.50)' : 'rgba(239,83,80,0.50)'
+      };
+    });
     // UTC cache (no shift) — used for live-update comparisons (candle.time from SSE is UTC)
     const candlesUTC = data.map(k => ({
       time: Math.floor(k.open_time / 1000),
@@ -4822,24 +4871,36 @@ async function updatePriceChart(backtest) {
       btPriceChart.remove();
       btPriceChart = null;
       btCandleSeries = null;
+      _btVolumeSeries = null;
+      _btOpenPositionLine = null;  // series was removed with the chart above
+      _btDcaGridLines = [];        // series were removed with the chart above
+      _dcaSeriesData = [];         // clear source data for DCA grid lines
+      _activeDcaTradeIdx = -1;     // reset active trade index
     }
 
     // Create candlestick chart
     btPriceChart = LightweightCharts.createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight || 480,
+      autoSize: true,            // fills container size via ResizeObserver (LWC native)
       layout: {
         background: { type: 'solid', color: '#0d1117' },
         textColor: '#8b949e'
       },
       grid: {
-        vertLines: { color: '#21262d' },
-        horzLines: { color: '#21262d' }
+        vertLines: { color: 'rgba(48,54,61,0.5)' },
+        horzLines: { color: 'rgba(48,54,61,0.8)' }
       },
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
-        vertLine: { color: '#58a6ff', width: 1, style: LightweightCharts.LineStyle.Dashed },
-        horzLine: { color: '#58a6ff', width: 1, style: LightweightCharts.LineStyle.Dashed }
+        vertLine: {
+          color: '#758696', width: 1,
+          style: LightweightCharts.LineStyle.Dashed,
+          labelBackgroundColor: '#21262d'
+        },
+        horzLine: {
+          color: '#758696', width: 1,
+          style: LightweightCharts.LineStyle.Dashed,
+          labelBackgroundColor: '#21262d'
+        }
       },
       // ── TradingView-style Y-axis scaling ──────────────────────────────
       // Drag the right price scale up/down to zoom price range (like TV).
@@ -4859,15 +4920,19 @@ async function updatePriceChart(backtest) {
         vertTouchDrag: false   // vertical drag reserved for price-scale drag
       },
       rightPriceScale: {
-        borderColor: '#30363d',
-        width: 80,
+        borderColor: 'rgba(48,54,61,0.8)',
         autoScale: true        // auto-fit on scroll; turns off when user manually scales
       },
       timeScale: {
-        borderColor: '#30363d',
+        borderColor: 'rgba(48,54,61,0.8)',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 5
+        rightOffset: 5,
+        fixLeftEdge: true,     // cannot scroll left beyond first bar
+        fixRightEdge: false,   // allow scrolling right (пространство для будущих баров)
+        lockVisibleTimeRangeOnResize: true,
+        minBarSpacing: 2,
+        maxBarSpacing: 80
       },
       localization: {
         timeFormatter: (unixSeconds) => {
@@ -4885,16 +4950,33 @@ async function updatePriceChart(backtest) {
     });
 
     btCandleSeries = btPriceChart.addCandlestickSeries({
-      upColor: '#00c853',
-      downColor: '#ff1744',
-      borderDownColor: '#ff1744',
-      borderUpColor: '#00c853',
-      wickDownColor: '#ff1744',
-      wickUpColor: '#00c853',
+      upColor: '#26a69a',           // TV-standard teal green
+      downColor: '#ef5350',         // TV-standard muted red
+      borderDownColor: '#ef5350',
+      borderUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+      wickUpColor: '#26a69a',
       lastValueVisible: false  // replaced by our two-row custom label; priceLineVisible stays true (dashed line kept)
     });
 
     btCandleSeries.setData(candles);
+
+    // ── Volume histogram (same pane, separate price scale, bottom 20%) ─────────
+    _btVolumeSeries = btPriceChart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',       // isolated scale — does not affect price Y-axis
+      lastValueVisible: false,
+      priceLineVisible: false
+    });
+    _btVolumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.80, bottom: 0 }   // volume occupies bottom 20% of the pane
+    });
+    if (_btShowVolume && _volumeBars.length > 0) {
+      _btVolumeSeries.setData(_volumeBars);
+      _btVolumeData = _volumeBars;  // cache for show/hide toggle
+    }
+    // ── end volume ──────────────────────────────────────────────────────────────
+
     // Track the max time fed to btCandleSeries to guard against LW "time must be greater" error
     _btLastSeriesTime = candles.length > 0 ? candles[candles.length - 1].time : 0;
     _btCachedCandles = candlesUTC; // cache in UTC (no shift) — live update comparisons use candle.time (UTC)
@@ -4924,22 +5006,145 @@ async function updatePriceChart(backtest) {
     }
     // ── end clock ──
 
-    // Add crosshair OHLC display
+    // ── HTML Trade Tooltip (shown on crosshair hover near a marker) ───────────
+    // Remove any previous tooltip
+    if (_btTooltipEl && _btTooltipEl.parentElement) _btTooltipEl.parentElement.removeChild(_btTooltipEl);
+    const _tooltipContainer = document.getElementById('btPriceChartContainer') || container.parentElement || container;
+    _btTooltipEl = document.createElement('div');
+    _btTooltipEl.id = 'btPriceChartTooltip';
+    _btTooltipEl.style.cssText = [
+      'position:absolute', 'z-index:50', 'display:none',
+      'pointer-events:none',
+      'background:rgba(13,17,23,0.92)',
+      'border:1px solid rgba(48,54,61,0.9)',
+      'border-radius:5px',
+      'padding:8px 12px',
+      'font-size:12px',
+      'font-family:monospace',
+      'color:#c9d1d9',
+      'line-height:1.6',
+      'box-shadow:0 4px 12px rgba(0,0,0,0.6)',
+      'min-width:160px',
+      'max-width:240px'
+    ].join(';');
+    _tooltipContainer.appendChild(_btTooltipEl);
+    // ── end tooltip element ────────────────────────────────────────────────────
+
+    // Add crosshair OHLC display + trade tooltip
+    // Build a time→trade[] lookup for O(1) tooltip lookup during mouse move
+    const _tradeByEntryTime = new Map();  // entryTimeSec → trade
+    const _tradeByExitTime = new Map();   // exitTimeSec → trade
+    if (backtest?.trades) {
+      backtest.trades.forEach((trade) => {
+        const entryS = trade.entry_time ? parseTradeTime(trade.entry_time) : null;
+        const exitS = trade.exit_time ? parseTradeTime(trade.exit_time) : null;
+        if (entryS) _tradeByEntryTime.set(String(entryS), trade);
+        if (exitS) _tradeByExitTime.set(String(exitS), trade);
+      });
+    }
+
     btPriceChart.subscribeCrosshairMove((param) => {
       const ohlcEl = document.getElementById('btChartOHLC');
-      if (!ohlcEl) return;
-      if (!param || !param.time || !param.seriesData) {
-        ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
+      if (ohlcEl) {
+        if (!param || !param.time || !param.seriesData) {
+          ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
+        } else {
+          const candleData = param.seriesData.get(btCandleSeries);
+          if (candleData) {
+            const fmt = (v) => (v != null ? Number(v).toFixed(2) : '--');
+            ohlcEl.textContent = `O: ${fmt(candleData.open)}  H: ${fmt(candleData.high)}  L: ${fmt(candleData.low)}  C: ${fmt(candleData.close)}`;
+          } else {
+            ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
+          }
+        }
+      }
+
+      // ── Trade Tooltip ────────────────────────────────────────────────────────
+      if (!_btTooltipEl) return;
+      if (!param || !param.time || !param.point) {
+        _btTooltipEl.style.display = 'none';
         return;
       }
-      const candleData = param.seriesData.get(btCandleSeries);
-      if (candleData) {
-        const fmt = (v) => (v != null ? Number(v).toFixed(2) : '--');
-        ohlcEl.textContent = `O: ${fmt(candleData.open)}  H: ${fmt(candleData.high)}  L: ${fmt(candleData.low)}  C: ${fmt(candleData.close)}`;
-      } else {
-        // Crosshair is between candles or outside data range — reset to placeholder
-        ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
+      const timeKey = String(param.time);
+      // Check if this candle time is a trade entry or exit
+      const entryTrade = _tradeByEntryTime.get(timeKey);
+      const exitTrade = _tradeByExitTime.get(timeKey);
+      const trade = entryTrade || exitTrade;
+      if (!trade) {
+        _btTooltipEl.style.display = 'none';
+        return;
       }
+
+      // Format tooltip content
+      const isEntry = Boolean(entryTrade);
+      const sideNorm = (trade.side || 'long').toLowerCase();
+      const isLong = sideNorm === 'long' || sideNorm === 'buy';
+      const sideLabel = isLong ? '▲ Long' : '▼ Short';
+      const sideColor = isLong ? '#26a69a' : '#ef5350';
+      const pnl = trade.pnl ?? 0;
+      const pnlColor = pnl >= 0 ? '#26a69a' : '#ef5350';
+      const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+      const entryPrice = trade.entry_price != null ? trade.entry_price.toFixed(4) : '--';
+      const exitPrice = trade.exit_price != null ? trade.exit_price.toFixed(4) : '--';
+      const exitReason = trade.exit_comment || trade.exit_reason || '--';
+      // Duration: try duration_bars first, else compute from times
+      let duration = '--';
+      if (trade.duration_bars) {
+        duration = `${trade.duration_bars} bars`;
+      } else if (trade.entry_time && trade.exit_time) {
+        const entryMs = new Date(trade.entry_time).getTime();
+        const exitMs = new Date(trade.exit_time).getTime();
+        if (!isNaN(entryMs) && !isNaN(exitMs)) {
+          const diffMin = Math.round((exitMs - entryMs) / 60000);
+          duration = diffMin >= 1440
+            ? `${(diffMin / 1440).toFixed(1)}d`
+            : diffMin >= 60
+              ? `${(diffMin / 60).toFixed(1)}h`
+              : `${diffMin}m`;
+        }
+      }
+
+      const label = isEntry ? 'ENTRY' : 'EXIT';
+      const labelColor = isEntry ? (isLong ? '#2196F3' : '#ef5350') : '#AB47BC';
+
+      _btTooltipEl.innerHTML = [
+        `<div style="font-weight:700;color:${labelColor};margin-bottom:4px">${label} — <span style="color:${sideColor}">${sideLabel}</span></div>`,
+        `<div>Entry: <b>${entryPrice}</b></div>`,
+        `<div>Exit:&nbsp; <b>${exitPrice}</b></div>`,
+        `<div>PnL:&nbsp;&nbsp; <b style="color:${pnlColor}">${pnlStr}</b></div>`,
+        `<div>Dur:&nbsp;&nbsp; <b>${duration}</b></div>`,
+        `<div style="color:#8b949e;font-size:11px;margin-top:3px">${exitReason}</div>`
+      ].join('');
+
+      // Position tooltip near the cursor but keep it inside the chart container
+      const containerRect = _tooltipContainer.getBoundingClientRect();
+      const tooltipW = 220;
+      const tooltipH = 110;
+      let tx = param.point.x + 15;
+      let ty = param.point.y - tooltipH / 2;
+      if (tx + tooltipW > containerRect.width - 10) tx = param.point.x - tooltipW - 10;
+      if (ty < 4) ty = 4;
+      if (ty + tooltipH > containerRect.height - 4) ty = containerRect.height - tooltipH - 4;
+      _btTooltipEl.style.left = `${tx}px`;
+      _btTooltipEl.style.top = `${ty}px`;
+      _btTooltipEl.style.display = 'block';
+      // ── end trade tooltip ────────────────────────────────────────────────────
+
+      // ── DCA grid highlight: show grid lines for the trade under crosshair ───
+      // Find the DCA trade whose entry ≤ crosshair time ≤ exit (or open)
+      if (param && param.time && _dcaSeriesData && _dcaSeriesData.length > 0) {
+        const t = param.time;
+        let newIdx = -1;
+        for (let i = 0; i < _dcaSeriesData.length; i++) {
+          const d = _dcaSeriesData[i];
+          if (t >= d.lineStart && t <= d.lineEnd) { newIdx = i; break; }
+        }
+        if (newIdx !== _activeDcaTradeIdx) {
+          _activeDcaTradeIdx = newIdx;
+          _renderDcaGridForTrade(btPriceChart, newIdx, _dcaSeriesData, _btDcaGridLines);
+        }
+      }
+      // ── end DCA crosshair update ──────────────────────────────────────────────
     });
 
     // Add trade markers
@@ -4947,15 +5152,128 @@ async function updatePriceChart(backtest) {
     btTradeLineSeries = [];
     if (backtest.trades && backtest.trades.length > 0) {
       btPriceChartMarkers = buildTradeMarkers(backtest.trades, candles);
-      if (btPriceChartMarkers.length > 0) {
-        btCandleSeries.setMarkers(btPriceChartMarkers);
+      console.log(`[PriceChart] markers built: ${btPriceChartMarkers.length}, trades: ${backtest.trades.length}, candles: ${candles.length}`);
+
+      // Visual debug badge so we can see marker count without DevTools
+      const _dbgEl = document.getElementById('priceChartTitle');
+      if (_dbgEl) {
+        let badge = document.getElementById('_markerCountBadge');
+        if (!badge) { badge = document.createElement('span'); badge.id = '_markerCountBadge'; badge.style.cssText = 'margin-left:8px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;'; _dbgEl.appendChild(badge); }
+        badge.textContent = `${btPriceChartMarkers.length} markers`;
+        badge.style.background = btPriceChartMarkers.length > 0 ? '#1b4332' : '#5c1a1a';
+        badge.style.color = btPriceChartMarkers.length > 0 ? '#52c41a' : '#ff4d4f';
       }
+
+      if (btPriceChartMarkers.length > 0 && btCandleSeries) {
+        try {
+          btCandleSeries.setMarkers(btPriceChartMarkers);
+          console.log(`[PriceChart] setMarkers OK: ${btPriceChartMarkers.length} markers`);
+          if (_dbgEl) { const b = document.getElementById('_markerCountBadge'); if (b) b.title = 'setMarkers OK'; }
+        } catch (e) {
+          console.error('[PriceChart] setMarkers ERROR:', e.message);
+          console.error('First marker:', JSON.stringify(btPriceChartMarkers[0]));
+          console.error('Last marker:', JSON.stringify(btPriceChartMarkers[btPriceChartMarkers.length - 1]));
+          if (_dbgEl) { const b = document.getElementById('_markerCountBadge'); if (b) { b.textContent = 'ERROR: ' + e.message; b.style.background = '#5c1a1a'; b.style.color = '#ff4d4f'; } }
+        }
+      } else {
+        console.warn('[PriceChart] 0 markers or no series. trades:', backtest.trades.length, 'candles:', candles.length);
+      }
+
       // Add entry→exit price connection lines (TradingView style)
       btTradeLineSeries = buildTradePriceLines(backtest.trades, candles, btPriceChart);
+
+      // ── Open position price line (unrealized / still-open trade) ─────────────
+      // createPriceLine draws full-width — use LineSeries with 2 pts to start from entry candle
+      const openTrade = backtest.trades.find(
+        (t) => t.is_open === true || !t.exit_time || (t.exit_reason || '').toLowerCase() === 'open_position'
+      );
+
+      if (openTrade && openTrade.entry_price != null && btPriceChart && candles.length > 0) {
+        const sideNorm = (openTrade.side || 'long').toLowerCase();
+        const isLongOpen = sideNorm === 'long' || sideNorm === 'buy';
+        const lineColor = isLongOpen ? '#f9a825' : '#f06292';
+        const entryTimeSec = snapToCandle(parseTradeTime(openTrade.entry_time), candles);
+        const lastCandleTime = candles[candles.length - 1].time;
+        _btOpenPositionLine = btPriceChart.addLineSeries({
+          color: lineColor,
+          lineWidth: 1,
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: false,
+          title: isLongOpen ? '▲ Open' : '▼ Open'
+        });
+        _btOpenPositionLine.setData([
+          { time: entryTimeSec, value: openTrade.entry_price },
+          { time: lastCandleTime, value: openTrade.entry_price }
+        ]);
+      }
+      // ── end open position line ────────────────────────────────────────────────
+
+      // ── DCA grid lines + TP/SL — one trade at a time (crosshair-driven) ──────
+      // Build _dcaSeriesData: metadata for each DCA trade (no series yet).
+      // _renderDcaGridForTrade() draws/clears actual LineSeries on demand.
+      // • On load: show the last DCA trade (most recent context).
+      // • On crosshair move: switch to the trade whose window covers the cursor.
+      // This means only ONE set of grid/TP/SL lines is visible at a time —
+      // closing a DCA group and opening a new G1 automatically switches the view.
+      _btDcaGridLines = [];
+      _dcaSeriesData = [];
+      _activeDcaTradeIdx = -1;
+      const lastCandleTimeSec = candles[candles.length - 1].time;
+
+      if (btPriceChart && candles.length > 0) {
+        backtest.trades.forEach((trade, tradeIdx) => {
+          if (!Array.isArray(trade.dca_grid_prices) || trade.dca_grid_prices.length === 0) return;
+
+          const isTradeOpen = trade.is_open === true
+            || !trade.exit_time
+            || (trade.exit_reason || '').toLowerCase() === 'open_position';
+
+          const lineStart = snapToCandle(parseTradeTime(trade.entry_time), candles);
+          const lineEnd = isTradeOpen
+            ? lastCandleTimeSec
+            : snapToCandle(parseTradeTime(trade.exit_time), candles);
+
+          if (!lineStart || !lineEnd || lineStart >= lineEnd) return;
+
+          _dcaSeriesData.push({ tradeIdx, lineStart, lineEnd, trade });
+        });
+
+        // Default: render the last DCA trade so the chart is not empty on load
+        if (_dcaSeriesData.length > 0) {
+          _activeDcaTradeIdx = _dcaSeriesData.length - 1;
+          _renderDcaGridForTrade(btPriceChart, _activeDcaTradeIdx, _dcaSeriesData, _btDcaGridLines);
+        }
+      }
+      // ── end DCA grid + TP/SL lines ────────────────────────────────────────────
     }
 
-    // Fit chart to data
+
+    // Fit chart to data — then zoom to backtest trade period
     btPriceChart.timeScale().fitContent();
+
+    // If backtest has trades, zoom to show the first ~20% of the trade period
+    // so markers are immediately visible (not zoomed all the way out)
+    if (backtest.trades && backtest.trades.length > 0 && candles.length > 0) {
+      const _TZ2 = 10800;
+      // Find first entry and last exit among closed trades
+      const closedTs = backtest.trades.filter(t => !t.is_open);
+      if (closedTs.length > 0) {
+        const firstEntryMs = Math.min(...closedTs.map(t => new Date(t.entry_time).getTime()));
+        const lastExitMs = Math.max(...closedTs.map(t => new Date(t.exit_time).getTime()));
+        const fromSec = Math.floor(firstEntryMs / 1000) + _TZ2 - 7200;   // 2h before first entry
+        const toSec = Math.floor(lastExitMs / 1000) + _TZ2 + 7200;   // 2h after last exit
+        // Clamp to candle range
+        const clampedFrom = Math.max(fromSec, candles[0].time);
+        const clampedTo = Math.min(toSec, candles[candles.length - 1].time);
+        try {
+          btPriceChart.timeScale().setVisibleRange({ from: clampedFrom, to: clampedTo });
+        } catch (_) {
+          // fallback: fitContent already applied
+        }
+      }
+    }
 
     // Start candle-life countdown overlay (uses the current chart interval)
     startCandleCountdown(interval);
@@ -4973,16 +5291,9 @@ async function updatePriceChart(backtest) {
       freshExtend.addEventListener('click', () => extendBacktestToNow());
     }
 
-    // Handle resize — store observer so it can be disconnected on rebuild
-    _priceChartResizeObserver = new ResizeObserver(() => {
-      if (btPriceChart) {
-        btPriceChart.applyOptions({
-          width: container.clientWidth,
-          height: container.clientHeight || 480
-        });
-      }
-    });
-    _priceChartResizeObserver.observe(container);
+    // autoSize: true — LWC управляет размером через собственный ResizeObserver.
+    // Ручной observer не нужен и конфликтует с autoSize.
+    _priceChartResizeObserver = null;
     // Sync trade markers/lines and observer to StateManager
     setPriceChartMarkers(btPriceChartMarkers);
     setPriceChartTradeLineSeries(btTradeLineSeries);
@@ -4996,6 +5307,110 @@ async function updatePriceChart(backtest) {
     if (loadingEl) loadingEl.classList.add('hidden');
   }
 }
+
+// ── DCA grid lines renderer ───────────────────────────────────────────────────
+/**
+ * Remove all existing DCA grid/TP/SL series from the chart and draw fresh ones
+ * for the DCA trade at `idx` in `seriesData`. Pass idx = -1 to only clear.
+ *
+ * @param {object} chart          - LightweightCharts chart instance
+ * @param {number} idx            - Index into seriesData to render (-1 = clear only)
+ * @param {Array}  seriesData     - Array of {tradeIdx, lineStart, lineEnd, trade} objects
+ * @param {Array}  seriesArray    - Mutable array; existing series are removed then new ones pushed
+ */
+function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
+  // 1. Remove all existing DCA series from chart
+  for (const s of seriesArray) {
+    try { chart.removeSeries(s); } catch (_e) { /* already removed */ }
+  }
+  seriesArray.length = 0;   // clear in-place so callers' reference stays valid
+
+  if (idx < 0 || idx >= seriesData.length) return;   // clear-only or out of range
+
+  const d = seriesData[idx];
+  const { lineStart, lineEnd, trade } = d;
+
+  // Build filled-level lookup: level number → fill info (contains exact fill_price)
+  // dca_levels[n].level = 1-based order number; .price = actual execution price (fill_price)
+  const filledMap = {};
+  if (Array.isArray(trade.dca_levels)) {
+    for (const lvl of trade.dca_levels) filledMap[lvl.level] = lvl;
+  }
+
+  // ── G1 line (entry order) ──────────────────────────────────────────────────
+  // G1 is always filled (it's the trade entry). Use fill_price from dca_levels[level=1]
+  // or fall back to trade.entry_price.
+  const g1Fill = filledMap[1];
+  const g1Price = g1Fill ? g1Fill.price : trade.entry_price;
+  if (g1Price && g1Price > 0) {
+    const g1s = chart.addLineSeries({
+      color: '#2196F3',   // blue — same as entry marker
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+      title: 'G1'
+    });
+    g1s.setData([{ time: lineStart, value: g1Price }, { time: lineEnd, value: g1Price }]);
+    seriesArray.push(g1s);
+  }
+
+  // ── G2..GN lines ─────────────────────────────────────────────────────────
+  // dca_grid_prices[i] = planned trigger price for G(i+2).
+  // For filled levels: use fill_price from dca_levels (exact execution price).
+  // For pending levels: use the planned trigger price from dca_grid_prices.
+  if (Array.isArray(trade.dca_grid_prices)) {
+    trade.dca_grid_prices.forEach((gridPrice, i) => {
+      const levelNum = i + 2;   // G2, G3, …
+      const filled = filledMap[levelNum];
+      const isFilled = Boolean(filled);
+
+      // Always show the planned (trigger) price as the line position —
+      // this is "the price set for the order to fire", which is what the user expects.
+      // For filled orders the marker already shows the actual fill; the line marks the trigger.
+      const levelPrice = gridPrice;
+      const lineColor = isFilled ? '#f9a825' : '#2196F3';  // yellow=filled, blue=pending
+
+      const gs = chart.addLineSeries({
+        color: lineColor,
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: false,
+        title: `G${levelNum}`
+      });
+      gs.setData([{ time: lineStart, value: levelPrice }, { time: lineEnd, value: levelPrice }]);
+      seriesArray.push(gs);
+    });
+  }
+
+  // TP line (green dashed)
+  if (trade.tp_price && trade.tp_price > 0) {
+    const tpS = chart.addLineSeries({
+      color: '#26a69a', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: false, title: 'TP'
+    });
+    tpS.setData([{ time: lineStart, value: trade.tp_price }, { time: lineEnd, value: trade.tp_price }]);
+    seriesArray.push(tpS);
+  }
+
+  // SL line (red dashed)
+  if (trade.sl_price && trade.sl_price > 0) {
+    const slS = chart.addLineSeries({
+      color: '#ef5350', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: false, title: 'SL'
+    });
+    slS.setData([{ time: lineStart, value: trade.sl_price }, { time: lineEnd, value: trade.sl_price }]);
+    seriesArray.push(slS);
+  }
+}
+// ── end DCA grid lines renderer ───────────────────────────────────────────────
 
 /**
  * Build LightweightCharts markers from backtest trades (TradingView exact style).
@@ -5025,6 +5440,14 @@ function buildTradeMarkers(trades, candles, options = {}) {
   const firstCandleTime = candles[0].time;
   const lastCandleTime = candles[candles.length - 1].time;
 
+  // Diagnostic: log first trade vs candle range
+  if (trades.length > 0) {
+    const t0 = trades[0];
+    const ets = parseTradeTime(t0.entry_time);
+    console.log(`[buildTradeMarkers] candles=${candles.length} range=[${firstCandleTime}..${lastCandleTime}]`);
+    console.log(`[buildTradeMarkers] trade[0] entry_time=${t0.entry_time} → parsed=${ets}  inRange=${ets >= firstCandleTime && ets <= lastCandleTime}`);
+  }
+
   // Colors matching TradingView
   const ENTRY_LONG_COLOR = '#2196F3';   // Blue
   const ENTRY_SHORT_COLOR = '#ef5350';  // Red
@@ -5051,70 +5474,113 @@ function buildTradeMarkers(trades, candles, options = {}) {
     const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
 
     // --- Determine entry label ---
-    // DCA/Grid: show number of orders filled (e.g., "DCA×3")
+    // Priority: dca_levels list (new) > Grid level (G1-G21) > DCA orders > plain buy/sell
     const dcaOrders = trade.dca_orders_filled ?? 0;
-    const isDcaTrade = dcaOrders > 1; // More than just entry order
-    const entryLabel = isDcaTrade
-      ? `DCA×${dcaOrders}`
-      : (trade.grid_level ? `#${trade.grid_level}` : (isLong ? 'buy' : 'sell'));
+    const isDcaTrade = dcaOrders > 0;
+    const gridLevel = trade.grid_level != null ? Number(trade.grid_level) : null;
+    const isGridTrade = gridLevel != null && gridLevel > 0 && !trade.dca_levels;
+    const hasDcaLevels = Array.isArray(trade.dca_levels) && trade.dca_levels.length > 0;
 
     // --- Determine exit reason (try exit_comment first, then exit_reason) ---
     const exitReason = (trade.exit_comment || trade.exit_reason || '').toLowerCase();
 
-    // Determine exit label: TP, SL, TP1-TP4, trailing, signal, etc.
+    // Determine exit label: TP1-TP4 > TP > SL > TSL > BE > Signal > Time > EOD > Close
     let exitLabel;
-    if (/^tp\d+$/.test(exitReason)) {
-      exitLabel = exitReason.toUpperCase();
-    } else if (exitReason === 'tp' || exitReason.includes('take_profit')) {
+    // Multi-TP: "tp1"…"tp4" or "take_profit_1"…"take_profit_4" or "tp_1"…"tp_4"
+    const multiTpMatch = exitReason.match(/tp[_\s]?(\d+)|take_profit[_\s]?(\d+)/);
+    if (multiTpMatch) {
+      const tpNum = multiTpMatch[1] || multiTpMatch[2];
+      exitLabel = `TP${tpNum}`;
+    } else if (exitReason === 'tp' || exitReason.startsWith('tp ') || exitReason.startsWith('tp(') || exitReason.includes('take_profit')) {
       exitLabel = 'TP';
-    } else if (exitReason === 'sl' || exitReason.includes('stop_loss')) {
+    } else if (exitReason === 'sl' || exitReason.startsWith('sl ') || exitReason.startsWith('sl(') || exitReason.includes('stop_loss')) {
       exitLabel = 'SL';
     } else if (exitReason.includes('trailing') || exitReason === 'tsl') {
       exitLabel = 'TSL';
+    } else if (exitReason.includes('breakeven') || exitReason === 'be') {
+      exitLabel = 'BE';
     } else if (exitReason.includes('signal')) {
       exitLabel = 'Signal';
     } else if (exitReason.includes('time_exit') || exitReason.includes('session') || exitReason.includes('weekend')) {
       exitLabel = 'Time';
     } else if (exitReason.includes('end_of_data') || exitReason === 'eod') {
       exitLabel = 'EOD';
-    } else if (exitReason.includes('breakeven') || exitReason === 'be') {
-      exitLabel = 'BE';
     } else {
       exitLabel = 'Close';
     }
 
-    // --- ENTRY MARKER ---
-    // Long: blue ↑ below bar | Short: red ↓ above bar
-    // Build entry text: "buy" + optional entry price
-    let entryText = entryLabel;
-    if (showEntryPrice && trade.entry_price) {
-      entryText += ` ${trade.entry_price.toFixed(2)}`;
-    }
-
-    // Build tooltip for DCA trades
-    let entryTooltip = null;
-    if (isDcaTrade) {
+    // --- ENTRY MARKERS ---
+    // DCA trades with dca_levels: draw one marker per level (G1, G2, G3…)
+    // G1 = first entry (blue), G2+ = subsequent DCA adds (lighter cyan)
+    if (hasDcaLevels) {
       const dcaAvgEntry = trade.dca_avg_entry_price?.toFixed(2) || 'N/A';
       const dcaSizeUsd = trade.dca_total_size_usd?.toFixed(2) || '0';
-      entryTooltip = `DCA Orders: ${dcaOrders}\nAvg Entry: ${dcaAvgEntry}\nTotal Size: ${dcaSizeUsd} USD`;
-    }
 
-    const entryMarker = {
-      time: entryTimeSec,
-      position: isLong ? 'belowBar' : 'aboveBar',
-      color: isLong ? ENTRY_LONG_COLOR : ENTRY_SHORT_COLOR,
-      shape: isLong ? 'arrowUp' : 'arrowDown',
-      text: entryText,
-      size: 2
-    };
-    if (entryTooltip) entryMarker.tooltip = entryTooltip;
-    markers.push(entryMarker);
+      trade.dca_levels.forEach((lvl) => {
+        const lvlTimeSec = parseTradeTime(lvl.time);
+        if (!lvlTimeSec || lvlTimeSec < firstCandleTime || lvlTimeSec > lastCandleTime) return;
+        const snappedTime = snapToCandle(lvlTimeSec, candles);
+
+        // G1 = blue (initial entry), G2+ = cyan (DCA additions)
+        const lvlColor = lvl.level === 1 ? ENTRY_LONG_COLOR : '#00BCD4';
+        let lvlText = `G${lvl.level}`;
+        if (showEntryPrice && lvl.price) {
+          lvlText += ` ${lvl.price.toFixed(2)}`;
+        }
+
+        markers.push({
+          time: snappedTime,
+          position: isLong ? 'belowBar' : 'aboveBar',
+          color: lvlColor,
+          shape: isLong ? 'arrowUp' : 'arrowDown',
+          text: lvlText,
+          size: 1,
+          tooltip: `G${lvl.level} @ ${lvl.price?.toFixed(2)}\nSize: ${lvl.size_usd} USD\nAvg: ${dcaAvgEntry}\nTotal: ${dcaSizeUsd} USD`
+        });
+      });
+    } else {
+      // Fallback: trades without dca_levels (old records / grid trades)
+      let entryLabel;
+      if (isGridTrade) {
+        entryLabel = `G${gridLevel}`;
+      } else if (isDcaTrade) {
+        entryLabel = `DCA×${dcaOrders}`;
+      } else {
+        entryLabel = isLong ? 'buy' : 'sell';
+      }
+
+      let entryText = entryLabel;
+      if (showEntryPrice && trade.entry_price) {
+        entryText += ` ${trade.entry_price.toFixed(2)}`;
+      }
+
+      let entryTooltip = null;
+      if (isDcaTrade) {
+        const dcaAvgEntry = trade.dca_avg_entry_price?.toFixed(2) || 'N/A';
+        const dcaSizeUsd = trade.dca_total_size_usd?.toFixed(2) || '0';
+        entryTooltip = `DCA Orders: ${dcaOrders}\nAvg Entry: ${dcaAvgEntry}\nTotal Size: ${dcaSizeUsd} USD`;
+      } else if (isGridTrade) {
+        const gridEntry = trade.entry_price?.toFixed(2) || 'N/A';
+        entryTooltip = `Grid Level: ${gridLevel}\nEntry: ${gridEntry}`;
+      }
+
+      const entryMarker = {
+        time: entryTimeSec,
+        position: isLong ? 'belowBar' : 'aboveBar',
+        color: isLong ? ENTRY_LONG_COLOR : ENTRY_SHORT_COLOR,
+        shape: isLong ? 'arrowUp' : 'arrowDown',
+        text: entryText,
+        size: 1
+      };
+      if (entryTooltip) entryMarker.tooltip = entryTooltip;
+      markers.push(entryMarker);
+    }
 
     // --- EXIT MARKER ---
     // Skip exit marker for open (unrealized) positions — no exit has occurred yet
     const isOpenPosition = trade.is_open === true || exitReason === 'open_position';
     if (!isOpenPosition && exitTimeSec >= firstCandleTime && exitTimeSec <= lastCandleTime) {
-      // Build exit text: "TP" + optional PnL
+      // Build exit text: "TP" / "TP1" / "SL" + optional PnL
       let exitText = exitLabel;
       if (showPnl) {
         exitText += ` ${pnlStr}`;
@@ -5125,14 +5591,31 @@ function buildTradeMarkers(trades, candles, options = {}) {
         color: EXIT_COLOR,
         shape: isLong ? 'arrowDown' : 'arrowUp',
         text: exitText,
-        size: 2
+        size: 1   // fixed size — does not grow with zoom
       });
     }
   });
 
   // Sort markers by time (required by LightweightCharts)
   markers.sort((a, b) => a.time - b.time);
-  return markers;
+
+  // LightweightCharts requires strictly unique timestamps per marker.
+  // When an exit and a new entry land on the exact same candle (e.g. grid/DCA
+  // strategies where one trade closes and another opens simultaneously),
+  // merge them into a single marker by concatenating their text labels.
+  const deduped = [];
+  for (const m of markers) {
+    const prev = deduped[deduped.length - 1];
+    if (prev && prev.time === m.time) {
+      // Combine: keep the earlier marker's visual style; append the new text.
+      prev.text = `${prev.text} | ${m.text}`;
+    } else {
+      deduped.push({ ...m });
+    }
+  }
+
+  console.log(`[buildTradeMarkers] Built ${deduped.length} markers (${markers.length} raw) from ${trades.length} trades`);
+  return deduped;
 }
 
 /**
@@ -5141,9 +5624,72 @@ function buildTradeMarkers(trades, candles, options = {}) {
  */
 function rebuildTradeMarkers() {
   if (!btCandleSeries || !currentBacktest?.trades || _btCachedCandles.length === 0) return;
-  btPriceChartMarkers = buildTradeMarkers(currentBacktest.trades, _btCachedCandles);
+  // _btCachedCandles stores UTC times; buildTradeMarkers expects shifted (+10800) candles
+  const _TZ = 10800;
+  const shiftedCandles = _btCachedCandles.map(c => ({ ...c, time: c.time + _TZ }));
+  btPriceChartMarkers = buildTradeMarkers(currentBacktest.trades, shiftedCandles);
   btCandleSeries.setMarkers(btPriceChartMarkers);
   console.log(`[PriceChart] Rebuilt ${btPriceChartMarkers.length} markers (PnL=${document.getElementById('markerShowPnl')?.checked}, Price=${document.getElementById('markerShowEntryPrice')?.checked})`);
+}
+
+/**
+ * Switch the price chart series type between candlestick, bar, and line.
+ * Preserves markers, volume histogram, and open position line.
+ * @param {'candlestick'|'bar'|'line'} type
+ */
+function switchPriceChartType(type) {
+  if (!btPriceChart || !btCandleSeries || _btCachedCandles.length === 0) return;
+  if (type === _btChartType) return;
+
+  // Build candle data (UTC+3 shifted, same as original render)
+  const _TZ = 10800;  // UTC+3 offset in seconds
+  const candles = _btCachedCandles.map((k) => ({
+    time: k.time + _TZ,
+    open: k.open,
+    high: k.high,
+    low: k.low,
+    close: k.close
+  }));
+
+  // Remove current price series
+  try { btPriceChart.removeSeries(btCandleSeries); } catch (_e) { /* ignore */ }
+  btCandleSeries = null;
+
+  // Create new series of the requested type
+  if (type === 'candlestick') {
+    btCandleSeries = btPriceChart.addCandlestickSeries({
+      upColor: '#26a69a', downColor: '#ef5350',
+      borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+      lastValueVisible: false
+    });
+  } else if (type === 'bar') {
+    btCandleSeries = btPriceChart.addBarSeries({
+      upColor: '#26a69a', downColor: '#ef5350',
+      thinBars: false,
+      lastValueVisible: false
+    });
+  } else {
+    // line — use close price
+    btCandleSeries = btPriceChart.addLineSeries({
+      color: '#58a6ff',
+      lineWidth: 2,
+      lastValueVisible: false,
+      priceLineVisible: false
+    });
+    // Line series takes {time, value} not OHLC
+    btCandleSeries.setData(candles.map((c) => ({ time: c.time, value: c.close })));
+    _btChartType = type;
+    // Restore markers and sync state
+    if (btPriceChartMarkers.length > 0) btCandleSeries.setMarkers(btPriceChartMarkers);
+    setPriceChartCandleSeries(btCandleSeries);
+    return;
+  }
+
+  btCandleSeries.setData(candles);
+  _btChartType = type;
+  if (btPriceChartMarkers.length > 0) btCandleSeries.setMarkers(btPriceChartMarkers);
+  setPriceChartCandleSeries(btCandleSeries);
 }
 
 /**

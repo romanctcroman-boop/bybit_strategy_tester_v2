@@ -884,6 +884,14 @@ class TradeRecord(BaseModel):
         default_factory=list,
         description="List of DCA grid trigger prices for this position. Empty for non-DCA trades.",
     )
+    dca_levels: list[dict] = Field(
+        default_factory=list,
+        description="Per-level DCA entries: [{level, time, price, size_usd}]. Empty for non-DCA trades.",
+    )
+    dca_grid_prices: list[float] = Field(
+        default_factory=list,
+        description="All planned DCA grid prices G2..GN (from entry_price downwards). Empty for non-DCA trades.",
+    )
 
     # ===== NEW: Entry/Exit bar indices (TradingView) =====
     entry_bar_index: int = Field(default=0, description="Bar index at entry")
@@ -892,11 +900,24 @@ class TradeRecord(BaseModel):
     # ===== NEW: Profit/Loss percentage (TradingView compatible) =====
     profit_percent: float = Field(default=0.0, description="Profit/loss as percentage of entry price")
 
+    # ===== Grid level (for Grid/DCA strategies) =====
+    grid_level: int | None = Field(
+        default=None,
+        description="Grid level number (1-N) for grid/DCA strategies. None for non-grid trades.",
+    )
+
     # ===== TV parity: open position at end of backtest =====
     is_open: bool = Field(
         default=False,
         description="True if position was still open at end of backtest (TV: counted separately, not in closed trades)",
     )
+
+    # ===== DCA chart rendering: per-order fill details =====
+    # dca_levels: [{level, bar_idx, price, size_usd}] — G1=entry, G2..=DCA fills
+    # dca_grid_prices: planned unfilled level prices for pending grid lines
+    # tp_price / sl_price: horizontal TP/SL lines for chart rendering
+    tp_price: float | None = Field(default=None, description="Take-profit price level for chart rendering")
+    sl_price: float | None = Field(default=None, description="Stop-loss price level for chart rendering")
 
 
 class PerformanceMetrics(BaseModel):

@@ -32,25 +32,7 @@
     </head>
     <body>
         <!-- JS Error Banner — injected immediately so it catches all runtime errors -->
-        <div
-            id="_jserrBanner"
-            style="
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 99999;
-                background: #c0392b;
-                color: #fff;
-                font: 12px monospace;
-                padding: 8px 12px;
-                white-space: pre-wrap;
-                word-break: break-all;
-                max-height: 150px;
-                overflow: auto;
-            "
-        ></div>
+        <div id="_jserrBanner"></div>
         <script>
             window.addEventListener('error', function (e) {
                 var b = document.getElementById('_jserrBanner');
@@ -468,6 +450,132 @@
                                     <span id="btChartOHLC" class="text-secondary"> O: -- H: -- L: -- C: -- </span>
                                 </div>
                                 <div class="bt-price-chart-controls">
+                                    <!-- Chart type toggle -->
+                                    <div class="bt-chart-type-toggle" title="Тип отображения цены">
+                                        <button class="bt-chart-type-btn active" data-type="candlestick" title="Свечи">
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 14 14"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <rect x="2" y="4" width="3" height="6" rx="0.5" fill="currentColor" />
+                                                <line
+                                                    x1="3.5"
+                                                    y1="1"
+                                                    x2="3.5"
+                                                    y2="4"
+                                                    stroke="currentColor"
+                                                    stroke-width="1"
+                                                />
+                                                <line
+                                                    x1="3.5"
+                                                    y1="10"
+                                                    x2="3.5"
+                                                    y2="13"
+                                                    stroke="currentColor"
+                                                    stroke-width="1"
+                                                />
+                                                <rect x="9" y="3" width="3" height="7" rx="0.5" fill="currentColor" />
+                                                <line
+                                                    x1="10.5"
+                                                    y1="1"
+                                                    x2="10.5"
+                                                    y2="3"
+                                                    stroke="currentColor"
+                                                    stroke-width="1"
+                                                />
+                                                <line
+                                                    x1="10.5"
+                                                    y1="10"
+                                                    x2="10.5"
+                                                    y2="13"
+                                                    stroke="currentColor"
+                                                    stroke-width="1"
+                                                />
+                                            </svg>
+                                            Свечи
+                                        </button>
+                                        <button class="bt-chart-type-btn" data-type="bar" title="Бары">
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 14 14"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <line
+                                                    x1="3.5"
+                                                    y1="2"
+                                                    x2="3.5"
+                                                    y2="12"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                                <line
+                                                    x1="1"
+                                                    y1="5"
+                                                    x2="3.5"
+                                                    y2="5"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                                <line
+                                                    x1="3.5"
+                                                    y1="9"
+                                                    x2="6"
+                                                    y2="9"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                                <line
+                                                    x1="10.5"
+                                                    y1="1"
+                                                    x2="10.5"
+                                                    y2="11"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                                <line
+                                                    x1="8"
+                                                    y1="4"
+                                                    x2="10.5"
+                                                    y2="4"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                                <line
+                                                    x1="10.5"
+                                                    y1="8"
+                                                    x2="13"
+                                                    y2="8"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.2"
+                                                />
+                                            </svg>
+                                            Бары
+                                        </button>
+                                        <button class="bt-chart-type-btn" data-type="line" title="Линия">
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 14 14"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <polyline
+                                                    points="1,11 4,6 7,8 10,3 13,5"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.4"
+                                                    fill="none"
+                                                    stroke-linejoin="round"
+                                                />
+                                            </svg>
+                                            Линия
+                                        </button>
+                                    </div>
+                                    <!-- Marker / display toggles -->
                                     <label>
                                         <input type="checkbox" id="markerShowPnl" checked />
                                         Показать PnL
@@ -475,6 +583,10 @@
                                     <label>
                                         <input type="checkbox" id="markerShowEntryPrice" checked />
                                         Показать цену входа
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="markerShowVolume" checked />
+                                        Объём
                                     </label>
                                 </div>
                             </div>
@@ -802,14 +914,11 @@
                                     </div>
                                 </div>
                                 <!-- MFE / MAE bar chart — TV-style per-trade excursion bars -->
-                                <div style="margin-top: 1.25rem">
-                                    <div class="tv-profit-chart" style="width: 100%; height: 280px">
-                                        <div
-                                            class="tv-chart-title"
-                                            style="display: flex; align-items: center; gap: 0.75rem"
-                                        >
+                                <div class="mfe-mae-section">
+                                    <div class="tv-profit-chart mfe-mae-chart-wrap">
+                                        <div class="tv-chart-title mfe-mae-chart-title">
                                             <span>MFE &amp; MAE по сделкам</span>
-                                            <span style="font-size: 0.7rem; color: #8b949e; font-weight: 400">
+                                            <span class="mfe-mae-subtitle">
                                                 Макс. благоприятное / неблагоприятное отклонение от цены входа (%)</span
                                             >
                                         </div>
@@ -973,7 +1082,7 @@
                                             >
                                                 Совокупные ПР/УБ<span class="sort-icon"> ⇅</span>
                                             </th>
-                                            <th id="tvTradesDcaHeader" class="tv-dca-header" style="display: none">
+                                            <th id="tvTradesDcaHeader" class="tv-dca-header tv-dca-header-hidden">
                                                 DCA<span class="sort-icon"> ⇅</span>
                                             </th>
                                         </tr>
@@ -1684,7 +1793,7 @@
                 .catch((e) => console.error('API error:', e));
         </script>
 
-        <script type="module" src="./js/pages/backtest_results.js?v=20260305i"></script>
+        <script type="module" src="./js/pages/backtest_results.js?v=20260308g"></script>
 
         <!-- Fallback: if module fails, load data manually after 2 seconds -->
         <script>

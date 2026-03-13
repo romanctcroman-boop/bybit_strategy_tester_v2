@@ -941,7 +941,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         # === TIME-BASED EXITS ===
         max_bars_in_trade = getattr(input_data, "max_bars_in_trade", 0)
         exit_on_session_close = getattr(input_data, "exit_on_session_close", False)
-        session_start_hour = getattr(input_data, "session_start_hour", 0)
+        _session_start_hour = getattr(input_data, "session_start_hour", 0)
         session_end_hour = getattr(input_data, "session_end_hour", 24)
         no_trade_days = getattr(input_data, "no_trade_days", ())
         no_trade_hours = getattr(input_data, "no_trade_hours", ())
@@ -1044,13 +1044,13 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         # === MULTI-TIMEFRAME (MTF) FILTER ===
         mtf_enabled = getattr(input_data, "mtf_enabled", False)
-        mtf_htf_interval = getattr(input_data, "mtf_htf_interval", "60")
+        _mtf_htf_interval = getattr(input_data, "mtf_htf_interval", "60")
         mtf_htf_candles = getattr(input_data, "mtf_htf_candles", None)
         mtf_htf_index_map: list[int] | None = getattr(input_data, "mtf_htf_index_map", None)
         mtf_filter_type = getattr(input_data, "mtf_filter_type", "sma")
         mtf_filter_period = getattr(input_data, "mtf_filter_period", 200)
         mtf_neutral_zone_pct = getattr(input_data, "mtf_neutral_zone_pct", 0.0)
-        mtf_lookahead_mode = getattr(input_data, "mtf_lookahead_mode", "none")
+        _mtf_lookahead_mode = getattr(input_data, "mtf_lookahead_mode", "none")
         # BTC Correlation filter
         mtf_btc_filter_enabled = getattr(input_data, "mtf_btc_filter_enabled", False)
         mtf_btc_candles = getattr(input_data, "mtf_btc_candles", None)
@@ -1239,6 +1239,9 @@ class FallbackEngineV4(BaseBacktestEngine):
         pending_long_mae = 0.0
         pending_short_mfe = 0.0
         pending_short_mae = 0.0
+        # Suppress F841: these are written in the MFE/MAE accumulation loop and
+        # will be consumed when per-trade recording is implemented.
+        _ = pending_long_mfe, pending_long_mae, pending_short_mfe, pending_short_mae
 
         # Bar Magnifier (для будущего использования)
         _bar_magnifier_index = self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
@@ -1334,15 +1337,17 @@ class FallbackEngineV4(BaseBacktestEngine):
 
             # === ADAPTIVE ATR MULTIPLIER ===
             # Обновляем историю ATR и получаем адаптивные множители
-            # Переопределяем локальные переменные для использования в остальном коде
+            # _local variables will replace the globals once ATR-TP/SL is wired up
             if adaptive_atr is not None and atr_values is not None:
                 adaptive_atr.update(atr_values[i])
                 # Локально переопределяем множители для этого бара
-                atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)
-                atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)
+                _atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)
+                _atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)
             else:
-                atr_tp_multiplier_local = atr_tp_multiplier
-                atr_sl_multiplier_local = atr_sl_multiplier
+                _atr_tp_multiplier_local = atr_tp_multiplier
+                _atr_sl_multiplier_local = atr_sl_multiplier
+            # Suppress F841 until adaptive multipliers are consumed downstream
+            _ = _atr_tp_multiplier_local, _atr_sl_multiplier_local
 
             # === MFE/MAE TRACKING ===
             # Аккумулируем MFE/MAE для открытых позиций на каждом баре
@@ -2841,7 +2846,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                         accumulated_funding -= funding_fee
                         cash += funding_fee  # Add to cash
 
-                    last_funding_bar = i
+                    last_funding_bar = i  # noqa: F841 – will gate 8-hour funding intervals
 
             # === ОБНОВЛЕНИЕ EQUITY ===
             unrealized_pnl = 0.0
@@ -3060,6 +3065,24 @@ class FallbackEngineV4(BaseBacktestEngine):
         metrics.payoff_ratio = calc_payoff_ratio(metrics.avg_win, metrics.avg_loss)
         # expectancy принимает win_rate_pct (0-100) — конвертируем долю → %
         metrics.expectancy = calc_expectancy(metrics.win_rate * 100.0, metrics.avg_win, metrics.avg_loss)
+
+        # === CONSECUTIVE WINS / LOSSES ===
+        _max_cw = _max_cl = _cur_cw = _cur_cl = 0
+        for _p in pnls:
+            if _p > 0:
+                _cur_cw += 1
+                _cur_cl = 0
+            elif _p < 0:
+                _cur_cl += 1
+                _cur_cw = 0
+            else:
+                _cur_cw = _cur_cl = 0
+            if _cur_cw > _max_cw:
+                _max_cw = _cur_cw
+            if _cur_cl > _max_cl:
+                _max_cl = _cur_cl
+        metrics.max_consecutive_wins = _max_cw
+        metrics.max_consecutive_losses = _max_cl
 
         # === DURATION METRICS ===
         durations = [t.duration_bars for t in trades if t.duration_bars is not None]

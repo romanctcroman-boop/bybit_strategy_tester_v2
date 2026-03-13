@@ -7,7 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added / Changed
+
+### 2026-03-13 — Infrastructure Fixes (5 issues)
+
+**Fix 1 — `/api/v1/dashboard/market/tickers` performance (12-14s → <1s)**
+- Added shared in-memory cache with 60s TTL for all USDT tickers list
+- Added `asyncio.Lock()` mutex to prevent thundering herd on cache miss
+- All `top:N` and `symbols:` requests share one cached list — only 1 Bybit API call per minute
+- Added endpoint to `long_running_paths` in `TimingMiddleware` to avoid false ERROR logs
+- File: `backend/api/routers/dashboard_improvements.py`, `backend/api/middleware_setup.py`
+
+**Fix 2 — Redis rate limiter not connecting**
+- Root cause: `is_connected()` returns `False` by default because `_get_client()` is lazy
+- Added `_redis_limiter._get_client()` call before `is_connected()` check (force eager connect)
+- Result: `Rate limiter initialized: backend=redis` (was: `backend=in-memory`)
+- File: `backend/middleware/rate_limiter.py`
+
+**Fix 3 — WS_SECRET_KEY not set warning**
+- Added `WS_SECRET_KEY` to `.env` with a generated secure key
+- File: `.env`
+
+**Fix 4 — asyncio ConnectionResetError WinError 10054**
+- Added Windows-specific `asyncio` exception handler in lifespan that silently ignores WinError 10054
+- These are benign errors from ProactorEventLoop when clients forcibly close connections
+- File: `backend/api/lifespan.py`
+
+**Fix 5 — MCP server log file not created**
+- Fixed `scripts/start_mcp_server.ps1`: `RedirectStandardOutput=true` was set but output was never written to disk
+- Added `Register-ObjectEvent` handlers for `OutputDataReceived` and `ErrorDataReceived` that append to log file
+- Added `BeginOutputReadLine()` / `BeginErrorReadLine()` to start async output reading
+- File: `scripts/start_mcp_server.ps1`
+
+- **[FRONTEND] Modernized price chart (backtest-results) — TradingView LWC parity** (2026-03-07)
+
+    Files: `frontend/js/pages/backtest_results.js`, `frontend/backtest-results.html`, `frontend/css/backtest_results.css`
+
+    **Changes:**
+    1. **Candle colors fixed** — `#00c853`/`#ff1744` → TradingView-standard `#26a69a`/`#ef5350` for candles, wicks, borders and `switchPriceChartType()`.
+    2. **`autoSize: true`** — chart fills container via LWC's native ResizeObserver; explicit `width`/`height` removed.
+    3. **`fixLeftEdge: true`, `fixRightEdge: true`** — cannot scroll beyond data range; `lockVisibleTimeRangeOnResize: true` added; `minBarSpacing`/`maxBarSpacing` set.
+    4. **Crosshair colors** — replaced GitHub blue `#58a6ff` with TV-standard neutral `#758696` + `labelBackgroundColor: '#21262d'`.
+    5. **Grid colors** — semi-transparent `rgba(48,54,61,0.5/0.8)` instead of solid `#21262d`.
+    6. **Volume histogram** — `addHistogramSeries` with `priceScaleId:'volume'`, `scaleMargins: { top:0.80, bottom:0 }` (bottom 20% of pane). Color: bull/bear tinted (50% opacity). Cached in `_btVolumeData` for toggle.
+    7. **HTML Trade Tooltip** — overlay shown on `subscribeCrosshairMove` when crosshair is on a marker candle. Shows: ENTRY/EXIT label, side, entry/exit price, PnL (colored), duration, exit reason. Built from `_tradeByEntryTime` / `_tradeByExitTime` Maps for O(1) lookup.
+    8. **Open position price line** — `btCandleSeries.createPriceLine()` with amber/pink dashed line at `entry_price` for any trade with `is_open===true` or no `exit_time`.
+    9. **Chart type toggle** — HTML buttons Свечи/Бары/Линия in controls bar; `switchPriceChartType(type)` function replaces series (candlestick → bar → line) preserving markers and volume.
+    10. **Volume checkbox** — `#markerShowVolume` checkbox in controls bar; toggles `_btVolumeSeries.setData([] | _btVolumeData)`.
+    11. **CSS** — `.bt-chart-type-toggle`, `.bt-chart-type-btn`, `#btPriceChartTooltip` styles added; `flex-wrap:wrap` on controls bar.
+
 ### Fixed
+
+- **[BUG FIX] DCA Engine: `position_size` now correctly limits capital allocation** (2026-03-08)
+
+    File: `backend/backtesting/engines/dca_engine.py`
+
+    **Root Cause**: `_configure_from_config()` and `_configure_from_input()` always set
+    `grid_config.deposit = initial_capital` (full capital), completely ignoring
+    `BacktestConfig.position_size`. With `position_size=0.1`, leverage=10 and 7 DCA
+    orders filled (martingale=1.2), the engine deployed ~$78,000 notional on a $10,000
+    account — causing drawdowns of 111% and losses of $2,600+ per trade on a 3% SL.
+
+    **Fix**: `grid_config.deposit = initial_capital * position_size` in both config paths,
+    with clamping to [0.01, 1.0].
+
+    **Impact**:
+    | Metric | Before fix | After fix |
+    |--------|-----------|-----------|
+    | Max notional (7 DCA orders) | ~$78,000 | ~$7,800 |
+    | Max drawdown | 111.3% | 11.1% |
+    | Net profit | -$6,626 | -$657 |
+    | Commission | $7,235 | $724 |
+
+    Tests: `tests/test_dca_e2e.py` — 9/9 passed.
+
+- **[BUG FIX] DCA mechanics: `max_consecutive_wins/losses` always 0** (2026-03-08)
+
+    File: `backend/backtesting/engines/fallback_engine_v4.py` — `_calculate_metrics()`
+
+    **Root Cause**: `_calculate_metrics()` never computed `max_consecutive_wins` /
+    `max_consecutive_losses`. The fields defaulted to 0 in `BacktestMetrics` and
+    `getattr(bm, "max_consecutive_wins", 0)` always returned 0 regardless of trade history.
+
+    **Fix**: Added O(n) single-pass consecutive streak calculation over the `pnls` list,
+    setting `metrics.max_consecutive_wins` and `metrics.max_consecutive_losses` correctly.
+    Also fixes all non-DCA engines that go through the same `_calculate_metrics` path.
+
+    **Verified**: 241-trade RSI-3 backtest now shows `max_consecutive_wins=25`, `max_consecutive_losses=4`.
+
+- **[BUG FIX] Trades missing `exit_reason` and `avg_price` fields in API response** (2026-03-08)
+
+    File: `backend/api/routers/strategy_builder/router.py` — trades serialisation loop
+
+    **Root Cause**: The router trade serialisation (both object and dict branches) did not
+    include `exit_reason` (only `exit_comment`) or `avg_price` (only `dca_avg_entry_price`).
+    Frontend and analytics scripts that read `exit_reason` / `avg_price` always got `null`.
+
+    **Fix**:
+    - Added `"exit_reason"` as explicit alias for `"exit_comment"` in both branches
+    - Added `"avg_price"` mapped from `dca_avg_entry_price` (object branch: `getattr`,
+      dict branch: `t.get`) in both branches
+
+    **Verified**: API response now includes `exit_reason: "take_profit"/"stop_loss"` and
+    `avg_price: <float>` for every DCA trade.
+
+    Strategy: `98810196-fc8f-4e37-83bb-f8bc089c29cf` (ETHUSDT 30m long)
+
+    With `position_size` bug fixed, updated DCA params to safe values:
+    | Param | Old | New | Reason |
+    |-------|-----|-----|--------|
+    | `stop_loss_percent` | 3.0% | 8.0% | Must be wider than DCA grid span (4×2%=8%) |
+    | `grid_size_percent` | 10% | 2% | ETH moves 2-3% routinely; 10% = orders never fill |
+    | `order_count` | 8 | 4 | Fewer orders = less capital per trade |
+    | `martingale_coefficient` | 1.2 | 1.1 | Gentler size escalation |
+    | `log_steps_coefficient` | 1.2 | 1.1 | Gentler log spacing |
+    | `take_profit_percent` | 1.8% | 1.8% | Unchanged |
 
 - **[BUGFIX] RSI индикатор: конфликт cross_long_level < long_rsi_more → 0 сигналов** (2026-03-06)
 
@@ -382,22 +496,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-    **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-    instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-    **price-change percentage** (6.6%), not the USDT amount.
+          **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+          instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+          **price-change percentage** (6.6%), not the USDT amount.
 
-    **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-    `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
-  m.get("long_largest_win_value")` — the `or` short-circuited because 6.6 is truthy.
+          **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+          `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
 
-    **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-    (no fallback chain) for all four long/short largest fields.
+    m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
 
-    **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-    TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-    (bars_in_trade now uses inclusive counting to match TV).
+          **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+          (no fallback chain) for all four long/short largest fields.
 
-    **File:** `scripts/_tv_calibration_check.py`
+          **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+          TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+          (bars_in_trade now uses inclusive counting to match TV).
+
+          **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 
