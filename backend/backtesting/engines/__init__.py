@@ -65,12 +65,54 @@ except ImportError:
     NumbaEngineV2 = None  # type: ignore[misc,assignment]
     NUMBA_AVAILABLE = False
 
-# === DEPRECATED (for backward compatibility) ===
-# These still work but emit DeprecationWarning
 # === DCA ENGINE (Grid/DCA Trading) ===
 from backend.backtesting.engines.dca_engine import DCAEngine, DCAGridCalculator, DCAGridConfig
-from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+
+# === DEPRECATED (not imported — import directly to use) ===
+# FallbackEngineV2 and FallbackEngineV3 are no longer exported from this package.
+# They still exist at:
+#   backend/backtesting/engines/fallback_engine_v2.py  (parity tests)
+#   backend/backtesting/engines/fallback_engine_v3.py  (parity tests)
+# Import them directly if needed:
+#   from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+
+
+def _deprecated_engine_shim(name: str):
+    """Backward-compat shim: returns class but warns."""
+    import warnings
+
+    if name == "FallbackEngineV2":
+        warnings.warn(
+            "FallbackEngineV2 is deprecated. Use FallbackEngine (V4). "
+            "Importing from engines package is deprecated; import directly from "
+            "backend.backtesting.engines.fallback_engine_v2 for parity tests.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+
+        return FallbackEngineV2
+    if name == "FallbackEngineV3":
+        warnings.warn(
+            "FallbackEngineV3 is deprecated. Use FallbackEngine (V4). "
+            "Importing from engines package is deprecated; import directly from "
+            "backend.backtesting.engines.fallback_engine_v3 for parity tests.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+
+        return FallbackEngineV3
+    return None
+
+
+def __getattr__(name: str):
+    """Lazy + deprecated access for removed engines."""
+    cls = _deprecated_engine_shim(name)
+    if cls is not None:
+        return cls
+    raise AttributeError(f"module 'backend.backtesting.engines' has no attribute '{name}'")
+
 
 # Event-driven engine (skeleton, ROADMAP_REMAINING_TASKS)
 try:
@@ -108,11 +150,10 @@ __all__ = [
     "ExitReason",
     # Main Engines
     "FallbackEngine",  # = V4 (основной)
-    # Deprecated (backward compatibility)
-    "FallbackEngineV2",  # deprecated
-    "FallbackEngineV3",  # deprecated
     # Explicit versions (for parity tests)
     "FallbackEngineV4",
+    # NOTE: FallbackEngineV2 and FallbackEngineV3 removed from __all__
+    # Import directly: from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
     "FillEvent",
     "NumbaEngine",  # = NumbaEngineV2 (быстрый)
     "NumbaEngineV2",

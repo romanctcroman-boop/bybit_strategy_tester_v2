@@ -16,10 +16,14 @@ Architecture:
 
 from __future__ import annotations
 
+import contextlib
 import copy
+import json
 import logging
+import threading
 import time
 from itertools import product
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -28,10 +32,128 @@ if TYPE_CHECKING:
     from optuna.samplers import BaseSampler
 import pandas as pd
 
+from backend.config.constants import COMMISSION_TV
 from backend.optimization.filters import passes_filters
 from backend.optimization.scoring import calculate_composite_score
 
 logger = logging.getLogger(__name__)
+
+
+_INTERVAL_BARS_PER_DAY: dict[str, float] = {
+    "1": 1440.0,
+    "3": 480.0,
+    "5": 288.0,
+    "15": 96.0,
+    "30": 48.0,
+    "60": 24.0,
+    "120": 12.0,
+    "240": 6.0,
+    "360": 4.0,
+    "720": 2.0,
+    "D": 1.0,
+    "W": 1.0 / 7.0,
+    "M": 1.0 / 30.44,
+}
+
+
+def _bars_per_month(interval: str) -> int:
+    """Approximate bars per calendar month for a given timeframe string."""
+    bars_per_day = _INTERVAL_BARS_PER_DAY.get(str(interval), 48.0)
+    return max(1, int(bars_per_day * 30.44))
+
+
+def _log_info(msg: str) -> None:
+    """Log to both module logger and uvicorn.error for guaranteed visibility."""
+    logger.info(msg)
+    uvi = logging.getLogger("uvicorn.error")
+    if uvi.handlers:
+        uvi.info(msg)
+
+
+def _log_warning(msg: str, **kwargs) -> None:
+    """Log warning to both module logger and uvicorn.error."""
+    logger.warning(msg, **kwargs)
+    uvi = logging.getLogger("uvicorn.error")
+    if uvi.handlers:
+        uvi.warning(msg, **kwargs)
+
+
+# =============================================================================
+# OPTIMIZATION PROGRESS TRACKING (file-based, shared across all uvicorn workers)
+# =============================================================================
+_progress_lock = threading.Lock()
+
+# Progress stored in .run/optimizer_progress.json so all uvicorn workers share state
+_PROGRESS_DIR = Path(__file__).parent.parent.parent / ".run"
+_PROGRESS_FILE = _PROGRESS_DIR / "optimizer_progress.json"
+
+
+def _read_progress_file() -> dict[str, Any]:
+    """Read progress from shared JSON file (atomic read)."""
+    try:
+        if _PROGRESS_FILE.exists():
+            return json.loads(_PROGRESS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _write_progress_file(data: dict[str, Any]) -> None:
+    """Write progress to shared JSON file (atomic write via temp file)."""
+    try:
+        _PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _PROGRESS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        tmp.replace(_PROGRESS_FILE)
+    except Exception:
+        pass
+
+
+def update_optimization_progress(
+    strategy_id: str,
+    *,
+    status: str = "running",
+    tested: int = 0,
+    total: int = 0,
+    best_score: float = 0.0,
+    results_found: int = 0,
+    speed: int = 0,
+    eta_seconds: int = 0,
+    started_at: float | None = None,
+) -> None:
+    """Update progress for a running builder optimization (file-based, shared across workers)."""
+    percent = round(tested * 100 / total, 1) if total > 0 else 0.0
+    with _progress_lock:
+        data = _read_progress_file()
+        data[strategy_id] = {
+            "status": status,
+            "tested": tested,
+            "total": total,
+            "percent": percent,
+            "best_score": best_score,
+            "results_found": results_found,
+            "speed": speed,
+            "eta_seconds": eta_seconds,
+            "started_at": started_at or time.time(),
+            "updated_at": time.time(),
+        }
+        _write_progress_file(data)
+
+
+def get_optimization_progress(strategy_id: str) -> dict[str, Any]:
+    """Get current progress for a strategy optimization (file-based, shared across workers)."""
+    with _progress_lock:
+        data = _read_progress_file()
+        return data.get(strategy_id, {"status": "idle"}).copy()
+
+
+def clear_optimization_progress(strategy_id: str) -> None:
+    """Clear progress entry after optimization completes (file-based)."""
+    with _progress_lock:
+        data = _read_progress_file()
+        data.pop(strategy_id, None)
+        _write_progress_file(data)
+
 
 # =============================================================================
 # PARAMETER EXTRACTION FROM GRAPH
@@ -354,6 +476,11 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
         # User-provided optimization overrides from the UI (block.optimizationParams)
         user_opt_params: dict[str, dict[str, Any]] = block.get("optimizationParams") or {}
 
+        # Track params the user EXPLICITLY disabled so DEFAULT_PARAM_RANGES doesn't re-add them.
+        # Without this set, a param with {enabled: False} would be removed from user_opt_params
+        # but then re-included from DEFAULT_PARAM_RANGES with default ranges.
+        user_explicitly_disabled: set[str] = set()
+
         # Validate user-provided optimizationParams format
         if user_opt_params:
             _validated: dict[str, dict[str, Any]] = {}
@@ -364,6 +491,14 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                         f"param '{pk}': expected dict with {{low, high, step}}, got {type(pv).__name__}. Skipping."
                     )
                     continue
+
+                # Normalize frontend format: frontend stores {min, max, step, enabled}
+                # backend expects {low, high, step, enabled}
+                if "low" not in pv and "min" in pv:
+                    pv = {**pv, "low": pv["min"]}
+                if "high" not in pv and "max" in pv:
+                    pv = {**pv, "high": pv["max"]}
+
                 required_keys = {"low", "high"}
                 if not required_keys.issubset(pv.keys()):
                     logger.warning(
@@ -371,6 +506,12 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                         f"missing required keys {required_keys - pv.keys()}. Skipping."
                     )
                     continue
+
+                # Skip if explicitly disabled — record it so DEFAULT_PARAM_RANGES won't re-add it
+                if not pv.get("enabled", True):
+                    user_explicitly_disabled.add(pk)
+                    continue
+
                 if pv["low"] > pv["high"]:
                     logger.warning(
                         f"[OptExtract] optimizationParams for block '{block_id}' param '{pk}': "
@@ -385,11 +526,23 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
         if not type_ranges and not user_opt_params:
             continue
 
+        # Track which param_keys have been added so we don't duplicate
+        added_param_keys: set[str] = set()
+
         for param_key, range_spec in type_ranges.items():
             current_value = block_params.get(param_key, range_spec["default"])
 
+            # If the user explicitly DISABLED this param, never include it from defaults
+            if param_key in user_explicitly_disabled:
+                continue
+
+            # If the user explicitly enabled this param in optimizationParams,
+            # always include it — skip mode-flag checks (user knows what they want).
+            user_explicitly_enabled = param_key in user_opt_params
+
             # Skip RSI params for disabled modes to avoid wasted optimization iterations
-            if block_type == "rsi":
+            # — UNLESS the user explicitly marked this param as enabled in optimizationParams
+            if block_type == "rsi" and not user_explicitly_enabled:
                 if param_key in ("long_rsi_more", "long_rsi_less") and not block_params.get("use_long_range", False):
                     continue
                 if param_key in ("short_rsi_less", "short_rsi_more") and not block_params.get("use_short_range", False):
@@ -409,8 +562,8 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                 if param_key in ("overbought", "oversold") and has_new_mode:
                     continue
 
-            # Skip MACD params for disabled modes to avoid wasted optimization iterations
-            if block_type == "macd":
+            # Skip MACD params for disabled modes — UNLESS user explicitly enabled
+            if block_type == "macd" and not user_explicitly_enabled:
                 if param_key == "macd_cross_zero_level" and not block_params.get("use_macd_cross_zero", False):
                     continue
                 if param_key == "signal_memory_bars" and block_params.get("disable_signal_memory", False):
@@ -421,6 +574,15 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                 )
                 if param_key == "signal_memory_bars" and not has_signal_mode:
                     continue
+
+            # Skip static_sltp breakeven params if breakeven is not activated — UNLESS user explicitly enabled
+            if (
+                block_type == "static_sltp"
+                and not user_explicitly_enabled
+                and param_key in ("breakeven_activation_percent", "new_breakeven_sl_percent")
+                and not block_params.get("activate_breakeven", False)
+            ):
+                continue
 
             # Merge user-provided optimizationParams over defaults
             user_override = user_opt_params.get(param_key, {})
@@ -443,6 +605,34 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "default": range_spec["default"],
                     "current_value": current_value,
                 }
+            )
+            added_param_keys.add(param_key)
+
+        # Second pass: include any user_opt_params keys that were NOT in type_ranges.
+        # This handles custom/extra params the user enabled that have no DEFAULT_PARAM_RANGES
+        # entry for this block type (rare, but valid).
+        for param_key, user_override in user_opt_params.items():
+            if param_key in added_param_keys:
+                continue  # already added above
+            current_value = block_params.get(param_key, user_override.get("low", 0))
+            params.append(
+                {
+                    "block_id": block_id,
+                    "block_type": block_type,
+                    "block_name": block_name,
+                    "param_key": param_key,
+                    "param_path": f"{block_id}.{param_key}",
+                    "type": user_override.get("type", "float"),
+                    "low": user_override["low"],
+                    "high": user_override["high"],
+                    "step": user_override.get("step", 1),
+                    "default": current_value,
+                    "current_value": current_value,
+                }
+            )
+            logger.debug(
+                f"[OptExtract] Added user-enabled param '{block_id}.{param_key}' "
+                f"(not in DEFAULT_PARAM_RANGES for block_type='{block_type}')"
             )
 
     return params
@@ -491,6 +681,27 @@ def clone_graph_with_params(
             block[params_key] = {}
         block[params_key][param_key] = value
 
+        # Auto-enable mode flags when optimizing mode-gated RSI params.
+        # Each param maps to the exact mode flag that gates it.
+        # Cross + range can coexist: "RSI crosses level AND is within range".
+        if block.get("type") == "rsi":
+            rsi_p = block[params_key]
+            if param_key in ("cross_long_level", "cross_short_level"):
+                rsi_p["use_cross_level"] = True
+            elif param_key == "cross_memory_bars":
+                rsi_p["use_cross_memory"] = True
+            elif param_key in ("long_rsi_more", "long_rsi_less"):
+                rsi_p["use_long_range"] = True
+            elif param_key in ("short_rsi_more", "short_rsi_less"):
+                rsi_p["use_short_range"] = True
+
+        # Auto-enable mode flags for MACD
+        if block.get("type") == "macd":
+            if param_key == "macd_cross_zero_level":
+                block[params_key]["use_macd_cross_zero"] = True
+            elif param_key == "signal_memory_bars":
+                block[params_key]["disable_signal_memory"] = False
+
     return graph
 
 
@@ -505,9 +716,15 @@ def generate_builder_param_combinations(
     search_method: str = "grid",
     max_iterations: int = 0,
     random_seed: int | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[Any, int, bool]:
     """
     Generate parameter combinations for builder strategy optimization.
+
+    For grid search returns a **lazy iterator** (itertools.product-based) so that
+    arbitrarily large grids are fully explored without materialising them all in
+    memory at once.  run_builder_grid_search consumes it chunk-by-chunk.
+
+    For random search a materialized list is returned (bounded by max_iterations).
 
     Args:
         param_specs: List of optimizable params from extract_optimizable_params().
@@ -516,11 +733,12 @@ def generate_builder_param_combinations(
                        - low, high, step (optional overrides)
                        - enabled: bool (whether to optimize this param)
         search_method: "grid" or "random".
-        max_iterations: Max combos for random search.
-        random_seed: Seed for reproducibility.
+        max_iterations: Max combos for random search (0 = no limit).
+        random_seed: Seed for reproducibility (random search only).
 
     Returns:
-        Tuple of (list_of_param_override_dicts, total_count_before_sampling).
+        Tuple of (combos_or_iterator, total_count, was_capped).
+        was_capped is always False for grid search (full exhaustive sweep).
     """
     import random as rng_module
 
@@ -529,9 +747,9 @@ def generate_builder_param_combinations(
 
     if not active_specs:
         logger.warning("No active parameters to optimize")
-        return [{}], 1
+        return [{}], 1, False
 
-    # Generate value ranges for each param
+    # Build per-param value lists
     param_paths: list[str] = []
     value_ranges: list[list] = []
 
@@ -544,31 +762,157 @@ def generate_builder_param_combinations(
         if spec["type"] == "int":
             values = list(range(int(low), int(high) + 1, int(step)))
         else:
-            # Float range with numpy
             values = list(np.arange(float(low), float(high) + float(step) / 2, float(step)))
             values = [round(v, 4) for v in values]
 
         value_ranges.append(values)
 
-    # Generate all combinations
-    all_combos = list(product(*value_ranges))
-    total_before_sampling = len(all_combos)
+    # Exact total — computed without materialising the product
+    total_combinations = 1
+    for vr in value_ranges:
+        total_combinations *= len(vr)
 
-    if search_method == "random" and max_iterations > 0 and max_iterations < total_before_sampling:
-        if random_seed is not None:
-            rng_module.seed(random_seed)
-        all_combos = rng_module.sample(all_combos, max_iterations)
-        logger.info(f"🎲 Builder Random Search: {max_iterations} from {total_before_sampling}")
-    else:
-        logger.info(f"🔢 Builder Grid Search: {total_before_sampling} combinations")
+    # ── Random search: bounded materialised list ─────────────────────────────
+    if search_method == "random" and max_iterations > 0:
+        n_sample = min(max_iterations, total_combinations)
+        if n_sample >= total_combinations:
+            # Small enough — full grid, no sampling
+            all_combos: list[dict[str, Any]] = [
+                dict(zip(param_paths, combo, strict=False)) for combo in product(*value_ranges)
+            ]
+        else:
+            # Lazy reservoir-sample without materialising the full product
+            if random_seed is not None:
+                rng_module.seed(random_seed)
+            sizes = [len(vr) for vr in value_ranges]
+            seen: set[tuple[int, ...]] = set()
+            sampled: list[tuple] = []
+            max_attempts = n_sample * 20
+            attempts = 0
+            while len(sampled) < n_sample and attempts < max_attempts:
+                attempts += 1
+                idx = tuple(rng_module.randrange(s) for s in sizes)
+                if idx not in seen:
+                    seen.add(idx)
+                    sampled.append(tuple(vr[i] for vr, i in zip(value_ranges, idx, strict=False)))
+            all_combos = [dict(zip(param_paths, combo, strict=False)) for combo in sampled]
+        logger.info(f"🎲 Builder Random Search: {len(all_combos):,} of {total_combinations:,}")
+        was_capped = len(all_combos) < total_combinations
+        return all_combos, total_combinations, was_capped
 
-    # Convert tuples to param_override dicts
-    result = []
-    for combo in all_combos:
-        overrides = dict(zip(param_paths, combo, strict=False))
-        result.append(overrides)
+    # ── Grid search: interleaved round-robin iterator ────────────────────────
+    # Problem with plain product(*shuffled_ranges): with 78M combos and 7500
+    # iterations budget, product exhausts ALL combos for period[0] before ever
+    # visiting period[1].  Under timeout you'd only see a single "period" value.
+    #
+    # Solution — interleaved (round-robin) sweep:
+    #   • Treat param_0 (e.g. "period") as the "outer" axis.
+    #   • For each value of param_0, produce one random combo of the remaining
+    #     params, cycling through all param_0 values repeatedly.
+    #   • This guarantees every distinct value of param_0 appears within the
+    #     first len(param_0_values) iterations — no matter when we time out.
+    #   • Full exhaustive coverage is still achieved when given enough time:
+    #     we track which "inner" combos have been yielded for each param_0 value
+    #     and continue until the full grid is done.
+    #
+    # Memory: O(1) — only the current combo is held in memory.
+    logger.info(f"🔢 Builder Grid Search: {total_combinations:,} combinations (interleaved round-robin, seed=42)")
 
-    return result, total_before_sampling
+    import random as _rng
+
+    def _interleaved_grid_iter() -> Any:
+        rng = _rng.Random(42)  # isolated instance — never affects global state
+
+        if len(value_ranges) == 1:
+            # Trivial: single parameter, just yield in shuffled order
+            vals = value_ranges[0][:]
+            rng.shuffle(vals)
+            for v in vals:
+                yield {param_paths[0]: v}
+            return
+
+        # Outer axis = param_0 (typically the slowest-varying, e.g. "period")
+        outer_vals = value_ranges[0][:]
+        rng.shuffle(outer_vals)
+
+        inner_ranges = value_ranges[1:]
+        inner_paths = param_paths[1:]
+
+        # Pre-shuffle each inner range once for consistent ordering
+        shuffled_inner = [v[:] for v in inner_ranges]
+        for v in shuffled_inner:
+            rng.shuffle(v)
+
+        # For each outer value, keep a separate shuffled iterator over inner combos
+        # so that across rounds we don't repeat combos.
+        # We build inner combos lazily: outer index → list of remaining inner combos.
+        # To stay O(1) in memory we generate them on demand using an index counter.
+        inner_total = 1
+        for v in inner_ranges:
+            inner_total *= len(v)
+
+        # Generate inner combo by linear index (no materialisation)
+        inner_sizes = [len(v) for v in shuffled_inner]
+
+        def _inner_combo(linear_idx: int) -> dict:
+            """Decode linear index into an inner param combo."""
+            combo = {}
+            idx = linear_idx
+            for path, vals, size in zip(inner_paths, shuffled_inner, inner_sizes, strict=False):
+                combo[path] = vals[idx % size]
+                idx //= size
+            return combo
+
+        # We permute the linear indices for each outer value so that the inner
+        # combos are visited in a different random order per outer value — this
+        # avoids patterns where the same TP/SL pair always appears first.
+        # Memory-efficient: use per-outer seeds instead of materialising full permutations.
+        # Each outer[oi] gets seed = 42 + oi, so it's reproducible but independent.
+        # We build a lazy Fisher-Yates mapping: track swaps on-the-fly with a dict.
+        outer_seeds = [42 + i for i in range(len(outer_vals))]
+
+        def _lazy_perm_index(seed: int, total: int, round_idx: int) -> int:
+            """
+            Compute the round_idx-th element of a Fisher-Yates shuffle of range(total)
+            seeded with `seed`, without materialising the full permutation.
+
+            Uses a dict to remember previous swaps — memory O(round_idx), not O(total).
+            """
+            # We cache built permutation state per outer value in _perm_cache
+            # keyed by seed. Each entry is (rng_state, swaps_dict, next_round).
+            if seed not in _perm_cache:
+                r = _rng.Random(seed)
+                _perm_cache[seed] = (r, {}, 0)  # rng, swaps dict, rounds_done
+
+            r, swaps, rounds_done = _perm_cache[seed]
+
+            # Advance the permutation from rounds_done to round_idx (inclusive)
+            while rounds_done <= round_idx:
+                i = total - 1 - rounds_done
+                j = r.randint(0, i)
+                # Swap positions i and j in the virtual array
+                vi = swaps.get(i, i)
+                vj = swaps.get(j, j)
+                swaps[i] = vj
+                swaps[j] = vi
+                rounds_done += 1
+
+            _perm_cache[seed] = (r, swaps, rounds_done)
+            # The value at position round_idx was settled after rounds_done = round_idx+1
+            return swaps.get(round_idx, round_idx)
+
+        _perm_cache: dict = {}
+
+        # Round-robin: one inner combo per outer value per round
+        # round k → yield outer_vals[0] + inner k-th, outer_vals[1] + inner k-th, …
+        for inner_round in range(inner_total):
+            for oi, outer_v in enumerate(outer_vals):
+                inner_idx = _lazy_perm_index(outer_seeds[oi], inner_total, inner_round)
+                inner_combo = _inner_combo(inner_idx)
+                yield {param_paths[0]: outer_v, **inner_combo}
+
+    # was_capped=False — grid is always exhaustive
+    return _interleaved_grid_iter(), total_combinations, False
 
 
 def _merge_ranges(
@@ -579,18 +923,44 @@ def _merge_ranges(
     Merge default param specs with user-defined custom ranges.
 
     Custom ranges can override low/high/step and enable/disable params.
+
+    Matching strategy (in priority order):
+    1. Exact param_path match: "block_1772832197062_q10k0.period" == "block_1772832197062_q10k0.period"
+    2. Suffix param_key match: custom "rsi_0.period" → param_key="period", matches any spec with param_key="period"
+       (when UI sends short-form IDs like "rsi_0" instead of real block IDs)
     """
     if not custom_ranges:
         # Use all defaults as-is
         return param_specs
 
-    # Build lookup by param_path
-    custom_map = {cr["param_path"]: cr for cr in custom_ranges}
+    # Build lookup by exact param_path
+    custom_map: dict[str, dict[str, Any]] = {cr["param_path"]: cr for cr in custom_ranges}
+
+    # Also build fallback lookup by param_key suffix (e.g. "rsi_0.period" → param_key="period")
+    # Key: param_key string, Value: list of custom range dicts with that key
+    custom_by_key: dict[str, list[dict[str, Any]]] = {}
+    for cr in custom_ranges:
+        param_path = cr["param_path"]
+        dot_idx = param_path.rfind(".")
+        param_key = param_path[dot_idx + 1 :] if dot_idx >= 0 else param_path
+        custom_by_key.setdefault(param_key, []).append(cr)
 
     active = []
     for spec in param_specs:
         path = spec["param_path"]
+        param_key = spec.get("param_key", path.split(".")[-1])
+
+        # 1. Exact match
         custom = custom_map.get(path)
+
+        # 2. Fallback: match by param_key if exactly one custom range has that key
+        if custom is None:
+            candidates = custom_by_key.get(param_key, [])
+            if len(candidates) == 1:
+                custom = candidates[0]
+                logger.debug(
+                    f"_merge_ranges: fuzzy match '{path}' → '{custom['param_path']}' via param_key='{param_key}'"
+                )
 
         if custom is not None:
             # User explicitly configured this param
@@ -606,10 +976,7 @@ def _merge_ranges(
             if "step" in custom:
                 merged["step"] = custom["step"]
             active.append(merged)
-        else:
-            # Default: include if not custom_ranges present (means user didn't filter)
-            # If custom_ranges is provided, only include params that are in it
-            pass  # Skip — user selected specific params to optimize
+        # else: param not in custom_ranges → skip (user only wants to optimize selected params)
 
     return active
 
@@ -627,6 +994,9 @@ def run_builder_backtest(
     """
     Run a single backtest using StrategyBuilderAdapter.
 
+    Mirrors the normal backtest flow (router.py) so that DCA, SL/TP, close_by_time
+    and other block-level configurations are properly applied during optimization.
+
     Args:
         graph: Strategy graph (already cloned with modified params).
         ohlcv: OHLCV DataFrame.
@@ -640,6 +1010,159 @@ def run_builder_backtest(
 
     try:
         adapter = StrategyBuilderAdapter(graph)
+
+        # ── Extract block-level configs (mirrors router.py normal backtest) ──
+        block_dca_config = adapter.extract_dca_config()
+        has_dca_blocks = adapter.has_dca_blocks()
+
+        dca_enabled = has_dca_blocks or block_dca_config.get("dca_enabled", False)
+
+        # Extract SL/TP / breakeven / close_by_time from blocks
+        block_stop_loss: float | None = config_params.get("stop_loss_pct")
+        block_take_profit: float | None = config_params.get("take_profit_pct")
+        if block_stop_loss:
+            block_stop_loss = block_stop_loss / 100.0
+        if block_take_profit:
+            block_take_profit = block_take_profit / 100.0
+        block_breakeven_enabled = False
+        block_breakeven_activation_pct = 0.005
+        block_breakeven_offset = 0.0
+        block_close_only_in_profit = False
+        block_sl_type = "average_price"
+        block_max_bars_in_trade = 0
+
+        for block in graph.get("blocks", []):
+            block_type = block.get("type", "")
+            block_params = block.get("params") or block.get("config") or {}
+            if block_type == "close_by_time":
+                bars_val = block_params.get("bars_since_entry", block_params.get("bars", 0))
+                block_max_bars_in_trade = int(bars_val) if bars_val else 0
+            elif block_type == "static_sltp":
+                if block_stop_loss is None:
+                    sl_val = block_params.get("stop_loss_percent", 1.5)
+                    block_stop_loss = sl_val / 100.0
+                if block_take_profit is None:
+                    tp_val = block_params.get("take_profit_percent", 1.5)
+                    block_take_profit = tp_val / 100.0
+                block_breakeven_enabled = block_params.get("activate_breakeven", False)
+                if block_breakeven_enabled:
+                    block_breakeven_activation_pct = block_params.get("breakeven_activation_percent", 0.5) / 100.0
+                    block_breakeven_offset = block_params.get("new_breakeven_sl_percent", 0.1) / 100.0
+                block_close_only_in_profit = block_params.get("close_only_in_profit", False)
+                block_sl_type = block_params.get("sl_type", "average_price")
+            elif block_type == "tp_percent" and block_take_profit is None:
+                block_take_profit = block_params.get("take_profit_percent", 3.0) / 100.0
+            elif block_type == "sl_percent" and block_stop_loss is None:
+                block_stop_loss = block_params.get("stop_loss_percent", 1.5) / 100.0
+
+        direction_str = config_params.get("direction", "both")
+
+        # Sync DCA direction to strategy direction
+        final_dca_config = block_dca_config.copy()
+        final_dca_config["dca_enabled"] = dca_enabled
+        if final_dca_config.get("dca_direction", "both") == "both" and direction_str in ("long", "short"):
+            final_dca_config["dca_direction"] = direction_str
+
+        # ── Route to DCA engine if DCA blocks are present ──────────────────
+        if dca_enabled:
+            from backend.backtesting.engines.dca_engine import DCAEngine
+            from backend.backtesting.models import BacktestConfig, StrategyType
+
+            config = BacktestConfig(
+                symbol=config_params.get("symbol", "BTCUSDT"),
+                interval=config_params.get("interval", "15"),
+                start_date="2025-01-01",
+                end_date="2026-01-01",
+                strategy_type=StrategyType.CUSTOM,
+                strategy_params={
+                    "close_conditions": final_dca_config.get("close_conditions", {}),
+                    "indent_order": final_dca_config.get("indent_order", {}),
+                },
+                initial_capital=config_params.get("initial_capital", 10000.0),
+                position_size=config_params.get("position_size", 1.0),
+                leverage=config_params.get("leverage", 1),
+                direction=direction_str,
+                stop_loss=block_stop_loss if block_stop_loss else None,
+                take_profit=block_take_profit if block_take_profit else None,
+                commission_value=config_params.get("commission", COMMISSION_TV),
+                taker_fee=config_params.get("commission", COMMISSION_TV),
+                maker_fee=config_params.get("commission", COMMISSION_TV),
+                # DCA fields from block config
+                dca_enabled=True,
+                dca_direction=final_dca_config.get("dca_direction", "both"),
+                dca_order_count=final_dca_config.get("dca_order_count", 5),
+                dca_grid_size_percent=final_dca_config.get("dca_grid_size_percent", 10.0),
+                dca_martingale_coef=final_dca_config.get("dca_martingale_coef", 1.0),
+                dca_martingale_mode=final_dca_config.get("dca_martingale_mode", "multiply_each"),
+                dca_log_step_enabled=final_dca_config.get("dca_log_step_enabled", False),
+                dca_log_step_coef=final_dca_config.get("dca_log_step_coef", 1.1),
+                dca_safety_close_enabled=final_dca_config.get("dca_safety_close_enabled", True),
+                dca_drawdown_threshold=final_dca_config.get("dca_drawdown_threshold", 30.0),
+                dca_multi_tp_enabled=final_dca_config.get("dca_multi_tp_enabled", False),
+                # DCA multi-TP levels from block config
+                dca_tp1_percent=final_dca_config.get("dca_tp1_percent", 0.5),
+                dca_tp1_close_percent=final_dca_config.get("dca_tp1_close_percent", 25.0),
+                dca_tp2_percent=final_dca_config.get("dca_tp2_percent", 1.0),
+                dca_tp2_close_percent=final_dca_config.get("dca_tp2_close_percent", 25.0),
+                dca_tp3_percent=final_dca_config.get("dca_tp3_percent", 2.0),
+                dca_tp3_close_percent=final_dca_config.get("dca_tp3_close_percent", 25.0),
+                dca_tp4_percent=final_dca_config.get("dca_tp4_percent", 3.0),
+                dca_tp4_close_percent=final_dca_config.get("dca_tp4_close_percent", 25.0),
+                # Breakeven
+                breakeven_enabled=block_breakeven_enabled,
+                breakeven_activation_pct=block_breakeven_activation_pct,
+                breakeven_offset=block_breakeven_offset,
+                sl_type=block_sl_type,
+                # Close by time
+                max_bars_in_trade=block_max_bars_in_trade,
+                close_only_in_profit=block_close_only_in_profit,
+            )
+
+            engine = DCAEngine()
+            bt_result = engine.run_from_config(config, ohlcv, custom_strategy=adapter)
+
+            if bt_result is None:
+                return None
+
+            # Extract metrics from BacktestResult (DCA engine returns BacktestResult)
+            metrics = getattr(bt_result, "metrics", None) or getattr(bt_result, "performance", None)
+            if metrics is None:
+                return None
+
+            def _safe(v: Any, default: float = 0.0) -> float:
+                return float(v) if v is not None else default
+
+            win_rate = _safe(getattr(metrics, "win_rate", 0))
+            if win_rate <= 1.0:
+                win_rate *= 100.0
+
+            return {
+                "total_return": _safe(getattr(metrics, "total_return", 0)),
+                "sharpe_ratio": _safe(getattr(metrics, "sharpe_ratio", 0)),
+                "max_drawdown": _safe(getattr(metrics, "max_drawdown", 0)),
+                "win_rate": win_rate,
+                "total_trades": int(getattr(metrics, "total_trades", 0) or 0),
+                "profit_factor": _safe(getattr(metrics, "profit_factor", 0)),
+                "winning_trades": int(getattr(metrics, "winning_trades", 0) or 0),
+                "losing_trades": int(getattr(metrics, "losing_trades", 0) or 0),
+                "net_profit": _safe(getattr(metrics, "net_profit", 0)),
+                "net_profit_pct": _safe(getattr(metrics, "total_return", 0)),
+                "gross_profit": _safe(getattr(metrics, "gross_profit", 0)),
+                "gross_loss": _safe(getattr(metrics, "gross_loss", 0)),
+                "avg_win": _safe(getattr(metrics, "avg_win", 0)),
+                "avg_loss": _safe(getattr(metrics, "avg_loss", 0)),
+                "largest_win": _safe(getattr(metrics, "largest_win", 0)),
+                "largest_loss": _safe(getattr(metrics, "largest_loss", 0)),
+                "recovery_factor": _safe(getattr(metrics, "recovery_factor", 0)),
+                "expectancy": _safe(getattr(metrics, "expectancy", 0)),
+                "sortino_ratio": _safe(getattr(metrics, "sortino_ratio", 0)),
+                "calmar_ratio": _safe(getattr(metrics, "calmar_ratio", 0)),
+                "max_drawdown_value": 0.0,
+                "long_trades": int(getattr(metrics, "long_trades", 0) or 0),
+                "short_trades": int(getattr(metrics, "short_trades", 0) or 0),
+            }
+
+        # ── Non-DCA path: use fast numba engine with BacktestInput ──────────
         signals = adapter.generate_signals(ohlcv)
 
         # Convert SignalResult to numpy arrays
@@ -656,10 +1179,8 @@ def run_builder_backtest(
             else np.zeros(len(ohlcv), dtype=bool)
         )
 
-        # Build BacktestInput
         from backend.optimization.utils import build_backtest_input, extract_metrics_from_output, parse_trade_direction
 
-        direction_str = config_params.get("direction", "both")
         trade_direction = parse_trade_direction(direction_str)
 
         bt_input = build_backtest_input(
@@ -670,11 +1191,10 @@ def run_builder_backtest(
             short_exits=short_exits,
             request_params=config_params,
             trade_direction=trade_direction,
-            stop_loss_pct=config_params.get("stop_loss_pct", 0),
-            take_profit_pct=config_params.get("take_profit_pct", 0),
+            stop_loss_pct=(block_stop_loss * 100.0) if block_stop_loss else 0.0,
+            take_profit_pct=(block_take_profit * 100.0) if block_take_profit else 0.0,
         )
 
-        # Get engine
         from backend.backtesting.engine_selector import get_engine
 
         engine_type = config_params.get("engine_type", "numba")
@@ -689,7 +1209,7 @@ def run_builder_backtest(
         return result
 
     except Exception as e:
-        logger.warning(f"Builder backtest failed: {e}")
+        logger.warning(f"Builder backtest failed: {e}", exc_info=True)
         return None
 
 
@@ -698,10 +1218,1425 @@ def run_builder_backtest(
 # =============================================================================
 
 
-def run_builder_grid_search(
+def _is_rsi_threshold_only_optimization(
+    param_combinations: list[dict[str, Any]],
+    base_graph: dict[str, Any],
+) -> tuple[bool, str | None]:
+    """Check if optimization only varies RSI threshold params (not period).
+
+    When only RSI thresholds change, we can pre-compute the RSI series once
+    and quickly re-evaluate threshold conditions for each combination,
+    avoiding the full signal generation pipeline (~10-50x speedup).
+
+    Returns:
+        (is_threshold_only, rsi_block_id) tuple
+    """
+    if not param_combinations:
+        return False, None
+
+    # Collect all param_keys being optimized and their block IDs
+    sample = param_combinations[0]
+    rsi_block_id = None
+    threshold_params = {
+        "cross_long_level",
+        "cross_short_level",
+        "long_rsi_more",
+        "long_rsi_less",
+        "short_rsi_more",
+        "short_rsi_less",
+        "overbought",
+        "oversold",
+        "cross_memory_bars",
+    }
+
+    for param_path in sample:
+        parts = param_path.split(".", 1)
+        if len(parts) != 2:
+            return False, None
+        block_id, param_key = parts
+
+        # Allow static_sltp block params (SL/TP) — handled in fast path per combo
+        block = None
+        for b in base_graph.get("blocks", []):
+            if b.get("id") == block_id:
+                block = b
+                break
+        if not block:
+            return False, None
+
+        block_type = block.get("type", "")
+
+        # static_sltp params are allowed alongside RSI threshold params
+        if block_type == "static_sltp":
+            sltp_allowed = {"stop_loss_percent", "take_profit_percent"}
+            if param_key not in sltp_allowed:
+                return False, None
+            continue  # Don't require RSI block for SL/TP params
+
+        if block_type != "rsi":
+            return False, None
+
+        # Check that param is a threshold (not period)
+        # NOTE: 'period' IS now allowed — the fast path handles it by re-computing RSI per period.
+        rsi_allowed_params = threshold_params | {"period"}
+        if param_key not in rsi_allowed_params:
+            return False, None
+
+        if rsi_block_id is None:
+            rsi_block_id = block_id
+        elif rsi_block_id != block_id:
+            return False, None  # Multiple RSI blocks — not supported for fast path
+
+    return True, rsi_block_id
+
+
+def _run_fast_rsi_threshold_optimization(
     base_graph: dict[str, Any],
     ohlcv: pd.DataFrame,
     param_combinations: list[dict[str, Any]],
+    config_params: dict[str, Any],
+    rsi_block_id: str,
+    optimize_metric: str = "sharpe_ratio",
+    weights: dict[str, float] | None = None,
+    max_results: int = 20,
+    early_stopping: bool = False,
+    early_stopping_patience: int = 20,
+    timeout_seconds: int = 3600,
+    strategy_id: str = "",
+) -> dict[str, Any]:
+    """Fast-path RSI threshold optimization.
+
+    Pre-computes the RSI series once, then quickly evaluates different
+    threshold combinations without re-running the full signal pipeline.
+    Falls back to standard path on any error.
+    """
+    start_time = time.time()
+    results: list[dict[str, Any]] = []
+    all_results: list[dict[str, Any]] = []
+    best_score = float("-inf")
+    no_improvement_count = 0
+    total = len(param_combinations)
+    tested = 0
+
+    # Initialize progress
+    if strategy_id:
+        update_optimization_progress(strategy_id, status="running", tested=0, total=total, started_at=start_time)
+
+    # Get the RSI block's base params
+    rsi_block = None
+    for block in base_graph.get("blocks", []):
+        if block.get("id") == rsi_block_id:
+            rsi_block = block
+            break
+
+    if not rsi_block:
+        logger.warning("Fast RSI optimization: RSI block not found, falling back to standard path")
+        raise ValueError("RSI block not found")
+
+    base_params = rsi_block.get("params") or rsi_block.get("config") or {}
+    _base_period = int(base_params.get("period", 14))
+
+    # Pre-compute RSI for each unique period in the combo set (avoids full pipeline per combo)
+    close = ohlcv["close"].astype(float).values
+    gain_arr = np.where(np.diff(close, prepend=close[0]) > 0, np.diff(close, prepend=close[0]), 0.0)
+    loss_arr = np.where(np.diff(close, prepend=close[0]) < 0, -np.diff(close, prepend=close[0]), 0.0)
+
+    def _compute_rsi_for_period(p: int) -> tuple:
+        """Compute Wilder RSI series for a given period."""
+        alpha = 1.0 / p
+        ag = np.zeros(len(close))
+        al = np.zeros(len(close))
+        ag[p] = np.mean(gain_arr[1 : p + 1])
+        al[p] = np.mean(loss_arr[1 : p + 1])
+        for j in range(p + 1, len(close)):
+            ag[j] = ag[j - 1] * (1 - alpha) + gain_arr[j] * alpha
+            al[j] = al[j - 1] * (1 - alpha) + loss_arr[j] * alpha
+        rs = np.divide(ag, al, out=np.zeros_like(ag), where=al != 0)
+        vals = 100.0 - 100.0 / (1.0 + rs)
+        vals[:p] = np.nan
+        s = pd.Series(vals, index=ohlcv.index)
+        return s, s.shift(1)
+
+    # Pre-compute RSI for all unique periods in the combo list
+    _rsi_cache: dict[int, tuple] = {}
+    for _combo in param_combinations:
+        for _path, _val in _combo.items():
+            if _path.endswith(".period"):
+                _p = int(_val)
+                if _p not in _rsi_cache:
+                    _rsi_cache[_p] = _compute_rsi_for_period(_p)
+    # Always include base period
+    if _base_period not in _rsi_cache:
+        _rsi_cache[_base_period] = _compute_rsi_for_period(_base_period)
+
+    # Default RSI (base period) — will be overridden per-combo if period is swept
+    rsi, rsi_prev = _rsi_cache[_base_period]
+
+    _log_info(
+        f"⚡ Fast RSI threshold optimization: pre-computed RSI for {len(_rsi_cache)} "
+        f"period(s) {sorted(_rsi_cache.keys())} over {len(ohlcv)} bars"
+    )
+
+    # Pre-extract DCA config and other block-level configs from the BASE graph
+    # (these don't change across RSI threshold combos)
+    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+
+    base_adapter = StrategyBuilderAdapter(base_graph)
+    block_dca_config = base_adapter.extract_dca_config()
+    has_dca_blocks = base_adapter.has_dca_blocks()
+    dca_enabled = has_dca_blocks or block_dca_config.get("dca_enabled", False)
+
+    # Extract SL/TP / close_by_time from base graph (unchanged across combos)
+    block_stop_loss: float | None = config_params.get("stop_loss_pct")
+    block_take_profit: float | None = config_params.get("take_profit_pct")
+    if block_stop_loss:
+        block_stop_loss = block_stop_loss / 100.0
+    if block_take_profit:
+        block_take_profit = block_take_profit / 100.0
+    block_breakeven_enabled = False
+    block_breakeven_activation_pct = 0.005
+    block_breakeven_offset = 0.0
+    block_close_only_in_profit = False
+    block_sl_type = "average_price"
+    block_max_bars_in_trade = 0
+
+    for block in base_graph.get("blocks", []):
+        block_type = block.get("type", "")
+        bp = block.get("params") or block.get("config") or {}
+        if block_type == "close_by_time":
+            bars_val = bp.get("bars_since_entry", bp.get("bars", 0))
+            block_max_bars_in_trade = int(bars_val) if bars_val else 0
+        elif block_type == "static_sltp":
+            if block_stop_loss is None:
+                block_stop_loss = bp.get("stop_loss_percent", 1.5) / 100.0
+            if block_take_profit is None:
+                block_take_profit = bp.get("take_profit_percent", 1.5) / 100.0
+            block_breakeven_enabled = bp.get("activate_breakeven", False)
+            if block_breakeven_enabled:
+                block_breakeven_activation_pct = bp.get("breakeven_activation_percent", 0.5) / 100.0
+                block_breakeven_offset = bp.get("new_breakeven_sl_percent", 0.1) / 100.0
+            block_close_only_in_profit = bp.get("close_only_in_profit", False)
+            block_sl_type = bp.get("sl_type", "average_price")
+        elif block_type == "tp_percent" and block_take_profit is None:
+            block_take_profit = bp.get("take_profit_percent", 3.0) / 100.0
+        elif block_type == "sl_percent" and block_stop_loss is None:
+            block_stop_loss = bp.get("stop_loss_percent", 1.5) / 100.0
+
+    direction_str = config_params.get("direction", "both")
+
+    # Sync DCA direction
+    final_dca_config = block_dca_config.copy()
+    final_dca_config["dca_enabled"] = dca_enabled
+    if final_dca_config.get("dca_direction", "both") == "both" and direction_str in ("long", "short"):
+        final_dca_config["dca_direction"] = direction_str
+
+    def _compute_two_mas_filter_mask(ohlcv_df: pd.DataFrame, blk_params: dict, src_port: str) -> np.ndarray | None:
+        """Compute EMA/MA filter boolean mask from a two_mas block directly (no adapter needed)."""
+        try:
+            ma1_len = int(blk_params.get("ma1_length", 50))
+            ma2_len = int(blk_params.get("ma2_length", 100))
+            ma1_type = str(blk_params.get("ma1_smoothing", "SMA")).upper()
+            ma2_type = str(blk_params.get("ma2_smoothing", "EMA")).upper()
+            ma1_src = str(blk_params.get("ma1_source", "close"))
+            ma2_src = str(blk_params.get("ma2_source", "close"))
+
+            src1 = ohlcv_df[ma1_src] if ma1_src in ohlcv_df.columns else ohlcv_df["close"]
+            src2 = ohlcv_df[ma2_src] if ma2_src in ohlcv_df.columns else ohlcv_df["close"]
+
+            def _ma(series: pd.Series, length: int, ma_type: str) -> pd.Series:
+                if ma_type == "EMA":
+                    return series.ewm(span=length, adjust=False).mean()
+                elif ma_type == "WMA":
+                    weights = np.arange(1, length + 1)
+                    return series.rolling(length).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+                else:  # SMA default
+                    return series.rolling(length).mean()
+
+            ma1 = _ma(src1, ma1_len, ma1_type)
+            ma2 = _ma(src2, ma2_len, ma2_type)
+            close = ohlcv_df["close"]
+
+            long_signal = pd.Series(True, index=ohlcv_df.index)
+            short_signal = pd.Series(True, index=ohlcv_df.index)
+
+            if blk_params.get("use_ma_cross", False):
+                ma1_prev = ma1.shift(1)
+                ma2_prev = ma2.shift(1)
+                long_signal = (ma1 > ma2) & (ma1_prev <= ma2_prev)
+                short_signal = (ma1 < ma2) & (ma1_prev >= ma2_prev)
+            elif blk_params.get("use_ma1_filter", False):
+                above = close > ma1
+                opposite = blk_params.get("opposite_ma1_filter", False)
+                if opposite:
+                    long_signal = ~above
+                    short_signal = above
+                else:
+                    long_signal = above
+                    short_signal = ~above
+
+            if src_port in ("long", "long_filter"):
+                sig = long_signal
+            elif src_port in ("short", "short_filter"):
+                sig = short_signal
+            else:
+                sig = long_signal
+
+            return np.asarray(sig.fillna(False).values, dtype=bool)
+        except Exception as _e:
+            _log_warning(f"_compute_two_mas_filter_mask failed: {_e}")
+            return None
+
+    # ── Pre-compute filter signals (EMA/indicator AND-filters) ───────────────
+    # These don't change across RSI threshold combos, so compute once and reuse.
+    _ema_long_filter: np.ndarray | None = None
+    _ema_short_filter: np.ndarray | None = None
+    _has_non_dca_filter = False
+    if not dca_enabled:
+        try:
+            _connections = base_graph.get("connections", [])
+            _filter_long_sigs: list[np.ndarray] = []
+            _filter_short_sigs: list[np.ndarray] = []
+            # Find connections that go to filter_long / filter_short ports
+            for _conn in _connections:
+                _tgt_port = _conn.get("target", {}).get("portId", "")
+                _src_block_id = _conn.get("source", {}).get("blockId", "")
+                if _tgt_port in ("filter_long", "confirm_long"):
+                    # Find the source block
+                    for _blk in base_graph.get("blocks", []):
+                        if _blk.get("id") == _src_block_id:
+                            _blk_type = _blk.get("type", "")
+                            _blk_params = _blk.get("params") or _blk.get("config") or {}
+                            if _blk_type == "two_mas":
+                                _src_port = _conn.get("source", {}).get("portId", "long")
+                                _sig = _compute_two_mas_filter_mask(ohlcv, _blk_params, _src_port)
+                                if _sig is not None:
+                                    _filter_long_sigs.append(_sig)
+                elif _tgt_port in ("filter_short", "confirm_short"):
+                    for _blk in base_graph.get("blocks", []):
+                        if _blk.get("id") == _src_block_id:
+                            _blk_type = _blk.get("type", "")
+                            _blk_params = _blk.get("params") or _blk.get("config") or {}
+                            if _blk_type == "two_mas":
+                                _src_port = _conn.get("source", {}).get("portId", "short")
+                                _sig = _compute_two_mas_filter_mask(ohlcv, _blk_params, _src_port)
+                                if _sig is not None:
+                                    _filter_short_sigs.append(_sig)
+
+            if _filter_long_sigs:
+                _ema_long_filter = _filter_long_sigs[0]
+                for _f in _filter_long_sigs[1:]:
+                    _ema_long_filter = _ema_long_filter & _f
+                _has_non_dca_filter = True
+                _log_info(f"⚡ Fast RSI path: pre-computed long filter mask ({_ema_long_filter.sum()} True bars)")
+            if _filter_short_sigs:
+                _ema_short_filter = _filter_short_sigs[0]
+                for _f in _filter_short_sigs[1:]:
+                    _ema_short_filter = _ema_short_filter & _f
+                _has_non_dca_filter = True
+                _log_info(f"⚡ Fast RSI path: pre-computed short filter mask ({_ema_short_filter.sum()} True bars)")
+        except Exception as _e:
+            _log_warning(f"Fast RSI path: filter pre-computation failed ({_e}), filters will be skipped")
+            _ema_long_filter = None
+            _ema_short_filter = None
+
+    # ── Determine if SL/TP is being swept across combos ──────────────────────
+    # When static_sltp params appear in overrides, extract per-combo instead of using base values.
+    _sltp_block_ids: set[str] = {b["id"] for b in base_graph.get("blocks", []) if b.get("type") == "static_sltp"}
+    _sample_combo = param_combinations[0] if param_combinations else {}
+    _sltp_in_overrides = any(k.split(".")[0] in _sltp_block_ids for k in _sample_combo)
+    if _sltp_in_overrides:
+        _log_info("⚡ Fast RSI path: SL/TP params detected in combos — will extract per-combo")
+
+    if dca_enabled:
+        _fast_rsi_dca_close_cache = _precompute_dca_close_cache(final_dca_config, config_params, ohlcv)
+        if _fast_rsi_dca_close_cache is not None:
+            _log_info("⚡ Fast RSI path: DCA close-condition indicator cache pre-computed")
+
+    # ── Pre-init engine and imports outside the hot loop ─────────────────────
+    # Importing inside the loop adds ~0.1-1ms per combo. Pre-init here.
+    if not dca_enabled:
+        from backend.backtesting.engine_selector import get_engine as _get_engine
+        from backend.backtesting.interfaces import BacktestInput
+        from backend.optimization.utils import extract_metrics_from_output, parse_trade_direction
+
+        _bt_engine = _get_engine(engine_type="numba")
+        _trade_direction = parse_trade_direction(direction_str)
+        # Pre-allocate zero arrays (same size, reused every combo)
+        _n = len(ohlcv)
+        _long_exits = np.zeros(_n, dtype=bool)
+        _short_exits = np.zeros(_n, dtype=bool)
+        _log_info(f"⚡ Fast RSI path: engine pre-initialized ({type(_bt_engine).__name__}), {_n} bars")
+
+    # Log to console every ~5%; update progress store every combo (for real-time UI feedback).
+    # Fast RSI path may run 100s of combos/s — cap progress store updates at 50ms intervals.
+    log_interval = max(1, total // 20)
+    _last_progress_update = 0.0
+
+    for i, overrides in enumerate(param_combinations):
+        elapsed = time.time() - start_time
+        if elapsed > timeout_seconds:
+            logger.info(f"⏱️ Fast RSI optimization timeout after {elapsed:.0f}s at combo {i}/{total}")
+            break
+
+        tested += 1
+
+        # Fast signal generation from pre-computed RSI
+        merged_params = {**base_params}
+        for param_path, value in overrides.items():
+            _bid_tmp, _pkey_tmp = param_path.split(".", 1)
+            if _bid_tmp not in _sltp_block_ids:
+                merged_params[_pkey_tmp] = value
+
+        # Pick RSI series for the combo's period (cached above)
+        _combo_period = int(merged_params.get("period", _base_period))
+        if _combo_period in _rsi_cache:
+            rsi, rsi_prev = _rsi_cache[_combo_period]
+        else:
+            rsi, rsi_prev = _rsi_cache[_base_period]
+
+        # Auto-enable mode flags when optimizing mode-gated RSI params —
+        # mirrors clone_graph_with_params logic (line ~617) so that
+        # e.g. optimizing cross_long_level activates use_cross_level=True
+        # even if the base block has it disabled.
+        # Also skip SL/TP keys so they don't pollute merged_params (not RSI params)
+        for param_path in overrides:
+            block_id_p, param_key = param_path.split(".", 1)
+            if block_id_p in _sltp_block_ids:
+                continue  # SL/TP params handled separately below
+            if param_key in ("cross_long_level", "cross_short_level"):
+                merged_params["use_cross_level"] = True
+            elif param_key == "cross_memory_bars":
+                merged_params["use_cross_memory"] = True
+            elif param_key in ("long_rsi_more", "long_rsi_less"):
+                merged_params["use_long_range"] = True
+            elif param_key in ("short_rsi_more", "short_rsi_less"):
+                merged_params["use_short_range"] = True
+
+        # Extract per-combo SL/TP (when static_sltp params are being swept)
+        _combo_sl = block_stop_loss
+        _combo_tp = block_take_profit
+        if _sltp_in_overrides:
+            for param_path, value in overrides.items():
+                _bid, _pkey = param_path.split(".", 1)
+                if _bid in _sltp_block_ids:
+                    if _pkey == "stop_loss_percent":
+                        _combo_sl = float(value) / 100.0
+                    elif _pkey == "take_profit_percent":
+                        _combo_tp = float(value) / 100.0
+
+        # Compute signals using pre-computed RSI
+        signals = _fast_rsi_signals(
+            rsi=rsi,
+            rsi_prev=rsi_prev,
+            params=merged_params,
+            direction=direction_str,
+        )
+
+        # Apply pre-computed EMA/indicator AND-filter masks (fast path replacement for adapter pipeline)
+        if _ema_long_filter is not None:
+            long_mask = signals > 0
+            long_mask &= _ema_long_filter
+            signals[signals > 0] = 0
+            signals[long_mask] = 1
+        if _ema_short_filter is not None:
+            short_mask = signals < 0
+            short_mask &= _ema_short_filter
+            signals[signals < 0] = 0
+            signals[short_mask] = -1
+
+        long_signal_count = int(np.sum(signals > 0))
+        short_signal_count = int(np.sum(signals < 0))
+
+        # Update progress store at most every 50ms (before potential early-continue)
+        now = time.time()
+        if strategy_id and (now - _last_progress_update) >= 0.05:
+            _last_progress_update = now
+            elapsed_now = now - start_time
+            speed_now = int(tested / max(elapsed_now, 0.001))
+            eta_now = int((total - tested) / max(speed_now, 1))
+            update_optimization_progress(
+                strategy_id,
+                status="running",
+                tested=tested,
+                total=total,
+                best_score=best_score if best_score != float("-inf") else 0.0,
+                results_found=len(results),
+                speed=speed_now,
+                eta_seconds=eta_now,
+                started_at=start_time,
+            )
+
+        # Log to console every 5%
+        if tested > 0 and tested % log_interval == 0:
+            elapsed_now = time.time() - start_time
+            speed_now = int(tested / max(elapsed_now, 0.001))
+            eta_now = int((total - tested) / max(speed_now, 1))
+            pct = tested * 100 // total if total > 0 else 0
+            logger.info(
+                f"📊 Fast RSI optimization progress: {tested}/{total} ({pct}%) "
+                f"speed={speed_now} combos/s, ETA={eta_now}s, results={len(results)}"
+            )
+
+        # Fast skip: no signals → no trades
+        if long_signal_count == 0 and short_signal_count == 0:
+            continue
+
+        # Run DCA engine with pre-computed signals
+        if dca_enabled:
+            result = _run_dca_with_signals(
+                signals=signals,
+                ohlcv=ohlcv,
+                config_params=config_params,
+                final_dca_config=final_dca_config,
+                direction_str=direction_str,
+                block_stop_loss=block_stop_loss,
+                block_take_profit=block_take_profit,
+                block_breakeven_enabled=block_breakeven_enabled,
+                block_breakeven_activation_pct=block_breakeven_activation_pct,
+                block_breakeven_offset=block_breakeven_offset,
+                block_close_only_in_profit=block_close_only_in_profit,
+                block_sl_type=block_sl_type,
+                block_max_bars_in_trade=block_max_bars_in_trade,
+                close_indicator_cache=_fast_rsi_dca_close_cache,
+            )
+        else:
+            # Fast path: directly run engine with pre-computed filtered signals.
+            # Engine and imports are pre-initialized before the loop for speed.
+            try:
+                long_entries = (signals > 0).astype(bool)
+                short_entries = (signals < 0).astype(bool)
+
+                bt_input = BacktestInput(
+                    candles=ohlcv,
+                    candles_1m=None,
+                    long_entries=long_entries,
+                    long_exits=_long_exits,
+                    short_entries=short_entries,
+                    short_exits=_short_exits,
+                    symbol=config_params.get("symbol", "BTCUSDT"),
+                    interval=config_params.get("interval", "15"),
+                    initial_capital=config_params.get("initial_capital", 10000.0),
+                    position_size=config_params.get("position_size", 1.0),
+                    use_fixed_amount=False,
+                    fixed_amount=0.0,
+                    leverage=config_params.get("leverage", 1),
+                    stop_loss=_combo_sl if _combo_sl else 0.0,
+                    take_profit=_combo_tp if _combo_tp else 0.0,
+                    direction=_trade_direction,
+                    taker_fee=config_params.get("commission", COMMISSION_TV),
+                    maker_fee=config_params.get("commission", COMMISSION_TV),
+                    slippage=config_params.get("slippage", 0.0),
+                    use_bar_magnifier=False,
+                    max_drawdown_limit=0.0,
+                    pyramiding=config_params.get("pyramiding", 1),
+                    market_regime_enabled=False,
+                    market_regime_filter="not_volatile",
+                    market_regime_lookback=50,
+                )
+
+                bt_output = _bt_engine.run(bt_input)
+                if not bt_output.is_valid:
+                    result = None
+                else:
+                    result = extract_metrics_from_output(bt_output, win_rate_as_pct=True)
+            except Exception as _fast_err:
+                _log_warning(f"Fast non-DCA path failed ({_fast_err}), using standard backtest")
+                modified_graph = clone_graph_with_params(base_graph, overrides)
+                result = run_builder_backtest(modified_graph, ohlcv, config_params)
+
+        # Update progress store at most every 50ms to avoid lock contention at high speed
+        now = time.time()
+        if strategy_id and (now - _last_progress_update) >= 0.05:
+            _last_progress_update = now
+            elapsed_now = now - start_time
+            speed_now = int(tested / max(elapsed_now, 0.001))
+            eta_now = int((total - tested) / max(speed_now, 1))
+            update_optimization_progress(
+                strategy_id,
+                status="running",
+                tested=tested,
+                total=total,
+                best_score=best_score if best_score != float("-inf") else 0.0,
+                results_found=len(results),
+                speed=speed_now,
+                eta_seconds=eta_now,
+                started_at=start_time,
+            )
+
+        # Log to console every 5%
+        if tested > 0 and tested % log_interval == 0:
+            elapsed_now = time.time() - start_time
+            speed_now = int(tested / max(elapsed_now, 0.001))
+            eta_now = int((total - tested) / max(speed_now, 1))
+            pct = tested * 100 // total if total > 0 else 0
+            logger.info(
+                f"📊 Fast RSI optimization progress: {tested}/{total} ({pct}%) "
+                f"speed={speed_now} combos/s, ETA={eta_now}s, results={len(results)}"
+            )
+
+        if result is None:
+            continue
+
+        score = calculate_composite_score(result, optimize_metric, weights)
+        entry = {"params": overrides, "score": score, **result}
+        all_results.append(entry)
+
+        if not passes_filters(result, config_params):
+            continue
+
+        results.append(entry)
+
+        if score > best_score:
+            best_score = score
+            no_improvement_count = 0
+        else:
+            no_improvement_count += 1
+
+        if early_stopping and no_improvement_count >= early_stopping_patience:
+            logger.info(f"⏹️ Fast RSI early stopping at combo {i}/{total}")
+            break
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+    top_results = results[:max_results]
+
+    if not top_results and all_results:
+        logger.warning(f"⚠️ All {len(all_results)} results filtered out. Returning best unfiltered.")
+        all_results.sort(key=lambda r: r["score"], reverse=True)
+        top_results = all_results[:max_results]
+
+    execution_time = time.time() - start_time
+    speed = int(tested / max(execution_time, 0.001))
+
+    logger.info(
+        f"⚡ Fast RSI optimization complete: {tested}/{total} tested in {execution_time:.1f}s "
+        f"({speed} combos/s), {len(results)} results found"
+    )
+
+    timed_out = time.time() - start_time >= timeout_seconds
+
+    # Mark progress as completed
+    if strategy_id:
+        update_optimization_progress(
+            strategy_id,
+            status="completed" if not timed_out else "partial",
+            tested=tested,
+            total=total,
+            best_score=top_results[0]["score"] if top_results else 0.0,
+            results_found=len(results),
+            speed=speed,
+            eta_seconds=0,
+            started_at=start_time,
+        )
+
+    return {
+        "status": "completed" if not timed_out else "partial",
+        "total_combinations": total,
+        "tested_combinations": tested,
+        "results_passing_filters": len(results),
+        "results_found": len(results),
+        "top_results": top_results,
+        "best_params": top_results[0]["params"] if top_results else {},
+        "best_score": top_results[0]["score"] if top_results else 0.0,
+        "best_metrics": {k: v for k, v in top_results[0].items() if k not in ("params", "score")}
+        if top_results
+        else {},
+        "execution_time_seconds": round(execution_time, 2),
+        "speed_combinations_per_sec": speed,
+        "early_stopped": early_stopping and no_improvement_count >= early_stopping_patience,
+    }
+
+
+def _fast_rsi_signals(
+    rsi: pd.Series,
+    rsi_prev: pd.Series,
+    params: dict[str, Any],
+    direction: str = "both",
+) -> np.ndarray:
+    """Generate RSI signals using pre-computed RSI series.
+
+    This is the fast-path signal generator that avoids the full
+    StrategyBuilderAdapter pipeline. Only evaluates threshold conditions.
+    """
+    n = len(rsi)
+    signals = np.zeros(n)
+
+    use_long_range = params.get("use_long_range", False)
+    use_short_range = params.get("use_short_range", False)
+    use_cross_level = params.get("use_cross_level", False)
+
+    # Range conditions
+    if use_long_range:
+        long_more = float(params.get("long_rsi_more", 0))
+        long_less = float(params.get("long_rsi_less", 50))
+        if long_more > long_less:
+            long_more, long_less = long_less, long_more
+        long_range = (rsi >= long_more) & (rsi <= long_less)
+    else:
+        long_range = pd.Series(True, index=rsi.index)
+
+    if use_short_range:
+        short_less = float(params.get("short_rsi_less", 100))
+        short_more = float(params.get("short_rsi_more", 50))
+        if short_more > short_less:
+            short_more, short_less = short_less, short_more
+        short_range = (rsi <= short_less) & (rsi >= short_more)
+    else:
+        short_range = pd.Series(True, index=rsi.index)
+
+    # Cross conditions
+    if use_cross_level:
+        cross_long_level = float(params.get("cross_long_level", 29))
+        cross_short_level = float(params.get("cross_short_level", 55))
+        cross_long = (rsi_prev < cross_long_level) & (rsi >= cross_long_level)
+        cross_short = (rsi_prev > cross_short_level) & (rsi <= cross_short_level)
+
+        # Apply cross memory if enabled
+        if params.get("use_cross_memory", False):
+            memory_bars = int(params.get("cross_memory_bars", 5))
+            cross_long = _apply_memory(cross_long, memory_bars)
+            cross_short = _apply_memory(cross_short, memory_bars)
+
+        long_cross = cross_long
+        short_cross = cross_short
+    else:
+        long_cross = pd.Series(True, index=rsi.index)
+        short_cross = pd.Series(True, index=rsi.index)
+
+    # Combine conditions (matching indicator_handlers.py logic)
+    if use_long_range and use_cross_level:
+        _cross_l = float(params.get("cross_long_level", 29))
+        _long_more = float(params.get("long_rsi_more", 0))
+        if _cross_l < _long_more:
+            # Conflict resolution: also fire when RSI crosses UP through long_rsi_more
+            cross_into_range = (rsi_prev < _long_more) & (rsi >= _long_more)
+            long_signal = (long_cross | cross_into_range) & long_range
+        else:
+            long_signal = long_cross & long_range
+    elif use_long_range:
+        long_signal = long_range
+    else:
+        long_signal = long_cross
+
+    if use_short_range and use_cross_level:
+        _cross_s = float(params.get("cross_short_level", 55))
+        _short_less = float(params.get("short_rsi_less", 100))
+        if _cross_s > _short_less:
+            cross_into_range_s = (rsi_prev > _short_less) & (rsi <= _short_less)
+            short_signal = (short_cross | cross_into_range_s) & short_range
+        else:
+            short_signal = short_cross & short_range
+    elif use_short_range:
+        short_signal = short_range
+    else:
+        short_signal = short_cross
+
+    # Legacy overbought/oversold
+    overbought = float(params.get("overbought", 0))
+    oversold = float(params.get("oversold", 0))
+    if overbought > 0 and oversold > 0 and not use_long_range and not use_short_range and not use_cross_level:
+        long_signal = (rsi <= oversold).fillna(False)
+        short_signal = (rsi >= overbought).fillna(False)
+
+    # Apply direction filter
+    long_arr = long_signal.fillna(False).values.astype(bool)
+    short_arr = short_signal.fillna(False).values.astype(bool)
+
+    if direction in ("long", "both"):
+        signals[long_arr] = 1
+    if direction in ("short", "both"):
+        # Only set short where long isn't already set
+        short_mask = short_arr & (signals == 0)
+        signals[short_mask] = -1
+
+    return signals
+
+
+def _apply_memory(signal: pd.Series, memory_bars: int) -> pd.Series:
+    """Apply signal memory: keep signal True for N bars after it fires."""
+    result = signal.copy()
+    counter = 0
+    for i in range(len(result)):
+        if signal.iloc[i]:
+            counter = memory_bars
+            result.iloc[i] = True
+        elif counter > 0:
+            counter -= 1
+            result.iloc[i] = True
+        else:
+            result.iloc[i] = False
+    return result
+
+
+def _precompute_dca_close_cache(
+    final_dca_config: dict[str, Any],
+    config_params: dict[str, Any],
+    ohlcv: pd.DataFrame,
+) -> dict | None:
+    """Pre-compute DCA close-condition indicator caches for the given OHLCV.
+
+    Called ONCE before the optimization loop when DCA is enabled and the
+    close_conditions parameters are static (don't change across trials).
+    Returns a cache dict suitable for injection into each DCAEngine via
+    ``_inject_close_indicator_cache``.  Returns None on error.
+    """
+    from backend.backtesting.engines.dca_engine import DCAEngine
+    from backend.backtesting.models import BacktestConfig, StrategyType
+
+    try:
+        config = BacktestConfig(
+            symbol=config_params.get("symbol", "BTCUSDT"),
+            interval=config_params.get("interval", "15"),
+            start_date="2025-01-01",
+            end_date="2026-01-01",
+            strategy_type=StrategyType.CUSTOM,
+            strategy_params={
+                "close_conditions": final_dca_config.get("close_conditions", {}),
+                "indent_order": final_dca_config.get("indent_order", {}),
+            },
+            initial_capital=config_params.get("initial_capital", 10000.0),
+            commission_value=config_params.get("commission", COMMISSION_TV),
+            taker_fee=config_params.get("commission", COMMISSION_TV),
+            maker_fee=config_params.get("commission", COMMISSION_TV),
+            dca_enabled=True,
+        )
+        engine = DCAEngine()
+        engine._configure_from_config(config)
+        engine._precompute_close_condition_indicators(ohlcv)
+        cache = engine._extract_close_indicator_cache()
+        logger.debug("⚡ DCA close-condition indicator cache built (will be reused for all trials)")
+        return cache
+    except Exception as e:
+        logger.warning(f"Failed to pre-compute DCA close-condition cache: {e}")
+        return None
+
+
+def _is_dca_sltp_only_optimization(
+    param_combinations: list[dict[str, Any]],
+    base_graph: dict[str, Any],
+) -> tuple[bool, list[str]]:
+    """
+    Detect if optimization only varies static_sltp block params (stop_loss_percent /
+    take_profit_percent) while keeping RSI / other indicator params constant.
+
+    When True, the Numba DCA batch path can pre-compute entry signals ONCE and
+    sweep all (sl, tp) combinations in parallel without re-running the adapter.
+
+    Returns:
+        (is_sltp_only, sltp_block_ids)
+    """
+    if not param_combinations:
+        return False, []
+
+    # Collect all param paths that vary across combinations
+    varying: set[str] = set()
+    if len(param_combinations) > 1:
+        first = param_combinations[0]
+        for combo in param_combinations[1:]:
+            for k, v in combo.items():
+                if k in first and first[k] != v:
+                    varying.add(k)
+            for k in first:
+                if k not in combo:
+                    varying.add(k)
+    else:
+        varying = set(param_combinations[0].keys())
+
+    # All varying paths must be from static_sltp blocks only
+    sltp_block_ids: list[str] = []
+    blocks = base_graph.get("blocks", [])
+    for b in blocks:
+        if b.get("type") == "static_sltp":
+            sltp_block_ids.append(b["id"])
+
+    if not sltp_block_ids:
+        return False, []
+
+    for path in varying:
+        if "." not in path:
+            return False, sltp_block_ids
+        block_id, _ = path.split(".", 1)
+        if block_id not in sltp_block_ids:
+            # Non-SLTP param varies → mixed case. Return the SLTP ids so
+            # caller can activate the mixed batch path.
+            return False, sltp_block_ids
+
+    return bool(varying), sltp_block_ids
+
+
+def _run_dca_sltp_batch_numba(
+    base_graph: dict[str, Any],
+    ohlcv: pd.DataFrame,
+    param_combinations: list[dict[str, Any]],
+    config_params: dict[str, Any],
+    final_dca_config: dict[str, Any],
+    direction_str: str,
+    sltp_block_ids: list[str],
+) -> list[dict[str, Any] | None]:
+    """
+    Fast DCA optimization path: pre-compute entry signals ONCE, then batch-simulate
+    all (sl, tp) combinations via Numba prange (parallel).
+
+    Returns list of result dicts aligned with param_combinations (None on failure).
+    """
+    from backend.backtesting.numba_dca_engine import run_dca_batch_numba
+    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+
+    n = len(param_combinations)
+    if n == 0:
+        return []
+
+    try:
+        # Generate entry signals once using the base graph (no SL/TP in signals)
+        adapter = StrategyBuilderAdapter(base_graph)
+        signal_result = adapter.generate_signals(ohlcv)
+        if signal_result is None:
+            return [None] * n
+
+        entries = signal_result.entries if signal_result.entries is not None else None
+        short_entries = signal_result.short_entries
+
+        # Build int8 signal array: +1 long, -1 short, 0 none
+        n_bars = len(ohlcv)
+        signals_int = np.zeros(n_bars, dtype=np.int8)
+        if entries is not None:
+            signals_int[entries.to_numpy(dtype=bool)] = 1
+        if short_entries is not None:
+            signals_int[short_entries.to_numpy(dtype=bool)] -= 1
+
+        # Extract (sl, tp) arrays for each combo
+        sl_arr = np.empty(n, dtype=np.float64)
+        tp_arr = np.empty(n, dtype=np.float64)
+        default_sl = 0.03
+        default_tp = 0.06
+        for i, combo in enumerate(param_combinations):
+            sl_val = default_sl
+            tp_val = default_tp
+            for path, val in combo.items():
+                _, param_key = path.split(".", 1)
+                if param_key == "stop_loss_percent":
+                    sl_val = float(val) / 100.0
+                elif param_key == "take_profit_percent":
+                    tp_val = float(val) / 100.0
+            sl_arr[i] = sl_val
+            tp_arr[i] = tp_val
+
+        # DCA config scalars
+        direction_int = 0 if direction_str == "long" else (1 if direction_str == "short" else 2)
+        order_count = int(final_dca_config.get("dca_order_count", 5))
+        grid_size_pct = float(final_dca_config.get("dca_grid_size_percent", 10.0))
+        martingale_coef = float(final_dca_config.get("dca_martingale_coef", 1.3))
+        initial_capital = float(config_params.get("initial_capital", 10000.0))
+        leverage = float(config_params.get("leverage", 1.0))
+        taker_fee = float(config_params.get("commission", COMMISSION_TV))
+
+        # Extract close_by_time, breakeven, and safety_close from base graph (for parity with V4)
+        _sltp_max_bars = 0
+        _sltp_min_profit_pct = 0.0
+        _sltp_be_activation = 0.0
+        _sltp_be_offset = 0.0
+        _sltp_safety_close = int(bool(final_dca_config.get("dca_safety_close_enabled", True)))
+        _sltp_safety_threshold = float(final_dca_config.get("dca_drawdown_threshold", 30.0))
+        for _blk in base_graph.get("blocks", []):
+            _bt = _blk.get("type", "")
+            _bp = _blk.get("params") or _blk.get("config") or {}
+            if _bt == "close_by_time":
+                _sltp_max_bars = int(_bp.get("bars_since_entry", _bp.get("bars", 0)) or 0)
+                _sltp_min_profit_pct = float(_bp.get("min_profit_percent", 0.0)) / 100.0
+            elif _bt == "static_sltp" and _bp.get("activate_breakeven", False):
+                _sltp_be_activation = float(_bp.get("breakeven_activation_percent", 0.5)) / 100.0
+                _sltp_be_offset = float(_bp.get("new_breakeven_sl_percent", 0.1)) / 100.0
+
+        # Run Numba batch
+        batch = run_dca_batch_numba(
+            close=ohlcv["close"].to_numpy(dtype=np.float64),
+            high=ohlcv["high"].to_numpy(dtype=np.float64),
+            low=ohlcv["low"].to_numpy(dtype=np.float64),
+            entry_signals=signals_int,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
+            direction=direction_int,
+            order_count=order_count,
+            grid_size_pct=grid_size_pct,
+            martingale_coef=martingale_coef,
+            initial_capital=initial_capital,
+            position_size_frac=1.0,
+            leverage=leverage,
+            taker_fee=taker_fee,
+            max_bars_in_trade=_sltp_max_bars,
+            min_profit_close_pct=_sltp_min_profit_pct,
+            breakeven_activation_pct=_sltp_be_activation,
+            breakeven_offset_pct=_sltp_be_offset,
+            safety_close_enabled=_sltp_safety_close,
+            safety_close_threshold_pct=_sltp_safety_threshold,
+            bars_per_month=_bars_per_month(str(config_params.get("interval", "30"))),
+        )
+
+        results: list[dict[str, Any] | None] = []
+        for i in range(n):
+            nt = int(batch["n_trades"][i])
+            if nt == 0:
+                results.append(None)
+                continue
+            results.append(
+                {
+                    "net_profit": float(batch["net_profit"][i]),
+                    "total_return": float(batch["net_profit"][i] / initial_capital * 100.0),
+                    "max_drawdown": float(batch["max_drawdown"][i] * 100.0),
+                    "win_rate": float(batch["win_rate"][i] * 100.0),
+                    "sharpe_ratio": float(batch["sharpe"][i]),
+                    "profit_factor": float(batch["profit_factor"][i]),
+                    "total_trades": nt,
+                    "n_trades": nt,
+                    "sortino_ratio": 0.0,
+                    "calmar_ratio": 0.0,
+                    "payoff_ratio": 0.0,
+                }
+            )
+        logger.info(f"⚡ Numba DCA batch: {n} combos done in parallel")
+        return results
+
+    except Exception as exc:
+        logger.warning(f"Numba DCA batch failed, falling back to Python path: {exc}")
+        return [None] * n  # caller will fall back to standard loop
+
+
+def _run_dca_mixed_batch_numba(
+    base_graph: dict[str, Any],
+    ohlcv: pd.DataFrame,
+    param_combinations: list[dict[str, Any]],
+    config_params: dict[str, Any],
+    final_dca_config: dict[str, Any],
+    direction_str: str,
+    sltp_block_ids: list[str],
+    progress_callback: Any = None,
+) -> list[dict[str, Any] | None]:
+    """
+    Nested DCA batch: handles mixed RSI+SLTP optimization (e.g. DCA-RSI-6 with
+    31×26×21×18 = 304,668 combos).
+
+    Algorithm:
+        1. Split each combo into indicator params (RSI, etc.) and SLTP params.
+        2. Group all combos by their indicator params → N_indicator unique groups.
+        3. For each group:
+              a. Clone base_graph with indicator params applied.
+              b. Generate entry signals ONCE via StrategyBuilderAdapter.
+              c. Collect all SLTP (sl, tp) variants for this group.
+              d. Run run_dca_batch_numba() over the SLTP sub-batch.
+              e. Store results back in original order.
+
+    Speedup for DCA-RSI-6 (806 indicator groups × 378 SLTP each):
+        Standard:  304,668 × ~0.4s ≈ 5h 17m
+        This path: 806 × 0.1s (signals) + 806 × 0.002s (Numba) ≈ 83s  (~230× faster)
+
+    Returns list of result dicts aligned with param_combinations (None on failure).
+    """
+    from backend.backtesting.numba_dca_engine import run_dca_batch_numba
+    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+
+    n = len(param_combinations)
+    if n == 0:
+        return []
+
+    try:
+        # ── Step 1: Split paths into SLTP vs indicator ──────────────────────────
+        sltp_id_set = set(sltp_block_ids)
+
+        def _is_sltp_path(path: str) -> bool:
+            block_id = path.split(".", 1)[0]
+            return block_id in sltp_id_set
+
+        # ── Step 2: Group combos by indicator params ────────────────────────────
+        # Key: frozenset of (indicator_path, value) tuples → comparable/hashable
+        group_key_to_indices: dict[tuple, list[int]] = {}
+        for i, combo in enumerate(param_combinations):
+            ind_key = tuple(sorted((k, v) for k, v in combo.items() if not _is_sltp_path(k)))
+            group_key_to_indices.setdefault(ind_key, []).append(i)
+
+        n_groups = len(group_key_to_indices)
+        _log_info(f"⚡ Mixed DCA batch: {n} combos → {n_groups} indicator groups × ~{n // max(n_groups, 1)} SLTP each")
+
+        # ── Shared arrays for the whole OHLCV ───────────────────────────────────
+        close_np = ohlcv["close"].to_numpy(dtype=np.float64)
+        high_np = ohlcv["high"].to_numpy(dtype=np.float64)
+        low_np = ohlcv["low"].to_numpy(dtype=np.float64)
+
+        # DCA engine scalars (same for all groups)
+        direction_int = 0 if direction_str == "long" else (1 if direction_str == "short" else 2)
+        order_count = int(final_dca_config.get("dca_order_count", 5))
+        grid_size_pct = float(final_dca_config.get("dca_grid_size_percent", 10.0))
+        martingale = float(final_dca_config.get("dca_martingale_coef", 1.3))
+        capital = float(config_params.get("initial_capital", 10000.0))
+        leverage = float(config_params.get("leverage", 1.0))
+        taker_fee = float(config_params.get("commission", COMMISSION_TV))
+
+        # Extract close_by_time, breakeven, and safety_close from base_graph (parity with V4)
+        _mx_max_bars = 0
+        _mx_min_profit_pct = 0.0
+        _mx_be_activation = 0.0
+        _mx_be_offset = 0.0
+        _mx_safety_close = int(bool(final_dca_config.get("dca_safety_close_enabled", True)))
+        _mx_safety_threshold = float(final_dca_config.get("dca_drawdown_threshold", 30.0))
+        for _blk in base_graph.get("blocks", []):
+            _bt = _blk.get("type", "")
+            _bp = _blk.get("params") or _blk.get("config") or {}
+            if _bt == "close_by_time":
+                _mx_max_bars = int(_bp.get("bars_since_entry", _bp.get("bars", 0)) or 0)
+                _mx_min_profit_pct = float(_bp.get("min_profit_percent", 0.0)) / 100.0
+            elif _bt == "static_sltp" and _bp.get("activate_breakeven", False):
+                _mx_be_activation = float(_bp.get("breakeven_activation_percent", 0.5)) / 100.0
+                _mx_be_offset = float(_bp.get("new_breakeven_sl_percent", 0.1)) / 100.0
+
+        results: list[dict[str, Any] | None] = [None] * n
+        _groups_no_signals = 0
+        _groups_sig_error = 0
+        _groups_ok = 0
+
+        # ── Step 3: Process each indicator group ────────────────────────────────
+        for group_idx, (ind_key, indices) in enumerate(group_key_to_indices.items()):
+            indicator_overrides = dict(ind_key)
+
+            # 3a. Clone graph with indicator params
+            ind_graph = clone_graph_with_params(base_graph, indicator_overrides)
+
+            # 3b. Generate signals once for this indicator combo
+            try:
+                adapter = StrategyBuilderAdapter(ind_graph)
+                sig = adapter.generate_signals(ohlcv)
+            except Exception as _sig_exc:
+                logger.debug(f"Mixed batch: signal gen failed for group {group_idx}: {_sig_exc}")
+                _groups_sig_error += 1
+                continue  # leave results[i] = None for these combos
+
+            if sig is None:
+                _groups_no_signals += 1
+                continue
+
+            n_bars = len(ohlcv)
+            signals_int = np.zeros(n_bars, dtype=np.int8)
+            if sig.entries is not None:
+                signals_int[sig.entries.to_numpy(dtype=bool)] = 1
+            if sig.short_entries is not None:
+                signals_int[sig.short_entries.to_numpy(dtype=bool)] -= 1
+
+            n_long_signals = int((signals_int > 0).sum())
+            n_short_signals = int((signals_int < 0).sum())
+            if n_long_signals == 0 and n_short_signals == 0:
+                _groups_no_signals += 1
+                continue  # no signals → all SLTP combos for this group will have 0 trades
+            _groups_ok += 1
+
+            # Log first-group signal counts for debugging
+            if group_idx == 0:
+                logger.debug(
+                    f"Mixed DCA group 0 signals: long={n_long_signals}, short={n_short_signals}, "
+                    f"direction='{direction_str}' (int={direction_int}), ohlcv_bars={n_bars}, "
+                    f"indicator_overrides={indicator_overrides}"
+                )
+
+            # 3c. Collect SLTP (sl%, tp%) for all combos in this group
+            m = len(indices)
+            sl_arr = np.empty(m, dtype=np.float64)
+            tp_arr = np.empty(m, dtype=np.float64)
+            default_sl, default_tp = 0.03, 0.06
+            for j, idx in enumerate(indices):
+                sl_val, tp_val = default_sl, default_tp
+                for path, val in param_combinations[idx].items():
+                    if _is_sltp_path(path):
+                        _, pk = path.split(".", 1)
+                        if pk == "stop_loss_percent":
+                            sl_val = float(val) / 100.0
+                        elif pk == "take_profit_percent":
+                            tp_val = float(val) / 100.0
+                sl_arr[j] = sl_val
+                tp_arr[j] = tp_val
+
+            # 3d. Numba batch over SLTP sub-batch.
+            # Apply DCA structural params from this group's indicator_overrides
+            # (e.g. order_count, grid_size_percent, martingale_coefficient may be optimized).
+            _group_order_count = order_count
+            _group_grid_size_pct = grid_size_pct
+            _group_martingale = martingale
+            for _path, _val in indicator_overrides.items():
+                if "." in _path:
+                    _, _pk = _path.split(".", 1)
+                    if _pk == "order_count":
+                        _group_order_count = int(_val)
+                    elif _pk in ("grid_size_percent", "grid_size_pct"):
+                        _group_grid_size_pct = float(_val)
+                    elif _pk in ("martingale_coefficient", "martingale_coef"):
+                        _group_martingale = float(_val)
+
+            batch = run_dca_batch_numba(
+                close=close_np,
+                high=high_np,
+                low=low_np,
+                entry_signals=signals_int,
+                sl_pct_arr=sl_arr,
+                tp_pct_arr=tp_arr,
+                direction=direction_int,
+                order_count=_group_order_count,
+                grid_size_pct=_group_grid_size_pct,
+                martingale_coef=_group_martingale,
+                initial_capital=capital,
+                position_size_frac=1.0,
+                leverage=leverage,
+                taker_fee=taker_fee,
+                max_bars_in_trade=_mx_max_bars,
+                min_profit_close_pct=_mx_min_profit_pct,
+                breakeven_activation_pct=_mx_be_activation,
+                breakeven_offset_pct=_mx_be_offset,
+                safety_close_enabled=_mx_safety_close,
+                safety_close_threshold_pct=_mx_safety_threshold,
+                bars_per_month=_bars_per_month(str(config_params.get("interval", "30"))),
+            )
+
+            # 3e. Map results back to original indices
+            for j, idx in enumerate(indices):
+                nt = int(batch["n_trades"][j])
+                if nt == 0:
+                    continue
+                results[idx] = {
+                    "net_profit": float(batch["net_profit"][j]),
+                    "total_return": float(batch["net_profit"][j] / capital * 100.0),
+                    "max_drawdown": float(batch["max_drawdown"][j] * 100.0),
+                    "win_rate": float(batch["win_rate"][j] * 100.0),
+                    "sharpe_ratio": float(batch["sharpe"][j]),
+                    "profit_factor": float(batch["profit_factor"][j]),
+                    "total_trades": nt,
+                    "n_trades": nt,
+                    "sortino_ratio": 0.0,
+                    "calmar_ratio": 0.0,
+                    "payoff_ratio": 0.0,
+                }
+
+            # Update progress after each indicator group (called by caller via callback)
+            if progress_callback is not None:
+                try:
+                    combos_done = sum(len(v) for k, v in list(group_key_to_indices.items())[: group_idx + 1])
+                    progress_callback(combos_done, n)
+                except Exception:
+                    pass
+
+        non_none = sum(1 for r in results if r is not None)
+        logger.info(
+            f"⚡ Mixed DCA batch complete: {n} combos, {n_groups} groups — "
+            f"ok={_groups_ok}, no_signals={_groups_no_signals}, errors={_groups_sig_error}, "
+            f"results_with_trades={non_none}"
+        )
+        if non_none == 0:
+            _diag = f"groups_ok={_groups_ok}, groups_no_signals={_groups_no_signals}, groups_error={_groups_sig_error}"
+            if _groups_no_signals == n_groups:
+                logger.warning(
+                    f"⚠️ Mixed DCA batch: ALL {n_groups} indicator groups produced 0 entry signals. "
+                    f"Cause: RSI/indicator params in optimization range never trigger signals. "
+                    f"Check oversold/overbought ranges — e.g. oversold=5 means RSI must drop below 5 to enter. "
+                    f"Direction: '{direction_str}', bars={len(ohlcv)}. {_diag}"
+                )
+            elif _groups_sig_error == n_groups:
+                logger.warning(
+                    f"⚠️ Mixed DCA batch: ALL {n_groups} groups failed signal generation (exception). "
+                    f"Check StrategyBuilderAdapter for errors with these param ranges. {_diag}"
+                )
+            else:
+                logger.warning(
+                    f"⚠️ Mixed DCA batch: 0 trades from {n} combinations. "
+                    f"Direction: '{direction_str}' (int={direction_int}), "
+                    f"order_count={order_count}, grid_size={grid_size_pct}%. {_diag}"
+                )
+        return results
+
+    except Exception as exc:
+        logger.warning(f"Mixed DCA batch failed, falling back to Python path: {exc}")
+        return [None] * n
+
+
+def _run_dca_with_signals(
+    signals: np.ndarray,
+    ohlcv: pd.DataFrame,
+    config_params: dict[str, Any],
+    final_dca_config: dict[str, Any],
+    direction_str: str,
+    block_stop_loss: float | None,
+    block_take_profit: float | None,
+    block_breakeven_enabled: bool,
+    block_breakeven_activation_pct: float,
+    block_breakeven_offset: float,
+    block_close_only_in_profit: bool,
+    block_sl_type: str,
+    block_max_bars_in_trade: int,
+    close_indicator_cache: dict | None = None,
+) -> dict[str, Any] | None:
+    """Run DCA engine with pre-computed signals (bypasses adapter signal generation)."""
+    from backend.backtesting.engines.dca_engine import DCAEngine
+    from backend.backtesting.models import BacktestConfig, StrategyType
+
+    try:
+        config = BacktestConfig(
+            symbol=config_params.get("symbol", "BTCUSDT"),
+            interval=config_params.get("interval", "15"),
+            start_date="2025-01-01",
+            end_date="2026-01-01",
+            strategy_type=StrategyType.CUSTOM,
+            strategy_params={
+                "close_conditions": final_dca_config.get("close_conditions", {}),
+                "indent_order": final_dca_config.get("indent_order", {}),
+            },
+            initial_capital=config_params.get("initial_capital", 10000.0),
+            position_size=config_params.get("position_size", 1.0),
+            leverage=config_params.get("leverage", 1),
+            direction=direction_str,
+            stop_loss=block_stop_loss if block_stop_loss else None,
+            take_profit=block_take_profit if block_take_profit else None,
+            commission_value=config_params.get("commission", COMMISSION_TV),
+            taker_fee=config_params.get("commission", COMMISSION_TV),
+            maker_fee=config_params.get("commission", COMMISSION_TV),
+            dca_enabled=True,
+            dca_direction=final_dca_config.get("dca_direction", "both"),
+            dca_order_count=final_dca_config.get("dca_order_count", 5),
+            dca_grid_size_percent=final_dca_config.get("dca_grid_size_percent", 10.0),
+            dca_martingale_coef=final_dca_config.get("dca_martingale_coef", 1.0),
+            dca_martingale_mode=final_dca_config.get("dca_martingale_mode", "multiply_each"),
+            dca_log_step_enabled=final_dca_config.get("dca_log_step_enabled", False),
+            dca_log_step_coef=final_dca_config.get("dca_log_step_coef", 1.1),
+            dca_safety_close_enabled=final_dca_config.get("dca_safety_close_enabled", True),
+            dca_drawdown_threshold=final_dca_config.get("dca_drawdown_threshold", 30.0),
+            dca_multi_tp_enabled=final_dca_config.get("dca_multi_tp_enabled", False),
+            dca_tp1_percent=final_dca_config.get("dca_tp1_percent", 0.5),
+            dca_tp1_close_percent=final_dca_config.get("dca_tp1_close_percent", 25.0),
+            dca_tp2_percent=final_dca_config.get("dca_tp2_percent", 1.0),
+            dca_tp2_close_percent=final_dca_config.get("dca_tp2_close_percent", 25.0),
+            dca_tp3_percent=final_dca_config.get("dca_tp3_percent", 2.0),
+            dca_tp3_close_percent=final_dca_config.get("dca_tp3_close_percent", 25.0),
+            dca_tp4_percent=final_dca_config.get("dca_tp4_percent", 3.0),
+            dca_tp4_close_percent=final_dca_config.get("dca_tp4_close_percent", 25.0),
+            breakeven_enabled=block_breakeven_enabled,
+            breakeven_activation_pct=block_breakeven_activation_pct,
+            breakeven_offset=block_breakeven_offset,
+            sl_type=block_sl_type,
+            max_bars_in_trade=block_max_bars_in_trade,
+            close_only_in_profit=block_close_only_in_profit,
+        )
+
+        engine = DCAEngine()
+        # Inject pre-computed close-condition indicator cache (avoids recalculating
+        # RSI/Stoch/MA/BB/Keltner/PSAR for every trial when OHLCV is unchanged)
+        if close_indicator_cache is not None:
+            engine._inject_close_indicator_cache(close_indicator_cache)
+        # Inject pre-computed signals directly (bypass _generate_signals_from_config)
+        engine._precomputed_signals = signals
+        bt_result = engine.run_from_config(config, ohlcv, custom_strategy=None)
+
+        if bt_result is None:
+            return None
+
+        metrics = getattr(bt_result, "metrics", None) or getattr(bt_result, "performance", None)
+        if metrics is None:
+            return None
+
+        def _safe(v: Any, default: float = 0.0) -> float:
+            return float(v) if v is not None else default
+
+        win_rate = _safe(getattr(metrics, "win_rate", 0))
+        if win_rate <= 1.0:
+            win_rate *= 100.0
+
+        return {
+            "total_return": _safe(getattr(metrics, "total_return", 0)),
+            "sharpe_ratio": _safe(getattr(metrics, "sharpe_ratio", 0)),
+            "max_drawdown": _safe(getattr(metrics, "max_drawdown", 0)),
+            "win_rate": win_rate,
+            "total_trades": int(getattr(metrics, "total_trades", 0) or 0),
+            "profit_factor": _safe(getattr(metrics, "profit_factor", 0)),
+            "winning_trades": int(getattr(metrics, "winning_trades", 0) or 0),
+            "losing_trades": int(getattr(metrics, "losing_trades", 0) or 0),
+            "net_profit": _safe(getattr(metrics, "net_profit", 0)),
+            "avg_trade": _safe(getattr(metrics, "avg_trade", 0)),
+            "avg_win": _safe(getattr(metrics, "avg_win", 0)),
+            "avg_loss": _safe(getattr(metrics, "avg_loss", 0)),
+            "expectancy": _safe(getattr(metrics, "expectancy", 0)),
+            "sortino_ratio": _safe(getattr(metrics, "sortino_ratio", 0)),
+            "calmar_ratio": _safe(getattr(metrics, "calmar_ratio", 0)),
+            "payoff_ratio": _safe(getattr(metrics, "payoff_ratio", 0)),
+        }
+    except Exception as e:
+        logger.debug(f"DCA with pre-computed signals failed: {e}")
+        return None
+
+
+def build_infeasibility_checker(base_graph: dict[str, Any]):
+    """Pre-compute base block params once and return a fast per-combo checker.
+
+    Call this ONCE before the optimization loop. The returned function is O(n_overrides)
+    per combo — much faster than rebuilding block_params from the full graph each time.
+
+    Returns a callable: checker(overrides) -> bool  (True = skip this combo)
+    """
+    # Extract base params for RSI blocks only (the only ones we check)
+    rsi_blocks: list[tuple[str, dict[str, Any]]] = []
+    for block in base_graph.get("blocks", []):
+        if block.get("type") == "rsi":
+            bid = block.get("id", "")
+            bp = dict(block.get("params") or block.get("config") or {})
+            rsi_blocks.append((bid, bp))
+
+    if not rsi_blocks:
+        # No RSI blocks → nothing to filter → always feasible
+        return lambda overrides: False
+
+    def _checker(overrides: dict[str, Any]) -> bool:
+        for bid, base_bp in rsi_blocks:
+            # Start from base values, apply any overrides for this block
+            bp = base_bp  # shared reference — DO NOT mutate
+            prefix = bid + "."
+            # Collect overrides for this block only
+            block_overrides = {k[len(prefix) :]: v for k, v in overrides.items() if k.startswith(prefix)}
+
+            if not block_overrides:
+                # No overrides for this block → use base values directly
+                pass
+            else:
+                # Merge: create a combined view (avoid full copy when possible)
+                bp = {**base_bp, **block_overrides}
+
+            use_cross = bp.get("use_cross_level", False)
+            use_long_range = bp.get("use_long_range", False)
+            use_short_range = bp.get("use_short_range", False)
+
+            # RSI(1) is degenerate: always jumps to 0 or 100 → no cross signals
+            period = float(bp.get("period", 14))
+            if period <= 1:
+                return True  # infeasible
+
+            if use_cross and use_long_range:
+                cross_long = float(bp.get("cross_long_level", 29))
+                long_more = float(bp.get("long_rsi_more", 0))
+                if cross_long <= long_more:
+                    return True  # infeasible: cross at or below range floor → 0 signals
+
+            if use_cross and use_short_range:
+                cross_short = float(bp.get("cross_short_level", 55))
+                short_less = float(bp.get("short_rsi_less", 100))
+                if cross_short >= short_less:
+                    return True  # infeasible: cross at or above range ceiling → 0 signals
+
+        return False
+
+    return _checker
+
+
+def combo_is_infeasible(overrides: dict[str, Any], base_graph: dict[str, Any]) -> bool:
+    """Single-call wrapper around build_infeasibility_checker.
+
+    For the optimization loop use build_infeasibility_checker() once and reuse
+    the returned checker — this avoids rebuilding base_block_params every call.
+    """
+    return build_infeasibility_checker(base_graph)(overrides)
+
+
+def run_builder_grid_search(
+    base_graph: dict[str, Any],
+    ohlcv: pd.DataFrame,
+    param_combinations: Any,  # list[dict] | Iterator[dict] — lazy grid iterator supported
     config_params: dict[str, Any],
     optimize_metric: str = "sharpe_ratio",
     weights: dict[str, float] | None = None,
@@ -709,14 +2644,25 @@ def run_builder_grid_search(
     early_stopping: bool = False,
     early_stopping_patience: int = 20,
     timeout_seconds: int = 3600,
+    strategy_id: str = "",
+    total_combinations: int = 0,  # pre-computed total; 0 → derive from list length
 ) -> dict[str, Any]:
     """
     Run grid search optimization for a builder strategy.
 
+    ``param_combinations`` can be either a materialized list **or** a lazy
+    iterator produced by ``generate_builder_param_combinations``.  Using an
+    iterator keeps memory usage O(1) regardless of grid size, enabling
+    exhaustive search over millions of combinations.
+
+    Fast-paths (RSI-threshold-only, Numba DCA batch) require a materialized
+    list; when an iterator is supplied those paths are attempted only if the
+    total is small enough to materialise safely (≤ 2 000 000).
+
     Args:
         base_graph: Base strategy graph to clone.
         ohlcv: OHLCV DataFrame.
-        param_combinations: List of param_override dicts.
+        param_combinations: List or lazy iterator of param-override dicts.
         config_params: Backtest config params.
         optimize_metric: Metric to optimize.
         weights: Metric weights for composite scoring.
@@ -724,37 +2670,486 @@ def run_builder_grid_search(
         early_stopping: Enable early stopping.
         early_stopping_patience: Patience for early stopping.
         timeout_seconds: Total timeout.
+        strategy_id: Strategy ID for progress tracking.
+        total_combinations: Exact total count (provided by caller to avoid
+            materialisation; derived from list length when 0).
 
     Returns:
         Dict with optimization results.
     """
+    # ── Normalise to iterator + known total ──────────────────────────────────
+    # If caller passed a list we can len() it and still use fast-paths.
+    # If caller passed a generator we consume it lazily.
+    _is_list = isinstance(param_combinations, list)
+    total = (total_combinations or len(param_combinations)) if _is_list else total_combinations
+
+    # ── Materialise generator when small enough for fast path ─────────────────
+    # Grid search returns a lazy iterator to save memory on huge grids.
+    # For ≤ 2M combos, materialising into a list is safe (~100MB RAM worst case)
+    # and REQUIRED to enable the fast RSI threshold path.
+    FAST_PATH_MATERIALISE_CAP = 2_000_000
+    if not _is_list and total and total <= FAST_PATH_MATERIALISE_CAP:
+        _log_info(f"⚡ Materialising {total:,} combos for fast-path eligibility check...")
+        param_combinations = list(param_combinations)
+        _is_list = True
+
+    _log_info(f"🔍 Builder grid search: {total:,} combinations, metric={optimize_metric}, timeout={timeout_seconds}s")
+
+    # ── Fast path: RSI threshold-only ────────────────────────────────────────
+    # Only feasible when we have a materialized list (needs random access) AND
+    # the grid is small enough to hold in memory.
+    if _is_list and total <= FAST_PATH_MATERIALISE_CAP:
+        is_rsi_threshold, rsi_block_id = _is_rsi_threshold_only_optimization(param_combinations, base_graph)
+        if is_rsi_threshold and rsi_block_id:
+            _log_info(f"⚡ Using fast RSI threshold optimization path for block {rsi_block_id}")
+            try:
+                return _run_fast_rsi_threshold_optimization(
+                    base_graph=base_graph,
+                    ohlcv=ohlcv,
+                    param_combinations=param_combinations,
+                    config_params=config_params,
+                    rsi_block_id=rsi_block_id,
+                    optimize_metric=optimize_metric,
+                    weights=weights,
+                    max_results=max_results,
+                    early_stopping=early_stopping,
+                    early_stopping_patience=early_stopping_patience,
+                    timeout_seconds=timeout_seconds,
+                    strategy_id=strategy_id,
+                )
+            except Exception as e:
+                _log_warning(f"Fast RSI path failed, falling back to standard: {e}", exc_info=True)
+
+    # Standard path
+    _log_info(f"📉 Falling through to STANDARD path for {total:,} combinations")
     start_time = time.time()
     results: list[dict[str, Any]] = []
+    all_results: list[dict[str, Any]] = []  # All results before filtering (fallback)
     best_score = float("-inf")
     no_improvement_count = 0
-
-    total = len(param_combinations)
     tested = 0
+    skipped_infeasible = 0  # combos skipped by pre-filter (logical conflicts, e.g. RSI cross < range)
+
+    # Build infeasibility checker ONCE — avoids rebuilding base block params on every combo
+    _infeasibility_checker = build_infeasibility_checker(base_graph)
+
+    # Initialize progress for standard path
+    if strategy_id:
+        update_optimization_progress(strategy_id, status="running", tested=0, total=total, started_at=start_time)
+
+    # Log to console every ~5% to avoid spam; but update progress store after EVERY combo
+    # so the frontend polling sees real-time progress (critical for slow DCA backtests).
+    log_interval = max(1, total // 20)
+
+    # ── DCA pre-computation (close-condition indicators) ────────────────────
+    # When DCA is enabled, _precompute_close_condition_indicators() recomputes
+    # RSI/Stoch/MA/BB/Keltner/PSAR for every trial even though OHLCV is constant.
+    # Pre-compute once here and inject into each DCAEngine via cache injection.
+    _std_dca_enabled = False
+    _std_dca_final_config: dict[str, Any] = {}
+    _std_dca_close_cache: dict | None = None
+    _std_block_stop_loss: float | None = config_params.get("stop_loss_pct")
+    _std_block_take_profit: float | None = config_params.get("take_profit_pct")
+    if _std_block_stop_loss:
+        _std_block_stop_loss = _std_block_stop_loss / 100.0
+    if _std_block_take_profit:
+        _std_block_take_profit = _std_block_take_profit / 100.0
+    _std_block_breakeven_enabled = False
+    _std_block_breakeven_activation_pct = 0.005
+    _std_block_breakeven_offset = 0.0
+    _std_block_close_only_in_profit = False
+    _std_block_sl_type = "average_price"
+    _std_block_max_bars_in_trade = 0
+
+    try:
+        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter as _SBA
+
+        _probe_adapter = _SBA(base_graph)
+        _probe_dca_config = _probe_adapter.extract_dca_config()
+        _std_dca_enabled = _probe_adapter.has_dca_blocks() or _probe_dca_config.get("dca_enabled", False)
+
+        if _std_dca_enabled:
+            _direction_str = config_params.get("direction", "both")
+            _std_dca_final_config = _probe_dca_config.copy()
+            _std_dca_final_config["dca_enabled"] = True
+            if _std_dca_final_config.get("dca_direction", "both") == "both" and _direction_str in ("long", "short"):
+                _std_dca_final_config["dca_direction"] = _direction_str
+
+            # Extract SL/TP/close_by_time from base graph (static across all trials)
+            for block in base_graph.get("blocks", []):
+                btype = block.get("type", "")
+                bp = block.get("params") or block.get("config") or {}
+                if btype == "close_by_time":
+                    bars_val = bp.get("bars_since_entry", bp.get("bars", 0))
+                    _std_block_max_bars_in_trade = int(bars_val) if bars_val else 0
+                elif btype == "static_sltp":
+                    if _std_block_stop_loss is None:
+                        _std_block_stop_loss = bp.get("stop_loss_percent", 1.5) / 100.0
+                    if _std_block_take_profit is None:
+                        _std_block_take_profit = bp.get("take_profit_percent", 1.5) / 100.0
+                    _std_block_breakeven_enabled = bp.get("activate_breakeven", False)
+                    if _std_block_breakeven_enabled:
+                        _std_block_breakeven_activation_pct = bp.get("breakeven_activation_percent", 0.5) / 100.0
+                        _std_block_breakeven_offset = bp.get("new_breakeven_sl_percent", 0.1) / 100.0
+                    _std_block_close_only_in_profit = bp.get("close_only_in_profit", False)
+                    _std_block_sl_type = bp.get("sl_type", "average_price")
+                elif btype == "tp_percent" and _std_block_take_profit is None:
+                    _std_block_take_profit = bp.get("take_profit_percent", 3.0) / 100.0
+                elif btype == "sl_percent" and _std_block_stop_loss is None:
+                    _std_block_stop_loss = bp.get("stop_loss_percent", 1.5) / 100.0
+
+            # Pre-compute close-condition indicator cache once for all trials
+            _std_dca_close_cache = _precompute_dca_close_cache(_std_dca_final_config, config_params, ohlcv)
+            if _std_dca_close_cache is not None:
+                _log_info("⚡ DCA close-condition indicators pre-computed (shared across all trials)")
+    except Exception as _e:
+        logger.debug(f"DCA pre-computation probe failed, using standard path: {_e}")
+        _std_dca_enabled = False
+        _std_dca_close_cache = None
+    # ────────────────────────────────────────────────────────────────────────
+
+    # ── Numba DCA batch fast path ────────────────────────────────────────────
+    # When DCA is enabled AND only static_sltp params vary, we can pre-compute
+    # entry signals once and batch-simulate all (sl, tp) combos in parallel via
+    # Numba prange — 20-40x faster than per-trial DCAEngine calls.
+    #
+    # Both Numba batch paths require a materialised list.  When param_combinations
+    # is a lazy iterator (large grid) we materialise it here — the DCA batch paths
+    # are extremely fast (Numba prange) so even millions of combos are fine in RAM
+    # because each dict is tiny (~5 keys × 8 bytes).
+    if _std_dca_enabled:
+        if not _is_list:
+            # Materialise the iterator for DCA batch inspection
+            param_combinations = list(param_combinations)
+            _is_list = True
+            if not total:
+                total = len(param_combinations)
+
+        is_sltp_only, _sltp_block_ids = _is_dca_sltp_only_optimization(param_combinations, base_graph)
+        if is_sltp_only and _sltp_block_ids:
+            _log_info(f"⚡ Using Numba DCA batch path ({total} SL/TP combos, parallel prange)")
+            try:
+                _numba_results = _run_dca_sltp_batch_numba(
+                    base_graph=base_graph,
+                    ohlcv=ohlcv,
+                    param_combinations=param_combinations,
+                    config_params=config_params,
+                    final_dca_config=_std_dca_final_config,
+                    direction_str=config_params.get("direction", "both"),
+                    sltp_block_ids=_sltp_block_ids,
+                )
+                # Build output structure matching standard path
+                _nb_results_out: list[dict[str, Any]] = []
+                _nb_all_out: list[dict[str, Any]] = []
+                for _ci, (_res, _combo) in enumerate(zip(_numba_results, param_combinations, strict=False)):
+                    if _res is None:
+                        continue
+                    _score = calculate_composite_score(_res, optimize_metric, weights)
+                    _entry = {"params": _combo, "score": _score, **_res}
+                    _nb_all_out.append(_entry)
+                    if passes_filters(_res, config_params):
+                        _nb_results_out.append(_entry)
+
+                _nb_results_out.sort(key=lambda r: r["score"], reverse=True)
+                if not _nb_results_out:
+                    _nb_all_out.sort(key=lambda r: r["score"], reverse=True)
+                    _nb_results_out = _nb_all_out
+                _nb_top = _nb_results_out[:max_results]
+                _nb_elapsed = time.time() - start_time
+                return {
+                    "status": "completed",
+                    "method": "grid_numba_dca",
+                    "total_combinations": total,
+                    "tested_combinations": len(_numba_results),
+                    "results_passing_filters": len(_nb_results_out),
+                    "results_found": len(_nb_top),
+                    "top_results": _nb_top,
+                    "best_params": _nb_top[0]["params"] if _nb_top else {},
+                    "best_score": _nb_top[0]["score"] if _nb_top else 0.0,
+                    "best_metrics": {k: v for k, v in _nb_top[0].items() if k not in ("params", "score")}
+                    if _nb_top
+                    else {},
+                    "execution_time_seconds": round(_nb_elapsed, 2),
+                    "speed_combinations_per_sec": int(len(_numba_results) / max(_nb_elapsed, 0.001)),
+                    "early_stopped": False,
+                    "optimize_metric": optimize_metric,
+                    "numba_accelerated": True,
+                }
+            except Exception as _nb_exc:
+                _log_warning(f"Numba DCA batch failed, falling back to standard loop: {_nb_exc}")
+
+        # ── Mixed Numba DCA batch fast path ──────────────────────────────────
+        # When DCA is enabled AND params include BOTH indicator (RSI/etc.) and
+        # SLTP variations, group by indicator combos and Numba-batch SLTP per group.
+        # For DCA-RSI-6: 806 RSI groups × 378 SLTP = 304,668 total — ~230× faster.
+        elif _sltp_block_ids:
+            _log_info(f"⚡ Using Mixed DCA batch path ({total} combos, Numba prange per indicator group)")
+            try:
+                # Update progress: Numba batch is running (progress will jump to 100% on completion)
+                if strategy_id:
+                    update_optimization_progress(
+                        strategy_id,
+                        status="running",
+                        tested=0,
+                        total=total,
+                        best_score=0.0,
+                        results_found=0,
+                        speed=0,
+                        eta_seconds=0,
+                        started_at=start_time,
+                    )
+
+                # Build progress callback for mixed batch — updates UI per indicator group
+                _mx_start = start_time
+
+                def _mixed_progress_cb(done: int, total_c: int) -> None:
+                    _now = time.time()
+                    _elapsed = max(_now - _mx_start, 0.001)
+                    _spd = int(done / _elapsed)
+                    _eta = int((total_c - done) / max(_spd, 1))
+                    update_optimization_progress(
+                        strategy_id,
+                        status="running",
+                        tested=done,
+                        total=total_c,
+                        best_score=0.0,
+                        results_found=0,
+                        speed=_spd,
+                        eta_seconds=_eta,
+                        started_at=_mx_start,
+                    )
+
+                _mixed_results = _run_dca_mixed_batch_numba(
+                    base_graph=base_graph,
+                    ohlcv=ohlcv,
+                    param_combinations=param_combinations,
+                    config_params=config_params,
+                    final_dca_config=_std_dca_final_config,
+                    direction_str=config_params.get("direction", "both"),
+                    sltp_block_ids=_sltp_block_ids,
+                    progress_callback=_mixed_progress_cb if strategy_id else None,
+                )
+                _mx_results_out: list[dict[str, Any]] = []
+                _mx_all_out: list[dict[str, Any]] = []
+                for _ci, (_res, _combo) in enumerate(zip(_mixed_results, param_combinations, strict=False)):
+                    if _res is None:
+                        continue
+                    _score = calculate_composite_score(_res, optimize_metric, weights)
+                    _entry = {"params": _combo, "score": _score, **_res}
+                    _mx_all_out.append(_entry)
+                    if passes_filters(_res, config_params):
+                        _mx_results_out.append(_entry)
+
+                _mx_results_out.sort(key=lambda r: r["score"], reverse=True)
+                _mx_passing_count = len(_mx_results_out)  # count before fallback
+                if not _mx_results_out:
+                    _mx_all_out.sort(key=lambda r: r["score"], reverse=True)
+                    _mx_results_out = _mx_all_out
+                _mx_top = _mx_results_out[:max_results]
+                _mx_elapsed = time.time() - start_time
+                _mx_tested = sum(1 for r in _mixed_results if r is not None)
+
+                # ── Detect features with minor Numba approximation (implemented but slight diff) ──
+                # safety_close, close_by_time, breakeven are all implemented now.
+                # Remaining ~4% trade count gap is from avg_entry formula (fee-deducted coins vs V4).
+                _approximations: list[str] = []
+                for _blk in base_graph.get("blocks", []):
+                    _bt = _blk.get("type", "")
+                    _bp = _blk.get("params") or _blk.get("config") or {}
+                    if _bt == "static_sltp" and _bp.get("activate_breakeven", False):
+                        _approximations.append("breakeven_approx")  # <4% trade diff vs V4
+                    if _bt == "close_by_time":
+                        _approximations.append("close_by_time_approx")  # implemented, minor diff
+
+                # ── Post-validate top-N via full V4 DCA engine ────────────────
+                # Numba ~96% parity with V4; re-score top candidates through
+                # run_builder_backtest() for exact final metrics.
+                _V4_VALIDATE_N = min(5, len(_mx_top))
+                _validated_top: list[dict[str, Any]] = []
+                if _approximations and _mx_top:
+                    _log_info(f"🔍 Post-validating top {_V4_VALIDATE_N} via V4 DCA (approximations: {_approximations})")
+                    for _cand in _mx_top[:_V4_VALIDATE_N]:
+                        _v4_graph = clone_graph_with_params(base_graph, _cand["params"])
+                        _v4_res = run_builder_backtest(_v4_graph, ohlcv, config_params)
+                        if _v4_res is not None:
+                            _v4_score = calculate_composite_score(_v4_res, optimize_metric, weights)
+                            _validated_top.append({"params": _cand["params"], "score": _v4_score, **_v4_res})
+                        else:
+                            _validated_top.append(_cand)  # keep Numba result if V4 fails
+                    _validated_top.sort(key=lambda r: r["score"], reverse=True)
+                    # Merge: validated first, then remaining Numba results
+                    _remaining = list(_mx_top[_V4_VALIDATE_N:])
+                    _mx_top = _validated_top + _remaining
+                    _log_info(f"✅ V4 post-validation complete for {len(_validated_top)} results")
+
+                # Update progress file to "completed" so frontend polling sees final state
+                if strategy_id:
+                    update_optimization_progress(
+                        strategy_id,
+                        status="completed",
+                        tested=_mx_tested,
+                        total=total,
+                        best_score=_mx_top[0]["score"] if _mx_top else 0.0,
+                        results_found=len(_mx_top),
+                        speed=int(_mx_tested / max(_mx_elapsed, 0.001)),
+                        eta_seconds=0,
+                        started_at=start_time,
+                    )
+
+                return {
+                    "status": "completed",
+                    "method": "grid_numba_dca_mixed",
+                    "total_combinations": total,
+                    "tested_combinations": _mx_tested,
+                    "results_passing_filters": _mx_passing_count,
+                    "results_found": len(_mx_top),
+                    "top_results": _mx_top,
+                    "best_params": _mx_top[0]["params"] if _mx_top else {},
+                    "best_score": _mx_top[0]["score"] if _mx_top else 0.0,
+                    "best_metrics": {k: v for k, v in _mx_top[0].items() if k not in ("params", "score")}
+                    if _mx_top
+                    else {},
+                    "execution_time_seconds": round(_mx_elapsed, 2),
+                    "speed_combinations_per_sec": int(_mx_tested / max(_mx_elapsed, 0.001)),
+                    "early_stopped": False,
+                    "optimize_metric": optimize_metric,
+                    "numba_accelerated": True,
+                    "approximations": _approximations,
+                    "top_validated_by_v4": len(_validated_top) if _approximations else 0,
+                }
+            except Exception as _mx_exc:
+                _log_warning(f"Mixed DCA batch failed, falling back to standard loop: {_mx_exc}")
+    # ────────────────────────────────────────────────────────────────────────
 
     for i, overrides in enumerate(param_combinations):
         # Timeout check
         elapsed = time.time() - start_time
         if elapsed > timeout_seconds:
-            logger.info(f"⏱️ Builder optimization timeout after {elapsed:.0f}s at combo {i}/{total}")
+            _log_info(f"⏱️ Builder optimization timeout after {elapsed:.0f}s at combo {i}/{total}")
             break
+
+        # Pre-filter: skip combos with known logical conflicts (e.g. RSI cross < range floor)
+        # _infeasibility_checker is built once before the loop — O(n_overrides) per combo.
+        if _infeasibility_checker(overrides):
+            skipped_infeasible += 1
+            continue
 
         # Clone graph and apply param overrides
         modified_graph = clone_graph_with_params(base_graph, overrides)
 
-        # Run backtest
-        result = run_builder_backtest(modified_graph, ohlcv, config_params)
+        # DCA fast path: generate signals via modified adapter, run DCA with cached indicators
+        if _std_dca_enabled and _std_dca_close_cache is not None:
+            try:
+                from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter as _SBA2
+
+                _trial_adapter = _SBA2(modified_graph)
+                _trial_signals_raw = _trial_adapter.generate_signals(ohlcv)
+                import numpy as _np
+
+                _long = _np.asarray(_trial_signals_raw.entries.values, dtype=bool)
+                _short = (
+                    _np.asarray(_trial_signals_raw.short_entries.values, dtype=bool)
+                    if _trial_signals_raw.short_entries is not None
+                    else _np.zeros(len(ohlcv), dtype=bool)
+                )
+                _dir = config_params.get("direction", "both")
+                _signals = _np.zeros(len(ohlcv), dtype=float)
+                if _dir in ("long", "both"):
+                    _signals[_long] = 1
+                if _dir in ("short", "both"):
+                    _short_only = _short & ~_long
+                    _signals[_short_only] = -1
+
+                # Skip no-signal combos early (same fast-skip as fast RSI path)
+                if int(_np.sum(_signals > 0)) == 0 and int(_np.sum(_signals < 0)) == 0:
+                    tested += 1
+                    # Still update progress
+                    if strategy_id:
+                        _elapsed_now = time.time() - start_time
+                        _spd = int(tested / max(_elapsed_now, 0.001))
+                        _eta = int((total - tested) / max(_spd, 1))
+                        update_optimization_progress(
+                            strategy_id,
+                            status="running",
+                            tested=tested,
+                            total=total,
+                            best_score=best_score if best_score != float("-inf") else 0.0,
+                            results_found=len(results),
+                            speed=_spd,
+                            eta_seconds=_eta,
+                            started_at=start_time,
+                        )
+                    continue
+
+                # Override base-graph SL/TP if this combo varies static_sltp params
+                _trial_sl = _std_block_stop_loss
+                _trial_tp = _std_block_take_profit
+                for _ovr_path, _ovr_val in overrides.items():
+                    if "." in _ovr_path:
+                        _, _ovr_pk = _ovr_path.split(".", 1)
+                        if _ovr_pk == "stop_loss_percent":
+                            _trial_sl = float(_ovr_val) / 100.0
+                        elif _ovr_pk == "take_profit_percent":
+                            _trial_tp = float(_ovr_val) / 100.0
+
+                result = _run_dca_with_signals(
+                    signals=_signals,
+                    ohlcv=ohlcv,
+                    config_params=config_params,
+                    final_dca_config=_std_dca_final_config,
+                    direction_str=_dir,
+                    block_stop_loss=_trial_sl,
+                    block_take_profit=_trial_tp,
+                    block_breakeven_enabled=_std_block_breakeven_enabled,
+                    block_breakeven_activation_pct=_std_block_breakeven_activation_pct,
+                    block_breakeven_offset=_std_block_breakeven_offset,
+                    block_close_only_in_profit=_std_block_close_only_in_profit,
+                    block_sl_type=_std_block_sl_type,
+                    block_max_bars_in_trade=_std_block_max_bars_in_trade,
+                    close_indicator_cache=_std_dca_close_cache,
+                )
+            except Exception as _trial_e:
+                logger.debug(f"DCA fast trial {i} failed, falling back: {_trial_e}")
+                result = run_builder_backtest(modified_graph, ohlcv, config_params)
+        else:
+            # Standard (non-DCA or cache-miss) path
+            result = run_builder_backtest(modified_graph, ohlcv, config_params)
         tested += 1
+
+        # Update progress after EVERY backtest — this is the primary real-time signal
+        # for the frontend. DCA backtests take 2-5s each, so this is cheap overhead.
+        if strategy_id:
+            elapsed_now = time.time() - start_time
+            speed = int(tested / max(elapsed_now, 0.001))
+            eta = int((total - tested) / max(speed, 1))
+            update_optimization_progress(
+                strategy_id,
+                status="running",
+                tested=tested,
+                total=total,
+                best_score=best_score if best_score != float("-inf") else 0.0,
+                results_found=len(results),
+                speed=speed,
+                eta_seconds=eta,
+                started_at=start_time,
+            )
+
+        # Log to console every 5% to avoid log spam
+        if tested > 0 and tested % log_interval == 0:
+            elapsed_now = time.time() - start_time
+            speed = int(tested / max(elapsed_now, 0.001))
+            eta = int((total - tested) / max(speed, 1))
+            pct = tested * 100 // total if total > 0 else 0
+            _log_info(
+                f"📊 Builder optimization progress: {tested}/{total} ({pct}%) "
+                f"speed={speed} combos/s, ETA={eta}s, results={len(results)}"
+            )
 
         if result is None:
             continue
 
-        # Apply filters
-        if not passes_filters(result, config_params):
+        # Skip zero-trade results early — they're worthless for optimization
+        if int(result.get("total_trades", 0)) == 0:
             continue
 
         # Calculate score
@@ -766,6 +3161,14 @@ def run_builder_grid_search(
             "score": score,
             **result,
         }
+
+        # Always keep in all_results for fallback display
+        all_results.append(entry)
+
+        # Apply filters — only filtered results go into ranked results
+        if not passes_filters(result, config_params):
+            continue
+
         results.append(entry)
 
         # Early stopping
@@ -783,13 +3186,51 @@ def run_builder_grid_search(
     results.sort(key=lambda r: r["score"], reverse=True)
     top_results = results[:max_results]
 
+    # Fallback: if all results were filtered out, return top N unfiltered results
+    # This happens when strategy generates too few trades for min_trades filter
+    fallback_used = False
+    if not top_results and all_results:
+        logger.warning(
+            f"⚠️ All {len(all_results)} results filtered out (min_trades={config_params.get('min_trades')}). "
+            "Returning best unfiltered results."
+        )
+        all_results.sort(key=lambda r: r["score"], reverse=True)
+        top_results = all_results[:max_results]
+        fallback_used = True
+
+    # Detect if best result has negative score for the optimize metric
+    no_positive_results = bool(top_results and top_results[0].get("score", 0) < 0)
+
     execution_time = time.time() - start_time
     speed = int(tested / max(execution_time, 0.001))
+    timed_out = tested < total
+
+    logger.info(
+        f"{'⏱️' if timed_out else '✅'} Builder optimization {'partial' if timed_out else 'complete'}: "
+        f"{tested}/{total} tested in {execution_time:.1f}s ({speed} combos/s), {len(results)} results"
+        + (f", {skipped_infeasible} skipped (infeasible)" if skipped_infeasible else "")
+    )
+
+    # Mark progress as completed
+    if strategy_id:
+        update_optimization_progress(
+            strategy_id,
+            status="completed" if not timed_out else "partial",
+            tested=tested,
+            total=total,
+            best_score=top_results[0]["score"] if top_results else 0.0,
+            results_found=len(results),
+            speed=speed,
+            eta_seconds=0,
+            started_at=start_time,
+        )
 
     return {
-        "status": "completed",
+        "status": "partial" if timed_out else "completed",
         "total_combinations": total,
         "tested_combinations": tested,
+        "skipped_infeasible": skipped_infeasible,
+        "results_passing_filters": len(results),
         "results_found": len(results),
         "top_results": top_results,
         "best_params": top_results[0]["params"] if top_results else {},
@@ -800,6 +3241,9 @@ def run_builder_grid_search(
         "execution_time_seconds": round(execution_time, 2),
         "speed_combinations_per_sec": speed,
         "early_stopped": early_stopping and no_improvement_count >= early_stopping_patience,
+        "fallback_used": fallback_used,
+        "no_positive_results": no_positive_results,
+        "optimize_metric": optimize_metric,
     }
 
 
@@ -819,6 +3263,7 @@ def run_builder_optuna_search(
     sampler_type: str = "tpe",
     top_n: int = 10,
     timeout_seconds: int = 3600,
+    n_jobs: int = 1,
 ) -> dict[str, Any]:
     """
     Run Optuna Bayesian optimization for a builder strategy.
@@ -834,6 +3279,8 @@ def run_builder_optuna_search(
         sampler_type: "tpe", "random", or "cmaes".
         top_n: Number of top results to re-run for full metrics.
         timeout_seconds: Total timeout.
+        n_jobs: Number of parallel workers (default 1). Values > 1 enable
+            multi-threaded Optuna trials. Capped at os.cpu_count().
 
     Returns:
         Dict with optimization results.
@@ -855,21 +3302,37 @@ def run_builder_optuna_search(
             "execution_time_seconds": 0.0,
         }
 
+    import os
+
     start_time = time.time()
+
+    # Clamp n_jobs to available CPUs
+    _cpu_count = os.cpu_count() or 1
+    effective_n_jobs = max(1, min(n_jobs, _cpu_count))
+    if effective_n_jobs > 1:
+        logger.info(f"Optuna parallel search: n_jobs={effective_n_jobs} (CPUs={_cpu_count})")
+
+    # Store all results (before min_trades filter) for fallback display.
+    # Protected by a lock when n_jobs > 1 (multiple threads write concurrently).
+    all_trial_results: list[dict[str, Any]] = []
+    _results_lock = threading.Lock()
 
     # Choose sampler
     sampler: BaseSampler
     if sampler_type == "random":
         sampler = RandomSampler(seed=42)
     elif sampler_type == "cmaes":
-        sampler = CmaEsSampler(seed=42)  # type: ignore[assignment]
+        # CMA-ES requires n_startup_trials random before covariance builds up.
+        # With parallel workers each thread needs its own seed offset; use None for auto.
+        sampler = CmaEsSampler(seed=42, n_startup_trials=min(25, n_trials // 4))  # type: ignore[assignment]
     else:
         sampler = TPESampler(seed=42, n_startup_trials=min(10, n_trials // 3))  # type: ignore[assignment]
 
     # Suppress Optuna logging
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-    # Create study
+    # Optuna's default in-memory storage is thread-safe for n_jobs > 1.
+    # No external storage backend needed.
     study = optuna.create_study(
         direction="maximize",
         sampler=sampler,
@@ -907,10 +3370,21 @@ def run_builder_optuna_search(
         if result is None:
             raise optuna.TrialPruned()
 
-        if not passes_filters(result, config_params):
-            raise optuna.TrialPruned()
+        # Always store result before applying min_trades filter (for fallback).
+        # Lock protects the shared list when multiple threads write concurrently.
+        score_raw = calculate_composite_score(result, optimize_metric, weights)
+        with _results_lock:
+            all_trial_results.append({"params": dict(overrides), "score": score_raw, **result})
 
-        return calculate_composite_score(result, optimize_metric, weights)
+        if not passes_filters(result, config_params):
+            # Return a large penalty instead of pruning — pruned trials are excluded
+            # from Optuna's surrogate model, so the sampler can't learn to avoid
+            # bad regions (e.g. too few trades). A negative score keeps the learning signal.
+            n_trades = result.get("total_trades", 0) or 0
+            penalty = -1000.0 - abs(score_raw) - (1.0 / max(n_trades, 1))
+            return penalty
+
+        return score_raw
 
     # Run optimization
     study.optimize(
@@ -918,16 +3392,19 @@ def run_builder_optuna_search(
         n_trials=n_trials,
         timeout=timeout_seconds,
         show_progress_bar=False,
+        n_jobs=effective_n_jobs,
     )
 
-    # Collect top-N trials
+    # Collect top-N trials — only those that passed filters (score > -1000 penalty threshold)
+    PENALTY_THRESHOLD = -500.0  # scores below this were penalized (didn't pass filters)
     completed_trials = [
         t
         for t in study.trials
         if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None and t.value > float("-inf")
     ]
-    completed_trials.sort(key=lambda t: t.value if t.value is not None else 0.0, reverse=True)  # type: ignore[arg-type]
-    top_trials = completed_trials[:top_n]
+    passing_trials = [t for t in completed_trials if (t.value or 0.0) >= PENALTY_THRESHOLD]
+    passing_trials.sort(key=lambda t: t.value if t.value is not None else 0.0, reverse=True)
+    top_trials = passing_trials[:top_n]
 
     # Re-run top-N for full metrics
     top_results: list[dict[str, Any]] = []
@@ -950,6 +3427,24 @@ def run_builder_optuna_search(
     # Sort by score
     top_results.sort(key=lambda r: r["score"], reverse=True)
 
+    # Fallback: if min_trades filter pruned all results, use all_trial_results instead
+    fallback_used = False
+    if not top_results and all_trial_results:
+        logger.warning(
+            f"⚠️ Optuna: all {len(completed_trials)} completed trials were re-run but produced no results "
+            f"(min_trades filter likely removed them). Falling back to {len(all_trial_results)} stored trial results."
+        )
+        all_trial_results.sort(key=lambda r: r["score"], reverse=True)
+        top_results = all_trial_results[:top_n]
+        fallback_used = True
+
+    # Detect if best result is negative for the optimize metric
+    no_positive_results = False
+    if top_results:
+        best_score = top_results[0].get("score", 0)
+        if best_score < 0:
+            no_positive_results = True
+
     execution_time = time.time() - start_time
 
     return {
@@ -957,7 +3452,8 @@ def run_builder_optuna_search(
         "method": "optuna",
         "sampler": sampler_type,
         "total_combinations": n_trials,
-        "tested_combinations": len(completed_trials),
+        "tested_combinations": len(completed_trials),  # all COMPLETE trials (including penalized)
+        "results_passing_filters": len(passing_trials),
         "results_found": len(top_results),
         "top_results": top_results,
         "best_params": top_results[0]["params"] if top_results else {},
@@ -967,5 +3463,308 @@ def run_builder_optuna_search(
         else {},
         "execution_time_seconds": round(execution_time, 2),
         "speed_combinations_per_sec": int(len(completed_trials) / max(execution_time, 0.001)),
+        "early_stopped": False,
+        "fallback_used": fallback_used,
+        "no_positive_results": no_positive_results,
+        "optimize_metric": optimize_metric,
+    }
+
+
+# =============================================================================
+# WALK-FORWARD OPTIMIZATION FOR BUILDER STRATEGIES
+# =============================================================================
+
+logger_wf = logging.getLogger(__name__)
+
+
+def run_builder_walk_forward(
+    base_graph: dict[str, Any],
+    ohlcv: pd.DataFrame,
+    param_specs: list[dict[str, Any]],
+    config_params: dict[str, Any],
+    optimize_metric: str = "sharpe_ratio",
+    weights: dict[str, float] | None = None,
+    n_splits: int = 5,
+    train_ratio: float = 0.7,
+    gap_periods: int = 0,
+    inner_method: str = "grid",
+    max_iterations: int = 200,
+    n_trials: int = 50,
+    sampler_type: str = "tpe",
+    max_results: int = 20,
+    timeout_seconds: int = 3600,
+) -> dict[str, Any]:
+    """
+    Walk-Forward Optimization for Builder strategies.
+
+    Splits OHLCV data into n_splits rolling windows. For each window:
+      - Optimizes parameters on the train portion (IS) using Grid or Bayesian
+      - Validates best params on the out-of-sample (OOS) portion
+    Returns aggregate robustness metrics and per-window results.
+
+    Args:
+        base_graph: Strategy graph.
+        ohlcv: Full OHLCV DataFrame (sorted ascending).
+        param_specs: Optimizable params from extract_optimizable_params().
+        config_params: Backtest config (symbol, capital, commission, etc.).
+        optimize_metric: Metric to optimise on IS (e.g. 'sharpe_ratio').
+        weights: Composite scoring weights.
+        n_splits: Number of WF windows.
+        train_ratio: Fraction of each window used for IS optimisation.
+        gap_periods: Bars to skip between IS and OOS (avoid look-ahead).
+        inner_method: 'grid' or 'bayesian' for IS optimisation.
+        max_iterations: Max combos for Grid/Random IS search.
+        n_trials: Max Optuna trials per window (Bayesian mode).
+        sampler_type: Optuna sampler ('tpe', 'random').
+        max_results: Top results to keep across all windows.
+        timeout_seconds: Total wall-clock timeout.
+
+    Returns:
+        Dict with keys: status, windows (list), aggregate_metrics, top_results,
+        best_params, recommended_params, overfit_score, execution_time_seconds.
+    """
+    start_time = time.time()
+
+    total_bars = len(ohlcv)
+    if total_bars < n_splits * 30:
+        raise ValueError(
+            f"Not enough data for {n_splits} walk-forward splits ({total_bars} bars, need at least {n_splits * 30})"
+        )
+
+    window_size = total_bars // n_splits
+    train_size = int(window_size * train_ratio)
+    test_size = window_size - train_size - gap_periods
+
+    if test_size < 10:
+        raise ValueError(
+            f"OOS window too small ({test_size} bars). Reduce n_splits, increase train_ratio, or use more data."
+        )
+
+    logger_wf.info(
+        f"[WF] Starting Walk-Forward: {n_splits} splits, "
+        f"window={window_size} bars, IS={train_size}, OOS={test_size}, method={inner_method}"
+    )
+
+    windows: list[dict[str, Any]] = []
+    all_best_params: list[dict[str, Any]] = []
+    oos_results_all: list[dict[str, Any]] = []
+
+    for split_idx in range(n_splits):
+        elapsed = time.time() - start_time
+        if elapsed > timeout_seconds:
+            logger_wf.info(f"[WF] Timeout after {elapsed:.0f}s at window {split_idx}/{n_splits}")
+            break
+
+        # Slice IS and OOS
+        is_start = split_idx * window_size
+        is_end = is_start + train_size
+        oos_start = is_end + gap_periods
+        oos_end = min(oos_start + test_size, total_bars)
+
+        ohlcv_is = ohlcv.iloc[is_start:is_end].copy()
+        ohlcv_oos = ohlcv.iloc[oos_start:oos_end].copy()
+
+        if len(ohlcv_is) < 20 or len(ohlcv_oos) < 10:
+            logger_wf.warning(f"[WF] Window {split_idx + 1}: insufficient data, skipping")
+            continue
+
+        window_timeout = max(30, int((timeout_seconds - elapsed) / max(1, n_splits - split_idx)))
+
+        # --- IS optimisation ---
+        try:
+            if inner_method == "bayesian":
+                is_result = run_builder_optuna_search(
+                    base_graph=base_graph,
+                    ohlcv=ohlcv_is,
+                    param_specs=param_specs,
+                    config_params=config_params,
+                    optimize_metric=optimize_metric,
+                    weights=weights,
+                    n_trials=n_trials,
+                    sampler_type=sampler_type,
+                    top_n=1,
+                    timeout_seconds=window_timeout,
+                )
+            else:
+                combos, _total, _capped = generate_builder_param_combinations(
+                    param_specs=param_specs,
+                    custom_ranges=None,
+                    search_method="random" if inner_method == "random" else "grid",
+                    max_iterations=max_iterations,
+                )
+                is_result = run_builder_grid_search(
+                    base_graph=base_graph,
+                    ohlcv=ohlcv_is,
+                    param_combinations=combos,
+                    config_params=config_params,
+                    optimize_metric=optimize_metric,
+                    weights=weights,
+                    max_results=1,
+                    timeout_seconds=window_timeout,
+                )
+        except Exception as e:
+            logger_wf.warning(f"[WF] Window {split_idx + 1} IS optimisation failed: {e}")
+            continue
+
+        best_params = is_result.get("best_params") or {}
+        best_is_metrics = is_result.get("best_metrics") or {}
+        is_score = is_result.get("best_score", 0.0)
+
+        if not best_params:
+            logger_wf.warning(f"[WF] Window {split_idx + 1}: no best params found, skipping")
+            continue
+
+        # --- OOS validation ---
+        modified_graph = clone_graph_with_params(base_graph, best_params)
+        oos_metrics = run_builder_backtest(modified_graph, ohlcv_oos, config_params)
+        oos_score = calculate_composite_score(oos_metrics, optimize_metric, weights) if oos_metrics else 0.0
+
+        # Degradation: how much worse is OOS vs IS
+        is_ret = best_is_metrics.get("total_return_pct", 0.0) or 0.0
+        oos_ret = (oos_metrics or {}).get("total_return_pct", 0.0) or 0.0
+        is_sharpe = best_is_metrics.get("sharpe_ratio", 0.0) or 0.0
+        oos_sharpe = (oos_metrics or {}).get("sharpe_ratio", 0.0) or 0.0
+        return_degradation = (oos_ret / is_ret - 1.0) if is_ret != 0 else 0.0
+        sharpe_degradation = (oos_sharpe / is_sharpe - 1.0) if is_sharpe != 0 else 0.0
+
+        is_ts = ohlcv_is.index[0] if hasattr(ohlcv_is.index, "__getitem__") else None
+        is_te = ohlcv_is.index[-1] if hasattr(ohlcv_is.index, "__getitem__") else None
+        oos_ts = ohlcv_oos.index[0] if hasattr(ohlcv_oos.index, "__getitem__") else None
+        oos_te = ohlcv_oos.index[-1] if hasattr(ohlcv_oos.index, "__getitem__") else None
+
+        window_result = {
+            "window_id": split_idx + 1,
+            "train_period": {
+                "start": str(is_ts) if is_ts is not None else None,
+                "end": str(is_te) if is_te is not None else None,
+                "bars": len(ohlcv_is),
+            },
+            "test_period": {
+                "start": str(oos_ts) if oos_ts is not None else None,
+                "end": str(oos_te) if oos_te is not None else None,
+                "bars": len(ohlcv_oos),
+            },
+            "best_params": best_params,
+            "is_score": round(is_score, 4),
+            "oos_score": round(oos_score, 4),
+            "is_metrics": {
+                "return_pct": round(is_ret, 2),
+                "sharpe": round(is_sharpe, 3),
+                "max_drawdown_pct": round(best_is_metrics.get("max_drawdown_pct", 0.0) or 0.0, 2),
+                "trades": best_is_metrics.get("total_trades", 0) or 0,
+            },
+            "oos_metrics": {
+                "return_pct": round(oos_ret, 2),
+                "sharpe": round(oos_sharpe, 3),
+                "max_drawdown_pct": round((oos_metrics or {}).get("max_drawdown_pct", 0.0) or 0.0, 2),
+                "trades": (oos_metrics or {}).get("total_trades", 0) or 0,
+            },
+            "degradation": {
+                "return_pct": round(return_degradation * 100, 2),
+                "sharpe_pct": round(sharpe_degradation * 100, 2),
+            },
+        }
+        windows.append(window_result)
+        all_best_params.append(best_params)
+
+        if oos_metrics:
+            oos_results_all.append({"params": best_params, "score": oos_score, **oos_metrics})
+
+    # --- Aggregate metrics ---
+    n_windows = len(windows)
+    if n_windows == 0:
+        raise ValueError("Walk-Forward: no windows completed successfully")
+
+    avg_is_sharpe = sum(w["is_metrics"]["sharpe"] for w in windows) / n_windows
+    avg_oos_sharpe = sum(w["oos_metrics"]["sharpe"] for w in windows) / n_windows
+    avg_is_ret = sum(w["is_metrics"]["return_pct"] for w in windows) / n_windows
+    avg_oos_ret = sum(w["oos_metrics"]["return_pct"] for w in windows) / n_windows
+    consistency_ratio = sum(1 for w in windows if w["oos_metrics"]["return_pct"] > 0) / n_windows
+
+    # Overfitting score: 0 = no overfit, 1 = severe
+    overfit_score = max(0.0, min(1.0, 1.0 - avg_oos_sharpe / avg_is_sharpe)) if avg_is_sharpe > 0 else 0.5
+
+    # Parameter stability: fraction of params that match the most-common value
+    param_stability = 1.0
+    if all_best_params:
+        all_keys = set().union(*all_best_params)
+        stabilities = []
+        for k in all_keys:
+            vals = [str(p.get(k)) for p in all_best_params if k in p]
+            if vals:
+                most_common_count = max(vals.count(v) for v in set(vals))
+                stabilities.append(most_common_count / len(vals))
+        param_stability = sum(stabilities) / len(stabilities) if stabilities else 1.0
+
+    # Recommended params: most common best params across windows
+    recommended_params: dict[str, Any] = {}
+    if all_best_params:
+        all_keys = set().union(*all_best_params)
+        for k in all_keys:
+            vals = [p[k] for p in all_best_params if k in p]
+            if vals:
+                # Most frequent value
+                recommended_params[k] = max(set(map(str, vals)), key=lambda v: [str(x) for x in vals].count(v))
+                # Try to cast back to numeric
+                try:
+                    recommended_params[k] = int(recommended_params[k])
+                except (ValueError, TypeError):
+                    with contextlib.suppress(ValueError, TypeError):
+                        recommended_params[k] = float(recommended_params[k])
+
+    confidence = (
+        "high"
+        if consistency_ratio >= 0.7 and overfit_score < 0.3
+        else "medium"
+        if consistency_ratio >= 0.5 and overfit_score < 0.6
+        else "low"
+    )
+
+    # Sort OOS results for top_results
+    oos_results_all.sort(key=lambda r: r["score"], reverse=True)
+    top_results = oos_results_all[:max_results]
+
+    execution_time = time.time() - start_time
+    logger_wf.info(
+        f"[WF] Completed: {n_windows} windows, "
+        f"avg OOS sharpe={avg_oos_sharpe:.3f}, overfit={overfit_score:.2f}, "
+        f"confidence={confidence}, time={execution_time:.1f}s"
+    )
+
+    return {
+        "status": "completed",
+        "method": "walk_forward",
+        "n_splits": n_splits,
+        "train_ratio": train_ratio,
+        "windows_completed": n_windows,
+        "windows": windows,
+        "aggregate_metrics": {
+            "train": {
+                "avg_return_pct": round(avg_is_ret, 2),
+                "avg_sharpe": round(avg_is_sharpe, 3),
+            },
+            "test": {
+                "avg_return_pct": round(avg_oos_ret, 2),
+                "avg_sharpe": round(avg_oos_sharpe, 3),
+            },
+        },
+        "robustness": {
+            "consistency_ratio_pct": round(consistency_ratio * 100, 2),
+            "parameter_stability_pct": round(param_stability * 100, 2),
+            "overfit_score": round(overfit_score, 3),
+        },
+        "recommendation": {
+            "params": recommended_params,
+            "confidence": confidence,
+        },
+        "total_combinations": n_splits,
+        "tested_combinations": n_windows,
+        "results_found": len(oos_results_all),
+        "top_results": top_results,
+        "best_params": recommended_params,
+        "best_score": round(avg_oos_sharpe, 4),
+        "best_metrics": {},
+        "execution_time_seconds": round(execution_time, 2),
+        "speed_combinations_per_sec": int(n_windows / max(execution_time, 0.001)),
         "early_stopped": False,
     }
