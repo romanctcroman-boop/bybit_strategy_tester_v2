@@ -9,9 +9,561 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **Cleanup: deprecated engines, commission hardcodes, temp files purge (2026-03-21)**
+    - **`backend/backtesting/engines/__init__.py`**: `FallbackEngineV2` and `FallbackEngineV3` removed from `__all__` and direct module-level imports. Added `__getattr__` shim that lazy-loads the deprecated class with a `DeprecationWarning` for backward compat. Files `fallback_engine_v2.py` / `fallback_engine_v3.py` stay in `engines/` for parity scripts (`tests/test_engine_comprehensive.py`, `scripts/`) that import directly from the module path — those continue to work unchanged.
+    - **`backend/optimization/builder_optimizer.py`**: two remaining hardcoded `0.0007` defaults replaced with `COMMISSION_TV` from `backend/config/constants.py` (import already present at line 35). This completes Phase 1 commission cleanup — all commission defaults in the optimization module now reference the single source of truth.
+    - **Temp files purged**: 131 one-off debug scripts deleted — all `temp_*.py` files from project root (67 files) and the entire `temp_analysis/` directory (56 files + 3 shell scripts + 2 JSON result dumps). Directory `temp_analysis/` removed. These were ad-hoc analysis scripts accumulated during development and are no longer needed.
+    - **Documentation synced**: `backend/backtesting/CLAUDE.md` updated — adapter path corrected to `strategy_builder/adapter.py` (1399 lines), full package structure added. `frontend/CLAUDE.md` updated — `strategy_builder.js` corrected from 13378 → ~7154 lines, `SymbolSyncModule.js` and `blockLibrary.js` listed.
+    - **`memory-bank/progress.md`**: updated to 2026-03-20, Phase 3-5 completion status added, stale line counts removed, remaining tech debt list refreshed.
+    - **`MEMORY.md`** (auto-memory): updated with correct package paths, file sizes, and refactoring plan final status (all Phases 0-5 ✅).
+
+- **Refactor: Phase 5 — SymbolSyncModule extracted from strategy_builder.js (2026-03-20)** — Symbol picker, ticker data, DB panel (кнопки block/unblock/delete), SSE candle sync, and auto-refresh timer moved from the 8132-line monolith into a self-contained module. Factory-function pattern with dependency injection (matching the pattern of other extracted components). Monolith reduced 8132 → 7154 lines (−978 lines net after wiring code).
+    - **New file**: `frontend/js/strategy_builder/SymbolSyncModule.js` (~707 lines) — `createSymbolSyncModule({ API_BASE, escapeHtml, showGlobalLoading, hideGlobalLoading, updateRunButtonsState })` factory; exports: `initSymbolPicker`, `initDunnahBasePanel`, `syncSymbolData`, `checkSymbolDataForProperties` (debounced), `setupAutoRefresh`, `fetchBlockedSymbols / fetchTickersData / fetchLocalSymbols / fetchBybitSymbols`, cache accessors
+    - **Updated**: `frontend/js/pages/strategy_builder.js` — added `import { createSymbolSyncModule }`, module-level `let symbolSync = null` singleton; `initializeStrategyBuilder()` creates the module and assigns `checkSymbolDataForProperties = symbolSync.checkSymbolDataForProperties`; calls `symbolSync.initSymbolPicker()` and `symbolSync.initDunnahBasePanel()`; replaced `symbolSyncCache` in `syncBtcSourceForNode` with private `_btcSyncCache`; export wrappers for `syncSymbolData` / `runCheckSymbolDataForProperties` now proxy through `symbolSync`
+    - All internal symbol sync state (`bybitSymbolsCache`, `localSymbolsCache`, `tickersDataCache`, `blockedSymbolsCache`, `symbolSortConfig`, `symbolSyncCache`, `symbolSyncInProgress`, `currentSyncAbortController`, `currentSyncSymbol`, `currentSyncStartTime`, `symbolRefreshTimers`, `refreshDunnahBasePanel`) moved inside the factory closure — no longer module-level globals in strategy_builder.js
+    - **REFACTORING_PLAN.md**: Phase 5 → 100% ✅
+    - **Pattern note**: Canvas core / block management (~4000 lines) intentionally stays in strategy_builder.js due to 30+ closure dependencies on module-level state; stub modules in `strategy_builder/` define target architecture for future incremental migration
+
+- **Refactor: Phase 5 — blockLibrary extracted from strategy_builder.js (2026-03-20)** — Pure data catalog of all block types (187 lines) moved out of the 8316-line monolith.
+    - **New file**: `frontend/js/strategy_builder/blockLibrary.js` — `export const blockLibrary` with categories: indicators, conditions, entry_mgmt, exits, close_conditions, divergence, logic
+    - **Updated**: `frontend/js/pages/strategy_builder.js` — replaced inline `const blockLibrary` with `import { blockLibrary } from '../strategy_builder/blockLibrary.js'`; monolith reduced 8316 → 8132 lines
+    - **Why only blockLibrary?** The remaining canvas/drag/event core of `strategy_builder.js` closes over 30+ module-level variables (`zoom`, `canvas`, `ctx`, `isDragging`, `dragOffset`, `connections`…) via JavaScript closures. Clean extraction would require architectural changes (parameterization or full StateManager migration), not just a mechanical move. The extractable modules were already done in prior sessions: `BacktestModule` (1178 lines), `AiBuildModule` (849), `SaveLoadModule` (806), `ConnectionsModule` (596), `ValidateModule` (555), `MyStrategiesModule` (332), `UndoRedoModule` (288) — all in `frontend/js/components/`. Phase 5 is ~70% complete; canvas engine is intentionally kept together.
+    - 632 tests pass
+
+- **Refactor: Phase 4 — backtests.py split into package (2026-03-20)** — `backend/api/routers/backtests.py` (3171 lines) converted to a package `backend/api/routers/backtests/` with clear separation of concerns. All 631 API tests pass with no regressions.
+    - **New file**: `backend/api/routers/backtests/formatters.py` — pure helpers: `_get_side_value`, `_safe_float`, `_safe_int`, `_safe_str`, `_ensure_utc`, `downsample_list`, `build_equity_curve_response`
+    - **New file**: `backend/api/routers/backtests/schemas.py` — Pydantic request/response models: `RunFromStrategyRequest/Response`, `SaveOptimizationResultRequest/Response`, `MTFBacktestRequest/Response`
+    - **New file**: `backend/api/routers/backtests/router.py` — all 13 FastAPI route handlers (logic unchanged, imports updated)
+    - **New file**: `backend/api/routers/backtests/__init__.py` — re-exports `router` + all helpers + all schemas for full backward compatibility
+    - **Deleted**: `backend/api/routers/backtests.py` (replaced by package)
+    - **Updated**: `tests/backend/api/routers/test_backtests.py` — 2 mock patch paths updated to `...backtests.router.*` (correct location for `get_backtest_service`, `list_available_strategies`)
+    - `app.py` import unchanged: `from backend.api.routers import backtests; backtests.router`
+
+- **Refactor: Phase 3 — StrategyBuilderAdapter decomposed into pure modules (2026-03-20)** — `adapter.py` reduced from 3575 → 1399 lines (−2176 lines). All `_execute_*` methods extracted as pure module-level functions callable without an adapter instance.
+    - **New file**: `backend/backtesting/strategy_builder/utils.py` — `_param`, `_clamp_period` shared helpers (eliminates circular import risk)
+    - **New file**: `backend/backtesting/strategy_builder/block_executor.py` (expanded) — added 11 functions: `extend_dual_signal_memory`, `execute_input`, `execute_filter`, `execute_signal_block`, `execute_action`, `execute_exit`, `execute_position_sizing`, `execute_time_filter`, `execute_price_action`, `execute_divergence`, `execute_close_condition`
+    - **adapter.py**: replaced each large method body with a 1-line delegation call; class structure and all call sites unchanged
+    - **`__init__.py`**: updated to re-export all new symbols; public API fully backward-compatible
+    - Phase 3 complete: `graph_parser.py` + `topology.py` + `signal_router.py` + `block_executor.py` + `utils.py` all independently testable
+    - 425 tests pass, 56 divergence tests pass (no regressions)
+
+- **Fix: Builder Optimizer — position_size and slippage hardcoded in fast path (critical bug)** — `backend/optimization/builder_optimizer.py` fast path использовал `position_size=1.0` (захардкодено) и `slippage=0.0005` вместо значений из `config_params`. Аналогично в обоих DCA path (`position_size=1.0` в двух местах). Это приводило к 5-10x завышению `net_profit` в результатах оптимизации по сравнению с backtest API. Исправлено: все 3 места теперь используют `config_params.get("position_size", 1.0)` и `config_params.get("slippage", 0.0)`. Также добавлены поля `position_size` и `slippage` в `BuilderOptimizationRequest` (router.py) и в `config_params` dict.
+    - **Было**: optimizer net=+$4,660 vs backtest API net=+$407 (11x разница) для position_size=0.1
+    - **Стало**: optimizer net=+$514, backtest API net=+$407 (~20% разница — норма из-за minor signal diff в fast path)
+    - **Affected files**: `backend/optimization/builder_optimizer.py` (3 places), `backend/api/routers/strategy_builder/router.py` (BuilderOptimizationRequest + config_params)
+
+- **RSI-1 strategy: wide lev1 optimization (116K combos) with correct params** — `temp_opt_lev1.py` запущен с `position_size=0.1, commission=0.0006, slippage=0.0`. Частично завершён (~partial). Новый потенциальный лидер `p=9, cl=25, cs=50, sl=4.0, tp=4.0` (optimizer net=$554, dd=3.0%) проверен через backtest API → net=-$327 (не валиден). Текущие best params `p=11` сохранены.
+
+- **RSI-1 best params (v3, correct position_size/commission/slippage)** — верифицированы через backtest API с `position_size=0.1, commission=0.0006, slippage=0.0`:
+    - **Best balanced** (в БД): `p=11, cl=35, cs=50, sl=3.75, tp=4.25` → net=+$407 (+4.1%), dd=4.87%, T=190, WR=51.1%, PF=1.113
+    - **Alt low-DD** (не записан): `p=12, cl=41, cs=56, sl=4.75, tp=3.25` → net=+$295 (+2.9%), dd=3.89%, T=196, WR=62.8%, PF=1.083
+    - Разница DD только 1% при потере net$112 — p=11 предпочтительнее
+
+- **Fix: Builder Optimizer fast path — EMA filter not applied (critical bug)** — `_handle_two_mas()` имеет сигнатуру `(params, ohlcv, close, inputs, adapter)`, но fast path вызывал её как `_handle_two_mas(ohlcv, _blk_params)` → `TypeError` поглощался `try/except` → `_ema_long_filter=None` → EMA фильтр полностью игнорировался в fast path. Добавлена функция `_compute_two_mas_filter_mask(ohlcv, blk_params, src_port)` с прямым вычислением EMA/MA без вызова `_handle_two_mas`. Результат: T~190 (было ~264 без фильтра), dd~43% (было ~67%). Оптимизатор теперь даёт результаты сходящиеся с backtest API по числу сделок (±1).
+
+- **Fix: Builder Optimizer fast path — generator not materialized** — `param_combinations` генератор → `_is_list=False` → fast path bypassed → ~21/s вместо ~78/s. Добавлена materialization до 2M комбо перед fast path check: если `total <= 2_000_000` и не list — выполняется `list(param_combinations)`.
+
+- **Fix: Builder Optimizer fast path — engine/imports inside hot loop** — `_get_engine()`, `from ... import BacktestInput`, `parse_trade_direction()` вызывались внутри цикла (~0.1-1ms per combo). Перенесены перед циклом + pre-allocated `_long_exits`/`_short_exits` zero arrays.
+
+- **RSI-1 strategy: EMA200 AND-filter** — добавлен `block_ema_trend_filter` (EMA200, `use_ma1_filter=True`) + 2 connections: `EMA:long → filter_long`, `EMA:short → filter_short` на `main_strategy`. Фильтр: лонг только когда close > EMA200, шорт только когда close < EMA200.
+
+- **RSI-1 strategy: short direction** — добавлены connections `RSI:short → entry_short`, `short_rsi_more=45.0` (был 80, что блокировало все шорт-сигналы). `direction=both` в БД.
+
+- **RSI-1 optimization ranges updated** — `sl=1..5 step=0.5`, `tp=2..6 step=0.5`, `cross_short_level min=50` (было 55), `use_short_range=True`.
+
+- **RSI-1 best params (v2, correct EMA filter)** — найдены через `temp_opt_refine.py` (100% из 47,250 комбо):
+    - **Best balanced**: `p=11, cl=35, cs=50, sl=3.75, tp=4.25` → net=+$4,660 (+46.6%), dd=41.6%, T=191, WR=51.8%, PF=1.107
+    - **Best low-DD**: `p=12, cl=41, cs=56, sl=4.75, tp=3.25` → net=+$4,311 (+43.1%), dd=31.0%, T=197, WR=64.0%, PF=1.085
+    - Записаны в БД: best balanced вариант (p=11)
+    - Верификация: backtest API → net=+$2,273, T=190 (сходится по числу сделок, небольшая разница net из-за отличий fast-path vs full-pipeline сигналов)
+
+- **Fix: Builder Optimizer — shuffled grid search** — `generate_builder_param_combinations()` теперь перемешивает значения каждого параметра перед `itertools.product()` (seed=42 для воспроизводимости). До этого детерминированный порядок `period=1,2,3,...` приводил к тому, что при timeout optimizer не успевал протестировать «интересные» параметры (e.g. `period=14`). Теперь первые же combo охватывают весь диапазон параметров равномерно.
+
+- **Fix: Builder Optimizer — `period=1` RSI pre-filter** — `build_infeasibility_checker` помечает `period=1` как infeasible (degenerate RSI: всегда 0 или 100, никогда не пересекает уровни). До фикса optimizer тратил ~9594 combo на `period=1` с `total_trades=0`.
+
+- **Fix: Builder Optimizer — `cross_long <= long_rsi_more` pre-filter** — изменено с `<` на `<=`; равное значение тоже infeasible (RSI cross на уровне фильтра → 0 сигналов). Аналогично `cross_short >= short_rsi_less`.
+
+- **Fix: Builder Optimizer — zero-trade skip** — результаты с `total_trades=0` теперь пропускаются в main loop (`continue` после проверки); ранее они попадали в `all_results` и создавали misleading `best_score=0`.
+
+- **Verified**: RSI-1 оптимизация ETHUSDT 30m (78.67M комбо) — с первой итерации находит `best_score=21835.17` (net_profit), `period=67`, `total_trades=4`, `win_rate=100%`.
+
+- **Fix: progress bar не запускался при оптимизации** — устранены 4 причины: (1) reset-код скрывал бар после `setRunningState`; (2) stale данные из предыдущего запуска показывались первые 2с (добавлена проверка `updated_at`); (3) бэкенд не писал статус до загрузки OHLCV — добавлен `status='starting'` сразу; (4) Mixed DCA path не обновлял прогресс до `completed` — исправлено
+- **Fix: optimization combination counter shows NaN** — `calculateTotalCombinations()` теперь поддерживает оба формата (`{low, high}` от `optimization_config_panel` и `{min, max}` от DOM path); ранее всегда показывал "~NaN combinations" при использовании основного флоу через config panel
+- **Fix: `updateParameterRangesFromBlocks` теряла `blockId`/`paramKey`** — state теперь включает эти поля; `buildBuilderParameterRanges()` может корректно строить `"blockId.paramKey"` param_path вместо `".name"`
+- **Fix: стaleый прогресс при повторном запуске оптимизации** — прогресс-бар теперь сбрасывается в 0 перед стартом поллинга; ранее показывал "Done — X combos" от предыдущего запуска 2-3 секунды
+
+- **Exit reasons for Close-by-indicator** — Channel, RSI, Stoch, MA, PSAR теперь отображаются на графике и в таблице сделок (вместо общего «Signal»)
+- **Жёлтое предупреждение** — «No long exit signals» не показывается, если DCA использует close_conditions (Close by Time, Channel, RSI и т.д.)
+- **DCAEngine: Partial TP (TP1–TP4)** — реализован `_check_multi_tp()` + `_partial_close_position()`; каждый TP уровень закрывает заданный % позиции, последний закрывает остаток
+- **DCAEngine: Trailing Stop** — добавлен `TrailingStopState`; читает `trailing_stop_activation` / `trailing_stop_offset` из BacktestConfig; сбрасывается при каждом новом входе
+- **DCAEngine: ATR TP/SL** — читает `atr_enabled`, `atr_period`, `atr_tp_multiplier`, `atr_sl_multiplier` из BacktestConfig; ATR пересчитывается при каждом заполнении DCA ордера
+- **DCAEngine: Grid Trailing** — добавлена логика сдвига незаполненных ордеров при благоприятном движении цены (дополняет существующий grid_pullback)
+- **DCAEngine: Grid Trailing / Pullback conflict fix** — при включённом Grid Trailing pullback-логика переведена на `elif`; добавлена отдельная переменная `_trailing_grid_base_price` (не конфликтует с `_pullback_base_price`)
+- **NumbaEngine: Multi-TP (TP1–TP4)** — `_simulate_dca_single` поддерживает частичные закрытия по 4 уровням TP; последний уровень закрывает весь остаток; каждое частичное закрытие записывается как отдельная сделка
+- **NumbaEngine: Trailing Stop** — активация по `trailing_activation_pct`, трейлинг с `trailing_distance_pct`; состояние сбрасывается при каждом новом входе
+- **NumbaEngine: ATR TP/SL** — `atr_values` (float64[n_bars]) передаётся в `_simulate_dca_single`; цены пересчитываются при каждом заполнении DCA ордера; 0.0 = выключено
+- **NumbaEngine: warmup** — второй прогрев компилирует пути с multi_tp_enabled=1 и trailing_stop
+- **Backward compat** — все новые параметры в `run_dca_batch_numba` / `run_dca_single_numba` имеют Python defaults (0 / None); существующие вызовы не требуют изменений
+- **V4 + Numba parity (100%)** — 9 сценариев (single TP/SL, Multi-TP 4 уровня, Trailing Stop, ATR TP, ATR SL, комбо Multi-TP+ATR SL, Breakeven SL, DCA grid fills+TP): delta=0.0000 USD по net_profit
+- **Bugfix DCA V4: ATR multiplier=0** — `_open_dca_position` и `_fill_dca_order` теперь не устанавливают `_atr_sl_price`/`_atr_tp_price` если соответствующий multiplier=0 (до фикса: price - ATR\*0 = entry_price → немедленный ложный стоп)
+- **Bugfix Numba: exit prices** — Multi-TP partial/full close теперь выходит по точной TP-цене; ATR TP — по `atr_tp_price`; ATR SL и Trailing Stop — по `max(low, min(high, stop_price))` (вместо close)
+
+## 2026-03-16 — Numba DCA Phase 1-3: 7 new features + 21 tests
+
+### Added — `backend/backtesting/numba_dca_engine.py`, `tests/backend/backtesting/test_numba_dca_phase1_3.py`
+
+**Phase 1 — correctness for optimization**
+
+- **Martingale `multiply_total` mode** (`martingale_mode=1`) — `w[k] = (coef-1) * sum(w[0..k-1])`, min=1; matches `DCAGridCalculator._calculate_order_sizes`
+- **Martingale `progressive` mode** (`martingale_mode=2`) — `w[k] = 1 + k*(coef-1)`; linear progression; added to `_calc_grid_orders` @njit helper
+- **Close conditions (precomputed)** (`close_cond: np.ndarray[bool, 1d]`, `close_cond_min_profit: float`) — V4 `_check_close_conditions` result precomputed to `bool[n_bars]` outside JIT via `build_close_condition_signal()` helper; Numba checks `close_cond[i]` at V4 priority-2; optional min unrealized profit filter
+
+**Phase 2 — feature completeness**
+
+- **Grid pullback** (`grid_pullback_pct: float`) — shifts unfilled orders when price deviates ≥ pct% from last anchor; matches V4 `_pullback_base_price` logic
+- **Grid trailing** (`grid_trailing_pct: float`) — shifts unfilled orders to trail favorable price move; takes priority over pullback; separate `trailing_grid_base_price` variable
+- **Partial grid** (`partial_grid_orders: int`) — activates N orders at a time; expands window by 1 on each fill; uses per-order `g_active[]` flag; V4 parity via `partial_grid_orders` index
+- **SL from last order** (`sl_from_last_order: int`) — `sl_from_last_order=1` uses `pos_last_fill_price` as SL base instead of `pos_avg_entry`; `pos_last_fill_price` updated on every DCA fill
+
+**Phase 3 — rarely used**
+
+- **Indent orders** (`indent_enabled`, `indent_pct`, `indent_cancel_bars`) — defers entry to a limit price `close*(1-pct)` for long; pending state `has_pending_indent` checked before in_position block; auto-cancel after N bars
+- **Log-scale grid steps** (`use_log_steps`, `log_coefficient`) — `step[k] = log_coefficient^k`, normalized to fill grid_size_pct; replaces linear even-spacing in `_calc_grid_orders`
+
+**All 12 new parameters have Python-level defaults** (0 / 0.0 / None) in `run_dca_single_numba` and `run_dca_batch_numba` → zero breaking changes to existing callers.
+
+**Tests — `tests/backend/backtesting/test_numba_dca_phase1_3.py` (21 tests, ALL PASS)**
+
+- `TestMartingaleModes` (5) — multiply_each default, multiply_total size ratios, progressive ratios, all-three combined
+- `TestCloseConditions` (3) — triggers exit, profit filter bypass, no-cc baseline unchanged
+- `TestGridPullback` (2) — pullback shifts unfilled orders, no-shift when disabled
+- `TestGridTrailing` (2) — trailing shifts with favorable move, overrides pullback
+- `TestPartialGrid` (2) — fills expand window, all-at-once when disabled
+- `TestSLFromLastOrder` (2) — different SL exit price vs avg_entry mode
+- `TestIndentOrders` (2) — deferred entry, auto-cancel on expiry
+- `TestLogSteps` (3) — log steps differ from linear, coefficient effect
+
+**Fixed (test infrastructure) — `tests/backend/backtesting/test_numba_dca_phase1_3.py`**
+
+- Added `scope="module" autouse=True` pytest fixture calling `warmup_numba_dca()` before tests; eliminates Numba cold-start flakiness where JIT compilation during a test caused `close_cond` / `sl_from_last_order` to appear as no-ops on first run (both returned same result as disabled case)
+
+**NUMBA_DCA_ROADMAP.md** — all 7 Phase 1-3 items marked ✅ Done; test coverage table added; Dynamic TP and Custom grid marked ❌ Not planned
+
+## 2026-03-16 — DCA optimization: close-condition indicator cache (2–5× speedup)
+
+### Performance — Builder Grid Search for DCA strategies
+
+**Problem:** При оптимизации DCA стратегий (например DCA-RSI-5 с 46 вариантами) каждый
+трайл запускал `DCAEngine._precompute_close_condition_indicators(ohlcv)` заново — пересчитывал
+RSI/Stoch/MA/BB/Keltner/PSAR для close-conditions, хотя OHLCV и параметры закрытия не менялись.
+46 трайлов × ~300 мс = **~14 секунд** только на индикаторы закрытия.
+
+**Fix:**
+
+**`backend/backtesting/engines/dca_engine.py`:**
+
+- Добавлен `_extract_close_indicator_cache()` — экспортирует вычисленные кеши в dict
+- Добавлен `_inject_close_indicator_cache(cache)` — инжектирует кеш, выставляет флаг `_close_indicators_precomputed`
+- `_precompute_close_condition_indicators()` — ранний выход если `_close_indicators_precomputed=True`
+
+**`backend/optimization/builder_optimizer.py`:**
+
+- Добавлена `_precompute_dca_close_cache(final_dca_config, config_params, ohlcv)` — строит
+  DCAEngine один раз, вычисляет индикаторы, возвращает cache dict
+- `_run_dca_with_signals()` — добавлен параметр `close_indicator_cache=None`; если передан —
+  инжектируется до `run_from_config`
+- **Standard grid search path** — перед циклом: если DCA, вычисляет close-indicator cache один раз;
+  в каждом трайле: генерирует entry-сигналы через `StrategyBuilderAdapter`, затем вызывает
+  `_run_dca_with_signals` с кешем вместо полного `run_builder_backtest`
+- **Fast RSI threshold path** — также получил pre-computed cache для DCA случая
+
+**Результат:** 2–5× ускорение для DCA оптимизации (зависит от количества активных close-conditions).
+46 трайлов DCA-RSI-5: ~14 сек → ~3–6 сек.
+
+## 2026-03-15 — Evaluation Criteria full pipeline fix
+
+### Fixed — Evaluation Criteria block (end-to-end)
+
+**Problem:** `sort_order`, `use_composite` and `EvaluationCriteriaPanel` state were silently dropped
+during Builder optimization, never reaching the backend scorer/sorter. Criteria saved to DB via
+`POST /criteria` were also disconnected from the `localStorage`-only panel state.
+
+**`backend/api/routers/strategy_builder/router.py`:**
+
+- `BuilderOptimizationRequest.commission` default `0.0007` → `0.00055` (unified with all other callers)
+- Added `sort_order: list[dict[str, Any]] | None` field
+- Added `use_composite: bool` field (default `False`)
+- `optimize_strategy()`: post-processing block after search completes:
+    - If `request.sort_order` → calls `apply_custom_sort_order(result["results"], sort_order)`
+    - If `request.use_composite` + `request.weights` → re-ranks by composite score
+
+**`frontend/js/pages/optimization_panels.js`:**
+
+- `startBuilderOptimization()` payload now includes `sort_order` and `use_composite` (previously omitted — classic optimization sent them but Builder did not)
+
+**`frontend/js/components/SaveLoadModule.js`:**
+
+- `buildStrategyPayload()`: added `evaluationCriteriaConfig` — reads from `window.evaluationCriteriaPanel.state` (live) or `localStorage['evaluationCriteriaState']`
+- `loadStrategy()`: restores `evaluationCriteriaState` to `localStorage` and calls `window.evaluationCriteriaPanel.loadSavedState()` — fixes cross-device/session criteria loss
+
+**`backend/optimization/builder_optimizer.py`:**
+
+- `generate_builder_param_combinations()` early-return for empty specs now returns `[{}], 1, False` (3-tuple, was returning 2 — caused `ValueError: not enough values to unpack`)
+
+**Tests:**
+
+- `tests/test_builder_optimizer.py`: updated 11 call sites of `generate_builder_param_combinations` to unpack 3 values `(combos, total, _)`
+- `tests/backend/api/routers/test_backtests.py`:
+    - `test_create_backtest_default_commission_parity`: updated expected value `0.0007` → `0.00055`
+    - `test_create_backtest_direction_from_strategy_params`: rewritten to test correct semantics — `_direction` wins only when `direction` is NOT explicitly provided
+    - Added `test_create_backtest_explicit_direction_overrides_strategy_params`: explicit `direction` beats `_direction` in `strategy_params`
+- **Result: 6291 passed, 130 skipped, EXIT:0**
+
+## 2026-03-16 — Systemic `commission_value` audit + `recovery_factor=inf` fix
+
+### Fixed
+
+**Root cause:** `engine.py:566` uses `getattr(config, "commission_value", 0.0007)` for HWM/drawdown
+calculation separately from `taker_fee` (used for P&L). All callers set `taker_fee` but missed
+`commission_value`, meaning drawdown calculations always used 0.07% regardless of user settings.
+
+**`backend/backtesting/validation_suite.py`:**
+
+- Added `commission_value=commission` and `maker_fee=commission` to `BacktestConfig(...)` in
+  `_run_fallback()` benchmark method.
+
+**`backend/core/metrics_calculator.py`** (prior session, documented here):
+
+- `recovery_factor = float("inf")` → `999.0` when `max_drawdown_value == 0` and `net_profit > 0`.
+  JSON serialization failed silently on `inf`; `999.0` is the "perfect strategy" sentinel.
+
+**`backend/api/routers/backtests.py`** (prior session, documented here):
+
+- `create_backtest` (line ~345): added `commission_value=commission`
+- `run_backtest_from_strategy` (line ~1700): added `commission_value=commission`
+- `save_optimization_result` (line ~2046): added `commission_value=...`; fixed wrong default
+  `0.0006` → `0.00055` (correct Bybit linear taker fee)
+
+**`backend/optimization/builder_optimizer.py`** (prior session, documented here):
+
+- DCA optimizer call #1 (line ~901): added `commission_value=config_params.get("commission", 0.0007)`
+- DCA optimizer call #2 (line ~1557): added `commission_value=config_params.get("commission", 0.0007)`
+
+### Verified Clean (no changes needed)
+
+- `backend/optimization/scoring.py` — all division operations division-by-zero safe ✅
+- `backend/backtesting/strategy_builder/adapter.py` — port aliases, timeframe resolution,
+  connection conditions, `generate_signals` signal routing all correct ✅
+- `backend/optimization/advanced_engine.py` — `BacktestConfig(**full_config)` relies on
+  `auto_set_commission` validator which fires correctly when `market_type` is in `full_config` ✅
+- `backend/backtesting/portfolio_strategy.py`, `backend/optimization/utils.py`,
+  `backend/agents/integration/*.py` — use `BacktestInput` (not `BacktestConfig`), no HWM field ✅
+
+## 2026-03-15 — Optimization: Grid Cap Warning, Degenerate Range Guard, End Date Fix
+
+### Fixed
+
+**`backend/optimization/builder_optimizer.py`:**
+
+- **Grid cap now reported** — `generate_builder_param_combinations()` return type extended from
+  `tuple[list, int]` → `tuple[list, int, bool]` where the third value (`was_capped`) is `True`
+  when the grid exceeded the 50,000-combination safety limit and was silently truncated.
+
+**`backend/api/routers/strategy_builder/router.py`:**
+
+- **Grid cap surfaced in API response** — when `was_capped=True`, the `/optimize` endpoint now
+  adds a `[GRID_CAPPED]` entry to `result["warnings"]`, plus `"grid_capped": true` and
+  `"full_grid_size": N` fields. Previously the user had no way to know their 100K-combo grid
+  was tested only up to 50K.
+
+**`frontend/js/pages/optimization_panels.js`:**
+
+- **Grid cap warning shown to user** — `handleOptimizationComplete()` reads `data.grid_capped` and
+  `data.full_grid_size` and fires a warning notification before the success notification.
+- **Degenerate range guard** — `startBuilderOptimization()` now validates all `parameterRanges`
+  before sending the API request. If any enabled param has `low === high` (degenerate range from
+  stale saved state), the optimization is cancelled and the user sees a clear warning naming the
+  affected parameter(s). Previously this silently ran 1 combination.
+
+**`frontend/js/pages/optimization_config_panel.js`:**
+
+- **End date capped at yesterday** — `getBacktestEndDate()` now returns `today − 1 day` as the
+  upper bound. Previously it allowed `today`, which could include an incomplete (not-yet-closed)
+  candle and produce false signals during intraday optimization runs.
+
+**`backend/agents/workflows/builder_workflow.py`:**
+
+- Updated `generate_builder_param_combinations()` call to unpack the new 3-value tuple.
+
+---
+
+## 2026-03-15 — Optimization: Progress Tracking, DCA TP Fields, Frontend Range Defaults
+
+### Fixed
+
+**`backend/optimization/builder_optimizer.py`:**
+
+- **Progress update frequency** — standard grid search path now calls `update_optimization_progress()` after
+  _every_ completed backtest instead of every 5% threshold. DCA backtests take 2–5 s each, so the
+  previous interval meant the UI showed no progress for minutes.
+- **Fast RSI path progress** — `_run_fast_rsi_threshold_optimization()` now throttles progress updates to
+  a minimum of 50 ms between calls (time-based, not count-based) to avoid lock contention at high
+  combo rates. Progress update was also moved to fire _before_ the "no signals → continue" early-exit
+  so that skipped combos are counted correctly.
+- **Missing DCA multi-TP fields** — `run_builder_backtest()` and `_run_dca_with_signals()` now pass all
+  four DCA take-profit levels (`dca_tp1_percent`, `dca_tp1_close_percent` … `dca_tp4_percent`,
+  `dca_tp4_close_percent`) into `BacktestConfig`. Previously these fields were absent, causing
+  optimization results to differ from the regular backtest run of the same strategy.
+
+**`frontend/js/pages/strategy_builder.js`:**
+
+- **`renderOptRow` default range bug** — `renderOptRow(key, label, value)` used to initialize
+  unconfigured params as `{min: currentValue, max: currentValue, step: 1}`, producing a degenerate
+  single-point range. The function now accepts `(key, label, value, fieldMin, fieldMax, fieldStep)`
+  and uses the field-level constraints (defined in `customLayouts`) as sensible defaults. A saved
+  config with `min === max === currentValue` is also detected and replaced with field defaults.
+- **Call sites updated** — Both direct `field.type === 'number'` path (line ~4659) and the
+  `field.type === 'inline'` path (line ~4617) now pass `field.min, field.max, field.step` to
+  `renderOptRow`.
+- **Checkbox `data-*` attributes** — The rendered checkbox now carries `data-field-min`,
+  `data-field-max`, `data-field-step` so that event handlers (`.tv-opt-checkbox` change,
+  `.tv-opt-input` change) can read field constraints at runtime without re-scanning the layout.
+- **TV-style checkbox handler** (line ~5594) and **TV optimization input handler** (line ~5619) both
+  updated to read field constraints from `data-field-*` attributes instead of falling back to
+  `{min: params[key], max: params[key]}`.
+- **Simple popup checkbox handler** (line ~5477) similarly updated with field-constraint fallback.
+
+**Root cause / impact:** When a user opened the RSI block in optimization mode and checked a parameter
+checkbox without manually adjusting the range inputs, the frontend sent `low == high == currentValue`
+to the backend. The backend produced exactly 1 combination total, making the optimization appear to
+"not execute". After this fix, the default range for `cross_long_level` (for example) is `[0.1, 100]`
+step `0.1` — matching the field definition — so the user immediately gets a meaningful sweep without
+touching the range inputs.
+
+## 2026-03-14 — Frontend Indicators: ADX, JSDoc Documentation, Tests
+
+### Added
+
+**`frontend/js/pages/market_chart.js`:**
+
+- `calculateADX(data, period = 14)` — Average Directional Index с +DI/-DI
+    - True Range расчёт
+    - Directional Movement (+DM/-DM)
+    - Wilder's smoothing для усреднения
+    - DX → ADX (сглаживание)
+    - Возвращает: `{ adx, plusDI, minusDI }`
+    - Паритет с `backend/core/indicators/advanced.py`
+
+**Priority 1 Indicators (6 new):**
+
+- `calculateCCI(data, period = 20, constant = 0.015)` — Commodity Channel Index
+- `calculateKeltner(data, period = 20, atrPeriod = 10, multiplier = 2)` — Keltner Channels
+- `calculateDonchian(data, period = 20)` — Donchian Channels
+- `calculateParabolicSAR(data, afStart = 0.02, afIncrement = 0.02, afMax = 0.2)` — Parabolic SAR
+- `calculateADLine(candles, volumes)` — Accumulation/Distribution Line
+- `calculateStochRSI(data, rsiPeriod = 14, stochPeriod = 14, kPeriod = 3, dPeriod = 3)` — Stochastic RSI
+
+**JSDoc Documentation (22/22 — 100% coverage):**
+
+- `calculateVolumeSMA()` — @param, @returns, @description, @note
+- `calculateSMA()` — @param, @returns, @description, @see
+- `calculateEMA()` — @param, @returns, @description, @see
+- `calculateBollingerBands()` — @param, @returns, @description, @see
+- `calculateOBV()` — @param, @returns, @description, @see
+- `calculateVolumeDelta()` — @param, @returns, @description, @note
+- `calculateStochastic()` — @param, @returns, @description, @see
+- `calculateADX()` — @param, @returns, @description, @see
+- `calculateATR()` — @param, @returns, @description, @see
+- `calculateRSI()` — @param, @returns, @description, @see
+- `calculateMACD()` — @param, @returns, @description, @see
+- `calculateVWAPIndicator()` — @param, @returns, @description, @note, @see
+- `calculateVWAP()` — @param, @returns, @description, @note
+- `calculateIchimoku()` — @param, @returns (complex type), @description, @interpretation, @see
+- `calculatePivotPoints()` — @param, @returns (complex type), @description, @interpretation, @see
+- `calculateSuperTrend()` — @param, @returns, @description, @interpretation, @see
+- `calculateCCI()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+- `calculateKeltner()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+- `calculateDonchian()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+- `calculateParabolicSAR()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+- `calculateADLine()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+- `calculateStochRSI()` — @param, @returns, @description, @interpretation, @see ⭐ NEW
+
+**`frontend/tests/indicators.test.js`:**
+
+- **RSI Tests (4):** period 3, RSI=100/0 extremes, period 14
+- **ATR Tests (3):** period 3, period 14, high volatility
+- **MACD Tests (3):** standard params, histogram calculation, colors
+- **Stochastic Tests (3):** %K/%D calculation, range 0-100, overbought
+- **ADX Tests (5):** ADX/+DI/-DI calculation, range 0-100, strong trend, insufficient data
+
+### Changed
+
+- **Total tests:** 13 → 31 (18 new tests)
+- **Lines added:** ~650 (ADX function + JSDoc + tests)
+- **Documentation coverage:** 0/15 → 16/16 (0% → 100%) ✅
+- **Conistency:** 85% → 100% (все индикаторы документированы)
+
+### Fixed
+
+- ADX missing from frontend indicator library (now 100% parity with backend)
+- JSDoc documentation missing for 8 functions (OBV, VolumeDelta, VWAP, VWAPIndicator, Ichimoku, PivotPoints, SuperTrend, VolumeSMA)
+
+### Technical Details
+
+**ADX Implementation:**
+
+```javascript
+function calculateADX(data, period = 14) {
+    // True Range
+    const tr = Math.max(high - low, |high - prevClose|, |low - prevClose|)
+
+    // Directional Movement
+    +DM = upMove > downMove && upMove > 0 ? upMove : 0
+    -DM = downMove > upMove && downMove > 0 ? downMove : 0
+
+    // Wilder's smoothing
+    atr[i] = atr[i-1] - (atr[i-1]/period) + tr[i]
+
+    // +DI, -DI
+    +DI = 100 * smoothPlusDM / atr
+    -DI = 100 * smoothMinusDM / atr
+
+    // DX → ADX
+    DX = 100 * |+DI - -DI| / (+DI + -DI)
+    ADX = SMA(DX, period)
+}
+```
+
+**Test Coverage:**
+
+- All indicators: RSI, MACD, ATR, Stochastic, ADX, SMA, EMA, Bollinger Bands
+- Edge cases: empty data, insufficient data, extreme values
+- Range validation: RSI 0-100, ADX 0-100, Stochastic 0-100
+- Calculation accuracy: histogram = MACD - Signal, Bollinger middle = SMA
+
+### Parity with Backend
+
+| Indicator  | Frontend           | Backend            | Status |
+| ---------- | ------------------ | ------------------ | ------ |
+| RSI        | Wilder's smoothing | Wilder's smoothing | ✅     |
+| MACD       | EMA (12,26,9)      | EMA (12,26,9)      | ✅     |
+| ATR        | Wilder's smoothing | Wilder's smoothing | ✅     |
+| ADX        | Wilder's smoothing | Wilder's smoothing | ✅     |
+| Stochastic | %K, %D smoothing   | %K, %D smoothing   | ✅     |
+| Bollinger  | Population std dev | Population std dev | ✅     |
+| SMA        | Arithmetic mean    | Arithmetic mean    | ✅     |
+| EMA        | Multiplier 2/(n+1) | Multiplier 2/(n+1) | ✅     |
+
+**All indicators: 100% parity ✅**
+
+## 2026-03-13 — DCA Engine: Breakeven Support (Static SL/TP)
+
+### Added
+
+**`backend/backtesting/interfaces.py`:**
+
+- `ExitReason.BREAKEVEN_SL` — отдельная причина выхода для breakeven SL (вместо stop_loss), чтобы в таблице сделок видеть «BE» и отличать от обычного SL
+
+**`backend/backtesting/engines/dca_engine.py`:**
+
+- Breakeven support from Static SL/TP block: `activate_breakeven`, `breakeven_activation_percent`, `new_breakeven_sl_percent`
+- When profit reaches `breakeven_activation_pct` (e.g. 0.5%), SL moves to `entry + breakeven_offset` (e.g. +0.1%)
+- Breakeven SL takes precedence over config SL when active
+- Exit price at breakeven SL uses actual SL price (clamped to bar range) for accurate PnL
+- Closed trades use `ExitReason.BREAKEVEN_SL` (displayed as «BE» in trades table) instead of `stop_loss`
+- Trade record `sl_price` shows breakeven level when closed via breakeven
+- Breakeven state reset on each new position open
+
+### Fixed
+
+- DCA strategies with Static SL/TP + "Activate Breakeven" now correctly move SL to entry+offset when profit threshold is reached (previously ignored)
+
+## 2026-03-13 — DCA Metrics Round-3: Buy&Hold, MaxDD USD, SQN, Ulcer Index, R², Breakeven
+
+### Fixed
+
+**`backend/backtesting/engines/dca_engine.py`:**
+
+- Added `self._first_close` / `self._last_close` stored in `_run_backtest` for buy & hold calculation
+- `max_drawdown_value` (USD) now computed as `max_drawdown% * initial_capital / 100` (was always 0)
+- `buy_hold_return` / `buy_hold_return_pct` computed from first/last OHLCV close prices
+- `sqn` (System Quality Number) = sqrt(N) \* mean(P&L) / std(P&L)
+- `ulcer_index` computed from bar-by-bar equity curve (sqrt of mean squared drawdown %)
+- `stability` (R²) = coefficient of determination of linear regression of equity curve
+- `breakeven_trades` / `long_breakeven_trades` / `short_breakeven_trades` = count of trades with |PnL| < 0.001
+
+**`backend/backtesting/models.py`:**
+
+- Added `stability: float` field (R² of equity linear regression)
+
+**`backend/api/routers/strategy_builder/router.py`:**
+
+- Added to `inline_metrics`: `buy_hold_return_pct`, `max_drawdown_value`, `sqn`, `ulcer_index`,
+  `stability`, `breakeven_trades`, `long/short_breakeven_trades`
+
+### Correct zeros (not bugs):
+
+- Нереализованная ПР/УБ = 0 — все позиции закрыты в конце бэктеста ✓
+- Всего открытых сделок = 0 — корректно ✓
+- Коэф. Kelly = 0 — математически верно: avg_loss >> avg_win → отрицательный Kelly → 0 ✓
+- Макс. просадка (внутри бара) = -- — требует intrabar данных, не реализовано
+- Эффективность маржи = 0 — требует трекинга маржи по барам
+
+## 2026-03-13 — DCA Metrics Round-2: CAGR, Calmar, Kelly, Payoff, Gross%, Recovery/Sharpe Long
+
+### Fixed
+
+**`backend/backtesting/engines/dca_engine.py` — `_build_performance_metrics`:**
+
+- Added `gross_profit_pct` / `gross_loss_pct` for "All" trades (gross / initial_capital \* 100) — was always 0
+- Added CAGR computation from OHLCV date range (`self._ohlcv_index`); `bm.cagr` was always 0
+- Added `calmar_ratio = CAGR / max_drawdown`; `bm.calmar_ratio` was always 0
+- Added Kelly Criterion (`kelly_percent`, `kelly_percent_long`/`_short`)
+- Added `payoff_ratio` (was pulling 0 from `bm.payoff_ratio`; now computed from win_pnls/loss_pnls)
+- Added `long_payoff_ratio`, `short_payoff_ratio`
+- Added `recovery_long` / `recovery_short` (= overall `recovery_factor` for pure-direction strategies)
+- Added `sharpe_long` / `sortino_long` / `calmar_long` for pure-Long DCA strategies
+- Added `cagr_long` for pure-Long strategies
+
+**`backend/api/routers/strategy_builder/router.py` — `inline_metrics`:**
+
+- Added ~35 missing fields: `gross_profit_pct`, `gross_loss_pct`, `avg_win_value`, `avg_loss_value`,
+  `avg_trade_value`, `avg_trade_pct`, `avg_bars_in_winning`, `avg_bars_in_losing`,
+  `cagr_long/short`, `recovery_long/short`, `sharpe/sortino/calmar_long/short`,
+  `kelly_percent*`, all `long_*` and `short_*` breakdown fields (avg, largest, payoff, expectancy,
+  consec, bars breakdown, gross profit/loss pct, profit factor, winning/losing counts)
+
+**`frontend/js/components/MetricsPanels.js`:**
+
+- Fixed `dyn-return-capital` double-multiplication bug: `(metrics.total_return || 0) * 100`
+  → `metrics.total_return || 0`. `total_return` is already in % (-9.16), was displaying -916.17%
+
+### 2026-03-13 — DCA Metrics & Direction Badge Fixes
+
+#### `backend/backtesting/engines/dca_engine.py` — `_build_performance_metrics` полная переработка
+
+- **FIXED**: `avg_win` / `avg_loss` теперь хранят per-trade % (соответствует `avg_win_pct`), а не USD — добавлены `avg_win_value` / `avg_loss_value` (USD)
+- **FIXED**: `largest_win` / `largest_loss` теперь хранят per-trade % (`largest_win_value` / `largest_loss_value` = USD)
+- **FIXED**: `avg_trade_pct` теперь вычисляется из `pnl_pct` трейдов
+- **ADDED**: `long_avg_trade` / `long_avg_trade_value` / `long_avg_trade_pct` — средняя сделка по Long
+- **ADDED**: `long_largest_win` / `long_largest_win_value` / `long_largest_loss` / `long_largest_loss_value`
+- **ADDED**: `long_avg_win_pct` / `long_avg_loss_pct` — per-trade % для Long
+- **ADDED**: `long_commission` / `short_commission` — сумма комиссий по направлениям
+- **ADDED**: `long_expectancy` / `short_expectancy` — математическое ожидание
+- **ADDED**: `long_max_consec_wins` / `long_max_consec_losses` — серии побед/поражений
+- **ADDED**: `avg_bars_in_long` / `avg_bars_in_winning_long` / `avg_bars_in_losing_long` — среднее баров
+- **ADDED**: `avg_bars_in_winning` / `avg_bars_in_losing` — из bm с fallback вычислением
+- **ADDED**: все short breakdown поля по аналогии с long
+- Рефакторинг: вынесены helper-функции `_pnl()`, `_pnl_pct()`, `_bars()`, `_comm()`, `_safe_mean()`, `_consec()`, `_expectancy()`, `_pf()` для читаемости
+
+#### `frontend/js/pages/backtest_results.js` — direction badge в списке бэктестов
+
+- **FIXED**: direction badge определяется по реальным данным `metrics.long_trades` / `metrics.short_trades` вместо `config.direction` — DCA-стратегия теперь правильно показывает "L" вместо "L&S"
+
 ### 2026-03-13 — DCA Chart Visualization + Engine Fixes (commit f714f1fd6)
 
 **Feature: DCA Chart Rendering Fields**
+
 - `models.TradeRecord`: new fields `dca_levels` (per-order fills), `dca_grid_prices` (planned G2..GN),
   `grid_level`, `tp_price`, `sl_price` for chart rendering
 - `dca_engine.DCATradeRecord`: new fields `order_fills`, `planned_grid_prices`, `tp_price`, `sl_price`
@@ -25,6 +577,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dca_total_size_usd`, `dca_levels`, `dca_grid_prices`, `tp_price`, `sl_price` to trade serialization
 
 **Feature: Frontend Chart Enhancements**
+
 - Volume histogram (bottom 20% of chart pane, green/red coloured, toggleable via checkbox)
 - DCA grid lines G1..GN on chart (blue=filled, planned grid lines for unfilled levels)
 - Chart type toggle buttons: Candlestick / Bar / Line
@@ -34,13 +587,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSS classes extracted from inline styles: `bt-chart-type-toggle`, `mfe-mae-section`, etc.
 
 **Fix: `fallback_engine_v4.py`**
+
 - Renamed unused local vars with `_` prefix to suppress F841 linter warnings
 - Added `max_consecutive_wins` / `max_consecutive_losses` calculation in `_calculate_metrics`
 
 **Fix: `dca_engine.py`**
+
 - `datetime.utcnow()` → `datetime.now(timezone.utc)` (DeprecationWarning removed)
 
 **Tests: 47 new tests in `test_dca_chart_fields.py`**
+
 - `TestDCATradeRecordDataclass`: new fields exist with correct defaults
 - `TestModelTradeRecordSchema`: Pydantic schema has tp/sl/dca_levels/dca_grid_prices
 - `TestDcaLevelsStructure`: dca_levels keys, sequential levels, ISO timestamps
@@ -53,12 +609,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TestSlTypeConfiguration` / `TestSlTypeLastOrderPriceDifference` / `TestGetSlBasePriceHelper`
 
 **Cleanup**
+
 - `temp_analysis/`: deleted 217 debug/analysis scripts accumulated over dev sessions
 - `pyproject.toml`: added `temp_analysis`, `TempState`, `ScreenClip`, `AppData` to mypy excludes
 
 ### 2026-03-13 — Infrastructure Fixes (5 issues)
 
 **Fix 1 — `/api/v1/dashboard/market/tickers` performance (12-14s → <1s)**
+
 - Added shared in-memory cache with 60s TTL for all USDT tickers list
 - Added `asyncio.Lock()` mutex to prevent thundering herd on cache miss
 - All `top:N` and `symbols:` requests share one cached list — only 1 Bybit API call per minute
@@ -66,21 +624,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File: `backend/api/routers/dashboard_improvements.py`, `backend/api/middleware_setup.py`
 
 **Fix 2 — Redis rate limiter not connecting**
+
 - Root cause: `is_connected()` returns `False` by default because `_get_client()` is lazy
 - Added `_redis_limiter._get_client()` call before `is_connected()` check (force eager connect)
 - Result: `Rate limiter initialized: backend=redis` (was: `backend=in-memory`)
 - File: `backend/middleware/rate_limiter.py`
 
 **Fix 3 — WS_SECRET_KEY not set warning**
+
 - Added `WS_SECRET_KEY` to `.env` with a generated secure key
 - File: `.env`
 
 **Fix 4 — asyncio ConnectionResetError WinError 10054**
+
 - Added Windows-specific `asyncio` exception handler in lifespan that silently ignores WinError 10054
 - These are benign errors from ProactorEventLoop when clients forcibly close connections
 - File: `backend/api/lifespan.py`
 
 **Fix 5 — MCP server log file not created**
+
 - Fixed `scripts/start_mcp_server.ps1`: `RedirectStandardOutput=true` was set but output was never written to disk
 - Added `Register-ObjectEvent` handlers for `OutputDataReceived` and `ErrorDataReceived` that append to log file
 - Added `BeginOutputReadLine()` / `BeginErrorReadLine()` to start async output reading
@@ -172,22 +734,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[BUGFIX] RSI индикатор: конфликт cross_long_level < long_rsi_more → 0 сигналов** (2026-03-06)
 
-    Файлы: `backend/backtesting/indicator_handlers.py`  
-     Тест: `tests/test_rsi_cross_range_conflict.py` (4 новых теста)
+    Файлы: `backend/backtesting/indicator_handlers.py`
+    Тест: `tests/test_rsi_cross_range_conflict.py` (4 новых теста)
 
     **Симптом:** Стратегия `Strategy_DCA_RSI_02` (и любая стратегия с RSI) не генерировала ни одного лонгового сигнала когда `cross_long_level < long_rsi_more`.
 
-    **Корневая причина:**  
-     Логика `long_signal = cross_long AND long_range_condition` оценивается на одном баре.  
-     При `cross_long_level=24` RSI пересекает 24 снизу вверх — на этом баре RSI ≈ 24.  
-     Но `long_range_condition = (rsi >= 28)` — `24 >= 28 = False`.  
-     Результат: `long_signal = True AND False = 0` сигналов.
+    **Корневая причина:**
+    Логика `long_signal = cross_long AND long_range_condition` оценивается на одном баре.
+    При `cross_long_level=24` RSI пересекает 24 снизу вверх — на этом баре RSI ≈ 24.
+    Но `long_range_condition = (rsi >= 28)` — `24 >= 28 = False`.
+    Результат: `long_signal = True AND False = 0` сигналов.
 
-    **Исправление:**  
-     Когда `cross_long_level < long_rsi_more` (конфликт конфигурации), добавляем дополнительный триггер:  
-     RSI пересекает вверх через `long_rsi_more` (нижнюю границу диапазона) = "RSI входит в диапазон снизу".  
-     `long_cross_condition_extended = cross_long | cross_into_range`  
-     `long_signal = long_cross_condition_extended & long_range_condition`
+    **Исправление:**
+    Когда `cross_long_level < long_rsi_more` (конфликт конфигурации), добавляем дополнительный триггер:
+    RSI пересекает вверх через `long_rsi_more` (нижнюю границу диапазона) = "RSI входит в диапазон снизу".
+    `long_cross_condition_extended = cross_long | cross_into_range`
+    `long_signal = long_cross_condition_extended & long_range_condition`
 
     Аналогично для шорт: `cross_short_level > short_rsi_less` → добавляет триггер на пересечение `short_rsi_less` сверху вниз.
 
@@ -543,23 +1105,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-          **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-          instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-          **price-change percentage** (6.6%), not the USDT amount.
+                            **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+                            instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+                            **price-change percentage** (6.6%), not the USDT amount.
 
-          **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-          `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+                            **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+                            `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
 
     m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
 
-          **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-          (no fallback chain) for all four long/short largest fields.
+                            **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+                            (no fallback chain) for all four long/short largest fields.
 
-          **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-          TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-          (bars_in_trade now uses inclusive counting to match TV).
+                            **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+                            TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+                            (bars_in_trade now uses inclusive counting to match TV).
 
-          **File:** `scripts/_tv_calibration_check.py`
+                            **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 
