@@ -5,15 +5,16 @@ Extracted from app.py for better maintainability.
 Configures all middleware in the correct order (order matters in FastAPI).
 
 Middleware execution order (request flow):
-1. RateLimitMiddleware - First line of defense
-2. TimingMiddleware - Performance monitoring
-3. GZipMiddleware - Compression
-4. OpenTelemetryMiddleware - Distributed tracing
-5. CorrelationIdMiddleware - Request tracking
-6. CacheHeadersMiddleware - HTTP caching
-7. SecurityHeadersMiddleware - Security hardening
-8. CORSMiddleware - Cross-origin requests
-9. UnifiedMcpMiddleware - MCP-specific handling
+1. ErrorHandlerMiddleware - Catches all unhandled exceptions (MUST BE FIRST!)
+2. RateLimitMiddleware - First line of defense
+3. TimingMiddleware - Performance monitoring
+4. GZipMiddleware - Compression
+5. OpenTelemetryMiddleware - Distributed tracing
+6. CorrelationIdMiddleware - Request tracking
+7. CacheHeadersMiddleware - HTTP caching
+8. SecurityHeadersMiddleware - Security hardening
+9. CORSMiddleware - Cross-origin requests
+10. UnifiedMcpMiddleware - MCP-specific handling
 """
 
 import logging
@@ -25,6 +26,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from backend.middleware.cache_headers import CacheHeadersMiddleware
 from backend.middleware.correlation_id import CorrelationIdMiddleware
+from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.opentelemetry_tracing import OpenTelemetryMiddleware
 from backend.middleware.rate_limiter import RateLimitMiddleware
 from backend.middleware.security_headers import SecurityHeadersMiddleware
@@ -43,6 +45,19 @@ def configure_middleware(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance
     """
+    # ========================================================================
+    # PHASE 0: Error Handler (MUST BE FIRST!)
+    # Catches all unhandled exceptions and returns structured JSON responses.
+    # Features:
+    #   - Consistent error format across all endpoints
+    #   - Hides internal errors in production (DEBUG=false)
+    #   - Includes correlation ID for tracing
+    #   - Logs errors with full context
+    # Configured via: DEBUG environment variable
+    # ========================================================================
+    debug_mode = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+    app.add_middleware(ErrorHandlerMiddleware, debug=debug_mode)
+
     # ========================================================================
     # PHASE 1: Rate Limiting (MUST BE FIRST!)
     # Uses Token Bucket algorithm with per-IP tracking.

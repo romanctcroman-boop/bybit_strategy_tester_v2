@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **Fix: middleware_setup.py missing ErrorHandlerMiddleware import (2026-03-21)** — `backend/api/middleware_setup.py` referenced `ErrorHandlerMiddleware` at line 58 but never imported it (would cause `NameError` at startup). Added `from backend.middleware.error_handler import ErrorHandlerMiddleware`.
+
+- **Phase 4.2: Unified error handler middleware (existing) (2026-03-21)** — `backend/middleware/error_handler.py` already implements `ErrorHandlerMiddleware(BaseHTTPMiddleware)` — catches all unhandled exceptions, returns structured `{"error": {"type", "message", "timestamp", "correlation_id"}}` JSON, hides internals in production (`DEBUG` env var), adds traceback in debug mode, sets `X-Error-Type` / `X-Correlation-ID` response headers. Registered as the FIRST middleware in `middleware_setup.py` (must be outermost to catch everything). This completes Phase 4.2 of REFACTORING_PLAN.
+
+- **Agent Pipeline Phase 7: MLValidationNode — overfitting detection, regime analysis, parameter stability (2026-03-21)** — `backend/agents/trading_strategy_graph.py`. Non-blocking validation phase before `memory_update`. Three checks: (1) Overfitting: IS/OOS Sharpe split at 70%/30% — flags if IS_sharpe − OOS_sharpe > 0.5. (2) Regime analysis: HMM/K-Means regime labeling, per-regime Sharpe, recommends filter when any regime has Sharpe < 0. (3) Parameter stability: ±20% perturbation of each indicator period — strategy is stable if Sharpe > 0 for all perturbations. Failures are non-blocking (add warnings). Results in `state.context["ml_validation"]`. Graph: `optimize_strategy → ml_validation → memory_update`.
+
+- **Agent Pipeline Phase 6: OptimizationNode — Optuna parameter tuning after backtest (2026-03-21)** — `backend/agents/trading_strategy_graph.py`. Triggered when backtest passes acceptance criteria. Runs 50 Optuna TPE trials within 120s timeout on the AI-generated `strategy_graph`. Multi-objective scoring: Sharpe 50% + Sortino 30% + ProfitFactor 20%. Optimized parameters written to `state.context["optimized_graph"]` which is used by `MemoryUpdateNode`. Graph: `backtest (passes) → optimize_strategy`. Non-blocking — optimization failures add warnings but do not abort the pipeline.
+
+- **Agent Pipeline: RefinementNode + iterative backtest loop (2026-03-20)** — `backend/agents/trading_strategy_graph.py`. Iterative refinement when backtest fails acceptance criteria (trades < 5 OR Sharpe ≤ 0 OR drawdown ≥ 30%). `RefinementNode` creates diagnostic feedback prompt with failure reason, increments `state.context["iteration"]`, clears stale backtest/graph results, and loops back to `generate_strategies`. Max 3 iterations (`MAX_REFINEMENTS`). `ConditionalRouter` after `BacktestNode`: if `_should_refine(state)` → `refine_strategy`; else → `optimize_strategy`. Tests: `tests/test_refinement_loop.py` (30 tests passing — boundary conditions, state mutations, graph wiring, 2-iteration simulation).
+
+- **Agent Pipeline: BuildGraphNode + StrategyDefToGraphConverter (2026-03-20)** — Connects LLM output to Strategy Builder execution path.
+    - **New file**: `backend/agents/integration/graph_converter.py` — `StrategyDefToGraphConverter` converts `StrategyDefinition → strategy_graph` (40+ block types). Categories: A (long/short direct ports), B (via condition block), C (filter blocks). Activation flags required — absent flags mean passthrough (always True). 26 tests in `tests/test_graph_converter.py` (all passing).
+    - **`BuildGraphNode`** in `trading_strategy_graph.py` between `ConsensusNode` and `BacktestNode` — converts consensus `StrategyDefinition` to `strategy_graph`, storing result in `state.context["strategy_graph"]`.
+    - **`BacktestNode._run_via_adapter`** — primary execution path using `StrategyBuilderAdapter` (40+ blocks); `BacktestBridge` retained as fallback.
+    - **Block activation rules** added to `backend/agents/prompts/templates.py` — LLM now receives explicit instructions for required activation flags per block type.
+
+- **Agent Pipeline: Live agent tests + response parser fixes (2026-03-20)**
+    - `tests/test_agent_live.py` — 10/10 live tests (DeepSeek + QWEN + Perplexity direct API)
+    - `tests/test_agent_soul.py` — 44/44 stub tests (no real API calls)
+    - Fixed 3 bugs in `backend/agents/prompts/response_parser.py`: `ExitCondition.value = list` → take `v[0]`; `value = None` → return `0.0`; `value = dict` → extract first numeric value
+
+- **Refactor: indicator_handlers.py split into indicators package (2026-03-21)** — `backend/backtesting/indicator_handlers.py` (2217 lines) restructured into a proper package `backend/backtesting/indicators/` organised by indicator category.
+    - **New package**: `backend/backtesting/indicators/`
+      - `trend.py` (~18 KB) — SMA, EMA, WMA, DEMA, TEMA, HullMA, ADX, Supertrend, Ichimoku, Parabolic SAR, Aroon, Two-MAs
+      - `oscillators.py` (~44 KB) — RSI, MACD, Stochastic, QQE, StochRSI, Williams %R, ROC, MFI, CMO, CCI, CMF, RVI filter
+      - `volatility.py` (~11 KB) — Bollinger Bands, Keltner, Donchian, ATR, ATRP, StdDev, ATR volatility filter
+      - `volume.py` (~10 KB) — OBV, VWAP, CMF, A/D Line, PVT, MFI, Volume filter
+      - `other.py` (~27 KB) — Pivot Points, MTF resampling, Highest/Lowest Bar, Accumulation Areas, Keltner×Bollinger, MFI/CCI/Momentum filters
+      - `__init__.py` — assembles master `BLOCK_REGISTRY` and `INDICATOR_DISPATCH` from all sub-modules; re-exports all handlers for direct import
+    - **Backward compat**: `indicator_handlers.py` converted to a thin re-export wrapper — all existing `from backend.backtesting.indicator_handlers import X` imports continue to work unchanged
+    - Each sub-module has its own `BLOCK_REGISTRY` dict and auto-generated `INDICATOR_DISPATCH`
+    - `_require_vbt()` and `_calc_ma()` helpers moved to `__init__.py` and `trend.py` respectively
+
 - **Cleanup: deprecated engines, commission hardcodes, temp files purge (2026-03-21)**
     - **`backend/backtesting/engines/__init__.py`**: `FallbackEngineV2` and `FallbackEngineV3` removed from `__all__` and direct module-level imports. Added `__getattr__` shim that lazy-loads the deprecated class with a `DeprecationWarning` for backward compat. Files `fallback_engine_v2.py` / `fallback_engine_v3.py` stay in `engines/` for parity scripts (`tests/test_engine_comprehensive.py`, `scripts/`) that import directly from the module path — those continue to work unchanged.
     - **`backend/optimization/builder_optimizer.py`**: two remaining hardcoded `0.0007` defaults replaced with `COMMISSION_TV` from `backend/config/constants.py` (import already present at line 35). This completes Phase 1 commission cleanup — all commission defaults in the optimization module now reference the single source of truth.
