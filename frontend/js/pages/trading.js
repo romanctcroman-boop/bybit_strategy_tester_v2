@@ -19,10 +19,10 @@ import { apiClient, API_CONFIG } from '../api.js';
 // eslint-disable-next-line no-unused-vars
 import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js';
 import liveTrading from '../services/liveTrading.js';
-import { getStore } from '../core/StateManager.js';
+import { getStore, initStore } from '../core/StateManager.js';
 
-// Get store instance
-const store = getStore();
+// Get or initialize store instance (initStore is safe to call multiple times — singleton)
+const store = getStore() || initStore();
 
 // ==========================================
 // STATE INITIALIZATION
@@ -323,7 +323,14 @@ async function loadCandleData() {
         if (response.ok) {
             const data = await response.json();
             if (data && data.length > 0) {
-                candleData = data.map(k => ({
+                // Sort ascending by time — API returns newest-first, LightweightCharts requires oldest-first
+                const sorted = [...data].sort((a, b) => {
+                    const ta = a.time || Math.floor(a.open_time / 1000);
+                    const tb = b.time || Math.floor(b.open_time / 1000);
+                    return ta - tb;
+                });
+
+                candleData = sorted.map(k => ({
                     time: k.time || Math.floor(k.open_time / 1000),
                     open: parseFloat(k.open),
                     high: parseFloat(k.high),
@@ -331,7 +338,7 @@ async function loadCandleData() {
                     close: parseFloat(k.close)
                 }));
 
-                volumeData = data.map(k => ({
+                volumeData = sorted.map(k => ({
                     time: k.time || Math.floor(k.open_time / 1000),
                     value: parseFloat(k.volume || 0),
                     color: parseFloat(k.close) >= parseFloat(k.open)
@@ -415,7 +422,7 @@ function showError(message) {
 function renderWatchlist() {
     const container = document.getElementById('watchlist');
     container.innerHTML = watchlistData.map(item => `
-                <div class="watchlist-item ${item.symbol === currentSymbol ? 'active' : ''}" 
+                <div class="watchlist-item ${item.symbol === currentSymbol ? 'active' : ''}"
                      onclick="selectSymbol('${item.symbol}')">
                     <div>
                         <div class="watchlist-symbol">${item.symbol}</div>

@@ -15,14 +15,14 @@
 // Import shared utilities
 import { apiClient as _apiClient, API_CONFIG as _API_CONFIG } from '../api.js';
 import { formatNumber as _formatNumber, formatCurrency, formatDate as _formatDate, debounce as _debounce } from '../utils.js';
-import { getStore } from '../core/StateManager.js';
+import { getStore, initStore } from '../core/StateManager.js';
 
 // Configuration
 const API_BASE = window.location.origin;
 const RISK_API = `${API_BASE}/api/v1/risk`;
 
-// Get store instance
-const store = getStore();
+// Get or initialize store instance (initStore is safe to call multiple times — singleton)
+const store = getStore() || initStore();
 
 // ==========================================
 // STATE INITIALIZATION

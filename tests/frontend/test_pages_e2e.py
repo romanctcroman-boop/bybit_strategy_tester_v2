@@ -115,6 +115,9 @@ CRITICAL_ERROR_PATTERNS = [
     "ReferenceError",
     "SyntaxError",
     "Uncaught",
+    "is null",  # lightweight-charts assertDefined crash (e.g. out-of-order kline data)
+    "is not defined",  # missing global variable
+    "Cannot read",  # property access on null/undefined
 ]
 
 # Допустимые предупреждения (не падаем по ним)
