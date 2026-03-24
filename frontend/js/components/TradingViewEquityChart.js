@@ -36,7 +36,7 @@ class TradingViewEquityChart {
     this.chart = null;
 
     this.options = {
-      showBuyHold: false,
+      showBuyHold: true,
       showTradeExcursions: false,
       displayMode: 'absolute',   // 'absolute' | 'percent'
       height: null,              // null → fills CSS container
@@ -91,7 +91,15 @@ class TradingViewEquityChart {
 
   toggleBuyHold(show) {
     this.options.showBuyHold = show;
-    if (this.data) this.render(this.data);
+    if (this._bhSeries) {
+      // Series already exists — just show/hide it without full re-render
+      this._bhSeries.applyOptions({ visible: show });
+    } else if (show && this.data && this._lwChart) {
+      // Series doesn't exist yet — build it now (e.g. first time enabling)
+      const isPercent = this.options.displayMode === 'percent';
+      this._buildBHSeries(this.data, isPercent);
+    }
+    // If no _lwChart yet, the flag is stored in options and will be respected at next render()
   }
 
   toggleTradeExcursions(show) {
@@ -415,7 +423,8 @@ class TradingViewEquityChart {
     // Always display P&L (equity - initialCapital).
     // In percent mode: ((equity - base) / base) * 100
     // In absolute mode: equity - base   (so zero = break-even)
-    const base = equity[0] || this.initialCapital;
+    // base = initialCapital so that the zero line truly means "no profit/loss".
+    const base = this.initialCapital;
     const raw = [];
 
     for (let i = 0; i < timestamps.length; i++) {
@@ -436,8 +445,10 @@ class TradingViewEquityChart {
     const ts = data.timestamps || [];
     if (!bh.length || !ts.length) return;
 
-    // Same convention as equity: show P&L from initial value (base)
-    const base = bh[0] || this.initialCapital;
+    // P&L from initial_capital so that BH zero line = equity zero line = break-even.
+    // Using this.initialCapital (same base as equity series) so both graphs are
+    // directly comparable on the same axis.
+    const base = this.initialCapital;
     const raw = [];
 
     for (let i = 0; i < Math.min(ts.length, bh.length); i++) {
@@ -454,7 +465,7 @@ class TradingViewEquityChart {
     if (!points.length) return;
 
     this._bhSeries = this._lwChart.addLineSeries({
-      color: 'rgba(120,123,134,0.85)',   // TV-style: muted grey, equity line stays dominant
+      color: '#2962ff',              // TV-style: bright blue — matches legend badge colour
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: true,

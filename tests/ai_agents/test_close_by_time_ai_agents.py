@@ -648,9 +648,11 @@ class TestExtractDCAConfig:
 
     def test_block_type_mismatch_documented(self, sample_ohlcv):
         """
-        KNOWN MISMATCH: Our block_type is 'close_by_time' but extract_dca_config
-        checks for 'time_bars_close'. Our block's params won't be auto-extracted
-        into time_bars_close_enable / close_after_bars / etc. keys.
+        Previously: block_type 'close_by_time' != 'time_bars_close' caused params
+        not to be extracted into time_bars_close_enable / close_after_bars / etc.
+
+        BUG FIXED: extract_dca_config now correctly handles 'close_by_time' blocks
+        and extracts their parameters properly.
         """
         graph = _make_close_by_time_only(
             {
@@ -665,11 +667,10 @@ class TestExtractDCAConfig:
         dca_config = adapter.extract_dca_config()
 
         close_conds = dca_config["close_conditions"]
-        # Since block_type is "close_by_time" (not "time_bars_close"),
-        # the time_bars_close_enable key should NOT be set
-        assert "time_bars_close_enable" not in close_conds, (
-            "Known mismatch: close_by_time block_type != time_bars_close, "
-            "so time_bars_close_enable is not auto-extracted"
+        # Bug is now fixed: close_by_time block params ARE correctly extracted
+        assert "time_bars_close_enable" in close_conds, (
+            "close_by_time block params should be correctly extracted "
+            "(bug was fixed: block_type mismatch no longer prevents extraction)"
         )
 
     def test_correct_block_type_would_extract(self, sample_ohlcv):

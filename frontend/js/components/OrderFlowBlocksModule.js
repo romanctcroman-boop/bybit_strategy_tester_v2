@@ -1,6 +1,6 @@
 /**
  * Order Flow Blocks Module — Order Flow Analysis блоки
- * 
+ *
  * Order Flow Imbalance, Cumulative Delta, Volume Profile
  */
 
@@ -61,15 +61,15 @@ export function createOrderFlowBlocksModule() {
       outputs: ['imbalance', 'classification']
     }
   ];
-  
+
   function getBlocks() {
     return [...orderFlowBlocks];
   }
-  
+
   function getBlock(blockId) {
     return orderFlowBlocks.find(b => b.id === blockId);
   }
-  
+
   return {
     getBlocks,
     getBlock

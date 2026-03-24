@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +42,7 @@ class PromptVersion:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict."""
@@ -139,7 +139,7 @@ class PromptVersioning:
             Version ID
         """
         # Generate version ID
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         content_hash = hashlib.sha256(f"{template}{timestamp}".encode()).hexdigest()[:12]
         version_id = f"v{len(self._versions.get(prompt_name, {})) + 1}_{content_hash}"
 
@@ -472,7 +472,7 @@ class PromptVersioning:
                     for prompt_name, versions in self._versions.items()
                 },
                 "active_versions": self._active_versions,
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
 
             with open(self.storage_path, "w", encoding="utf-8") as f:

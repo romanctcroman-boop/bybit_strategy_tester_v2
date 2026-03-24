@@ -1,6 +1,6 @@
 # Progress — Статус проекта
 
-## Последнее обновление: 2026-03-20
+## Последнее обновление: 2026-03-24
 
 ## ✅ Что работает (проверено)
 
@@ -21,31 +21,48 @@
 - Phase 4: `backtests.py` (3171→пакет router.py+formatters.py+schemas.py) ✅
 - Phase 5: `SymbolSyncModule.js` извлечён из `strategy_builder.js` (13378→7154 строк) ✅
 - Phase 5: `blockLibrary.js` извлечён (каталог блоков, ~158 строк) ✅
+- Agent pipeline BUG#1-3 fixes: PerformanceMetrics.model_dump(), analysis_warnings, None-safe RefinementNode ✅ (2026-03-24)
+- ТЗ_ЭВОЛЮЦИЯ_ПАМЯТИ: все 5 фаз (P1-P5) реализованы и проверены, 286 тестов ✅ (2026-03-24)
+- real_llm_deliberation.py: deprecated `connections` import → `backend.agents.llm` ✅
+- 27 тестов: `test_agent_feedback_improvements.py` (все проходят) ✅
+- 33 тестов: `test_refinement_loop.py` (все проходят) ✅
+- P0 Agent Embodiment: MemoryRecallNode + BacktestAnalysisNode ✅ (2026-03-24)
+  - MemoryRecallNode: читает HierarchicalMemory перед генерацией (wins/failures/regime)
+  - BacktestAnalysisNode: severity + root_cause диагностика после backtest
+  - Graph: analyze→[debate]→memory_recall→generate, backtest→backtest_analysis→[router]
+  - 33 новых теста, 93 agent pipeline тестов проходят
+- AI Agent system 9.5/10 readiness ✅ (2026-03-24)
+  - Global pipeline timeout (asyncio.wait_for, 300s default)
+  - LLM cost observability: AgentState.total_cost_usd, llm_call_count, record_llm_cost()
+  - Extended get_metrics(): node_timing_s, slowest_node, total_wall_time_s
+  - Pipeline metrics in _report_node(), _backtest_passes() reads backtest_analysis
+  - Module constants _MIN_TRADES=5, _MAX_DD_PCT=30.0 (single source of truth)
+  - ConsensusNode fallback to best_of on engine exception
+  - 25 new tests: refinement E2E + consensus fallback + cost accumulation + timeout
+- generate-and-build endpoint: 25 integration tests ✅ (2026-03-24)
+  - Happy path, error paths (404/503/500), request forwarding, edge cases
+  - datetime.utcnow() → datetime.now(UTC) deprecation fix
 
 ## ⚠️ Известные проблемы / Технический долг
 
 - RSI Wilder smoothing: 4-trade divergence vs TradingView (warmup limit 500 баров) — ACCEPTABLE
-- commission=0.001 остаётся в: `optimize_tasks.py`, `fast_optimizer.py` (deprecated), `ai_backtest_executor.py` (ML-experimental) — LOW PRIORITY
+- RSI Wilder smoothing: 4-trade divergence vs TradingView (warmup limit 500 баров) — ACCEPTABLE
+- ~~commission=0.001 в optimize_tasks.py + ai_backtest_executor.py~~ — FIXED (2026-03-24), теперь COMMISSION_TV
 - position_size: fraction (0-1) в engine vs percent в live trading — ADR-006, задокументировано
 - leverage default: 10 в optimizer/UI vs 1.0 в live trading — задокументировано
-- 12 temp_analysis/ скриптов (одноразовые, не удалены) — CLEANUP NEEDED
-- **Phase 1 незавершена**: `optimization/models.py`, `builder_optimizer.py`, `backtests.py:2771` — ещё 3 файла с хардкодом 0.0007
 
 ## 📁 Крупные файлы требующие внимания
 
 | Файл | Строк | Статус |
 |------|-------|--------|
 | strategy_builder/adapter.py | 1399 | ✅ Phase 3 рефакторинг завершён |
-| indicator_handlers.py | 2217 | Не разбит по категориям (trend/oscillators/etc) |
+| indicator_handlers.py | wrapper | ✅ Phase 4: разбит на пакет indicators/ (trend/oscillators/volatility/volume/other) |
 | strategy_builder.js | 7154 | ✅ Phase 5: SymbolSync + blockLibrary извлечены; canvas/block core остаётся |
 | backtests/ (пакет) | router+formatters+schemas | ✅ Phase 4 завершён |
 
 ## 🚧 В процессе / Запланировано
 
-- Phase 1: ~3 файла ещё с хардкодом 0.0007 (optimization/models.py, builder_optimizer.py, backtests/router.py:2771) — LOW
-- indicator_handlers.py разбить по категориям (trend/oscillators/volatility/volume/other) — LOW
-- Удалить deprecated файлы (fast_optimizer.py, fallback_engine_v2.py, v3.py) — MEDIUM
-- Unified error handler для API роутеров (Phase 4.2) — LOW
+- Deferred: real API integration tests (требует live keys + data), load tests (100+ requests)
 
 ## 📊 Метрики кодовой базы
 

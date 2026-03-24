@@ -89,18 +89,49 @@ class OptimizationPanels {
                     this.state.trainSplit = e.detail.data_period.train_split ?? 0.8;
                 }
 
+                // Walk-Forward settings
+                if (e.detail.walk_forward) {
+                    this.state.wfNSplits = e.detail.walk_forward.n_splits ?? 5;
+                    this.state.wfTrainRatio = e.detail.walk_forward.train_ratio ?? 0.7;
+                    this.state.wfGapPeriods = e.detail.walk_forward.gap_periods ?? 0;
+                    this.state.wfInnerMethod = e.detail.walk_forward.inner_method ?? 'grid';
+                }
+
+                // Capture optimize_metric for display after completion
+                if (e.detail.optimize_metric) {
+                    this.state.lastOptimizeMetric = e.detail.optimize_metric;
+                }
+
                 // Parameter ranges from config panel
                 if (e.detail.parameter_ranges && e.detail.parameter_ranges.length > 0) {
+                    // Keep full objects — buildBuilderParameterRanges() needs param_path, low, high, step
                     this.state.parameterRanges = e.detail.parameter_ranges.map(p => ({
                         name: p.name,
-                        min: p.low,
-                        max: p.high,
+                        param_path: p.param_path,
+                        low: p.low,
+                        high: p.high,
                         step: p.step
                     }));
                     this.state.runMode = 'optimization';
                 } else {
-                    this.state.parameterRanges = [];
-                    this.state.runMode = 'single';
+                    // Event sent empty ranges — try to pull live from OptimizationConfigPanel state
+                    // (happens when loadSavedState restores an older empty snapshot)
+                    const liveRanges = window.optimizationConfigPanel?.state?.parameterRanges;
+                    if (liveRanges && liveRanges.length > 0) {
+                        this.state.parameterRanges = liveRanges.map(p => ({
+                            name: p.id || p.name,
+                            param_path: p.param_path || `${p.blockId}.${p.paramKey}`,
+                            low: p.low ?? p.min ?? 0,
+                            high: p.high ?? p.max ?? 100,
+                            step: p.step ?? 1
+                        }));
+                        this.state.runMode = 'optimization';
+                        console.log('[OptPanels] Pulled', this.state.parameterRanges.length, 'param ranges from OptimizationConfigPanel live state');
+                    } else {
+                        // Truly no params — run as single backtest
+                        this.state.parameterRanges = [];
+                        this.state.runMode = 'single';
+                    }
                 }
             }
             this.startRun();
@@ -162,13 +193,11 @@ class OptimizationPanels {
         const commissionEl = document.getElementById('backtestCommission');
         const marketTypeEl = document.getElementById('builderMarketType');
 
-        // Map Bybit timeframe codes to API-friendly format
-        const tfMap = {
-            '1': '1m', '5': '5m', '15': '15m', '30': '30m',
-            '60': '1h', '240': '4h', 'D': '1d', 'W': '1w', 'M': '1M'
-        };
+        // Keep Bybit timeframe codes as-is — the backend BuilderOptimizationRequest
+        // validates only Bybit codes: 1/5/15/30/60/240/D/W/M.
+        // DO NOT convert to 1m/15m/1h etc. here.
         const rawTf = timeframeEl?.value || '15';
-        const interval = tfMap[rawTf] || rawTf;
+        const interval = rawTf;
 
         // Commission: UI shows percentage (0.07), API expects fraction (0.0007)
         const commissionPct = parseFloat(commissionEl?.value) || 0.07;
@@ -324,7 +353,11 @@ class OptimizationPanels {
 
         let total = 1;
         this.state.parameterRanges.forEach(param => {
-            const steps = Math.max(1, Math.floor((param.max - param.min) / param.step) + 1);
+            // Support both {low, high} (from optimization_config_panel event) and {min, max} (from DOM path)
+            const lo = param.low ?? param.min ?? 0;
+            const hi = param.high ?? param.max ?? 100;
+            const st = param.step ?? 1;
+            const steps = Math.max(1, Math.floor((hi - lo) / st) + 1);
             total *= steps;
         });
         return total;
@@ -392,9 +425,12 @@ class OptimizationPanels {
             });
         });
 
-        // Collect ranges for state
+        // Collect ranges for state — preserve blockId/paramKey so buildBuilderParameterRanges()
+        // can construct correct "blockId.paramKey" param_path for the backend
         this.state.parameterRanges = params.map(p => ({
             name: p.name,
+            blockId: p.blockId,
+            paramKey: p.paramKey,
             min: p.min,
             max: p.max,
             step: p.step
@@ -500,11 +536,9 @@ class OptimizationPanels {
             });
         }
 
-        // Start button - runs single backtest or optimization based on mode
-        const btnStartOpt = document.getElementById('btnStartOptimization');
-        if (btnStartOpt) {
-            btnStartOpt.addEventListener('click', () => this.startRun());
-        }
+        // NOTE: #btnStartOptimization click is handled by optimization_config_panel.js
+        // which dispatches the 'startOptimization' event with parameter ranges.
+        // Do NOT add a direct click listener here — it causes duplicate API calls.
 
         // View Full Results button
         const btnViewResults = document.getElementById('btnViewFullResults');
@@ -626,7 +660,7 @@ class OptimizationPanels {
             item.innerHTML = `
                 <div class="param-range-header">
                     <span class="param-range-name">${param.label}</span>
-                    <input type="checkbox" class="param-range-toggle" 
+                    <input type="checkbox" class="param-range-toggle"
                            ${param.optimize ? 'checked' : ''} title="Include in optimization" />
                 </div>
                 <div class="param-range-inputs">
@@ -825,6 +859,12 @@ class OptimizationPanels {
      * - Classic strategies: POST /api/v1/optimizations/sync/grid-search or optuna-search
      */
     async startOptimization() {
+        // Guard against double-click / double invocation
+        if (this.state.isRunning) {
+            console.warn('[OptPanels] startOptimization called while already running — ignored');
+            return;
+        }
+
         // Validate
         if (this.state.parameterRanges.length === 0) {
             this.showNotification('No optimization parameters enabled', 'warning');
@@ -854,6 +894,7 @@ class OptimizationPanels {
      * Start optimization for Strategy Builder strategies.
      * Uses POST /api/v1/strategy-builder/strategies/{id}/optimize
      * with BuilderOptimizationRequest payload.
+     * Polls GET .../optimize/progress every 2s for real-time progress feedback.
      */
     async startBuilderOptimization(strategyId) {
         try {
@@ -861,7 +902,7 @@ class OptimizationPanels {
 
             // Get evaluation criteria from EvaluationCriteriaPanel
             const evalCriteria = window.evaluationCriteriaPanel?.getCriteria() || {
-                primary_metric: this.state.primaryMetric,
+                primary_metric: this.state.lastOptimizeMetric || this.state.primaryMetric,
                 secondary_metrics: this.state.secondaryMetrics,
                 constraints: [],
                 sort_order: [],
@@ -875,13 +916,34 @@ class OptimizationPanels {
             // Build parameter_ranges from collected UI state (block_id.param_key format)
             const parameterRanges = this.buildBuilderParameterRanges();
 
-            // Map method name for backend
+            // Guard: detect degenerate ranges (min === max) from stale saved state.
+            // These produce only 1 combo and make optimization pointless.
+            const degenerate = parameterRanges.filter(p => p.low === p.high);
+            if (degenerate.length > 0) {
+                const names = degenerate.map(p => p.param_path.split('.').pop()).join(', ');
+                this.setRunningState(false);
+                this.showNotification(
+                    `⚠️ Parameter range issue: "${names}" has min = max. Open the block, check optimization ranges, and try again.`,
+                    'warning'
+                );
+                return;
+            }
+
+            // Map method name for backend (all methods pass through directly)
             const methodMap = {
                 'grid_search': 'grid_search',
                 'random_search': 'random_search',
                 'bayesian': 'bayesian',
-                'walk_forward': 'grid_search'
+                'walk_forward': 'walk_forward'
             };
+
+            // Walk-Forward config (from optimization_config_panel state)
+            const wfConfig = this.state.method === 'walk_forward' ? {
+                n_splits: this.state.wfNSplits || 5,
+                train_ratio: this.state.wfTrainRatio || 0.7,
+                gap_periods: this.state.wfGapPeriods || 0,
+                inner_method: this.state.wfInnerMethod || 'grid'
+            } : null;
 
             const payload = {
                 symbol: props.symbol,
@@ -894,7 +956,7 @@ class OptimizationPanels {
                 commission: props.commission,
                 direction: props.direction,
                 method: methodMap[this.state.method] || 'grid_search',
-                parameter_ranges: parameterRanges.length > 0 ? parameterRanges : null,
+                parameter_ranges: parameterRanges.length > 0 ? parameterRanges : [],
                 max_iterations: this.state.maxTrials,
                 n_trials: this.state.maxTrials,
                 sampler_type: 'tpe',
@@ -903,19 +965,102 @@ class OptimizationPanels {
                 early_stopping: this.state.earlyStopping ?? false,
                 early_stopping_patience: this.state.earlyStoppingPatience ?? 20,
                 optimize_metric: evalCriteria.primary_metric || 'sharpe_ratio',
+                ranking_mode: evalCriteria.ranking_mode || 'single',
+                secondary_metrics: evalCriteria.secondary_metrics || [],
                 weights: evalCriteria.weights || null,
                 constraints: evalCriteria.constraints || null,
-                min_trades: 5
+                sort_order: evalCriteria.sort_order || null,
+                use_composite: evalCriteria.use_composite ?? false,
+                min_trades: (() => {
+                    // Read min_trades from constraints.
+                    // Supports both 'total_trades' (EvaluationCriteriaPanel) and legacy 'min_trades'.
+                    const all = evalCriteria.constraints || this.state.constraints || [];
+                    const c = all.find(x =>
+                        (x.metric === 'total_trades' || x.metric === 'min_trades') && x.operator === '>='
+                    );
+                    return c ? Math.max(1, parseInt(c.value) || 1) : 10;
+                })(),
+                ...(wfConfig ? { walk_forward: wfConfig } : {})
             };
+
+            // Remember the metric used so displayQuickResults can show it
+            this.state.lastOptimizeMetric = payload.optimize_metric;
 
             const endpoint = `/api/v1/strategy-builder/strategies/${strategyId}/optimize`;
             console.log(`[OptPanels] Builder optimization → ${endpoint}`, payload);
 
+            // Reset progress bar content only — setRunningState already made it visible.
+            // Do NOT hide the section (that would undo setRunningState's display:block).
+            const _prevFill = document.getElementById('optProgressFill');
+            if (_prevFill) _prevFill.style.width = '0%';
+            const _prevPct = document.getElementById('optProgressPercent');
+            if (_prevPct) _prevPct.textContent = '0%';
+            const _prevDetails = document.getElementById('optProgressDetails');
+            if (_prevDetails) _prevDetails.textContent = 'Starting optimization...';
+
+            // Track start time so polling can ignore stale data from previous run
+            this._optimizationStartTime = Date.now() / 1000;
+
+            // Start progress polling BEFORE firing the long-running POST
+            const progressEndpoint = `/api/v1/strategy-builder/strategies/${strategyId}/optimize/progress`;
+            this._builderProgressInterval = setInterval(async () => {
+                try {
+                    const pRes = await fetch(progressEndpoint);
+                    if (!pRes.ok) return;
+                    const prog = await pRes.json();
+                    // Ignore stale data from a previous run (updated_at predates our start)
+                    if (prog.updated_at && this._optimizationStartTime &&
+                        prog.updated_at < this._optimizationStartTime - 1) {
+                        return;
+                    }
+                    if (prog.status === 'running' || prog.status === 'starting' || prog.status === 'completed' || prog.status === 'partial') {
+                        const pct = prog.percent || 0;
+
+                        // Update progress bar inside Optimization panel (not Results)
+                        const section = document.getElementById('optProgressSection');
+                        const fillEl = document.getElementById('optProgressFill');
+                        const pctEl = document.getElementById('optProgressPercent');
+                        const detailsEl = document.getElementById('optProgressDetails');
+
+                        if (section) section.style.display = 'block';
+                        if (fillEl) fillEl.style.width = `${pct}%`;
+                        if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+
+                        if (detailsEl) {
+                            const tested = prog.tested || 0;
+                            const total = prog.total || 0;
+                            const speed = prog.speed || 0;
+                            const eta = prog.eta_seconds || 0;
+                            if (prog.status === 'starting') {
+                                detailsEl.textContent = 'Loading market data...';
+                            } else if (prog.status === 'running' && total > 0 && tested === 0) {
+                                // JIT compiling or just started
+                                detailsEl.textContent = `Preparing... ${total.toLocaleString()} combos total`;
+                            } else if (prog.status === 'running' && total > 0) {
+                                const etaText = eta > 60 ? `${Math.floor(eta / 60)}m ${Math.round(eta % 60)}s` : `${eta}s`;
+                                detailsEl.textContent = `${tested.toLocaleString()}/${total.toLocaleString()} · ${speed.toLocaleString()} c/s · ETA ${etaText}`;
+                            } else if (prog.status === 'completed') {
+                                detailsEl.textContent = `Done — ${total.toLocaleString()} combos`;
+                            }
+                        }
+                    }
+                } catch (_e) {
+                    console.debug('[OptPanels] Progress poll error:', _e);
+                }
+            }, 2000);
+
+            // Fire the long-running POST (this blocks until optimization completes)
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            // Stop progress polling once POST completes
+            if (this._builderProgressInterval) {
+                clearInterval(this._builderProgressInterval);
+                this._builderProgressInterval = null;
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -926,6 +1071,11 @@ class OptimizationPanels {
             this.handleOptimizationComplete(data);
 
         } catch (error) {
+            // Stop progress polling on error
+            if (this._builderProgressInterval) {
+                clearInterval(this._builderProgressInterval);
+                this._builderProgressInterval = null;
+            }
             console.error('[OptPanels] Builder optimization failed:', error);
             this.showNotification(`Error: ${error.message}`, 'error');
             this.setRunningState(false);
@@ -934,18 +1084,35 @@ class OptimizationPanels {
 
     /**
      * Build parameter ranges array for Builder optimization API.
-     * Converts UI state (blockId_paramKey min/max/step) to backend format:
-     * [{param_path: "blockId.paramKey", low, high, step, enabled}]
+     * Priority:
+     *   1. this.state.parameterRanges — populated by startOptimization event from
+     *      optimization_config_panel.js (already in correct format with blockId/paramKey)
+     *   2. DOM fallback — reads .param-range-item elements with data-block-id / data-param-key
+     *      (used when called from the old sidebar panel, not the floating config panel)
+     *
+     * Backend format: [{param_path: "blockId.paramKey", low, high, step, enabled}]
      */
     buildBuilderParameterRanges() {
-        const ranges = [];
+        // Primary: use state populated from optimization_config_panel event
+        if (this.state.parameterRanges && this.state.parameterRanges.length > 0) {
+            console.log('[OptPanels] buildBuilderParameterRanges: using state.parameterRanges', this.state.parameterRanges);
+            return this.state.parameterRanges.map(p => ({
+                // Support both naming conventions from the two sources
+                param_path: p.param_path || `${p.blockId || ''}.${p.paramKey || p.name || ''}`,
+                low: p.low ?? p.min ?? 0,
+                high: p.high ?? p.max ?? 100,
+                step: p.step ?? 1,
+                enabled: true
+            }));
+        }
 
+        // Fallback: read from DOM (classic sidebar .param-range-item elements)
+        const ranges = [];
         document.querySelectorAll('.param-range-item').forEach(item => {
             const blockId = item.dataset.blockId;
             const paramKey = item.dataset.paramKey;
             if (!blockId || !paramKey) return;
 
-            // Check if toggle checkbox exists and is unchecked
             const toggle = item.querySelector('.param-range-toggle');
             if (toggle && !toggle.checked) return;
 
@@ -962,6 +1129,7 @@ class OptimizationPanels {
             });
         });
 
+        console.log('[OptPanels] buildBuilderParameterRanges: DOM fallback returned', ranges.length, 'ranges');
         return ranges;
     }
 
@@ -1186,10 +1354,26 @@ class OptimizationPanels {
      * Handle optimization JSON response (sync endpoint)
      */
     handleOptimizationComplete(data) {
+        console.log('[OptPanels] handleOptimizationComplete v1773520390 called. best_params:', data.best_params, 'keys count:', Object.keys(data.best_params || {}).length);
         this.setRunningState(false);
 
+        // Hide progress bar in Optimization panel
+        const optProgressSection = document.getElementById('optProgressSection');
+        if (optProgressSection) optProgressSection.style.display = 'none';
+        const fillEl = document.getElementById('optProgressFill');
+        if (fillEl) fillEl.style.width = '0%';
+
+        // Capture optimize_metric if returned by backend
+        if (data.optimize_metric) {
+            this.state.lastOptimizeMetric = data.optimize_metric;
+        }
+
         // Extract results from sync response - map to displayQuickResults format
-        const bestMetrics = data.best_metrics || (data.top_results?.[0] || {});
+        // API returns best_metrics at top level; top_results[0] has metrics flat (no .metrics sub-key)
+        const bestMetrics = data.best_metrics || {};
+        console.log('[OptPanels] data.best_metrics keys:', Object.keys(bestMetrics));
+        console.log('[OptPanels] data.top_results count:', data.top_results?.length, 'first:', data.top_results?.[0] ? Object.keys(data.top_results[0]).slice(0, 5) : 'none');
+
         const results = {
             top_results: data.top_results || [],
             best_params: data.best_params || {},
@@ -1198,7 +1382,10 @@ class OptimizationPanels {
             tested_combinations: data.tested_combinations || data.total_combinations || 0,
             execution_time: data.execution_time_seconds || 0,
             smart_recommendations: data.smart_recommendations || null,
-            // Map for displayQuickResults compatibility
+            optimize_metric: data.optimize_metric || this.state.lastOptimizeMetric || this.state.primaryMetric || 'sharpe_ratio',
+            // Expose best_metrics directly for displayQuickResults
+            best_metrics: bestMetrics,
+            // Also map to .best.metrics for compatibility
             best: {
                 params: data.best_params || {},
                 metrics: bestMetrics
@@ -1208,8 +1395,72 @@ class OptimizationPanels {
 
         this.state.lastResults = results;
         this.saveState();
-        this.displayQuickResults(results);
 
+        // First open the Results panel, THEN render results into it
+        // (panel must be visible before innerHTML is written so DOM is active)
+        if (typeof window.openFloatingWindow === 'function') {
+            window.openFloatingWindow('floatingWindowResults');
+        } else {
+            // Fallback: remove collapsed class directly and update spine visibility
+            const resWin = document.getElementById('floatingWindowResults');
+            if (resWin && resWin.classList.contains('floating-window-collapsed')) {
+                resWin.classList.remove('floating-window-collapsed');
+                document.body.classList.add('floating-window-open');
+                if (typeof window.updateSpinesVisibility === 'function') {
+                    window.updateSpinesVisibility();
+                }
+                document.dispatchEvent(new CustomEvent('floatingWindowToggle', {
+                    detail: { windowId: 'floatingWindowResults', isOpen: true }
+                }));
+            }
+        }
+
+        // Render results after panel is open (small delay ensures DOM is painted)
+        requestAnimationFrame(() => {
+            this.displayQuickResults(results);
+        });
+
+        // Apply best parameters to strategy blocks, then save + run backtest
+        const bestParams = data.best_params || {};
+        const bestTrades = data.best_metrics?.total_trades ?? data.top_results?.[0]?.total_trades ?? '?';
+        const bestProfit = data.best_metrics?.net_profit ?? data.top_results?.[0]?.net_profit ?? null;
+        const testedCount = data.tested_combinations || 0;
+        const passingCount = data.results_passing_filters ?? data.results_found ?? 0;
+        const fallbackUsed = data.fallback_used === true;
+
+        // Show diagnostic summary so user knows what optimizer found
+        const profitStr = bestProfit !== null ? ` net_profit=${bestProfit.toFixed(2)}` : '';
+        const fallbackNote = fallbackUsed ? ' ⚠️ фильтры обнулили всё — показан лучший без фильтра' : '';
+        // Show best params concisely (e.g. "sl=2.0% tp=1.5% period=14")
+        const paramStr = Object.entries(bestParams).length > 0
+            ? ' | ' + Object.entries(bestParams).map(([k, v]) => {
+                const pk = k.split('.').pop();
+                const label = pk.replace(/_percent$/, '%').replace(/_/g, ' ');
+                const val = typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(2) : v;
+                return `${label}=${val}`;
+            }).join(', ')
+            : ' | нет изменений';
+        this.showNotification(
+            `📊 Оптимизация: проверено ${testedCount} комбо, прошли фильтр ${passingCount}. ` +
+            `Лучший: trades=${bestTrades}${profitStr}${paramStr}${fallbackNote}`,
+            fallbackUsed ? 'warning' : 'info'
+        );
+
+        if (Object.keys(bestParams).length > 0) {
+            this.applyBestParamsToBlocks(bestParams);
+        } else if ((data.tested_combinations || 0) > 0) {
+            // Optimization ran but returned 0 results — explain why
+            this.showNotification(
+                '⚠️ Оптимизация завершена, но 0 результатов. ' +
+                'Вероятная причина: ни одна комбинация параметров не дала сделок. ' +
+                'Проверь: (1) направление стратегии (long/short/both); ' +
+                '(2) диапазоны RSI (oversold слишком низко?); ' +
+                '(3) запусти обычный бэктест без оптимизации — работает ли стратегия?',
+                'warning'
+            );
+        }
+
+        // Show completion notification
         const msg = `Optimization completed! ${results.tested_combinations} combinations in ${results.execution_time.toFixed(1)}s`;
         this.showNotification(msg, 'success');
 
@@ -1218,6 +1469,123 @@ class OptimizationPanels {
         if (btn) btn.style.display = 'block';
 
         console.log('[OptPanels] Optimization complete:', results);
+    }
+
+    /**
+     * Apply best_params from optimization result to strategy blocks.
+     * best_params format: { "blockId.paramKey": value, ... }
+     * After applying: saves the strategy and triggers a backtest.
+     */
+    applyBestParamsToBlocks(bestParams) {
+        console.log('[OptPanels] applyBestParamsToBlocks called with:', bestParams);
+        console.log('[OptPanels] window.updateBlockParam available:', typeof window.updateBlockParam);
+        console.log('[OptPanels] window.saveStrategy available:', typeof window.saveStrategy);
+        console.log('[OptPanels] window.runBacktest available:', typeof window.runBacktest);
+        console.log('[OptPanels] window.strategyBlocks available:', typeof window.strategyBlocks, window.strategyBlocks?.length);
+
+        const entries = Object.entries(bestParams);
+        if (entries.length === 0) {
+            console.warn('[OptPanels] best_params is empty — nothing to apply');
+            return;
+        }
+
+        let applied = 0;
+        entries.forEach(([key, value]) => {
+            // key format: "blockId.paramKey"
+            const dotIdx = key.indexOf('.');
+            if (dotIdx === -1) {
+                console.warn('[OptPanels] best_params key has no dot separator, skipping:', key);
+                return;
+            }
+            const blockId = key.substring(0, dotIdx);
+            const paramKey = key.substring(dotIdx + 1);
+
+            if (typeof window.updateBlockParam === 'function') {
+                console.log(`[OptPanels] Applying ${blockId}.${paramKey} = ${value}`);
+                window.updateBlockParam(blockId, paramKey, value);
+                applied++;
+            } else {
+                console.error('[OptPanels] window.updateBlockParam not available!');
+            }
+        });
+
+        console.log(`[OptPanels] Applied ${applied}/${entries.length} params`);
+
+        if (applied === 0) return;
+
+        // Disable optimization mode for all applied params so the block shows
+        // the fixed optimized value (not a range) — user can see exactly what changed
+        const blocks = window.strategyBlocks;
+        if (Array.isArray(blocks)) {
+            entries.forEach(([key]) => {
+                const dotIdx = key.indexOf('.');
+                if (dotIdx === -1) return;
+                const blockId = key.substring(0, dotIdx);
+                const paramKey = key.substring(dotIdx + 1);
+                const block = blocks.find(b => b.id === blockId);
+                if (block && block.optimizationParams && block.optimizationParams[paramKey]) {
+                    block.optimizationParams[paramKey].enabled = false;
+                }
+            });
+        }
+
+        // Re-render blocks so optimization indicators (yellow ⚙) are cleared,
+        // then re-render properties panel so fields show the new values
+        if (typeof window.renderBlocks === 'function') {
+            window.renderBlocks();
+        }
+        if (typeof window.renderBlockProperties === 'function') {
+            window.renderBlockProperties();
+        }
+
+        // Refresh the param-ranges list in the Optimization panel — it should now be empty
+        // since all optimization flags were just disabled
+        if (Array.isArray(blocks)) {
+            const freshParams = this.extractOptimizationParamsFromBlocks(blocks);
+            this.updateParameterRangesFromBlocks(freshParams);
+            this.state.parameterRanges = freshParams;
+        }
+
+        this.showNotification(
+            `✅ Применены оптимальные параметры (${applied} значений). Режим оптимизации выключен.`,
+            'success'
+        );
+
+        // Save updated params to the CURRENT strategy (PUT, not POST) then run backtest
+        this._saveCurrentAndBacktest();
+    }
+
+    /**
+     * Save current strategy (with optimized params applied) via PUT to update in-place,
+     * then trigger a backtest so user sees the result immediately.
+     * Does NOT create a new strategy.
+     */
+    async _saveCurrentAndBacktest() {
+        try {
+            // Use existing saveStrategy which does a PUT to current strategy ID
+            if (typeof window.saveStrategy === 'function') {
+                await window.saveStrategy();
+                console.log('[OptPanels] Strategy saved (PUT) with optimized params');
+            } else {
+                console.warn('[OptPanels] window.saveStrategy not available');
+            }
+
+            // Short delay to ensure save completes, then run backtest
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            if (typeof window.runBacktest === 'function') {
+                console.log('[OptPanels] Triggering backtest with optimized params...');
+                window.runBacktest();
+            } else if (document.getElementById('btnBacktest')) {
+                document.getElementById('btnBacktest').click();
+            } else {
+                console.warn('[OptPanels] runBacktest not available');
+            }
+
+        } catch (err) {
+            console.error('[OptPanels] _saveCurrentAndBacktest failed:', err);
+            this.showNotification(`Ошибка сохранения: ${err.message}`, 'error');
+        }
     }
 
     /**
@@ -1261,8 +1629,25 @@ class OptimizationPanels {
             }
         }
 
-        // Show/hide progress
-        this.updateProgress(running ? 0 : -1);
+        if (running) {
+            // Ensure Optimization panel is open and visible
+            if (typeof window.openFloatingWindow === 'function') {
+                window.openFloatingWindow('floatingWindowOptimization');
+            } else {
+                const optWin = document.getElementById('floatingWindowOptimization');
+                if (optWin) optWin.classList.remove('floating-window-collapsed');
+            }
+            // Show progress bar immediately (don't wait for first poll)
+            const section = document.getElementById('optProgressSection');
+            const fillEl = document.getElementById('optProgressFill');
+            const pctEl = document.getElementById('optProgressPercent');
+            const detailsEl = document.getElementById('optProgressDetails');
+            if (section) section.style.display = 'block';
+            if (fillEl) fillEl.style.width = '0%';
+            if (pctEl) pctEl.textContent = '0%';
+            if (detailsEl) detailsEl.textContent = 'Starting... (Numba JIT compile ~30s first run)';
+        }
+        // When stopping: handleOptimizationComplete will hide progress bar and open Results panel
     }
 
     /**
@@ -1381,15 +1766,25 @@ class OptimizationPanels {
         const summary = document.getElementById('resultsQuickSummary');
         if (!summary) return;
 
-        // Handle both API formats: results.best.metrics OR results.top_results[0]
+        console.log('[OptPanels] displayQuickResults called. results keys:', Object.keys(results || {}));
+        console.log('[OptPanels] results.best:', results?.best);
+        console.log('[OptPanels] results.top_results length:', results?.top_results?.length);
+        console.log('[OptPanels] results.best_metrics:', results?.best_metrics);
+
+        // Handle both API formats: results.best.metrics OR results.top_results[0] OR results.best_metrics
         let metrics = {};
-        if (results?.best?.metrics) {
+        if (results?.best?.metrics && Object.keys(results.best.metrics).length > 0) {
             metrics = results.best.metrics;
-        } else if (results?.top_results?.[0]) {
-            metrics = results.top_results[0];
-        } else if (results?.best_metrics) {
+            console.log('[OptPanels] Using results.best.metrics, keys:', Object.keys(metrics).length);
+        } else if (results?.best_metrics && Object.keys(results.best_metrics).length > 0) {
             metrics = results.best_metrics;
+            console.log('[OptPanels] Using results.best_metrics, keys:', Object.keys(metrics).length);
+        } else if (results?.top_results?.[0] && Object.keys(results.top_results[0]).length > 0) {
+            metrics = results.top_results[0];
+            console.log('[OptPanels] Using results.top_results[0], keys:', Object.keys(metrics).length);
         }
+
+        console.log('[OptPanels] Final metrics object keys:', Object.keys(metrics));
 
         if (!metrics || Object.keys(metrics).length === 0) {
             summary.innerHTML = `
@@ -1406,8 +1801,56 @@ class OptimizationPanels {
         const totalReturn = metrics.total_return ?? 0;
         const maxDD = metrics.max_drawdown ?? 0;
         const winRate = metrics.win_rate ?? 0;
+        const netProfit = metrics.net_profit ?? null;
+
+        // Determine the optimization criterion used
+        const optimizeMetric = results.optimize_metric
+            || this.state.lastOptimizeMetric
+            || this.state.primaryMetric
+            || 'sharpe_ratio';
+        const metricLabelMap = {
+            'sharpe_ratio': 'Sharpe Ratio',
+            'total_return': 'Total Return',
+            'total_return_pct': 'Total Return %',
+            'max_drawdown': 'Max Drawdown',
+            'win_rate': 'Win Rate',
+            'profit_factor': 'Profit Factor',
+            'calmar_ratio': 'Calmar Ratio',
+            'sortino_ratio': 'Sortino Ratio',
+            'expectancy': 'Expectancy',
+            'net_profit': 'Net Profit',
+            'cagr': 'CAGR',
+            'recovery_factor': 'Recovery Factor'
+        };
+        const metricLabel = metricLabelMap[optimizeMetric] || optimizeMetric;
+
+        // Best score value from the optimization metric
+        const _bestScore = metrics[optimizeMetric] ?? results.best_score ?? null;
+        const isLosing = (optimizeMetric === 'net_profit' && netProfit !== null && netProfit < 0)
+            || (optimizeMetric === 'total_return' && totalReturn < 0)
+            || (optimizeMetric === 'sharpe_ratio' && sharpe < 0);
+        const noPositiveResult = results.no_positive_results === true
+            || (isLosing && (results.fallback_used === true || results.all_filtered === true));
+
+        const warningHtml = noPositiveResult
+            ? '<div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.4);border-radius:6px;padding:5px 10px;margin-bottom:6px;font-size:11px;color:#fca5a5;text-align:center;"><i class="bi bi-exclamation-triangle"></i> Прибыльных конфигураций не найдено. Показан наименее убыточный вариант.</div>'
+            : (isLosing ? '<div style="background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.4);border-radius:6px;padding:5px 10px;margin-bottom:6px;font-size:11px;color:#fdba74;text-align:center;"><i class="bi bi-exclamation-triangle"></i> Лучший найденный результат убыточен. Попробуйте другой период или параметры.</div>' : '');
 
         summary.innerHTML = `
+            ${warningHtml}
+            <div class="opt-criterion-badge" style="
+                background: rgba(99,102,241,0.12);
+                border: 1px solid rgba(99,102,241,0.3);
+                border-radius: 6px;
+                padding: 5px 10px;
+                margin-bottom: 8px;
+                font-size: 11px;
+                text-align: center;
+                color: #a5b4fc;
+            ">
+                <i class="bi bi-bullseye"></i>
+                Критерий оптимизации: <strong style="color:#c7d2fe">${metricLabel}</strong>
+            </div>
             <div class="results-metric-grid">
                 <div class="result-metric-card">
                     <span class="result-metric-label">Sharpe</span>
@@ -1419,12 +1862,16 @@ class OptimizationPanels {
                 </div>
                 <div class="result-metric-card">
                     <span class="result-metric-label">Max DD</span>
-                    <span class="result-metric-value negative">${(maxDD * 100).toFixed(1)}%</span>
+                    <span class="result-metric-value negative">${maxDD.toFixed(1)}%</span>
                 </div>
                 <div class="result-metric-card">
                     <span class="result-metric-label">Win Rate</span>
                     <span class="result-metric-value">${winRate.toFixed(1)}%</span>
                 </div>
+                ${netProfit !== null ? `<div class="result-metric-card" style="grid-column: 1 / -1;">
+                    <span class="result-metric-label">Net Profit</span>
+                    <span class="result-metric-value ${netProfit >= 0 ? 'positive' : 'negative'}">${netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)} USD</span>
+                </div>` : ''}
             </div>
             <p class="text-muted text-sm mt-2 text-center">
                 <i class="bi bi-trophy"></i> Best of ${totalTrials} trials

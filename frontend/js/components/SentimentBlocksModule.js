@@ -1,6 +1,6 @@
 /**
  * Sentiment Blocks Module — Sentiment Analysis блоки
- * 
+ *
  * Twitter Sentiment, News Sentiment, Composite Sentiment
  */
 
@@ -29,8 +29,8 @@ export function createSentimentBlocksModule() {
       icon: '📰',
       category: 'Sentiment Analysis',
       parameters: {
-        sources: { 
-          type: 'multiselect', 
+        sources: {
+          type: 'multiselect',
           options: ['coindesk', 'cointelegraph', 'bloomberg', 'reuters'],
           default: ['coindesk', 'cointelegraph']
         },
@@ -55,15 +55,15 @@ export function createSentimentBlocksModule() {
       outputs: ['composite_sentiment', 'confidence']
     }
   ];
-  
+
   function getBlocks() {
     return [...sentimentBlocks];
   }
-  
+
   function getBlock(blockId) {
     return sentimentBlocks.find(b => b.id === blockId);
   }
-  
+
   return {
     getBlocks,
     getBlock

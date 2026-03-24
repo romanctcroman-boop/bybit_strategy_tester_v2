@@ -314,7 +314,7 @@ class TestLLMClientPool:
         """Empty pool raises on chat."""
         pool = LLMClientPool()
         with pytest.raises(RuntimeError, match="No clients"):
-            asyncio.get_event_loop().run_until_complete(pool.chat([LLMMessage(role="user", content="test")]))
+            asyncio.run(pool.chat([LLMMessage(role="user", content="test")]))
 
     def test_add_client(self):
         """add_client() adds to pool."""

@@ -1790,6 +1790,10 @@ class BacktestEngine:
         max_bars_in_trade = getattr(config, "max_bars_in_trade", 0) or 0
         if extra_data.get("max_bars_in_trade", 0) > 0:
             max_bars_in_trade = int(extra_data["max_bars_in_trade"])
+        # profit_only filter for time-based exit (close_by_time block).
+        # When True, time exit only fires if PnL >= time_exit_min_profit (decimal fraction).
+        time_exit_profit_only: bool = bool(extra_data.get("time_exit_profit_only", False))
+        time_exit_min_profit: float = float(extra_data.get("time_exit_min_profit", 0.0))
 
         # ========== BREAKEVEN via extra_data (breakeven_exit block) ==========
         # Override config breakeven settings when the block is wired in graph.
@@ -2292,13 +2296,25 @@ class BacktestEngine:
 
                     # === TIME-BASED EXIT (time_exit block / close_by_time block) ===
                     # Close position after max_bars_in_trade bars regardless of PnL.
+                    # When time_exit_profit_only=True (close_by_time block config),
+                    # only fire if PnL >= time_exit_min_profit (decimal fraction).
                     if not should_exit and max_bars_in_trade > 0 and entry_idx is not None:
                         bars_held = i - entry_idx
                         if bars_held >= max_bars_in_trade:
-                            should_exit = True
-                            exit_reason = "time_exit"
-                            exit_price = price
-                            apply_slippage = False
+                            allow_time_exit = True
+                            if time_exit_profit_only:
+                                # Calculate current PnL% relative to entry price
+                                cur_pnl_pct = (
+                                    (price - entry_price) / entry_price
+                                    if is_long
+                                    else (entry_price - price) / entry_price
+                                )
+                                allow_time_exit = cur_pnl_pct >= time_exit_min_profit
+                            if allow_time_exit:
+                                should_exit = True
+                                exit_reason = "time_exit"
+                                exit_price = price
+                                apply_slippage = False
 
                     # Check Stop Loss using worst price within bar (TradingView style)
                     # SL/TP = % price movement, matches FallbackEngineV4

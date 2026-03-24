@@ -12,6 +12,7 @@ from typing import Any
 from loguru import logger
 
 from backend.agents.mcp.tool_registry import get_tool_registry
+from backend.config.constants import COMMISSION_TV, INITIAL_CAPITAL
 
 registry = get_tool_registry()
 
@@ -20,7 +21,7 @@ registry = get_tool_registry()
     name="run_backtest",
     description=(
         "Run a strategy backtest and return key metrics. "
-        "Uses FallbackEngineV4 (gold standard), commission=0.0007. "
+        "Uses FallbackEngineV4 (gold standard), commission=COMMISSION_TV (0.07%). "
         "Supported strategies: sma_crossover, rsi, macd, bollinger_bands, grid, dca, martingale."
     ),
     category="backtesting",
@@ -32,7 +33,7 @@ async def run_backtest(
     strategy_params: dict[str, Any] | None = None,
     start_date: str = "2025-06-01",
     end_date: str = "2025-07-01",
-    initial_capital: float = 10000.0,
+    initial_capital: float = INITIAL_CAPITAL,
     leverage: float = 10.0,
     direction: str = "both",
     stop_loss: float | None = None,
@@ -157,7 +158,7 @@ async def run_backtest(
             "sharpe_ratio": round(metrics.sharpe_ratio, 4),
             "profit_factor": round(getattr(metrics, "profit_factor", 0), 4),
             "avg_trade_pct": round(getattr(metrics, "avg_trade", 0), 4),
-            "commission_rate": 0.0007,
+            "commission_rate": COMMISSION_TV,
             "engine": "FallbackEngineV4",
         }
 

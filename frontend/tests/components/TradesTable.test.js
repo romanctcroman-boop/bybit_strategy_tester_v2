@@ -50,8 +50,8 @@ function makeShortTrade(overrides = {}) {
 // ─── TRADES_PAGE_SIZE ────────────────────────────────────────────────────────
 
 describe('TRADES_PAGE_SIZE', () => {
-    it('is 25', () => {
-        expect(TRADES_PAGE_SIZE).toBe(25);
+    it('is 100000 (pagination disabled — show all trades)', () => {
+        expect(TRADES_PAGE_SIZE).toBe(100000);
     });
 });
 
@@ -270,33 +270,32 @@ describe('renderPage', () => {
         document.body.innerHTML = '';
     });
 
-    it('renders first 25 rows on page 0', () => {
+    it('renders all rows on page 0 (pagination disabled)', () => {
         renderPage(tbody, rows, 0);
         const trs = tbody.querySelectorAll('tr');
-        expect(trs.length).toBe(25);
+        expect(trs.length).toBe(30); // all rows shown
         expect(trs[0].id).toBe('r0');
-        expect(trs[24].id).toBe('r24');
+        expect(trs[29].id).toBe('r29');
     });
 
-    it('renders remaining rows on page 1', () => {
+    it('renders all rows on page 1 (pagination disabled)', () => {
         renderPage(tbody, rows, 1);
         const trs = tbody.querySelectorAll('tr');
-        expect(trs.length).toBe(5); // 30 - 25
-        expect(trs[0].id).toBe('r25');
+        expect(trs.length).toBe(30); // all rows shown regardless of page
     });
 
-    it('respects custom pageSize', () => {
+    it('ignores custom pageSize (pagination disabled)', () => {
         renderPage(tbody, rows, 0, 10);
-        expect(tbody.querySelectorAll('tr').length).toBe(10);
+        expect(tbody.querySelectorAll('tr').length).toBe(30); // all rows shown
     });
 
     it('does nothing when tbody is null', () => {
         expect(() => renderPage(null, rows, 0)).not.toThrow();
     });
 
-    it('renders empty when page beyond range', () => {
+    it('renders all rows even for page beyond range (pagination disabled)', () => {
         renderPage(tbody, rows, 99);
-        expect(tbody.innerHTML).toBe('');
+        expect(tbody.querySelectorAll('tr').length).toBe(30); // all rows shown
     });
 });
 
@@ -328,27 +327,24 @@ describe('renderPagination', () => {
         expect(document.getElementById('tradesPagination')).toBeNull();
     });
 
-    it('creates pagination element when totalTrades > pageSize', () => {
+    it('never creates pagination element (pagination disabled)', () => {
         renderPagination(container, 100, 0);
-        expect(document.getElementById('tradesPagination')).not.toBeNull();
+        expect(document.getElementById('tradesPagination')).toBeNull();
     });
 
-    it('prev button is disabled on first page', () => {
+    it('no prev button created (pagination disabled)', () => {
         renderPagination(container, 100, 0);
-        const prevBtn = document.getElementById('tradesPrevBtn');
-        expect(prevBtn.disabled).toBe(true);
+        expect(document.getElementById('tradesPrevBtn')).toBeNull();
     });
 
-    it('next button is disabled on last page', () => {
-        renderPagination(container, 50, 1, 25); // 2 pages, page 1 = last
-        const nextBtn = document.getElementById('tradesNextBtn');
-        expect(nextBtn.disabled).toBe(true);
+    it('no next button created (pagination disabled)', () => {
+        renderPagination(container, 50, 1, 25);
+        expect(document.getElementById('tradesNextBtn')).toBeNull();
     });
 
-    it('shows correct page info text', () => {
+    it('no page info text created (pagination disabled)', () => {
         renderPagination(container, 50, 0, 25);
-        const info = document.getElementById('tradesPageInfo');
-        expect(info.textContent).toContain('1 / 2');
+        expect(document.getElementById('tradesPageInfo')).toBeNull();
     });
 
     it('reuses existing pagination element', () => {
@@ -384,30 +380,31 @@ describe('updatePaginationControls', () => {
         expect(() => updatePaginationControls(100, 0)).not.toThrow();
     });
 
-    it('disables prev on page 0', () => {
+    it('is a no-op — prev button stays unchanged on page 0', () => {
         updatePaginationControls(100, 0);
-        expect(document.getElementById('tradesPrevBtn').disabled).toBe(true);
+        // no-op: button state is not mutated
+        expect(document.getElementById('tradesPrevBtn').disabled).toBe(false);
     });
 
-    it('enables prev on page > 0', () => {
+    it('is a no-op — prev button stays unchanged on page > 0', () => {
         updatePaginationControls(100, 1);
         expect(document.getElementById('tradesPrevBtn').disabled).toBe(false);
     });
 
-    it('disables next on last page', () => {
-        updatePaginationControls(50, 1, 25); // 2 pages, on page 1
-        expect(document.getElementById('tradesNextBtn').disabled).toBe(true);
-    });
-
-    it('enables next when not on last page', () => {
-        updatePaginationControls(100, 0, 25); // 4 pages, on page 0
+    it('is a no-op — next button stays unchanged on last page', () => {
+        updatePaginationControls(50, 1, 25);
         expect(document.getElementById('tradesNextBtn').disabled).toBe(false);
     });
 
-    it('updates info text with current page', () => {
-        updatePaginationControls(75, 1, 25); // page 2 of 3
+    it('is a no-op — next button stays unchanged when not on last page', () => {
+        updatePaginationControls(100, 0, 25);
+        expect(document.getElementById('tradesNextBtn').disabled).toBe(false);
+    });
+
+    it('is a no-op — page info text stays empty', () => {
+        updatePaginationControls(75, 1, 25);
         const info = document.getElementById('tradesPageInfo');
-        expect(info.innerHTML).toContain('2 / 3');
+        expect(info.innerHTML).toBe('');
     });
 });
 

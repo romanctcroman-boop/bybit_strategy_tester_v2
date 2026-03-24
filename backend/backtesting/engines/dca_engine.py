@@ -505,6 +505,48 @@ class DCAGridCalculator:
         return sizes
 
 
+@dataclass
+class TrailingStopState:
+    """Trailing stop state for a DCA position."""
+
+    activated: bool = False
+    highest_price: float = 0.0
+    lowest_price: float = float("inf")
+    trailing_stop_price: float = 0.0
+
+    def reset(self) -> None:
+        self.activated = False
+        self.highest_price = 0.0
+        self.lowest_price = float("inf")
+        self.trailing_stop_price = 0.0
+
+    def update_long(
+        self, high_price: float, entry_price: float, activation_pct: float, distance_pct: float
+    ) -> float | None:
+        profit_pct = (high_price - entry_price) / entry_price
+        if profit_pct >= activation_pct:
+            self.activated = True
+        if not self.activated:
+            return None
+        if high_price > self.highest_price:
+            self.highest_price = high_price
+            self.trailing_stop_price = self.highest_price * (1 - distance_pct)
+        return self.trailing_stop_price
+
+    def update_short(
+        self, low_price: float, entry_price: float, activation_pct: float, distance_pct: float
+    ) -> float | None:
+        profit_pct = (entry_price - low_price) / entry_price
+        if profit_pct >= activation_pct:
+            self.activated = True
+        if not self.activated:
+            return None
+        if low_price < self.lowest_price:
+            self.lowest_price = low_price
+            self.trailing_stop_price = self.lowest_price * (1 + distance_pct)
+        return self.trailing_stop_price
+
+
 class DCAEngine(BaseBacktestEngine):
     """
     DCA/Grid Trading Backtest Engine.
@@ -562,10 +604,31 @@ class DCAEngine(BaseBacktestEngine):
         # SL reference price mode: "average_price" (default) or "last_order"
         # "last_order" → SL is measured from the last filled DCA order price
         self._sl_type: str = "average_price"
+        # Breakeven: move SL to entry+offset when profit reaches activation threshold
+        self._breakeven_enabled: bool = False
+        self._breakeven_activation_pct: float = 0.005  # 0.5% default
+        self._breakeven_offset: float = 0.0  # decimal, e.g. 0.001 = +0.1%
+        self._breakeven_active: bool = False  # per-position, reset on new entry
+        self._breakeven_sl_price: float = 0.0  # when active
         # Realized equity for correct equity curve (unrealized PnL is NOT accumulated)
         self._realized_equity: float = 0.0
         # Grid pullback tracking: price at which the grid was last placed/shifted
         self._pullback_base_price: float = 0.0
+        # Grid trailing tracking: independent base price (used only when grid_trailing_percent > 0)
+        self._trailing_grid_base_price: float = 0.0
+        # Trailing stop (per-position, reset on new entry)
+        self._trailing_state: TrailingStopState = TrailingStopState()
+        self._trailing_activation_pct: float = 0.0  # 0 = disabled
+        self._trailing_distance_pct: float = 0.0
+        # ATR TP/SL
+        self._atr_enabled: bool = False
+        self._atr_period: int = 14
+        self._atr_tp_multiplier: float = 2.0
+        self._atr_sl_multiplier: float = 1.5
+        self._atr_values: np.ndarray | None = None  # pre-calculated per run
+        # Per-position ATR prices (set at entry, None = not in ATR mode)
+        self._atr_tp_price: float | None = None
+        self._atr_sl_price: float | None = None
 
     # ===== Abstract method implementations =====
 
@@ -642,10 +705,14 @@ class DCAEngine(BaseBacktestEngine):
         - BacktestInput (interface) -> BacktestOutput
         - Tuple of (BacktestConfig, pd.DataFrame) -> BacktestResult
         """
-        # Check if called with BacktestConfig and DataFrame (from BacktestService)
+        # Guard: run() accepts BacktestInput (interface), NOT BacktestConfig.
+        # BacktestConfig has dca_enabled attribute — detect and give clear error.
+        # All production callers (BacktestService, router, optimizer) use run_from_config().
         if hasattr(input_data, "dca_enabled"):
-            # This is BacktestConfig - need DataFrame as second arg
-            raise ValueError("DCAEngine.run() called with BacktestConfig. Use run_from_config(config, ohlcv) instead.")
+            raise TypeError(
+                "DCAEngine.run() expects a BacktestInput object, not BacktestConfig. "
+                "Use run_from_config(config, ohlcv) instead."
+            )
 
         start_time = time.time()
 
@@ -831,6 +898,20 @@ class DCAEngine(BaseBacktestEngine):
         # SL reference price mode: "average_price" (default) or "last_order"
         raw_sl_type = getattr(config, "sl_type", "average_price") or "average_price"
         self._sl_type = raw_sl_type if raw_sl_type in ("average_price", "last_order") else "average_price"
+        # Breakeven from Static SL/TP block (breakeven_enabled, breakeven_activation_pct, breakeven_offset)
+        self._breakeven_enabled = bool(getattr(config, "breakeven_enabled", False))
+        self._breakeven_activation_pct = float(getattr(config, "breakeven_activation_pct", 0.005))
+        self._breakeven_offset = float(getattr(config, "breakeven_offset", 0.0))
+        # Trailing stop
+        raw_ts_act = getattr(config, "trailing_stop_activation", None)
+        self._trailing_activation_pct = float(raw_ts_act) if raw_ts_act is not None and float(raw_ts_act) > 0 else 0.0
+        raw_ts_off = getattr(config, "trailing_stop_offset", None)
+        self._trailing_distance_pct = float(raw_ts_off) if raw_ts_off is not None and float(raw_ts_off) > 0 else 0.0
+        # ATR TP/SL
+        self._atr_enabled = bool(getattr(config, "atr_enabled", False))
+        self._atr_period = int(getattr(config, "atr_period", 14))
+        self._atr_tp_multiplier = float(getattr(config, "atr_tp_multiplier", 2.0))
+        self._atr_sl_multiplier = float(getattr(config, "atr_sl_multiplier", 1.5))
 
     def run_from_config(self, config: Any, ohlcv: pd.DataFrame, custom_strategy: Any = None) -> Any:
         """
@@ -882,17 +963,50 @@ class DCAEngine(BaseBacktestEngine):
         self.trades = []
         self.position = DCAPosition()
         self._ohlcv_index = ohlcv.index  # used by _build_performance_metrics for Sharpe/Sortino
+        self._first_close = float(ohlcv.iloc[0]["close"]) if len(ohlcv) > 0 else 0.0
+        self._last_close = float(ohlcv.iloc[-1]["close"]) if len(ohlcv) > 0 else 0.0
 
         # Pre-calculate indicator caches for close conditions
         self._precompute_close_condition_indicators(ohlcv)
 
+        # Pre-calculate ATR values if ATR TP/SL mode is enabled
+        if self._atr_enabled:
+            from backend.backtesting.atr_calculator import calculate_atr_fast
+
+            self._atr_values = calculate_atr_fast(
+                ohlcv["high"].to_numpy(np.float64),
+                ohlcv["low"].to_numpy(np.float64),
+                ohlcv["close"].to_numpy(np.float64),
+                self._atr_period,
+            )
+        else:
+            self._atr_values = None
+
         # Generate signals using strategy from config
         signals = self._generate_signals_from_config(config, ohlcv)
 
-        # Log signal statistics
+        # Log signal statistics (debug level to avoid flooding during optimization)
         long_signals = int(np.sum(signals > 0))
         short_signals = int(np.sum(signals < 0))
-        logger.info(f"DCAEngine: Generated {long_signals} long signals, {short_signals} short signals")
+        logger.debug(f"DCAEngine: Generated {long_signals} long signals, {short_signals} short signals")
+
+        # Fast path: no signals → no trades possible. Skip the entire bar loop.
+        # This is critical for optimization where many parameter combos produce 0 signals.
+        if long_signals == 0 and short_signals == 0:
+            empty_metrics = self._build_performance_metrics(initial_capital, initial_capital, [])
+            return BacktestResult(
+                id=backtest_id,
+                status=BacktestStatus.COMPLETED,
+                created_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+                config=config,
+                trades=[],
+                metrics=empty_metrics,
+                equity_curve=EquityCurve(timestamps=[], equity=[initial_capital]),
+                final_equity=initial_capital,
+                final_pnl=0.0,
+                final_pnl_pct=0.0,
+            )
 
         # Main loop
         for i in range(1, len(ohlcv)):
@@ -976,6 +1090,17 @@ class DCAEngine(BaseBacktestEngine):
         """
         signals = np.zeros(len(df))
 
+        # Fast path: pre-computed signals injected by optimizer (bypass adapter entirely)
+        if hasattr(self, "_precomputed_signals") and self._precomputed_signals is not None:
+            precomp = self._precomputed_signals
+            if len(precomp) == len(df):
+                return precomp if isinstance(precomp, np.ndarray) else np.asarray(precomp)
+            else:
+                logger.warning(
+                    f"Pre-computed signals length mismatch: {len(precomp)} vs {len(df)}, "
+                    "falling back to standard signal generation"
+                )
+
         # If custom_strategy (StrategyBuilderAdapter) is provided, use it for signals
         if hasattr(self, "_custom_strategy") and self._custom_strategy is not None:
             try:
@@ -1043,15 +1168,28 @@ class DCAEngine(BaseBacktestEngine):
 
         return signals
 
+    @staticmethod
+    def _ts_to_utc(ts: "pd.Timestamp") -> "pd.Timestamp":
+        """Ensure a pandas Timestamp is UTC-aware (localize if tz-naive).
+
+        Python isoformat() on tz-naive timestamps omits the timezone suffix,
+        causing browsers to interpret them as LOCAL time and shifting markers
+        by the user's UTC offset (e.g. -3h for UTC+3).
+        """
+        if ts.tzinfo is None:
+            return ts.tz_localize("UTC")
+        return ts
+
     def _convert_trades_to_model(self, ohlcv: pd.DataFrame) -> list:
         """Convert internal trades to BacktestModel TradeRecord format."""
         from backend.backtesting.models import TradeRecord as ModelTradeRecord
 
         model_trades = []
         for i, trade in enumerate(self.trades):
-            # Get timestamps from bar indices
-            entry_time = ohlcv.index[min(trade.entry_bar_idx, len(ohlcv) - 1)]
-            exit_time = ohlcv.index[min(trade.exit_bar_idx, len(ohlcv) - 1)]
+            # Get timestamps from bar indices; localize to UTC so isoformat()
+            # emits "+00:00" suffix (prevents browser LOCAL-time misinterpretation).
+            entry_time = self._ts_to_utc(ohlcv.index[min(trade.entry_bar_idx, len(ohlcv) - 1)])
+            exit_time = self._ts_to_utc(ohlcv.index[min(trade.exit_bar_idx, len(ohlcv) - 1)])
 
             model_trades.append(
                 ModelTradeRecord(
@@ -1079,11 +1217,11 @@ class DCAEngine(BaseBacktestEngine):
                     dca_total_size_usd=trade.total_size_usd,
                     dca_total_size_coins=trade.total_size_coins,
                     dca_grid_levels=trade.grid_levels,
-                    # Per-order fill details: convert bar_idx → ISO timestamp for frontend
+                    # Per-order fill details: convert bar_idx → UTC ISO timestamp for frontend
                     dca_levels=[
                         {
                             "level": f["level"],
-                            "time": ohlcv.index[min(f["bar_idx"], len(ohlcv) - 1)].isoformat()
+                            "time": self._ts_to_utc(ohlcv.index[min(f["bar_idx"], len(ohlcv) - 1)]).isoformat()
                             if f.get("bar_idx") is not None
                             else None,
                             "price": f["price"],
@@ -1159,64 +1297,334 @@ class DCAEngine(BaseBacktestEngine):
         # Convert BacktestMetrics → PerformanceMetrics.
         # Key difference: PerformanceMetrics.win_rate stores percent (0–100),
         # BacktestMetrics.win_rate stores fraction (0–1).
+        # PerformanceMetrics field naming convention (matching MetricsCalculator):
+        #   avg_win        = per-trade return % (pct)       avg_win_value  = USD absolute
+        #   largest_win    = per-trade return % (pct)       largest_win_value = USD absolute
         long_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "long"]
         short_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "short"]
-        long_pnls = [float(getattr(t, "pnl", 0.0)) for t in long_trades_list]
-        short_pnls = [float(getattr(t, "pnl", 0.0)) for t in short_trades_list]
+
+        def _pnl(t: object) -> float:
+            return float(getattr(t, "pnl", 0.0))
+
+        def _pnl_pct(t: object) -> float:
+            return float(getattr(t, "pnl_pct", 0.0))
+
+        def _bars(t: object) -> int:
+            return int(getattr(t, "bars_in_trade", getattr(t, "duration_bars", 0)) or 0)
+
+        def _comm(t: object) -> float:
+            return float(getattr(t, "commission", 0.0) or 0.0)
 
         def _safe_wr_pct(win: int, total: int) -> float:
             return (win / total * 100.0) if total > 0 else 0.0
 
-        long_wins = sum(1 for p in long_pnls if p > 0)
-        short_wins = sum(1 for p in short_pnls if p > 0)
+        def _safe_mean(lst: list) -> float:
+            return float(np.mean(lst)) if lst else 0.0
+
+        def _consec(pnls: list) -> tuple[int, int]:
+            max_w = max_l = cur_w = cur_l = 0
+            for p in pnls:
+                if p > 0:
+                    cur_w += 1
+                    cur_l = 0
+                elif p < 0:
+                    cur_l += 1
+                    cur_w = 0
+                else:
+                    cur_w = cur_l = 0
+                if cur_w > max_w:
+                    max_w = cur_w
+                if cur_l > max_l:
+                    max_l = cur_l
+            return max_w, max_l
+
+        # ── All-trades vectors ────────────────────────────────────────────────────────
+        all_pnls = [_pnl(t) for t in trades]
+        all_pnl_pcts = [_pnl_pct(t) for t in trades]
+        all_bars_list = [_bars(t) for t in trades]  # noqa: F841 — kept for symmetry with long/short vectors
+
+        win_pnls = [p for p in all_pnls if p > 0]
+        loss_pnls = [p for p in all_pnls if p < 0]
+        win_pnl_pcts = [_pnl_pct(t) for t in trades if _pnl(t) > 0]
+        loss_pnl_pcts = [_pnl_pct(t) for t in trades if _pnl(t) < 0]
+        win_bars = [_bars(t) for t in trades if _pnl(t) > 0]
+        loss_bars = [_bars(t) for t in trades if _pnl(t) < 0]
+
+        # ── Long vectors ─────────────────────────────────────────────────────────────
+        long_pnls = [_pnl(t) for t in long_trades_list]
+        long_pnl_pcts = [_pnl_pct(t) for t in long_trades_list]
+        long_bars_list = [_bars(t) for t in long_trades_list]
+
+        long_win_pnls = [p for p in long_pnls if p > 0]
+        long_loss_pnls = [p for p in long_pnls if p < 0]
+        long_win_pnl_pcts = [_pnl_pct(t) for t in long_trades_list if _pnl(t) > 0]
+        long_loss_pnl_pcts = [_pnl_pct(t) for t in long_trades_list if _pnl(t) < 0]
+        long_win_bars = [_bars(t) for t in long_trades_list if _pnl(t) > 0]
+        long_loss_bars = [_bars(t) for t in long_trades_list if _pnl(t) < 0]
+
+        # ── Short vectors ────────────────────────────────────────────────────────────
+        short_pnls = [_pnl(t) for t in short_trades_list]
+        short_pnl_pcts = [_pnl_pct(t) for t in short_trades_list]  # noqa: F841 — reserved for future short metrics
+        short_bars_list = [_bars(t) for t in short_trades_list]
+
+        short_win_pnls = [p for p in short_pnls if p > 0]
+        short_loss_pnls = [p for p in short_pnls if p < 0]
+        short_win_pnl_pcts = [_pnl_pct(t) for t in short_trades_list if _pnl(t) > 0]
+        short_win_bars = [_bars(t) for t in short_trades_list if _pnl(t) > 0]
+        short_loss_bars = [_bars(t) for t in short_trades_list if _pnl(t) < 0]
+
+        # ── Consecutive win/loss counts ───────────────────────────────────────────
+        long_max_cw, long_max_cl = _consec(long_pnls)
+        short_max_cw, short_max_cl = _consec(short_pnls)
+
+        # ── Expectancy helpers ────────────────────────────────────────────────────
+        def _expectancy(pnl_list: list) -> float:
+            if not pnl_list:
+                return 0.0
+            w = [p for p in pnl_list if p > 0]
+            losses = [p for p in pnl_list if p < 0]
+            wr = len(w) / len(pnl_list)
+            lr = 1.0 - wr
+            avg_w = float(np.mean(w)) if w else 0.0
+            avg_l = float(np.mean(losses)) if losses else 0.0
+            return (wr * avg_w) - (lr * abs(avg_l))
+
+        # ── Commission sums by side ───────────────────────────────────────────────
+        long_comm_sum = sum(_comm(t) for t in long_trades_list)
+        short_comm_sum = sum(_comm(t) for t in short_trades_list)
+
+        # ── Profit factor helper ──────────────────────────────────────────────────
+        def _pf(gp: float, gl: float) -> float:
+            return gp / gl if gl > 0 else (float("inf") if gp > 0 else 0.0)
+
+        long_gp = sum(long_win_pnls)
+        long_gl = abs(sum(long_loss_pnls))
+        short_gp = sum(short_win_pnls)
+        short_gl = abs(sum(short_loss_pnls))
+
+        # ── CAGR (computed from OHLCV date range) ────────────────────────────────
+        _cagr = 0.0
+        if self._ohlcv_index is not None and len(self._ohlcv_index) >= 2:
+            try:
+                _years = float((self._ohlcv_index[-1] - self._ohlcv_index[0]).total_seconds()) / (365.25 * 86400)
+                if _years > 0 and initial_capital > 0 and final_equity > 0:
+                    _cagr = (((final_equity / initial_capital) ** (1.0 / _years)) - 1.0) * 100.0
+            except Exception:
+                pass
+
+        # ── Calmar ratio = CAGR / max_drawdown ────────────────────────────────────
+        _max_dd = float(getattr(bm, "max_drawdown", 0.0))
+        _calmar = _cagr / _max_dd if _max_dd > 0 else 0.0
+
+        # ── Kelly Criterion (fraction 0–1, stored as fraction; MetricsPanels * 100) ─
+        _kelly = 0.0
+        if win_pnls and loss_pnls:
+            _avg_w = abs(_safe_mean(win_pnls))
+            _avg_l = abs(_safe_mean(loss_pnls))
+            _wr = len(win_pnls) / len(all_pnls)
+            if _avg_l > 0:
+                _b = _avg_w / _avg_l
+                _kelly = max(0.0, (_wr * _b - (1.0 - _wr)) / _b)
+
+        # ── Payoff ratios (avg_win_usd / avg_loss_usd per direction) ─────────────
+        _payoff_all = (
+            abs(_safe_mean(win_pnls)) / abs(_safe_mean(loss_pnls)) if loss_pnls and _safe_mean(loss_pnls) != 0 else 0.0
+        )
+        _payoff_long = (
+            abs(_safe_mean(long_win_pnls)) / abs(_safe_mean(long_loss_pnls))
+            if long_loss_pnls and _safe_mean(long_loss_pnls) != 0
+            else 0.0
+        )
+        _payoff_short = (
+            abs(_safe_mean(short_win_pnls)) / abs(_safe_mean(short_loss_pnls))
+            if short_loss_pnls and _safe_mean(short_loss_pnls) != 0
+            else 0.0
+        )
+
+        # ── Pure-direction flags (Long-only or Short-only) ────────────────────────
+        _is_pure_long = not short_trades_list
+        _is_pure_short = not long_trades_list
+
+        # ── Max drawdown USD value ────────────────────────────────────────────────
+        _max_dd_value = _max_dd * initial_capital / 100.0
+
+        # ── Buy & Hold return ─────────────────────────────────────────────────────
+        _bh_return = 0.0
+        _bh_return_pct = 0.0
+        _first_c = getattr(self, "_first_close", 0.0)
+        _last_c = getattr(self, "_last_close", 0.0)
+        if _first_c > 0 and initial_capital > 0:
+            _bh_return = initial_capital * (_last_c / _first_c - 1.0)
+            _bh_return_pct = (_last_c / _first_c - 1.0) * 100.0
+
+        # ── SQN (System Quality Number) ────────────────────────────────────────────
+        _sqn = 0.0
+        if len(all_pnls) >= 2:
+            _std_pnl = float(np.std(all_pnls, ddof=0))
+            if _std_pnl > 0:
+                _sqn = float(np.sqrt(len(all_pnls))) * float(np.mean(all_pnls)) / _std_pnl
+
+        # ── Ulcer Index (from equity curve) ───────────────────────────────────────
+        _ulcer = 0.0
+        _eq_arr = np.asarray(self.equity_curve, dtype=np.float64)
+        if len(_eq_arr) >= 2:
+            _peaks = np.maximum.accumulate(_eq_arr)
+            _safe_peaks = np.where(_peaks > 0, _peaks, 1.0)
+            _dd_pct = (_eq_arr - _peaks) / _safe_peaks * 100.0
+            _ulcer = float(np.sqrt(np.mean(_dd_pct**2)))
+
+        # ── Stability R² (linear regression of equity curve) ──────────────────────
+        _stability = 0.0
+        if len(_eq_arr) >= 3:
+            _x = np.arange(len(_eq_arr), dtype=np.float64)
+            _x_mean = _x.mean()
+            _y_mean = _eq_arr.mean()
+            _ss_tot = float(np.sum((_eq_arr - _y_mean) ** 2))
+            if _ss_tot > 0:
+                _cov = float(np.sum((_x - _x_mean) * (_eq_arr - _y_mean)))
+                _ss_x = float(np.sum((_x - _x_mean) ** 2))
+                _slope = _cov / _ss_x if _ss_x > 0 else 0.0
+                _intercept = _y_mean - _slope * _x_mean
+                _y_pred = _slope * _x + _intercept
+                _ss_res = float(np.sum((_eq_arr - _y_pred) ** 2))
+                _stability = max(0.0, 1.0 - _ss_res / _ss_tot)
+
+        # ── Breakeven trades ──────────────────────────────────────────────────────
+        _breakeven = sum(1 for p in all_pnls if abs(p) < 0.001)
+        _breakeven_long = sum(1 for p in long_pnls if abs(p) < 0.001)
+        _breakeven_short = sum(1 for p in short_pnls if abs(p) < 0.001)
+
+        _sharpe = float(getattr(bm, "sharpe_ratio", 0.0))
+        _sortino = float(getattr(bm, "sortino_ratio", 0.0))
+        _recov = float(getattr(bm, "recovery_factor", 0.0))
+        _gp = float(getattr(bm, "gross_profit", 0.0))
+        _gl = float(getattr(bm, "gross_loss", 0.0))
 
         return PerformanceMetrics(
-            # P&L
+            # ── P&L ──────────────────────────────────────────────────────────────────
             net_profit=float(getattr(bm, "net_profit", 0.0)),
             net_profit_pct=float(getattr(bm, "total_return", 0.0)),
-            gross_profit=float(getattr(bm, "gross_profit", 0.0)),
-            gross_loss=float(getattr(bm, "gross_loss", 0.0)),
+            gross_profit=_gp,
+            gross_loss=_gl,
+            gross_profit_pct=_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            gross_loss_pct=_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
             total_commission=float(getattr(bm, "commission_paid", 0.0)),
-            # Returns
+            buy_hold_return=_bh_return,
+            buy_hold_return_pct=_bh_return_pct,
+            # ── Returns ──────────────────────────────────────────────────────────────
             total_return=float(getattr(bm, "total_return", 0.0)),
             annual_return=float(getattr(bm, "annual_return", 0.0)),
-            cagr=float(getattr(bm, "cagr", 0.0)),
-            # Risk ratios
-            sharpe_ratio=float(getattr(bm, "sharpe_ratio", 0.0)),
-            sortino_ratio=float(getattr(bm, "sortino_ratio", 0.0)),
-            calmar_ratio=float(getattr(bm, "calmar_ratio", 0.0)),
-            # Drawdown
+            cagr=_cagr,
+            cagr_long=_cagr if _is_pure_long else 0.0,
+            # ── Risk ratios ───────────────────────────────────────────────────────────
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+            calmar_ratio=_calmar,
+            sharpe_long=_sharpe if _is_pure_long else 0.0,
+            sortino_long=_sortino if _is_pure_long else 0.0,
+            calmar_long=_calmar if _is_pure_long else 0.0,
+            # ── Drawdown ─────────────────────────────────────────────────────────────
             max_drawdown=float(getattr(bm, "max_drawdown", 0.0)),
-            max_drawdown_value=float(getattr(bm, "max_drawdown_value", 0.0)),
-            # Trade stats — win_rate as percent (0–100) per PerformanceMetrics contract
+            max_drawdown_value=_max_dd_value,
+            # ── Trade stats (win_rate as percent 0-100) ───────────────────────────────
             total_trades=int(getattr(bm, "total_trades", len(trades))),
             winning_trades=int(getattr(bm, "winning_trades", 0)),
             losing_trades=int(getattr(bm, "losing_trades", 0)),
-            win_rate=float(getattr(bm, "win_rate", 0.0)) * 100.0,  # fraction→percent
+            win_rate=float(getattr(bm, "win_rate", 0.0)) * 100.0,
             profit_factor=float(getattr(bm, "profit_factor", 0.0)),
-            avg_win=float(getattr(bm, "avg_win", 0.0)),
-            avg_loss=float(getattr(bm, "avg_loss", 0.0)),
+            # avg_win/loss: pct field = per-trade return %, value field = USD absolute
+            avg_win=_safe_mean(win_pnl_pcts),
+            avg_win_value=float(getattr(bm, "avg_win", 0.0)),
+            avg_loss=_safe_mean(loss_pnl_pcts),
+            avg_loss_value=float(getattr(bm, "avg_loss", 0.0)),
             avg_trade=float(getattr(bm, "avg_trade", 0.0)),
             avg_trade_value=float(getattr(bm, "avg_trade", 0.0)),
-            largest_win=float(getattr(bm, "largest_win", 0.0)),
-            largest_loss=float(getattr(bm, "largest_loss", 0.0)),
-            payoff_ratio=float(getattr(bm, "payoff_ratio", 0.0)),
+            avg_trade_pct=_safe_mean(all_pnl_pcts),
+            # largest: pct field = per-trade return %, value field = USD absolute
+            largest_win=max(win_pnl_pcts) if win_pnl_pcts else 0.0,
+            largest_win_value=max(win_pnls) if win_pnls else 0.0,
+            largest_loss=min(loss_pnl_pcts) if loss_pnl_pcts else 0.0,
+            largest_loss_value=min(loss_pnls) if loss_pnls else 0.0,
+            payoff_ratio=_payoff_all,
             expectancy=float(getattr(bm, "expectancy", 0.0)),
-            recovery_factor=float(getattr(bm, "recovery_factor", 0.0)),
+            sqn=_sqn,
+            ulcer_index=_ulcer,
+            stability=_stability,
+            breakeven_trades=_breakeven,
+            long_breakeven_trades=_breakeven_long,
+            short_breakeven_trades=_breakeven_short,
+            recovery_factor=_recov,
+            recovery_long=_recov if _is_pure_long else 0.0,
+            recovery_short=_recov if _is_pure_short else 0.0,
+            kelly_percent=_kelly,
+            kelly_percent_long=_kelly if _is_pure_long else 0.0,
+            kelly_percent_short=_kelly if _is_pure_short else 0.0,
             max_consecutive_wins=int(getattr(bm, "max_consecutive_wins", 0)),
             max_consecutive_losses=int(getattr(bm, "max_consecutive_losses", 0)),
+            # avg bars (all trades, winning, losing)
             avg_bars_in_trade=float(getattr(bm, "avg_trade_duration", 0.0)),
-            # Long/short breakdown (win_rate as percent)
+            avg_bars_in_winning=float(getattr(bm, "avg_winning_duration", 0.0)) or _safe_mean(win_bars),
+            avg_bars_in_losing=float(getattr(bm, "avg_losing_duration", 0.0)) or _safe_mean(loss_bars),
+            # ── Long breakdown ────────────────────────────────────────────────────────
             long_trades=len(long_trades_list),
-            short_trades=len(short_trades_list),
             long_pnl=sum(long_pnls),
-            short_pnl=sum(short_pnls),
-            long_win_rate=_safe_wr_pct(long_wins, len(long_trades_list)),
-            short_win_rate=_safe_wr_pct(short_wins, len(short_trades_list)),
-            long_winning_trades=long_wins,
-            short_winning_trades=short_wins,
+            long_pnl_pct=sum(long_pnls) / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_winning_trades=len(long_win_pnls),
+            long_losing_trades=len(long_loss_pnls),
             long_net_profit=sum(long_pnls),
+            long_win_rate=_safe_wr_pct(len(long_win_pnls), len(long_trades_list)),
+            long_gross_profit=long_gp,
+            long_gross_loss=long_gl,
+            long_gross_profit_pct=long_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_gross_loss_pct=long_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_profit_factor=_pf(long_gp, long_gl),
+            long_avg_win=_safe_mean(long_win_pnls),
+            long_avg_win_value=_safe_mean(long_win_pnls),
+            long_avg_win_pct=_safe_mean(long_win_pnl_pcts),
+            long_avg_loss=_safe_mean(long_loss_pnls),
+            long_avg_loss_value=_safe_mean(long_loss_pnls),
+            long_avg_loss_pct=_safe_mean(long_loss_pnl_pcts),
+            long_avg_trade=_safe_mean(long_pnls),
+            long_avg_trade_value=_safe_mean(long_pnls),
+            long_avg_trade_pct=_safe_mean(long_pnl_pcts),
+            long_largest_win=max(long_win_pnl_pcts) if long_win_pnl_pcts else 0.0,
+            long_largest_win_value=max(long_win_pnls) if long_win_pnls else 0.0,
+            long_largest_loss=min(long_loss_pnl_pcts) if long_loss_pnl_pcts else 0.0,
+            long_largest_loss_value=min(long_loss_pnls) if long_loss_pnls else 0.0,
+            long_commission=long_comm_sum,
+            long_payoff_ratio=_payoff_long,
+            long_expectancy=_expectancy(long_pnls),
+            long_max_consec_wins=long_max_cw,
+            long_max_consec_losses=long_max_cl,
+            avg_bars_in_long=_safe_mean(long_bars_list),
+            avg_bars_in_winning_long=_safe_mean(long_win_bars),
+            avg_bars_in_losing_long=_safe_mean(long_loss_bars),
+            # ── Short breakdown ───────────────────────────────────────────────────────
+            short_trades=len(short_trades_list),
+            short_pnl=sum(short_pnls),
+            short_pnl_pct=sum(short_pnls) / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_winning_trades=len(short_win_pnls),
+            short_losing_trades=len([p for p in short_pnls if p < 0]),
             short_net_profit=sum(short_pnls),
+            short_win_rate=_safe_wr_pct(len(short_win_pnls), len(short_trades_list)),
+            short_gross_profit=short_gp,
+            short_gross_loss=short_gl,
+            short_gross_profit_pct=short_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_gross_loss_pct=short_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_profit_factor=_pf(short_gp, short_gl),
+            short_avg_win=_safe_mean(short_win_pnls),
+            short_avg_win_value=_safe_mean(short_win_pnls),
+            short_avg_win_pct=_safe_mean(short_win_pnl_pcts),
+            short_avg_loss=_safe_mean([p for p in short_pnls if p < 0]),
+            short_avg_loss_value=_safe_mean([p for p in short_pnls if p < 0]),
+            short_commission=short_comm_sum,
+            short_payoff_ratio=_payoff_short,
+            short_expectancy=_expectancy(short_pnls),
+            short_max_consec_wins=short_max_cw,
+            short_max_consec_losses=short_max_cl,
+            avg_bars_in_short=_safe_mean(short_bars_list),
+            avg_bars_in_winning_short=_safe_mean(short_win_bars),
+            avg_bars_in_losing_short=_safe_mean(short_loss_bars),
         )
 
     def _generate_signals(self, input_data: BacktestInput, df: pd.DataFrame) -> np.ndarray:
@@ -1300,8 +1708,9 @@ class DCAEngine(BaseBacktestEngine):
         orders[0].fill_time = bar_index
         orders[0].fill_price = price
 
-        # Initialize grid pullback tracking from current price
+        # Initialize grid pullback and grid trailing tracking from current price
         self._pullback_base_price = price
+        self._trailing_grid_base_price = price
 
         # Initialize position
         self.position = DCAPosition(
@@ -1318,18 +1727,62 @@ class DCAEngine(BaseBacktestEngine):
             last_order_bar=bar_index,
         )
 
+        # Reset breakeven state for new position
+        self._breakeven_active = False
+        self._breakeven_sl_price = 0.0
+
+        # Reset trailing stop for new position
+        self._trailing_state.reset()
+
+        # Set ATR-based TP/SL prices at entry
+        self._atr_tp_price = None
+        self._atr_sl_price = None
+        if self._atr_enabled and self._atr_values is not None and bar_index < len(self._atr_values):
+            atr = float(self._atr_values[bar_index])
+            if atr > 0:
+                if direction == "long":
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = price + atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = price - atr * self._atr_sl_multiplier
+                else:
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = price - atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = price + atr * self._atr_sl_multiplier
+
+        # Reset multi-TP state for new position
+        self.position.tp_hit = [False, False, False, False]
+        self.position.remaining_size_percent = 100.0
+
         self.total_orders_filled += 1
 
     def _process_open_position(self, bar_index: int, high: float, low: float, close: float, equity: float) -> float:
         """Process open position: check for DCA fills, TPs, SL."""
 
-        # Grid pullback: if price moves away X% from base without any new fill, shift the grid
-        if self.grid_config.grid_pullback_percent > 0 and self._pullback_base_price > 0:
+        any_active_unfilled = any(not o.filled and o.active_in_grid for o in self.position.orders)
+
+        # Grid trailing (priority over pullback when enabled):
+        # if price moves in the FAVORABLE direction by grid_trailing_percent%,
+        # shift unfilled orders to trail the price.
+        if self.grid_config.grid_trailing_percent > 0 and self._trailing_grid_base_price > 0:
+            trailing_threshold = self.grid_config.grid_trailing_percent / 100.0
+            if any_active_unfilled:
+                if self.position.direction == "long":
+                    favorable_move = (close - self._trailing_grid_base_price) / self._trailing_grid_base_price
+                else:
+                    favorable_move = (self._trailing_grid_base_price - close) / self._trailing_grid_base_price
+                if favorable_move >= trailing_threshold:
+                    self._shift_grid_to_price(close)
+                    self._trailing_grid_base_price = close
+                    self._pullback_base_price = close  # sync so pullback also resets
+
+        # Grid pullback (only when grid trailing is NOT active):
+        # if price moves away from base in any direction by grid_pullback_percent%, shift grid.
+        elif self.grid_config.grid_pullback_percent > 0 and self._pullback_base_price > 0:
             pullback_threshold = self.grid_config.grid_pullback_percent / 100.0
             price_move = abs(close - self._pullback_base_price) / self._pullback_base_price
-            any_active_unfilled = any(not o.filled and o.active_in_grid for o in self.position.orders)
             if price_move >= pullback_threshold and any_active_unfilled:
-                # Shift the entire unfilled grid to new base price
                 self._shift_grid_to_price(close)
                 self._pullback_base_price = close
 
@@ -1356,12 +1809,67 @@ class DCAEngine(BaseBacktestEngine):
             if result is not None:
                 return result
         else:
-            # Single TP check
-            if self._check_single_tp(high, low):
+            # ATR TP check (takes precedence over fixed TP when ATR mode enabled)
+            if self._atr_tp_price is not None:
+                if self.position.direction == "long" and high >= self._atr_tp_price:
+                    return self._close_position(bar_index, self._atr_tp_price, ExitReason.ATR_TP)
+                elif self.position.direction == "short" and low <= self._atr_tp_price:
+                    return self._close_position(bar_index, self._atr_tp_price, ExitReason.ATR_TP)
+            elif self._check_single_tp(high, low):
+                # Single fixed TP check (only when not in ATR mode)
                 return self._close_position(bar_index, close, ExitReason.TAKE_PROFIT)
 
-        # Check SL from BacktestConfig (stop_loss_pct = fraction, e.g. 0.015 for 1.5%)
-        if self._stop_loss_pct is not None and self._stop_loss_pct > 0 and self._check_config_stop_loss(high, low):
+        # Breakeven: activate when profit reaches threshold (use best price in bar)
+        if self._breakeven_enabled and not self._breakeven_active:
+            sl_base = self._get_sl_base_price()
+            if sl_base > 0:
+                if self.position.direction == "long":
+                    profit_pct = (high - sl_base) / sl_base
+                else:
+                    profit_pct = (sl_base - low) / sl_base
+                if profit_pct >= self._breakeven_activation_pct:
+                    self._breakeven_active = True
+                    if self.position.direction == "long":
+                        self._breakeven_sl_price = sl_base * (1.0 + self._breakeven_offset)
+                    else:
+                        self._breakeven_sl_price = sl_base * (1.0 - self._breakeven_offset)
+
+        # Trailing stop (checked before fixed SL, after breakeven activation)
+        if self._trailing_activation_pct > 0 and self._trailing_distance_pct > 0:
+            sl_base = self._get_sl_base_price()
+            if sl_base > 0:
+                if self.position.direction == "long":
+                    ts_price = self._trailing_state.update_long(
+                        high, sl_base, self._trailing_activation_pct, self._trailing_distance_pct
+                    )
+                    if ts_price is not None and low <= ts_price:
+                        exit_price = max(low, min(high, ts_price))
+                        return self._close_position(bar_index, exit_price, ExitReason.TRAILING_STOP)
+                else:
+                    ts_price = self._trailing_state.update_short(
+                        low, sl_base, self._trailing_activation_pct, self._trailing_distance_pct
+                    )
+                    if ts_price is not None and high >= ts_price:
+                        exit_price = max(low, min(high, ts_price))
+                        return self._close_position(bar_index, exit_price, ExitReason.TRAILING_STOP)
+
+        # Check SL: breakeven SL takes precedence when active, else ATR SL, else config SL
+        if self._breakeven_active and self._breakeven_sl_price > 0:
+            if self.position.direction == "long" and low <= self._breakeven_sl_price:
+                exit_price = max(low, min(high, self._breakeven_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.BREAKEVEN_SL)
+            if self.position.direction == "short" and high >= self._breakeven_sl_price:
+                exit_price = max(low, min(high, self._breakeven_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.BREAKEVEN_SL)
+        elif self._atr_sl_price is not None:
+            # ATR-based SL
+            if self.position.direction == "long" and low <= self._atr_sl_price:
+                exit_price = max(low, min(high, self._atr_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.ATR_SL)
+            elif self.position.direction == "short" and high >= self._atr_sl_price:
+                exit_price = max(low, min(high, self._atr_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.ATR_SL)
+        elif self._stop_loss_pct is not None and self._stop_loss_pct > 0 and self._check_config_stop_loss(high, low):
             return self._close_position(bar_index, close, ExitReason.STOP_LOSS)
 
         # Return current realized equity; unrealized PnL will be added in the main loop
@@ -1397,6 +1905,23 @@ class DCAEngine(BaseBacktestEngine):
         self.total_orders_filled += 1
         # Track how many grid orders have been filled in this position (entry=1, first DCA=2, ...)
         self.position.orders_filled_count += 1
+
+        # Recalculate ATR-based TP/SL prices based on updated average entry price
+        if self._atr_enabled and self._atr_values is not None and self.position.total_size_coins > 0:
+            atr_bar = min(bar_index, len(self._atr_values) - 1)
+            atr = float(self._atr_values[atr_bar])
+            if atr > 0:
+                avg = self.position.average_entry_price
+                if self.position.direction == "long":
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = avg + atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = avg - atr * self._atr_sl_multiplier
+                else:
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = avg - atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = avg + atr * self._atr_sl_multiplier
 
         # Partial grid: after filling an order, activate the next unfilled N orders
         partial = max(1, self.grid_config.partial_grid_orders)
@@ -1529,9 +2054,125 @@ class DCAEngine(BaseBacktestEngine):
             return high >= sl_price
 
     def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> float | None:
-        """Check multi-level take profits and execute partial closes."""
-        # Not implemented yet - placeholder
-        return None
+        """Check multi-level take profits and execute partial closes.
+
+        Returns realized equity after last partial/full close, or None if no TP triggered.
+        """
+        mtp = self.multi_tp
+        pos = self.position
+        direction = pos.direction
+
+        # Build TP levels: (tp_pct_decimal, tp_close_pct_of_original, level_index)
+        tp_levels = [
+            (mtp.tp1_percent / 100.0, mtp.tp1_close_percent),
+            (mtp.tp2_percent / 100.0, mtp.tp2_close_percent),
+            (mtp.tp3_percent / 100.0, mtp.tp3_close_percent),
+            (mtp.tp4_percent / 100.0, mtp.tp4_close_percent),
+        ]
+        n_levels = min(mtp.tp_count, 4)
+
+        any_triggered = False
+        for idx in range(n_levels):
+            if pos.tp_hit[idx]:
+                continue  # already hit
+
+            tp_pct, close_pct_of_original = tp_levels[idx]
+            avg = pos.average_entry_price
+            if avg <= 0:
+                continue
+
+            # Calculate TP price
+            if direction == "long":
+                tp_price = avg * (1 + tp_pct)
+                tp_hit = high >= tp_price
+            else:
+                tp_price = avg * (1 - tp_pct)
+                tp_hit = low <= tp_price
+
+            if not tp_hit:
+                continue
+
+            pos.tp_hit[idx] = True
+            any_triggered = True
+
+            # Determine if this is the last level (or close_remaining_at_last applies)
+            is_last = idx == n_levels - 1
+            remaining_after = pos.remaining_size_percent - close_pct_of_original
+            is_last_or_empty = is_last or (mtp.close_remaining_at_last and remaining_after <= 0.0)
+
+            if is_last_or_empty:
+                # Full close of remaining position
+                return self._close_position(bar_index, tp_price, ExitReason.TAKE_PROFIT)
+            else:
+                # Partial close: close_pct_of_original% of the original position
+                # fraction of CURRENT remaining = close_pct_of_original / remaining_size_percent
+                if pos.remaining_size_percent > 0:
+                    fraction = min(close_pct_of_original / pos.remaining_size_percent, 1.0)
+                    self._partial_close_position(bar_index, tp_price, fraction)
+                    pos.remaining_size_percent = max(0.0, remaining_after)
+
+        return self._realized_equity if any_triggered else None
+
+    def _partial_close_position(self, bar_index: int, exit_price: float, fraction: float) -> None:
+        """Close a fraction of the current position and record a partial trade.
+
+        Args:
+            bar_index: Current bar index
+            exit_price: Price at which to close the partial position
+            fraction: Fraction of the CURRENT remaining position to close (0.0–1.0)
+        """
+        if not self.position.is_open or fraction <= 0:
+            return
+
+        fraction = min(fraction, 1.0)
+        pos = self.position
+
+        # Coins and notional being closed
+        coins_to_close = pos.total_size_coins * fraction
+        notional_to_close = pos.total_notional_usd * fraction  # entry notional fraction
+        cost_to_close = pos.total_cost_usd * fraction  # margin fraction
+
+        # Gross PnL for this portion
+        if pos.direction == "long":
+            pnl_gross = (exit_price - pos.average_entry_price) * coins_to_close
+        else:
+            pnl_gross = (pos.average_entry_price - exit_price) * coins_to_close
+
+        # Commission: entry + exit (both as taker fee on notional)
+        entry_commission = notional_to_close * self._taker_fee
+        exit_commission = exit_price * coins_to_close * self._taker_fee
+        total_commission = entry_commission + exit_commission
+        pnl_net = pnl_gross - total_commission
+
+        # Record partial trade
+        trade = DCATradeRecord(
+            entry_bar_idx=pos.entry_bar,
+            exit_bar_idx=bar_index,
+            entry_price=pos.average_entry_price,
+            exit_price=exit_price,
+            direction=TradeDirection.LONG if pos.direction == "long" else TradeDirection.SHORT,
+            position_size=coins_to_close,
+            pnl=pnl_net,
+            pnl_pct=(pnl_net / cost_to_close * 100) if cost_to_close > 0 else 0.0,
+            exit_reason=ExitReason.TAKE_PROFIT,
+            commission=total_commission,
+            mfe=pos.max_favorable_excursion,
+            mae=pos.max_adverse_excursion,
+            bars_held=bar_index - pos.entry_bar,
+            orders_filled_count=pos.orders_filled_count,
+            avg_entry_price=pos.average_entry_price,
+            total_size_usd=notional_to_close,
+            total_size_coins=coins_to_close,
+        )
+        self.trades.append(trade)
+
+        # Update realized equity
+        self._realized_equity += pnl_net
+
+        # Reduce position size (remaining fraction stays open)
+        pos.total_size_coins *= (1.0 - fraction)
+        pos.total_cost_usd *= (1.0 - fraction)
+        pos.total_notional_usd *= (1.0 - fraction)
 
     # =========================================================================
     # CLOSE CONDITIONS (Session 5.5)
@@ -1561,7 +2202,7 @@ class DCAEngine(BaseBacktestEngine):
 
         # RSI Close
         if cc.rsi_close_enable and self._rsi_cache is not None and self._check_rsi_close(bar_index, profit_percent):
-            return ExitReason.SIGNAL
+            return ExitReason.RSI_CLOSE
 
         # Stochastic Close
         if (
@@ -1569,11 +2210,11 @@ class DCAEngine(BaseBacktestEngine):
             and self._stoch_k_cache is not None
             and self._check_stoch_close(bar_index, profit_percent)
         ):
-            return ExitReason.SIGNAL
+            return ExitReason.STOCH_CLOSE
 
         # Channel Close
         if cc.channel_close_enable and self._check_channel_close(bar_index, close, profit_percent):
-            return ExitReason.SIGNAL
+            return ExitReason.CHANNEL_CLOSE
 
         # MA Close
         if (
@@ -1582,7 +2223,7 @@ class DCAEngine(BaseBacktestEngine):
             and self._ma2_cache is not None
             and self._check_ma_close(bar_index, profit_percent)
         ):
-            return ExitReason.SIGNAL
+            return ExitReason.MA_CLOSE
 
         # PSAR Close
         if (
@@ -1590,7 +2231,7 @@ class DCAEngine(BaseBacktestEngine):
             and self._psar_cache is not None
             and self._check_psar_close(bar_index, close, profit_percent)
         ):
-            return ExitReason.SIGNAL
+            return ExitReason.PSAR_CLOSE
 
         return None
 
@@ -1730,8 +2371,51 @@ class DCAEngine(BaseBacktestEngine):
             # Close short when price crosses above PSAR
             return close > psar
 
+    def _extract_close_indicator_cache(self) -> dict:
+        """Extract current close-condition indicator caches as a plain dict.
+
+        Call this *after* ``_precompute_close_condition_indicators`` to snapshot
+        the computed arrays so they can be re-injected into other DCAEngine
+        instances (e.g. during grid-search where OHLCV never changes).
+
+        Returns:
+            Dict with cache arrays (values may be None if indicator is disabled).
+        """
+        return {
+            "_rsi_cache": self._rsi_cache,
+            "_stoch_k_cache": self._stoch_k_cache,
+            "_stoch_d_cache": self._stoch_d_cache,
+            "_ma1_cache": self._ma1_cache,
+            "_ma2_cache": self._ma2_cache,
+            "_psar_cache": self._psar_cache,
+            "_bb_upper_cache": self._bb_upper_cache,
+            "_bb_lower_cache": self._bb_lower_cache,
+            "_keltner_upper_cache": self._keltner_upper_cache,
+            "_keltner_lower_cache": self._keltner_lower_cache,
+        }
+
+    def _inject_close_indicator_cache(self, cache: dict) -> None:
+        """Inject pre-computed close-condition indicator caches.
+
+        Allows the optimization loop to compute indicators once and reuse
+        them across all trials that share the same OHLCV and close_conditions.
+        When this is called, ``_precompute_close_condition_indicators`` will be
+        skipped inside ``run_from_config`` (the flag is set here).
+
+        Args:
+            cache: Dict returned by ``_extract_close_indicator_cache``.
+        """
+        for attr, value in cache.items():
+            setattr(self, attr, value)
+        # Signal that pre-computation is already done — skip it in run_from_config
+        self._close_indicators_precomputed = True
+
     def _precompute_close_condition_indicators(self, df: pd.DataFrame) -> None:
         """Pre-compute all indicators needed for close conditions."""
+        # Fast path: already injected from cache (optimization loop)
+        if getattr(self, "_close_indicators_precomputed", False):
+            return
+
         cc = self.close_conditions
         close = df["close"].values
         high = df["high"].values
@@ -2026,7 +2710,9 @@ class DCAEngine(BaseBacktestEngine):
         _sl_price: float | None = None
         if self._take_profit_pct and self._take_profit_pct > 0 and _avg_p > 0:
             _tp_price = _avg_p * (1 + self._take_profit_pct) if _is_long else _avg_p * (1 - self._take_profit_pct)
-        if self._stop_loss_pct and self._stop_loss_pct > 0 and _avg_p > 0:
+        if self._breakeven_active and self._breakeven_sl_price > 0:
+            _sl_price = self._breakeven_sl_price
+        elif self._stop_loss_pct and self._stop_loss_pct > 0 and _avg_p > 0:
             # SL reference price depends on _sl_type: average_entry_price or last filled order
             _sl_base = self._get_sl_base_price()
             _sl_price = _sl_base * (1 - self._stop_loss_pct) if _is_long else _sl_base * (1 + self._stop_loss_pct)
@@ -2061,8 +2747,11 @@ class DCAEngine(BaseBacktestEngine):
         # Update realized equity: add net PnL (commission already deducted)
         self._realized_equity += pnl_net
 
-        # Reset position
+        # Reset position and per-position state
         self.position = DCAPosition()
+        self._trailing_state.reset()
+        self._atr_tp_price = None
+        self._atr_sl_price = None
 
         return self._realized_equity
 

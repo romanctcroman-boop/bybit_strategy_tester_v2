@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -153,7 +153,7 @@ class PromptsMonitor:
 
             prompt_logger = PromptLogger(db_path=self.config.log_db_path)
 
-            end_date = datetime.utcnow()
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(hours=period_hours)
 
             logs = prompt_logger.search_logs(start_date=start_date, end_date=end_date, limit=10000)
@@ -272,7 +272,7 @@ class PromptsMonitor:
 
             prompt_logger = PromptLogger(db_path=self.config.log_db_path)
 
-            end_date = datetime.utcnow()
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(hours=period_hours)
 
             logs = prompt_logger.search_logs(start_date=start_date, end_date=end_date, limit=10000)
@@ -341,7 +341,7 @@ class PromptsMonitor:
             trends: list[dict[str, Any]] = []
 
             for i in range(intervals):
-                end_date = datetime.utcnow() - timedelta(hours=i * interval_hours)
+                end_date = datetime.now(UTC) - timedelta(hours=i * interval_hours)
                 start_date = end_date - timedelta(hours=interval_hours)
 
                 logs = prompt_logger.search_logs(start_date=start_date, end_date=end_date, limit=1000)
@@ -376,7 +376,7 @@ class PromptsMonitor:
         cost = self.get_cost_breakdown(period_hours)
 
         return DashboardMetrics(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             period_hours=period_hours,
             # Validation
             total_prompts=validation.get("total_prompts", 0),

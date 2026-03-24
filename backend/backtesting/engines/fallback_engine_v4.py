@@ -2922,7 +2922,13 @@ class FallbackEngineV4(BaseBacktestEngine):
         # Pass candles.index so monthly Sharpe/Sortino can be computed (TV-parity).
         # equity_curve has 1 + warmup_bars + n entries; candles.index has n entries.
         # Trim equity to last n values so lengths match.
-        equity_for_metrics = equity_curve[len(equity_curve) - n :] if len(equity_curve) > n else equity_curve
+        equity_for_metrics = equity_curve[-n:]
+        if len(equity_for_metrics) != n:
+            logger.warning(
+                "equity_curve length mismatch after trim: got %d, expected %d — metrics may be misaligned",
+                len(equity_for_metrics),
+                n,
+            )
         metrics = self._calculate_metrics(trades, equity_for_metrics, capital, candles_index=candles.index)
 
         execution_time = time.time() - start_time

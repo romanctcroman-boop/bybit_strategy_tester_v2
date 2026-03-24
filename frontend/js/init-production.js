@@ -13,16 +13,16 @@
  */
 
 (function () {
-  "use strict";
+  'use strict';
 
   // ============================================
   // ENVIRONMENT DETECTION
   // ============================================
 
   const isProduction =
-    window.location.hostname !== "localhost" &&
-    window.location.hostname !== "127.0.0.1" &&
-    !window.location.hostname.includes(".local");
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1' &&
+    !window.location.hostname.includes('.local');
 
   const isDevelopment = !isProduction;
 
@@ -30,7 +30,7 @@
   window.__ENV__ = {
     production: isProduction,
     development: isDevelopment,
-    debug: isDevelopment,
+    debug: isDevelopment
   };
 
   // ============================================
@@ -44,7 +44,7 @@
       debug: console.debug,
       info: console.info,
       warn: console.warn,
-      error: console.error,
+      error: console.error
     };
 
     // Replace with filtered versions
@@ -65,8 +65,8 @@
       // Only show if first arg is marked as important
       if (
         args[0] &&
-        typeof args[0] === "string" &&
-        args[0].startsWith("[IMPORTANT]")
+        typeof args[0] === 'string' &&
+        args[0].startsWith('[IMPORTANT]')
       ) {
         originalConsole.warn.apply(console, args);
       }
@@ -85,9 +85,9 @@
         console.info = originalConsole.info;
         console.warn = originalConsole.warn;
         console.error = originalConsole.error;
-        console.log("[DEBUG] Console restored for debugging");
+        console.log('[DEBUG] Console restored for debugging');
       },
-      log: originalConsole.log,
+      log: originalConsole.log
     };
   }
 
@@ -100,12 +100,12 @@
     if (isProduction) {
       // In production, send to error tracking service
       // TODO: Integrate with Sentry/LogRocket
-      console.error("[ERROR]", {
+      console.error('[ERROR]', {
         message: message,
         source: source,
         line: lineno,
         column: colno,
-        stack: error ? error.stack : null,
+        stack: error ? error.stack : null
       });
     }
 
@@ -114,7 +114,7 @@
   };
 
   window.onunhandledrejection = function (event) {
-    console.error("[UNHANDLED PROMISE]", event.reason);
+    console.error('[UNHANDLED PROMISE]', event.reason);
   };
 
   // ============================================
@@ -154,7 +154,7 @@
           didTimeout: false,
           timeRemaining: function () {
             return Math.max(0, 50 - (Date.now() - start));
-          },
+          }
         });
       }, 1);
     };
@@ -170,7 +170,7 @@
   // ============================================
 
   if (isDevelopment) {
-    console.log("[INIT] Development mode enabled");
-    console.log("[INIT] Console logging: ENABLED");
+    console.log('[INIT] Development mode enabled');
+    console.log('[INIT] Console logging: ENABLED');
   }
 })();

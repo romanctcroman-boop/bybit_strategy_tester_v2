@@ -66,7 +66,7 @@ from backend.agents.consensus.perplexity_integration import (
     AgentSignal,
     get_perplexity_integration,
 )
-from backend.agents.llm.connections import (
+from backend.agents.llm import (
     DeepSeekClient,
     LLMConfig,
     LLMMessage,

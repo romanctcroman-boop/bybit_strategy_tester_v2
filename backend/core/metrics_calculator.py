@@ -1034,7 +1034,9 @@ class MetricsCalculator:
             metrics.recovery_factor = net_profit / metrics.max_drawdown_value
         else:
             net_profit = final_capital - initial_capital
-            metrics.recovery_factor = float("inf") if net_profit > 0 else 0.0
+            # No drawdown: recovery_factor is undefined; use 999.0 as "perfect" proxy.
+            # float("inf") is not JSON-serializable and causes crashes downstream.
+            metrics.recovery_factor = 999.0 if net_profit > 0 else 0.0
 
         # Margin Efficiency
         if margin_used > 0:

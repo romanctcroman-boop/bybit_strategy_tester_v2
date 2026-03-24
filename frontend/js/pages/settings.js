@@ -1,9 +1,9 @@
 /**
  * 📄 Settings Page JavaScript
- * 
+ *
  * Page-specific scripts for settings.html
  * Extracted during Phase 1 Week 3: JS Extraction
- * 
+ *
  * @version 1.0.0
  * @date 2025-12-21
  */
@@ -17,7 +17,7 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
             item.addEventListener('click', () => {
                 document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
                 document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
-                
+
                 item.classList.add('active');
                 document.getElementById(`${item.dataset.section}-section`).classList.add('active');
             });
@@ -38,7 +38,7 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
         function toggleApiKeyVisibility() {
             const display = document.getElementById('apiKeyDisplay');
             const icon = event.currentTarget.querySelector('i');
-            
+
             if (display.textContent.includes('•')) {
                 display.textContent = 'ABC123XYZ789...';
                 icon.className = 'bi bi-eye-slash';

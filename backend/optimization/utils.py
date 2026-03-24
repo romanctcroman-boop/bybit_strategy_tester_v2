@@ -57,7 +57,7 @@ def build_backtest_input(
 
     # Position sizing: fixed amount or percentage
     use_fixed = request_params.get("use_fixed_amount", False)
-    pos_size = 0.1 if use_fixed else 1.0
+    pos_size = request_params.get("fixed_amount", 100.0) if use_fixed else request_params.get("position_size", 1.0)
 
     return BacktestInput(
         candles=candles,
@@ -78,7 +78,7 @@ def build_backtest_input(
         direction=trade_direction,
         taker_fee=request_params["commission"],
         maker_fee=request_params["commission"],
-        slippage=0.0005,
+        slippage=request_params.get("slippage", 0.0005),
         use_bar_magnifier=False,
         max_drawdown_limit=0.0,
         pyramiding=request_params.get("pyramiding", 1),

@@ -178,18 +178,24 @@ def get_engine(
         logger.info("🎯 Using FallbackEngineV4 for SINGLE BACKTEST (reference implementation)")
         return FallbackEngineV4()
 
-    # === DEPRECATED ENGINES (backward compatibility) ===
+    # === DEPRECATED ENGINES — redirected to FallbackEngineV4 ===
+    # FallbackEngineV2 and V3 are no longer routed. All requests silently upgrade to V4.
+    # The engine files are kept for historical reference only.
     if engine_type == "fallback_v3":
-        from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
-
-        logger.warning("⚠️ FallbackEngineV3 is DEPRECATED. Use 'single' or 'fallback' instead.")
-        return FallbackEngineV3()
+        logger.warning(
+            "⚠️ FallbackEngineV3 is DEPRECATED and no longer used. "
+            "Redirecting to FallbackEngineV4 (gold standard). "
+            "Update your code to use engine_type='fallback' or 'single'."
+        )
+        return FallbackEngineV4()
 
     if engine_type == "fallback_v2":
-        from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-
-        logger.warning("⚠️ FallbackEngineV2 is DEPRECATED. Use 'single' or 'fallback' instead.")
-        return FallbackEngineV2()
+        logger.warning(
+            "⚠️ FallbackEngineV2 is DEPRECATED and no longer used. "
+            "Redirecting to FallbackEngineV4 (gold standard). "
+            "Update your code to use engine_type='fallback' or 'single'."
+        )
+        return FallbackEngineV4()
 
     # === DCA/GRID ENGINE (specialized for DCA strategies) ===
     if engine_type in ("dca", "grid", "dca_grid"):

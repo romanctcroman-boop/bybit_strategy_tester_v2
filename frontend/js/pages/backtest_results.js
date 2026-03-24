@@ -2775,9 +2775,9 @@ function renderResultsList(results) {
         : (_st > 0 && _lt === 0)
           ? 'short'
           : (r.config?.direction ||
-             r.config?.strategy_params?._direction ||
-             r.direction ||
-             'both');
+            r.config?.strategy_params?._direction ||
+            r.direction ||
+            'both');
       let directionBadge = '';
       if (direction === 'long') {
         directionBadge =
@@ -3193,7 +3193,6 @@ function updateCharts(backtest) {
       // Normalise equity_curve to parallel arrays
       const timestamps = isArray ? ec.map((p) => p.timestamp) : (ec.timestamps || []);
       const equityArr = isArray ? ec.map((p) => p.equity) : (ec.equity || []);
-      const bhEquityArr = isArray ? [] : (ec.bh_equity || []);
       const drawdownArr = isArray ? ec.map((p) => p.drawdown || 0) : (ec.drawdown || []);
 
       // initial_capital: prefer config > metrics > first equity point
@@ -3202,6 +3201,34 @@ function updateCharts(backtest) {
         backtest.metrics?.initial_capital ||
         equityArr[0] ||
         10000;
+
+      // Buy & Hold equity: try ec.bh_equity first, then reconstruct from klines or metrics
+      let bhEquityArr = isArray ? [] : (ec.bh_equity || []);
+      if (!bhEquityArr.length && timestamps.length) {
+        if (backtest.klines && backtest.klines.length > 0) {
+          // Build BH equity from kline close prices scaled to initialCapital
+          const klines = backtest.klines;
+          const firstClose = klines[0]?.close || 1;
+          // Map klines to timestamps-aligned bh_equity using simple linear interpolation
+          // by matching kline timestamps to equity timestamps
+          const klMap = new Map(klines.map((k) => [k.timestamp ?? k.time, k.close]));
+          bhEquityArr = timestamps.map((ts) => {
+            const close = klMap.get(ts);
+            if (close != null) return initialCapital * (close / firstClose);
+            return null;
+          });
+          // Fill nulls by forward-fill
+          let last = initialCapital;
+          bhEquityArr = bhEquityArr.map((v) => { if (v != null) { last = v; return v; } return last; });
+        } else if (backtest.metrics?.buy_hold_return_pct != null) {
+          // Linear ramp from 0 to buy_hold_return_pct
+          const bhReturn = backtest.metrics.buy_hold_return_pct / 100;
+          bhEquityArr = timestamps.map((_, i) => {
+            const progress = timestamps.length > 1 ? i / (timestamps.length - 1) : 1;
+            return initialCapital * (1 + bhReturn * progress);
+          });
+        }
+      }
 
       // Normalise trades for TradingViewEquityChart
       const trades = (backtest.trades || []).map((t) => ({

@@ -20,7 +20,7 @@ import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -106,7 +106,7 @@ class Task:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict."""
@@ -465,7 +465,7 @@ class AgentOrchestrator:
 
         # Update task
         task.assigned_agent = agent
-        task.started_at = datetime.utcnow().isoformat()
+        task.started_at = datetime.now(UTC).isoformat()
         self._active_tasks[task.task_id] = task
 
         start_time = time.time()
@@ -508,7 +508,7 @@ class AgentOrchestrator:
         response_time = time.time() - start_time
 
         # Update task
-        task.completed_at = datetime.utcnow().isoformat()
+        task.completed_at = datetime.now(UTC).isoformat()
         task.result = result
         task.error = error
 
@@ -626,7 +626,7 @@ class AgentOrchestrator:
         perf.avg_response_time = (perf.avg_response_time * (perf.total_tasks - 1) + response_time) / perf.total_tasks
 
         perf.total_cost_usd += cost_usd
-        perf.last_used = datetime.utcnow().isoformat()
+        perf.last_used = datetime.now(UTC).isoformat()
 
     def _calculate_consensus_score(
         self,

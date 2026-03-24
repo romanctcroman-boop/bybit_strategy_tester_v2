@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 📄 Strategy Builder Page JavaScript
  *
  * Page-specific scripts for strategy_builder.html
@@ -12,12 +12,13 @@
 /* eslint-disable indent */
 
 // Import advanced blocks (P2-6)
-import { createMLBlocksModule } from '../components/MLBlocksModule.js';
-import { createSentimentBlocksModule } from '../components/SentimentBlocksModule.js';
-import { createOrderFlowBlocksModule } from '../components/OrderFlowBlocksModule.js';
+import { createMLBlocksModule as _createMLBlocksModule } from '../components/MLBlocksModule.js';
+import { createSentimentBlocksModule as _createSentimentBlocksModule } from '../components/SentimentBlocksModule.js';
+import { createOrderFlowBlocksModule as _createOrderFlowBlocksModule } from '../components/OrderFlowBlocksModule.js';
 import { formatDate, debounce } from '../utils.js';
 import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
-import { localDateStr } from '../utils/dateUtils.js';
+import { blockLibrary } from '../strategy_builder/blockLibrary.js';
+import { createSymbolSyncModule } from '../strategy_builder/SymbolSyncModule.js';
 
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
@@ -52,6 +53,9 @@ console.log('%c[Strategy Builder] v20260225f LOADED — modal branch active', 'c
 
 // Forward declaration for checkSymbolDataForProperties (initialized later after runCheckSymbolDataForProperties is defined)
 let checkSymbolDataForProperties = null;
+
+/** SymbolSyncModule singleton — initialized in initializeStrategyBuilder(). */
+let symbolSync = null;
 
 // Global loading indicator functions
 function showGlobalLoading(text = 'Loading...') {
@@ -123,458 +127,6 @@ function enableWheelScrollForNumberInputs(container) {
   });
 }
 
-// Block Library Data
-const blockLibrary = {
-  indicators: [
-    // Universal indicator blocks (integrated with AI agents — do not remove)
-    { id: 'rsi', name: 'RSI', desc: 'Relative Strength Index (0-100)', icon: 'graph-up' },
-    { id: 'stochastic', name: 'Stochastic', desc: 'Stochastic (Range Filter + Cross Signal + K/D Cross)', icon: 'percent' },
-    { id: 'macd', name: 'MACD', desc: 'Moving Average Convergence Divergence', icon: 'bar-chart' },
-    { id: 'supertrend', name: 'Supertrend', desc: 'Trend following indicator', icon: 'arrow-up-right-circle' },
-    { id: 'qqe', name: 'QQE', desc: 'Quantitative Qualitative Estimation', icon: 'activity' },
-    // Universal filters (integrated with AI agents — do not remove)
-    { id: 'atr_volatility', name: 'ATR Volatility', desc: 'ATR Volatility Filter (ATR1 <> ATR2)', icon: 'arrows-expand' },
-    { id: 'volume_filter', name: 'Volume Filter', desc: 'Volume Filter (VOL1 <> VOL2)', icon: 'bar-chart-steps' },
-    { id: 'highest_lowest_bar', name: 'Highest/Lowest Bar', desc: 'Signal on Highest/Lowest Bar + Block if Worse Than', icon: 'arrow-up-short' },
-    { id: 'two_mas', name: 'TWO MAs', desc: 'Two Moving Averages (Signal + Filter)', icon: 'graph-up-arrow' },
-    { id: 'accumulation_areas', name: 'Accumulation Areas', desc: 'Accumulation Areas Filter or Signal', icon: 'layers' },
-    { id: 'keltner_bollinger', name: 'Keltner/Bollinger Channel', desc: 'Keltner Channel / Bollinger Bands Filter', icon: 'border-outer' },
-    { id: 'rvi_filter', name: 'RVI', desc: 'Relative Volatility Index Filter', icon: 'speedometer' },
-    { id: 'mfi_filter', name: 'MFI', desc: 'Money Flow Index Filter', icon: 'currency-exchange' },
-    { id: 'cci_filter', name: 'CCI', desc: 'Commodity Channel Index Filter', icon: 'reception-4' },
-    { id: 'momentum_filter', name: 'Momentum', desc: 'Momentum Filter', icon: 'rocket-takeoff' }
-  ],
-  // (Filters category removed — entire block deprecated)
-  conditions: [
-    {
-      id: 'crossover',
-      name: 'Crossover',
-      desc: 'When value A crosses above B',
-      icon: 'intersect'
-    },
-    {
-      id: 'crossunder',
-      name: 'Crossunder',
-      desc: 'When value A crosses below B',
-      icon: 'intersect'
-    },
-    {
-      id: 'greater_than',
-      name: 'Greater Than',
-      desc: 'When value A > B',
-      icon: 'chevron-double-up'
-    },
-    {
-      id: 'less_than',
-      name: 'Less Than',
-      desc: 'When value A < B',
-      icon: 'chevron-double-down'
-    },
-    {
-      id: 'equals',
-      name: 'Equals',
-      desc: 'When value A equals B',
-      icon: 'dash'
-    },
-    {
-      id: 'between',
-      name: 'Between',
-      desc: 'When value is in range',
-      icon: 'arrows-collapse'
-    }
-  ],
-  entry_mgmt: [
-    {
-      id: 'dca',
-      name: 'DCA',
-      desc: 'Dollar Cost Averaging',
-      icon: 'grid-3x3'
-    },
-    {
-      id: 'grid_orders',
-      name: 'Manual Grid',
-      desc: 'Custom offset & volume per order',
-      icon: 'grid'
-    }
-  ],
-  // Exits: Standard exit rules (SL/TP, trailing, ATR, session, DCA close)
-  exits: [
-    {
-      id: 'static_sltp',
-      name: 'Static SL/TP',
-      desc: 'Auto % SL/TP from entry price',
-      icon: 'shield-check'
-    },
-    {
-      id: 'trailing_stop_exit',
-      name: 'Trailing Stop',
-      desc: 'Auto trailing % from entry',
-      icon: 'arrow-bar-down'
-    },
-    {
-      id: 'atr_exit',
-      name: 'ATR Exit',
-      desc: 'Auto ATR-based SL/TP',
-      icon: 'arrows-expand'
-    },
-    {
-      id: 'multi_tp_exit',
-      name: 'Multi TP Levels',
-      desc: 'TP1/TP2/TP3 with % allocation',
-      icon: 'stack'
-    }
-  ],
-  // Close Conditions: Indicator-based close rules with profit filter (TradingView-style)
-  close_conditions: [
-    {
-      id: 'close_by_time',
-      name: 'Close by Time',
-      desc: 'Close after N bars since entry',
-      icon: 'clock'
-    },
-    {
-      id: 'close_channel',
-      name: 'Channel Close (Keltner/BB)',
-      desc: 'Close on Keltner/Bollinger band touch',
-      icon: 'bar-chart'
-    },
-    {
-      id: 'close_ma_cross',
-      name: 'Two MAs Close',
-      desc: 'Close on MA1/MA2 cross',
-      icon: 'trending-up'
-    },
-    {
-      id: 'close_rsi',
-      name: 'Close by RSI',
-      desc: 'Close on RSI reach/cross level',
-      icon: 'activity'
-    },
-    {
-      id: 'close_stochastic',
-      name: 'Close by Stochastic',
-      desc: 'Close on Stoch reach/cross level',
-      icon: 'activity'
-    },
-    {
-      id: 'close_psar',
-      name: 'Close by Parabolic SAR',
-      desc: 'Close on PSAR signal reversal',
-      icon: 'git-commit'
-    }
-  ],
-  // Divergence Detection — unified multi-indicator divergence signal block
-  divergence: [
-    {
-      id: 'divergence',
-      name: 'Divergence',
-      desc: 'Multi-indicator divergence detection (RSI, Stochastic, Momentum, CMF, OBV, MFI)',
-      icon: 'arrow-left-right'
-    }
-  ],
-  // Logic Gates — combine multiple condition signals
-  logic: [
-    {
-      id: 'and',
-      name: 'AND',
-      desc: 'All inputs must be true (combine signals)',
-      icon: 'diagram-3'
-    },
-    {
-      id: 'or',
-      name: 'OR',
-      desc: 'Any input must be true (alternative signals)',
-      icon: 'diagram-2'
-    },
-    {
-      id: 'not',
-      name: 'NOT',
-      desc: 'Invert signal (true → false)',
-      icon: 'x-circle'
-    }
-  ]
-
-  // (Smart Signals category removed — all composite nodes deprecated in favor of universal indicator blocks)
-};
-
-// Strategy Templates - EXPANDED
-const templates = [
-  // =============================================
-  // MEAN REVERSION STRATEGIES
-  // =============================================
-  {
-    id: 'rsi_oversold',
-    name: 'RSI Cross Level',
-    desc: 'Long when RSI crosses up through 30, short when crosses down through 70',
-    icon: 'graph-up',
-    iconColor: 'var(--accent-blue)',
-    blocks: 2,
-    connections: 4,
-    category: 'Mean Reversion',
-    difficulty: 'Beginner',
-    expectedWinRate: '45-55%'
-  },
-  {
-    id: 'rsi_long_short',
-    name: 'RSI Range Filter',
-    desc: 'Long when RSI in low range (1-30), Short when RSI in high range (70-100)',
-    icon: 'arrow-up-down',
-    iconColor: 'var(--accent-green)',
-    blocks: 2,
-    connections: 4,
-    category: 'Mean Reversion',
-    difficulty: 'Beginner',
-    expectedWinRate: '40-50%'
-  },
-  {
-    id: 'bollinger_bounce',
-    name: 'Bollinger Bounce',
-    desc: 'Trade bounces off Bollinger Band boundaries',
-    icon: 'distribute-vertical',
-    iconColor: 'var(--accent-yellow)',
-    blocks: 5,
-    connections: 8,
-    category: 'Mean Reversion',
-    difficulty: 'Intermediate',
-    expectedWinRate: '50-60%'
-  },
-  {
-    id: 'stochastic_oversold',
-    name: 'Stochastic Reversal',
-    desc: 'Trade oversold/overbought with K/D crossover confirmation',
-    icon: 'percent',
-    iconColor: 'var(--accent-cyan)',
-    blocks: 10,
-    connections: 16,
-    category: 'Mean Reversion',
-    difficulty: 'Intermediate',
-    expectedWinRate: '45-55%'
-  },
-
-  // =============================================
-  // TREND FOLLOWING STRATEGIES
-  // =============================================
-  {
-    id: 'macd_crossover',
-    name: 'MACD Crossover',
-    desc: 'Trade MACD line crossovers with signal line',
-    icon: 'bar-chart',
-    iconColor: 'var(--accent-purple)',
-    blocks: 4,
-    connections: 8,
-    category: 'Trend Following',
-    difficulty: 'Beginner',
-    expectedWinRate: '40-50%'
-  },
-  {
-    id: 'ema_crossover',
-    name: 'EMA Crossover',
-    desc: 'Classic dual EMA crossover strategy',
-    icon: 'graph-up-arrow',
-    iconColor: 'var(--accent-green)',
-    blocks: 5,
-    connections: 8,
-    category: 'Trend Following',
-    difficulty: 'Beginner',
-    expectedWinRate: '35-45%'
-  },
-  {
-    id: 'supertrend_follow',
-    name: 'SuperTrend Follower',
-    desc: 'Follow SuperTrend direction with ATR-based stops',
-    icon: 'arrow-up-right-circle',
-    iconColor: 'var(--accent-teal)',
-    blocks: 5,
-    connections: 8,
-    category: 'Trend Following',
-    difficulty: 'Beginner',
-    expectedWinRate: '40-50%'
-  },
-  {
-    id: 'triple_ema',
-    name: 'Triple EMA System',
-    desc: 'EMA 9/21/55 with trend confirmation',
-    icon: 'layers',
-    iconColor: 'var(--accent-indigo)',
-    blocks: 10,
-    connections: 16,
-    category: 'Trend Following',
-    difficulty: 'Intermediate',
-    expectedWinRate: '45-55%'
-  },
-  {
-    id: 'ichimoku_cloud',
-    name: 'Ichimoku Cloud Strategy',
-    desc: 'Trade with Ichimoku cloud, TK cross and Chikou confirmation',
-    icon: 'cloud',
-    iconColor: 'var(--accent-pink)',
-    blocks: 9,
-    connections: 16,
-    category: 'Trend Following',
-    difficulty: 'Advanced',
-    expectedWinRate: '50-60%'
-  },
-
-  // =============================================
-  // MOMENTUM STRATEGIES
-  // =============================================
-  {
-    id: 'breakout',
-    name: 'Breakout Strategy',
-    desc: 'Trade breakouts from consolidation ranges',
-    icon: 'arrows-expand',
-    iconColor: 'var(--accent-orange)',
-    blocks: 5,
-    connections: 8,
-    category: 'Momentum',
-    difficulty: 'Intermediate',
-    expectedWinRate: '35-45%'
-  },
-  {
-    id: 'donchian_breakout',
-    name: 'Donchian Channel Breakout',
-    desc: 'Classic turtle trading - buy 20-day high, sell 10-day low',
-    icon: 'box-arrow-up',
-    iconColor: 'var(--accent-amber)',
-    blocks: 8,
-    connections: 12,
-    category: 'Momentum',
-    difficulty: 'Intermediate',
-    expectedWinRate: '35-45%'
-  },
-  {
-    id: 'volume_breakout',
-    name: 'Volume Breakout',
-    desc: 'Enter on price breakout with volume confirmation',
-    icon: 'bar-chart-steps',
-    iconColor: 'var(--accent-lime)',
-    blocks: 11,
-    connections: 16,
-    category: 'Momentum',
-    difficulty: 'Intermediate',
-    expectedWinRate: '40-50%'
-  },
-
-  // =============================================
-  // DCA & GRID STRATEGIES
-  // =============================================
-  {
-    id: 'simple_dca',
-    name: 'Simple DCA Bot',
-    desc: 'Dollar cost averaging with safety orders on price drops',
-    icon: 'grid-3x3',
-    iconColor: 'var(--accent-blue)',
-    blocks: 6,
-    connections: 8,
-    category: 'DCA',
-    difficulty: 'Intermediate',
-    expectedWinRate: '65-75%'
-  },
-  {
-    id: 'rsi_dca',
-    name: 'RSI DCA Strategy',
-    desc: 'DCA entries only when RSI is oversold',
-    icon: 'plus-circle',
-    iconColor: 'var(--accent-green)',
-    blocks: 9,
-    connections: 12,
-    category: 'DCA',
-    difficulty: 'Intermediate',
-    expectedWinRate: '60-70%'
-  },
-  {
-    id: 'grid_trading',
-    name: 'Grid Trading Bot',
-    desc: 'Place grid of orders within price range',
-    icon: 'grid',
-    iconColor: 'var(--accent-purple)',
-    blocks: 7,
-    connections: 12,
-    category: 'Grid',
-    difficulty: 'Advanced',
-    expectedWinRate: '55-65%'
-  },
-
-  // =============================================
-  // ADVANCED / MULTI-INDICATOR
-  // =============================================
-  {
-    id: 'multi_indicator',
-    name: 'Multi-Indicator Confluence',
-    desc: 'Combine multiple indicators for confirmation',
-    icon: 'layers',
-    iconColor: 'var(--accent-red)',
-    blocks: 17,
-    connections: 24,
-    category: 'Advanced',
-    difficulty: 'Advanced',
-    expectedWinRate: '50-60%'
-  },
-  {
-    id: 'divergence_hunter',
-    name: 'Divergence Hunter',
-    desc: 'Find RSI/MACD divergences with price',
-    icon: 'arrow-left-right',
-    iconColor: 'var(--accent-violet)',
-    blocks: 12,
-    connections: 16,
-    category: 'Advanced',
-    difficulty: 'Advanced',
-    expectedWinRate: '55-65%'
-  },
-  {
-    id: 'smart_money',
-    name: 'Smart Money Concept',
-    desc: 'Trade order blocks, FVG and liquidity sweeps',
-    icon: 'bank',
-    iconColor: 'var(--accent-gold)',
-    blocks: 18,
-    connections: 24,
-    category: 'Advanced',
-    difficulty: 'Expert',
-    expectedWinRate: '50-60%'
-  },
-  {
-    id: 'scalping_pro',
-    name: 'Scalping Pro',
-    desc: 'Quick entries with tight stops on small timeframes',
-    icon: 'lightning',
-    iconColor: 'var(--accent-yellow)',
-    blocks: 17,
-    connections: 24,
-    category: 'Scalping',
-    difficulty: 'Expert',
-    expectedWinRate: '55-65%'
-  },
-
-  // =============================================
-  // VOLATILITY STRATEGIES
-  // =============================================
-  {
-    id: 'atr_breakout',
-    name: 'ATR Volatility Breakout',
-    desc: 'Enter when volatility expands beyond threshold',
-    icon: 'arrows-fullscreen',
-    iconColor: 'var(--accent-orange)',
-    blocks: 10,
-    connections: 14,
-    category: 'Volatility',
-    difficulty: 'Intermediate',
-    expectedWinRate: '40-50%'
-  },
-  {
-    id: 'bb_squeeze',
-    name: 'Bollinger Squeeze',
-    desc: 'Trade breakout after BB width contraction',
-    icon: 'arrows-collapse',
-    iconColor: 'var(--accent-cyan)',
-    blocks: 9,
-    connections: 14,
-    category: 'Volatility',
-    difficulty: 'Intermediate',
-    expectedWinRate: '45-55%'
-  }
-];
 
 // ============================================================
 // P0-3 StateManager Integration — Strategy Builder
@@ -603,8 +155,7 @@ function initializeStrategyBuilderState() {
     // Selection
     selection: {
       selectedBlockId: null,
-      selectedBlockIds: [],
-      selectedTemplate: null
+      selectedBlockIds: []
     },
     // Viewport / canvas
     viewport: {
@@ -665,8 +216,6 @@ function getSBSelectedBlockId() { const s = getStore(); return s ? s.get('strate
 function setSBSelectedBlockId(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedBlockId', v); }
 function getSBSelectedBlockIds() { const s = getStore(); return s ? s.get('strategyBuilder.selection.selectedBlockIds') ?? [] : selectedBlockIds; }
 function setSBSelectedBlockIds(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedBlockIds', v); }
-function getSBSelectedTemplate() { const s = getStore(); return s ? s.get('strategyBuilder.selection.selectedTemplate') : selectedTemplate; }
-function setSBSelectedTemplate(v) { const s = getStore(); if (s) s.set('strategyBuilder.selection.selectedTemplate', v); }
 
 // Viewport
 function getSBZoom() { const s = getStore(); return s ? s.get('strategyBuilder.viewport.zoom') ?? 1 : zoom; }
@@ -723,7 +272,6 @@ function _setupStrategyBuilderShimSync() {
   store.subscribe('strategyBuilder.graph.connections', (v) => { connections.length = 0; if (Array.isArray(v)) connections.push(...v); });
   store.subscribe('strategyBuilder.selection.selectedBlockId', (v) => { selectedBlockId = v ?? null; });
   store.subscribe('strategyBuilder.selection.selectedBlockIds', (v) => { selectedBlockIds = Array.isArray(v) ? v : []; });
-  store.subscribe('strategyBuilder.selection.selectedTemplate', (v) => { selectedTemplate = v ?? null; });
   store.subscribe('strategyBuilder.viewport.zoom', (v) => { zoom = v ?? 1; });
   store.subscribe('strategyBuilder.viewport.isDragging', (v) => { isDragging = v ?? false; });
   store.subscribe('strategyBuilder.viewport.dragOffset', (v) => { if (v) { dragOffset.x = v.x; dragOffset.y = v.y; } });
@@ -752,6 +300,8 @@ function _setupStrategyBuilderShimSync() {
 
 // State
 let strategyBlocks = [];
+// Expose to non-module scripts (optimization_config_panel.js, optimization_panels.js)
+// Note: the live StateManager getter is defined at the bottom of this file.
 const connections = [];
 // eslint-disable-next-line no-unused-vars
 const undoStack = [];  // Managed by UndoRedoModule — kept for store-subscriber compatibility
@@ -766,7 +316,6 @@ const STORAGE_KEY_PREFIX = 'strategy_builder_draft_';
 let skipNextAutoSave = false; // Flag to skip autosave after reset
 let selectedBlockId = null;
 let selectedBlockIds = []; // Multi-selection array
-let selectedTemplate = null;
 let zoom = 1;
 let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
@@ -776,6 +325,7 @@ let _aiModule = null;              // Initialized in initializeStrategyBuilder()
 let _myStrategiesModule = null;    // Initialized in initializeStrategyBuilder() via _initMyStrategiesModule()
 let _connectionsModule = null;     // Initialized in initializeStrategyBuilder() via _initConnectionsModule()
 let _undoRedoModule = null;        // Initialized in initializeStrategyBuilder() via _initUndoRedoModule()
+const _btcSyncCache = {};          // Cache for BTC source sync per node (separate from SymbolSyncModule's cache)
 let _validateModule = null;        // Initialized in initializeStrategyBuilder() via _initValidateModule()
 let _saveLoadModule = null;        // Initialized in initializeStrategyBuilder() via _initSaveLoadModule()
 
@@ -874,7 +424,7 @@ function tryLoadFromLocalStorage(strategyId) {
       data.connections.forEach(conn => {
         if (conn.source && conn.target) {
           connections.push({
-            id: conn.id || `conn_restored_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: conn.id || `conn_restored_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
             source: conn.source,
             target: conn.target,
             type: conn.type || 'data'
@@ -1051,9 +601,11 @@ function clearAllAndReset() {
 
     // Clear all blocks
     strategyBlocks.length = 0;
+    setSBBlocks(strategyBlocks);
 
     // Clear all connections
     connections.length = 0;
+    setSBConnections(connections);
 
     // Clear undo/redo history
     undoStack.length = 0;
@@ -1136,9 +688,12 @@ function resetFormToDefaults() {
   const positionSizeEl = document.getElementById('backtestPositionSize');
   if (positionSizeEl) positionSizeEl.value = '10';
 
-  // Commission
+  // Commission — default by market type (Bybit taker fees, market orders)
   const commissionEl = document.getElementById('backtestCommission');
-  if (commissionEl) commissionEl.value = '0.07';
+  if (commissionEl) {
+    const marketType = document.getElementById('builderMarketType')?.value || 'linear';
+    commissionEl.value = marketType === 'spot' ? '0.1' : '0.055';
+  }
 
   // Slippage (TV parity: 0% default)
   const slippageEl = document.getElementById('backtestSlippage');
@@ -1175,8 +730,7 @@ function resetFormToDefaults() {
 let isGroupDragging = false;
 let groupDragOffsets = {}; // blockId -> {x, y} offset from mouse
 
-/** Global refresh for "База данных" panel (set by initDunnahBasePanel, used after sync). */
-let refreshDunnahBasePanel = null;
+// refreshDunnahBasePanel — now managed internally by SymbolSyncModule.initDunnahBasePanel()
 
 // Show a dismissible banner when backend is unreachable or page opened from file
 function showBackendConnectionBanner(message) {
@@ -1268,13 +822,22 @@ function initializeStrategyBuilder() {
     console.log('[Strategy Builder] Rendering block library...');
     renderBlockLibrary();
 
-    console.log('[Strategy Builder] Rendering templates...');
-    renderTemplates();
-
     console.log('[Strategy Builder] Setting up event listeners...');
     setupEventListeners();
     syncStrategyNameDisplay();
-    initSymbolPicker();
+
+    // Initialize SymbolSyncModule (extracted Phase 5 refactor)
+    symbolSync = createSymbolSyncModule({
+      API_BASE,
+      escapeHtml,
+      showGlobalLoading,
+      hideGlobalLoading,
+      updateRunButtonsState
+    });
+    checkSymbolDataForProperties = symbolSync.checkSymbolDataForProperties;
+
+    symbolSync.initSymbolPicker();
+    symbolSync.initDunnahBasePanel();
     // Тикеры предзагружаются в initSymbolPicker — дублирующий fetchBybitSymbols здесь убран
 
     console.log('[Strategy Builder] Initializing connection system...');
@@ -1440,8 +1003,8 @@ function renderBlockLibrary() {
           ${blocks
           .map(
             (block) => `
-              <div class="block-item" 
-                   draggable="true" 
+              <div class="block-item"
+                   draggable="true"
                    data-block-id="${block.id}"
                    data-block-type="${blockCategory}">
                 <div class="block-icon ${cat.iconType}">
@@ -1488,48 +1051,6 @@ function renderBlockLibrary() {
     document.querySelectorAll('.block-category-group').length);
 }
 
-function renderTemplates() {
-  console.log('[Strategy Builder] Rendering templates, count:', templates.length);
-  const container = document.getElementById('templatesGrid');
-  if (!container) {
-    console.error('[Strategy Builder] Templates grid container not found!');
-    return;
-  }
-
-  if (templates.length === 0) {
-    console.warn('[Strategy Builder] No templates available!');
-    container.innerHTML = '<div class="text-center py-4"><p class="text-secondary">No templates available</p></div>';
-    return;
-  }
-
-  container.innerHTML = templates
-    .map(
-      (template) => `
-                <div class="template-card ${selectedTemplate === template.id ? 'selected' : ''}" 
-                     data-template-id="${template.id}">
-                    <div class="template-icon" style="background: ${template.iconColor}15; color: ${template.iconColor}">
-                        <i class="bi bi-${template.icon}"></i>
-                    </div>
-                    <div class="template-name">${template.name}</div>
-                    <div class="template-desc">${template.desc}</div>
-                    <div class="template-meta">
-                        <span><i class="bi bi-box"></i> ${template.blocks} blocks</span>
-                        <span><i class="bi bi-link"></i> ${template.connections} connections</span>
-                        <span><i class="bi bi-tag"></i> ${template.category}</span>
-                    </div>
-                </div>
-            `
-    )
-    .join('');
-
-  console.log(
-    '[Strategy Builder] Templates rendered, HTML length:',
-    container.innerHTML.length,
-    'Templates in DOM:',
-    container.querySelectorAll('.template-card').length
-  );
-}
-
 /** Синхронизирует название стратегии: шапка -> панель Properties. */
 function syncStrategyNameDisplay() {
   const nameInput = document.getElementById('strategyName');
@@ -1548,1004 +1069,11 @@ function syncStrategyNameToNavbar() {
   }
 }
 
-/** Кэш тикеров Bybit по категории (linear/spot). */
-const bybitSymbolsCache = { linear: [], spot: [] };
 
-/** Кэш символов с локальными данными в БД. */
-let localSymbolsCache = null;
+// ── SymbolSyncModule extracted to frontend/js/strategy_builder/SymbolSyncModule.js ──
+// All symbol picker, ticker data, DB panel, and SSE sync code lives there.
+// Initialized via createSymbolSyncModule() in initializeStrategyBuilder().
 
-/** Кэш тикеров с ценами и объёмами по категории. */
-const tickersDataCache = {};
-
-/** Список заблокированных тикеров (единый источник для База данных и Symbol picker). */
-let blockedSymbolsCache = null;
-
-/** Текущая сортировка для symbol picker. */
-const symbolSortConfig = { field: 'name', direction: 'asc' };
-
-/** Загрузить список заблокированных тикеров (единый источник). */
-async function fetchBlockedSymbols() {
-  try {
-    const res = await fetch('/api/v1/marketdata/symbols/blocked');
-    if (!res.ok) return new Set();
-    const data = await res.json();
-    const list = (data.symbols || []).map((s) => String(s).toUpperCase());
-    blockedSymbolsCache = new Set(list);
-    return blockedSymbolsCache;
-  } catch (e) {
-    console.error('[Strategy Builder] fetchBlockedSymbols failed:', e);
-    return blockedSymbolsCache || new Set();
-  }
-}
-
-/** Загрузить тикеры с ценами, 24h%, объёмом. */
-async function fetchTickersData(category = 'linear') {
-  const key = category === 'spot' ? 'spot' : 'linear';
-  if (tickersDataCache[key] && Object.keys(tickersDataCache[key]).length > 0) {
-    return tickersDataCache[key];
-  }
-  try {
-    const res = await fetch(`/api/v1/marketdata/tickers?category=${encodeURIComponent(key)}`);
-    if (!res.ok) {
-      console.error('[Strategy Builder] fetchTickersData not ok:', res.statusText);
-      return {};
-    }
-    const data = await res.json();
-    const map = {};
-    (data.tickers || []).forEach((t) => {
-      map[t.symbol] = t;
-    });
-    if (Object.keys(map).length > 0) tickersDataCache[key] = map;
-    console.log('[Strategy Builder] Tickers data loaded:', key, Object.keys(map).length);
-    return map;
-  } catch (e) {
-    console.error('[Strategy Builder] fetchTickersData failed:', e);
-    return {};
-  }
-}
-
-/** Загрузить список символов с локальными данными.
- *  @param {boolean} [force=false] — принудительно обновить с сервера, игнорируя кэш.
- */
-async function fetchLocalSymbols(force = false) {
-  // Return cached data if already loaded successfully and not forced
-  // Note: cache empty results too (symbols: []) to avoid unnecessary API calls after all tickers are deleted
-  if (!force && localSymbolsCache !== null && localSymbolsCache.symbols) {
-    return localSymbolsCache;
-  }
-  try {
-    const base = typeof window !== 'undefined' && window.location && window.location.origin
-      ? window.location.origin
-      : '';
-    const url = `${base}/api/v1/marketdata/symbols/local?_=${Date.now()}`;
-    const res = await fetch(url, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
-    });
-    if (!res.ok) {
-      console.error('[Strategy Builder] fetchLocalSymbols not ok:', res.statusText);
-      // Don't cache error - allow retry
-      return { symbols: [], details: {} };
-    }
-    const data = await res.json();
-    localSymbolsCache = data;
-    console.log('[Strategy Builder] Local symbols loaded:', data.symbols?.length || 0, data.symbols);
-    return localSymbolsCache;
-  } catch (e) {
-    console.error('[Strategy Builder] fetchLocalSymbols failed:', e);
-    // Don't cache error - allow retry
-    return { symbols: [], details: {} };
-  }
-}
-
-/** Загрузить список тикеров Bybit по типу рынка. */
-async function fetchBybitSymbols(category) {
-  const key = category === 'spot' ? 'spot' : 'linear';
-  console.log('[Strategy Builder] fetchBybitSymbols called, category:', key);
-  if (bybitSymbolsCache[key] && bybitSymbolsCache[key].length > 0) {
-    console.log('[Strategy Builder] Returning from cache:', bybitSymbolsCache[key].length, 'symbols');
-    return bybitSymbolsCache[key];
-  }
-  try {
-    const base = typeof window !== 'undefined' && window.location && window.location.origin
-      ? window.location.origin
-      : '';
-    const url = `${base}/api/v1/marketdata/symbols-list?category=${key}`;
-    console.log('[Strategy Builder] Fetching symbols from:', url);
-    const res = await fetch(url);
-    console.log('[Strategy Builder] Fetch response status:', res.status);
-    if (!res.ok) {
-      console.error('[Strategy Builder] Fetch not ok:', res.statusText);
-      return [];
-    }
-    const data = await res.json();
-    const list = data.symbols || [];
-    console.log('[Strategy Builder] Received symbols:', list.length, 'first 5:', list.slice(0, 5));
-    // DEBUG: Show alert with count
-    // alert(`Loaded ${list.length} symbols for ${key}`);
-    bybitSymbolsCache[key] = Array.isArray(list) ? list : [];
-    return bybitSymbolsCache[key];
-  } catch (e) {
-    console.error('[Strategy Builder] fetchBybitSymbols failed:', e);
-    return [];
-  }
-}
-
-/** Позиционировать выпадающий список по полю ввода (fixed), чтобы не обрезался sidebar overflow. */
-function positionSymbolDropdown() {
-  const input = document.getElementById('backtestSymbol');
-  const dropdown = document.getElementById('backtestSymbolDropdown');
-  if (!input || !dropdown || !dropdown.classList.contains('open')) return;
-
-  // Move dropdown to body to avoid overflow clipping issues
-  if (dropdown.parentElement !== document.body) {
-    document.body.appendChild(dropdown);
-  }
-
-  const rect = input.getBoundingClientRect();
-  const maxH = Math.min(400, window.innerHeight - rect.bottom - 24);
-
-  // Calculate optimal width and position
-  const dropdownWidth = 520; // Fixed width for table columns
-  let leftPos = rect.left;
-
-  // Prevent dropdown from going off-screen to the right
-  if (leftPos + dropdownWidth > window.innerWidth - 20) {
-    leftPos = window.innerWidth - dropdownWidth - 20;
-  }
-  // Prevent going off-screen to the left
-  if (leftPos < 10) {
-    leftPos = 10;
-  }
-
-  dropdown.style.position = 'fixed';
-  dropdown.style.left = `${leftPos}px`;
-  dropdown.style.top = `${rect.bottom + 4}px`;
-  dropdown.style.width = `${dropdownWidth}px`;
-  dropdown.style.minWidth = `${dropdownWidth}px`;
-  dropdown.style.maxHeight = `${Math.max(200, maxH)}px`;
-  dropdown.style.overflowY = 'auto';
-  dropdown.style.zIndex = '100000';
-  dropdown.style.display = 'block';
-  dropdown.style.visibility = 'visible';
-  dropdown.style.pointerEvents = 'auto';
-  dropdown.style.background = 'var(--bg-tertiary, #1e1e2e)';
-  dropdown.style.border = '1px solid var(--border-color, #444)';
-  dropdown.style.borderRadius = '6px';
-  dropdown.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
-
-  // Custom scrollbar styles
-  dropdown.style.scrollbarWidth = 'thin';
-  dropdown.style.scrollbarColor = 'var(--accent-blue, #3b82f6) transparent';
-}
-
-/** Показать выпадающий список тикеров с фильтром по поиску и сортировкой. */
-function showSymbolDropdown(query, options = {}) {
-  const { loading = false, error = null } = options;
-  console.log('[Strategy Builder] showSymbolDropdown called:', { query, loading, error });
-  const input = document.getElementById('backtestSymbol');
-  const dropdown = document.getElementById('backtestSymbolDropdown');
-  const marketEl = document.getElementById('builderMarketType');
-  if (!input || !dropdown || !marketEl) {
-    console.error('[Strategy Builder] showSymbolDropdown: Missing elements');
-    return;
-  }
-  if (error) {
-    console.log('[Strategy Builder] showSymbolDropdown: error mode');
-    dropdown.innerHTML = '';
-    dropdown.classList.remove('open');
-    dropdown.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  if (loading) {
-    console.log('[Strategy Builder] showSymbolDropdown: loading mode');
-    dropdown.innerHTML = '<li class="symbol-picker-item symbol-picker-message">Загрузка тикеров...</li>';
-    dropdown.setAttribute('aria-hidden', 'false');
-    dropdown.classList.add('open');
-    positionSymbolDropdown();
-    return;
-  }
-  const category = marketEl.value === 'spot' ? 'spot' : 'linear';
-  const list = bybitSymbolsCache[category] || [];
-  const localData = localSymbolsCache || { symbols: [], details: {}, blocked: [] };
-  const localSet = new Set(localData.symbols || []);
-  const blockedSet = blockedSymbolsCache || new Set((localData.blocked || []).map((s) => String(s).toUpperCase()));
-  const tickersData = (tickersDataCache && tickersDataCache[category]) || {};
-  console.log('[Strategy Builder] showSymbolDropdown: category =', category, ', cache size =', list.length, ', local symbols =', localSet.size, ', tickers data =', Object.keys(tickersData).length);
-  const q = (query || '').toUpperCase().trim();
-
-  // Build enriched list with ticker data
-  const enrichedList = list.map((symbol) => {
-    const ticker = tickersData[symbol] || {};
-    return {
-      symbol,
-      isLocal: localSet.has(symbol),
-      price: ticker.price || 0,
-      change_24h: ticker.change_24h || 0,
-      volume_24h: ticker.volume_24h || 0
-    };
-  });
-
-  // Sort by current sort config
-  const { field, direction } = symbolSortConfig;
-  enrichedList.sort((a, b) => {
-    // Local symbols always first
-    if (a.isLocal && !b.isLocal) return -1;
-    if (!a.isLocal && b.isLocal) return 1;
-
-    let cmp = 0;
-    if (field === 'name') {
-      cmp = a.symbol.localeCompare(b.symbol);
-    } else if (field === 'price') {
-      cmp = a.price - b.price;
-    } else if (field === 'change') {
-      cmp = a.change_24h - b.change_24h;
-    } else if (field === 'volume') {
-      cmp = a.volume_24h - b.volume_24h;
-    }
-    return direction === 'desc' ? -cmp : cmp;
-  });
-
-  const filtered = q ? enrichedList.filter((item) => item.symbol.toUpperCase().includes(q)) : enrichedList;
-  console.log('[Strategy Builder] showSymbolDropdown: filtered size =', filtered.length);
-
-  if (list.length === 0) {
-    console.log('[Strategy Builder] showSymbolDropdown: list is empty, hiding dropdown');
-    dropdown.innerHTML = '';
-    dropdown.classList.remove('open');
-    dropdown.setAttribute('aria-hidden', 'true');
-    return;
-  }
-
-  // Format numbers
-  const formatPrice = (p) => (p >= 1 ? p.toFixed(2) : p >= 0.0001 ? p.toFixed(6) : p.toExponential(2));
-  const formatChange = (c) => {
-    const sign = c >= 0 ? '+' : '';
-    const color = c >= 0 ? 'var(--success-green, #4caf50)' : 'var(--error-red, #f44336)';
-    return `<span style="color: ${color}">${sign}${Number(c).toFixed(2)}%</span>`;
-  };
-  const formatVolume = (v) => {
-    if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
-    if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
-    if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
-    return v.toFixed(0);
-  };
-
-  // Sort indicator
-  const sortIcon = (fld) => {
-    if (symbolSortConfig.field !== fld) return '⇅';
-    return symbolSortConfig.direction === 'asc' ? '↑' : '↓';
-  };
-
-  // Header with sortable columns
-  const headerRow = `
-        <li class="symbol-picker-header-row" style="display: grid; grid-template-columns: minmax(180px, 1fr) 90px 75px 80px; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 2px solid var(--accent-blue); font-size: 12px; color: var(--text-secondary);">
-            <span class="symbol-sort-col" data-sort="name" style="cursor: pointer;" title="Сортировать по названию">Символ ${sortIcon('name')}</span>
-            <span class="symbol-sort-col" data-sort="price" style="cursor: pointer; text-align: right;" title="Сортировать по цене">Цена ${sortIcon('price')}</span>
-            <span class="symbol-sort-col" data-sort="change" style="cursor: pointer; text-align: right;" title="Сортировать по изменению 24h">24H% ${sortIcon('change')}</span>
-            <span class="symbol-sort-col" data-sort="volume" style="cursor: pointer; text-align: right;" title="Сортировать по объёму">Объём ${sortIcon('volume')}</span>
-        </li>`;
-
-  // Info row
-  const infoText = q ? `Найдено: ${filtered.length} из ${list.length}` : `Всего: ${list.length} (📊 = лок. данные)`;
-  const infoRow = `<li class="symbol-picker-info" style="font-size: 10px; color: var(--text-muted); padding: 2px 10px; background: var(--bg-tertiary);">${infoText}</li>`;
-
-  // Data rows
-  const items = filtered
-    .slice(0, 500)
-    .map((item) => {
-      const details = localData.details?.[item.symbol];
-      const intervals = details ? Object.keys(details.intervals || {}).join(', ') : '';
-      const isBlocked = blockedSet.has(item.symbol.toUpperCase());
-      let badge = item.isLocal ? `<span class="symbol-local-badge" title="Локальные данные: ${intervals}">📊</span>` : '';
-      badge += isBlocked
-        ? '<span class="symbol-blocked-badge" title="Заблокирован для догрузки">🔒</span>'
-        : '<span class="symbol-unblocked-badge" title="Разблокирован">🔓</span>';
-      let cls = item.isLocal ? 'symbol-picker-item symbol-has-local' : 'symbol-picker-item';
-      if (isBlocked) cls += ' symbol-blocked';
-      return `<li class="${cls}" data-symbol="${item.symbol}" tabindex="0" role="option" style="display: grid; grid-template-columns: minmax(180px, 1fr) 90px 75px 80px; gap: 8px; align-items: center; padding: 6px 12px;">
-                <span class="symbol-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${badge}${item.symbol}</span>
-                <span style="text-align: right; font-size: 13px; color: var(--text-primary);">${Number.isFinite(item.price) ? formatPrice(item.price) : '-'}</span>
-                <span style="text-align: right; font-size: 13px;">${Number.isFinite(item.change_24h) ? formatChange(item.change_24h) : '-'}</span>
-                <span style="text-align: right; font-size: 13px; color: var(--text-primary);">${Number.isFinite(item.volume_24h) ? formatVolume(item.volume_24h) : '-'}</span>
-            </li>`;
-    })
-    .join('');
-
-  dropdown.innerHTML = headerRow + infoRow + (items || '<li class="symbol-picker-item symbol-picker-message">Нет совпадений</li>');
-  dropdown.setAttribute('aria-hidden', filtered.length === 0 && !items ? 'true' : 'false');
-  dropdown.classList.add('open');
-
-  // Add click handlers for sorting
-  dropdown.querySelectorAll('.symbol-sort-col').forEach((col) => {
-    col.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const sortField = col.dataset.sort;
-      if (symbolSortConfig.field === sortField) {
-        symbolSortConfig.direction = symbolSortConfig.direction === 'asc' ? 'desc' : 'asc';
-      } else {
-        symbolSortConfig.field = sortField;
-        symbolSortConfig.direction = sortField === 'name' ? 'asc' : 'desc'; // Default: name asc, others desc
-      }
-      showSymbolDropdown(query, options);
-    });
-  });
-
-  console.log('[Strategy Builder] showSymbolDropdown: dropdown opened with', filtered.length, 'items');
-  positionSymbolDropdown();
-}
-
-/** Инициализация поля Symbol: тикеры с Bybit + поиск, привязка к типу рынка. */
-function initSymbolPicker() {
-  console.log('[Strategy Builder] initSymbolPicker called');
-  const input = document.getElementById('backtestSymbol');
-  const dropdown = document.getElementById('backtestSymbolDropdown');
-  const marketEl = document.getElementById('builderMarketType');
-  console.log('[Strategy Builder] Symbol picker elements:', { input: !!input, dropdown: !!dropdown, marketEl: !!marketEl });
-  if (!input || !dropdown || !marketEl) {
-    console.error('[Strategy Builder] initSymbolPicker: Missing elements!');
-    return;
-  }
-
-  function getCategory() {
-    return marketEl.value === 'spot' ? 'spot' : 'linear';
-  }
-
-  async function loadAndShow() {
-    const cat = getCategory();
-    const cachedList = bybitSymbolsCache[cat] || [];
-    const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
-    // If all caches are warm (symbols + tickers + blocked), show immediately without loading spinner
-    if (cachedList.length > 0 && blockedSymbolsCache !== null && tickersCached) {
-      showSymbolDropdown(input.value);
-      return;
-    }
-    showSymbolDropdown(input.value, { loading: true });
-    try {
-      // Load Bybit symbols, local symbols, and tickers data in parallel
-      await Promise.all([
-        fetchBybitSymbols(cat),
-        fetchLocalSymbols(),
-        fetchTickersData(cat),
-        fetchBlockedSymbols()
-      ]);
-      showSymbolDropdown(input.value);
-    } catch (e) {
-      showSymbolDropdown(input.value, { error: 'Ошибка загрузки тикеров. Проверьте сеть.' });
-    }
-  }
-
-  // Debounce helper for input filtering (150ms)
-  let _symbolInputTimer = null;
-
-  input.addEventListener('focus', function () {
-    loadAndShow();
-  });
-  input.addEventListener('input', function () {
-    // Debounce input to avoid excessive re-renders during fast typing
-    clearTimeout(_symbolInputTimer);
-    _symbolInputTimer = setTimeout(function () {
-      const cat = getCategory();
-      const list = bybitSymbolsCache[cat] || [];
-      const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
-      if (list.length > 0 && blockedSymbolsCache !== null && tickersCached) showSymbolDropdown(input.value);
-      else loadAndShow();
-    }, 150);
-  });
-  input.addEventListener('click', function () {
-    const cat = getCategory();
-    const tickersCached = tickersDataCache[cat] && Object.keys(tickersDataCache[cat]).length > 0;
-    if ((bybitSymbolsCache[cat] || []).length > 0 && blockedSymbolsCache !== null && tickersCached) {
-      showSymbolDropdown(input.value);
-    } else {
-      loadAndShow();
-    }
-  });
-  input.addEventListener('blur', function (e) {
-    const related = e.relatedTarget;
-    if (related && dropdown.contains(related)) return;
-    setTimeout(function () {
-      if (!dropdown.classList.contains('open')) return;
-      closeSymbolDropdown();
-    }, 200);
-  });
-
-  /** Закрыть выпадающий список (скрыть и сбросить позиционирование). */
-  function closeSymbolDropdown() {
-    const d = document.getElementById('backtestSymbolDropdown');
-    if (!d) return;
-    d.classList.remove('open');
-    d.setAttribute('aria-hidden', 'true');
-    d.style.position = '';
-    d.style.left = '';
-    d.style.top = '';
-    d.style.width = '';
-    d.style.minWidth = '';
-    d.style.maxHeight = '';
-    d.style.overflowY = '';
-    d.style.zIndex = '';
-    d.style.display = 'none';
-    d.style.visibility = '';
-    d.style.pointerEvents = '';
-
-    // Return dropdown to its original parent if moved to body
-    const symbolPicker = document.querySelector('.symbol-picker');
-    if (symbolPicker && d.parentElement === document.body) {
-      symbolPicker.appendChild(d);
-    }
-  }
-
-  document.addEventListener('click', function (e) {
-    const t = e.target;
-    if (input.contains(t) || dropdown.contains(t)) return;
-    closeSymbolDropdown();
-  });
-
-  function onSymbolSelected(sym) {
-    input.value = sym;
-    closeSymbolDropdown();
-    input.blur();
-    console.log(`[SymbolPicker] Selected: ${sym}`);
-    document.dispatchEvent(new CustomEvent('properties-symbol-selected'));
-    // Update action-button state now that a symbol is set
-    updateRunButtonsState();
-    // Отменить отложенный вызов от change/debounce, чтобы не прерывать только что запущенный sync
-    if (typeof checkSymbolDataForProperties === 'function' && checkSymbolDataForProperties.cancel) {
-      checkSymbolDataForProperties.cancel();
-    }
-    // При выборе тикера из списка всегда запускаем синхронизацию (игнорируем кэш 10 с)
-    runCheckSymbolDataForProperties(true);
-  }
-
-  dropdown.addEventListener('mousedown', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const item = e.target.closest('.symbol-picker-item');
-    if (item && item.dataset.symbol) onSymbolSelected(item.dataset.symbol);
-  });
-
-  dropdown.addEventListener('click', function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const item = e.target.closest('.symbol-picker-item');
-    if (item && item.dataset.symbol) onSymbolSelected(item.dataset.symbol);
-  });
-
-  marketEl.addEventListener('change', async function () {
-    // Clear cache and preload new symbols for the selected market type
-    bybitSymbolsCache.linear = [];
-    bybitSymbolsCache.spot = [];
-    delete tickersDataCache.linear;
-    delete tickersDataCache.spot;
-    const cat = getCategory();
-    console.log('[Strategy Builder] Market type changed to:', cat, '- preloading symbols');
-    try {
-      await Promise.all([
-        fetchBybitSymbols(cat),
-        fetchLocalSymbols(),
-        fetchTickersData(cat)
-      ]);
-      console.log('[Strategy Builder] Symbols preloaded for', cat, ':', bybitSymbolsCache[cat]?.length || 0);
-      // Sync current symbol for new market type (spot/linear) — сброс кэша для принудительной загрузки
-      const sym = input.value?.trim()?.toUpperCase();
-      if (sym) {
-        delete symbolSyncCache[sym];
-        checkSymbolDataForProperties();
-      }
-    } catch (e) {
-      console.warn('[Strategy Builder] Failed to preload symbols:', e);
-    }
-  });
-
-  // Предзагрузка тикеров, цен и списка блокировок (прогрев кэша при загрузке страницы)
-  const _preloadCat = getCategory();
-  Promise.all([
-    fetchBybitSymbols(_preloadCat),
-    fetchTickersData(_preloadCat),
-    fetchLocalSymbols(),
-    fetchBlockedSymbols()
-  ]).catch(() => { });
-}
-
-/** База данных: инициализация панели групп тикеров в БД. */
-function initDunnahBasePanel() {
-  const container = document.getElementById('dunnahBaseGroups');
-  const btnRefresh = document.getElementById('btnDunnahRefresh');
-  if (!container) return;
-
-  async function loadAndRender() {
-    container.innerHTML = '<p class="text-muted text-sm">Загрузка...</p>';
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 15000);
-      const res = await fetch(`${API_BASE}/marketdata/symbols/db-groups?_=${Date.now()}`, {
-        signal: ctrl.signal,
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
-      });
-      clearTimeout(t);
-      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-      const data = await res.json();
-      const groups = data.groups || [];
-      const blocked = new Set((data.blocked || []).map((s) => String(s).toUpperCase()));
-
-      if (groups.length === 0) {
-        container.innerHTML = '<p class="text-muted text-sm mb-1">В БД нет тикеров.</p><p class="text-muted text-sm" style="font-size:12px">Выберите тикер в «ОСНОВНЫЕ ПАРАМЕТРЫ» и дождитесь синхронизации.</p>';
-        return;
-      }
-
-      container.innerHTML = groups
-        .map((g) => {
-          const sym = (g.symbol || '').trim();
-          const mt = g.market_type || 'linear';
-          const intervals = Object.keys(g.intervals || {}).filter(i => i !== 'UNKNOWN').sort((a, b) => {
-            const order = { '1': 1, '5': 2, '15': 3, '30': 4, '60': 5, '240': 6, 'D': 7, 'W': 8, 'M': 9 };
-            return (order[a] || 99) - (order[b] || 99);
-          });
-          const total = g.total_rows || 0;
-          const isBlocked = blocked.has(sym.toUpperCase());
-          const tfDisplay = intervals.length > 4
-            ? intervals.slice(0, 4).join(', ') + ` +${intervals.length - 4}`
-            : intervals.join(', ');
-
-          return `
-          <div class="dunnah-group-item" data-symbol="${sym}" data-market="${mt}">
-            <div class="dunnah-group-header">
-              <span class="dunnah-group-symbol">${sym}</span>
-              <span class="dunnah-group-mt">${mt}</span>
-              ${isBlocked ? '<span class="dunnah-blocked-badge" title="Заблокирован">🔒</span>' : '<span class="dunnah-unblocked-badge" title="Активен">🔓</span>'}
-            </div>
-            <div class="dunnah-group-info">${tfDisplay} · ${total.toLocaleString()} свечей</div>
-            <div class="dunnah-group-actions">
-              <button type="button" class="btn-dunnah-delete" data-symbol="${sym}" data-market="${mt}">🗑️ Удалить</button>
-              ${isBlocked
-              ? `<button type="button" class="btn-dunnah-unblock" data-symbol="${sym}">� Разблокировать</button>`
-              : `<button type="button" class="btn-dunnah-block" data-symbol="${sym}">� Блокировать</button>`
-            }
-            </div>
-          </div>`;
-        })
-        .join('');
-
-      container.querySelectorAll('.btn-dunnah-delete').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const symbol = btn.dataset.symbol;
-          const market = btn.dataset.market || 'linear';
-          if (!confirm(`Удалить все данные ${symbol} (${market}) из БД?`)) return;
-          btn.disabled = true;
-          btn.textContent = '⏳';
-          try {
-            const r = await fetch(`${API_BASE}/marketdata/symbols/db-groups?symbol=${encodeURIComponent(symbol)}&market_type=${encodeURIComponent(market)}`, { method: 'DELETE' });
-            if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and force-reload from server
-            localSymbolsCache = null;
-            blockedSymbolsCache = null;
-            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
-          } catch (e) {
-            console.error(e);
-            alert('Ошибка удаления: ' + e.message);
-            await loadAndRender();
-          }
-        });
-      });
-      container.querySelectorAll('.btn-dunnah-block').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const symbol = btn.dataset.symbol;
-          btn.disabled = true;
-          btn.textContent = '⏳';
-          try {
-            const r = await fetch(`${API_BASE}/marketdata/symbols/blocked?symbol=${encodeURIComponent(symbol)}`, { method: 'POST' });
-            if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and force-reload from server
-            localSymbolsCache = null;
-            blockedSymbolsCache = null;
-            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
-          } catch (e) {
-            console.error(e);
-            alert('Ошибка: ' + e.message);
-            await loadAndRender();
-          }
-        });
-      });
-      container.querySelectorAll('.btn-dunnah-unblock').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const symbol = btn.dataset.symbol;
-          btn.disabled = true;
-          btn.textContent = '⏳';
-          try {
-            const r = await fetch(`${API_BASE}/marketdata/symbols/blocked/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
-            if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and force-reload from server
-            localSymbolsCache = null;
-            blockedSymbolsCache = null;
-            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
-          } catch (e) {
-            console.error(e);
-            alert('Ошибка: ' + e.message);
-            await loadAndRender();
-          }
-        });
-      });
-    } catch (e) {
-      console.error('[База данных]', e);
-      const msg = e.name === 'AbortError' ? 'Таймаут запроса (15 с)' : e.message;
-      container.innerHTML = `<p class="text-danger text-sm">Ошибка: ${escapeHtml(msg)}</p><p class="text-muted text-sm" style="font-size:12px">Проверьте, что сервер запущен. Нажмите «Обновить» для повтора.</p>`;
-    }
-  }
-
-  if (btnRefresh) btnRefresh.addEventListener('click', loadAndRender);
-  refreshDunnahBasePanel = loadAndRender;
-
-  // Lazy-load: загружаем данные только при первом открытии окна "База данных"
-  let _dunnahPanelLoaded = false;
-  document.addEventListener('floatingWindowToggle', function (e) {
-    if (e.detail.windowId === 'floatingWindowDatabase' && e.detail.isOpen && !_dunnahPanelLoaded) {
-      _dunnahPanelLoaded = true;
-      loadAndRender();
-    }
-  });
-  // Also mark as loaded when refreshDunnahBasePanel is called externally (e.g. after sync)
-  const _origRefresh = loadAndRender;
-  refreshDunnahBasePanel = function () {
-    _dunnahPanelLoaded = true;
-    return _origRefresh();
-  };
-}
-
-function updatePropertiesProgressBar(visible, options = {}) {
-  const { indeterminate = false, percent = 0 } = options;
-  const progressContainer = document.getElementById('propertiesCandleLoadingProgress');
-  const bar = document.getElementById('propertiesCandleLoadingBar');
-  if (!progressContainer || !bar) return;
-  if (visible) {
-    progressContainer.classList.remove('hidden');
-    bar.classList.toggle('indeterminate', indeterminate);
-    bar.style.width = indeterminate ? '' : `${percent}%`;
-    bar.setAttribute('aria-valuenow', percent);
-  } else {
-    progressContainer.classList.add('hidden');
-    bar.classList.remove('indeterminate');
-  }
-}
-
-/**
- * Render data sync status in Properties panel.
- * States: checking, syncing, synced, error
- */
-function renderPropertiesDataStatus(state, data = {}) {
-  const statusIndicator = document.getElementById('propertiesDataStatusIndicator');
-  if (!statusIndicator) return;
-
-  const { symbol = '', totalNew = 0, message = '', step = 0, totalSteps = 8 } = data;
-
-  if (state === 'checking') {
-    statusIndicator.className = 'data-status checking';
-    statusIndicator.innerHTML = `<span class="status-icon">🔍</span><span class="status-text">Проверка ${escapeHtml(symbol)}...</span>`;
-  } else if (state === 'syncing') {
-    const progressText = totalSteps > 0 ? ` (${step}/${totalSteps})` : '';
-    const newText = totalNew > 0 ? `<br><small>Загружено: +${totalNew} свечей</small>` : '';
-    statusIndicator.className = 'data-status loading';
-    statusIndicator.innerHTML = `<span class="status-icon">📥</span><span class="status-text">${escapeHtml(message) || 'Синхронизация...'}${progressText}${newText}</span>`;
-  } else if (state === 'syncing_background') {
-    statusIndicator.className = 'data-status loading';
-    statusIndicator.innerHTML = `<span class="status-icon">⏳</span><span class="status-text">${escapeHtml(message) || 'Синхронизация в фоне...'}<br><small>Загрузка исторических данных может занять время</small></span>`;
-  } else if (state === 'synced') {
-    const icon = totalNew > 0 ? '✅' : '✓';
-    const text = totalNew > 0 ? `Синхронизировано, +${totalNew} свечей` : 'Данные актуальны';
-    statusIndicator.className = 'data-status available';
-    statusIndicator.innerHTML = `<span class="status-icon">${icon}</span><span class="status-text">${text}<br><small>TF: 1m, 5m, 15m, 30m, 1h, 4h, 1D, 1W, 1M</small></span>`;
-  } else if (state === 'blocked') {
-    statusIndicator.className = 'data-status';
-    statusIndicator.innerHTML = `<span class="status-icon">🔒</span><span class="status-text">${escapeHtml(message) || 'Тикер заблокирован для догрузки'}<br><small>Разблокируйте в «База данных»</small></span>`;
-  } else if (state === 'error') {
-    statusIndicator.className = 'data-status error';
-    statusIndicator.style.cursor = 'pointer';
-    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${escapeHtml(message) || 'Проверьте соединение'}. Кликните для повтора.</small></span>`;
-    // Add click-to-retry handler
-    statusIndicator.onclick = function () {
-      statusIndicator.onclick = null;
-      statusIndicator.style.cursor = '';
-      syncSymbolData(true);
-    };
-  }
-}
-
-/** Cache for last sync time per symbol to avoid too frequent syncs */
-const symbolSyncCache = {};
-
-/** Track symbols currently being synced to prevent duplicate requests */
-const symbolSyncInProgress = {};
-
-/** AbortController for the current sync — отмена при переключении на другой тикер */
-let currentSyncAbortController = null;
-/** Символ и время старта текущего sync — чтобы не прерывать дубликатом от change/debounce */
-let currentSyncSymbol = null;
-let currentSyncStartTime = 0;
-
-/** Auto-refresh interval IDs per symbol */
-const symbolRefreshTimers = {};
-
-/**
- * Get refresh interval in ms based on timeframe (auto-actualization).
- * 1m, 5m -> 5 min; 15m -> 15 min; 30m -> 30 min; 1h -> 1h; 4h -> 4h; D -> 1d; W -> 1w
- */
-function getRefreshIntervalForTF(tf) {
-  // 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M
-  const tfIntervals = {
-    '1': 5 * 60 * 1000, '5': 5 * 60 * 1000, '15': 15 * 60 * 1000, '30': 30 * 60 * 1000,
-    '60': 60 * 60 * 1000, '240': 4 * 60 * 60 * 1000,
-    'D': 24 * 60 * 60 * 1000, 'W': 7 * 24 * 60 * 60 * 1000,
-    'M': 30 * 24 * 60 * 60 * 1000  // 1 month
-  };
-  return tfIntervals[tf] || 60 * 60 * 1000;
-}
-
-/**
- * Sync all timeframes for selected symbol using SSE for real-time progress.
- * Called when symbol is selected or periodically for auto-refresh.
- */
-async function syncSymbolData(forceRefresh = false) {
-  const symbolEl = document.getElementById('backtestSymbol');
-  const marketEl = document.getElementById('builderMarketType');
-  const statusRow = document.getElementById('propertiesDataStatusRow');
-
-  const symbol = symbolEl?.value?.trim()?.toUpperCase();
-  const marketType = marketEl?.value === 'spot' ? 'spot' : 'linear';
-
-  if (!symbol || !statusRow) return;
-
-  if ((blockedSymbolsCache || new Set()).has(symbol?.toUpperCase?.() ?? '')) {
-    console.log(`[DataSync] ${symbol} is blocked, skipping auto-sync`);
-    renderPropertiesDataStatus('blocked', { symbol, message: 'Тикер заблокирован для догрузки' });
-    return;
-  }
-
-  // Check if sync is already in progress for this symbol
-  if (symbolSyncInProgress[symbol]) {
-    console.log(`[DataSync] ${symbol} sync already in progress, skipping`);
-    return;
-  }
-
-  // Не прерывать текущий sync дубликатом от change/debounce (тот же символ, вызов через ~200 ms)
-  const DUPLICATE_SYNC_GRACE_MS = 600;
-  if (currentSyncAbortController && currentSyncSymbol === symbol && Date.now() - currentSyncStartTime < DUPLICATE_SYNC_GRACE_MS) {
-    console.log('[DataSync] Same symbol sync in progress, skipping duplicate (change/debounce)');
-    return;
-  }
-
-  // Abort only if in-flight sync is for a *different* symbol (переключение тикера во время загрузки)
-  if (currentSyncAbortController && currentSyncSymbol !== symbol) {
-    console.log(`[DataSync] Aborting previous sync (switched symbol ${currentSyncSymbol} -> ${symbol})`);
-    currentSyncAbortController.abort();
-    currentSyncAbortController = null;
-  }
-
-  // Check if we synced recently (within 10 seconds) unless forced — при выборе из списка forceRefresh=true
-  const SYNC_CACHE_MS = 10000;
-  const lastSync = symbolSyncCache[symbol];
-  if (!forceRefresh && lastSync && Date.now() - lastSync < SYNC_CACHE_MS) {
-    console.log(`[DataSync] ${symbol} synced recently, skipping`);
-    return;
-  }
-
-  // Mark sync as in progress
-  symbolSyncInProgress[symbol] = true;
-
-  statusRow.classList.remove('hidden');
-  renderPropertiesDataStatus('checking', { symbol });
-  updatePropertiesProgressBar(true, { indeterminate: true });
-
-  // Show global loading indicator
-  showGlobalLoading(`Синхронизация ${symbol}...`);
-
-  // Динамический таймаут: сбрасывается при каждом полученном SSE event.
-  // Если данные приходят — процесс жив. Таймаут срабатывает только если
-  // сервер молчит > 90 секунд (например, потеря соединения).
-  const controller = new AbortController();
-  currentSyncAbortController = controller;
-  currentSyncSymbol = symbol;
-  currentSyncStartTime = Date.now();
-  setSBCurrentSyncSymbol(symbol);
-  setSBCurrentSyncStartTime(currentSyncStartTime);
-  const SYNC_INACTIVITY_TIMEOUT_MS = 90000; // 90 сек без SSE events = таймаут
-  let timeoutId = setTimeout(() => controller.abort(), SYNC_INACTIVITY_TIMEOUT_MS);
-
-  // Helper: сброс таймаута при получении данных
-  const resetSyncTimeout = () => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => controller.abort(), SYNC_INACTIVITY_TIMEOUT_MS);
-  };
-
-  try {
-    // Прогресс по TF: 1 → 5 → 15 → 30 → 60 → 240 → D → W → M
-    const totalSteps = 9;
-    renderPropertiesDataStatus('syncing', {
-      symbol,
-      message: 'Синхронизация БД с биржей...',
-      step: 0,
-      totalSteps
-    });
-    updatePropertiesProgressBar(true, { indeterminate: false, percent: 0 });
-
-    const streamUrl = `${API_BASE}/marketdata/symbols/sync-all-tf-stream?symbol=${encodeURIComponent(symbol)}&market_type=${marketType}`;
-    console.log('[DataSync] Starting sync (stream):', streamUrl);
-
-    const response = await fetch(streamUrl, { signal: controller.signal });
-
-    if (!response.ok) {
-      clearTimeout(timeoutId);
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let result = null;
-
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      // Данные пришли — сброс таймаута неактивности
-      resetSyncTimeout();
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const dataMatch = line.match(/^data:\s*(.+)$/m);
-        if (!dataMatch) continue;
-        try {
-          const data = JSON.parse(dataMatch[1]);
-          if (data.event === 'progress') {
-            const percent = Math.min(100, data.percent != null ? data.percent : Math.round(((data.step || 0) / (data.totalSteps || totalSteps)) * 100));
-            updatePropertiesProgressBar(true, { indeterminate: false, percent });
-            renderPropertiesDataStatus('syncing', {
-              symbol,
-              message: data.message || `Синхронизация ${data.tfName || data.tf}...`,
-              step: data.step || 0,
-              totalSteps: data.totalSteps || totalSteps,
-              totalNew: data.totalNew || 0
-            });
-          } else if (data.event === 'complete') {
-            clearTimeout(timeoutId);
-            result = { timeframes: data.results, total_new_candles: data.totalNew, summary: data.message, cancelled: !!data.cancelled };
-          } else if (data.event === 'error') {
-            // Per-TF error — do NOT abort the whole sync, server continues to next TF
-            // Update UI to show partial warning but keep waiting for 'complete'
-            const errMsg = data.message || `${data.tfName || data.tf || 'TF'}: ошибка`;
-            renderPropertiesDataStatus('syncing', {
-              symbol,
-              message: `⚠️ ${errMsg} — продолжаем...`,
-              step: data.step || 0,
-              totalSteps: data.totalSteps || totalSteps,
-              totalNew: data.totalNew || 0
-            });
-            console.warn('[DataSync] TF error (non-fatal):', errMsg);
-          }
-        } catch (parseErr) {
-          if (parseErr instanceof SyntaxError) continue;
-          throw parseErr;
-        }
-      }
-    }
-
-    if (!result) {
-      clearTimeout(timeoutId);
-      throw new Error('Синхронизация не вернула результат');
-    }
-
-    if (result.cancelled) {
-      console.log('[DataSync] Sync cancelled (client disconnected)');
-      updatePropertiesProgressBar(false);
-      hideGlobalLoading();
-      return;
-    }
-
-    console.log('[DataSync] Sync complete:', result);
-
-    symbolSyncCache[symbol] = Date.now();
-    updatePropertiesProgressBar(false);
-
-    const timeframes = result.timeframes || {};
-    const timeoutTfs = Object.entries(timeframes).filter(([, v]) => v && v.status === 'timeout').map(([tf]) => tf);
-    const errorTfs = Object.entries(timeframes).filter(([, v]) => v && v.status === 'error').map(([tf]) => tf);
-    const failedTfs = [...new Set([...timeoutTfs, ...errorTfs])];
-    const totalNew = result.total_new_candles || 0;
-    if (failedTfs.length > 0) {
-      renderPropertiesDataStatus('synced', {
-        symbol,
-        totalNew,
-        message: `Синхронизировано частично: ${failedTfs.join(', ')} не удалось (сеть). Остальные TF готовы. Кликните для повторной попытки.`
-      });
-    } else {
-      renderPropertiesDataStatus('synced', {
-        symbol,
-        totalNew,
-        message: result.summary || 'Данные синхронизированы'
-      });
-    }
-
-    hideGlobalLoading();
-    setupAutoRefresh(symbol);
-    if (typeof refreshDunnahBasePanel === 'function') refreshDunnahBasePanel();
-
-  } catch (e) {
-    clearTimeout(timeoutId);
-
-    const currentSymbol = document.getElementById('backtestSymbol')?.value?.trim()?.toUpperCase();
-    const wasAbortedBySwitch = e.name === 'AbortError' && currentSymbol !== symbol;
-
-    if (wasAbortedBySwitch) {
-      console.log(`[DataSync] ${symbol} sync aborted (switched to ${currentSymbol})`);
-      // Не сбрасывать прогресс и global loading — новая синхронизация (currentSymbol) уже отрисовала свой UI
-      return;
-    }
-
-    if (e.name === 'AbortError') {
-      console.log('[DataSync] Sync timeout — no SSE events for 90s');
-      // Don't cache timeout — allow immediate retry
-      updatePropertiesProgressBar(false);
-      renderPropertiesDataStatus('error', {
-        message: 'Потеря связи с сервером (нет данных 90 сек). Кликните для повторной попытки.'
-      });
-      hideGlobalLoading();
-      return;
-    }
-
-    console.error('[DataSync] Sync failed:', e);
-    updatePropertiesProgressBar(false);
-    renderPropertiesDataStatus('error', { message: e.message });
-    hideGlobalLoading();
-  } finally {
-    if (currentSyncAbortController === controller) {
-      currentSyncAbortController = null;
-      currentSyncSymbol = null;
-      setSBCurrentSyncSymbol(null);
-    }
-    delete symbolSyncInProgress[symbol];
-  }
-}
-
-/**
- * Setup auto-refresh timer for the current symbol based on selected TF.
- * Clears any previous timers (only one symbol is active at a time).
- */
-function setupAutoRefresh(symbol) {
-  const tfEl = document.getElementById('strategyTimeframe');
-  const tf = tfEl?.value || '15';
-
-  // Clear all existing refresh timers (only one symbol active at a time)
-  for (const sym of Object.keys(symbolRefreshTimers)) {
-    clearInterval(symbolRefreshTimers[sym]);
-    delete symbolRefreshTimers[sym];
-  }
-
-  const interval = getRefreshIntervalForTF(tf);
-  const intervalMin = interval / 60000;
-  console.log(`[DataSync] Auto-refresh for ${symbol} every ${intervalMin} min (TF=${tf})`);
-
-  symbolRefreshTimers[symbol] = setInterval(() => {
-    console.log(`[DataSync] Auto-refresh triggered for ${symbol}`);
-    syncSymbolData(true);
-  }, interval);
-}
-
-/** Force refresh - called from button click */
-window.forceRefreshTickerData = function () {
-  syncSymbolData(true);
-};
-
-/**
- * Main function called when symbol or TF changes.
- * Triggers data sync for the selected symbol.
- * @param {boolean} [forceRefresh=false] — при true игнорируем кэш «недавно синхронизирован» (выбор из списка)
- */
-async function runCheckSymbolDataForProperties(forceRefresh = false) {
-  await syncSymbolData(forceRefresh);
-}
-
-// Debounce 200 ms — быстрее запуск синхронизации после смены Symbol/TF/типа рынка (было 600 ms)
-checkSymbolDataForProperties = debounce(runCheckSymbolDataForProperties, 200);
 
 /** Обновить подпись и ограничения поля «Размер позиции» в Properties по типу ордера. */
 function updateBacktestPositionSizeInput() {
@@ -2560,21 +1088,21 @@ function updateBacktestPositionSizeInput() {
       sizeInput.min = 1;
       sizeInput.max = 100;
       sizeInput.step = 1;
-      sizeInput.value = sizeInput.value || 100;
+      if (sizeInput.value === '' || sizeInput.value === null || sizeInput.value === undefined) sizeInput.value = 100;
       break;
     case 'fixed_amount':
       sizeLabel.textContent = 'Сумма на ордер ($)';
       sizeInput.min = 1;
       sizeInput.max = 1000000;
       sizeInput.step = 1;
-      sizeInput.value = sizeInput.value || 100;
+      if (sizeInput.value === '' || sizeInput.value === null || sizeInput.value === undefined) sizeInput.value = 100;
       break;
     case 'contracts':
       sizeLabel.textContent = 'Контракты/Лоты';
       sizeInput.min = 0.001;
       sizeInput.max = 10000;
       sizeInput.step = 0.001;
-      sizeInput.value = sizeInput.value || 1;
+      if (sizeInput.value === '' || sizeInput.value === null || sizeInput.value === undefined) sizeInput.value = 1;
       break;
     default:
       sizeLabel.textContent = 'Размер позиции (%)';
@@ -2651,9 +1179,22 @@ function setupEventListeners() {
     checkSymbolDataForProperties();
     // Restart auto-refresh with new TF interval
     const sym = backtestSymbolEl?.value?.trim()?.toUpperCase();
-    if (sym && symbolSyncCache[sym]) setupAutoRefresh(sym);
+    if (sym) symbolSync.setupAutoRefresh(sym);
   });
-  if (builderMarketTypeEl) builderMarketTypeEl.addEventListener('change', checkSymbolDataForProperties);
+  if (builderMarketTypeEl) {
+    builderMarketTypeEl.addEventListener('change', checkSymbolDataForProperties);
+    // Auto-update commission when market type changes
+    // linear = Bybit perpetuals taker 0.055%, spot = Bybit spot taker 0.1%
+    builderMarketTypeEl.addEventListener('change', () => {
+      const commEl = document.getElementById('backtestCommission');
+      if (!commEl) return;
+      const isSpot = builderMarketTypeEl.value === 'spot';
+      commEl.value = isSpot ? '0.1' : '0.055';
+      commEl.title = isSpot
+        ? '0.1% = Bybit Spot taker fee (market orders)'
+        : '0.055% = Bybit Linear/Perpetual taker fee (market orders)';
+    });
+  }
 
   // Direction change - update Strategy node ports and connection mismatch highlighting
   const builderDirectionEl = document.getElementById('builderDirection');
@@ -2740,12 +1281,11 @@ function setupEventListeners() {
   if (dataStatusRow) {
     dataStatusRow.addEventListener('click', function () {
       const indicator = document.getElementById('propertiesDataStatusIndicator');
-      if (indicator?.classList.contains('error')) syncSymbolData(true);
+      if (indicator?.classList.contains('error')) symbolSync.syncSymbolData(true);
     });
   }
 
-  // База данных
-  initDunnahBasePanel();
+  // База данных — initDunnahBasePanel вызывается после создания symbolSync (см. initializeStrategyBuilder)
 
   // Block search
   document
@@ -2796,6 +1336,7 @@ function setupEventListeners() {
           block.x = newX;
         }
       });
+      setSBBlocks([...strategyBlocks]);
 
     } else if (!e.detail.isOpen && isFloatingWindowOpen) {
       // Window closing - return all affected nodes to saved positions
@@ -2814,6 +1355,7 @@ function setupEventListeners() {
       });
 
       blocksOriginalPositions.clear();
+      setSBBlocks([...strategyBlocks]);
     }
 
     // Update connections after animation
@@ -3079,62 +1621,6 @@ function setupEventListeners() {
   // Navbar buttons (CSP-compliant event listeners by ID)
   // =====================================================
 
-  // Templates button - MUST be set up BEFORE overlay handler
-  const btnTemplates = document.getElementById('btnTemplates');
-  if (btnTemplates) {
-    // Flag to prevent overlay from closing modal when opening via button
-    let openingViaButton = false;
-
-    btnTemplates.addEventListener('click', function (e) {
-      console.log('[Strategy Builder] Templates button clicked');
-      e.preventDefault();
-      e.stopImmediatePropagation(); // Stop ALL event propagation immediately
-
-      const modal = document.getElementById('templatesModal');
-      const isCurrentlyOpen = modal && modal.classList.contains('active');
-
-      if (isCurrentlyOpen) {
-        console.log('[Strategy Builder] Modal already open, closing');
-        openingViaButton = false;
-        closeTemplatesModal();
-      } else {
-        console.log('[Strategy Builder] Opening modal via button');
-        openingViaButton = true;
-
-        // Update open time before opening
-        if (window._updateTemplatesModalOpenTime) {
-          window._updateTemplatesModalOpenTime();
-        }
-
-        // Open modal immediately using requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(() => {
-          openTemplatesModal();
-
-          // Double-check modal is still open after a short delay
-          setTimeout(() => {
-            if (!modal.classList.contains('active')) {
-              console.warn('[Strategy Builder] Modal closed unexpectedly, reopening...');
-              modal.classList.add('active');
-            }
-          }, 50);
-        });
-
-        // Reset flag after a delay to allow modal to fully open
-        setTimeout(() => {
-          openingViaButton = false;
-          console.log('[Strategy Builder] Opening flag reset');
-        }, 800); // Increased delay to ensure modal is fully opened
-      }
-    }, true); // Use capture phase to handle BEFORE overlay handler
-
-    console.log('[Strategy Builder] Templates button listener attached');
-
-    // Store flag in window for overlay handler to check
-    window._templatesModalOpeningViaButton = () => openingViaButton;
-  } else {
-    console.error('[Strategy Builder] Templates button not found!');
-  }
-
   // Versions button and modal
   const btnVersions = document.getElementById('btnVersions');
   if (btnVersions) btnVersions.addEventListener('click', openVersionsModal);
@@ -3397,89 +1883,6 @@ function setupEventListeners() {
 
   // NOTE: fitToScreen and zoom buttons have no onclick attributes in HTML.
   // They are wired in initCspCompliantListeners() via title/class selectors.
-
-  // Modal buttons by ID
-  const btnCloseModal = document.getElementById('btnCloseModal');
-  if (btnCloseModal) {
-    btnCloseModal.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[Strategy Builder] Close button clicked');
-      closeTemplatesModal();
-    });
-  } else {
-    console.warn('[Strategy Builder] Close modal button not found');
-  }
-
-  const btnCancelModal = document.getElementById('btnCancelModal');
-  if (btnCancelModal) {
-    btnCancelModal.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[Strategy Builder] Cancel button clicked');
-      closeTemplatesModal();
-    });
-  } else {
-    console.warn('[Strategy Builder] Cancel modal button not found');
-  }
-
-  const btnLoadTemplate = document.getElementById('btnLoadTemplate');
-  if (btnLoadTemplate) {
-    btnLoadTemplate.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[Strategy Builder] Load Template button clicked');
-      loadSelectedTemplate();
-    });
-  } else {
-    console.warn('[Strategy Builder] Load Template button not found');
-  }
-
-  // Templates grid - event delegation for template selection
-  const templatesGrid = document.getElementById('templatesGrid');
-  if (templatesGrid) {
-    templatesGrid.addEventListener('click', function (e) {
-      const card = e.target.closest('.template-card');
-      if (card) {
-        const templateId = card.dataset.templateId;
-        if (templateId) {
-          selectTemplate(templateId);
-        }
-      }
-    });
-  }
-
-  const importTemplateInput = document.getElementById('importTemplateInput');
-  if (importTemplateInput) {
-    importTemplateInput.addEventListener('change', function (e) {
-      const file = e.target.files?.[0];
-      if (file) {
-        importTemplateFromFile(file);
-        e.target.value = '';
-      }
-    });
-  }
-
-  // Templates modal: do NOT close on overlay click (caused immediate close / invisible content).
-  // Close only via Close (X), Cancel, or Use Template buttons.
-  const templatesModal = document.getElementById('templatesModal');
-  if (templatesModal) {
-    // No overlay click handler - modal closes only via btnCloseModal, btnCancelModal, btnLoadTemplate
-    window._updateTemplatesModalOpenTime = () => { }; // no-op for compatibility
-
-    // Prevent modal content clicks from bubbling to overlay
-    const modalContent = templatesModal.querySelector('.modal');
-    if (modalContent) {
-      modalContent.addEventListener('click', function (e) {
-        console.log('[Strategy Builder] Modal content click, stopping propagation');
-        e.stopPropagation();
-      });
-    } else {
-      console.warn('[Strategy Builder] Modal content (.modal) not found!');
-    }
-  } else {
-    console.error('[Strategy Builder] Templates modal not found during setup!');
-  }
 }
 
 function _toggleCategory(header) {
@@ -3536,8 +1939,8 @@ function filterBlocks() {
   const categoryMatches = new Map();
 
   items.forEach((item) => {
-    const name = item.querySelector('.block-name').textContent.toLowerCase();
-    const desc = item.querySelector('.block-desc').textContent.toLowerCase();
+    const name = item.querySelector('.block-name')?.textContent.toLowerCase() ?? '';
+    const desc = item.querySelector('.block-desc')?.textContent.toLowerCase() ?? '';
     const blockId = item.dataset.blockId?.toLowerCase() || '';
     const matches = name.includes(search) || desc.includes(search) || blockId.includes(search);
 
@@ -3850,6 +2253,19 @@ function getDefaultParams(blockType) {
       momentum_short_less: 95,
       momentum_short_more: -30
     },
+    stoch_rsi: { rsi_period: 14, stoch_period: 14, k_period: 3, d_period: 3, source: 'close' },
+    cci: { period: 20 },
+    adx: { period: 14 },
+    parabolic_sar: { start: 0.02, increment: 0.02, max_value: 0.2 },
+    sma: { period: 50, source: 'close' },
+    ema: { period: 20, source: 'close' },
+    bollinger: { period: 20, std_dev: 2.0, source: 'close' },
+    donchian: { period: 20 },
+    ichimoku: { tenkan_period: 9, kijun_period: 26, senkou_b_period: 52 },
+    pivot_points: {},
+    obv: {},
+    vwap: {},
+    ad_line: {},
 
     // (Filters defaults removed — entire Filters category deprecated)
 
@@ -4084,24 +2500,24 @@ function renderGridOrdersPanel(block, blockId, _optimizationMode = false) {
       : 'Распределите 100% объёма по ордерам'}
         </div>
       </div>
-      
+
       <div class="grid-trailing-row">
         <div class="grid-order-field grid-trailing-field">
           <label class="grid-order-label">
             GRID TRAILING / CANCEL (%)
             <i class="bi bi-info-circle" title="Подтяжка сетки: отмена ордеров если цена отклонилась на указанный %. 0 = отключено."></i>
           </label>
-          <input type="number" 
-                 class="grid-order-input grid-trailing-input" 
-                 value="${params.grid_trailing || 0}" 
-                 step="0.1" 
-                 min="0" 
+          <input type="number"
+                 class="grid-order-input grid-trailing-input"
+                 value="${params.grid_trailing || 0}"
+                 step="0.1"
+                 min="0"
                  max="30"
                  data-field="grid_trailing"
                  id="gridTrailing_${blockId}">
         </div>
       </div>
-      
+
       <div class="grid-orders-list" id="gridOrdersList_${blockId}">
   `;
 
@@ -4111,22 +2527,22 @@ function renderGridOrdersPanel(block, blockId, _optimizationMode = false) {
         <div class="grid-order-row" data-order-index="${index}">
           <div class="grid-order-field">
             <label class="grid-order-label">ОТСТУП %</label>
-            <input type="number" 
-                   class="grid-order-input" 
-                   value="${order.offset}" 
-                   step="0.01" 
-                   min="0" 
+            <input type="number"
+                   class="grid-order-input"
+                   value="${order.offset}"
+                   step="0.01"
+                   min="0"
                    max="100"
                    data-field="offset"
                    data-order-index="${index}">
           </div>
           <div class="grid-order-field">
             <label class="grid-order-label">ОБЪЁМ %</label>
-            <input type="number" 
-                   class="grid-order-input" 
-                   value="${order.volume}" 
-                   step="0.1" 
-                   min="0.1" 
+            <input type="number"
+                   class="grid-order-input"
+                   value="${order.volume}"
+                   step="0.1"
+                   min="0.1"
                    max="100"
                    data-field="volume"
                    data-order-index="${index}">
@@ -4140,7 +2556,7 @@ function renderGridOrdersPanel(block, blockId, _optimizationMode = false) {
 
   html += `
       </div>
-      
+
       <button class="grid-orders-add-btn" id="gridAddOrder_${blockId}" ${orders.length >= MAX_ORDERS ? 'disabled' : ''}>
         <i class="bi bi-plus-lg"></i> Добавить ордер
       </button>
@@ -4600,6 +3016,100 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       ]
     },
 
+    // =============================================
+    // NEW INDICATOR BLOCKS
+    // =============================================
+    stoch_rsi: {
+      title: '======== StochRSI - [OSCILLATOR] ========',
+      fields: [
+        { key: 'rsi_period', label: 'RSI Period (14):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 },
+        { key: 'stoch_period', label: 'Stoch Period (14):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 },
+        { key: 'k_period', label: '%K Smoothing (3):', type: 'number', optimizable: true, min: 1, max: 50, step: 1 },
+        { key: 'd_period', label: '%D Smoothing (3):', type: 'number', optimizable: true, min: 1, max: 50, step: 1 },
+        { key: 'source', label: 'Source:', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] }
+      ]
+    },
+    cci: {
+      title: '======== CCI - [COMMODITY CHANNEL INDEX] ========',
+      fields: [
+        { key: 'period', label: 'CCI Period (20):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 }
+      ]
+    },
+    adx: {
+      title: '======== ADX - [AVERAGE DIRECTIONAL INDEX] ========',
+      fields: [
+        { key: 'period', label: 'ADX Period (14):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 }
+      ]
+    },
+    parabolic_sar: {
+      title: '======== Parabolic SAR ========',
+      fields: [
+        { key: 'start', label: 'AF Start (0.02):', type: 'number', optimizable: true, min: 0.001, max: 0.5, step: 0.001 },
+        { key: 'increment', label: 'AF Increment (0.02):', type: 'number', optimizable: true, min: 0.001, max: 0.5, step: 0.001 },
+        { key: 'max_value', label: 'AF Max (0.2):', type: 'number', optimizable: true, min: 0.01, max: 1.0, step: 0.01 }
+      ]
+    },
+    sma: {
+      title: '======== SMA - [SIMPLE MOVING AVERAGE] ========',
+      fields: [
+        { key: 'period', label: 'SMA Period (50):', type: 'number', optimizable: true, min: 1, max: 500, step: 1 },
+        { key: 'source', label: 'Source:', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] }
+      ]
+    },
+    ema: {
+      title: '======== EMA - [EXPONENTIAL MOVING AVERAGE] ========',
+      fields: [
+        { key: 'period', label: 'EMA Period (20):', type: 'number', optimizable: true, min: 1, max: 500, step: 1 },
+        { key: 'source', label: 'Source:', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] }
+      ]
+    },
+    bollinger: {
+      title: '======== Bollinger Bands ========',
+      fields: [
+        { key: 'period', label: 'BB Period (20):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 },
+        { key: 'std_dev', label: 'Std Dev Multiplier (2.0):', type: 'number', optimizable: true, min: 0.1, max: 10, step: 0.1 },
+        { key: 'source', label: 'Source:', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] }
+      ]
+    },
+    donchian: {
+      title: '======== Donchian Channels ========',
+      fields: [
+        { key: 'period', label: 'Donchian Period (20):', type: 'number', optimizable: true, min: 2, max: 200, step: 1 }
+      ]
+    },
+    ichimoku: {
+      title: '======== Ichimoku Cloud ========',
+      fields: [
+        { key: 'tenkan_period', label: 'Tenkan-Sen Period (9):', type: 'number', optimizable: true, min: 1, max: 100, step: 1 },
+        { key: 'kijun_period', label: 'Kijun-Sen Period (26):', type: 'number', optimizable: true, min: 1, max: 200, step: 1 },
+        { key: 'senkou_b_period', label: 'Senkou Span B Period (52):', type: 'number', optimizable: true, min: 1, max: 300, step: 1 }
+      ]
+    },
+    pivot_points: {
+      title: '======== Pivot Points (Classic) ========',
+      fields: [
+        { type: 'separator', label: 'Outputs: PP, R1, R2, R3, S1, S2, S3 — use with Crossover/Crossunder conditions' }
+      ]
+    },
+    obv: {
+      title: '======== OBV - [ON-BALANCE VOLUME] ========',
+      fields: [
+        { type: 'separator', label: 'OBV — cumulative volume indicator (no params required)' }
+      ]
+    },
+    vwap: {
+      title: '======== VWAP - [VOLUME WEIGHTED AVERAGE PRICE] ========',
+      fields: [
+        { type: 'separator', label: 'VWAP — session-based volume weighted price (no params required)' }
+      ]
+    },
+    ad_line: {
+      title: '======== AD Line - [ACCUMULATION/DISTRIBUTION] ========',
+      fields: [
+        { type: 'separator', label: 'AD Line — cumulative A/D indicator (no params required)' }
+      ]
+    },
+
     // (Filters panels removed — entire Filters category deprecated)
 
     // =============================================
@@ -4861,14 +3371,34 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
   }
 
   // Helper to render a complete optimization row (label + checkbox + range inputs)
-  const renderOptRow = (key, label, value) => {
-    const opt = optParams[key] || { enabled: false, min: value, max: value, step: 1 };
+  // fieldMin/fieldMax/fieldStep: field-level constraints used as defaults when no saved opt config exists
+  const renderOptRow = (key, label, value, fieldMin, fieldMax, fieldStep) => {
+    const saved = optParams[key];
+    let opt;
+    if (!saved) {
+      // No saved config — use field constraints as sensible defaults
+      opt = { enabled: false, min: fieldMin ?? value, max: fieldMax ?? value, step: fieldStep ?? 1 };
+    } else if (saved.min === saved.max && saved.min == value && (fieldMin !== undefined || fieldMax !== undefined)) {
+      // Auto-initialized with current value only (degenerate range) — replace with field defaults.
+      // ALSO update optParams in-memory so that strategies loaded from DB get corrected immediately
+      // (without user needing to re-open the popup before clicking Start Optimization).
+      opt = { enabled: saved.enabled || false, min: fieldMin ?? value, max: fieldMax ?? value, step: fieldStep ?? saved.step ?? 1 };
+      optParams[key] = opt;
+    } else {
+      opt = saved;
+    }
     const disabled = opt.enabled ? '' : 'disabled';
+    const fMin = fieldMin ?? '';
+    const fMax = fieldMax ?? '';
+    const fStep = fieldStep ?? 1;
     return `
       <div class="tv-opt-row" data-param-key="${key}">
-        <input type="checkbox" 
+        <input type="checkbox"
                class="tv-opt-checkbox"
                data-param-key="${key}"
+               data-field-min="${fMin}"
+               data-field-max="${fMax}"
+               data-field-step="${fStep}"
                ${opt.enabled ? 'checked' : ''}>
         <span class="tv-opt-label">${label}</span>
         <div class="tv-opt-controls">
@@ -4939,7 +3469,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
           const maxAttr = f.max !== undefined ? `max="${f.max}"` : '';
           html += `
             ${f.label ? `<span class="tv-inline-label">${f.label}</span>` : ''}
-            <input type="number" 
+            <input type="number"
                    class="tv-input tv-input-inline"
                    style="width: ${f.width || '80px'}"
                    value="${val}"
@@ -4951,12 +3481,12 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       });
       html += '</div>';
     } else if (field.type === 'inline' && optimizationMode) {
-      // In optimization mode, render inline fields as separate opt rows
+      // In optimization mode, render inline fields as separate opt rows (pass field constraints as defaults)
       field.fields.forEach(f => {
         if (f.type === 'number' && f.optimizable) {
           const val = params[f.key] ?? 0;
           const label = f.label || formatParamName(f.key);
-          html += renderOptRow(f.key, label, val);
+          html += renderOptRow(f.key, label, val, f.min, f.max, f.step);
         }
       });
     } else if (field.type === 'checkbox' && !optimizationMode) {
@@ -4967,7 +3497,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       html += `
         <div class="tv-param-row tv-checkbox-row">
           <label class="tv-checkbox-label">
-            <input type="checkbox" 
+            <input type="checkbox"
                    class="tv-checkbox"
                    data-block-id="${blockId}"
                    data-param-key="${field.key}"
@@ -4997,8 +3527,8 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       const val = params[field.key] ?? '';
 
       if (optimizationMode && field.optimizable) {
-        // Optimization mode - use complete opt row
-        html += renderOptRow(field.key, field.label, val);
+        // Optimization mode - use complete opt row (pass field constraints as defaults)
+        html += renderOptRow(field.key, field.label, val, field.min, field.max, field.step);
       } else if (!optimizationMode) {
         // Default mode - show single input with step, min, max attributes
         const stepAttr = field.step ? `step="${field.step}"` : '';
@@ -5007,7 +3537,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         html += `
           <div class="tv-param-row">
             <label class="tv-label">${field.label}</label>
-            <input type="number" 
+            <input type="number"
                    class="tv-input"
                    value="${val}"
                    ${stepAttr} ${minAttr} ${maxAttr}
@@ -5369,6 +3899,22 @@ function getBlockPorts(blockId, _category) {
         { id: 'short', label: 'Short', type: 'condition' }
       ]
     },
+    pivot_points: {
+      inputs: [],
+      outputs: [
+        { id: 'pp', label: 'PP', type: 'data' },
+        { id: 'r1', label: 'R1', type: 'data' },
+        { id: 'r2', label: 'R2', type: 'data' },
+        { id: 'r3', label: 'R3', type: 'data' },
+        { id: 's1', label: 'S1', type: 'data' },
+        { id: 's2', label: 'S2', type: 'data' },
+        { id: 's3', label: 'S3', type: 'data' }
+      ]
+    },
+    ad_line: {
+      inputs: [],
+      outputs: [{ id: 'value', label: 'AD', type: 'data' }]
+    },
 
     // ── Divergence (outputs long/short signals) ──
     divergence: {
@@ -5439,8 +3985,8 @@ function renderPorts(ports, direction, blockId) {
   if (ports.length === 1) {
     const port = ports[0];
     const posClass = direction === 'input' ? 'input' : 'output';
-    return `<div class="port ${posClass} ${port.type}-port" 
-                 data-port-id="${port.id}" 
+    return `<div class="port ${posClass} ${port.type}-port"
+                 data-port-id="${port.id}"
                  data-port-type="${port.type}"
                  data-block-id="${blockId}"
                  data-direction="${direction}"
@@ -5454,8 +4000,8 @@ function renderPorts(ports, direction, blockId) {
       .map(
         (port) => `
         <div class="port-row ${direction}">
-          <div class="port ${port.type}-port" 
-               data-port-id="${port.id}" 
+          <div class="port ${port.type}-port"
+               data-port-id="${port.id}"
                data-port-type="${port.type}"
                data-block-id="${blockId}"
                data-direction="${direction}"
@@ -5477,38 +4023,38 @@ function renderMainStrategyNode(block, _ports) {
          style="left: ${block.x}px; top: ${block.y}px"
          data-block-id="${block.id}">
         <!-- Entry Long port -->
-        <div class="port condition-port main-port-left entry-port" 
-             data-port-id="entry_long" 
+        <div class="port condition-port main-port-left entry-port"
+             data-port-id="entry_long"
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Long — connect indicator Long signal or condition result"
              style="top: 10%;"></div>
         <span class="main-port-label entry-label" style="top: 10%; transform: translateY(-50%);"><i class="bi bi-arrow-up-circle"></i> Entry L</span>
-        
+
         <!-- Entry Short port -->
-        <div class="port condition-port main-port-left entry-port" 
-             data-port-id="entry_short" 
+        <div class="port condition-port main-port-left entry-port"
+             data-port-id="entry_short"
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Short — connect indicator Short signal or condition result"
              style="top: 23%;"></div>
         <span class="main-port-label entry-label" style="top: 23%; transform: translateY(-50%);"><i class="bi bi-arrow-down-circle"></i> Entry S</span>
-        
+
         <!-- Exit Long port -->
-        <div class="port condition-port main-port-left exit-port" 
-             data-port-id="exit_long" 
+        <div class="port condition-port main-port-left exit-port"
+             data-port-id="exit_long"
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Long — optional signal to close long positions"
              style="top: 36%;"></div>
         <span class="main-port-label exit-label" style="top: 36%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit L</span>
-        
+
         <!-- Exit Short port -->
-        <div class="port condition-port main-port-left exit-port" 
-             data-port-id="exit_short" 
+        <div class="port condition-port main-port-left exit-port"
+             data-port-id="exit_short"
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
@@ -5517,8 +4063,8 @@ function renderMainStrategyNode(block, _ports) {
         <span class="main-port-label exit-label" style="top: 49%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit S</span>
 
         <!-- SL/TP config port — cyan -->
-        <div class="port config-port main-port-left config-input-port" 
-             data-port-id="sl_tp" 
+        <div class="port config-port main-port-left config-input-port"
+             data-port-id="sl_tp"
              data-port-type="config"
              data-block-id="${block.id}"
              data-direction="input"
@@ -5527,8 +4073,8 @@ function renderMainStrategyNode(block, _ports) {
         <span class="main-port-label config-label-sltp" style="top: 63%; transform: translateY(-50%);"><i class="bi bi-shield-check"></i> SL/TP</span>
 
         <!-- Close Conditions config port — amber -->
-        <div class="port config-port main-port-left config-input-port" 
-             data-port-id="close_cond" 
+        <div class="port config-port main-port-left config-input-port"
+             data-port-id="close_cond"
              data-port-type="config"
              data-block-id="${block.id}"
              data-direction="input"
@@ -5537,15 +4083,15 @@ function renderMainStrategyNode(block, _ports) {
         <span class="main-port-label config-label-close" style="top: 77%; transform: translateY(-50%);"><i class="bi bi-door-open"></i> Close</span>
 
         <!-- DCA/Grid config port — purple -->
-        <div class="port config-port main-port-left config-input-port" 
-             data-port-id="dca_grid" 
+        <div class="port config-port main-port-left config-input-port"
+             data-port-id="dca_grid"
              data-port-type="config"
              data-block-id="${block.id}"
              data-direction="input"
              title="DCA/Grid — connect DCA or Manual Grid block"
              style="top: 91%;"></div>
         <span class="main-port-label config-label-dca" style="top: 91%; transform: translateY(-50%);"><i class="bi bi-layers"></i> DCA</span>
-        
+
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
     </div>
@@ -5726,8 +4272,8 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
         return optimizationMode ? `
           <div class="popup-param-row optimization-row">
             <div class="opt-checkbox">
-              <input type="checkbox" 
-                     id="opt_${blockId}_${key}" 
+              <input type="checkbox"
+                     id="opt_${blockId}_${key}"
                      class="opt-enable-checkbox"
                      data-param-key="${key}"
                      ${opt.enabled ? 'checked' : ''}>
@@ -5744,8 +4290,8 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
           ` : `
           <div class="popup-param-row">
             <label class="popup-param-label">${formatParamName(key)}</label>
-            <input type="number" 
-                   class="popup-param-input" 
+            <input type="number"
+                   class="popup-param-input"
                    value="${value}"
                    data-block-id="${blockId}"
                    data-param-key="${key}"
@@ -5800,10 +4346,14 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
         const key = checkbox.dataset.paramKey;
         if (!block.optimizationParams) block.optimizationParams = {};
         if (!block.optimizationParams[key]) {
-          block.optimizationParams[key] = { enabled: false, min: params[key], max: params[key], step: 1 };
+          const fMin = checkbox.dataset.fieldMin !== '' ? parseFloat(checkbox.dataset.fieldMin) : params[key];
+          const fMax = checkbox.dataset.fieldMax !== '' ? parseFloat(checkbox.dataset.fieldMax) : params[key];
+          const fStep = checkbox.dataset.fieldStep !== '' ? parseFloat(checkbox.dataset.fieldStep) : 1;
+          block.optimizationParams[key] = { enabled: false, min: fMin, max: fMax, step: fStep };
         }
         block.optimizationParams[key].enabled = checkbox.checked;
         updateBlockOptimizationIndicator(blockId);
+        dispatchBlocksChanged(); // notify optimization_panels.js
       });
     });
 
@@ -5818,6 +4368,7 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
           block.optimizationParams[key] = { enabled: false, min: params[key], max: params[key], step: 1 };
         }
         block.optimizationParams[key][field] = parseFloat(input.value);
+        dispatchBlocksChanged(); // notify optimization_panels.js
       });
     });
   } else {
@@ -5915,7 +4466,11 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
       const key = checkbox.dataset.paramKey;
       if (!block.optimizationParams) block.optimizationParams = {};
       if (!block.optimizationParams[key]) {
-        block.optimizationParams[key] = { enabled: false, min: params[key], max: params[key], step: 1 };
+        // Use field-level constraints stored as data-* attributes (fallback to current value)
+        const fMin = checkbox.dataset.fieldMin !== '' ? parseFloat(checkbox.dataset.fieldMin) : params[key];
+        const fMax = checkbox.dataset.fieldMax !== '' ? parseFloat(checkbox.dataset.fieldMax) : params[key];
+        const fStep = checkbox.dataset.fieldStep !== '' ? parseFloat(checkbox.dataset.fieldStep) : 1;
+        block.optimizationParams[key] = { enabled: false, min: fMin, max: fMax, step: fStep };
       }
       block.optimizationParams[key].enabled = checkbox.checked;
 
@@ -5927,6 +4482,7 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
         });
       }
       updateBlockOptimizationIndicator(blockId);
+      dispatchBlocksChanged(); // notify optimization panel to refresh Parameter Ranges
     });
   });
 
@@ -5939,9 +4495,15 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
       const field = input.dataset.optField;
       if (!block.optimizationParams) block.optimizationParams = {};
       if (!block.optimizationParams[key]) {
-        block.optimizationParams[key] = { enabled: false, min: params[key], max: params[key], step: 1 };
+        // Use field-level constraints from sibling checkbox data-* attributes
+        const cbx = input.closest('.tv-opt-row')?.querySelector('.tv-opt-checkbox');
+        const fMin = cbx?.dataset.fieldMin !== '' ? parseFloat(cbx?.dataset.fieldMin) : params[key];
+        const fMax = cbx?.dataset.fieldMax !== '' ? parseFloat(cbx?.dataset.fieldMax) : params[key];
+        const fStep = cbx?.dataset.fieldStep !== '' ? parseFloat(cbx?.dataset.fieldStep) : 1;
+        block.optimizationParams[key] = { enabled: false, min: fMin ?? params[key], max: fMax ?? params[key], step: fStep ?? 1 };
       }
       block.optimizationParams[key][field] = parseFloat(input.value);
+      dispatchBlocksChanged(); // notify optimization panel to refresh Parameter Ranges
     });
   });
 
@@ -6423,7 +4985,7 @@ function insertPreset(presetId, x = 200, y = 200) {
 
   // Create new blocks with unique IDs
   preset.blocks.forEach((block) => {
-    const newId = `block_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const newId = `block_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     idMap.set(block.id, newId);
 
     const newBlock = {
@@ -6444,7 +5006,7 @@ function insertPreset(presetId, x = 200, y = 200) {
 
     if (newSourceId && newTargetId) {
       connections.push({
-        id: `conn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        id: `conn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         source: { blockId: newSourceId, portId: conn.source.portId },
         target: { blockId: newTargetId, portId: conn.target.portId },
         type: conn.type
@@ -6661,8 +5223,8 @@ function _renderBlockParams(block) {
       ([key, value]) => `
                 <div class="block-param">
                     <span class="block-param-label">${formatParamName(key)}</span>
-                    <input type="text" 
-                           class="block-param-input" 
+                    <input type="text"
+                           class="block-param-input"
                            value="${value}"
                            onchange="updateBlockParam('${block.id}', '${key}', this.value)"
                            onclick="event.stopPropagation()">
@@ -7003,7 +5565,18 @@ function validateBlockParams(block) {
 
   const errors = [];
 
+  // RSI range params are only relevant when their feature flag is enabled
+  const rsiRangeSkip = block.type === 'rsi' ? new Set([
+    ...(block.params.use_long_range ? [] : ['long_rsi_more', 'long_rsi_less']),
+    ...(block.params.use_short_range ? [] : ['short_rsi_less', 'short_rsi_more']),
+    ...(block.params.use_cross_long ? [] : ['cross_long_level', 'cross_memory_bars']),
+    ...(block.params.use_cross_short ? [] : ['cross_short_level', 'cross_memory_bars'])
+  ]) : null;
+
   for (const [paramName, rule] of Object.entries(rules)) {
+    // Skip RSI range params when the corresponding feature is disabled
+    if (rsiRangeSkip && rsiRangeSkip.has(paramName)) continue;
+
     const value = block.params[paramName];
     const result = validateParamValue(value, rule, paramName);
     if (!result.valid) {
@@ -7221,7 +5794,7 @@ async function syncBtcSourceForNode(blockId) {
 
   // Check cache — skip if synced recently (same logic as main sync, 10s grace)
   const BTC_SYNC_CACHE_KEY = 'BTCUSDT_btcsource';
-  const lastSync = symbolSyncCache[BTC_SYNC_CACHE_KEY];
+  const lastSync = _btcSyncCache[BTC_SYNC_CACHE_KEY];
   if (lastSync && Date.now() - lastSync < 10000) {
     _setStatus('✓', `BTCUSDT${tfNote} — данные актуальны`, '#4caf50');
     return;
@@ -7281,7 +5854,7 @@ async function syncBtcSourceForNode(blockId) {
     clearTimeout(timeoutId);
 
     if (result) {
-      symbolSyncCache[BTC_SYNC_CACHE_KEY] = Date.now();
+      _btcSyncCache[BTC_SYNC_CACHE_KEY] = Date.now();
       const totalNew = result.totalNew || 0;
       const newText = totalNew > 0 ? `, +${totalNew} свечей` : '';
       _setStatus('✅', `BTCUSDT${tfNote} — готово${newText}`, '#4caf50');
@@ -7776,1284 +6349,6 @@ function applyNodeRepulsionForGroup(movedBlockId, excludeIds) {
 }
 
 
-// Modal functions
-function openTemplatesModal() {
-  console.log('[Strategy Builder] Opening templates modal');
-  const modal = document.getElementById('templatesModal');
-  if (!modal) {
-    console.error('[Strategy Builder] Templates modal not found!');
-    return;
-  }
-
-  // Prevent any other handlers from closing it immediately
-  const wasOpen = modal.classList.contains('active');
-  if (wasOpen) {
-    console.log('[Strategy Builder] Modal already open, skipping');
-    return;
-  }
-
-  // Ensure templates are rendered before opening
-  renderTemplates();
-
-  // Update open time before opening (for overlay handler to check)
-  if (window._updateTemplatesModalOpenTime) {
-    window._updateTemplatesModalOpenTime();
-  }
-
-  // Open modal
-  modal.classList.add('active');
-  console.log('[Strategy Builder] Templates modal opened');
-  console.log('[Strategy Builder] Modal classes:', modal.className);
-  console.log('[Strategy Builder] Modal display:', window.getComputedStyle(modal).display);
-  console.log('[Strategy Builder] Modal z-index:', window.getComputedStyle(modal).zIndex);
-  console.log('[Strategy Builder] Modal visibility:', window.getComputedStyle(modal).visibility);
-
-  // Check modal content visibility
-  const modalContent = modal.querySelector('.modal');
-  if (modalContent) {
-    const contentStyle = window.getComputedStyle(modalContent);
-    console.log('[Strategy Builder] Modal content (.modal) found');
-    console.log('  - Display:', contentStyle.display);
-    console.log('  - Opacity:', contentStyle.opacity);
-    console.log('  - Visibility:', contentStyle.visibility);
-    console.log('  - Z-index:', contentStyle.zIndex);
-    console.log('  - Width:', contentStyle.width);
-    console.log('  - Height:', contentStyle.height);
-    console.log('  - Background:', contentStyle.backgroundColor);
-
-    // Force visibility if needed
-    if (contentStyle.display === 'none' || contentStyle.opacity === '0' || contentStyle.visibility === 'hidden') {
-      console.warn('[Strategy Builder] Modal content not visible, forcing display');
-      modalContent.style.display = 'flex';
-      modalContent.style.flexDirection = 'column';
-      modalContent.style.opacity = '1';
-      modalContent.style.visibility = 'visible';
-    }
-  } else {
-    console.error('[Strategy Builder] Modal content (.modal) NOT FOUND!');
-  }
-
-  // Verify it's still open after a moment
-  setTimeout(() => {
-    const stillOpen = modal.classList.contains('active');
-    if (!stillOpen) {
-      console.error('[Strategy Builder] Modal was closed unexpectedly! Reopening...');
-      modal.classList.add('active');
-    } else {
-      console.log('[Strategy Builder] Modal confirmed open');
-    }
-  }, 100);
-}
-
-function closeTemplatesModal() {
-  console.log('[Strategy Builder] Closing templates modal');
-  const modal = document.getElementById('templatesModal');
-  if (modal) {
-    modal.classList.remove('active');
-    console.log('[Strategy Builder] Templates modal closed');
-  }
-}
-
-function selectTemplate(templateId) {
-  console.log(`[Strategy Builder] Template selected: ${templateId}`);
-  selectedTemplate = templateId;
-  renderTemplates();
-
-  // Visual feedback
-  const cards = document.querySelectorAll('.template-card');
-  cards.forEach(card => {
-    if (card.dataset.templateId === templateId) {
-      card.classList.add('selected');
-      console.log(`[Strategy Builder] Template card selected: ${templateId}`);
-    } else {
-      card.classList.remove('selected');
-    }
-  });
-}
-
-function loadSelectedTemplate() {
-  if (!selectedTemplate) {
-    console.warn('[Strategy Builder] No template selected');
-    showNotification('Выберите шаблон', 'warning');
-    return;
-  }
-
-  console.log(`[Strategy Builder] Loading template: ${selectedTemplate}`);
-  const template = templates.find((t) => t.id === selectedTemplate);
-  if (template) {
-    console.log('[Strategy Builder] Template found:', template);
-
-    // Update strategy name
-    const nameInput = document.getElementById('strategyName');
-    if (nameInput) {
-      nameInput.value = template.name;
-      syncStrategyNameDisplay();
-    }
-
-    // Load template blocks and connections
-    loadTemplateData(selectedTemplate);
-
-    // Close modal after a short delay to ensure template is loaded
-    setTimeout(() => {
-      closeTemplatesModal();
-      showNotification(`Шаблон "${template.name}" загружен`, 'success');
-    }, 100);
-  } else {
-    console.error(`[Strategy Builder] Template not found: ${selectedTemplate}`);
-    showNotification(`Шаблон "${selectedTemplate}" не найден`, 'error');
-  }
-}
-
-// Template data with actual blocks and connections
-const templateData = {
-  rsi_oversold: {
-    blocks: [
-      {
-        id: 'rsi_1',
-        type: 'rsi',
-        category: 'indicator',
-        name: 'RSI',
-        icon: 'graph-up',
-        x: 100,
-        y: 150,
-        params: { period: 14, use_cross_level: true, cross_long_level: 30, cross_short_level: 70 }
-      },
-      {
-        id: 'sltp_1',
-        type: 'static_sltp',
-        category: 'exit',
-        name: 'Static SL/TP',
-        icon: 'shield-check',
-        x: 600,
-        y: 450,
-        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
-      }
-    ],
-    connections: [
-      {
-        id: 'conn_1',
-        source: { blockId: 'rsi_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'entry_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'rsi_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'exit_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'rsi_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'entry_short' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'rsi_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'exit_short' },
-        type: 'condition'
-      }
-    ]
-  },
-  macd_crossover: {
-    blocks: [
-      {
-        id: 'macd_1',
-        type: 'macd',
-        category: 'indicator',
-        name: 'MACD',
-        icon: 'bar-chart',
-        x: 100,
-        y: 200,
-        params: { fast_period: 12, slow_period: 26, signal_period: 9, source: 'close', use_macd_cross_signal: true }
-      },
-      {
-        id: 'sltp_1',
-        type: 'static_sltp',
-        category: 'exit',
-        name: 'Static SL/TP',
-        icon: 'shield-check',
-        x: 400,
-        y: 350,
-        params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 }
-      }
-    ],
-    connections: [
-      {
-        id: 'conn_1',
-        source: { blockId: 'macd_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'entry_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'macd_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'exit_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'macd_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'entry_short' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'macd_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'exit_short' },
-        type: 'condition'
-      }
-    ]
-  },
-  ema_crossover: {
-    blocks: [
-      {
-        id: 'ema_fast',
-        type: 'ema',
-        category: 'indicator',
-        name: 'EMA Fast',
-        icon: 'graph-up-arrow',
-        x: 100,
-        y: 150,
-        params: { period: 9 }
-      },
-      {
-        id: 'ema_slow',
-        type: 'ema',
-        category: 'indicator',
-        name: 'EMA Slow',
-        icon: 'graph-up-arrow',
-        x: 100,
-        y: 300,
-        params: { period: 21 }
-      },
-      {
-        id: 'crossover_1',
-        type: 'crossover',
-        category: 'condition',
-        name: 'Crossover',
-        icon: 'intersect',
-        x: 350,
-        y: 150,
-        params: {}
-      },
-      {
-        id: 'crossunder_1',
-        type: 'crossunder',
-        category: 'condition',
-        name: 'Crossunder',
-        icon: 'intersect',
-        x: 350,
-        y: 350,
-        params: {}
-      },
-      {
-        id: 'sltp_1',
-        type: 'static_sltp',
-        category: 'exit',
-        name: 'Static SL/TP',
-        icon: 'shield-check',
-        x: 600,
-        y: 450,
-        params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 }
-      }
-    ],
-    connections: [
-      {
-        id: 'conn_1',
-        source: { blockId: 'ema_fast', portId: 'value' },
-        target: { blockId: 'crossover_1', portId: 'a' },
-        type: 'data'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'ema_slow', portId: 'value' },
-        target: { blockId: 'crossover_1', portId: 'b' },
-        type: 'data'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'ema_fast', portId: 'value' },
-        target: { blockId: 'crossunder_1', portId: 'a' },
-        type: 'data'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'ema_slow', portId: 'value' },
-        target: { blockId: 'crossunder_1', portId: 'b' },
-        type: 'data'
-      },
-      {
-        id: 'conn_5',
-        source: { blockId: 'crossover_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'entry_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_6',
-        source: { blockId: 'crossunder_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'exit_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_7',
-        source: { blockId: 'crossunder_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'entry_short' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_8',
-        source: { blockId: 'crossover_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'exit_short' },
-        type: 'condition'
-      }
-    ]
-  },
-  bollinger_bounce: {
-    blocks: [
-      {
-        id: 'price_1',
-        type: 'price',
-        category: 'input',
-        name: 'Price',
-        icon: 'currency-dollar',
-        x: 50,
-        y: 150,
-        params: {}
-      },
-      {
-        id: 'bb_1',
-        type: 'bollinger',
-        category: 'indicator',
-        name: 'Bollinger Bands',
-        icon: 'distribute-vertical',
-        x: 50,
-        y: 300,
-        params: { period: 20, stdDev: 2 }
-      },
-      {
-        id: 'less_than_1',
-        type: 'less_than',
-        category: 'condition',
-        name: 'Less Than',
-        icon: 'chevron-double-down',
-        x: 300,
-        y: 150,
-        params: {}
-      },
-      {
-        id: 'greater_than_1',
-        type: 'greater_than',
-        category: 'condition',
-        name: 'Greater Than',
-        icon: 'chevron-double-up',
-        x: 300,
-        y: 350,
-        params: {}
-      },
-      {
-        id: 'sltp_1',
-        type: 'static_sltp',
-        category: 'exit',
-        name: 'Static SL/TP',
-        icon: 'shield-check',
-        x: 600,
-        y: 450,
-        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
-      }
-    ],
-    connections: [
-      {
-        id: 'conn_1',
-        source: { blockId: 'price_1', portId: 'close' },
-        target: { blockId: 'less_than_1', portId: 'left' },
-        type: 'data'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'bb_1', portId: 'lower' },
-        target: { blockId: 'less_than_1', portId: 'right' },
-        type: 'data'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'price_1', portId: 'close' },
-        target: { blockId: 'greater_than_1', portId: 'left' },
-        type: 'data'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'bb_1', portId: 'upper' },
-        target: { blockId: 'greater_than_1', portId: 'right' },
-        type: 'data'
-      },
-      {
-        id: 'conn_5',
-        source: { blockId: 'less_than_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'entry_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_6',
-        source: { blockId: 'greater_than_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'exit_long' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_7',
-        source: { blockId: 'greater_than_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'entry_short' },
-        type: 'condition'
-      },
-      {
-        id: 'conn_8',
-        source: { blockId: 'less_than_1', portId: 'result' },
-        target: { blockId: 'main_strategy', portId: 'exit_short' },
-        type: 'condition'
-      }
-    ]
-  },
-  rsi_long_short: {
-    blocks: [
-      {
-        id: 'rsi_1',
-        type: 'rsi',
-        category: 'indicator',
-        name: 'RSI',
-        icon: 'graph-up',
-        x: 150,
-        y: 150,
-        params: { period: 14, use_long_range: true, long_rsi_more: 1, long_rsi_less: 30, use_short_range: true, short_rsi_less: 100, short_rsi_more: 70 }
-      },
-      {
-        id: 'sltp_1',
-        type: 'static_sltp',
-        category: 'exit',
-        name: 'Static SL/TP',
-        icon: 'shield-check',
-        x: 650,
-        y: 500,
-        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
-      }
-    ],
-    connections: [
-      // RSI long signal → Entry Long
-      {
-        id: 'conn_1',
-        source: { blockId: 'rsi_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'entry_long' },
-        type: 'condition'
-      },
-      // RSI short signal → Exit Long
-      {
-        id: 'conn_2',
-        source: { blockId: 'rsi_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'exit_long' },
-        type: 'condition'
-      },
-      // RSI short signal → Entry Short
-      {
-        id: 'conn_3',
-        source: { blockId: 'rsi_1', portId: 'short' },
-        target: { blockId: 'main_strategy', portId: 'entry_short' },
-        type: 'condition'
-      },
-      // RSI long signal → Exit Short
-      {
-        id: 'conn_4',
-        source: { blockId: 'rsi_1', portId: 'long' },
-        target: { blockId: 'main_strategy', portId: 'exit_short' },
-        type: 'condition'
-      }
-    ]
-  },
-
-  // =============================================
-  // STOCHASTIC REVERSAL — %K/%D crossover at oversold/overbought
-  // =============================================
-  stochastic_oversold: {
-    blocks: [
-      { id: 'stoch_1', type: 'stochastic', category: 'indicator', name: 'Stochastic', icon: 'percent', x: 80, y: 150, params: { k_period: 14, d_period: 3, smooth: 3 } },
-      { id: 'const_20', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 350, params: { value: 20 } },
-      { id: 'const_80', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 450, params: { value: 80 } },
-      { id: 'crossover_1', type: 'crossover', category: 'condition', name: 'K cross D up', icon: 'intersect', x: 320, y: 120, params: {} },
-      { id: 'crossunder_1', type: 'crossunder', category: 'condition', name: 'K cross D down', icon: 'intersect', x: 320, y: 280, params: {} },
-      { id: 'less_than_1', type: 'less_than', category: 'condition', name: 'K < 20', icon: 'chevron-double-down', x: 320, y: 420, params: {} },
-      { id: 'greater_than_1', type: 'greater_than', category: 'condition', name: 'K > 80', icon: 'chevron-double-up', x: 320, y: 540, params: {} },
-      { id: 'and_entry_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 170, params: {} },
-      { id: 'and_entry_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 380, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 500, params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // K crossover D (bullish)
-      { id: 'conn_1', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossover_1', portId: 'a' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossover_1', portId: 'b' }, type: 'data' },
-      // K crossunder D (bearish)
-      { id: 'conn_3', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossunder_1', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossunder_1', portId: 'b' }, type: 'data' },
-      // K < 20 (oversold zone)
-      { id: 'conn_5', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'less_than_1', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'const_20', portId: 'value' }, target: { blockId: 'less_than_1', portId: 'right' }, type: 'data' },
-      // K > 80 (overbought zone)
-      { id: 'conn_7', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'greater_than_1', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'const_80', portId: 'value' }, target: { blockId: 'greater_than_1', portId: 'right' }, type: 'data' },
-      // AND: crossover + oversold → entry long
-      { id: 'conn_9', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'and_entry_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'less_than_1', portId: 'result' }, target: { blockId: 'and_entry_long', portId: 'b' }, type: 'condition' },
-      // AND: crossunder + overbought → entry short
-      { id: 'conn_11', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'and_entry_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'greater_than_1', portId: 'result' }, target: { blockId: 'and_entry_short', portId: 'b' }, type: 'condition' },
-      // Strategy connections
-      { id: 'conn_13', source: { blockId: 'and_entry_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_15', source: { blockId: 'and_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'and_entry_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // SUPERTREND FOLLOWER — direction flips
-  // =============================================
-  supertrend_follow: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 80, y: 150, params: {} },
-      { id: 'st_1', type: 'supertrend', category: 'indicator', name: 'SuperTrend', icon: 'arrow-up-right-circle', x: 80, y: 320, params: { period: 10, multiplier: 3.0 } },
-      { id: 'crossover_1', type: 'crossover', category: 'condition', name: 'Price cross above ST', icon: 'intersect', x: 340, y: 150, params: {} },
-      { id: 'crossunder_1', type: 'crossunder', category: 'condition', name: 'Price cross below ST', icon: 'intersect', x: 340, y: 350, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_1', portId: 'a' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'crossover_1', portId: 'b' }, type: 'data' },
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_1', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'crossunder_1', portId: 'b' }, type: 'data' },
-      { id: 'conn_5', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_6', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_7', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_8', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // TRIPLE EMA — EMA 9/21/55 alignment
-  // =============================================
-  triple_ema: {
-    blocks: [
-      { id: 'ema_9', type: 'ema', category: 'indicator', name: 'EMA 9', icon: 'graph-up-arrow', x: 80, y: 100, params: { period: 9 } },
-      { id: 'ema_21', type: 'ema', category: 'indicator', name: 'EMA 21', icon: 'graph-up-arrow', x: 80, y: 250, params: { period: 21 } },
-      { id: 'ema_55', type: 'ema', category: 'indicator', name: 'EMA 55', icon: 'graph-up-arrow', x: 80, y: 400, params: { period: 55 } },
-      { id: 'crossover_fast', type: 'crossover', category: 'condition', name: 'EMA9 cross EMA21 up', icon: 'intersect', x: 320, y: 120, params: {} },
-      { id: 'gt_trend', type: 'greater_than', category: 'condition', name: 'EMA21 > EMA55', icon: 'chevron-double-up', x: 320, y: 280, params: {} },
-      { id: 'crossunder_fast', type: 'crossunder', category: 'condition', name: 'EMA9 cross EMA21 down', icon: 'intersect', x: 320, y: 420, params: {} },
-      { id: 'lt_trend', type: 'less_than', category: 'condition', name: 'EMA21 < EMA55', icon: 'chevron-double-down', x: 320, y: 560, params: {} },
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 180, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 470, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // EMA9 crossover EMA21
-      { id: 'conn_1', source: { blockId: 'ema_9', portId: 'value' }, target: { blockId: 'crossover_fast', portId: 'a' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'crossover_fast', portId: 'b' }, type: 'data' },
-      // EMA21 > EMA55 (uptrend)
-      { id: 'conn_3', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'gt_trend', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'ema_55', portId: 'value' }, target: { blockId: 'gt_trend', portId: 'right' }, type: 'data' },
-      // EMA9 crossunder EMA21
-      { id: 'conn_5', source: { blockId: 'ema_9', portId: 'value' }, target: { blockId: 'crossunder_fast', portId: 'a' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'crossunder_fast', portId: 'b' }, type: 'data' },
-      // EMA21 < EMA55 (downtrend)
-      { id: 'conn_7', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'lt_trend', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'ema_55', portId: 'value' }, target: { blockId: 'lt_trend', portId: 'right' }, type: 'data' },
-      // AND: crossover + uptrend → entry long
-      { id: 'conn_9', source: { blockId: 'crossover_fast', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'gt_trend', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND: crossunder + downtrend → entry short
-      { id: 'conn_11', source: { blockId: 'crossunder_fast', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'lt_trend', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // ICHIMOKU CLOUD — TK cross + price above/below cloud
-  // =============================================
-  ichimoku_cloud: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 80, params: {} },
-      { id: 'ich_1', type: 'ichimoku', category: 'indicator', name: 'Ichimoku', icon: 'cloud', x: 60, y: 250, params: { tenkan: 9, kijun: 26, senkou_b: 52 } },
-      { id: 'crossover_tk', type: 'crossover', category: 'condition', name: 'TK cross up', icon: 'intersect', x: 310, y: 80, params: {} },
-      { id: 'gt_cloud', type: 'greater_than', category: 'condition', name: 'Close > SpanA', icon: 'chevron-double-up', x: 310, y: 230, params: {} },
-      { id: 'crossunder_tk', type: 'crossunder', category: 'condition', name: 'TK cross down', icon: 'intersect', x: 310, y: 380, params: {} },
-      { id: 'lt_cloud', type: 'less_than', category: 'condition', name: 'Close < SpanB', icon: 'chevron-double-down', x: 310, y: 520, params: {} },
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 140, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 430, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.5, stop_loss_percent: 2.0 } }
-    ],
-    connections: [
-      // Tenkan crossover Kijun
-      { id: 'conn_1', source: { blockId: 'ich_1', portId: 'tenkan_sen' }, target: { blockId: 'crossover_tk', portId: 'a' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'ich_1', portId: 'kijun_sen' }, target: { blockId: 'crossover_tk', portId: 'b' }, type: 'data' },
-      // Close > Senkou Span A (above cloud)
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_cloud', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'ich_1', portId: 'senkou_span_a' }, target: { blockId: 'gt_cloud', portId: 'right' }, type: 'data' },
-      // Tenkan crossunder Kijun
-      { id: 'conn_5', source: { blockId: 'ich_1', portId: 'tenkan_sen' }, target: { blockId: 'crossunder_tk', portId: 'a' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'ich_1', portId: 'kijun_sen' }, target: { blockId: 'crossunder_tk', portId: 'b' }, type: 'data' },
-      // Close < Senkou Span B (below cloud)
-      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_cloud', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'ich_1', portId: 'senkou_span_b' }, target: { blockId: 'lt_cloud', portId: 'right' }, type: 'data' },
-      // AND: TK cross up + above cloud → entry long
-      { id: 'conn_9', source: { blockId: 'crossover_tk', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'gt_cloud', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND: TK cross down + below cloud → entry short
-      { id: 'conn_11', source: { blockId: 'crossunder_tk', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'lt_cloud', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // BREAKOUT — Price breaks above/below Donchian channel
-  // =============================================
-  breakout: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 80, y: 150, params: {} },
-      { id: 'dc_1', type: 'donchian', category: 'indicator', name: 'Donchian 20', icon: 'distribute-vertical', x: 80, y: 320, params: { period: 20 } },
-      { id: 'gt_upper', type: 'greater_than', category: 'condition', name: 'Close > Upper', icon: 'chevron-double-up', x: 340, y: 150, params: {} },
-      { id: 'lt_lower', type: 'less_than', category: 'condition', name: 'Close < Lower', icon: 'chevron-double-down', x: 340, y: 350, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 3.0, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_upper', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'dc_1', portId: 'upper' }, target: { blockId: 'gt_upper', portId: 'right' }, type: 'data' },
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_lower', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'dc_1', portId: 'lower' }, target: { blockId: 'lt_lower', portId: 'right' }, type: 'data' },
-      { id: 'conn_5', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_6', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_7', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_8', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // DONCHIAN CHANNEL BREAKOUT — Classic turtle: buy 20-day high, sell 10-day low
-  // =============================================
-  donchian_breakout: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'dc_entry', type: 'donchian', category: 'indicator', name: 'Donchian Entry (20)', icon: 'distribute-vertical', x: 60, y: 270, params: { period: 20 } },
-      { id: 'dc_exit', type: 'donchian', category: 'indicator', name: 'Donchian Exit (10)', icon: 'distribute-vertical', x: 60, y: 440, params: { period: 10 } },
-      { id: 'gt_entry', type: 'greater_than', category: 'condition', name: 'Close > DC20 Upper', icon: 'chevron-double-up', x: 330, y: 100, params: {} },
-      { id: 'lt_exit_long', type: 'less_than', category: 'condition', name: 'Close < DC10 Lower', icon: 'chevron-double-down', x: 330, y: 260, params: {} },
-      { id: 'lt_entry_short', type: 'less_than', category: 'condition', name: 'Close < DC20 Lower', icon: 'chevron-double-down', x: 330, y: 400, params: {} },
-      { id: 'gt_exit_short', type: 'greater_than', category: 'condition', name: 'Close > DC10 Upper', icon: 'chevron-double-up', x: 330, y: 540, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 500, params: { take_profit_percent: 3.0, stop_loss_percent: 2.0 } }
-    ],
-    connections: [
-      // Entry long: Close > DC20 upper
-      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_entry', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'dc_entry', portId: 'upper' }, target: { blockId: 'gt_entry', portId: 'right' }, type: 'data' },
-      // Exit long: Close < DC10 lower
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_exit_long', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'dc_exit', portId: 'lower' }, target: { blockId: 'lt_exit_long', portId: 'right' }, type: 'data' },
-      // Entry short: Close < DC20 lower
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_entry_short', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'dc_entry', portId: 'lower' }, target: { blockId: 'lt_entry_short', portId: 'right' }, type: 'data' },
-      // Exit short: Close > DC10 upper
-      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_exit_short', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'dc_exit', portId: 'upper' }, target: { blockId: 'gt_exit_short', portId: 'right' }, type: 'data' },
-      // Strategy
-      { id: 'conn_9', source: { blockId: 'gt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'lt_exit_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_11', source: { blockId: 'lt_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'gt_exit_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // VOLUME BREAKOUT — Price breakout + OBV confirmation
-  // =============================================
-  volume_breakout: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger', icon: 'distribute-vertical', x: 60, y: 270, params: { period: 20, stdDev: 2 } },
-      { id: 'obv_1', type: 'obv', category: 'indicator', name: 'OBV', icon: 'bar-chart-steps', x: 60, y: 440, params: {} },
-      { id: 'obv_sma', type: 'sma', category: 'indicator', name: 'OBV SMA', icon: 'graph-up-arrow', x: 60, y: 580, params: { period: 20 } },
-      { id: 'gt_bb', type: 'greater_than', category: 'condition', name: 'Close > BB Upper', icon: 'chevron-double-up', x: 320, y: 100, params: {} },
-      { id: 'gt_obv', type: 'greater_than', category: 'condition', name: 'OBV > OBV SMA', icon: 'chevron-double-up', x: 320, y: 280, params: {} },
-      { id: 'lt_bb', type: 'less_than', category: 'condition', name: 'Close < BB Lower', icon: 'chevron-double-down', x: 320, y: 420, params: {} },
-      { id: 'lt_obv', type: 'less_than', category: 'condition', name: 'OBV < OBV SMA', icon: 'chevron-double-down', x: 320, y: 560, params: {} },
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 540, y: 170, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 540, y: 470, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 520, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // Close > BB Upper
-      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_bb', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'gt_bb', portId: 'right' }, type: 'data' },
-      // OBV > OBV SMA (volume confirming)
-      { id: 'conn_3', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'obv_sma', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'right' }, type: 'data' },
-      // Close < BB Lower
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_bb', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'lt_bb', portId: 'right' }, type: 'data' },
-      // OBV < OBV SMA
-      { id: 'conn_7', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'obv_sma', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'right' }, type: 'data' },
-      // AND long
-      { id: 'conn_9', source: { blockId: 'gt_bb', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'gt_obv', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND short
-      { id: 'conn_11', source: { blockId: 'lt_bb', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'lt_obv', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // SIMPLE DCA — RSI-based DCA entries with TP
-  // =============================================
-  simple_dca: {
-    blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14 } },
-      { id: 'const_40', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 40 } },
-      { id: 'const_60', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 60 } },
-      { id: 'lt_entry', type: 'less_than', category: 'condition', name: 'RSI < 40', icon: 'chevron-double-down', x: 330, y: 180, params: {} },
-      { id: 'gt_exit', type: 'greater_than', category: 'condition', name: 'RSI > 60', icon: 'chevron-double-up', x: 330, y: 380, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 1.0, stop_loss_percent: 3.0 } }
-    ],
-    connections: [
-      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_entry', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'const_40', portId: 'value' }, target: { blockId: 'lt_entry', portId: 'right' }, type: 'data' },
-      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_exit', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'const_60', portId: 'value' }, target: { blockId: 'gt_exit', portId: 'right' }, type: 'data' },
-      { id: 'conn_5', source: { blockId: 'lt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_6', source: { blockId: 'gt_exit', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_7', source: { blockId: 'gt_exit', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_8', source: { blockId: 'lt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // RSI DCA — RSI oversold entries with mean reversion exit
-  // =============================================
-  rsi_dca: {
-    blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14 } },
-      { id: 'const_25', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 25 } },
-      { id: 'const_50', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 50 } },
-      { id: 'const_75', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 560, params: { value: 75 } },
-      { id: 'lt_25', type: 'less_than', category: 'condition', name: 'RSI < 25', icon: 'chevron-double-down', x: 330, y: 180, params: {} },
-      { id: 'gt_50', type: 'greater_than', category: 'condition', name: 'RSI > 50', icon: 'chevron-double-up', x: 330, y: 350, params: {} },
-      { id: 'gt_75', type: 'greater_than', category: 'condition', name: 'RSI > 75', icon: 'chevron-double-up', x: 330, y: 500, params: {} },
-      { id: 'lt_50', type: 'less_than', category: 'condition', name: 'RSI < 50', icon: 'chevron-double-down', x: 330, y: 640, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 550, params: { take_profit_percent: 1.5, stop_loss_percent: 3.0 } }
-    ],
-    connections: [
-      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_25', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'const_25', portId: 'value' }, target: { blockId: 'lt_25', portId: 'right' }, type: 'data' },
-      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_50', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'const_50', portId: 'value' }, target: { blockId: 'gt_50', portId: 'right' }, type: 'data' },
-      { id: 'conn_5', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_75', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'const_75', portId: 'value' }, target: { blockId: 'gt_75', portId: 'right' }, type: 'data' },
-      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_50', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'const_50', portId: 'value' }, target: { blockId: 'lt_50', portId: 'right' }, type: 'data' },
-      // Entry/Exit
-      { id: 'conn_9', source: { blockId: 'lt_25', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'gt_50', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_11', source: { blockId: 'gt_75', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'lt_50', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // GRID TRADING — Bollinger Band grid using upper/lower/middle
-  // =============================================
-  grid_trading: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger Bands', icon: 'distribute-vertical', x: 60, y: 280, params: { period: 20, stdDev: 2 } },
-      { id: 'lt_lower', type: 'less_than', category: 'condition', name: 'Close < BB Lower', icon: 'chevron-double-down', x: 320, y: 100, params: {} },
-      { id: 'crossover_mid', type: 'crossover', category: 'condition', name: 'Close cross Mid up', icon: 'intersect', x: 320, y: 260, params: {} },
-      { id: 'gt_upper', type: 'greater_than', category: 'condition', name: 'Close > BB Upper', icon: 'chevron-double-up', x: 320, y: 400, params: {} },
-      { id: 'crossunder_mid', type: 'crossunder', category: 'condition', name: 'Close cross Mid down', icon: 'intersect', x: 320, y: 540, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 480, params: { take_profit_percent: 1.0, stop_loss_percent: 2.0 } }
-    ],
-    connections: [
-      // Close < BB Lower → entry long
-      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_lower', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'lt_lower', portId: 'right' }, type: 'data' },
-      // Close crossover middle → exit long
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_mid', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'bb_1', portId: 'middle' }, target: { blockId: 'crossover_mid', portId: 'b' }, type: 'data' },
-      // Close > BB Upper → entry short
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_upper', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'gt_upper', portId: 'right' }, type: 'data' },
-      // Close crossunder middle → exit short
-      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_mid', portId: 'a' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'bb_1', portId: 'middle' }, target: { blockId: 'crossunder_mid', portId: 'b' }, type: 'data' },
-      // Strategy
-      { id: 'conn_9', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'crossover_mid', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_11', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'crossunder_mid', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // MULTI-INDICATOR CONFLUENCE — RSI + MACD + EMA
-  // =============================================
-  multi_indicator: {
-    blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 80, params: { period: 14 } },
-      { id: 'macd_1', type: 'macd', category: 'indicator', name: 'MACD', icon: 'bar-chart', x: 60, y: 220, params: { fast_period: 12, slow_period: 26, signal_period: 9 } },
-      { id: 'ema_fast', type: 'ema', category: 'indicator', name: 'EMA 9', icon: 'graph-up-arrow', x: 60, y: 380, params: { period: 9 } },
-      { id: 'ema_slow', type: 'ema', category: 'indicator', name: 'EMA 21', icon: 'graph-up-arrow', x: 60, y: 500, params: { period: 21 } },
-      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 620, params: { value: 30 } },
-      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 720, params: { value: 70 } },
-      // Conditions
-      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 300, y: 80, params: {} },
-      { id: 'crossover_macd', type: 'crossover', category: 'condition', name: 'MACD cross signal up', icon: 'intersect', x: 300, y: 220, params: {} },
-      { id: 'gt_ema', type: 'greater_than', category: 'condition', name: 'EMA9 > EMA21', icon: 'chevron-double-up', x: 300, y: 380, params: {} },
-      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 300, y: 520, params: {} },
-      { id: 'crossunder_macd', type: 'crossunder', category: 'condition', name: 'MACD cross signal down', icon: 'intersect', x: 300, y: 640, params: {} },
-      { id: 'lt_ema', type: 'less_than', category: 'condition', name: 'EMA9 < EMA21', icon: 'chevron-double-down', x: 300, y: 760, params: {} },
-      // Logic
-      { id: 'and_rsi_macd_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 140, params: {} },
-      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 700, y: 220, params: {} },
-      { id: 'and_rsi_macd_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 560, params: {} },
-      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 700, y: 640, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 880, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // RSI < 30
-      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
-      // MACD crossover signal
-      { id: 'conn_3', source: { blockId: 'macd_1', portId: 'macd' }, target: { blockId: 'crossover_macd', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'macd_1', portId: 'signal' }, target: { blockId: 'crossover_macd', portId: 'b' }, type: 'data' },
-      // EMA9 > EMA21
-      { id: 'conn_5', source: { blockId: 'ema_fast', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'ema_slow', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'right' }, type: 'data' },
-      // RSI > 70
-      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
-      // MACD crossunder signal
-      { id: 'conn_9', source: { blockId: 'macd_1', portId: 'macd' }, target: { blockId: 'crossunder_macd', portId: 'a' }, type: 'data' },
-      { id: 'conn_10', source: { blockId: 'macd_1', portId: 'signal' }, target: { blockId: 'crossunder_macd', portId: 'b' }, type: 'data' },
-      // EMA9 < EMA21
-      { id: 'conn_11', source: { blockId: 'ema_fast', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'left' }, type: 'data' },
-      { id: 'conn_12', source: { blockId: 'ema_slow', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'right' }, type: 'data' },
-      // AND: RSI oversold + MACD cross up
-      { id: 'conn_13', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_macd_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'crossover_macd', portId: 'result' }, target: { blockId: 'and_rsi_macd_long', portId: 'b' }, type: 'condition' },
-      // AND: (RSI+MACD) + EMA bullish
-      { id: 'conn_15', source: { blockId: 'and_rsi_macd_long', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'gt_ema', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
-      // AND: RSI overbought + MACD cross down
-      { id: 'conn_17', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_macd_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_18', source: { blockId: 'crossunder_macd', portId: 'result' }, target: { blockId: 'and_rsi_macd_short', portId: 'b' }, type: 'condition' },
-      // AND: (RSI+MACD) + EMA bearish
-      { id: 'conn_19', source: { blockId: 'and_rsi_macd_short', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_20', source: { blockId: 'lt_ema', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // DIVERGENCE HUNTER — RSI divergence via RSI slope vs price slope
-  // =============================================
-  divergence_hunter: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 260, params: { period: 14 } },
-      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 420, params: { value: 30 } },
-      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 530, params: { value: 70 } },
-      { id: 'ema_price', type: 'ema', category: 'indicator', name: 'EMA Price', icon: 'graph-up-arrow', x: 60, y: 640, params: { period: 14 } },
-      // RSI oversold + price crossing EMA = bullish divergence signal
-      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 310, y: 100, params: {} },
-      { id: 'crossover_price', type: 'crossover', category: 'condition', name: 'Close cross EMA up', icon: 'intersect', x: 310, y: 260, params: {} },
-      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 310, y: 420, params: {} },
-      { id: 'crossunder_price', type: 'crossunder', category: 'condition', name: 'Close cross EMA down', icon: 'intersect', x: 310, y: 560, params: {} },
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 160, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 470, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // RSI < 30
-      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
-      // Price crossover EMA
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_price', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'ema_price', portId: 'value' }, target: { blockId: 'crossover_price', portId: 'b' }, type: 'data' },
-      // RSI > 70
-      { id: 'conn_5', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
-      // Price crossunder EMA
-      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_price', portId: 'a' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'ema_price', portId: 'value' }, target: { blockId: 'crossunder_price', portId: 'b' }, type: 'data' },
-      // AND long: RSI oversold + price bounce
-      { id: 'conn_9', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'crossover_price', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND short: RSI overbought + price rejection
-      { id: 'conn_11', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'crossunder_price', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // SMART MONEY CONCEPT — OBV + RSI + SuperTrend confluence
-  // =============================================
-  smart_money: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 40, y: 80, params: {} },
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 40, y: 220, params: { period: 14 } },
-      { id: 'obv_1', type: 'obv', category: 'indicator', name: 'OBV', icon: 'bar-chart-steps', x: 40, y: 370, params: {} },
-      { id: 'obv_ema', type: 'ema', category: 'indicator', name: 'OBV EMA', icon: 'graph-up-arrow', x: 40, y: 510, params: { period: 21 } },
-      { id: 'st_1', type: 'supertrend', category: 'indicator', name: 'SuperTrend', icon: 'arrow-up-right-circle', x: 40, y: 650, params: { period: 10, multiplier: 3.0 } },
-      { id: 'const_40', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 40, y: 780, params: { value: 40 } },
-      { id: 'const_60', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 40, y: 870, params: { value: 60 } },
-      // Conditions
-      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 40', icon: 'chevron-double-down', x: 280, y: 80, params: {} },
-      { id: 'gt_obv', type: 'greater_than', category: 'condition', name: 'OBV > OBV EMA', icon: 'chevron-double-up', x: 280, y: 220, params: {} },
-      { id: 'gt_st', type: 'greater_than', category: 'condition', name: 'Close > ST', icon: 'chevron-double-up', x: 280, y: 370, params: {} },
-      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 60', icon: 'chevron-double-up', x: 280, y: 510, params: {} },
-      { id: 'lt_obv', type: 'less_than', category: 'condition', name: 'OBV < OBV EMA', icon: 'chevron-double-down', x: 280, y: 650, params: {} },
-      { id: 'lt_st', type: 'less_than', category: 'condition', name: 'Close < ST', icon: 'chevron-double-down', x: 280, y: 780, params: {} },
-      // Logic
-      { id: 'and_rsi_obv_l', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 140, params: {} },
-      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 240, params: {} },
-      { id: 'and_rsi_obv_s', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 560, params: {} },
-      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 660, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 860, y: 500, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // RSI < 40
-      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'const_40', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
-      // OBV > OBV EMA
-      { id: 'conn_3', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'obv_ema', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'right' }, type: 'data' },
-      // Close > SuperTrend
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_st', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'gt_st', portId: 'right' }, type: 'data' },
-      // RSI > 60
-      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'const_60', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
-      // OBV < OBV EMA
-      { id: 'conn_9', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'left' }, type: 'data' },
-      { id: 'conn_10', source: { blockId: 'obv_ema', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'right' }, type: 'data' },
-      // Close < SuperTrend
-      { id: 'conn_11', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_st', portId: 'left' }, type: 'data' },
-      { id: 'conn_12', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'lt_st', portId: 'right' }, type: 'data' },
-      // AND: RSI low + OBV rising
-      { id: 'conn_13', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_obv_l', portId: 'a' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'gt_obv', portId: 'result' }, target: { blockId: 'and_rsi_obv_l', portId: 'b' }, type: 'condition' },
-      // AND: (RSI+OBV) + SuperTrend bullish
-      { id: 'conn_15', source: { blockId: 'and_rsi_obv_l', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'gt_st', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
-      // AND: RSI high + OBV falling
-      { id: 'conn_17', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_obv_s', portId: 'a' }, type: 'condition' },
-      { id: 'conn_18', source: { blockId: 'lt_obv', portId: 'result' }, target: { blockId: 'and_rsi_obv_s', portId: 'b' }, type: 'condition' },
-      // AND: (RSI+OBV) + SuperTrend bearish
-      { id: 'conn_19', source: { blockId: 'and_rsi_obv_s', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_20', source: { blockId: 'lt_st', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // SCALPING PRO — EMA + RSI + Stochastic quick entries
-  // =============================================
-  scalping_pro: {
-    blocks: [
-      { id: 'ema_5', type: 'ema', category: 'indicator', name: 'EMA 5', icon: 'graph-up-arrow', x: 50, y: 80, params: { period: 5 } },
-      { id: 'ema_13', type: 'ema', category: 'indicator', name: 'EMA 13', icon: 'graph-up-arrow', x: 50, y: 210, params: { period: 13 } },
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 50, y: 350, params: { period: 7, overbought: 70, oversold: 30 } },
-      { id: 'stoch_1', type: 'stochastic', category: 'indicator', name: 'Stochastic', icon: 'percent', x: 50, y: 500, params: { k_period: 5, d_period: 3, smooth: 3 } },
-      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 50, y: 640, params: { value: 30 } },
-      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 50, y: 730, params: { value: 70 } },
-      // Conditions
-      { id: 'crossover_ema', type: 'crossover', category: 'condition', name: 'EMA5 cross EMA13 up', icon: 'intersect', x: 290, y: 80, params: {} },
-      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 290, y: 230, params: {} },
-      { id: 'crossover_stoch', type: 'crossover', category: 'condition', name: 'K cross D up', icon: 'intersect', x: 290, y: 370, params: {} },
-      { id: 'crossunder_ema', type: 'crossunder', category: 'condition', name: 'EMA5 cross EMA13 dn', icon: 'intersect', x: 290, y: 510, params: {} },
-      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 290, y: 650, params: {} },
-      { id: 'crossunder_stoch', type: 'crossunder', category: 'condition', name: 'K cross D down', icon: 'intersect', x: 290, y: 770, params: {} },
-      // Logic
-      { id: 'and_ema_rsi_l', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 140, params: {} },
-      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 220, params: {} },
-      { id: 'and_ema_rsi_s', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 560, params: {} },
-      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 650, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 860, y: 450, params: { take_profit_percent: 0.8, stop_loss_percent: 0.5 } }
-    ],
-    connections: [
-      // EMA5 crossover EMA13
-      { id: 'conn_1', source: { blockId: 'ema_5', portId: 'value' }, target: { blockId: 'crossover_ema', portId: 'a' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'ema_13', portId: 'value' }, target: { blockId: 'crossover_ema', portId: 'b' }, type: 'data' },
-      // RSI < 30
-      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
-      // Stochastic K crossover D
-      { id: 'conn_5', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossover_stoch', portId: 'a' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossover_stoch', portId: 'b' }, type: 'data' },
-      // EMA5 crossunder EMA13
-      { id: 'conn_7', source: { blockId: 'ema_5', portId: 'value' }, target: { blockId: 'crossunder_ema', portId: 'a' }, type: 'data' },
-      { id: 'conn_8', source: { blockId: 'ema_13', portId: 'value' }, target: { blockId: 'crossunder_ema', portId: 'b' }, type: 'data' },
-      // RSI > 70
-      { id: 'conn_9', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
-      { id: 'conn_10', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
-      // Stochastic K crossunder D
-      { id: 'conn_11', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossunder_stoch', portId: 'a' }, type: 'data' },
-      { id: 'conn_12', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossunder_stoch', portId: 'b' }, type: 'data' },
-      // AND: EMA cross + RSI oversold
-      { id: 'conn_13', source: { blockId: 'crossover_ema', portId: 'result' }, target: { blockId: 'and_ema_rsi_l', portId: 'a' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_ema_rsi_l', portId: 'b' }, type: 'condition' },
-      // AND: (EMA+RSI) + Stoch bullish
-      { id: 'conn_15', source: { blockId: 'and_ema_rsi_l', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_16', source: { blockId: 'crossover_stoch', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
-      // AND: EMA cross down + RSI overbought
-      { id: 'conn_17', source: { blockId: 'crossunder_ema', portId: 'result' }, target: { blockId: 'and_ema_rsi_s', portId: 'a' }, type: 'condition' },
-      { id: 'conn_18', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_ema_rsi_s', portId: 'b' }, type: 'condition' },
-      // AND: (EMA+RSI) + Stoch bearish
-      { id: 'conn_19', source: { blockId: 'and_ema_rsi_s', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_20', source: { blockId: 'crossunder_stoch', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // ATR VOLATILITY BREAKOUT — ATR threshold + price break
-  // =============================================
-  atr_breakout: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'atr_1', type: 'atr', category: 'indicator', name: 'ATR', icon: 'arrows-fullscreen', x: 60, y: 260, params: { period: 14 } },
-      { id: 'sma_atr', type: 'sma', category: 'indicator', name: 'ATR SMA', icon: 'graph-up-arrow', x: 60, y: 400, params: { period: 20 } },
-      { id: 'ema_1', type: 'ema', category: 'indicator', name: 'EMA 20', icon: 'graph-up-arrow', x: 60, y: 540, params: { period: 20 } },
-      // ATR > ATR SMA (volatility expanding)
-      { id: 'gt_atr', type: 'greater_than', category: 'condition', name: 'ATR > ATR SMA', icon: 'chevron-double-up', x: 310, y: 100, params: {} },
-      // Price > EMA (bullish)
-      { id: 'gt_ema', type: 'greater_than', category: 'condition', name: 'Close > EMA', icon: 'chevron-double-up', x: 310, y: 260, params: {} },
-      // Price < EMA (bearish)
-      { id: 'lt_ema', type: 'less_than', category: 'condition', name: 'Close < EMA', icon: 'chevron-double-down', x: 310, y: 420, params: {} },
-      // Logic
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 160, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 380, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 460, params: { take_profit_percent: 3.0, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // ATR > ATR SMA
-      { id: 'conn_1', source: { blockId: 'atr_1', portId: 'value' }, target: { blockId: 'gt_atr', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'sma_atr', portId: 'value' }, target: { blockId: 'gt_atr', portId: 'right' }, type: 'data' },
-      // Close > EMA
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_ema', portId: 'left' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'ema_1', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'right' }, type: 'data' },
-      // Close < EMA
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_ema', portId: 'left' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'ema_1', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'right' }, type: 'data' },
-      // AND: volatility expanding + bullish
-      { id: 'conn_7', source: { blockId: 'gt_atr', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_8', source: { blockId: 'gt_ema', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND: volatility expanding + bearish
-      { id: 'conn_9', source: { blockId: 'gt_atr', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'lt_ema', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_11', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_13', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  },
-
-  // =============================================
-  // BOLLINGER SQUEEZE — BB width contraction then breakout
-  // =============================================
-  bb_squeeze: {
-    blocks: [
-      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 50, y: 80, params: {} },
-      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger', icon: 'distribute-vertical', x: 50, y: 240, params: { period: 20, stdDev: 2 } },
-      { id: 'kc_1', type: 'keltner', category: 'indicator', name: 'Keltner', icon: 'distribute-vertical', x: 50, y: 410, params: { period: 20, multiplier: 1.5 } },
-      // BB upper < KC upper = squeeze (BB inside KC)
-      { id: 'lt_squeeze', type: 'less_than', category: 'condition', name: 'BB Up < KC Up', icon: 'chevron-double-down', x: 300, y: 80, params: {} },
-      // Price breaks above BB upper after squeeze = bullish
-      { id: 'crossover_bb', type: 'crossover', category: 'condition', name: 'Close cross BB Up', icon: 'intersect', x: 300, y: 240, params: {} },
-      // Price breaks below BB lower after squeeze = bearish
-      { id: 'crossunder_bb', type: 'crossunder', category: 'condition', name: 'Close cross BB Lo', icon: 'intersect', x: 300, y: 400, params: {} },
-      // Logic
-      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 140, params: {} },
-      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 350, params: {} },
-      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 430, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
-    ],
-    connections: [
-      // BB upper < KC upper (squeeze active)
-      { id: 'conn_1', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'lt_squeeze', portId: 'left' }, type: 'data' },
-      { id: 'conn_2', source: { blockId: 'kc_1', portId: 'upper' }, target: { blockId: 'lt_squeeze', portId: 'right' }, type: 'data' },
-      // Close crossover BB upper
-      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_bb', portId: 'a' }, type: 'data' },
-      { id: 'conn_4', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'crossover_bb', portId: 'b' }, type: 'data' },
-      // Close crossunder BB lower
-      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_bb', portId: 'a' }, type: 'data' },
-      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'crossunder_bb', portId: 'b' }, type: 'data' },
-      // AND: squeeze + bullish breakout
-      { id: 'conn_7', source: { blockId: 'lt_squeeze', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
-      { id: 'conn_8', source: { blockId: 'crossover_bb', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
-      // AND: squeeze + bearish breakout
-      { id: 'conn_9', source: { blockId: 'lt_squeeze', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
-      { id: 'conn_10', source: { blockId: 'crossunder_bb', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
-      // Strategy
-      { id: 'conn_11', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
-      { id: 'conn_12', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
-      { id: 'conn_13', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
-      { id: 'conn_14', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
-    ]
-  }
-};
-
-function loadTemplateData(templateId) {
-  console.log(`[Strategy Builder] Loading template: ${templateId}`);
-  const data = templateData[templateId];
-  if (!data) {
-    console.error(`[Strategy Builder] Template data not found for: ${templateId}`);
-    showNotification(`Шаблон "${templateId}" не найден`, 'error');
-    return;
-  }
-
-  console.log('[Strategy Builder] Template data found:', data);
-  console.log(`[Strategy Builder] Blocks: ${data.blocks.length}, Connections: ${data.connections.length}`);
-
-  pushUndo();
-
-  // Keep main strategy node, clear others
-  const mainNode = strategyBlocks.find((b) => b.isMain);
-  strategyBlocks = mainNode ? [mainNode] : [];
-
-  // Position main strategy node on the right side
-  if (mainNode) {
-    mainNode.x = 600;
-    mainNode.y = 250;
-  }
-
-  // Clear connections
-  connections.length = 0;
-
-  // Add template blocks
-  data.blocks.forEach((block) => {
-    const newBlock = { ...block };
-    // Don't modify IDs - they are used in connections
-    // Only ensure main_strategy is not duplicated
-    if (newBlock.id === 'main_strategy' || newBlock.isMain) {
-      console.log('[Strategy Builder] Skipping main_strategy block - already exists');
-      return; // Skip main strategy node - it already exists
-    }
-    strategyBlocks.push(newBlock);
-    console.log(`[Strategy Builder] Added block: ${newBlock.id} (${newBlock.type})`);
-  });
-
-  console.log(`[Strategy Builder] Added ${data.blocks.length} blocks`);
-
-  // Add template connections
-  data.connections.forEach((conn) => {
-    // Map template block IDs to actual block IDs
-    const sourceBlock = strategyBlocks.find((b) =>
-      b.id.startsWith(conn.source.blockId) || b.id === conn.source.blockId
-    );
-
-    // Special handling for main_strategy node
-    let targetBlock;
-    if (conn.target.blockId === 'main_strategy') {
-      targetBlock = strategyBlocks.find((b) => b.isMain);
-    } else {
-      targetBlock = strategyBlocks.find((b) =>
-        b.id.startsWith(conn.target.blockId) || b.id === conn.target.blockId
-      );
-    }
-
-    if (sourceBlock && targetBlock) {
-      const newConn = {
-        id: `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        source: {
-          blockId: sourceBlock.id,
-          portId: conn.source.portId
-        },
-        target: {
-          blockId: targetBlock.id,
-          portId: conn.target.portId
-        },
-        type: conn.type
-      };
-      connections.push(newConn);
-      console.log(`[Strategy Builder] Connection added: ${sourceBlock.id}.${conn.source.portId} -> ${targetBlock.id}.${conn.target.portId}`);
-    } else {
-      console.warn('[Strategy Builder] Connection skipped - blocks not found:', {
-        source: conn.source.blockId,
-        target: conn.target.blockId,
-        sourceFound: !!sourceBlock,
-        targetFound: !!targetBlock,
-        allBlocks: strategyBlocks.map(b => ({ id: b.id, isMain: b.isMain }))
-      });
-    }
-  });
-
-  // Auto-inject SL/TP connection if template has an exit block (sltp_1, trailing_1, etc.)
-  const exitBlock = strategyBlocks.find(b =>
-    b.id === 'sltp_1' || b.category === 'exit'
-  );
-  const mainBlock = strategyBlocks.find(b => b.isMain);
-  if (exitBlock && mainBlock) {
-    const hasConfigConn = connections.some(c =>
-      c.source.blockId === exitBlock.id && c.target.portId === 'sl_tp'
-    );
-    if (!hasConfigConn) {
-      connections.push({
-        id: `conn_sltp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        source: { blockId: exitBlock.id, portId: 'config' },
-        target: { blockId: mainBlock.id, portId: 'sl_tp' },
-        type: 'config'
-      });
-    }
-  }
-
-  // Re-render — BUG#4 FIX: renderBlocks() calls renderConnections() internally
-  setSBBlocks(strategyBlocks);
-  setSBConnections(connections);
-  renderBlocks();
-  selectedBlockId = null;
-  setSBSelectedBlockId(null);
-  renderBlockProperties();
-
-  showNotification(`Шаблон "${templateId}" загружен`, 'success');
-}
-
 function exportAsTemplate() {
   const blocksToExport = strategyBlocks.filter((b) => !b.isMain);
   if (blocksToExport.length === 0) {
@@ -9134,7 +6429,6 @@ function importTemplateFromFile(file) {
       setSBConnections(connections);
       renderBlocks();
       dispatchBlocksChanged();
-      closeTemplatesModal();
       showNotification(`Импортировано: ${blocks.length} блоков`, 'success');
     } catch (err) {
       showNotification(`Ошибка импорта: ${err.message}`, 'error');
@@ -9461,7 +6755,8 @@ function _initSaveLoadModule() {
     wsValidation,
     getZoom: () => zoom,
     escapeHtml,
-    formatDate
+    formatDate,
+    dispatchBlocksChanged
   });
 }
 async function saveStrategy() { return _saveLoadModule ? _saveLoadModule.saveStrategy() : Promise.resolve(); }
@@ -9655,6 +6950,8 @@ window.selectBlock = selectBlock;
 window.startDragBlock = startDragBlock;
 window.showBlockMenu = showBlockMenu;
 window.updateBlockParam = updateBlockParam;
+window.renderBlockProperties = renderBlockProperties;
+window.renderBlocks = renderBlocks;
 window.onBlockDragStart = onBlockDragStart;
 window.onCanvasDrop = onCanvasDrop;
 window.showBlockParamsPopup = showBlockParamsPopup;
@@ -9698,19 +6995,19 @@ window.buildStrategyPayload = buildStrategyPayload;
 window.migrateLegacyBlocks = migrateLegacyBlocks;
 window.updateValidationPanel = updateValidationPanel;
 
+// Expose strategyBlocks as a live getter so optimization_panels.js polling works.
+// Returns the current blocks array from StateManager (or module-level fallback).
+Object.defineProperty(window, 'strategyBlocks', {
+  get: () => getSBBlocks(),
+  configurable: true,
+  enumerable: false
+});
+
 // LocalStorage persistence functions
 window.tryLoadFromLocalStorage = tryLoadFromLocalStorage;
 window.clearLocalStorageDraft = clearLocalStorageDraft;
 window.clearAllAndReset = clearAllAndReset;
 window.resetFormToDefaults = resetFormToDefaults;
-
-// Modal functions
-window.openTemplatesModal = openTemplatesModal;
-window.closeTemplatesModal = closeTemplatesModal;
-window.selectTemplate = selectTemplate;
-window.loadSelectedTemplate = loadSelectedTemplate;
-window.renderTemplates = renderTemplates;
-window.loadTemplateData = loadTemplateData;
 
 // Backtest Results Display functions
 window.displayBacktestResults = displayBacktestResults;
@@ -9832,17 +7129,25 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// Export for frontend tests (ticker sync flow)
-export { syncSymbolData, runCheckSymbolDataForProperties };
+// Export for frontend tests (ticker sync flow) — proxied through SymbolSyncModule
+export function syncSymbolData(force) { return symbolSync?.syncSymbolData(force); }
+export function runCheckSymbolDataForProperties(force) { return symbolSync?.runCheckSymbolDataForProperties(force); }
 
 // ── Reset End Date button ─────────────────────────────────────────────────────
-// Sets backtestEndDate to today (local date) on click.
+// Sets backtestEndDate to today on click.
 document.addEventListener('DOMContentLoaded', () => {
   const resetBtn = document.getElementById('resetEndDateBtn');
   const endDateEl = document.getElementById('backtestEndDate');
   if (resetBtn && endDateEl) {
+    // Compute today string (local time, not UTC — avoids off-by-one in UTC+N zones)
+    const _getToday = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    resetBtn.title = 'Reset to today';
     resetBtn.addEventListener('click', () => {
-      endDateEl.value = localDateStr();
+      endDateEl.value = _getToday();
+      endDateEl.max = _getToday();
       endDateEl.dispatchEvent(new Event('change', { bubbles: true }));
     });
   }

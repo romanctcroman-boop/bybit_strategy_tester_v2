@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from backend.config.constants import COMMISSION_TV
+
 # =============================================================================
 # SYNC GRID SEARCH
 # =============================================================================
@@ -29,7 +31,7 @@ class SyncOptimizationRequest(BaseModel):
     fixed_amount: float = 100.0
     leverage: int = 10
     initial_capital: float = 10000.0
-    commission: float = 0.0007  # 0.07% TradingView parity
+    commission: float = COMMISSION_TV  # 0.07% TradingView parity
 
     # RSI parameter ranges (lists of discrete values)
     rsi_period_range: list[int] = [7, 14, 21]
@@ -186,7 +188,7 @@ class VectorbtOptimizationRequest(BaseModel):
     direction: str = "long"
     leverage: int = 10
     initial_capital: float = 10000.0
-    commission: float = 0.0007
+    commission: float = COMMISSION_TV
     slippage: float = 0.0005
     position_size: float = 1.0
 

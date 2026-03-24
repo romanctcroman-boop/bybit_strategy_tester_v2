@@ -18,6 +18,7 @@ Endpoints:
 import asyncio
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -59,6 +60,30 @@ code_generator = CodeGenerator()
 template_manager = StrategyTemplateManager()
 validator = StrategyValidator()
 indicator_library = IndicatorLibrary()
+
+# ---------------------------------------------------------------------------
+# OHLCV in-memory cache for optimization endpoint
+# Eliminates repeated Bybit API fetches when re-running optimization with the
+# same symbol/interval/date range (common during parameter tuning sessions).
+# TTL = 5 minutes — data doesn't change meaningfully within a session.
+# ---------------------------------------------------------------------------
+_OHLCV_CACHE: dict[tuple, tuple] = {}  # key → (dataframe, expires_at)
+_OHLCV_CACHE_TTL = 300  # seconds
+
+
+def _get_cached_ohlcv(key: tuple):
+    entry = _OHLCV_CACHE.get(key)
+    if entry and time.time() < entry[1]:
+        return entry[0]
+    return None
+
+
+def _set_cached_ohlcv(key: tuple, df) -> None:
+    _OHLCV_CACHE[key] = (df, time.time() + _OHLCV_CACHE_TTL)
+    # Evict expired entries to prevent memory growth
+    expired = [k for k, v in _OHLCV_CACHE.items() if time.time() >= v[1]]
+    for k in expired:
+        _OHLCV_CACHE.pop(k, None)
 
 
 # === Block param normalization ===
@@ -277,13 +302,22 @@ class BuilderOptimizationRequest(BaseModel):
     # Capital & risk
     initial_capital: float = Field(default=10000.0, ge=100, description="Initial capital")
     leverage: int = Field(default=10, ge=1, le=125, description="Leverage")
-    commission: float = Field(default=0.0007, ge=0, le=0.01, description="Commission rate (0.0007 = 0.07%)")
+    position_size: float = Field(
+        default=1.0, ge=0.01, le=1.0, description="Position size as fraction of capital (0.1 = 10%)"
+    )
+    commission: float = Field(
+        default=0.00055,
+        ge=0,
+        le=1.0,
+        description="Commission rate (0.00055 = Bybit linear taker, auto-converts from percent)",
+    )
+    slippage: float = Field(default=0.0, ge=0, le=0.01, description="Slippage per side (0.0005 = 0.05%)")
     direction: str = Field(default="both", description="Trading direction: long/short/both")
 
     # Optimization method
     method: str = Field(
         default="grid_search",
-        pattern="^(grid_search|random_search|bayesian)$",
+        pattern="^(grid_search|random_search|bayesian|walk_forward)$",
         description="Optimization method",
     )
 
@@ -296,8 +330,9 @@ class BuilderOptimizationRequest(BaseModel):
 
     # Optimization limits
     max_iterations: int = Field(default=0, ge=0, description="Max iterations (0 = all for grid)")
-    n_trials: int = Field(default=100, ge=10, le=500, description="Optuna trials for bayesian")
+    n_trials: int = Field(default=100, ge=10, le=50000, description="Optuna/random trials")
     sampler_type: str = Field(default="tpe", description="Optuna sampler: tpe/random/cmaes")
+    n_jobs: int = Field(default=1, ge=1, le=32, description="Parallel Optuna workers (1=sequential)")
     timeout_seconds: int = Field(default=3600, ge=60, le=86400, description="Timeout")
     max_results: int = Field(default=20, ge=1, le=100, description="Max results to return")
 
@@ -308,6 +343,14 @@ class BuilderOptimizationRequest(BaseModel):
     # Scoring
     optimize_metric: str = Field(default="sharpe_ratio", description="Metric to optimize")
     weights: dict[str, float] | None = Field(default=None, description="Composite weights")
+    use_composite: bool = Field(default=False, description="Use composite multi-metric scoring")
+    ranking_mode: str = Field(default="single", description="Ranking mode: single | balanced | weighted")
+    secondary_metrics: list[str] = Field(default_factory=list, description="Metrics for balanced/weighted ranking")
+
+    # Result ordering
+    sort_order: list[dict[str, Any]] | None = Field(
+        default=None, description="Custom sort order from EvaluationCriteriaPanel: [{metric, direction: asc|desc}, ...]"
+    )
 
     # Filters
     constraints: list[dict] | None = Field(default=None, description="Metric constraints")
@@ -318,10 +361,40 @@ class BuilderOptimizationRequest(BaseModel):
     def validate_interval(cls, v: str) -> str:
         supported = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
         legacy_map = {"3": "5", "120": "60", "360": "240", "720": "D"}
+        # Human-readable → Bybit format (frontend may send "30m", "1h", "4h", etc.)
+        human_map = {
+            "1m": "1",
+            "5m": "5",
+            "15m": "15",
+            "30m": "30",
+            "1h": "60",
+            "60m": "60",
+            "4h": "240",
+            "240m": "240",
+            "1d": "D",
+            "1D": "D",
+            "1w": "W",
+            "1W": "W",
+            "1M": "M",
+        }
+        if v in human_map:
+            v = human_map[v]
         if v in legacy_map:
             return legacy_map[v]
         if v not in supported:
             raise ValueError(f"Unsupported interval '{v}'. Use: {sorted(supported)}")
+        return v
+
+    @field_validator("commission")
+    @classmethod
+    def normalize_commission(cls, v: float) -> float:
+        """Auto-convert commission from percent to fraction if needed.
+
+        UI shows 0.07 (percent), API expects 0.0007 (fraction).
+        If value > 0.01, assume it's in percent format and convert.
+        """
+        if v > 0.01:
+            return v / 100.0
         return v
 
     @model_validator(mode="after")
@@ -665,15 +738,31 @@ async def update_strategy(
         if request.position_size is not None:
             db_strategy.position_size = request.position_size  # type: ignore[assignment]
         db_strategy.parameters = params  # type: ignore[assignment]
-        _normalized_blocks = _normalize_indicator_blocks(request.blocks)
+        # Guard: if request sends empty blocks but DB already has blocks,
+        # keep the existing blocks to prevent accidental erasure.
+        # This protects against PUT calls that only update metadata (name, params, etc.)
+        # without including the full blocks array.
+        existing_blocks = db_strategy.builder_blocks or []
+        if request.blocks or not existing_blocks:
+            _blocks_to_save = _normalize_indicator_blocks(request.blocks)
+            _connections_to_save = request.connections
+        else:
+            logger.warning(
+                "PUT /strategies/{}: request.blocks is empty but DB has {} blocks — keeping existing blocks",
+                strategy_id,
+                len(existing_blocks),
+            )
+            _blocks_to_save = list(existing_blocks)
+            _connections_to_save = db_strategy.builder_connections or []
+
         db_strategy.builder_graph = {  # type: ignore[assignment]
-            "blocks": _normalized_blocks,
-            "connections": request.connections,
+            "blocks": _blocks_to_save,
+            "connections": _connections_to_save,
             "market_type": request.market_type,
             "direction": request.direction,
         }
-        db_strategy.builder_blocks = _normalized_blocks  # type: ignore[assignment]
-        db_strategy.builder_connections = request.connections  # type: ignore[assignment]
+        db_strategy.builder_blocks = _blocks_to_save  # type: ignore[assignment]
+        db_strategy.builder_connections = _connections_to_save  # type: ignore[assignment]
 
         db.commit()
         db.refresh(db_strategy)
@@ -1607,6 +1696,7 @@ async def optimize_strategy(
         generate_builder_param_combinations,
         run_builder_grid_search,
         run_builder_optuna_search,
+        run_builder_walk_forward,
     )
 
     # Fetch strategy from DB
@@ -1655,24 +1745,66 @@ async def optimize_strategy(
             "Add indicator blocks (RSI, MACD, Bollinger, etc.) to enable optimization.",
         )
 
-    # Fetch OHLCV data
+    # Signal to frontend immediately so progress bar shows activity from the first poll.
+    # This fires before OHLCV fetch (which can take 10-30s on cold start).
+    import time as _time
+
+    from backend.optimization.builder_optimizer import update_optimization_progress
+
+    update_optimization_progress(
+        strategy_id,
+        status="starting",
+        tested=0,
+        total=0,
+        best_score=0.0,
+        results_found=0,
+        speed=0,
+        eta_seconds=0,
+        started_at=_time.time(),
+    )
+
+    # Fetch OHLCV data (cached to avoid repeated Bybit API calls within a session)
     from backend.backtesting.service import BacktestService
 
-    service = BacktestService()
-    try:
-        ohlcv = await service._fetch_historical_data(
-            symbol=request.symbol,
-            interval=request.interval,
-            start_date=datetime.fromisoformat(request.start_date),
-            end_date=datetime.fromisoformat(request.end_date),
-            market_type=request.market_type,
+    _cache_key = (request.symbol, request.interval, request.start_date, request.end_date, request.market_type)
+    ohlcv = _get_cached_ohlcv(_cache_key)
+    if ohlcv is not None:
+        logger.info(
+            f"OHLCV cache hit: {request.symbol} {request.interval} {request.start_date}→{request.end_date} ({len(ohlcv)} bars)"
         )
-    except Exception as e:
-        logger.error(f"Failed to fetch data for builder optimization: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch market data: {e!s}",
-        )
+    else:
+        service = BacktestService()
+        try:
+            ohlcv = await asyncio.wait_for(
+                service._fetch_historical_data(
+                    symbol=request.symbol,
+                    interval=request.interval,
+                    start_date=datetime.fromisoformat(request.start_date),
+                    end_date=datetime.fromisoformat(request.end_date),
+                    market_type=request.market_type,
+                ),
+                timeout=120.0,  # 2 min max for data fetch — prevents indefinite hang
+            )
+        except TimeoutError:
+            logger.error(f"OHLCV fetch timed out for {request.symbol} {request.interval}")
+            from backend.optimization.builder_optimizer import clear_optimization_progress
+
+            clear_optimization_progress(strategy_id)
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail=f"Timeout fetching market data for {request.symbol}. Bybit API may be unreachable. Try again.",
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch data for builder optimization: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to fetch market data: {e!s}",
+            )
+        if ohlcv is not None and len(ohlcv) > 0:
+            _set_cached_ohlcv(_cache_key, ohlcv)
+            logger.info(
+                f"OHLCV cached: {request.symbol} {request.interval} ({len(ohlcv)} bars, TTL={_OHLCV_CACHE_TTL}s)"
+            )
 
     if ohlcv is None or len(ohlcv) == 0:
         raise HTTPException(
@@ -1686,7 +1818,9 @@ async def optimize_strategy(
         "interval": request.interval,
         "initial_capital": request.initial_capital,
         "leverage": request.leverage,
+        "position_size": request.position_size,
         "commission": request.commission,
+        "slippage": request.slippage,
         "direction": request.direction,
         "use_fixed_amount": False,
         "fixed_amount": 0.0,
@@ -1696,6 +1830,14 @@ async def optimize_strategy(
         "constraints": request.constraints,
         "min_trades": request.min_trades,
     }
+
+    # For balanced/weighted modes, collect a much larger candidate pool before
+    # post-processing re-ranks it — otherwise rank_by_multi_criteria only sees
+    # the top-N already selected by a single metric inside the optimizer.
+    # We fetch up to 500 filtered results and trim to max_results after re-ranking.
+    _internal_max_results = request.max_results
+    if request.ranking_mode in ("balanced", "weighted") and request.ranking_mode != "single":
+        _internal_max_results = max(request.max_results, 500)
 
     try:
         if request.method == "bayesian":
@@ -1716,14 +1858,48 @@ async def optimize_strategy(
                 weights=request.weights,
                 n_trials=request.n_trials,
                 sampler_type=request.sampler_type,
-                top_n=request.max_results,
+                top_n=_internal_max_results,
+                timeout_seconds=request.timeout_seconds,
+                n_jobs=request.n_jobs,
+            )
+        elif request.method == "walk_forward":
+            # Walk-Forward Optimization
+            custom_ranges = request.parameter_ranges or None
+            from backend.optimization.builder_optimizer import _merge_ranges
+
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            wf_config = getattr(request, "walk_forward", None) or {}
+            n_splits = int(wf_config.get("n_splits", 5)) if wf_config else 5
+            train_ratio = float(wf_config.get("train_ratio", 0.7)) if wf_config else 0.7
+            gap_periods = int(wf_config.get("gap_periods", 0)) if wf_config else 0
+            inner_method = str(wf_config.get("inner_method", "grid")) if wf_config else "grid"
+
+            result = await asyncio.to_thread(
+                run_builder_walk_forward,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv,
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_splits=n_splits,
+                train_ratio=train_ratio,
+                gap_periods=gap_periods,
+                inner_method=inner_method,
+                max_iterations=request.max_iterations,
+                n_trials=request.n_trials,
+                sampler_type=request.sampler_type,
+                max_results=_internal_max_results,
                 timeout_seconds=request.timeout_seconds,
             )
         else:
             # Grid or Random search
             search_method = "random" if request.method == "random_search" else "grid"
             custom_ranges = request.parameter_ranges or None
-            param_combinations, _total = generate_builder_param_combinations(
+            # Run in thread to avoid blocking the event loop (can be slow for large grids)
+            param_combinations, _total, _ = await asyncio.to_thread(
+                generate_builder_param_combinations,
                 param_specs=all_params,
                 custom_ranges=custom_ranges,
                 search_method=search_method,
@@ -1739,15 +1915,54 @@ async def optimize_strategy(
                 config_params=config_params,
                 optimize_metric=request.optimize_metric,
                 weights=request.weights,
-                max_results=request.max_results,
+                max_results=_internal_max_results,
                 early_stopping=request.early_stopping,
                 early_stopping_patience=request.early_stopping_patience,
                 timeout_seconds=request.timeout_seconds,
+                strategy_id=strategy_id,
+                total_combinations=_total,
             )
+
+        # ── Post-processing: EvaluationCriteriaPanel ranking modes ──
+        # grid_search returns "top_results"; handle both keys for robustness
+        _results_key = "top_results" if isinstance(result, dict) and "top_results" in result else "results"
+        if isinstance(result, dict) and _results_key in result:
+            from backend.optimization.scoring import (
+                apply_custom_sort_order,
+                calculate_composite_score,
+                rank_by_multi_criteria,
+            )
+
+            results_list = result[_results_key]
+
+            if request.ranking_mode == "balanced" and request.secondary_metrics:
+                # Average-rank method: robust to mixed units ($ vs %)
+                # Works on the full _internal_max_results candidate pool
+                all_criteria = list(dict.fromkeys([request.optimize_metric, *request.secondary_metrics]))
+                results_list = rank_by_multi_criteria(results_list, all_criteria)
+
+            elif request.ranking_mode == "weighted" and request.use_composite and request.weights:
+                # Weighted composite score over the full candidate pool
+                for entry in results_list:
+                    entry["score"] = calculate_composite_score(entry, request.optimize_metric, request.weights)
+                results_list.sort(key=lambda r: r.get("score", float("-inf")), reverse=True)
+
+            # Custom tiebreaker sort (always applied last if provided)
+            if request.sort_order:
+                results_list = apply_custom_sort_order(results_list, request.sort_order)
+
+            # Trim to the user-requested max_results AFTER re-ranking
+            result[_results_key] = results_list[: request.max_results]
+            # Sync best_metrics from new top result after re-ranking
+            if results_list:
+                result["best_metrics"] = {k: v for k, v in results_list[0].items() if k not in ("params", "score")}
+                result["best_params"] = results_list[0].get("params", result.get("best_params", {}))
+                result["best_score"] = results_list[0].get("score", result.get("best_score", 0))
 
         return {
             "strategy_id": strategy_id,
             "strategy_name": db_strategy.name,
+            "optimize_metric": request.optimize_metric,
             "optimizable_params": [
                 {
                     "param_path": p["param_path"],
@@ -1765,12 +1980,38 @@ async def optimize_strategy(
             **result,
         }
 
+    except asyncio.CancelledError:
+        # Client disconnected mid-optimization — clear progress so next run starts clean.
+        logger.warning(f"Builder optimization cancelled (client disconnected): {strategy_id}")
+        from backend.optimization.builder_optimizer import clear_optimization_progress
+
+        clear_optimization_progress(strategy_id)
+        raise
     except Exception as e:
         logger.error(f"Builder optimization failed: {e}", exc_info=True)
+        # Clean up progress on error
+        from backend.optimization.builder_optimizer import clear_optimization_progress
+
+        clear_optimization_progress(strategy_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Optimization failed: {e!s}",
         )
+
+
+@router.get("/strategies/{strategy_id}/optimize/progress")
+async def get_optimize_progress(strategy_id: str):
+    """
+    Get real-time progress of a running builder optimization.
+
+    Returns current progress including tested/total combinations,
+    percentage, speed, ETA, and best score found so far.
+    Returns {status: "idle"} when no optimization is running.
+    """
+    from backend.optimization.builder_optimizer import get_optimization_progress
+
+    progress = get_optimization_progress(strategy_id)
+    return progress
 
 
 @router.get("/strategies/{strategy_id}/optimizable-params")
@@ -2926,6 +3167,7 @@ async def run_backtest_from_builder(
             direction=direction,
             stop_loss=block_stop_loss,
             take_profit=block_take_profit,
+            commission_value=request.commission,
             taker_fee=request.commission,
             maker_fee=request.commission,
             slippage=request.slippage,
@@ -3115,14 +3357,29 @@ async def run_backtest_from_builder(
                     "are connected to the Strategy node's Entry ports."
                 )
 
-            if direction in ("long", "both") and long_count > 0 and exit_long_count == 0:
-                backtest_warnings.append(
-                    "No long exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
-                )
-            if direction in ("short", "both") and short_count > 0 and exit_short_count == 0:
-                backtest_warnings.append(
-                    "No short exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
-                )
+            # Skip "no exit signals" warning when DCA uses close_conditions (Close by Time, Channel, RSI, etc.)
+            # — those close internally in the engine, not via strategy exit ports
+            close_conds = (
+                backtest_config.strategy_params.get("close_conditions", {}) if backtest_config.strategy_params else {}
+            )
+            has_dca_close_conditions = bool(
+                close_conds.get("time_bars_close_enable")
+                or close_conds.get("channel_close_enable")
+                or close_conds.get("rsi_close_enable")
+                or close_conds.get("stoch_close_enable")
+                or close_conds.get("psar_close_enable")
+                or close_conds.get("ma_close_enable")
+                or close_conds.get("ma_cross_close_enable")
+            )
+            if not (dca_enabled and has_dca_close_conditions):
+                if direction in ("long", "both") and long_count > 0 and exit_long_count == 0:
+                    backtest_warnings.append(
+                        "No long exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
+                    )
+                if direction in ("short", "both") and short_count > 0 and exit_short_count == 0:
+                    backtest_warnings.append(
+                        "No short exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
+                    )
 
             if backtest_warnings:
                 for w in backtest_warnings:
@@ -3433,6 +3690,12 @@ async def run_backtest_from_builder(
             "avg_win": _sf(_m.avg_win if _m else None),
             "avg_loss": _sf(_m.avg_loss if _m else None),
             "avg_trade": _sf(_m.avg_trade if _m else None),
+            # TradingView-style dual fields used by frontend summary table
+            "largest_win": _sf(getattr(_m, "largest_win", None) if _m else None),
+            "largest_win_value": _sf(getattr(_m, "largest_win_value", None) if _m else None),
+            "largest_loss": _sf(getattr(_m, "largest_loss", None) if _m else None),
+            "largest_loss_value": _sf(getattr(_m, "largest_loss_value", None) if _m else None),
+            "avg_bars_in_trade": _sf(getattr(_m, "avg_bars_in_trade", None) if _m else None),
             "gross_profit": _sf(_m.gross_profit if _m else None),
             "gross_loss": _sf(_m.gross_loss if _m else None),
             "total_commission": _sf(_m.total_commission if _m else None),
@@ -3457,6 +3720,91 @@ async def run_backtest_from_builder(
             "short_commission": _sf(getattr(_m, "short_commission", None) if _m else None),
             "exposure_time": _sf(getattr(_m, "exposure_time", None) if _m else None),
             "open_trades": int(getattr(_m, "open_trades", 0) or 0) if _m else 0,
+            # ── Gross profit/loss % (All trades) ─────────────────────────────────
+            "gross_profit_pct": _sf(getattr(_m, "gross_profit_pct", None) if _m else None),
+            "gross_loss_pct": _sf(getattr(_m, "gross_loss_pct", None) if _m else None),
+            "sqn": _sf(getattr(_m, "sqn", None) if _m else None),
+            "ulcer_index": _sf(getattr(_m, "ulcer_index", None) if _m else None),
+            "stability": _sf(getattr(_m, "stability", None) if _m else None),
+            "breakeven_trades": int(getattr(_m, "breakeven_trades", 0) or 0) if _m else 0,
+            "long_breakeven_trades": int(getattr(_m, "long_breakeven_trades", 0) or 0) if _m else 0,
+            "short_breakeven_trades": int(getattr(_m, "short_breakeven_trades", 0) or 0) if _m else 0,
+            # ── All-trades dual fields (value + pct) ─────────────────────────────
+            "avg_win_value": _sf(getattr(_m, "avg_win_value", None) if _m else None),
+            "avg_loss_value": _sf(getattr(_m, "avg_loss_value", None) if _m else None),
+            "avg_trade_value": _sf(getattr(_m, "avg_trade_value", None) if _m else None),
+            "avg_trade_pct": _sf(getattr(_m, "avg_trade_pct", None) if _m else None),
+            "avg_bars_in_winning": _sf(getattr(_m, "avg_bars_in_winning", None) if _m else None),
+            "avg_bars_in_losing": _sf(getattr(_m, "avg_bars_in_losing", None) if _m else None),
+            # ── CAGR / Calmar / Kelly / Payoff (All) ─────────────────────────────
+            "cagr_long": _sf(getattr(_m, "cagr_long", None) if _m else None),
+            "cagr_short": _sf(getattr(_m, "cagr_short", None) if _m else None),
+            "recovery_long": _sf(getattr(_m, "recovery_long", None) if _m else None),
+            "recovery_short": _sf(getattr(_m, "recovery_short", None) if _m else None),
+            "sharpe_long": _sf(getattr(_m, "sharpe_long", None) if _m else None),
+            "sharpe_short": _sf(getattr(_m, "sharpe_short", None) if _m else None),
+            "sortino_long": _sf(getattr(_m, "sortino_long", None) if _m else None),
+            "calmar_long": _sf(getattr(_m, "calmar_long", None) if _m else None),
+            "calmar_short": _sf(getattr(_m, "calmar_short", None) if _m else None),
+            "kelly_percent": _sf(getattr(_m, "kelly_percent", None) if _m else None),
+            "kelly_percent_long": _sf(getattr(_m, "kelly_percent_long", None) if _m else None),
+            "kelly_percent_short": _sf(getattr(_m, "kelly_percent_short", None) if _m else None),
+            # ── Long breakdown (missing from original) ────────────────────────────
+            "long_winning_trades": int(getattr(_m, "long_winning_trades", 0) or 0) if _m else 0,
+            "long_losing_trades": int(getattr(_m, "long_losing_trades", 0) or 0) if _m else 0,
+            "long_gross_profit": _sf(getattr(_m, "long_gross_profit", None) if _m else None),
+            "long_gross_loss": _sf(getattr(_m, "long_gross_loss", None) if _m else None),
+            "long_gross_profit_pct": _sf(getattr(_m, "long_gross_profit_pct", None) if _m else None),
+            "long_gross_loss_pct": _sf(getattr(_m, "long_gross_loss_pct", None) if _m else None),
+            "long_profit_factor": _sf(getattr(_m, "long_profit_factor", None) if _m else None),
+            "long_avg_trade": _sf(getattr(_m, "long_avg_trade", None) if _m else None),
+            "long_avg_trade_value": _sf(getattr(_m, "long_avg_trade_value", None) if _m else None),
+            "long_avg_trade_pct": _sf(getattr(_m, "long_avg_trade_pct", None) if _m else None),
+            "long_avg_win": _sf(getattr(_m, "long_avg_win", None) if _m else None),
+            "long_avg_win_value": _sf(getattr(_m, "long_avg_win_value", None) if _m else None),
+            "long_avg_win_pct": _sf(getattr(_m, "long_avg_win_pct", None) if _m else None),
+            "long_avg_loss": _sf(getattr(_m, "long_avg_loss", None) if _m else None),
+            "long_avg_loss_value": _sf(getattr(_m, "long_avg_loss_value", None) if _m else None),
+            "long_avg_loss_pct": _sf(getattr(_m, "long_avg_loss_pct", None) if _m else None),
+            "long_largest_win": _sf(getattr(_m, "long_largest_win", None) if _m else None),
+            "long_largest_win_value": _sf(getattr(_m, "long_largest_win_value", None) if _m else None),
+            "long_largest_loss": _sf(getattr(_m, "long_largest_loss", None) if _m else None),
+            "long_largest_loss_value": _sf(getattr(_m, "long_largest_loss_value", None) if _m else None),
+            "long_payoff_ratio": _sf(getattr(_m, "long_payoff_ratio", None) if _m else None),
+            "long_expectancy": _sf(getattr(_m, "long_expectancy", None) if _m else None),
+            "long_max_consec_wins": int(getattr(_m, "long_max_consec_wins", 0) or 0) if _m else 0,
+            "long_max_consec_losses": int(getattr(_m, "long_max_consec_losses", 0) or 0) if _m else 0,
+            "avg_bars_in_long": _sf(getattr(_m, "avg_bars_in_long", None) if _m else None),
+            "avg_bars_in_winning_long": _sf(getattr(_m, "avg_bars_in_winning_long", None) if _m else None),
+            "avg_bars_in_losing_long": _sf(getattr(_m, "avg_bars_in_losing_long", None) if _m else None),
+            # ── Short breakdown (symmetrical) ─────────────────────────────────────
+            "short_winning_trades": int(getattr(_m, "short_winning_trades", 0) or 0) if _m else 0,
+            "short_losing_trades": int(getattr(_m, "short_losing_trades", 0) or 0) if _m else 0,
+            "short_gross_profit": _sf(getattr(_m, "short_gross_profit", None) if _m else None),
+            "short_gross_loss": _sf(getattr(_m, "short_gross_loss", None) if _m else None),
+            "short_gross_profit_pct": _sf(getattr(_m, "short_gross_profit_pct", None) if _m else None),
+            "short_gross_loss_pct": _sf(getattr(_m, "short_gross_loss_pct", None) if _m else None),
+            "short_profit_factor": _sf(getattr(_m, "short_profit_factor", None) if _m else None),
+            "short_avg_trade": _sf(getattr(_m, "short_avg_trade", None) if _m else None),
+            "short_avg_trade_value": _sf(getattr(_m, "short_avg_trade_value", None) if _m else None),
+            "short_avg_trade_pct": _sf(getattr(_m, "short_avg_trade_pct", None) if _m else None),
+            "short_avg_win": _sf(getattr(_m, "short_avg_win", None) if _m else None),
+            "short_avg_win_value": _sf(getattr(_m, "short_avg_win_value", None) if _m else None),
+            "short_avg_win_pct": _sf(getattr(_m, "short_avg_win_pct", None) if _m else None),
+            "short_avg_loss": _sf(getattr(_m, "short_avg_loss", None) if _m else None),
+            "short_avg_loss_value": _sf(getattr(_m, "short_avg_loss_value", None) if _m else None),
+            "short_avg_loss_pct": _sf(getattr(_m, "short_avg_loss_pct", None) if _m else None),
+            "short_largest_win": _sf(getattr(_m, "short_largest_win", None) if _m else None),
+            "short_largest_win_value": _sf(getattr(_m, "short_largest_win_value", None) if _m else None),
+            "short_largest_loss": _sf(getattr(_m, "short_largest_loss", None) if _m else None),
+            "short_largest_loss_value": _sf(getattr(_m, "short_largest_loss_value", None) if _m else None),
+            "short_payoff_ratio": _sf(getattr(_m, "short_payoff_ratio", None) if _m else None),
+            "short_expectancy": _sf(getattr(_m, "short_expectancy", None) if _m else None),
+            "short_max_consec_wins": int(getattr(_m, "short_max_consec_wins", 0) or 0) if _m else 0,
+            "short_max_consec_losses": int(getattr(_m, "short_max_consec_losses", 0) or 0) if _m else 0,
+            "avg_bars_in_short": _sf(getattr(_m, "avg_bars_in_short", None) if _m else None),
+            "avg_bars_in_winning_short": _sf(getattr(_m, "avg_bars_in_winning_short", None) if _m else None),
+            "avg_bars_in_losing_short": _sf(getattr(_m, "avg_bars_in_losing_short", None) if _m else None),
             "initial_capital": float(backtest_config.initial_capital),
             "final_equity": _sf(
                 result.final_equity if result.final_equity is not None else backtest_config.initial_capital

@@ -11,7 +11,7 @@ Generates PDF and Excel reports for backtesting results:
 import io
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ class ReportExportService:
         summary.set_column("B:B", 20)
 
         summary.write("A1", "Backtest Report", header_format)
-        summary.write("B1", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), header_format)
+        summary.write("B1", datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), header_format)
 
         row = 3
         summary_data = [
@@ -428,7 +428,7 @@ class ReportExportService:
         elements.append(Paragraph("Backtest Report", title_style))
         elements.append(
             Paragraph(
-                f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+                f"Generated: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
                 normal_style,
             )
         )

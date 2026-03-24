@@ -78,6 +78,12 @@ class OptimizationConfigPanel {
                 pruneInfeasible: true,
                 randomSeed: null
             },
+            walkForward: {
+                nSplits: 5,
+                trainRatio: 0.7,
+                gapPeriods: 0,
+                innerMethod: 'grid'
+            },
             symbol: 'BTCUSDT',
             timeframe: '1h'
         };
@@ -90,7 +96,9 @@ class OptimizationConfigPanel {
     }
 
     getDefaultEndDate() {
-        return '2030-01-01';
+        // Default to today (local time, not UTC — avoids off-by-one in UTC+N zones)
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
     /** Период из блока «Основные параметры» */
@@ -101,11 +109,7 @@ class OptimizationConfigPanel {
 
     getBacktestEndDate() {
         const el = document.getElementById('backtestEndDate');
-        const val = el?.value || this.getDefaultEndDate();
-        // Use local date (not UTC) to avoid off-by-one at midnight in UTC+N timezones
-        const _now = new Date();
-        const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
-        return val > today ? today : val;
+        return el?.value || this.getDefaultEndDate();
     }
 
     init() {
@@ -113,6 +117,12 @@ class OptimizationConfigPanel {
         if (!this.container) {
             console.warn(`[OptimizationConfigPanel] Container #${this.containerId} not found`);
             return;
+        }
+
+        // Set backtestEndDate default to today if not already set
+        const endDateEl = document.getElementById('backtestEndDate');
+        if (endDateEl && !endDateEl.value) {
+            endDateEl.value = this.getDefaultEndDate();
         }
 
         this.render();
@@ -143,19 +153,29 @@ class OptimizationConfigPanel {
      * Extract optimizable parameters from strategy blocks
      */
     updateParameterRangesFromBlocks(blocks) {
-        if (!blocks || !Array.isArray(blocks)) return;
+        if (!blocks || !Array.isArray(blocks)) {
+            console.warn('[OptimizationConfigPanel] updateParameterRangesFromBlocks: no blocks', blocks);
+            return;
+        }
 
         const params = [];
 
         blocks.forEach(block => {
-            if (!block.optimizationParams || !block.params) return;
+            if (!block.optimizationParams) return;
+            // params may live in block.params OR block.config — accept both
+            const blockParamsObj = block.params || block.config || {};
+
+            const enabledKeys = Object.keys(block.optimizationParams)
+                .filter(k => block.optimizationParams[k]?.enabled);
+            if (enabledKeys.length === 0) return;
 
             const blockName = block.name || block.type || block.id;
+            console.log(`[OptimizationConfigPanel] Block "${blockName}" has enabled keys:`, enabledKeys);
+            console.log('[OptimizationConfigPanel] Block ID (real):', block.id);
 
-            Object.entries(block.optimizationParams).forEach(([paramKey, optConfig]) => {
-                if (!optConfig || !optConfig.enabled) return;
-
-                const currentValue = block.params[paramKey];
+            enabledKeys.forEach(paramKey => {
+                const optConfig = block.optimizationParams[paramKey];
+                const currentValue = blockParamsObj[paramKey] ?? optConfig.min ?? 0;
                 params.push({
                     id: `${block.id}_${paramKey}`,
                     blockId: block.id,
@@ -170,8 +190,10 @@ class OptimizationConfigPanel {
             });
         });
 
+        console.log(`[OptimizationConfigPanel] Extracted ${params.length} param(s):`, params.map(p => p.id));
         this.state.parameterRanges = params;
-        this.renderParameterRanges();
+        this.renderParameterRangesUI();
+        this.updateEstimatedTime();
         this.updateModeBadge();
     }
 
@@ -238,46 +260,6 @@ class OptimizationConfigPanel {
                 </label>
                 <div class="param-ranges-container" id="optParamRanges">
                     ${this.renderParameterRanges()}
-                </div>
-            </div>
-
-            <!-- Data Period -->
-            <div class="property-row property-row-vertical">
-                <label class="property-label">
-                    <i class="bi bi-calendar-range"></i> Data Period
-                </label>
-                <div class="data-period-config" id="optDataPeriod">
-                    ${this.renderDataPeriod()}
-                </div>
-            </div>
-
-            <!-- Walk-Forward Config (conditional) -->
-            <div class="property-row property-row-vertical ${this.state.method === 'walk_forward' ? '' : 'd-none'}" id="optWalkForwardConfig">
-                <label class="property-label">
-                    <i class="bi bi-clock-history"></i> Walk-Forward Settings
-                </label>
-                <div class="wf-config">
-                    ${this.renderWalkForwardConfig()}
-                </div>
-            </div>
-
-            <!-- Limits -->
-            <div class="property-row property-row-vertical">
-                <label class="property-label">
-                    <i class="bi bi-speedometer2"></i> Resource Limits
-                </label>
-                <div class="limits-config" id="optLimits">
-                    ${this.renderLimits()}
-                </div>
-            </div>
-
-            <!-- Advanced Options (всегда развёрнуто) -->
-            <div class="property-row property-row-vertical">
-                <span class="property-label property-label-secondary">
-                    <i class="bi bi-sliders2-vertical"></i> Advanced Options
-                </span>
-                <div class="advanced-config" id="optAdvancedConfig">
-                    ${this.renderAdvancedOptions()}
                 </div>
             </div>
 
@@ -349,53 +331,24 @@ class OptimizationConfigPanel {
         if (this.state.parameterRanges.length === 0) {
             return `
                 <div class="no-params-message">
-                    <i class="bi bi-info-circle"></i>
-                    <p>Click <strong>Optimization</strong> in indicator block popups to enable parameter ranges</p>
+                    <i class="bi bi-sliders text-muted" style="font-size:1.4rem"></i>
+                    <p style="margin:6px 0 4px 0;font-weight:600;color:var(--text-primary)">Параметры не выбраны</p>
+                    <p style="margin:0;color:var(--text-secondary);font-size:12px">
+                        Откройте блок индикатора (⚙️ меню на блоке), нажмите кнопку
+                        <strong style="color:var(--accent-blue)">Optimization</strong>
+                        и поставьте ✓ рядом с нужными параметрами.
+                    </p>
                 </div>
             `;
         }
 
         return this.state.parameterRanges.map(param => `
-            <div class="param-range-item" data-param-id="${param.id}">
-                <div class="param-range-header">
-                    <span class="param-range-label">${param.label}</span>
-                    <span class="param-range-current">current: ${param.currentValue}</span>
-                </div>
-                <div class="param-range-slider-container">
-                    <div class="dual-range-slider">
-                        <input type="range" class="range-min" 
-                               min="${param.min - param.step * 5}" 
-                               max="${param.max + param.step * 5}" 
-                               step="${param.step}" 
-                               value="${param.min}">
-                        <input type="range" class="range-max" 
-                               min="${param.min - param.step * 5}" 
-                               max="${param.max + param.step * 5}" 
-                               step="${param.step}" 
-                               value="${param.max}">
-                        <div class="slider-track"></div>
-                        <div class="slider-range" style="left: 20%; right: 20%;"></div>
-                    </div>
-                </div>
-                <div class="param-range-inputs">
-                    <div class="param-input-group">
-                        <label>Min</label>
-                        <input type="number" class="param-min" value="${param.min}" step="${param.step}">
-                    </div>
-                    <div class="param-input-group">
-                        <label>Max</label>
-                        <input type="number" class="param-max" value="${param.max}" step="${param.step}">
-                    </div>
-                    <div class="param-input-group">
-                        <label>Step</label>
-                        <input type="number" class="param-step" value="${param.step}" step="any">
-                    </div>
-                </div>
-                <div class="param-range-info">
-                    <span class="param-combinations">
-                        <i class="bi bi-layers"></i> ${this.calculateParamCombinations(param)} values
-                    </span>
-                </div>
+            <div data-param-id="${param.id}" style="display:flex;flex-direction:row;align-items:center;gap:16px;padding:4px 8px;border-bottom:1px solid var(--border-color,#2a2a2a);font-size:12px;flex-wrap:nowrap;">
+                <span style="flex:1;min-width:0;font-weight:600;color:var(--text-primary,#e0e0e0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${param.label}</span>
+                <span style="color:var(--text-secondary,#888);white-space:nowrap">Min&nbsp;<strong>${param.min}</strong></span>
+                <span style="color:var(--text-secondary,#888);white-space:nowrap">Max&nbsp;<strong>${param.max}</strong></span>
+                <span style="color:var(--text-secondary,#888);white-space:nowrap">Step&nbsp;<strong>${param.step}</strong></span>
+                <span style="color:var(--accent-blue,#4a9eff);white-space:nowrap">${this.calculateParamCombinations(param)}&nbsp;values</span>
             </div>
         `).join('');
     }
@@ -422,8 +375,8 @@ class OptimizationConfigPanel {
             <div class="train-test-split">
                 <label>Train/Test Split</label>
                 <div class="split-slider-container">
-                    <input type="range" id="optTrainSplit" 
-                           min="0.5" max="0.95" step="0.05" 
+                    <input type="range" id="optTrainSplit"
+                           min="0.5" max="0.95" step="0.05"
                            value="${this.state.dataPeriod.trainSplit}">
                     <div class="split-labels">
                         <span class="train-label">Train: ${Math.round(this.state.dataPeriod.trainSplit * 100)}%</span>
@@ -438,23 +391,36 @@ class OptimizationConfigPanel {
      * Render walk-forward configuration
      */
     renderWalkForwardConfig() {
+        const wf = this.state.walkForward;
         return `
-            <div class="wf-inputs">
-                <div class="wf-input-group">
-                    <label>Train Window (days)</label>
-                    <input type="number" id="wfTrainSize" value="${this.state.dataPeriod.wfTrainSize}" min="30" max="365">
+            <div style="display:flex;flex-direction:column;gap:8px;padding:10px;background:var(--bg-secondary,#1a1a1a);border-radius:6px;margin-top:8px;">
+                <div style="font-size:11px;color:var(--text-secondary,#888);margin-bottom:2px;">
+                    <i class="bi bi-info-circle"></i>
+                    Разбивает данные на окна: оптимизирует на IS, валидирует на OOS. Показывает устойчивость стратегии.
                 </div>
-                <div class="wf-input-group">
-                    <label>Test Window (days)</label>
-                    <input type="number" id="wfTestSize" value="${this.state.dataPeriod.wfTestSize}" min="7" max="90">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:100px;">
+                        <label style="font-size:11px;color:var(--text-secondary,#888);">Окна (splits)</label>
+                        <input type="number" id="wfNSplits" value="${wf.nSplits}" min="2" max="20" step="1"
+                               style="padding:4px 8px;background:var(--bg-tertiary,#252525);border:1px solid var(--border-color,#333);border-radius:4px;color:var(--text-primary,#e0e0e0);font-size:12px;width:100%;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:100px;">
+                        <label style="font-size:11px;color:var(--text-secondary,#888);">IS доля (0.5–0.9)</label>
+                        <input type="number" id="wfTrainRatio" value="${wf.trainRatio}" min="0.5" max="0.9" step="0.05"
+                               style="padding:4px 8px;background:var(--bg-tertiary,#252525);border:1px solid var(--border-color,#333);border-radius:4px;color:var(--text-primary,#e0e0e0);font-size:12px;width:100%;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;">
+                        <label style="font-size:11px;color:var(--text-secondary,#888);">Метод IS</label>
+                        <select id="wfInnerMethod"
+                                style="padding:4px 8px;background:var(--bg-tertiary,#252525);border:1px solid var(--border-color,#333);border-radius:4px;color:var(--text-primary,#e0e0e0);font-size:12px;width:100%;">
+                            <option value="grid" ${wf.innerMethod === 'grid' ? 'selected' : ''}>Grid Search</option>
+                            <option value="bayesian" ${wf.innerMethod === 'bayesian' ? 'selected' : ''}>Bayesian</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="wf-input-group">
-                    <label>Step Size (days)</label>
-                    <input type="number" id="wfStepSize" value="${this.state.dataPeriod.wfStepSize}" min="7" max="90">
+                <div id="wfPreview" style="font-size:11px;color:var(--accent-blue,#4a9eff);margin-top:4px;">
+                    ${this.renderWalkForwardPreview()}
                 </div>
-            </div>
-            <div class="wf-preview" id="wfPreview">
-                ${this.renderWalkForwardPreview()}
             </div>
         `;
     }
@@ -463,18 +429,9 @@ class OptimizationConfigPanel {
      * Render walk-forward preview
      */
     renderWalkForwardPreview() {
-        const { wfTrainSize, wfTestSize, wfStepSize, startDate, endDate } = this.state.dataPeriod;
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-        const numFolds = Math.floor((totalDays - wfTrainSize) / wfStepSize);
-
-        return `
-            <div class="wf-preview-info">
-                <span><i class="bi bi-layers"></i> ${Math.max(1, numFolds)} folds</span>
-                <span><i class="bi bi-calendar"></i> ${totalDays} days total</span>
-            </div>
-        `;
+        const { nSplits, trainRatio } = this.state.walkForward;
+        const oosPct = Math.round((1 - trainRatio) * 100);
+        return `<i class="bi bi-layers"></i> ${nSplits} окон · IS ${Math.round(trainRatio * 100)}% / OOS ${oosPct}% · результат = среднее OOS`;
     }
 
     /**
@@ -485,20 +442,20 @@ class OptimizationConfigPanel {
             <div class="limits-grid">
                 <div class="limit-item">
                     <label for="optMaxTrials">Max Trials</label>
-                    <input type="number" id="optMaxTrials" 
-                           value="${this.state.limits.maxTrials}" 
+                    <input type="number" id="optMaxTrials"
+                           value="${this.state.limits.maxTrials}"
                            min="10" max="10000" step="10">
                 </div>
                 <div class="limit-item">
                     <label for="optTimeout">Timeout (sec)</label>
-                    <input type="number" id="optTimeout" 
-                           value="${this.state.limits.timeoutSeconds}" 
+                    <input type="number" id="optTimeout"
+                           value="${this.state.limits.timeoutSeconds}"
                            min="60" max="86400" step="60">
                 </div>
                 <div class="limit-item">
                     <label for="optWorkers">Workers</label>
-                    <input type="number" id="optWorkers" 
-                           value="${this.state.limits.workers}" 
+                    <input type="number" id="optWorkers"
+                           value="${this.state.limits.workers}"
                            min="1" max="16">
                 </div>
             </div>
@@ -516,9 +473,9 @@ class OptimizationConfigPanel {
                         <input type="checkbox" id="optEarlyStopping" ${this.state.advanced.earlyStopping ? 'checked' : ''}>
                         <span>Early Stopping</span>
                     </label>
-                    <input type="number" id="optEarlyStoppingPatience" 
-                           value="${this.state.advanced.earlyStoppingPatience}" 
-                           min="5" max="100" 
+                    <input type="number" id="optEarlyStoppingPatience"
+                           value="${this.state.advanced.earlyStoppingPatience}"
+                           min="5" max="100"
                            class="${this.state.advanced.earlyStopping ? '' : 'disabled'}"
                            title="Stop after N trials without improvement">
                 </div>
@@ -538,8 +495,8 @@ class OptimizationConfigPanel {
                 </div>
                 <div class="advanced-option">
                     <label>Random Seed</label>
-                    <input type="number" id="optRandomSeed" 
-                           value="${this.state.advanced.randomSeed || ''}" 
+                    <input type="number" id="optRandomSeed"
+                           value="${this.state.advanced.randomSeed || ''}"
                            placeholder="Auto"
                            min="0" max="999999">
                 </div>
@@ -553,7 +510,17 @@ class OptimizationConfigPanel {
     renderEstimatedTime() {
         const combinations = this.calculateTotalCombinations();
         const method = this.state.method;
-        const workers = this.state.limits.workers;
+        const workers = this.state.limits.workers || 4;
+
+        // No parameters selected
+        if (this.state.parameterRanges.length === 0) {
+            return `
+                <div class="estimated-time-content" style="opacity:0.55">
+                    <i class="bi bi-clock"></i>
+                    <span>Выберите параметры для оптимизации чтобы увидеть оценку времени</span>
+                </div>
+            `;
+        }
 
         // Rough estimates per backtest (seconds)
         const backtestTime = 0.5;
@@ -569,12 +536,13 @@ class OptimizationConfigPanel {
 
         const totalSeconds = (estimatedTrials * backtestTime) / workers;
         const timeStr = this.formatDuration(totalSeconds);
+        const methodLabel = method === 'grid_search' ? 'Grid' : method === 'bayesian' ? 'Bayesian' : method === 'walk_forward' ? 'Walk-Forward' : 'Random';
 
         return `
             <div class="estimated-time-content">
                 <i class="bi bi-clock"></i>
-                <span>Estimated time: <strong>${timeStr}</strong></span>
-                <span class="text-muted">(~${estimatedTrials.toLocaleString()} trials)</span>
+                <span>~${estimatedTrials.toLocaleString()} прогонов (${methodLabel})</span>
+                <span class="text-muted"> · ~${timeStr}</span>
             </div>
         `;
     }
@@ -602,17 +570,6 @@ class OptimizationConfigPanel {
 
         // Период берётся из «Основные параметры», даты не редактируются здесь
 
-        // Train/test split
-        this.container.querySelector('#optTrainSplit')?.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.state.dataPeriod.trainSplit = value;
-            const trainLabel = this.container.querySelector('.train-label');
-            const testLabel = this.container.querySelector('.test-label');
-            if (trainLabel) trainLabel.textContent = `Train: ${Math.round(value * 100)}%`;
-            if (testLabel) testLabel.textContent = `Test: ${Math.round((1 - value) * 100)}%`;
-            this.saveState();
-        });
-
         // Limits
         this.container.querySelector('#optMaxTrials')?.addEventListener('change', (e) => {
             this.state.limits.maxTrials = parseInt(e.target.value) || 200;
@@ -620,61 +577,28 @@ class OptimizationConfigPanel {
             this.saveState();
         });
 
-        this.container.querySelector('#optTimeout')?.addEventListener('change', (e) => {
-            this.state.limits.timeoutSeconds = parseInt(e.target.value) || 3600;
+        // Walk-Forward settings
+        this.container.querySelector('#wfNSplits')?.addEventListener('change', (e) => {
+            this.state.walkForward.nSplits = parseInt(e.target.value) || 5;
+            this.updateWalkForwardPreview();
             this.saveState();
+            this.emitChange();
         });
-
-        this.container.querySelector('#optWorkers')?.addEventListener('change', (e) => {
-            this.state.limits.workers = parseInt(e.target.value) || 4;
-            this.updateEstimatedTime();
+        this.container.querySelector('#wfTrainRatio')?.addEventListener('change', (e) => {
+            this.state.walkForward.trainRatio = parseFloat(e.target.value) || 0.7;
+            this.updateWalkForwardPreview();
             this.saveState();
+            this.emitChange();
         });
-
-        // Advanced Options — всегда развёрнуты (внутри блоков ничего не сворачивается)
-
-        // Advanced options
-        this.container.querySelector('#optEarlyStopping')?.addEventListener('change', (e) => {
-            this.state.advanced.earlyStopping = e.target.checked;
-            const patience = this.container.querySelector('#optEarlyStoppingPatience');
-            patience?.classList.toggle('disabled', !e.target.checked);
+        this.container.querySelector('#wfInnerMethod')?.addEventListener('change', (e) => {
+            this.state.walkForward.innerMethod = e.target.value || 'grid';
             this.saveState();
-        });
-
-        this.container.querySelector('#optEarlyStoppingPatience')?.addEventListener('change', (e) => {
-            this.state.advanced.earlyStoppingPatience = parseInt(e.target.value) || 20;
-            this.saveState();
-        });
-
-        this.container.querySelector('#optPruneInfeasible')?.addEventListener('change', (e) => {
-            this.state.advanced.pruneInfeasible = e.target.checked;
-            this.saveState();
-        });
-
-        this.container.querySelector('#optWarmStart')?.addEventListener('change', (e) => {
-            this.state.advanced.warmStart = e.target.checked;
-            this.saveState();
-        });
-
-        this.container.querySelector('#optRandomSeed')?.addEventListener('change', (e) => {
-            const val = e.target.value;
-            this.state.advanced.randomSeed = val ? parseInt(val) : null;
-            this.saveState();
+            this.emitChange();
         });
 
         // Parameter range inputs (delegated)
         this.container.querySelector('#optParamRanges')?.addEventListener('change', (e) => {
             this.handleParamRangeChange(e);
-        });
-
-        // Walk-forward inputs
-        ['wfTrainSize', 'wfTestSize', 'wfStepSize'].forEach(id => {
-            this.container.querySelector(`#${id}`)?.addEventListener('change', (e) => {
-                const key = id;
-                this.state.dataPeriod[key] = parseInt(e.target.value);
-                this.updateWalkForwardPreview();
-                this.saveState();
-            });
         });
 
         // Start button
@@ -814,8 +738,10 @@ class OptimizationConfigPanel {
     async startOptimization() {
         // Emit start event - will be handled by optimization_panels.js
         // If no parameter ranges, it will run single backtest instead
+        const cfg = this.getConfig();
+        console.log('[OptConfigPanel] startOptimization — param_paths:', cfg.parameter_ranges.map(p => p.param_path));
         const event = new CustomEvent('startOptimization', {
-            detail: this.getConfig()
+            detail: cfg
         });
         document.dispatchEvent(event);
     }
@@ -824,8 +750,13 @@ class OptimizationConfigPanel {
      * Get current configuration
      */
     getConfig() {
+        // Pull optimize_metric from optimization_panels.js state (it owns the metric selector)
+        const optimizeMetric = window.optimizationPanels?.state?.primaryMetric
+            || window.optimizationPanels?.state?.lastOptimizeMetric
+            || 'sharpe_ratio';
         return {
             method: this.state.method,
+            optimize_metric: optimizeMetric,
             parameter_ranges: this.state.parameterRanges.map(p => ({
                 name: p.id,
                 param_path: `${p.blockId}.${p.paramKey}`,
@@ -836,16 +767,17 @@ class OptimizationConfigPanel {
             })),
             data_period: {
                 start_date: this.getBacktestStartDate(),
-                end_date: this.getBacktestEndDate(),
-                train_split: this.state.dataPeriod.trainSplit,
-                walk_forward: this.state.method === 'walk_forward' ? {
-                    train_size: this.state.dataPeriod.wfTrainSize,
-                    test_size: this.state.dataPeriod.wfTestSize,
-                    step_size: this.state.dataPeriod.wfStepSize
-                } : null
+                end_date: this.getBacktestEndDate()
             },
-            limits: this.state.limits,
-            advanced: this.state.advanced,
+            limits: {
+                maxTrials: this.state.limits.maxTrials
+            },
+            walk_forward: this.state.method === 'walk_forward' ? {
+                n_splits: this.state.walkForward.nSplits,
+                train_ratio: this.state.walkForward.trainRatio,
+                gap_periods: this.state.walkForward.gapPeriods,
+                inner_method: this.state.walkForward.innerMethod
+            } : null,
             symbol: this.state.symbol,
             timeframe: this.state.timeframe
         };
@@ -866,15 +798,22 @@ class OptimizationConfigPanel {
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                // Merge with default, preserving structure
+                // Merge with default, preserving structure.
+                // NOTE: Do NOT restore parameterRanges from localStorage — they are
+                // rebuilt live from window.strategyBlocks via setupBlockIntegration().
+                // Restoring stale saved ranges causes empty-range bugs on reload.
                 this.state = {
                     ...this.state,
                     ...parsed,
+                    parameterRanges: [],  // always rebuilt from live blocks
                     dataPeriod: { ...this.state.dataPeriod, ...parsed.dataPeriod },
                     limits: { ...this.state.limits, ...parsed.limits },
                     advanced: { ...this.state.advanced, ...parsed.advanced }
                 };
+                // Re-render UI to reflect restored method/settings, but do NOT
+                // call bindEvents() again — init() already called it once.
                 this.render();
+                // Re-bind ONLY after re-render (render() wipes innerHTML → old listeners gone)
                 this.bindEvents();
             } catch (e) {
                 console.warn('[OptimizationConfigPanel] Failed to load saved state:', e);

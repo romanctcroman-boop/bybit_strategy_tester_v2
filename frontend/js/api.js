@@ -17,8 +17,26 @@ const API_CONFIG = {
     cacheTime: 60000 // 1 minute
 };
 
-// Simple in-memory cache
+// Simple in-memory cache with LRU eviction
+const MAX_CACHE_SIZE = 100;
 const cache = new Map();
+
+/**
+ * Set a cache entry, evicting the oldest entry if the cache is full.
+ * Map preserves insertion order, so the first key is always the oldest.
+ * @param {string} key
+ * @param {{ data: any, timestamp: number }} value
+ */
+function setCacheEntry(key, value) {
+    if (cache.has(key)) {
+        // Re-insert to refresh insertion order (move to end)
+        cache.delete(key);
+    } else if (cache.size >= MAX_CACHE_SIZE) {
+        // Evict the oldest (first) entry
+        cache.delete(cache.keys().next().value);
+    }
+    cache.set(key, value);
+}
 
 /**
  * API Client class with retry and caching
@@ -111,7 +129,7 @@ class ApiClient {
         const data = await this.request(endpoint, { method: 'GET' });
 
         if (useCache) {
-            cache.set(cacheKey, { data, timestamp: Date.now() });
+            setCacheEntry(cacheKey, { data, timestamp: Date.now() });
         }
 
         return data;
@@ -169,11 +187,23 @@ class ApiClient {
         const signals = [timeoutController.signal];
         if (options.signal) signals.push(options.signal);
 
-        const combinedSignal = signals.length === 1
-            ? signals[0]
-            : AbortSignal.any
-                ? AbortSignal.any(signals)          // modern browsers
-                : signals[0];                        // fallback: timeout wins
+        let combinedSignal;
+        if (signals.length === 1) {
+            combinedSignal = signals[0];
+        } else if (typeof AbortSignal.any === 'function') {
+            combinedSignal = AbortSignal.any(signals);  // modern browsers
+        } else {
+            // Fallback for browsers without AbortSignal.any:
+            // Wire both signals into a single bridging AbortController so
+            // neither the timeout nor the caller signal is silently dropped.
+            const bridge = new AbortController();
+            const abort = (reason) => bridge.abort(reason);
+            signals.forEach(sig => {
+                if (sig.aborted) { abort(sig.reason); return; }
+                sig.addEventListener('abort', () => abort(sig.reason), { once: true });
+            });
+            combinedSignal = bridge.signal;
+        }
 
         try {
             const response = await fetch(url, { ...options, signal: combinedSignal });

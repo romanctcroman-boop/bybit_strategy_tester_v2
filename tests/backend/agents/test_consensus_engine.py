@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import pytest
 
+from unittest.mock import patch
+
 from backend.agents.consensus.consensus_engine import (
     AgentPerformance,
     ConsensusEngine,
@@ -463,3 +465,116 @@ class TestEdgeCases:
         engine.aggregate(two_strategies)
         engine.aggregate(two_strategies, method="best_of")
         assert len(engine._history) == 2
+
+
+# =============================================================================
+# TESTS — FALLBACK BEHAVIOUR
+# =============================================================================
+
+
+class TestConsensusFallback:
+    """Verify ConsensusEngine degrades gracefully when agents fail or input is partial."""
+
+    # ── Single / partial agent responses ─────────────────────────────────────
+
+    def test_single_agent_returns_that_strategy(self):
+        """Only one agent responds → result is that strategy, method=single_agent."""
+        engine = ConsensusEngine()
+        s = _make_strategy("Solo")
+        result = engine.aggregate({"deepseek": s})
+        assert result.strategy.strategy_name == "Solo"
+        assert result.method == "single_agent"
+        assert result.agreement_score == 1.0
+
+    def test_two_agents_produces_consensus_without_error(self):
+        """Two of three expected agents respond → still produces a result."""
+        engine = ConsensusEngine()
+        strategies = {
+            "deepseek": _make_strategy("A", [_make_signal("RSI")]),
+            "qwen":     _make_strategy("B", [_make_signal("MACD")]),
+        }
+        result = engine.aggregate(strategies, method="weighted_voting")
+        assert result is not None
+        assert result.strategy is not None
+        assert len(result.input_agents) == 2
+
+    def test_empty_strategies_raises_value_error(self):
+        """Empty input should raise ValueError, not crash silently."""
+        engine = ConsensusEngine()
+        with pytest.raises(ValueError, match="empty"):
+            engine.aggregate({})
+
+    # ── Agent weight degradation ──────────────────────────────────────────────
+
+    def test_agent_weight_decreases_after_repeated_failures(self):
+        """Agent weight (success_rate) declines when backtest_passed=False repeatedly."""
+        engine = ConsensusEngine()
+        # Initial prior: 0.5
+        engine.update_performance("deepseek", backtest_passed=True)  # baseline
+        initial_rate = engine._performance["deepseek"].success_rate
+
+        # Three consecutive failures
+        for _ in range(3):
+            engine.update_performance("deepseek", backtest_passed=False)
+
+        degraded_rate = engine._performance["deepseek"].success_rate
+        assert degraded_rate < initial_rate, (
+            f"success_rate should drop after failures: {initial_rate:.3f} → {degraded_rate:.3f}"
+        )
+
+    def test_different_agents_have_independent_weights(self):
+        """Updating deepseek's record does not change qwen's weight."""
+        engine = ConsensusEngine()
+        engine.update_performance("deepseek", backtest_passed=False)
+        engine.update_performance("deepseek", backtest_passed=False)
+
+        # qwen has never been recorded — must have the default prior
+        if "qwen" in engine._performance:
+            assert engine._performance["qwen"].total_strategies == 0
+        else:
+            pass  # qwen not present at all — also fine
+
+    # ── ConsensusNode fallback (via trading_strategy_graph) ──────────────────
+
+    def test_consensus_node_falls_back_when_engine_raises(self):
+        """If ConsensusEngine.aggregate() raises, ConsensusNode falls back to best_of."""
+        import asyncio
+        from backend.agents.langgraph_orchestrator import AgentState
+        from backend.agents.trading_strategy_graph import ConsensusNode
+        from backend.agents.prompts.response_parser import ValidationResult
+
+        node = ConsensusNode()
+        strategy_a = _make_strategy("FallbackStrategy", [_make_signal("RSI")])
+        strategy_b = _make_strategy("OtherStrategy",   [_make_signal("MACD")])
+
+        val = ValidationResult(is_valid=True, quality_score=0.75)
+
+        state = AgentState()
+        state.set_result("parse_responses", {
+            "proposals": [
+                {"agent": "deepseek", "strategy": strategy_a, "validation": val},
+                {"agent": "qwen",     "strategy": strategy_b, "validation": val},
+            ]
+        })
+
+        # Patch at the source module — ConsensusEngine is lazy-imported inside execute()
+        with patch(
+            "backend.agents.consensus.consensus_engine.ConsensusEngine.aggregate",
+            side_effect=RuntimeError("engine exploded"),
+        ):
+            result_state = asyncio.run(node.execute(state))
+
+        # Should still have a result despite the engine failure
+        result = result_state.get_result("select_best")
+        assert result is not None
+        assert result["selected_strategy"] is not None
+        assert result["selected_agent"] in ("deepseek", "qwen")
+
+    def test_unusual_signal_type_does_not_crash_aggregation(self):
+        """Strategy with a rare signal type is still valid ConsensusEngine input."""
+        engine = ConsensusEngine()
+        # Both strategies have signals — StrategyDefinition requires at least 1
+        s_rsi   = _make_strategy("RSI Strategy",     [_make_signal("RSI")])
+        s_weird = _make_strategy("Weird Strategy",   [_make_signal("CUSTOM_INDICATOR_X")])
+        result = engine.aggregate({"deepseek": s_rsi, "qwen": s_weird})
+        assert result.strategy is not None

@@ -122,7 +122,7 @@ class PerplexityClient:
         self.timeout = 5.0  # 🚀 Quick Win 2: Reduced timeout
 
         # 🚀 Priority 1: Shared cache implementation
-        self.cache = SimpleCache(max_size=10, ttl_seconds=60)
+        self.cache = SimpleCache(max_size=50, ttl_seconds=300)
 
         # Circuit breaker tracking
         self.failure_count = 0

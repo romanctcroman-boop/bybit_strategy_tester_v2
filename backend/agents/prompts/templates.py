@@ -745,6 +745,51 @@ IMPORTANT RULES:
   E.g., RSI range params only optimize if use_rsi_range_filter=true.
 - After optimization, update strategy params with the best combination using builder_update_block_params.
 
+PORT NAMES QUICK REFERENCE — CRITICAL:
+When building connections, "fromPort" MUST exactly match the block's actual output port name.
+Wrong port name → 0 trades generated (silent failure). Use this table:
+
+  RSI:               long, short, value
+  MACD:              long, short, macd, signal, hist
+  SuperTrend:        long, short, supertrend, direction, upper, lower
+  Stochastic:        long, short, k, d
+  QQE:               long, short, qqe_line, rsi_ma, histogram, trend
+  EMA/SMA/WMA:       long, short  (when used as trend filter)
+  Two MAs:           long, short
+  ATR Volatility:    long, short
+  Volume Filter:     long, short
+  Highest/Lowest:    long, short
+  Accumulation:      long, short
+  Keltner/Bollinger: long, short
+  RVI:               long, short
+  MFI:               long, short
+  CCI:               long, short
+  Momentum:          long, short
+  Divergence:        long, short, bullish, bearish, signal  ← bullish=long, bearish=short
+  Crossover/under:   long, short
+  Greater/Less Than: output
+  Between:           output
+
+  Strategy node (toPort): entry_long, entry_short, exit_long, exit_short
+
+ALIAS RESOLUTION (backend maps automatically, but prefer canonical names):
+  "bullish" → "long"  |  "bearish" → "short"  |  "value"/"signal" → "output"
+
+BLOCK ACTIVATION RULES — READ CAREFULLY:
+All universal blocks default to passthrough mode (long=True, short=True always) unless an activation
+flag is explicitly set. A passthrough block does NOT filter signals — every bar passes through.
+You MUST include the activation flag in params or the block has no effect:
+  MACD:        use_macd_cross_signal=true  OR  use_macd_cross_zero=true
+  SuperTrend:  use_supertrend=true
+  QQE:         use_qqe=true
+  Two MAs:     use_ma_cross=true  (crossover)  OR  use_ma1_filter=true  (price-above-MA filter)
+  Stochastic:  use_stoch_range_filter=true  OR  use_stoch_cross_level=true  OR  use_stoch_kd_cross=true
+  RSI:         use_long_range=true / use_short_range=true  OR  use_cross_level=true
+               (legacy oversold/overbought params auto-enable without flags)
+  ATR Volatility: use_atr_volatility=true
+  Volume Filter:  use_volume_filter=true
+Omitting these flags = block is always True = NO filtering at all.
+
 TASK: Create a trading strategy that maximizes {primary_metric} while keeping Max Drawdown < {max_drawdown_target}%.
 
 STRATEGY REQUIREMENTS:

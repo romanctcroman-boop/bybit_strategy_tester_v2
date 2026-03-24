@@ -70,23 +70,60 @@ export function createValidateModule({
 
         // Part 1: Parameters
         const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+        const timeframe = document.getElementById('strategyTimeframe')?.value?.trim();
         const startDate = document.getElementById('backtestStartDate')?.value?.trim();
         const endDate = document.getElementById('backtestEndDate')?.value?.trim();
         const capital = parseFloat(document.getElementById('backtestCapital')?.value);
+        const leverage = parseFloat(document.getElementById('backtestLeverage')?.value);
+        const positionSize = parseFloat(document.getElementById('backtestPositionSize')?.value);
+        const pyramiding = parseInt(document.getElementById('backtestPyramiding')?.value, 10);
+
         if (!symbol) { result.valid = false; result.errors.push('⚙️ Параметры: не выбран Symbol'); }
+        if (!timeframe) { result.valid = false; result.errors.push('⚙️ Параметры: не выбран Timeframe'); }
         if (!startDate || !endDate) { result.valid = false; result.errors.push('⚙️ Параметры: не заданы даты'); }
+        if (startDate) {
+            const DATA_START = '2025-01-01';
+            if (startDate < DATA_START) {
+                result.valid = false;
+                result.errors.push(`⚙️ Параметры: Start Date раньше ${DATA_START} — данных нет`);
+            }
+        }
+        if (endDate) {
+            const _n = new Date();
+            const todayStr = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
+            if (endDate > todayStr) {
+                result.valid = false;
+                result.errors.push('⚙️ Параметры: End Date в будущем — данных нет');
+            }
+        }
         if (startDate && endDate && startDate >= endDate) {
             result.valid = false;
             result.errors.push('⚙️ Параметры: Start Date должна быть раньше End Date');
         }
         if (startDate && endDate && startDate < endDate) {
             const diffMs = new Date(endDate) - new Date(startDate);
+            const diffDays = diffMs / (24 * 60 * 60 * 1000);
             const diffYears = diffMs / (365.25 * 24 * 60 * 60 * 1000);
+            if (diffDays < 7) {
+                result.warnings.push('⚙️ Параметры: диапазон дат < 7 дней — слишком мало баров для бэктеста');
+            }
             if (diffYears > 10) {
                 result.warnings.push('⚙️ Параметры: диапазон дат > 10 лет — бэктест может быть очень долгим');
             }
         }
         if (!capital || capital <= 0) { result.valid = false; result.errors.push('⚙️ Параметры: Capital должен быть > 0'); }
+        if (document.getElementById('backtestLeverage') && (!leverage || leverage <= 0)) {
+            result.valid = false;
+            result.errors.push('⚙️ Параметры: Leverage должен быть > 0');
+        }
+        if (document.getElementById('backtestPositionSize') && (!positionSize || positionSize <= 0)) {
+            result.valid = false;
+            result.errors.push('⚙️ Параметры: Position Size должен быть > 0');
+        }
+        if (document.getElementById('backtestPyramiding') && (isNaN(pyramiding) || pyramiding <= 0)) {
+            result.valid = false;
+            result.errors.push('⚙️ Параметры: Pyramiding должен быть ≥ 1');
+        }
 
         // Part 2: Entry conditions
         const hasEntryLong = connections.some((c) =>
@@ -154,13 +191,60 @@ export function createValidateModule({
 
             // ── PART 1: PARAMETERS ──
             const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+            const timeframe = document.getElementById('strategyTimeframe')?.value?.trim();
             const startDate = document.getElementById('backtestStartDate')?.value?.trim();
             const endDate = document.getElementById('backtestEndDate')?.value?.trim();
             const capital = parseFloat(document.getElementById('backtestCapital')?.value);
+            const leverage = parseFloat(document.getElementById('backtestLeverage')?.value);
+            const positionSize = parseFloat(document.getElementById('backtestPositionSize')?.value);
+            const pyramiding = parseInt(document.getElementById('backtestPyramiding')?.value, 10);
 
             if (!symbol) { result.valid = false; result.errors.push('⚙️ Parameters: Symbol not selected'); }
+            if (!timeframe) { result.valid = false; result.errors.push('⚙️ Parameters: Timeframe not selected'); }
             if (!startDate || !endDate) { result.valid = false; result.errors.push('⚙️ Parameters: Start/End date not set'); }
+            if (startDate) {
+                const DATA_START = '2025-01-01';
+                if (startDate < DATA_START) {
+                    result.valid = false;
+                    result.errors.push(`⚙️ Parameters: Start Date is before ${DATA_START} — no data available`);
+                }
+            }
+            if (endDate) {
+                const _n = new Date();
+                const todayStr = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
+                if (endDate > todayStr) {
+                    result.valid = false;
+                    result.errors.push('⚙️ Parameters: End Date is in the future — no data available');
+                }
+            }
+            if (startDate && endDate && startDate >= endDate) {
+                result.valid = false;
+                result.errors.push('⚙️ Parameters: Start Date must be before End Date');
+            }
+            if (startDate && endDate && startDate < endDate) {
+                const diffMs = new Date(endDate) - new Date(startDate);
+                const diffDays = diffMs / (24 * 60 * 60 * 1000);
+                const diffYears = diffMs / (365.25 * 24 * 60 * 60 * 1000);
+                if (diffDays < 7) {
+                    result.warnings.push('⚙️ Parameters: Date range < 7 days — too few bars for reliable backtesting');
+                }
+                if (diffYears > 10) {
+                    result.warnings.push('⚙️ Parameters: Date range > 10 years — backtest may be very slow');
+                }
+            }
             if (!capital || capital <= 0) { result.valid = false; result.errors.push('⚙️ Parameters: Initial capital must be > 0'); }
+            if (document.getElementById('backtestLeverage') && (!leverage || leverage <= 0)) {
+                result.valid = false;
+                result.errors.push('⚙️ Parameters: Leverage must be > 0');
+            }
+            if (document.getElementById('backtestPositionSize') && (!positionSize || positionSize <= 0)) {
+                result.valid = false;
+                result.errors.push('⚙️ Parameters: Position Size must be > 0');
+            }
+            if (document.getElementById('backtestPyramiding') && (isNaN(pyramiding) || pyramiding <= 0)) {
+                result.valid = false;
+                result.errors.push('⚙️ Parameters: Pyramiding must be ≥ 1');
+            }
 
             // ── PART 2: ENTRY CONDITIONS ──
             if (mainNode) {
@@ -200,6 +284,11 @@ export function createValidateModule({
                     } else if (!hasEntryLong && hasEntryShort && direction === 'both') {
                         result.warnings.push('🟢 Entry: Only Short entries — consider adding Long for "both" direction');
                     }
+                    if (direction === 'long' && hasEntryShort && !hasEntryLong) {
+                        result.warnings.push('🟢 Entry: Direction is "long" but only Short entries connected — signals will be ignored');
+                    } else if (direction === 'short' && hasEntryLong && !hasEntryShort) {
+                        result.warnings.push('🟢 Entry: Direction is "short" but only Long entries connected — signals will be ignored');
+                    }
                 }
             }
 
@@ -228,6 +317,15 @@ export function createValidateModule({
                 );
                 if (!hasSLTP) {
                     result.warnings.push('🔴 Exit: No SL/TP block — trades have no stop-loss protection');
+                }
+                // Duplicate static_sltp blocks — only first one is used by engine
+                const sltpCount = exitBlocks.filter((b) => b.type === 'static_sltp').length;
+                if (sltpCount > 1) {
+                    result.warnings.push(`🔴 Exit: ${sltpCount} Static SL/TP blocks detected — only the first will be used`);
+                }
+                const atrExitCount = exitBlocks.filter((b) => b.type === 'atr_exit').length;
+                if (atrExitCount > 1) {
+                    result.warnings.push(`🔴 Exit: ${atrExitCount} ATR Exit blocks detected — only the first will be used`);
                 }
             }
 

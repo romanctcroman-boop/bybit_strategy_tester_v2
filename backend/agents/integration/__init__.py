@@ -16,6 +16,7 @@ from backend.agents.integration.ai_backtest_integration import (
     get_optimization_analyzer,
 )
 from backend.agents.integration.backtest_bridge import BacktestBridge
+from backend.agents.integration.graph_converter import StrategyDefToGraphConverter
 
 __all__ = [
     "AIBacktestAnalyzer",
@@ -23,6 +24,7 @@ __all__ = [
     "AIOptimizationAnalyzer",
     "AIOptimizationResult",
     "BacktestBridge",
+    "StrategyDefToGraphConverter",
     "get_backtest_analyzer",
     "get_optimization_analyzer",
 ]

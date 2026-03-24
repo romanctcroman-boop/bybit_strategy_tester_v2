@@ -23,7 +23,7 @@ import math
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -86,7 +86,7 @@ class ABTest:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict."""
@@ -432,7 +432,7 @@ class ABTesting:
             return False
 
         test.status = "completed"
-        test.completed_at = datetime.utcnow().isoformat()
+        test.completed_at = datetime.now(UTC).isoformat()
 
         if select_winner:
             winner, _, _ = self._calculate_winner(test)
@@ -485,7 +485,7 @@ class ABTesting:
             return False
 
         test.status = "running"
-        test.started_at = datetime.utcnow().isoformat()
+        test.started_at = datetime.now(UTC).isoformat()
 
         # Save
         self._save()
@@ -681,7 +681,7 @@ class ABTesting:
             data = {
                 "tests": [t.to_dict() for t in self._tests.values()],
                 "user_assignments": self._user_assignments,
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
 
             with open(self.storage_path, "w", encoding="utf-8") as f:

@@ -183,7 +183,7 @@ async function refreshData() {
         const summaryResponse = await fetch(`${RISK_API}/summary`);
         if (summaryResponse.ok) {
             const summary = await summaryResponse.json();
-            
+
             // If demo mode enabled or no real data, show mock data
             const hasRealData = summary.risk_score > 0 || summary.positions_count > 0;
             if (window.DEMO_MODE || !hasRealData) {
@@ -191,7 +191,7 @@ async function refreshData() {
                 showMockData();
                 return;
             }
-            
+
             updateRiskSummary(summary);
         }
 

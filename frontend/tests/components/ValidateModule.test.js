@@ -41,7 +41,7 @@ function makeConn(sourceId, sourcePt, targetId, targetPt) {
 }
 
 /** Set DOM values used by validateStrategyCompleteness/validateStrategy */
-function setDom({ symbol = 'BTCUSDT', startDate = '2025-01-01', endDate = '2025-12-31', capital = '10000', direction = 'both' } = {}) {
+function setDom({ symbol = 'BTCUSDT', startDate = '2025-01-01', endDate = '2025-12-31', capital = '10000', direction = 'both', timeframe = '15' } = {}) {
     const set = (id, val) => {
         const el = document.getElementById(id) || (() => {
             const e = document.createElement('input');
@@ -55,6 +55,7 @@ function setDom({ symbol = 'BTCUSDT', startDate = '2025-01-01', endDate = '2025-
     set('backtestStartDate', startDate);
     set('backtestEndDate', endDate);
     set('backtestCapital', capital);
+    set('strategyTimeframe', timeframe);
     const d = document.getElementById('builderDirection') || (() => {
         const e = document.createElement('select');
         e.id = 'builderDirection';

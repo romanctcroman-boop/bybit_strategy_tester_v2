@@ -21,21 +21,21 @@ export class MonteCarloChart {
       height: 400,
       confidenceLevels: [0.05, 0.25, 0.5, 0.75, 0.95],
       colors: {
-        median: "#26a69a",
+        median: '#26a69a',
         bands: [
-          "rgba(38, 166, 154, 0.1)", // 5-95%
-          "rgba(38, 166, 154, 0.2)", // 25-75%
+          'rgba(38, 166, 154, 0.1)', // 5-95%
+          'rgba(38, 166, 154, 0.2)' // 25-75%
         ],
-        baseline: "#ef5350",
-        var: "#ff9800",
-        grid: "rgba(42, 46, 57, 0.8)",
-        text: "#787b86",
-        background: "#131722",
+        baseline: '#ef5350',
+        var: '#ff9800',
+        grid: 'rgba(42, 46, 57, 0.8)',
+        text: '#787b86',
+        background: '#131722'
       },
       showVaR: true,
       varLevel: 0.05, // 5% VaR
       initialCapital: 10000,
-      ...options,
+      ...options
     };
   }
 
@@ -48,7 +48,7 @@ export class MonteCarloChart {
    */
   render(data) {
     if (!this.container || !data?.simulations) {
-      console.warn("MonteCarloChart: Container or data not found");
+      console.warn('MonteCarloChart: Container or data not found');
       return;
     }
 
@@ -70,12 +70,12 @@ export class MonteCarloChart {
 
     // Create chart
     this.chart = new Chart(ctx, {
-      type: "line",
+      type: 'line',
       data: {
         labels: timestamps,
-        datasets: datasets,
+        datasets: datasets
       },
-      options: this._getChartOptions(data),
+      options: this._getChartOptions(data)
     });
 
     // Add distribution panel if container exists
@@ -98,29 +98,29 @@ export class MonteCarloChart {
     // Calculate histogram bins
     const bins = this._calculateHistogramBins(finalEquities, 30);
 
-    const ctx = this._createCanvas(container, "distribution-canvas");
+    const ctx = this._createCanvas(container, 'distribution-canvas');
 
     // Calculate colors based on profit/loss
     const colors = bins.centers.map(
       (v) =>
         v >= this.options.initialCapital
-          ? "rgba(38, 166, 154, 0.7)" // Profit - green
-          : "rgba(239, 83, 80, 0.7)", // Loss - red
+          ? 'rgba(38, 166, 154, 0.7)' // Profit - green
+          : 'rgba(239, 83, 80, 0.7)' // Loss - red
     );
 
     new Chart(ctx, {
-      type: "bar",
+      type: 'bar',
       data: {
         labels: bins.centers.map((v) => this._formatCurrency(v)),
         datasets: [
           {
-            label: "Frequency",
+            label: 'Frequency',
             data: bins.counts,
             backgroundColor: colors,
             borderRadius: 2,
-            barPercentage: 0.95,
-          },
-        ],
+            barPercentage: 0.95
+          }
+        ]
       },
       options: {
         responsive: true,
@@ -129,32 +129,32 @@ export class MonteCarloChart {
           legend: { display: false },
           title: {
             display: true,
-            text: "Final Equity Distribution",
-            color: this.options.colors.text,
+            text: 'Final Equity Distribution',
+            color: this.options.colors.text
           },
-          annotation: this._getDistributionAnnotations(finalEquities),
+          annotation: this._getDistributionAnnotations(finalEquities)
         },
         scales: {
           x: {
             title: {
               display: true,
-              text: "Final Equity ($)",
-              color: this.options.colors.text,
+              text: 'Final Equity ($)',
+              color: this.options.colors.text
             },
             grid: { display: false },
-            ticks: { color: this.options.colors.text },
+            ticks: { color: this.options.colors.text }
           },
           y: {
             title: {
               display: true,
-              text: "Frequency",
-              color: this.options.colors.text,
+              text: 'Frequency',
+              color: this.options.colors.text
             },
             grid: { color: this.options.colors.grid },
-            ticks: { color: this.options.colors.text },
-          },
-        },
-      },
+            ticks: { color: this.options.colors.text }
+          }
+        }
+      }
     });
   }
 
@@ -169,7 +169,7 @@ export class MonteCarloChart {
       p25: [],
       p50: [],
       p75: [],
-      p95: [],
+      p95: []
     };
 
     for (let t = 0; t < n_periods; t++) {
@@ -195,67 +195,67 @@ export class MonteCarloChart {
 
     // 5-95% confidence band (background)
     datasets.push({
-      label: "90% Confidence",
+      label: '90% Confidence',
       data: percentiles.p95,
-      borderColor: "transparent",
+      borderColor: 'transparent',
       backgroundColor: this.options.colors.bands[0],
-      fill: "+1",
+      fill: '+1',
       pointRadius: 0,
-      order: 4,
+      order: 4
     });
     datasets.push({
-      label: "_p5",
+      label: '_p5',
       data: percentiles.p5,
-      borderColor: "transparent",
-      backgroundColor: "transparent",
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
       fill: false,
       pointRadius: 0,
-      order: 5,
+      order: 5
     });
 
     // 25-75% confidence band
     datasets.push({
-      label: "50% Confidence",
+      label: '50% Confidence',
       data: percentiles.p75,
-      borderColor: "transparent",
+      borderColor: 'transparent',
       backgroundColor: this.options.colors.bands[1],
-      fill: "+1",
+      fill: '+1',
       pointRadius: 0,
-      order: 2,
+      order: 2
     });
     datasets.push({
-      label: "_p25",
+      label: '_p25',
       data: percentiles.p25,
-      borderColor: "transparent",
-      backgroundColor: "transparent",
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
       fill: false,
       pointRadius: 0,
-      order: 3,
+      order: 3
     });
 
     // Median line
     datasets.push({
-      label: "Median (50th Percentile)",
+      label: 'Median (50th Percentile)',
       data: percentiles.p50,
       borderColor: this.options.colors.median,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       borderWidth: 2,
       fill: false,
       pointRadius: 0,
       tension: 0.1,
-      order: 1,
+      order: 1
     });
 
     // Initial capital baseline
     datasets.push({
-      label: "Initial Capital",
+      label: 'Initial Capital',
       data: new Array(timestamps.length).fill(this.options.initialCapital),
       borderColor: this.options.colors.baseline,
       borderDash: [5, 5],
       borderWidth: 1,
       fill: false,
       pointRadius: 0,
-      order: 6,
+      order: 6
     });
 
     return datasets;
@@ -271,52 +271,52 @@ export class MonteCarloChart {
       maintainAspectRatio: false,
       interaction: {
         intersect: false,
-        mode: "index",
+        mode: 'index'
       },
       plugins: {
         legend: {
-          position: "top",
+          position: 'top',
           labels: {
             color: this.options.colors.text,
-            filter: (item) => !item.text.startsWith("_"),
-          },
+            filter: (item) => !item.text.startsWith('_')
+          }
         },
         title: {
           display: true,
           text: `Monte Carlo Simulation (${data.simulations?.length || 0} runs)`,
           color: this.options.colors.text,
-          font: { size: 14 },
+          font: { size: 14 }
         },
         tooltip: {
           callbacks: {
             label: (context) => {
               const value = context.parsed.y;
               return `${context.dataset.label}: ${this._formatCurrency(value)}`;
-            },
-          },
-        },
+            }
+          }
+        }
       },
       scales: {
         x: {
           grid: { color: this.options.colors.grid },
           ticks: {
             color: this.options.colors.text,
-            maxTicksLimit: 10,
-          },
+            maxTicksLimit: 10
+          }
         },
         y: {
           title: {
             display: true,
-            text: "Portfolio Value ($)",
-            color: this.options.colors.text,
+            text: 'Portfolio Value ($)',
+            color: this.options.colors.text
           },
           grid: { color: this.options.colors.grid },
           ticks: {
             color: this.options.colors.text,
-            callback: (value) => this._formatCurrency(value),
-          },
-        },
-      },
+            callback: (value) => this._formatCurrency(value)
+          }
+        }
+      }
     };
   }
 
@@ -340,7 +340,7 @@ export class MonteCarloChart {
     for (const value of values) {
       const binIndex = Math.min(
         Math.floor((value - min) / binWidth),
-        numBins - 1,
+        numBins - 1
       );
       counts[binIndex]++;
     }
@@ -363,7 +363,7 @@ export class MonteCarloChart {
     return {
       annotations: {
         varLine: {
-          type: "line",
+          type: 'line',
           xMin: this._formatCurrency(varValue),
           xMax: this._formatCurrency(varValue),
           borderColor: this.options.colors.var,
@@ -372,22 +372,22 @@ export class MonteCarloChart {
           label: {
             display: true,
             content: `VaR ${(this.options.varLevel * 100).toFixed(0)}%`,
-            position: "start",
-          },
+            position: 'start'
+          }
         },
         meanLine: {
-          type: "line",
+          type: 'line',
           xMin: this._formatCurrency(meanValue),
           xMax: this._formatCurrency(meanValue),
           borderColor: this.options.colors.median,
           borderWidth: 2,
           label: {
             display: true,
-            content: "Mean",
-            position: "end",
-          },
-        },
-      },
+            content: 'Mean',
+            position: 'end'
+          }
+        }
+      }
     };
   }
 
@@ -400,9 +400,9 @@ export class MonteCarloChart {
     let panel = document.getElementById(panelId);
 
     if (!panel) {
-      panel = document.createElement("div");
+      panel = document.createElement('div');
       panel.id = panelId;
-      panel.className = "monte-carlo-stats mt-3";
+      panel.className = 'monte-carlo-stats mt-3';
       this.container.parentNode.appendChild(panel);
     }
 
@@ -414,7 +414,7 @@ export class MonteCarloChart {
       prob_loss,
       var_5,
       cvar_5,
-      max_drawdown_mean,
+      max_drawdown_mean
     } = statistics;
 
     panel.innerHTML = `
@@ -422,7 +422,7 @@ export class MonteCarloChart {
                 <div class="col-md-3">
                     <div class="stat-card bg-dark p-2 rounded">
                         <div class="text-muted small">Expected Return</div>
-                        <div class="h5 mb-0 ${mean_return >= 0 ? "text-success" : "text-danger"}">
+                        <div class="h5 mb-0 ${mean_return >= 0 ? 'text-success' : 'text-danger'}">
                             ${(mean_return * 100).toFixed(2)}%
                         </div>
                     </div>
@@ -454,14 +454,14 @@ export class MonteCarloChart {
    * @private
    */
   _getOrCreateCanvas() {
-    let canvas = this.container.querySelector("canvas");
+    let canvas = this.container.querySelector('canvas');
     if (!canvas) {
-      canvas = document.createElement("canvas");
+      canvas = document.createElement('canvas');
       canvas.style.height = `${this.options.height}px`;
-      this.container.innerHTML = "";
+      this.container.innerHTML = '';
       this.container.appendChild(canvas);
     }
-    return canvas.getContext("2d");
+    return canvas.getContext('2d');
   }
 
   /**
@@ -469,12 +469,12 @@ export class MonteCarloChart {
    * @private
    */
   _createCanvas(container, id) {
-    container.innerHTML = "";
-    const canvas = document.createElement("canvas");
+    container.innerHTML = '';
+    const canvas = document.createElement('canvas');
     canvas.id = id;
     canvas.style.height = `${this.options.height / 2}px`;
     container.appendChild(canvas);
-    return canvas.getContext("2d");
+    return canvas.getContext('2d');
   }
 
   /**
@@ -490,11 +490,11 @@ export class MonteCarloChart {
    * @private
    */
   _formatCurrency(value) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   }
 
@@ -513,6 +513,6 @@ export class MonteCarloChart {
 export default MonteCarloChart;
 
 // Attach to window for non-module scripts
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.MonteCarloChart = MonteCarloChart;
 }

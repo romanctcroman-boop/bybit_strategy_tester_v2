@@ -14,6 +14,7 @@ Features:
 """
 
 import asyncio
+import inspect
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -60,6 +61,10 @@ class AgentState:
     results: dict[str, Any] = field(default_factory=dict)
     errors: list[dict[str, Any]] = field(default_factory=list)
 
+    # Observability — LLM cost & call count accumulated across all nodes
+    total_cost_usd: float = 0.0
+    llm_call_count: int = 0
+
     # Metadata
     session_id: str = field(default_factory=lambda: str(uuid4()))
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -85,6 +90,11 @@ class AgentState:
     def get_result(self, node: str) -> Any | None:
         """Get result from a node execution."""
         return self.results.get(node)
+
+    def record_llm_cost(self, cost_usd: float) -> None:
+        """Accumulate LLM API cost and increment call counter."""
+        self.total_cost_usd += cost_usd
+        self.llm_call_count += 1
 
     def add_error(self, node: str, error: Exception):
         """Add an error to the state."""
@@ -198,7 +208,7 @@ class FunctionAgent(AgentNode):
 
     async def execute(self, state: AgentState) -> AgentState:
         """Execute the wrapped function."""
-        if asyncio.iscoroutinefunction(self.func):
+        if inspect.iscoroutinefunction(self.func):
             return await self.func(state)
         return self.func(state)
 
@@ -345,6 +355,9 @@ class AgentGraph:
         self.total_executions = 0
         self.successful_executions = 0
         self.failed_executions = 0
+
+        # Last execution state — used by get_metrics() for timing + cost
+        self._last_state: AgentState | None = None
 
     def add_node(self, node: AgentNode) -> "AgentGraph":
         """Add a node to the graph."""
@@ -495,12 +508,13 @@ class AgentGraph:
         else:
             self.successful_executions += 1
 
+        self._last_state = state
         logger.info(f"Graph '{self.name}' completed in {iterations} iterations")
         return state
 
     def get_metrics(self) -> dict[str, Any]:
-        """Get graph execution metrics."""
-        return {
+        """Get graph execution metrics including timing and LLM cost from last run."""
+        base: dict[str, Any] = {
             "name": self.name,
             "nodes_count": len(self.nodes),
             "edges_count": sum(len(e) for e in self.edges.values()),
@@ -509,6 +523,16 @@ class AgentGraph:
             "failed_executions": self.failed_executions,
             "success_rate": (self.successful_executions / max(self.total_executions, 1) * 100),
         }
+        if self._last_state is not None:
+            timing: dict[str, float] = dict(self._last_state.execution_path)
+            base.update({
+                "node_timing_s": timing,
+                "slowest_node": max(timing, key=timing.__getitem__) if timing else None,
+                "total_wall_time_s": round(sum(timing.values()), 3),
+                "total_cost_usd": round(self._last_state.total_cost_usd, 6),
+                "llm_call_count": self._last_state.llm_call_count,
+            })
+        return base
 
     def visualize(self) -> str:
         """Generate ASCII visualization of the graph."""

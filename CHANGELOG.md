@@ -9,6 +9,351 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **test(api): generate-and-build endpoint — 25 integration tests + datetime deprecation fix (2026-03-24)**
+
+    Added full integration test coverage for `POST /ai-strategy-generator/generate-and-build`:
+
+    - **`tests/backend/api/test_generate_and_build.py`** (new file, 25 tests, 4 classes):
+      - `TestGenerateAndBuildHappyPath` (10 tests): response shape keys, strategy_name from select_best,
+        backtest_metrics passthrough, strategy_graph passthrough, saved_strategy_id, execution_path,
+        symbol/timeframe echo, graph_warnings, proposals_count from report, pipeline errors surfaced as 200
+      - `TestGenerateAndBuildRequestForwarding` (4 tests): all request params forwarded to pipeline as kwargs,
+        default agents=["deepseek"], symbol forwarded as-is, pipeline called exactly once
+      - `TestGenerateAndBuildErrorPaths` (5 tests): empty DataFrame → 404, DB exception → 503,
+        pipeline RuntimeError → 500, None DataFrame → 404, pipeline ValueError message in detail
+      - `TestGenerateAndBuildEdgeCases` (6 tests): no select_best → "AI Strategy" fallback,
+        no backtest result → empty {}, no strategy_graph → None, empty body uses defaults, multiple warnings preserved
+
+    - **Patch strategy documented** (critical for future tests):
+      `run_strategy_pipeline` is lazy-imported inside the endpoint function body →
+      must be patched at source `backend.agents.trading_strategy_graph.run_strategy_pipeline`,
+      NOT at `backend.api.routers.ai_strategy_generator.run_strategy_pipeline`.
+      `asyncio.to_thread` patched as `backend.api.routers.ai_strategy_generator.asyncio.to_thread`.
+
+    - **Fixed**: `datetime.utcnow()` → `datetime.now(UTC)` in `ai_strategy_generator.py:594`
+      (Python 3.12+ deprecation warning).
+
+- **feat(agents): 10/10 production readiness — timeout, observability, E2E tests, consensus fallback (2026-03-24)**
+
+    Four production-readiness improvements closing the gap from 7.5/10 → 9.5/10:
+
+    **Item 1 — Global Pipeline Timeout (Safety)**
+    - `run_strategy_pipeline()` now accepts `pipeline_timeout: float = 300.0` (5 min default)
+    - Wraps `graph.execute()` with `asyncio.wait_for()` — prevents runaway refinement loops
+    - On timeout: returns partial `AgentState` with `"pipeline"` error entry, logs visited nodes
+
+    **Item 2 — Observability: Cost + Timing everywhere**
+    - `AgentState` gains `total_cost_usd: float` + `llm_call_count: int` + `record_llm_cost()`
+    - `GenerateStrategiesNode._call_llm()` now accepts `state=` parameter and accumulates cost via `response.estimated_cost`
+    - `AgentGraph` stores `_last_state` after each run; `get_metrics()` now returns `node_timing_s`, `slowest_node`, `total_wall_time_s`, `total_cost_usd`, `llm_call_count`
+    - `_report_node()` includes `pipeline_metrics` key (cost + call count + timing) in final report
+
+    **Item 3 — Refinement Loop E2E Integration Tests (9 new tests)**
+    - `TestRefinementLoopEndToEnd` in `tests/test_refinement_loop.py`
+    - Tests run `BacktestAnalysisNode → RefinementNode` together on real state
+    - Covers: catastrophic/near-miss instructions, direction mismatch port hint, no-signal connectivity hint, stale key clearing, 3-iteration exhaustion, iteration counter label, root-cause consistency
+
+    **Item 4 — Consensus Fallback Tests (7 new tests)**
+    - `TestConsensusFallback` in `tests/backend/agents/test_consensus_engine.py`
+    - Covers: single-agent passthrough, 2/3 agents responding, empty input ValueError, weight degradation after failures, independent agent weight isolation, ConsensusNode fallback to best_of when engine raises, unusual signal type handling
+
+    **Bug fix**: `fake_call_llm` in `test_agent_soul.py` and `test_multi_agent_integration.py` updated to accept new `state=None` kwarg.
+
+    **Total tests**: 210 passing across all new test classes.
+
+- **fix(agents): Code review fixes — constants dedup, _backtest_passes single source of truth, report includes analysis (2026-03-24)**
+
+    Post-review fixes for P0 agent embodiment (`trading_strategy_graph.py`):
+    - Extracted `_MIN_TRADES = 5` and `_MAX_DD_PCT = 30.0` as module-level constants.
+      Both `RefinementNode` and `BacktestAnalysisNode` now reference these instead of
+      hardcoding `5` / `30.0` independently. Eliminated `if False else 5` forward-ref hack.
+    - `_backtest_passes()` now reads `state.context["backtest_analysis"]["passed"]` when
+      `BacktestAnalysisNode` has run — single evaluation point, no duplicate threshold logic.
+      Falls back to direct metric computation only when the node was skipped (`run_backtest=False`).
+    - `_report_node()` now includes `"backtest_analysis"` key in the final report dict,
+      making root-cause diagnostics visible to API consumers.
+    - 13 new tests added to `tests/test_memory_recall_and_analysis_nodes.py` (total: 43).
+      Tests cover: module-level constant values, `RefinementNode`/`BacktestAnalysisNode` inherit
+      constants correctly, `_backtest_passes` reads from analysis, fallback path, `_report_node`
+      includes analysis key.
+
+- **fix(frontend): Frontend audit B-01..B-15 — 16 bugs fixed + full test coverage (2026-03-24)**
+
+    Complete frontend audit: 15 bugs identified (B-01..B-15) across 8 JS files, all fixed,
+    and covered with new Vitest unit tests. Final result: **759/759 tests passing**.
+
+    **Production fixes:**
+    - **B-01** `js/core/WebSocketClient.js` — `_onOpen()` saved `wasReconnecting` AFTER resetting
+      `_reconnectAttempts = 0`, so the `RECONNECT` event never fired after reconnection. Fixed: save
+      flag before reset.
+    - **B-02** `js/components/BacktestModule.js` — `renderDrawdownChart` read `p.drawdown` (always
+      `undefined`); drawdown now computed as `(equity − peak) / peak` from equity values.
+    - **B-03** `js/pages/strategy_builder.js` — `clearAllAndReset()` cleared `strategyBlocks[]` in
+      place but never called `setSBBlocks()` / `setSBConnections()` → StateManager out of sync.
+    - **B-04** `js/pages/strategy_builder.js` — `floatingWindowToggle` mutated `block.x` but never
+      called `setSBBlocks()` → StateManager stale.
+    - **B-05** `js/pages/strategy_builder.js` — `sizeInput.value || 100` coerced `'0'` to 100.
+      Replaced with strict empty-string check.
+    - **B-06** `js/pages/strategy_builder.js` — `filterBlocks()` crashed with TypeError when
+      `.block-name` element was absent. Fixed with optional chaining `?.textContent`.
+    - **B-07** `js/components/BacktestModule.js` — `blockLibrary.filters.some(...)` threw TypeError
+      when `filters` was `undefined`. Fixed with `filters?.some(...) ?? false`.
+    - **B-08** `js/pages/dashboard.js` — `loadMetricsSummary()` did 12 bare `el.textContent =`
+      writes without null-checking. All wrapped in null-safe `setEl()` helper.
+    - **B-09** `js/api.js` — Cache `Map` grew without bound. Added `MAX_CACHE_SIZE = 100` with LRU
+      eviction via `setCacheEntry()` (deletes oldest key when limit exceeded).
+    - **B-10** `js/api.js` — `_fetchWithTimeout` fallback (when `AbortSignal.any` absent) only
+      merged the timeout signal, dropping the caller signal. Fixed with bridge `AbortController`
+      that listens to both signals.
+    - **B-11** `js/core/ApiClient.js` — 429 responses ignored the `Retry-After` header; all 429s
+      were treated as non-retryable client errors. Fixed: `_handleResponse` attaches
+      `error.retryAfterMs`; retry loop uses it instead of exponential backoff.
+    - **B-11+** `js/core/ApiClient.js` — Constructor used `options.retries || 3` which coerced
+      `retries: 0` to `3`. Changed to `?? 3`.
+    - **B-12** `js/pages/strategy_builder.js` — 3× `.substr(2, N)` (2nd arg = length in `substr`,
+      but end-index in `substring`). Changed to `.substring(2, 2 + N)`.
+    - **B-12b** `js/strategy_builder/BlocksModule.js` — Same `.substr(2, 9)` bug in
+      `createBlock()` and `duplicateBlock()`. Fixed to `.substring(2, 11)`.
+    - **B-13** `js/components/BacktestModule.js` — `DATA_START_DATE` was declared inside a
+      function; any other function referencing it got ReferenceError. Moved to module-level const.
+    - **B-14** `js/utils.js` — `isValidSymbol` regex `/^[A-Z]{2,10}USDT?$/` rejected USDC pairs
+      and numeric-prefix tickers (`10000PEPUSDT`). New regex: `/^[A-Z0-9]{3,12}(USDT|USDC)$/`.
+    - **B-15** `js/pages/strategy_builder.js` — `Object.defineProperty(window, 'strategyBlocks')`
+      called twice (once weak at ~line 305, once StateManager-backed at bottom). The first shadowed
+      the second. First one removed.
+
+    **New test files (all green):**
+
+    | File                                 | Tests | Covers                                                       |
+    | ------------------------------------ | ----- | ------------------------------------------------------------ |
+    | `tests/utils/utils.test.js`          | 29    | isValidSymbol (B-14), formatNumber, debounce, validateNumber |
+    | `tests/api/api.test.js`              | 5     | LRU cache (B-09), AbortSignal fallback (B-10)                |
+    | `tests/core/ApiClient.test.js`       | 10    | Retry-After (B-11), core retry, ApiError helpers             |
+    | `tests/core/WebSocketClient.test.js` | —     | RECONNECT (B-01), lifecycle                                  |
+
+    **Regression tests added to existing files:**
+    - `tests/components/BacktestModule.test.js` — B-02 drawdown computation, B-07 optional
+      chaining, B-13 module-level constant (3 new `describe` blocks).
+    - `tests/indicators.test.js` — Fixed 4 incorrect test assertions (CCI time off-by-one,
+      Stochastic period vs data size, RSI asymptote precision).
+
+- **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
+
+    All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+    changes that were not reflected in the tests.
+
+    **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+    - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+      now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+    - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+    - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+    - `renderPagination` tests updated: pagination is always removed, no elements created.
+    - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+
+    **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+    - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
+selected'`) but `setDom()` helper did not create the `#strategyTimeframe` element.
+    - Added `strategyTimeframe = '15'` parameter to `setDom()` and creates the element.
+
+    **`frontend/tests/components/SaveLoadModule.test.js`** (1 test fixed)
+    - `loadStrategy` calls `renderConnections()` after loading, but this dependency was absent from
+      the mock `setup()` function → error thrown, success notification never fired.
+    - Added `renderConnections: vi.fn()` to the mocks in `setup()`.
+
+    **`frontend/tests/components/AiBuildModule.test.js`** (2 tests fixed)
+    - Tests checking modal title (`'AI Strategy Builder'` / `'AI Strategy Optimizer'`) were synchronous
+      but the title is set inside `_loadStrategiesList().then()` (a microtask).
+    - Made both tests `async` with `await new Promise(r => setTimeout(r, 0))` to flush microtask queue.
+    - Added missing `#aiExistingStrategy`, `#aiExistingStrategyHint`, `#aiNameHint` to `makeDOM()`.
+
+    **`frontend/tests/ticker-sync.test.js`** (8 tests fixed) + **`frontend/js/pages/strategy_builder.js`** (bug fix)
+    - Root cause: `setupEventListeners()` (line 826) called `symbolSync.initDunnahBasePanel()` at line
+      1288, but `symbolSync` is not created until line 830 (after `setupEventListeners` returns).
+      This threw `TypeError: Cannot read properties of null`, the catch swallowed it, and `symbolSync`
+      remained `null` — making all exported `syncSymbolData` calls no-ops.
+    - **Production bug fixed**: removed `symbolSync.initDunnahBasePanel()` from inside
+      `setupEventListeners()`; moved the call to after `symbolSync` is created (line ~840) in
+      `initializeStrategyBuilder()`.
+    - All 16 ticker-sync integration tests now pass.
+
+- **feat(agents): P0 Agent Embodiment — MemoryRecallNode + BacktestAnalysisNode (2026-03-24)**
+
+    Closes the two most critical agent embodiment gaps identified in the 5/10 architecture audit.
+    Agents now read their own memory before generating strategies and receive structured diagnostic
+    context after backtesting — instead of hardcoded if-else logic.
+
+    **MemoryRecallNode** (`backend/agents/trading_strategy_graph.py`)
+    - New `MemoryRecallNode` (Node 1.7) inserted between `DebateNode` and `GenerateStrategiesNode`.
+    - Queries `HierarchicalMemory` for 3 categories: past wins (`importance ≥ 0.5`), past failures (`importance ≥ 0.1`), regime patterns (`importance ≥ 0.3`). Top-K: 5 wins / 3 failures / 3 regime.
+    - Builds a formatted `## Prior Knowledge from Memory` block injected into `state.context["memory_context"]`.
+    - Structured list written to `state.context["past_attempts"]` for downstream nodes.
+    - Non-blocking: any `HierarchicalMemory` error silently degrades to empty context (pipeline never aborted).
+    - `GenerateStrategiesNode.execute()` now prepends `memory_context` to all LLM prompts (DeepSeek Self-MoA variants + other agents).
+
+    **BacktestAnalysisNode** (`backend/agents/trading_strategy_graph.py`)
+    - New `BacktestAnalysisNode` (Node 5.5) inserted between `BacktestNode` and the conditional router.
+    - Classifies failure **severity**: `pass` / `near_miss` / `moderate` / `catastrophic`.
+    - Diagnoses **root cause** (priority order): `direction_mismatch` → `no_signal` → `signal_connectivity` → `sl_too_tight` → `excessive_risk` → `low_activity` → `poor_risk_reward` → `unknown`.
+    - Generates root-cause-specific **suggestions** (e.g. "Connect BOTH long and short ports", "Increase SL to 2–3× ATR").
+    - Result stored in `state.context["backtest_analysis"]` and `state.results["backtest_analysis"]`.
+    - `RefinementNode.execute()` now reads `backtest_analysis` for severity/root_cause/suggestions instead of rebuilding diagnostics from scratch.
+    - Near-miss paths use a softer "refine, don't redesign" instruction; catastrophic paths use a stronger "complete redesign" instruction.
+
+    **Graph re-wiring** (`build_trading_strategy_graph()`)
+    - Old: `analyze → [debate] → generate`, router on `backtest`.
+    - New: `analyze → [debate] → memory_recall → generate`, `backtest → backtest_analysis → [router]`.
+    - `test_refinement_loop.py` updated: `graph.routers["backtest"]` → `graph.routers["backtest_analysis"]` in 4 tests.
+
+    **Tests:** `tests/test_memory_recall_and_analysis_nodes.py` — 33 tests:
+    - `TestBacktestAnalysisNodeSeverity` (6): pass/near_miss/moderate/catastrophic classification.
+    - `TestBacktestAnalysisNodeRootCause` (6): direction_mismatch/no_signal/signal_connectivity/sl_too_tight/low_activity/poor_risk_reward.
+    - `TestBacktestAnalysisNodeOutput` (5): suggestions content, result structure, None-safety.
+    - `TestMemoryRecallNode` (5): empty memory, error non-fatal, wins injection, failures AVOID section, result metadata.
+    - `TestRefinementNodeUsesAnalysis` (4): analysis suggestions in feedback, near_miss/catastrophic instructions, no-analysis fallback.
+    - `TestGraphWiringWithNewNodes` (7): all new nodes present, correct edge wiring, router placement.
+    - All 93 agent pipeline tests pass (27 feedback + 33 refinement + 33 new).
+
+- **feat(memory): Agent Memory Evolution — все 5 фаз ТЗ*ЭВОЛЮЦИЯ*ПАМЯТИ реализованы (2026-03-24)**
+
+    Полная реализация `docs/ТЗ_ЭВОЛЮЦИЯ_ПАМЯТИ.md` — эволюция системы памяти AI-агентов с 5-6/10 до 8/10 зрелости. Закрывает 5 консенсус-проблем аудита Phase 13 (3/3 агента, HIGH severity).
+
+    **Фаза P1 — UnifiedMemoryItem** (`backend/agents/memory/hierarchical_memory.py`)
+    - Устранён дуальный anti-pattern: `MemoryItem` и `PersistentMemoryItem` объединены в единый dataclass.
+    - Новые поля: `agent_namespace: str = "shared"` (per-agent isolation), `ttl_seconds: float | None`, `source`, `related_ids`, `embedding`.
+    - Временны́е метки — всегда `datetime` UTC (не `float` timestamp). `from_dict()` обратно совместим с legacy `float`.
+    - `to_dict() → from_dict()` lossless roundtrip. `__post_init__` валидирует `importance` ∈ [0, 1] и конвертирует `str → MemoryType`.
+    - `UnifiedMemoryItem = MemoryItem` алиас для backward compatibility.
+    - SQLite-схема обновлена: новые колонки `agent_namespace`, `embedding BLOB`, `source`, `related_ids JSON`, индексы по `(agent_namespace, memory_type)`.
+    - Тесты: `tests/backend/agents/test_unified_memory_item.py` — 21 тест.
+
+    **Фаза P2 — MCP-инструменты памяти** (`backend/agents/mcp/tools/memory.py`)
+    - Создан новый MCP tool файл с 5 инструментами: `memory_store`, `memory_recall`, `memory_get_stats`, `memory_consolidate`, `memory_forget`.
+    - Singleton `get_global_memory() → HierarchicalMemory` — ленивая инициализация с `SQLiteBackendAdapter`.
+    - `memory_store`: принимает `content`, `memory_type`, `importance`, `tags`, `namespace`, `source`; возвращает `{"id": ..., "namespace": ..., "tags": [...]}`.
+    - `memory_recall`: `query` + фильтры (`memory_type`, `top_k`, `min_importance`, `tags`, `namespace`, `use_semantic`); возвращает список с `id/content/importance/tags/score`.
+    - `memory_get_stats`: статистика по tier'ам (count, capacity, utilization %).
+    - `memory_consolidate` / `memory_forget`: ручной триггер.
+    - Тесты: `tests/backend/agents/test_mcp_memory_tools.py` — 26 тестов.
+
+    **Фаза P3 — TagNormalizer + AutoTagger** (`backend/agents/memory/tag_normalizer.py`, `auto_tagger.py`)
+    - `TagNormalizer`: 20+ групп синонимов для трейдинг-домена (`rsi/RSI_indicator/relative-strength-index → rsi`, `trading/trade/trades → trading` и т.д.). Case-insensitive, strip, дедупликация.
+    - `AutoTagger`: regex-паттерны для символов (`BTCUSDT`), индикаторов (`RSI/MACD/BB/EMA`), таймфреймов (`1h/4h/1d`). Keyword extraction. Metadata mapping (`source="deepseek"` → tag `"agent:deepseek"`).
+    - Интеграция в `HierarchicalMemory.store()`: автотегирование + нормализация перед сохранением.
+    - Интеграция в `consolidate()`: группировка по canonical tags → разблокирует EPISODIC→SEMANTIC переход (ранее блокировалась из-за тег-инконсистенции между агентами).
+    - Тесты: `test_tag_normalizer.py` (37 тестов) + `test_auto_tagger.py` (33 теста).
+
+    **Фаза P4 — Hybrid Retrieval** (`backend/agents/memory/bm25_ranker.py`, `hierarchical_memory.py`)
+    - `BM25Ranker`: реализация BM25 без внешних зависимостей (~130 строк). TF-IDF с насыщением (`k1=1.2`, `b=0.75`), IDF weighting, инкрементальное индексирование, thread-safe через `asyncio.Lock`.
+    - Трёхступенчатый pipeline: Structured filter → BM25 ranking → Vector cosine → Fusion scoring.
+    - Fusion weights (normal): `0.35×BM25 + 0.40×cosine + 0.15×importance + 0.10×recency`.
+    - Degraded mode (без ChromaDB): `0.65×BM25 + 0.00×cosine + 0.20×importance + 0.15×recency` + `logger.debug("⚠️ degraded mode")`.
+    - `get_stats()` возвращает `vector_degraded: bool` для мониторинга.
+    - Тесты: `test_bm25_ranker.py` (35 тестов) + `test_hybrid_retrieval.py` (25 тестов).
+
+    **Фаза P5 — Интеграция памяти в делиберацию** (`backend/agents/consensus/real_llm_deliberation.py`)
+    - `deliberate_with_llm()`: параметр `use_memory: bool = True`.
+    - Auto-recall перед делиберацией: `recall_for_deliberation(question, agents)` — каждый агент получает top-5 воспоминаний из своего namespace, форматированных как `## Relevant Prior Knowledge`.
+    - Auto-store после консенсуса: `store_deliberation_result(result)` → сохраняет в `SEMANTIC` с `importance=confidence`, тегами `["deliberation", strategy_type]`.
+    - `RealLLMDeliberation._format_memory_context()` — форматирует memories как нумерованный список с tier/importance/content.
+    - Тесты: `test_memory_deliberation_integration.py` (19 тестов).
+
+    **Fix (в рамках P5):** `real_llm_deliberation.py:69` — `from backend.agents.llm.connections import ...` → `from backend.agents.llm import ...`. Убирает `DeprecationWarning` (модуль `connections` объявлен deprecated, будет удалён в будущей версии).
+
+    **Итог:** 286 тестов памяти — все проходят за 4.6 с. Полное покрытие всех 5 фаз.
+
+- **tests(integration): optimizer integration tests on real historical data — 22 tests (2026-03-24)**
+    - `tests/integration/test_optimizer_real_data.py` — new integration test file covering optimizer correctness on real ETHUSDT 30m data (2025-01-01 → 2025-03-01, 2833 bars from local DB).
+    - `TestRealDataLoading` (5 tests): bar count ≥ 2500, required OHLCV columns, no NaN in OHLC, high ≥ low, prices positive.
+    - `TestSingleBacktestRealData` (3 tests): returns metrics dict, all key metrics are finite (no NaN/inf), produces at least 1 trade.
+    - `TestPositionSizeNotHardcoded` (2 tests): **BUG-1 regression** — `position_size=0.5` produces >1.5× larger `|net_profit|` than `position_size=0.1`; trade count is unchanged by position_size.
+    - `TestLongShortBreakdownNonZero` (2 tests): **BUG-2 regression** — `long_gross_profit > 0` when there are winning long trades; FallbackV4 and NumbaV2 long/short breakdown fields match exactly.
+    - `TestNumbaParityRealData` (3 tests): NumbaEngineV2 vs FallbackEngineV4 — `total_trades` exact match, `net_profit` within 0.01% relative tolerance, `sharpe_ratio` within 0.01 absolute.
+    - `TestGridSearchRealData` (6 tests): 12-combo mini grid (3 periods × 2 SL × 2 TP) — returns results, all combos tested, ranked by Sharpe, top results contain expected param keys, different metrics give different rankings.
+    - `TestDCAPathRegressionRealData` (1 test): **BUG-3 regression** — DCA+RSI strategy must not return `method="rsi_threshold_*"` (guard against fast-path bypass).
+    - **Fix**: `generate_builder_param_combinations` returns `(iterator, total, was_capped)` 3-tuple — corrected erroneous `list(generate_builder_param_combinations(...))` call in `TestDCAPathRegressionRealData` to proper unpacking `combos_iter, total, _ = ...`.
+    - All 22 tests pass in ~7 s (real data loaded from local SQLite kline DB, no mocking).
+
+- **fix: deprecation warnings cleanup (2026-03-24)**
+    - `backend/agents/langgraph_orchestrator.py:201` — `asyncio.iscoroutinefunction` → `inspect.iscoroutinefunction` (Python 3.16 removal). Added `import inspect`.
+    - `backend/agents/prompts/prompt_logger.py` — all 3 `datetime.utcnow()` → `datetime.now(UTC)`. Added `UTC` to datetime import.
+    - `backend/ml/ai_backtest_executor.py:170` — `"commission": 0.001` → `COMMISSION_TV` (0.0007). Fixes ~43% commission overcharge in ML experimental backtest path.
+    - `backend/tasks/optimize_tasks.py:309,470` — `strategy_config.get("commission", 0.001)` → `strategy_config.get("commission", COMMISSION_TV)` in `WalkForwardAnalyzer` and `BayesianOptimizer` init. Fallback now matches platform standard.
+    - `fast_optimizer.py` — 3 occurrences left as-is (file explicitly marked `⚠️ DEPRECATED`).
+
+- **fix(agents): 4 production bugs in trading_strategy_graph.py — BacktestNode + RefinementNode (2026-03-24)**
+
+    Deep audit of all agent pipeline changes from 2026-03-23 revealed 4 bugs that would cause crashes or silent data loss in production:
+    - **BUG #1 — `PerformanceMetrics.get()` AttributeError** (`backend/agents/trading_strategy_graph.py`): `BacktestEngine.run()` returns `BacktestResult` where `.metrics` is a Pydantic `PerformanceMetrics` model, not a plain dict. `RefinementNode` was calling `metrics.get("total_trades", 0)` which raises `AttributeError` on any non-zero result. Fix: detect `hasattr(raw_metrics, "model_dump")` and call `.model_dump()` before storing metrics in agent state.
+
+    - **BUG #2 — `result.warnings` always empty** (`backend/agents/trading_strategy_graph.py`): `BacktestResult` has no `.warnings` attribute — the correct attribute is `.analysis_warnings`. Additionally, `[DIRECTION_MISMATCH]` and `[NO_TRADES]` are generated by the API router, not by `FallbackEngineV4`, so they are never present in engine output. Fix: read `result.analysis_warnings` for raw engine warnings, then synthesize `DIRECTION_MISMATCH`/`NO_TRADES` in `BacktestNode._run_via_adapter()` by checking `long_trades`/`short_trades`/`total_trades` from the converted metrics dict.
+
+    - **BUG #3 — `engine_warnings=None` crash in `RefinementNode`** (`backend/agents/trading_strategy_graph.py`): When `engine_warnings` or `sample_trades` stored in state was `None` (e.g. interrupted pipeline or legacy path), iterating `for w in None` raised `TypeError`. Fix: `list(backtest_result.get("engine_warnings", None) or [])` and same pattern for `sample_trades`.
+
+    - **Trade serialization** — `model_dump()` preferred over `__dict__` for `TradeRecord` objects (Pydantic BaseModel). `__dict__` on a Pydantic v2 model includes internal fields; `model_dump()` gives clean field-only output. Order of fallbacks changed to `model_dump()` → `__dict__`.
+
+    All 4 fixes covered by `TestRefinementNodeSafety` (4 tests) added to `tests/test_agent_feedback_improvements.py` — extending suite from 23 → 27 tests.
+
+- **tests: test_agent_feedback_improvements.py — 23 tests for agent pipeline improvements (2026-03-24)**
+    - `tests/test_agent_feedback_improvements.py` — new test file covering all agent feedback improvements added 2026-03-23:
+        - `TestParseStrategyWithErrors` (7 tests): empty response, no JSON, invalid JSON syntax, missing signals, valid strategy, out-of-range param warning, backward-compat `parse_strategy()` wrapper
+        - `TestRefinementNodeEngineWarnings` (4 tests): `DIRECTION_MISMATCH` text + interpretation, `NO_TRADES` text + port guidance, irrelevant warnings excluded, no-warnings case has no ENGINE WARNINGS section
+        - `TestRefinementNodeSampleTrades` (3 tests): trades shown when < 10, suppressed when ≥ 10, capped at 5 entries
+        - `TestRefinementNodeGraphWarnings` (2 tests): graph warnings in feedback, capped at 3
+        - `TestApplyAgentHints` (6 tests): range narrowing, unmatched params unchanged, disabled hints skipped, empty hints passthrough, simple ranges dict format, dotted key matching
+    - All 23 tests pass in 0.93 s.
+
+- **fix: test_llm_clients.py — Python 3.14 asyncio compatibility (2026-03-24)**
+    - `tests/backend/agents/test_llm_clients.py::TestLLMClientPool::test_empty_pool_raises`: `asyncio.get_event_loop().run_until_complete(...)` → `asyncio.run(...)`. In Python 3.14, `asyncio.get_event_loop()` raises `RuntimeError("There is no current event loop in thread 'MainThread'.")` when no loop exists, which masked the expected `RuntimeError("No clients")` from `LLMClientPool.chat()`. Fix uses `asyncio.run()` which creates a fresh loop per call.
+
+- **cleanup: temp_opt_lev1.py + run_tests\*.bat deleted (2026-03-24)**
+    - Deleted `temp_opt_lev1.py` — one-off optimization script, superseded by proper tests.
+    - Deleted `run_tests.bat` and `run_tests2.bat` — temporary test runner scripts used during this session.
+
+- **docs: REFACTORING_PLAN.md — post-Phase 5 section added (2026-03-24)**
+    - Added "Работа после Phase 5 — Agent Pipeline (2026-03-23)" section documenting all agent pipeline improvements in a structured table (7 files, what was done in each). Deferred items listed (ТЗ*ЭВОЛЮЦИЯ*ПАМЯТИ, commission legacy paths).
+
+- **feat(agents): Agent feedback pipeline — PORT NAMES, structured parse errors, engine warnings in RefinementNode, OptimizationNode hints (2026-03-23)**
+
+    **1. `backend/agents/prompts/templates.py` — PORT NAMES QUICK REFERENCE section**
+    Added a compact table of output port names for all 20+ indicator blocks immediately before the `BLOCK ACTIVATION RULES` section. Previously agents silently produced 0 trades because they used wrong port names (e.g. `"signal"` instead of `"long"`, `"go_long"` instead of `"long"`). Table covers: RSI/MACD/SuperTrend/Stochastic/QQE/Two MAs/ATR Volatility/Volume Filter/Highest-Lowest/Accumulation/Keltner-Bollinger/RVI/MFI/CCI/Momentum/Divergence/Crossover/Between and Strategy node `toPort` values. Includes alias resolution note (`"bullish"→"long"`, `"bearish"→"short"`).
+
+    **2. `backend/agents/prompts/response_parser.py` — `parse_strategy_with_errors()`**
+    New public method returns `tuple[StrategyDefinition | None, list[str]]` instead of bare `None` on failure. Error list contains structured, field-specific messages: JSON syntax errors, Pydantic field validation failures (via `_extract_pydantic_errors()`), parameter range warnings from `validate_strategy()`. Existing `parse_strategy()` is now a one-line wrapper — full backward compatibility preserved. This enables `RefinementNode` to relay exact failure reasons back to the LLM.
+
+    **3. `backend/agents/trading_strategy_graph.py` — BacktestNode enriched result**
+    `_run_via_adapter()` now returns `{"metrics": ..., "engine_warnings": [...], "sample_trades": [...]}` instead of bare metrics dict. `engine_warnings` captures `result.warnings` from `FallbackEngineV4` (includes `[DIRECTION_MISMATCH]`, `[NO_TRADES]`, `[INVALID_OHLC]`). `sample_trades` captures first 10 trades (supports dict, `__dict__`, and `model_dump()` trade objects). `BacktestNode.execute()` stores all three in `state.results["backtest"]`.
+
+    **4. `backend/agents/trading_strategy_graph.py` — RefinementNode enriched feedback**
+    Feedback prompt now has 3 additional sections beyond the base failure diagnosis:
+    - `ENGINE WARNINGS` — `[DIRECTION_MISMATCH]` and `[NO_TRADES]` presented with human-readable interpretation (port name guidance, direction config context).
+    - `GRAPH CONVERSION WARNINGS` — up to 3 warnings from `BuildGraphNode` (block not found, port mismatch, etc.).
+    - `SAMPLE TRADES` — first 5 trades (entry price, exit price, PnL, direction) shown when `total_trades < 10`, helping the agent understand why so few trades fired.
+
+    **5. `backend/agents/trading_strategy_graph.py` — BuildGraphNode saves optimization hints**
+    After graph conversion, `strategy.optimization_hints` (from LLM JSON `optimization_hints.optimizationParams`) is serialised and stored in `state.context["agent_optimization_hints"]` for downstream use.
+
+    **6. `backend/agents/trading_strategy_graph.py` — OptimizationNode uses agent hints**
+    New `_apply_agent_hints(param_specs, hints)` static method narrows Optuna search ranges using agent-provided hints. Supports both `optimizationParams` format (`{"period": {"enabled": true, "min": 5, "max": 20, "step": 1}}`) and simple `ranges` format (`{"period": [5, 20]}`). Unmatched params fall through to default ranges. Logged at DEBUG level per param overridden.
+
+    **Tests: 1432 passed** (tests/test_refinement_loop.py + tests/test_agent_soul.py + tests/test_graph_converter.py + tests/ai_agents/ — all green).
+
+- **Fix: optimizer bugs — position_size hardcode + long/short breakdown zeroes (2026-03-21)**
+    - **BUG 1 (`backend/optimization/builder_optimizer.py`)**: `position_size` was hardcoded as `0.1` (grid search) and `1.0` (Numba path) instead of reading from `request.position_size`. For a strategy with leverage=10 and 10k capital, this produced a 10× profit inflation (top result showed $2284 vs correct $460). Fixed: both paths now pass the user-supplied `position_size` through to `BacktestConfig` / Numba engine args.
+    - **BUG 2 (`backend/backtesting/engines/numba_engine_v2.py`)**: `long_winning_trades`, `long_gross_profit`, `long_gross_loss`, `long_losing_trades`, `short_winning_trades`, `short_gross_profit`, `short_gross_loss`, `short_losing_trades`, and 8 related breakdown metrics always returned `0`. Root cause: loop accumulated into `long_wins`, `short_wins`, etc. but the final result dict used different key names (`long_winning_trades` etc.) that were never assigned. Fixed: aligned variable names.
+
+- **Fix: optimizer DCA mixed batch path bypass (2026-03-21)** — `backend/optimization/builder_optimizer.py`. For strategy graphs containing DCA blocks, `run_builder_grid_search` was incorrectly routing through the RSI threshold fast path instead of the DCA-aware mixed batch path (`_run_dca_mixed_batch_numba`). Root cause: `_is_rsi_threshold_only_optimization()` returns `True` when the combo contains both RSI threshold params and `static_sltp` params (intentional, for non-DCA graphs). This caused the DCA check to be unreachable. Fix: added a 1-line `_has_dca_blocks_early` pre-check that skips the RSI threshold fast path entirely when the graph contains `dca` or `grid_orders` block types.
+
+- **Fix: test_builder_optimizer.py — 3 types of test breakage (2026-03-21)**
+    - `test_extract_sltp_params`: `extract_optimizable_params` skips breakeven params when `activate_breakeven=False`. Added `"activate_breakeven": True` to `static_sltp_1` block in `sample_rsi_graph` fixture and `exit_1` block in `multi_indicator_graph` fixture so tests receive the expected 4 breakeven params.
+    - `test_grid_search_single_param`, `test_grid_search_two_params`, `test_single_value_param_range`: `generate_builder_param_combinations` now returns a lazy generator (memory-efficient for 100M+ combo grids). Tests called `len()` and index access directly on the generator. Fixed by adding `combos = list(combos)` after the generator call in each test.
+    - `test_grid_search_activates_mixed_path`: was failing with `KeyError: 'method'` because the DCA mixed batch path was bypassed (see DCA fix above). Test now passes after the `_has_dca_blocks_early` guard.
+
+- **Verified: RSI-1 strategy top-1 optimization result (2026-03-21)** — Ran 116,424 parameter combinations for strategy `824561e0-...` (RSI + cross-level + SLTP). Top-1 result: `period=15, long_rsi_more=32.0, cross_long_level=25.0, cross_short_level=65.0, stop_loss_percent=3.0, take_profit_percent=5.0` → 43 trades, net_profit=$460.89 (4.62%), Sharpe=0.268, win_rate=53.49%, max_drawdown=1.73%. NumbaEngineV2 confirmed 100% parity with FallbackEngineV4. Updated strategy params in DB via PUT `/api/v1/strategy-builder/strategies/{id}`.
+
+- **docs: AI Agents Integration Map (2026-03-21)** — Создан `docs/AI_AGENTS_INTEGRATION_MAP.md` — полная карта интеграции AI агентов (DeepSeek/Qwen/Perplexity) с проектом по результатам аудита. Документирует: (1) что агенты ВИДЯТ — рыночный контекст, 40+ индикаторов с параметрами, платформенные ограничения (commission=0.07%, capital, leverage), few-shot примеры стратегий (динамически выбираются по режиму), refined feedback из `RefinementNode`, ML-предупреждения из `MLValidationNode`; (2) что НЕ ВИДЯТ — port alias маппинг (`"long"` ↔ `"bullish"`), детали отдельных сделок, structured validation errors от ResponseParser, internals `StrategyBuilderAdapter` (clamping, topological sort), engine warnings (`[DIRECTION_MISMATCH]`, `[NO_TRADES]`), Optuna optimization progress; (3) полная схема information flow от запроса до report; (4) 8 приоритизированных TODO пробелов (#1 port alias blindness, #2 validation errors в refinement, #3 direction trap feedback, #4 trade details при <10 сделок и др.); (5) таблица файлов для изучения при работе с агентами.
+
+- **docs: Stale documentation fixes (2026-03-21)** — исправлены устаревшие ссылки в 4 файлах после завершения рефакторинга Phase 3-5: `CLAUDE.md` (main) — `StrategyBuilderAdapter` путь исправлен на `strategy_builder/adapter.py` (1399 строк вместо 3575), `indicator_handlers.py` помечен как `[WRAPPER]` → `indicators/` package, directory tree обновлён, `strategy_builder.js` исправлен с 13378 → ~7154 строк; `memory-bank/systemPatterns.md` — обновлена таблица крупных файлов; `.claude/agents/backtesting-expert.md` — обновлены пути и размеры; `REFACTORING_PLAN.md` — статус обновлён на «ВСЕ ФАЗЫ 0–5 ЗАВЕРШЕНЫ».
+
 - **Fix: middleware_setup.py missing ErrorHandlerMiddleware import (2026-03-21)** — `backend/api/middleware_setup.py` referenced `ErrorHandlerMiddleware` at line 58 but never imported it (would cause `NameError` at startup). Added `from backend.middleware.error_handler import ErrorHandlerMiddleware`.
 
 - **Phase 4.2: Unified error handler middleware (existing) (2026-03-21)** — `backend/middleware/error_handler.py` already implements `ErrorHandlerMiddleware(BaseHTTPMiddleware)` — catches all unhandled exceptions, returns structured `{"error": {"type", "message", "timestamp", "correlation_id"}}` JSON, hides internals in production (`DEBUG` env var), adds traceback in debug mode, sets `X-Error-Type` / `X-Correlation-ID` response headers. Registered as the FIRST middleware in `middleware_setup.py` (must be outermost to catch everything). This completes Phase 4.2 of REFACTORING_PLAN.
@@ -32,12 +377,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Refactor: indicator_handlers.py split into indicators package (2026-03-21)** — `backend/backtesting/indicator_handlers.py` (2217 lines) restructured into a proper package `backend/backtesting/indicators/` organised by indicator category.
     - **New package**: `backend/backtesting/indicators/`
-      - `trend.py` (~18 KB) — SMA, EMA, WMA, DEMA, TEMA, HullMA, ADX, Supertrend, Ichimoku, Parabolic SAR, Aroon, Two-MAs
-      - `oscillators.py` (~44 KB) — RSI, MACD, Stochastic, QQE, StochRSI, Williams %R, ROC, MFI, CMO, CCI, CMF, RVI filter
-      - `volatility.py` (~11 KB) — Bollinger Bands, Keltner, Donchian, ATR, ATRP, StdDev, ATR volatility filter
-      - `volume.py` (~10 KB) — OBV, VWAP, CMF, A/D Line, PVT, MFI, Volume filter
-      - `other.py` (~27 KB) — Pivot Points, MTF resampling, Highest/Lowest Bar, Accumulation Areas, Keltner×Bollinger, MFI/CCI/Momentum filters
-      - `__init__.py` — assembles master `BLOCK_REGISTRY` and `INDICATOR_DISPATCH` from all sub-modules; re-exports all handlers for direct import
+        - `trend.py` (~18 KB) — SMA, EMA, WMA, DEMA, TEMA, HullMA, ADX, Supertrend, Ichimoku, Parabolic SAR, Aroon, Two-MAs
+        - `oscillators.py` (~44 KB) — RSI, MACD, Stochastic, QQE, StochRSI, Williams %R, ROC, MFI, CMO, CCI, CMF, RVI filter
+        - `volatility.py` (~11 KB) — Bollinger Bands, Keltner, Donchian, ATR, ATRP, StdDev, ATR volatility filter
+        - `volume.py` (~10 KB) — OBV, VWAP, CMF, A/D Line, PVT, MFI, Volume filter
+        - `other.py` (~27 KB) — Pivot Points, MTF resampling, Highest/Lowest Bar, Accumulation Areas, Keltner×Bollinger, MFI/CCI/Momentum filters
+        - `__init__.py` — assembles master `BLOCK_REGISTRY` and `INDICATOR_DISPATCH` from all sub-modules; re-exports all handlers for direct import
     - **Backward compat**: `indicator_handlers.py` converted to a thin re-export wrapper — all existing `from backend.backtesting.indicator_handlers import X` imports continue to work unchanged
     - Each sub-module has its own `BLOCK_REGISTRY` dict and auto-generated `INDICATOR_DISPATCH`
     - `_require_vbt()` and `_calc_ma()` helpers moved to `__init__.py` and `trend.py` respectively
@@ -714,12 +1059,13 @@ function calculateADX(data, period = 14) {
     with clamping to [0.01, 1.0].
 
     **Impact**:
-    | Metric | Before fix | After fix |
-    |--------|-----------|-----------|
-    | Max notional (7 DCA orders) | ~$78,000 | ~$7,800 |
-    | Max drawdown | 111.3% | 11.1% |
-    | Net profit | -$6,626 | -$657 |
-    | Commission | $7,235 | $724 |
+
+    | Metric                      | Before fix | After fix |
+    | --------------------------- | ---------- | --------- |
+    | Max notional (7 DCA orders) | ~$78,000   | ~$7,800   |
+    | Max drawdown                | 111.3%     | 11.1%     |
+    | Net profit                  | -$6,626    | -$657     |
+    | Commission                  | $7,235     | $724      |
 
     Tests: `tests/test_dca_e2e.py` — 9/9 passed.
 
@@ -756,14 +1102,15 @@ function calculateADX(data, period = 14) {
     Strategy: `98810196-fc8f-4e37-83bb-f8bc089c29cf` (ETHUSDT 30m long)
 
     With `position_size` bug fixed, updated DCA params to safe values:
-    | Param | Old | New | Reason |
-    |-------|-----|-----|--------|
-    | `stop_loss_percent` | 3.0% | 8.0% | Must be wider than DCA grid span (4×2%=8%) |
-    | `grid_size_percent` | 10% | 2% | ETH moves 2-3% routinely; 10% = orders never fill |
-    | `order_count` | 8 | 4 | Fewer orders = less capital per trade |
-    | `martingale_coefficient` | 1.2 | 1.1 | Gentler size escalation |
-    | `log_steps_coefficient` | 1.2 | 1.1 | Gentler log spacing |
-    | `take_profit_percent` | 1.8% | 1.8% | Unchanged |
+
+    | Param                    | Old  | New  | Reason                                            |
+    | ------------------------ | ---- | ---- | ------------------------------------------------- |
+    | `stop_loss_percent`      | 3.0% | 8.0% | Must be wider than DCA grid span (4×2%=8%)        |
+    | `grid_size_percent`      | 10%  | 2%   | ETH moves 2-3% routinely; 10% = orders never fill |
+    | `order_count`            | 8    | 4    | Fewer orders = less capital per trade             |
+    | `martingale_coefficient` | 1.2  | 1.1  | Gentler size escalation                           |
+    | `log_steps_coefficient`  | 1.2  | 1.1  | Gentler log spacing                               |
+    | `take_profit_percent`    | 1.8% | 1.8% | Unchanged                                         |
 
 - **[BUGFIX] RSI индикатор: конфликт cross_long_level < long_rsi_more → 0 сигналов** (2026-03-06)
 
@@ -1138,23 +1485,23 @@ function calculateADX(data, period = 14) {
 
 - **[CALIBRATION] TV calibration script: use `*_value` fields for largest win/loss USDT amounts** (`7fe427767`, 2026-03-03)
 
-                            **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
-                            instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
-                            **price-change percentage** (6.6%), not the USDT amount.
+    **Problem:** Calibration script Section 5 (Largest Trades) showed `long_largest_win = 6.6` (TP%)
+    instead of `64.55 USDT`. The script was reading `m["long_largest_win"]` which stores the
+    **price-change percentage** (6.6%), not the USDT amount.
 
-                            **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
-                            `long_largest_win_value` = USDT (64.55). The script was using `m.get("long_largest_win") or
+    **Root cause:** In `PerformanceMetrics`, `long_largest_win` = pct (6.6%), while
+    `long_largest_win_value` = USDT (64.55). The script was using
+    `m.get("long_largest_win") or m.get("long_largest_win_value")` — the `or` short-circuited
+    because 6.6 is truthy.
 
-    m.get("long_largest_win_value")`— the`or` short-circuited because 6.6 is truthy.
+    **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
+    (no fallback chain) for all four long/short largest fields.
 
-                            **Fix:** Changed script to read `long_largest_win_value` / `short_largest_win_value` directly
-                            (no fallback chain) for all four long/short largest fields.
+    **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
+    TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
+    (bars_in_trade now uses inclusive counting to match TV).
 
-                            **Result:** Section 5 now fully passes ✅. All monetary metrics (Sections 1–7, 9) match
-                            TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
-                            (bars_in_trade now uses inclusive counting to match TV).
-
-                            **File:** `scripts/_tv_calibration_check.py`
+                              **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="./css/variables.css?v=20260204d" />
   <link rel="stylesheet" href="./css/components.css?v=20260204d" />
   <link rel="stylesheet" href="./css/common.css?v=20260204d" />
-  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260221a" />
+  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260314b" />
 
   <!-- auto-event-binding.js removed - using native event listeners in strategy_builder.js -->
 </head>
@@ -54,9 +54,6 @@
         </button>
         <button class="btn btn-secondary hidden" id="btnVersions" title="Версии стратегии">
           <i class="bi bi-clock-history"></i> Versions
-        </button>
-        <button class="btn btn-secondary" id="btnTemplates">
-          <i class="bi bi-collection"></i> Templates
         </button>
         <button class="btn btn-secondary" id="btnValidate">
           <i class="bi bi-check-circle"></i> Validate
@@ -265,8 +262,8 @@
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestCommission" class="property-label">Commission %</label>
-                  <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.07"
-                    min="0" max="1" step="0.01" title="0.07% = TradingView parity. 0% = без комиссии (для тестов)" />
+                  <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.055"
+                    min="0" max="1" step="0.005" title="0.055% = Bybit Linear taker fee (market orders). 0.1% = Bybit Spot taker. 0% = без комиссии (для тестов)" />
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestSlippage" class="property-label">Slippage %</label>
@@ -302,7 +299,7 @@
                     </button>
                   </label>
                   <input type="date" class="property-input property-input-full" id="backtestEndDate"
-                    value="2030-01-01" title="Если дата в будущем — бэктест автоматически ограничивается текущим временем" />
+                    title="End date for backtest/optimization" />
                 </div>
               </div>
               <div class="property-row property-row-vertical">
@@ -450,6 +447,20 @@
               <button class="btn btn-primary w-100 mt-3" id="btnStartOptimization">
                 <i class="bi bi-play-fill"></i> Start Optimization
               </button>
+
+              <!-- Progress bar — shown while optimization is running -->
+              <div id="optProgressSection">
+                <div class="opt-progress-container opt-progress-container--compact">
+                  <div class="opt-progress-header">
+                    <span class="opt-progress-label">Optimizing...</span>
+                    <span id="optProgressPercent" class="opt-progress-value">0%</span>
+                  </div>
+                  <div class="opt-progress-bar">
+                    <div id="optProgressFill" class="opt-progress-fill" style="width:0%"></div>
+                  </div>
+                  <div id="optProgressDetails"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -516,40 +527,6 @@
           <div class="validation-item info">
             <i class="bi bi-info-circle"></i>
             <span>Add blocks to start building your strategy</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Templates Modal -->
-      <div class="modal-overlay" id="templatesModal">
-        <div class="modal">
-          <div class="modal-header">
-            <h3 class="modal-title">Strategy Templates</h3>
-            <button class="modal-close" id="btnCloseModal">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="templates-grid" id="templatesGrid">
-              <!-- Populated by JavaScript -->
-            </div>
-          </div>
-          <div class="modal-footer d-flex flex-wrap gap-2 justify-content-between">
-            <div class="d-flex gap-2">
-              <button class="btn btn-outline-secondary btn-sm" title="Save current strategy as JSON file">
-                <i class="bi bi-download"></i> Export
-              </button>
-              <button class="btn btn-outline-secondary btn-sm"
-                title="Load strategy from JSON file">
-                <i class="bi bi-upload"></i> Import
-              </button>
-              <input type="file" id="importTemplateInput" accept=".json" class="hidden"
-                title="Select JSON file to import" />
-            </div>
-            <div class="d-flex gap-2">
-              <button class="btn btn-secondary" id="btnCancelModal">Cancel</button>
-              <button class="btn btn-primary" id="btnLoadTemplate">
-                <i class="bi bi-check-lg"></i> Use Template
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -722,14 +699,14 @@
 
       <!-- Production Init (must load before all other scripts) -->
       <script src="./js/init-production.js"></script>
-      <script src="./js/sidebar-toggle.js"></script>
+      <script src="./js/sidebar-toggle.js?v=1773520387"></script>
       <script src="./js/pages/strategy_builder_debug.js"></script>
-      <script type="module" src="./js/pages/strategy_builder.js?v=20260225f"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260314f"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
-      <script src="./js/pages/optimization_panels.js?v=20260204"></script>
+      <script src="./js/pages/optimization_panels.js?v=1773520393"></script>
       <script type="module" src="./js/pages/optimization.js"></script>
       <script src="./js/pages/evaluation_criteria_panel.js?v=20260204"></script>
-      <script src="./js/pages/optimization_config_panel.js?v=20260204d"></script>
+      <script src="./js/pages/optimization_config_panel.js?v=1773520393"></script>
 
       <!-- AI Build Modal -->
       <div id="aiBuildModal" class="ai-build-modal hidden">

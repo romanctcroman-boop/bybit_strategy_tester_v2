@@ -11,9 +11,19 @@ DeepSeek/Perplexity Recommendation:
 """
 
 import contextlib
+import logging
 
 import numpy as np
 from numba import njit, prange
+
+logger = logging.getLogger(__name__)
+
+# Maximum trades stored per Numba simulation run.
+# NOTE: This is the LEGACY Numba engine (used in validation/testing only).
+# Production optimization uses numba_engine_v2.py which uses dynamic max_trades = min(n // 2, 50000).
+# If a strategy generates more than _NUMBA_MAX_TRADES trades, excess trades are silently discarded.
+# total_trade_count in the return value reflects the TRUE count (may exceed this limit).
+_NUMBA_MAX_TRADES: int = 1000
 
 # Trade result structure for Numba
 # Each trade is a tuple of: (entry_idx, exit_idx, is_long, entry_price, exit_price,
@@ -62,8 +72,9 @@ def simulate_trades_numba(
     """
     n_bars = len(close)
 
-    # Pre-allocate outputs
-    max_trades = 1000
+    # Pre-allocate outputs — capped at _NUMBA_MAX_TRADES (1000).
+    # If total_trade_count in the return value exceeds this, trades were truncated.
+    max_trades = 1000  # must match _NUMBA_MAX_TRADES (module constant)
     # Trade columns: entry_idx, exit_idx, is_long, entry_price, exit_price,
     #                pnl, pnl_pct, size, mfe, mae, mfe_pct, mae_pct, exit_reason
     trades = np.zeros((max_trades, 13), dtype=np.float64)
@@ -411,6 +422,22 @@ def warmup_numba():
         1.0,
         2,
     )
+
+
+def check_trade_truncation(total_trade_count: int) -> None:
+    """Log a warning if Numba simulation truncated trades due to _NUMBA_MAX_TRADES limit.
+
+    Call after simulate_trades_numba() when total_trade_count is returned.
+    """
+    if total_trade_count > _NUMBA_MAX_TRADES:
+        logger.warning(
+            "Numba simulation truncated: %d trades generated but only %d recorded "
+            "(limit = _NUMBA_MAX_TRADES=%d). Metrics may be incomplete. "
+            "For high-frequency strategies use numba_engine_v2 (dynamic limit up to 50000).",
+            total_trade_count,
+            _NUMBA_MAX_TRADES,
+            _NUMBA_MAX_TRADES,
+        )
 
 
 # Warm up on import if numba is available

@@ -22,7 +22,7 @@ import statistics
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -462,7 +462,7 @@ class BenchmarkSuite:
         recommendations = self.generate_recommendations()
 
         report = BenchmarkReport(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             total_benchmarks=len(self._results),
             passed_benchmarks=passed,
             failed_benchmarks=failed,

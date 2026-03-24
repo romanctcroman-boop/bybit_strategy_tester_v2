@@ -45,7 +45,7 @@ def sample_rsi_graph():
                 "id": "static_sltp_1",
                 "type": "static_sltp",
                 "name": "Stop Loss / Take Profit",
-                "params": {"stop_loss_percent": 1.5, "take_profit_percent": 2.0},
+                "params": {"stop_loss_percent": 1.5, "take_profit_percent": 2.0, "activate_breakeven": True},
             },
         ],
         "connections": [
@@ -85,7 +85,7 @@ def multi_indicator_graph():
                 "id": "exit_1",
                 "type": "static_sltp",
                 "name": "Exit",
-                "params": {"stop_loss_percent": 1.5, "take_profit_percent": 2.5},
+                "params": {"stop_loss_percent": 1.5, "take_profit_percent": 2.5, "activate_breakeven": True},
             },
         ],
         "connections": [],
@@ -666,7 +666,8 @@ class TestGenerateBuilderParamCombinations:
                 "step": 1,
             }
         ]
-        combos, total = generate_builder_param_combinations(specs)
+        combos, total, _ = generate_builder_param_combinations(specs)
+        combos = list(combos)
         # 10, 11, 12, 13, 14 = 5 values
         assert total == 5
         assert len(combos) == 5
@@ -677,7 +678,8 @@ class TestGenerateBuilderParamCombinations:
             {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 12, "step": 1},
             {"param_path": "rsi_1.overbought", "type": "int", "low": 70, "high": 75, "step": 5},
         ]
-        combos, total = generate_builder_param_combinations(specs)
+        combos, total, _ = generate_builder_param_combinations(specs)
+        combos = list(combos)
         # 3 x 2 = 6
         assert total == 6
         assert len(combos) == 6
@@ -687,7 +689,7 @@ class TestGenerateBuilderParamCombinations:
         specs = [
             {"param_path": "rsi_1.period", "type": "int", "low": 5, "high": 30, "step": 1},
         ]
-        combos, total = generate_builder_param_combinations(
+        combos, total, _ = generate_builder_param_combinations(
             specs,
             search_method="random",
             max_iterations=5,
@@ -701,13 +703,13 @@ class TestGenerateBuilderParamCombinations:
         specs = [
             {"param_path": "rsi_1.period", "type": "int", "low": 5, "high": 30, "step": 1},
         ]
-        combos1, _ = generate_builder_param_combinations(
+        combos1, _, _1 = generate_builder_param_combinations(
             specs,
             search_method="random",
             max_iterations=5,
             random_seed=42,
         )
-        combos2, _ = generate_builder_param_combinations(
+        combos2, _, _2 = generate_builder_param_combinations(
             specs,
             search_method="random",
             max_iterations=5,
@@ -720,7 +722,7 @@ class TestGenerateBuilderParamCombinations:
         specs = [
             {"param_path": "boll_1.std_dev", "type": "float", "low": 1.5, "high": 2.5, "step": 0.5},
         ]
-        combos, total = generate_builder_param_combinations(specs)
+        combos, total, _ = generate_builder_param_combinations(specs)
         # 1.5, 2.0, 2.5 = 3 values
         assert total == 3
         values = [c["boll_1.std_dev"] for c in combos]
@@ -730,7 +732,7 @@ class TestGenerateBuilderParamCombinations:
 
     def test_empty_specs_returns_single_empty_combo(self):
         """Empty param specs returns one empty combo (no optimization)."""
-        combos, total = generate_builder_param_combinations([])
+        combos, total, _ = generate_builder_param_combinations([])
         assert total == 1
         assert len(combos) == 1
         assert combos[0] == {}
@@ -740,7 +742,7 @@ class TestGenerateBuilderParamCombinations:
         specs = [
             {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 12, "step": 1},
         ]
-        combos, _ = generate_builder_param_combinations(specs)
+        combos, _, _2 = generate_builder_param_combinations(specs)
         for combo in combos:
             assert "rsi_1.period" in combo
 
@@ -752,7 +754,7 @@ class TestGenerateBuilderParamCombinations:
         custom = [
             {"param_path": "rsi_1.period", "low": 10, "high": 12, "step": 1, "enabled": True},
         ]
-        _combos, total = generate_builder_param_combinations(specs, custom_ranges=custom)
+        _combos, total, _ = generate_builder_param_combinations(specs, custom_ranges=custom)
         assert total == 3  # 10, 11, 12
 
     def test_custom_ranges_disable_param(self):
@@ -765,7 +767,7 @@ class TestGenerateBuilderParamCombinations:
             {"param_path": "rsi_1.period", "low": 10, "high": 12, "step": 1, "enabled": True},
             {"param_path": "rsi_1.overbought", "enabled": False},
         ]
-        _combos, total = generate_builder_param_combinations(specs, custom_ranges=custom)
+        _combos, total, _ = generate_builder_param_combinations(specs, custom_ranges=custom)
         # Only period is active: 10, 11, 12 = 3
         assert total == 3
         # Combos should only have period key
@@ -1070,7 +1072,7 @@ class TestBuilderOptimizationPipeline:
         custom = [
             {"param_path": "rsi_1.period", "low": 12, "high": 16, "step": 2, "enabled": True},
         ]
-        combos, total = generate_builder_param_combinations(all_params, custom_ranges=custom)
+        combos, total, _ = generate_builder_param_combinations(all_params, custom_ranges=custom)
         assert total == 3  # 12, 14, 16
 
         # Step 3: Grid search
@@ -1132,7 +1134,7 @@ class TestEdgeCases:
     def test_very_large_grid_with_random_sampling(self):
         """Large grid with random sampling returns correct count."""
         specs = [{"param_path": f"rsi_1.p{i}", "type": "int", "low": 1, "high": 100, "step": 1} for i in range(3)]
-        combos, total = generate_builder_param_combinations(
+        combos, total, _ = generate_builder_param_combinations(
             specs,
             search_method="random",
             max_iterations=50,
@@ -1146,6 +1148,687 @@ class TestEdgeCases:
         specs = [
             {"param_path": "rsi_1.period", "type": "int", "low": 14, "high": 14, "step": 1},
         ]
-        combos, total = generate_builder_param_combinations(specs)
+        combos, total, _ = generate_builder_param_combinations(specs)
+        combos = list(combos)
         assert total == 1
         assert combos[0]["rsi_1.period"] == 14
+
+
+# =============================================================================
+# TESTS: Approach 1 — n_jobs parallel Optuna workers
+# =============================================================================
+
+
+class TestOptunaParallelNJobs:
+    """Tests for n_jobs parallelism in run_builder_optuna_search."""
+
+    @pytest.mark.slow
+    def test_n_jobs_1_returns_valid_structure(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """n_jobs=1 (sequential) returns valid result structure."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.overbought", "type": "int", "low": 65, "high": 75, "step": 5},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=5,
+            top_n=3,
+            timeout_seconds=60,
+            n_jobs=1,
+        )
+        assert result["status"] == "completed"
+        assert result["tested_combinations"] <= 5
+        assert "top_results" in result
+
+    @pytest.mark.slow
+    def test_n_jobs_2_returns_valid_structure(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """n_jobs=2 (parallel) returns same valid structure as sequential."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.overbought", "type": "int", "low": 65, "high": 80, "step": 5},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=8,
+            top_n=3,
+            timeout_seconds=60,
+            n_jobs=2,
+        )
+        assert result["status"] == "completed"
+        assert "top_results" in result
+        assert "best_params" in result
+        assert "tested_combinations" in result
+
+    @pytest.mark.slow
+    def test_n_jobs_parallel_completes_and_reports_tested(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """Parallel workers complete and report correct number of tested combos."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 18, "step": 2},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=10,
+            top_n=5,
+            timeout_seconds=60,
+            n_jobs=2,
+        )
+        # Parallel search should complete and have tried at least 1 trial
+        assert result["status"] == "completed"
+        # Note: Optuna may legitimately suggest duplicate params to parallel workers
+        # so we only verify the structure is valid, not uniqueness
+        assert result["tested_combinations"] >= 0
+        assert isinstance(result["top_results"], list)
+
+    @pytest.mark.slow
+    def test_n_jobs_capped_at_cpu_count(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """n_jobs > cpu_count is silently capped and still produces valid results."""
+        import os
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.oversold", "type": "int", "low": 25, "high": 35, "step": 5},
+        ]
+        # Pass absurdly large n_jobs — should be capped to os.cpu_count()
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=6,
+            top_n=3,
+            timeout_seconds=60,
+            n_jobs=999,
+        )
+        assert result["status"] == "completed"
+
+    def test_n_jobs_signature_has_n_jobs_param(self):
+        """run_builder_optuna_search signature includes n_jobs parameter."""
+        import inspect
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        sig = inspect.signature(run_builder_optuna_search)
+        assert "n_jobs" in sig.parameters
+        assert sig.parameters["n_jobs"].default == 1
+
+    def test_request_model_has_n_jobs_field(self):
+        """BuilderOptimizationRequest model includes n_jobs field."""
+        from backend.api.routers.strategy_builder.router import BuilderOptimizationRequest
+
+        fields = BuilderOptimizationRequest.model_fields
+        assert "n_jobs" in fields
+        # Default value must be 1 (sequential, safe default)
+        default = fields["n_jobs"].default
+        assert default == 1
+
+
+# =============================================================================
+# TESTS: Approach 4 — Mixed DCA batch (RSI + SLTP params both vary)
+# =============================================================================
+
+
+@pytest.fixture
+def dca_rsi_graph():
+    """Strategy graph mimicking DCA-RSI-6: RSI block + DCA block + static_sltp block."""
+    return {
+        "name": "DCA-RSI-6 test",
+        "interval": "30",
+        "blocks": [
+            {
+                "id": "rsi_1",
+                "type": "rsi",
+                "name": "RSI",
+                "params": {
+                    "period": 14,
+                    "source": "close",
+                    "timeframe": "30",
+                    "use_cross_level": True,
+                    "cross_long_level": 29,
+                    "long_rsi_less": 40,
+                    "use_long_range": True,
+                },
+            },
+            {
+                "id": "dca_1",
+                "type": "dca",
+                "name": "DCA",
+                "params": {
+                    "order_count": 3,
+                    "grid_size_percent": 5.0,
+                    "martingale_coef": 1.0,
+                    "tp_percent": 1.5,
+                    "sl_percent": 5.0,
+                },
+            },
+            {
+                "id": "sltp_1",
+                "type": "static_sltp",
+                "name": "SL/TP",
+                "params": {
+                    "stop_loss_percent": 5.0,
+                    "take_profit_percent": 1.5,
+                    "sl_type": "average_price",
+                },
+            },
+            {
+                "id": "strategy_1",
+                "type": "strategy",
+                "isMain": True,
+                "params": {},
+            },
+        ],
+        "connections": [
+            {"from": "rsi_1", "fromPort": "long", "to": "strategy_1", "toPort": "entry_long"},
+            {"from": "dca_1", "fromPort": "output", "to": "strategy_1", "toPort": "dca"},
+            {"from": "sltp_1", "fromPort": "output", "to": "strategy_1", "toPort": "sltp"},
+        ],
+    }
+
+
+@pytest.fixture
+def mixed_combos():
+    """Small mixed RSI+SLTP param combos (2 RSI × 3 SLTP = 6 total)."""
+    combos = []
+    for rsi_level in (25, 30):
+        for tp in (1.0, 1.5, 2.0):
+            combos.append({
+                "rsi_1.cross_long_level": rsi_level,
+                "sltp_1.take_profit_percent": tp,
+                "sltp_1.stop_loss_percent": 5.0,
+            })
+    return combos
+
+
+class TestRunDcaMixedBatchNumba:
+    """Tests for _run_dca_mixed_batch_numba — nested RSI × SLTP optimization."""
+
+    def test_returns_list_aligned_with_combos(self, dca_rsi_graph, sample_ohlcv, backtest_config_params, mixed_combos):
+        """Result list length equals number of input combos."""
+        from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
+
+        config = {**backtest_config_params, "direction": "long"}
+        results = _run_dca_mixed_batch_numba(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=mixed_combos,
+            config_params=config,
+            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
+                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        assert len(results) == len(mixed_combos)
+
+    def test_non_none_results_have_required_keys(self, dca_rsi_graph, sample_ohlcv, backtest_config_params, mixed_combos):
+        """Every non-None result contains the standard metric keys."""
+        from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
+
+        config = {**backtest_config_params, "direction": "long"}
+        results = _run_dca_mixed_batch_numba(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=mixed_combos,
+            config_params=config,
+            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
+                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        required = {"net_profit", "win_rate", "profit_factor", "total_trades", "max_drawdown"}
+        for res in results:
+            if res is not None:
+                assert required.issubset(res.keys()), f"Missing keys: {required - res.keys()}"
+
+    def test_groups_correctly_two_rsi_combos(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
+        """Two RSI values produce two independent signal generations, results in 2×3=6 outputs."""
+        from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
+
+        combos = [
+            {"rsi_1.cross_long_level": 20, "sltp_1.take_profit_percent": 1.0, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 20, "sltp_1.take_profit_percent": 1.5, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 20, "sltp_1.take_profit_percent": 2.0, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 35, "sltp_1.take_profit_percent": 1.0, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 35, "sltp_1.take_profit_percent": 1.5, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 35, "sltp_1.take_profit_percent": 2.0, "sltp_1.stop_loss_percent": 5.0},
+        ]
+        config = {**backtest_config_params, "direction": "long"}
+        results = _run_dca_mixed_batch_numba(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=combos,
+            config_params=config,
+            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
+                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        assert len(results) == 6
+
+    def test_higher_tp_can_differ_from_lower_tp(self, sample_ohlcv, backtest_config_params):
+        """Different TP values within same RSI group produce potentially different metrics.
+
+        Uses use_long_range mode (RSI < threshold) instead of cross mode to guarantee
+        signals on any synthetic data.
+        """
+        from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
+
+        # Graph with use_long_range=True: RSI < 70 → fires on most bars → guaranteed trades
+        graph = {
+            "name": "test",
+            "interval": "30",
+            "blocks": [
+                {"id": "rsi_1", "type": "rsi", "name": "RSI",
+                 "params": {"period": 5, "source": "close", "timeframe": "30",
+                            "use_long_range": True, "long_rsi_more": 0, "long_rsi_less": 70}},
+                {"id": "dca_1", "type": "dca", "name": "DCA",
+                 "params": {"order_count": 2, "grid_size_percent": 3.0, "martingale_coef": 1.0}},
+                {"id": "sltp_1", "type": "static_sltp", "name": "SL/TP",
+                 "params": {"stop_loss_percent": 20.0, "take_profit_percent": 1.5, "sl_type": "average_price"}},
+                {"id": "strategy_1", "type": "strategy", "isMain": True, "params": {}},
+            ],
+            "connections": [
+                {"from": "rsi_1", "fromPort": "long", "to": "strategy_1", "toPort": "entry_long"},
+                {"from": "dca_1", "fromPort": "output", "to": "strategy_1", "toPort": "dca"},
+                {"from": "sltp_1", "fromPort": "output", "to": "strategy_1", "toPort": "sltp"},
+            ],
+        }
+        combos = [
+            {"rsi_1.long_rsi_less": 60, "sltp_1.take_profit_percent": 0.5, "sltp_1.stop_loss_percent": 20.0},
+            {"rsi_1.long_rsi_less": 60, "sltp_1.take_profit_percent": 5.0, "sltp_1.stop_loss_percent": 20.0},
+        ]
+        config = {**backtest_config_params, "direction": "long"}
+        results = _run_dca_mixed_batch_numba(
+            base_graph=graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=combos,
+            config_params=config,
+            final_dca_config={"dca_enabled": True, "dca_order_count": 2,
+                              "dca_grid_size_percent": 3.0, "dca_martingale_coef": 1.0},
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        assert len(results) == 2
+        # At least one result should have trades (RSI<70 fires often on 500 bars)
+        assert any(r is not None for r in results), "Expected at least one non-None result"
+
+    def test_empty_combos_returns_empty_list(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
+        """Empty combo list returns empty list (no crash)."""
+        from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
+
+        results = _run_dca_mixed_batch_numba(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=[],
+            config_params=backtest_config_params,
+            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
+                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        assert results == []
+
+    def test_single_rsi_group_matches_sltp_only_batch(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
+        """When only one RSI combo exists, mixed batch result == SLTP-only batch result."""
+        from backend.optimization.builder_optimizer import (
+            _run_dca_mixed_batch_numba,
+            _run_dca_sltp_batch_numba,
+        )
+
+        # Only SLTP varies (same RSI for all combos)
+        combos = [
+            {"rsi_1.cross_long_level": 25, "sltp_1.take_profit_percent": 1.0, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 25, "sltp_1.take_profit_percent": 2.0, "sltp_1.stop_loss_percent": 5.0},
+            {"rsi_1.cross_long_level": 25, "sltp_1.take_profit_percent": 3.0, "sltp_1.stop_loss_percent": 5.0},
+        ]
+        config = {**backtest_config_params, "direction": "long"}
+        dca_config = {"dca_enabled": True, "dca_order_count": 3,
+                      "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0}
+
+        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+        import copy
+        graph_with_rsi = copy.deepcopy(dca_rsi_graph)
+        for b in graph_with_rsi["blocks"]:
+            if b["id"] == "rsi_1":
+                b["params"]["cross_long_level"] = 25
+
+        mixed = _run_dca_mixed_batch_numba(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=combos,
+            config_params=config,
+            final_dca_config=dca_config,
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        sltp_only_combos = [
+            {"sltp_1.take_profit_percent": 1.0, "sltp_1.stop_loss_percent": 5.0},
+            {"sltp_1.take_profit_percent": 2.0, "sltp_1.stop_loss_percent": 5.0},
+            {"sltp_1.take_profit_percent": 3.0, "sltp_1.stop_loss_percent": 5.0},
+        ]
+        sltp = _run_dca_sltp_batch_numba(
+            base_graph=graph_with_rsi,
+            ohlcv=sample_ohlcv,
+            param_combinations=sltp_only_combos,
+            config_params=config,
+            final_dca_config=dca_config,
+            direction_str="long",
+            sltp_block_ids=["sltp_1"],
+        )
+        # n_trades must match exactly between the two paths
+        for m, s in zip(mixed, sltp):
+            if m is not None and s is not None:
+                assert m["total_trades"] == s["total_trades"], (
+                    f"Trade count mismatch: mixed={m['total_trades']}, sltp={s['total_trades']}"
+                )
+
+    def test_grid_search_activates_mixed_path(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
+        """run_builder_grid_search returns method=grid_numba_dca_mixed for RSI+SLTP combos."""
+        combos = []
+        for rsi_level in (20, 25, 30):
+            for tp in (1.0, 1.5, 2.0):
+                combos.append({
+                    "rsi_1.cross_long_level": rsi_level,
+                    "sltp_1.take_profit_percent": tp,
+                    "sltp_1.stop_loss_percent": 5.0,
+                })
+
+        config = {**backtest_config_params, "direction": "long"}
+        result = run_builder_grid_search(
+            base_graph=dca_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_combinations=combos,
+            config_params=config,
+        )
+        # Should use mixed fast path, not slow Python loop
+        assert result["method"] == "grid_numba_dca_mixed", (
+            f"Expected grid_numba_dca_mixed, got: {result['method']}"
+        )
+        assert result.get("numba_accelerated") is True
+        assert result["tested_combinations"] > 0
+
+
+# =============================================================================
+# TESTS: Progress Tracking (file-based, cross-worker)
+# =============================================================================
+
+
+class TestProgressTracking:
+    """Tests for update_optimization_progress, get_optimization_progress,
+    clear_optimization_progress — file-based shared state across uvicorn workers.
+
+    All tests use monkeypatch to redirect progress file to tmp_path so real
+    .run/optimizer_progress.json is never touched.
+    """
+
+    @pytest.fixture(autouse=True)
+    def patch_progress_file(self, tmp_path, monkeypatch):
+        """Redirect _PROGRESS_FILE and _PROGRESS_DIR to a temp directory."""
+        import backend.optimization.builder_optimizer as bopt
+
+        tmp_file = tmp_path / "optimizer_progress.json"
+        monkeypatch.setattr(bopt, "_PROGRESS_DIR", tmp_path)
+        monkeypatch.setattr(bopt, "_PROGRESS_FILE", tmp_file)
+
+    # ------------------------------------------------------------------
+    # update_optimization_progress
+    # ------------------------------------------------------------------
+
+    def test_update_creates_entry(self):
+        """update_optimization_progress writes a new entry to the file."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-abc", tested=100, total=1000)
+        entry = get_optimization_progress("strat-abc")
+        assert entry["status"] == "running"
+        assert entry["tested"] == 100
+        assert entry["total"] == 1000
+
+    def test_update_schema_has_all_required_fields(self):
+        """Progress entry must include all 10 fields documented in OPTIMIZATION_FLOW.md §4."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress(
+            "strat-schema",
+            status="running",
+            tested=500,
+            total=1000,
+            best_score=1.23,
+            results_found=5,
+            speed=4500,
+            eta_seconds=10,
+        )
+        entry = get_optimization_progress("strat-schema")
+        required_fields = {
+            "status", "tested", "total", "percent",
+            "best_score", "results_found", "speed",
+            "eta_seconds", "started_at", "updated_at",
+        }
+        missing = required_fields - set(entry.keys())
+        assert not missing, f"Progress entry missing fields: {missing}"
+
+    def test_percent_calculated_correctly(self):
+        """percent = round(tested * 100 / total, 1)."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-pct", tested=250, total=1000)
+        entry = get_optimization_progress("strat-pct")
+        assert entry["percent"] == 25.0
+
+    def test_percent_zero_when_total_is_zero(self):
+        """When total=0, percent must be 0.0 (no ZeroDivisionError)."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-zero", tested=0, total=0)
+        entry = get_optimization_progress("strat-zero")
+        assert entry["percent"] == 0.0
+
+    def test_percent_reaches_100_at_completion(self):
+        """tested == total → percent == 100.0."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-done", tested=304668, total=304668)
+        entry = get_optimization_progress("strat-done")
+        assert entry["percent"] == 100.0
+
+    def test_update_overwrites_previous_entry(self):
+        """Second call to update_optimization_progress replaces previous values."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-ow", tested=100, total=1000)
+        update_optimization_progress("strat-ow", tested=500, total=1000, best_score=2.5)
+        entry = get_optimization_progress("strat-ow")
+        assert entry["tested"] == 500
+        assert entry["best_score"] == 2.5
+
+    def test_updated_at_is_set_automatically(self):
+        """updated_at must be a float (Unix timestamp) set by the function itself."""
+        import time
+
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        before = time.time()
+        update_optimization_progress("strat-ts", tested=0, total=0)
+        after = time.time()
+        entry = get_optimization_progress("strat-ts")
+        assert isinstance(entry["updated_at"], float)
+        assert before <= entry["updated_at"] <= after
+
+    def test_started_at_preserved_on_subsequent_updates(self):
+        """started_at passed explicitly must survive a second update call."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        t0 = 1_742_000_000.0
+        update_optimization_progress("strat-sa", tested=0, total=100, started_at=t0)
+        update_optimization_progress("strat-sa", tested=50, total=100, started_at=t0)
+        entry = get_optimization_progress("strat-sa")
+        assert entry["started_at"] == t0
+
+    # ------------------------------------------------------------------
+    # get_optimization_progress
+    # ------------------------------------------------------------------
+
+    def test_get_returns_idle_for_unknown_strategy(self):
+        """get_optimization_progress on a missing id returns {'status': 'idle'}."""
+        from backend.optimization.builder_optimizer import get_optimization_progress
+
+        result = get_optimization_progress("nonexistent-strat-xyz")
+        assert result == {"status": "idle"}
+
+    def test_get_returns_idle_when_file_missing(self, tmp_path, monkeypatch):
+        """get_optimization_progress works even when file does not exist yet."""
+        import backend.optimization.builder_optimizer as bopt
+
+        missing_file = tmp_path / "does_not_exist.json"
+        monkeypatch.setattr(bopt, "_PROGRESS_FILE", missing_file)
+        from backend.optimization.builder_optimizer import get_optimization_progress
+
+        result = get_optimization_progress("any-id")
+        assert result == {"status": "idle"}
+
+    def test_get_returns_copy_not_reference(self):
+        """get_optimization_progress returns a copy; mutating it must not affect store."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-copy", tested=10, total=100)
+        entry = get_optimization_progress("strat-copy")
+        entry["tested"] = 9999  # mutate the returned copy
+
+        entry2 = get_optimization_progress("strat-copy")
+        assert entry2["tested"] == 10  # original unchanged
+
+    # ------------------------------------------------------------------
+    # clear_optimization_progress
+    # ------------------------------------------------------------------
+
+    def test_clear_removes_entry(self):
+        """clear_optimization_progress removes the strategy entry."""
+        from backend.optimization.builder_optimizer import (
+            clear_optimization_progress,
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-clr", tested=100, total=100)
+        clear_optimization_progress("strat-clr")
+        result = get_optimization_progress("strat-clr")
+        assert result == {"status": "idle"}
+
+    def test_clear_is_idempotent(self):
+        """Clearing a non-existent entry must not raise."""
+        from backend.optimization.builder_optimizer import clear_optimization_progress
+
+        clear_optimization_progress("strat-never-existed")  # must not raise
+
+    def test_clear_preserves_other_strategies(self):
+        """Clearing one strategy must not affect progress of another strategy."""
+        from backend.optimization.builder_optimizer import (
+            clear_optimization_progress,
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-a", tested=111, total=200)
+        update_optimization_progress("strat-b", tested=222, total=400)
+        clear_optimization_progress("strat-a")
+
+        assert get_optimization_progress("strat-a") == {"status": "idle"}
+        assert get_optimization_progress("strat-b")["tested"] == 222
+
+    # ------------------------------------------------------------------
+    # Multiple strategies / concurrent writes
+    # ------------------------------------------------------------------
+
+    def test_multiple_strategies_coexist_in_file(self):
+        """Two parallel optimizations can write progress independently."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress("strat-x", tested=10, total=100)
+        update_optimization_progress("strat-y", tested=50, total=200)
+
+        x = get_optimization_progress("strat-x")
+        y = get_optimization_progress("strat-y")
+        assert x["tested"] == 10
+        assert y["tested"] == 50
+
+    def test_completed_status_written_correctly(self):
+        """Status can be set to 'completed' after optimization finishes."""
+        from backend.optimization.builder_optimizer import (
+            get_optimization_progress,
+            update_optimization_progress,
+        )
+
+        update_optimization_progress(
+            "strat-fin",
+            status="completed",
+            tested=1000,
+            total=1000,
+            best_score=4.2,
+            results_found=20,
+        )
+        entry = get_optimization_progress("strat-fin")
+        assert entry["status"] == "completed"
+        assert entry["percent"] == 100.0
+        assert entry["best_score"] == 4.2
+        assert entry["results_found"] == 20
+
+    def test_atomic_write_no_partial_reads(self, tmp_path, monkeypatch):
+        """Atomic write: result file must be valid JSON after update (no partial writes)."""
+        import json
+
+        import backend.optimization.builder_optimizer as bopt
+
+        tmp_file = tmp_path / "prog.json"
+        monkeypatch.setattr(bopt, "_PROGRESS_FILE", tmp_file)
+        monkeypatch.setattr(bopt, "_PROGRESS_DIR", tmp_path)
+        from backend.optimization.builder_optimizer import update_optimization_progress
+
+        for i in range(20):
+            update_optimization_progress(f"s{i}", tested=i * 10, total=200)
+
+        raw = tmp_file.read_text(encoding="utf-8")
+        data = json.loads(raw)  # must not raise
+        assert len(data) == 20

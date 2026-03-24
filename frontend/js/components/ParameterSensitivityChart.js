@@ -19,21 +19,21 @@ export class ParameterSensitivityChart {
 
     this.options = {
       height: 350,
-      metrics: ["sharpe_ratio", "total_return", "win_rate"],
+      metrics: ['sharpe_ratio', 'total_return', 'win_rate'],
       colors: {
-        sharpe_ratio: "#26a69a",
-        sortino_ratio: "#42a5f5",
-        total_return: "#66bb6a",
-        win_rate: "#ffca28",
-        profit_factor: "#ab47bc",
-        max_drawdown: "#ef5350",
-        calmar_ratio: "#29b6f6",
-        text: "#787b86",
-        grid: "rgba(42, 46, 57, 0.8)",
-        optimal: "rgba(38, 166, 154, 0.2)",
+        sharpe_ratio: '#26a69a',
+        sortino_ratio: '#42a5f5',
+        total_return: '#66bb6a',
+        win_rate: '#ffca28',
+        profit_factor: '#ab47bc',
+        max_drawdown: '#ef5350',
+        calmar_ratio: '#29b6f6',
+        text: '#787b86',
+        grid: 'rgba(42, 46, 57, 0.8)',
+        optimal: 'rgba(38, 166, 154, 0.2)'
       },
       showOptimalRange: true,
-      ...options,
+      ...options
     };
   }
 
@@ -47,7 +47,7 @@ export class ParameterSensitivityChart {
    */
   render(data) {
     if (!this.container || !data?.parameter_values) {
-      console.warn("ParameterSensitivityChart: Container or data not found");
+      console.warn('ParameterSensitivityChart: Container or data not found');
       return;
     }
 
@@ -60,15 +60,15 @@ export class ParameterSensitivityChart {
     const datasets = this._buildDatasets(data);
 
     this.chart = new Chart(ctx, {
-      type: "line",
+      type: 'line',
       data: {
         labels: data.parameter_values.map((v) => this._formatValue(v)),
-        datasets: datasets,
+        datasets: datasets
       },
       options: this._getChartOptions(data),
       plugins: this.options.showOptimalRange
         ? [this._optimalRangePlugin(data)]
-        : [],
+        : []
     });
 
     return this.chart;
@@ -81,7 +81,7 @@ export class ParameterSensitivityChart {
   _buildDatasets(data) {
     const datasets = [];
     const metricsToShow = Object.keys(data.metrics).filter((m) =>
-      this.options.metrics.includes(m),
+      this.options.metrics.includes(m)
     );
 
     metricsToShow.forEach((metric, index) => {
@@ -98,7 +98,7 @@ export class ParameterSensitivityChart {
         tension: 0.3,
         pointRadius: 3,
         pointHoverRadius: 6,
-        yAxisID: this._getAxisId(metric),
+        yAxisID: this._getAxisId(metric)
       });
     });
 
@@ -120,18 +120,18 @@ export class ParameterSensitivityChart {
       maintainAspectRatio: false,
       interaction: {
         intersect: false,
-        mode: "index",
+        mode: 'index'
       },
       plugins: {
         legend: {
-          position: "top",
-          labels: { color: this.options.colors.text },
+          position: 'top',
+          labels: { color: this.options.colors.text }
         },
         title: {
           display: true,
           text: `Parameter Sensitivity: ${data.parameter_name}`,
           color: this.options.colors.text,
-          font: { size: 14, weight: "bold" },
+          font: { size: 14, weight: 'bold' }
         },
         tooltip: {
           callbacks: {
@@ -142,48 +142,48 @@ export class ParameterSensitivityChart {
               const metric = context.dataset.label;
               const value = context.parsed.y;
               return `${metric}: ${this._formatMetricValue(context.dataset.yAxisID, value)}`;
-            },
-          },
-        },
+            }
+          }
+        }
       },
       scales: {
         x: {
           title: {
             display: true,
             text: data.parameter_name,
-            color: this.options.colors.text,
+            color: this.options.colors.text
           },
           grid: { color: this.options.colors.grid },
-          ticks: { color: this.options.colors.text },
+          ticks: { color: this.options.colors.text }
         },
         y: {
-          type: "linear",
+          type: 'linear',
           display: hasRatioMetric,
-          position: "left",
+          position: 'left',
           title: {
             display: true,
-            text: "Ratio",
-            color: this.options.colors.text,
+            text: 'Ratio',
+            color: this.options.colors.text
           },
           grid: { color: this.options.colors.grid },
-          ticks: { color: this.options.colors.text },
+          ticks: { color: this.options.colors.text }
         },
         y1: {
-          type: "linear",
+          type: 'linear',
           display: hasReturnMetric,
-          position: "right",
+          position: 'right',
           title: {
             display: true,
-            text: "Return %",
-            color: this.options.colors.text,
+            text: 'Return %',
+            color: this.options.colors.text
           },
           grid: { drawOnChartArea: false },
           ticks: {
             color: this.options.colors.text,
-            callback: (value) => `${value.toFixed(1)}%`,
-          },
-        },
-      },
+            callback: (value) => `${value.toFixed(1)}%`
+          }
+        }
+      }
     };
   }
 
@@ -193,7 +193,7 @@ export class ParameterSensitivityChart {
    */
   _optimalRangePlugin(data) {
     return {
-      id: "optimalRange",
+      id: 'optimalRange',
       beforeDraw: (chart) => {
         if (!data.optimal_range) return;
 
@@ -217,10 +217,10 @@ export class ParameterSensitivityChart {
           x1,
           chartArea.top,
           x2 - x1,
-          chartArea.bottom - chartArea.top,
+          chartArea.bottom - chartArea.top
         );
         ctx.restore();
-      },
+      }
     };
   }
 
@@ -229,8 +229,8 @@ export class ParameterSensitivityChart {
    * @private
    */
   _getAxisId(metric) {
-    const returnMetrics = ["total_return", "win_rate", "max_drawdown"];
-    return returnMetrics.includes(metric) ? "y1" : "y";
+    const returnMetrics = ['total_return', 'win_rate', 'max_drawdown'];
+    return returnMetrics.includes(metric) ? 'y1' : 'y';
   }
 
   /**
@@ -238,7 +238,7 @@ export class ParameterSensitivityChart {
    * @private
    */
   _formatMetricValue(axisId, value) {
-    if (axisId === "y1") {
+    if (axisId === 'y1') {
       return `${value.toFixed(2)}%`;
     }
     return value.toFixed(3);
@@ -250,14 +250,14 @@ export class ParameterSensitivityChart {
    */
   _getDefaultColor(index) {
     const palette = [
-      "#26a69a",
-      "#42a5f5",
-      "#66bb6a",
-      "#ffca28",
-      "#ab47bc",
-      "#ef5350",
-      "#29b6f6",
-      "#ff7043",
+      '#26a69a',
+      '#42a5f5',
+      '#66bb6a',
+      '#ffca28',
+      '#ab47bc',
+      '#ef5350',
+      '#29b6f6',
+      '#ff7043'
     ];
     return palette[index % palette.length];
   }
@@ -268,17 +268,17 @@ export class ParameterSensitivityChart {
    */
   _formatMetricName(metric) {
     const names = {
-      sharpe_ratio: "Sharpe Ratio",
-      sortino_ratio: "Sortino Ratio",
-      total_return: "Total Return",
-      win_rate: "Win Rate",
-      profit_factor: "Profit Factor",
-      max_drawdown: "Max Drawdown",
-      calmar_ratio: "Calmar Ratio",
+      sharpe_ratio: 'Sharpe Ratio',
+      sortino_ratio: 'Sortino Ratio',
+      total_return: 'Total Return',
+      win_rate: 'Win Rate',
+      profit_factor: 'Profit Factor',
+      max_drawdown: 'Max Drawdown',
+      calmar_ratio: 'Calmar Ratio'
     };
     return (
       names[metric] ||
-      metric.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+      metric.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
     );
   }
 
@@ -287,7 +287,7 @@ export class ParameterSensitivityChart {
    * @private
    */
   _formatValue(value) {
-    if (typeof value !== "number") return value;
+    if (typeof value !== 'number') return value;
     if (Number.isInteger(value)) return value.toString();
     return value.toFixed(2);
   }
@@ -297,14 +297,14 @@ export class ParameterSensitivityChart {
    * @private
    */
   _getOrCreateCanvas() {
-    let canvas = this.container.querySelector("canvas");
+    let canvas = this.container.querySelector('canvas');
     if (!canvas) {
-      canvas = document.createElement("canvas");
+      canvas = document.createElement('canvas');
       canvas.style.height = `${this.options.height}px`;
-      this.container.innerHTML = "";
+      this.container.innerHTML = '';
       this.container.appendChild(canvas);
     }
-    return canvas.getContext("2d");
+    return canvas.getContext('2d');
   }
 
   /**
@@ -322,6 +322,6 @@ export class ParameterSensitivityChart {
 export default ParameterSensitivityChart;
 
 // Attach to window for non-module scripts
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.ParameterSensitivityChart = ParameterSensitivityChart;
 }

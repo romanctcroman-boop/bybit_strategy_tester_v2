@@ -19,7 +19,7 @@ import json
 import sqlite3
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -153,7 +153,7 @@ class PromptLogger:
             Prompt ID for later response logging
         """
         prompt_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(UTC).isoformat()
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -334,7 +334,7 @@ class PromptLogger:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        start_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        start_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
         # Total count
         cursor.execute(
@@ -418,7 +418,7 @@ class PromptLogger:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cutoff_date = (datetime.utcnow() - timedelta(days=self.retention_days)).isoformat()
+        cutoff_date = (datetime.now(UTC) - timedelta(days=self.retention_days)).isoformat()
 
         cursor.execute(
             "DELETE FROM prompt_logs WHERE timestamp < ?",

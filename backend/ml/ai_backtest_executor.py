@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from backend.config.constants import COMMISSION_TV
 from backend.core.logging_config import get_logger
 from backend.ml.ai_feature_engineer import AIFeatureEngineer
 
@@ -167,7 +168,7 @@ class AIBacktestExecutor:
             },
             "backtest": {
                 "initial_capital": initial_capital,
-                "commission": 0.001,  # 0.1% trading fee
+                "commission": COMMISSION_TV,  # 0.07% — TradingView parity
                 "slippage": 0.0005,  # 0.05% slippage
             },
             "risk_management": {

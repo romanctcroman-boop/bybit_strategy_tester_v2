@@ -66,7 +66,7 @@ export class WebSocketClient {
             // Heartbeat/ping settings
             heartbeatInterval: options.heartbeatInterval || 20000,
             heartbeatMessage:
-        options.heartbeatMessage || JSON.stringify({ op: 'ping' }),
+                options.heartbeatMessage || JSON.stringify({ op: 'ping' }),
 
             // Message queue settings
             queueMessages: options.queueMessages !== false,
@@ -106,7 +106,7 @@ export class WebSocketClient {
     connect() {
         if (
             this._ws &&
-      (this._state === WS_STATE.CONNECTING || this._state === WS_STATE.OPEN)
+            (this._state === WS_STATE.CONNECTING || this._state === WS_STATE.OPEN)
         ) {
             this._log('Already connected or connecting');
             return this;
@@ -154,7 +154,7 @@ export class WebSocketClient {
    */
     send(message) {
         const data =
-      typeof message === 'string' ? message : JSON.stringify(message);
+            typeof message === 'string' ? message : JSON.stringify(message);
 
         if (this._state === WS_STATE.OPEN && this._ws) {
             this._ws.send(data);
@@ -288,6 +288,12 @@ export class WebSocketClient {
     _onOpen() {
         this._log('Connected');
         this._setState(WS_STATE.OPEN);
+
+        // BUG-FIX B-01: capture attempt count BEFORE resetting to zero so the
+        // RECONNECT event can be emitted correctly (previously _reconnectAttempts
+        // was reset first, making the if-check below always false).
+        const wasReconnecting = this._reconnectAttempts > 0;
+        const reconnectCount = this._reconnectAttempts;
         this._reconnectAttempts = 0;
 
         // Start heartbeat
@@ -300,8 +306,8 @@ export class WebSocketClient {
         this._resubscribe();
 
         // Emit events
-        if (this._reconnectAttempts > 0) {
-            this._emit(WS_EVENTS.RECONNECT, this._reconnectAttempts);
+        if (wasReconnecting) {
+            this._emit(WS_EVENTS.RECONNECT, reconnectCount);
         }
         this._emit(WS_EVENTS.CONNECT);
     }
@@ -385,7 +391,7 @@ export class WebSocketClient {
         // Calculate delay with exponential backoff
         const delay = Math.min(
             this.options.reconnectInterval *
-        Math.pow(this.options.reconnectDecay, this._reconnectAttempts),
+            Math.pow(this.options.reconnectDecay, this._reconnectAttempts),
             this.options.maxReconnectInterval
         );
 
@@ -429,7 +435,7 @@ export class WebSocketClient {
             // Check for stale connection
             if (
                 Date.now() - this._lastPongTime >
-        this.options.heartbeatInterval * 2
+                this.options.heartbeatInterval * 2
             ) {
                 this._log('Connection stale, reconnecting...');
                 this._ws?.close(4000, 'Heartbeat timeout');

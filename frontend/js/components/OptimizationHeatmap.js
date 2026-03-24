@@ -19,32 +19,32 @@ export class OptimizationHeatmap {
 
     this.options = {
       height: 450,
-      metric: "sharpe_ratio",
-      colorScale: "performance", // 'performance', 'diverging', 'sequential'
+      metric: 'sharpe_ratio',
+      colorScale: 'performance', // 'performance', 'diverging', 'sequential'
       colors: {
         // Performance scale (red -> yellow -> green)
         performance: [
-          { value: 0, color: "rgba(239, 83, 80, 0.9)" }, // Red (worst)
-          { value: 0.25, color: "rgba(255, 152, 0, 0.9)" }, // Orange
-          { value: 0.5, color: "rgba(255, 235, 59, 0.9)" }, // Yellow
-          { value: 0.75, color: "rgba(139, 195, 74, 0.9)" }, // Light green
-          { value: 1, color: "rgba(38, 166, 154, 0.9)" }, // Green (best)
+          { value: 0, color: 'rgba(239, 83, 80, 0.9)' }, // Red (worst)
+          { value: 0.25, color: 'rgba(255, 152, 0, 0.9)' }, // Orange
+          { value: 0.5, color: 'rgba(255, 235, 59, 0.9)' }, // Yellow
+          { value: 0.75, color: 'rgba(139, 195, 74, 0.9)' }, // Light green
+          { value: 1, color: 'rgba(38, 166, 154, 0.9)' } // Green (best)
         ],
         // Diverging scale (for returns around 0)
         diverging: [
-          { value: 0, color: "rgba(239, 83, 80, 0.9)" }, // Red (negative)
-          { value: 0.5, color: "rgba(255, 255, 255, 0.5)" }, // White (neutral)
-          { value: 1, color: "rgba(38, 166, 154, 0.9)" }, // Green (positive)
+          { value: 0, color: 'rgba(239, 83, 80, 0.9)' }, // Red (negative)
+          { value: 0.5, color: 'rgba(255, 255, 255, 0.5)' }, // White (neutral)
+          { value: 1, color: 'rgba(38, 166, 154, 0.9)' } // Green (positive)
         ],
-        best: "#ffd700", // Gold for best cell
-        text: "#787b86",
-        grid: "rgba(42, 46, 57, 0.8)",
-        background: "#131722",
+        best: '#ffd700', // Gold for best cell
+        text: '#787b86',
+        grid: 'rgba(42, 46, 57, 0.8)',
+        background: '#131722'
       },
       showBestMarker: true,
       showValues: true,
-      valueFormat: ".2f",
-      ...options,
+      valueFormat: '.2f',
+      ...options
     };
   }
 
@@ -60,7 +60,7 @@ export class OptimizationHeatmap {
    */
   render(data) {
     if (!this.container || !data?.results) {
-      console.warn("OptimizationHeatmap: Container or data not found");
+      console.warn('OptimizationHeatmap: Container or data not found');
       return;
     }
 
@@ -97,12 +97,12 @@ export class OptimizationHeatmap {
       results,
       param1_name,
       param2_name,
-      best,
+      best
     } = data;
 
     // Setup container
-    this.container.innerHTML = "";
-    this.container.style.position = "relative";
+    this.container.innerHTML = '';
+    this.container.style.position = 'relative';
 
     // Calculate dimensions
     const margin = { top: 60, right: 120, bottom: 70, left: 80 };
@@ -115,14 +115,14 @@ export class OptimizationHeatmap {
     const cellHeight = chartHeight / param2_values.length;
 
     // Create canvas
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    canvas.style.width = "100%";
+    canvas.style.width = '100%';
     canvas.style.height = `${height}px`;
     this.container.appendChild(canvas);
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
 
     // Draw background
     ctx.fillStyle = this.options.colors.background;
@@ -130,12 +130,12 @@ export class OptimizationHeatmap {
 
     // Draw title
     ctx.fillStyle = this.options.colors.text;
-    ctx.font = "bold 14px Arial";
-    ctx.textAlign = "center";
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
     ctx.fillText(
       `Parameter Optimization: ${this._formatMetricName(this.options.metric)}`,
       width / 2,
-      25,
+      25
     );
 
     // Draw heatmap cells
@@ -154,14 +154,14 @@ export class OptimizationHeatmap {
 
         // Draw value text if cells are large enough
         if (this.options.showValues && cellWidth > 30 && cellHeight > 20) {
-          ctx.fillStyle = normalizedValue > 0.5 ? "#000000" : "#ffffff";
-          ctx.font = "10px Arial";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
+          ctx.fillStyle = normalizedValue > 0.5 ? '#000000' : '#ffffff';
+          ctx.font = '10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
           ctx.fillText(
             this._formatValue(value),
             cellX + cellWidth / 2,
-            cellY + cellHeight / 2,
+            cellY + cellHeight / 2
           );
         }
 
@@ -181,37 +181,37 @@ export class OptimizationHeatmap {
 
     // Draw X-axis labels (param1)
     ctx.fillStyle = this.options.colors.text;
-    ctx.font = "11px Arial";
-    ctx.textAlign = "center";
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'center';
 
     for (let x = 0; x < param1_values.length; x++) {
       const labelX = margin.left + x * cellWidth + cellWidth / 2;
       ctx.fillText(
         this._formatAxisValue(param1_values[x]),
         labelX,
-        margin.top + chartHeight + 15,
+        margin.top + chartHeight + 15
       );
     }
 
     // X-axis title
-    ctx.font = "bold 12px Arial";
+    ctx.font = 'bold 12px Arial';
     ctx.fillText(
-      param1_name || "Parameter 1",
+      param1_name || 'Parameter 1',
       margin.left + chartWidth / 2,
-      height - 15,
+      height - 15
     );
 
     // Draw Y-axis labels (param2)
-    ctx.font = "11px Arial";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
 
     for (let y = 0; y < param2_values.length; y++) {
       const labelY = margin.top + y * cellHeight + cellHeight / 2;
       ctx.fillText(
         this._formatAxisValue(param2_values[y]),
         margin.left - 8,
-        labelY,
+        labelY
       );
     }
 
@@ -219,9 +219,9 @@ export class OptimizationHeatmap {
     ctx.save();
     ctx.translate(15, margin.top + chartHeight / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.font = "bold 12px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(param2_name || "Parameter 2", 0, 0);
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(param2_name || 'Parameter 2', 0, 0);
     ctx.restore();
 
     // Setup tooltip
@@ -237,9 +237,9 @@ export class OptimizationHeatmap {
     let legend = document.getElementById(legendId);
 
     if (!legend) {
-      legend = document.createElement("div");
+      legend = document.createElement('div');
       legend.id = legendId;
-      legend.className = "heatmap-legend";
+      legend.className = 'heatmap-legend';
       legend.style.cssText = `
                 position: absolute;
                 right: 10px;
@@ -252,7 +252,7 @@ export class OptimizationHeatmap {
 
     const gradientStops = this.options.colors[this.options.colorScale]
       .map((s) => s.color)
-      .join(", ");
+      .join(', ');
 
     legend.innerHTML = `
             <div style="font-size: 11px; color: ${this.options.colors.text}; margin-bottom: 5px;">
@@ -283,8 +283,8 @@ export class OptimizationHeatmap {
    * @private
    */
   _setupTooltip(canvas, margin, cellWidth, cellHeight, data) {
-    const tooltip = document.createElement("div");
-    tooltip.className = "heatmap-tooltip";
+    const tooltip = document.createElement('div');
+    tooltip.className = 'heatmap-tooltip';
     tooltip.style.cssText = `
             position: fixed;
             padding: 8px 12px;
@@ -300,7 +300,7 @@ export class OptimizationHeatmap {
         `;
     document.body.appendChild(tooltip);
 
-    canvas.addEventListener("mousemove", (e) => {
+    canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
@@ -327,16 +327,16 @@ export class OptimizationHeatmap {
                     <div>${data.param2_name}: ${data.param2_values[y]}</div>
                 `;
 
-        tooltip.style.display = "block";
+        tooltip.style.display = 'block';
         tooltip.style.left = `${e.clientX + 10}px`;
         tooltip.style.top = `${e.clientY + 10}px`;
       } else {
-        tooltip.style.display = "none";
+        tooltip.style.display = 'none';
       }
     });
 
-    canvas.addEventListener("mouseleave", () => {
-      tooltip.style.display = "none";
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
     });
 
     // Store tooltip reference for cleanup
@@ -388,14 +388,14 @@ export class OptimizationHeatmap {
   _interpolateColor(color1, color2, ratio) {
     const parse = (c) => {
       const match = c.match(
-        /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/,
+        /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/
       );
       return match
         ? {
             r: parseInt(match[1]),
             g: parseInt(match[2]),
             b: parseInt(match[3]),
-            a: parseFloat(match[4] ?? 1),
+            a: parseFloat(match[4] ?? 1)
           }
         : { r: 0, g: 0, b: 0, a: 1 };
     };
@@ -417,17 +417,17 @@ export class OptimizationHeatmap {
    */
   _formatMetricName(metric) {
     const names = {
-      sharpe_ratio: "Sharpe Ratio",
-      sortino_ratio: "Sortino Ratio",
-      total_return: "Total Return",
-      win_rate: "Win Rate",
-      profit_factor: "Profit Factor",
-      max_drawdown: "Max Drawdown",
-      calmar_ratio: "Calmar Ratio",
+      sharpe_ratio: 'Sharpe Ratio',
+      sortino_ratio: 'Sortino Ratio',
+      total_return: 'Total Return',
+      win_rate: 'Win Rate',
+      profit_factor: 'Profit Factor',
+      max_drawdown: 'Max Drawdown',
+      calmar_ratio: 'Calmar Ratio'
     };
     return (
       names[metric] ||
-      metric.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+      metric.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
     );
   }
 
@@ -446,8 +446,8 @@ export class OptimizationHeatmap {
    * @private
    */
   _formatAxisValue(value) {
-    if (typeof value === "number") {
-      if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1) + "k";
+    if (typeof value === 'number') {
+      if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1) + 'k';
       if (Number.isInteger(value)) return value.toString();
       return value.toFixed(2);
     }
@@ -457,13 +457,13 @@ export class OptimizationHeatmap {
   /**
    * Export as image
    */
-  exportImage(filename = "optimization-heatmap.png") {
-    const canvas = this.container.querySelector("canvas");
+  exportImage(filename = 'optimization-heatmap.png') {
+    const canvas = this.container.querySelector('canvas');
     if (!canvas) return;
 
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.download = filename;
-    link.href = canvas.toDataURL("image/png");
+    link.href = canvas.toDataURL('image/png');
     link.click();
   }
 
@@ -475,7 +475,7 @@ export class OptimizationHeatmap {
       this._tooltip.remove();
     }
     if (this.container) {
-      this.container.innerHTML = "";
+      this.container.innerHTML = '';
     }
   }
 }
@@ -484,6 +484,6 @@ export class OptimizationHeatmap {
 export default OptimizationHeatmap;
 
 // Attach to window for non-module scripts
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.OptimizationHeatmap = OptimizationHeatmap;
 }

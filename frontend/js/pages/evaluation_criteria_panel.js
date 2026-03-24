@@ -24,6 +24,7 @@ class EvaluationCriteriaPanel {
             performance: {
                 label: 'Performance',
                 metrics: {
+                    net_profit: { label: 'Net Profit', unit: '$', direction: 'maximize' },
                     total_return: { label: 'Total Return', unit: '%', direction: 'maximize' },
                     cagr: { label: 'CAGR', unit: '%', direction: 'maximize' },
                     sharpe_ratio: { label: 'Sharpe Ratio', unit: '', direction: 'maximize' },
@@ -65,7 +66,12 @@ class EvaluationCriteriaPanel {
 
         // State
         this.state = {
+            // Ranking mode: 'single' | 'balanced' | 'weighted'
+            rankingMode: 'single',
             primaryMetric: 'sharpe_ratio',
+            // balanced mode: metrics to rank by average rank
+            balancedMetrics: ['net_profit', 'max_drawdown'],
+            // weighted mode: same as secondary + weights
             secondaryMetrics: ['win_rate', 'max_drawdown', 'profit_factor'],
             constraints: [
                 { id: crypto.randomUUID(), metric: 'max_drawdown', operator: '<=', value: 15, unit: '%', enabled: true },
@@ -80,6 +86,7 @@ class EvaluationCriteriaPanel {
                 max_drawdown: 0.9,
                 profit_factor: 0.7
             },
+            // Legacy alias kept for loadSavedState compat
             useCompositeScore: false
         };
 
@@ -120,8 +127,10 @@ class EvaluationCriteriaPanel {
      * Render the panel
      */
     render() {
+        const mode = this.state.rankingMode || 'single';
+
         this.container.innerHTML = `
-            <!-- Quick Presets (Top) -->
+            <!-- Quick Presets -->
             <div class="property-row property-row-vertical eval-presets-section">
                 <label class="property-label">
                     <i class="bi bi-lightning text-warning"></i> Quick Presets
@@ -142,85 +151,127 @@ class EvaluationCriteriaPanel {
                 </div>
             </div>
 
-            <!-- Primary Metric -->
-            <div class="property-row property-row-vertical">
-                <label for="evalPrimaryMetric" class="property-label">
-                    <i class="bi bi-bullseye text-primary"></i> Primary Metric
-                    <span class="property-hint-icon" title="Main metric to optimize">?</span>
-                </label>
-                <select class="property-select property-select-full" id="evalPrimaryMetric">
-                    ${this.renderMetricOptions(this.state.primaryMetric)}
-                </select>
-            </div>
-
-            <!-- Composite Score Toggle -->
-            <div class="property-row">
+            <!-- Ranking Mode Selector -->
+            <div class="property-row property-row-vertical eval-ranking-mode-section">
                 <label class="property-label">
-                    <i class="bi bi-calculator"></i> Use Composite Score
+                    <i class="bi bi-trophy text-primary"></i> How to rank results?
                 </label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="evalUseComposite" ${this.state.useCompositeScore ? 'checked' : ''}>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <!-- Secondary Metrics (Collapsible) -->
-            <div class="property-row property-row-vertical eval-collapsible-section">
-                <div class="eval-section-header" id="evalMetricsToggle">
-                    <label class="property-label">
-                        <i class="bi bi-list-check"></i> Secondary Metrics
-                        <span class="metric-count">(${this.state.secondaryMetrics.length} selected)</span>
-                    </label>
-                    <button class="eval-collapse-btn" type="button">
-                        <i class="bi bi-chevron-down"></i>
+                <div class="eval-mode-buttons">
+                    <button class="eval-mode-btn ${mode === 'single' ? 'active' : ''}"
+                            data-mode="single"
+                            title="Pick one metric and maximize it">
+                        <i class="bi bi-bullseye"></i>
+                        <span class="mode-btn-title">Single metric</span>
+                        <span class="mode-btn-desc">Maximize one goal</span>
+                    </button>
+                    <button class="eval-mode-btn ${mode === 'balanced' ? 'active' : ''}"
+                            data-mode="balanced"
+                            title="Best average rank across multiple metrics — recommended for profit + risk">
+                        <i class="bi bi-bar-chart-steps"></i>
+                        <span class="mode-btn-title">Balanced rank</span>
+                        <span class="mode-btn-desc">Best on multiple metrics</span>
+                    </button>
+                    <button class="eval-mode-btn ${mode === 'weighted' ? 'active' : ''}"
+                            data-mode="weighted"
+                            title="Combine metrics into a single score using weights">
+                        <i class="bi bi-sliders2"></i>
+                        <span class="mode-btn-title">Weighted score</span>
+                        <span class="mode-btn-desc">Custom importance</span>
                     </button>
                 </div>
-                <div class="eval-collapsible-content" id="evalSecondaryMetricsWrapper">
-                    <div class="criteria-metrics-grid" id="evalSecondaryMetrics">
-                        ${this.renderSecondaryMetrics()}
+            </div>
+
+            <!-- SINGLE MODE: just primary metric -->
+            <div class="eval-mode-content ${mode === 'single' ? '' : 'd-none'}" id="evalModeSingle">
+                <div class="property-row property-row-vertical">
+                    <label for="evalPrimaryMetric" class="property-label">
+                        Optimize for
+                    </label>
+                    <select class="property-select property-select-full" id="evalPrimaryMetric">
+                        ${this.renderMetricOptions(this.state.primaryMetric)}
+                    </select>
+                    <p class="eval-mode-hint">All combinations are sorted by this metric. Use <em>Minimum Requirements</em> below to exclude bad results.</p>
+                </div>
+            </div>
+
+            <!-- BALANCED MODE: rank by average rank across selected metrics -->
+            <div class="eval-mode-content ${mode === 'balanced' ? '' : 'd-none'}" id="evalModeBalanced">
+                <div class="property-row property-row-vertical">
+                    <label class="property-label">
+                        Rank by all of these
+                    </label>
+                    <p class="eval-mode-hint">Each result gets a rank per metric, then an average rank is computed. Best average rank wins — scales ($, %) don't matter.</p>
+                    <div class="criteria-metrics-grid" id="evalBalancedMetrics">
+                        ${this.renderBalancedMetrics()}
                     </div>
                 </div>
             </div>
 
-            <!-- Metric Weights (shown when composite enabled) -->
-            <div class="property-row property-row-vertical ${this.state.useCompositeScore ? '' : 'd-none'}" id="evalWeightsSection">
-                <label class="property-label">
-                    <i class="bi bi-sliders2"></i> Metric Weights
-                </label>
-                <div class="metric-weights-list" id="evalWeightsList">
-                    ${this.renderWeights()}
+            <!-- WEIGHTED MODE: composite score with sliders -->
+            <div class="eval-mode-content ${mode === 'weighted' ? '' : 'd-none'}" id="evalModeWeighted">
+                <div class="property-row property-row-vertical">
+                    <label for="evalPrimaryMetricW" class="property-label">
+                        Primary metric
+                    </label>
+                    <select class="property-select property-select-full" id="evalPrimaryMetricW">
+                        ${this.renderMetricOptions(this.state.primaryMetric)}
+                    </select>
+                </div>
+                <div class="property-row property-row-vertical">
+                    <label class="property-label">
+                        Also include in score
+                    </label>
+                    <p class="eval-mode-hint">⚠️ Works best when metrics use similar units (e.g. ratios). Avoid mixing $ and %.</p>
+                    <div class="criteria-metrics-grid" id="evalSecondaryMetrics">
+                        ${this.renderSecondaryMetrics()}
+                    </div>
+                </div>
+                <div class="property-row property-row-vertical">
+                    <label class="property-label">
+                        <i class="bi bi-sliders2"></i> Weights
+                    </label>
+                    <div class="metric-weights-list" id="evalWeightsList">
+                        ${this.renderWeights()}
+                    </div>
                 </div>
             </div>
 
-            <!-- Constraints (Compact) -->
+            <!-- Minimum Requirements (Constraints) -->
             <div class="property-row property-row-vertical eval-constraints-section">
                 <div class="eval-section-header">
                     <label class="property-label">
-                        <i class="bi bi-funnel"></i> Constraints
+                        <i class="bi bi-funnel"></i> Minimum Requirements
                         <span class="constraint-count">(${this.state.constraints.filter(c => c.enabled).length} active)</span>
                     </label>
-                    <button class="btn-add-sm" id="btnAddEvalConstraint" title="Add constraint">
+                    <button class="btn-add-sm" id="btnAddEvalConstraint" title="Add requirement">
                         <i class="bi bi-plus"></i>
                     </button>
                 </div>
+                <p class="eval-mode-hint" style="margin-bottom:6px">Results that don't meet these are excluded before ranking.</p>
                 <div class="constraints-list-compact" id="evalConstraintsList">
                     ${this.renderConstraints()}
                 </div>
             </div>
 
-            <!-- Sort Order (Compact) -->
-            <div class="property-row property-row-vertical eval-sort-section">
-                <div class="eval-section-header">
-                    <label class="property-label">
-                        <i class="bi bi-sort-down"></i> Sort Results By
+            <!-- Advanced: Sort Order (collapsed by default) -->
+            <div class="property-row property-row-vertical eval-sort-section eval-collapsible-section collapsed" id="evalAdvancedSection">
+                <div class="eval-section-header" id="evalAdvancedToggle">
+                    <label class="property-label" style="cursor:pointer">
+                        <i class="bi bi-sort-down"></i> Advanced: Tiebreaker Order
                         <span class="sort-count">(${this.state.sortOrder.length} levels)</span>
                     </label>
-                    <button class="btn-add-sm" id="btnAddEvalSort" title="Add sort level">
-                        <i class="bi bi-plus"></i>
+                    <button class="eval-collapse-btn" type="button">
+                        <i class="bi bi-chevron-down"></i>
                     </button>
                 </div>
-                <div class="sort-order-list-compact" id="evalSortOrderList">
-                    ${this.renderSortOrder()}
+                <div class="eval-collapsible-content" id="evalSortOrderWrapper">
+                    <p class="eval-mode-hint">When results have equal scores, sort by these in order.</p>
+                    <div class="sort-order-list-compact" id="evalSortOrderList">
+                        ${this.renderSortOrder()}
+                    </div>
+                    <button class="btn-add-sm" id="btnAddEvalSort" style="margin-top:6px" title="Add tiebreaker">
+                        <i class="bi bi-plus"></i> Add level
+                    </button>
                 </div>
             </div>
         `;
@@ -244,7 +295,31 @@ class EvaluationCriteriaPanel {
     }
 
     /**
-     * Render secondary metrics grid with categories
+     * Render balanced-mode metric checkboxes (uses balancedMetrics state)
+     */
+    renderBalancedMetrics() {
+        let html = '';
+        for (const [_categoryKey, category] of Object.entries(this.availableMetrics)) {
+            html += `<div class="metric-category">
+                <div class="metric-category-label">${category.label}</div>
+                <div class="metric-category-items">`;
+            for (const [metricKey, metric] of Object.entries(category.metrics)) {
+                const isChecked = this.state.balancedMetrics.includes(metricKey) ? 'checked' : '';
+                const dirLabel = metric.direction === 'maximize' ? '↑' : metric.direction === 'minimize' ? '↓' : '';
+                html += `
+                    <label class="criteria-checkbox-item" title="${metric.label} (${metric.direction})">
+                        <input type="checkbox" data-metric="${metricKey}" ${isChecked}>
+                        <span>${metric.label} <small class="metric-dir-hint">${dirLabel}</small></span>
+                    </label>
+                `;
+            }
+            html += '</div></div>';
+        }
+        return html;
+    }
+
+    /**
+     * Render secondary metrics grid with categories (weighted mode)
      */
     renderSecondaryMetrics() {
         let html = '';
@@ -370,7 +445,26 @@ class EvaluationCriteriaPanel {
      * Bind all events
      */
     bindEvents() {
-        // Primary metric
+        // --- Ranking mode buttons ---
+        this.container.querySelectorAll('.eval-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.dataset.mode;
+                this.state.rankingMode = mode;
+                // Legacy compat field
+                this.state.useCompositeScore = (mode === 'weighted');
+                // Switch active button
+                this.container.querySelectorAll('.eval-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // Show/hide mode content panels
+                this.container.querySelectorAll('.eval-mode-content').forEach(el => el.classList.add('d-none'));
+                const modeMap = { single: 'evalModeSingle', balanced: 'evalModeBalanced', weighted: 'evalModeWeighted' };
+                this.container.querySelector(`#${modeMap[mode]}`)?.classList.remove('d-none');
+                this.saveState();
+                this.emitChange();
+            });
+        });
+
+        // --- Primary metric (single mode) ---
         this.container.querySelector('#evalPrimaryMetric')?.addEventListener('change', (e) => {
             this.state.primaryMetric = e.target.value;
             this.updateWeightsUI();
@@ -378,18 +472,31 @@ class EvaluationCriteriaPanel {
             this.emitChange();
         });
 
-        // Composite score toggle
-        this.container.querySelector('#evalUseComposite')?.addEventListener('change', (e) => {
-            this.state.useCompositeScore = e.target.checked;
-            const weightsSection = this.container.querySelector('#evalWeightsSection');
-            if (weightsSection) {
-                weightsSection.classList.toggle('d-none', !e.target.checked);
-            }
+        // --- Primary metric (weighted mode) ---
+        this.container.querySelector('#evalPrimaryMetricW')?.addEventListener('change', (e) => {
+            this.state.primaryMetric = e.target.value;
+            this.updateWeightsUI();
             this.saveState();
             this.emitChange();
         });
 
-        // Secondary metrics
+        // --- Balanced metrics checkboxes ---
+        this.container.querySelector('#evalBalancedMetrics')?.addEventListener('change', (e) => {
+            if (e.target.type === 'checkbox') {
+                const metric = e.target.dataset.metric;
+                if (e.target.checked) {
+                    if (!this.state.balancedMetrics.includes(metric)) {
+                        this.state.balancedMetrics.push(metric);
+                    }
+                } else {
+                    this.state.balancedMetrics = this.state.balancedMetrics.filter(m => m !== metric);
+                }
+                this.saveState();
+                this.emitChange();
+            }
+        });
+
+        // --- Secondary metrics (weighted mode) ---
         this.container.querySelector('#evalSecondaryMetrics')?.addEventListener('change', (e) => {
             if (e.target.type === 'checkbox') {
                 const metric = e.target.dataset.metric;
@@ -400,14 +507,13 @@ class EvaluationCriteriaPanel {
                 } else {
                     this.state.secondaryMetrics = this.state.secondaryMetrics.filter(m => m !== metric);
                 }
-                this.updateMetricCount();
                 this.updateWeightsUI();
                 this.saveState();
                 this.emitChange();
             }
         });
 
-        // Weights
+        // --- Weights (weighted mode) ---
         this.container.querySelector('#evalWeightsList')?.addEventListener('input', (e) => {
             if (e.target.classList.contains('weight-slider')) {
                 const item = e.target.closest('.metric-weight-item');
@@ -422,16 +528,15 @@ class EvaluationCriteriaPanel {
             }
         });
 
-        // Add constraint
+        // --- Add constraint ---
         this.container.querySelector('#btnAddEvalConstraint')?.addEventListener('click', () => {
             this.addConstraint();
         });
 
-        // Constraint events (delegated)
+        // --- Constraint events (delegated) ---
         this.container.querySelector('#evalConstraintsList')?.addEventListener('click', (e) => {
             const item = e.target.closest('.constraint-item');
             if (!item) return;
-
             if (e.target.closest('.constraint-remove')) {
                 this.removeConstraint(item.dataset.id);
             }
@@ -440,22 +545,20 @@ class EvaluationCriteriaPanel {
         this.container.querySelector('#evalConstraintsList')?.addEventListener('change', (e) => {
             const item = e.target.closest('.constraint-item');
             if (!item) return;
-
             this.updateConstraintFromUI(item);
             this.saveState();
             this.emitChange();
         });
 
-        // Add sort level
+        // --- Add sort level ---
         this.container.querySelector('#btnAddEvalSort')?.addEventListener('click', () => {
             this.addSortLevel();
         });
 
-        // Sort events (delegated)
+        // --- Sort events (delegated) ---
         this.container.querySelector('#evalSortOrderList')?.addEventListener('click', (e) => {
             const item = e.target.closest('.sort-order-item');
             if (!item) return;
-
             if (e.target.closest('.sort-remove')) {
                 this.removeSortLevel(item.dataset.id);
             } else if (e.target.closest('.sort-direction')) {
@@ -466,29 +569,24 @@ class EvaluationCriteriaPanel {
         this.container.querySelector('#evalSortOrderList')?.addEventListener('change', (e) => {
             const item = e.target.closest('.sort-order-item');
             if (!item) return;
-
             this.updateSortFromUI(item);
             this.saveState();
             this.emitChange();
         });
 
-        // Presets (both old and new compact buttons)
+        // --- Presets ---
         this.container.querySelectorAll('.criteria-preset-btn, .criteria-preset-btn-sm').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.applyPreset(e.target.closest('.criteria-preset-btn, .criteria-preset-btn-sm').dataset.preset);
             });
         });
 
-        // Collapsible sections toggle
-        this.container.querySelector('#evalMetricsToggle')?.addEventListener('click', (e) => {
-            // Only toggle if clicking header or button, not checkboxes inside
-            if (e.target.closest('.eval-collapse-btn') || e.target.closest('.eval-section-header')) {
-                const section = this.container.querySelector('.eval-collapsible-section');
-                section?.classList.toggle('collapsed');
-            }
+        // --- Advanced section toggle ---
+        this.container.querySelector('#evalAdvancedToggle')?.addEventListener('click', () => {
+            this.container.querySelector('#evalAdvancedSection')?.classList.toggle('collapsed');
         });
 
-        // Drag & drop for sort order
+        // --- Drag & drop for sort order ---
         this.setupSortDragDrop();
     }
 
@@ -666,7 +764,9 @@ class EvaluationCriteriaPanel {
     applyPreset(presetName) {
         const presets = {
             conservative: {
+                rankingMode: 'balanced',
                 primaryMetric: 'sortino_ratio',
+                balancedMetrics: ['sortino_ratio', 'max_drawdown', 'volatility'],
                 secondaryMetrics: ['max_drawdown', 'win_rate', 'profit_factor', 'volatility'],
                 constraints: [
                     { metric: 'max_drawdown', operator: '<=', value: 10, enabled: true },
@@ -679,7 +779,9 @@ class EvaluationCriteriaPanel {
                 ]
             },
             aggressive: {
+                rankingMode: 'single',
                 primaryMetric: 'total_return',
+                balancedMetrics: ['total_return', 'sharpe_ratio'],
                 secondaryMetrics: ['sharpe_ratio', 'max_drawdown', 'cagr', 'win_rate'],
                 constraints: [
                     { metric: 'max_drawdown', operator: '<=', value: 25, enabled: true },
@@ -691,7 +793,9 @@ class EvaluationCriteriaPanel {
                 ]
             },
             balanced: {
+                rankingMode: 'balanced',
                 primaryMetric: 'sharpe_ratio',
+                balancedMetrics: ['net_profit', 'sharpe_ratio', 'max_drawdown', 'win_rate'],
                 secondaryMetrics: ['win_rate', 'max_drawdown', 'profit_factor', 'total_return'],
                 constraints: [
                     { metric: 'max_drawdown', operator: '<=', value: 15, enabled: true },
@@ -704,7 +808,9 @@ class EvaluationCriteriaPanel {
                 ]
             },
             frequency: {
+                rankingMode: 'single',
                 primaryMetric: 'profit_factor',
+                balancedMetrics: ['profit_factor', 'total_trades', 'win_rate'],
                 secondaryMetrics: ['total_trades', 'win_rate', 'expectancy', 'trades_per_month'],
                 constraints: [
                     { metric: 'total_trades', operator: '>=', value: 100, enabled: true },
@@ -722,7 +828,10 @@ class EvaluationCriteriaPanel {
         if (!preset) return;
 
         // Apply preset with IDs
+        this.state.rankingMode = preset.rankingMode;
+        this.state.useCompositeScore = (preset.rankingMode === 'weighted');
         this.state.primaryMetric = preset.primaryMetric;
+        this.state.balancedMetrics = [...preset.balancedMetrics];
         this.state.secondaryMetrics = [...preset.secondaryMetrics];
         this.state.constraints = preset.constraints.map(c => ({
             id: crypto.randomUUID(),
@@ -740,7 +849,6 @@ class EvaluationCriteriaPanel {
         this.saveState();
         this.emitChange();
 
-        // Show notification
         this.showNotification(`Applied "${presetName}" preset`, 'success');
     }
 
@@ -794,13 +902,20 @@ class EvaluationCriteriaPanel {
     }
 
     /**
-     * Load saved state
+     * Load saved state — migrates legacy useCompositeScore to rankingMode
      */
     loadSavedState() {
         const saved = localStorage.getItem('evaluationCriteriaState');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
+                // Migration: old state had useCompositeScore but no rankingMode
+                if (!parsed.rankingMode) {
+                    parsed.rankingMode = parsed.useCompositeScore ? 'weighted' : 'single';
+                }
+                if (!parsed.balancedMetrics) {
+                    parsed.balancedMetrics = ['net_profit', 'max_drawdown'];
+                }
                 this.state = { ...this.state, ...parsed };
                 this.render();
                 this.bindEvents();
@@ -811,12 +926,38 @@ class EvaluationCriteriaPanel {
     }
 
     /**
-     * Get current criteria for API
+     * Get current criteria for API.
+     * Maps rankingMode → use_composite + secondary_metrics correctly.
      */
     getCriteria() {
+        const mode = this.state.rankingMode || 'single';
+
+        // Build mode-specific fields
+        let useComposite = false;
+        let secondaryMetrics = [];
+        let weights = null;
+
+        if (mode === 'single') {
+            // Pure single-metric: no secondary, no composite
+            useComposite = false;
+            secondaryMetrics = [];
+            weights = null;
+        } else if (mode === 'balanced') {
+            // rank_by_multi_criteria on backend: send secondary_metrics, use_composite=false
+            useComposite = false;
+            secondaryMetrics = this.state.balancedMetrics.filter(m => m !== this.state.primaryMetric);
+            weights = null;
+        } else if (mode === 'weighted') {
+            // Composite weighted score
+            useComposite = true;
+            secondaryMetrics = this.state.secondaryMetrics;
+            weights = this.state.weights;
+        }
+
         return {
             primary_metric: this.state.primaryMetric,
-            secondary_metrics: this.state.secondaryMetrics,
+            secondary_metrics: secondaryMetrics,
+            ranking_mode: mode,
             constraints: this.state.constraints.filter(c => c.enabled).map(c => ({
                 metric: c.metric,
                 operator: c.operator,
@@ -826,8 +967,8 @@ class EvaluationCriteriaPanel {
                 metric: s.metric,
                 direction: s.direction
             })),
-            use_composite: this.state.useCompositeScore,
-            weights: this.state.useCompositeScore ? this.state.weights : null
+            use_composite: useComposite,
+            weights: weights
         };
     }
 

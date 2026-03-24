@@ -3404,6 +3404,32 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics.long_profit = sum(t.pnl for t in long_trades)
         metrics.short_profit = sum(t.pnl for t in short_trades)
 
+        # === LONG/SHORT DETAILED BREAKDOWN ===
+        long_wins = [t for t in long_trades if t.pnl > 0]
+        long_losses = [t for t in long_trades if t.pnl <= 0]
+        short_wins = [t for t in short_trades if t.pnl > 0]
+        short_losses = [t for t in short_trades if t.pnl <= 0]
+        metrics.long_winning_trades = len(long_wins)
+        metrics.long_losing_trades = len(long_losses)
+        metrics.short_winning_trades = len(short_wins)
+        metrics.short_losing_trades = len(short_losses)
+        metrics.long_gross_profit = sum(t.pnl for t in long_wins)
+        metrics.long_gross_loss = sum(t.pnl for t in long_losses)
+        metrics.short_gross_profit = sum(t.pnl for t in short_wins)
+        metrics.short_gross_loss = sum(t.pnl for t in short_losses)
+        metrics.long_avg_win = metrics.long_gross_profit / len(long_wins) if long_wins else 0.0
+        metrics.long_avg_loss = metrics.long_gross_loss / len(long_losses) if long_losses else 0.0
+        metrics.short_avg_win = metrics.short_gross_profit / len(short_wins) if short_wins else 0.0
+        metrics.short_avg_loss = metrics.short_gross_loss / len(short_losses) if short_losses else 0.0
+        metrics.long_profit_factor = (
+            metrics.long_gross_profit / abs(metrics.long_gross_loss) if metrics.long_gross_loss != 0 else float("inf")
+        )
+        metrics.short_profit_factor = (
+            metrics.short_gross_profit / abs(metrics.short_gross_loss)
+            if metrics.short_gross_loss != 0
+            else float("inf")
+        )
+
         # === DURATION ===
         durations = [t.duration_bars for t in trades]
         metrics.avg_trade_duration = float(np.mean(durations)) if durations else 0.0

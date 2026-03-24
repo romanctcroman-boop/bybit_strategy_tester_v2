@@ -1,6 +1,6 @@
 /**
  * Strategy Builder — Главный модуль
- * 
+ *
  * Объединяет все модули в единую систему
  */
 
@@ -14,13 +14,13 @@ const store = getStore();
 
 export function createStrategyBuilder(config = {}) {
   const { canvasElement, toolbarElement, propertiesPanel } = config;
-  
+
   // Initialize modules
   const canvas = createCanvasModule(canvasElement);
   const blocks = createBlocksModule();
   const properties = createPropertiesModule(propertiesPanel);
   const toolbar = createToolbarModule(toolbarElement);
-  
+
   // Render loop
   function render() {
     const blocksData = blocks.getAllBlocks();
@@ -28,11 +28,11 @@ export function createStrategyBuilder(config = {}) {
     const connections = [];
     canvas.render(blocksData, connections);
   }
-  
+
   // Auto-save
   let lastAutoSave = 0;
   const AUTOSAVE_INTERVAL = 30000;
-  
+
   function autoSave() {
     const now = Date.now();
     if (now - lastAutoSave > AUTOSAVE_INTERVAL) {
@@ -47,14 +47,14 @@ export function createStrategyBuilder(config = {}) {
       lastAutoSave = now;
     }
   }
-  
+
   // Animation loop
   function animate() {
     render();
     autoSave();
     requestAnimationFrame(animate);
   }
-  
+
   // Load from autosave
   function loadFromAutosave() {
     const saved = localStorage.getItem('strategy_builder_autosave');
@@ -67,14 +67,14 @@ export function createStrategyBuilder(config = {}) {
       }
     }
   }
-  
+
   // Initialize
   function initialize() {
     loadFromAutosave();
     animate();
     console.log('[StrategyBuilder] Initialized');
   }
-  
+
   // Public API
   return {
     initialize,

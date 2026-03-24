@@ -502,6 +502,9 @@ app.include_router(
     strategy_builder_router.router, prefix="/api/v1", tags=["strategy-builder"]
 )  # NEW: Visual Strategy Builder
 app.include_router(
+    strategy_builder_router.router, prefix="/api/v1/strategy-builder", tags=["strategy-builder"]
+)  # Alias: /api/v1/strategy-builder/... (used by frontend)
+app.include_router(
     strategy_validation_ws_router.router, prefix="/api/v1", tags=["strategy-builder-ws"]
 )  # NEW: WebSocket real-time validation for Strategy Builder
 app.include_router(

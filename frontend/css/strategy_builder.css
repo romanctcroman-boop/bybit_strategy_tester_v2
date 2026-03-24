@@ -1,9 +1,9 @@
 /**
  * 📄 Strategy Builder Page Styles
- * 
+ *
  * Page-specific styles for strategy_builder.html
  * Extracted during Phase 1 Week 2: CSS Extraction
- * 
+ *
  * @version 1.0.0
  * @date 2025-12-21
  */
@@ -3483,25 +3483,17 @@ body {
 /* Spine hidden state - когда другое окно открыто */
 /* Используем !important для гарантии перекрытия селекторов с ID */
 .floating-window-spine.spine-hidden {
-    /* Dim other spines but keep them present and clickable.
-       Previously we hid them completely (visibility:hidden + pointer-events:none)
-       which made it impossible to click other spines/tabs to open their windows.
-       Keep a low opacity and allow pointer events so users can click the tab to open it. */
-    opacity: 0.18 !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
     transform: rotate(180deg) translateX(20px) !important;
     transition:
-        opacity 0.3s ease,
-        transform 0.3s ease;
+        opacity 0.25s ease,
+        transform 0.25s ease,
+        visibility 0.25s ease;
 }
 
-/* Allow hover to indicate interactivity even when dimmed */
-.floating-window-spine.spine-hidden:hover {
-    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.18) !important;
-    cursor: pointer !important;
-    opacity: 0.32 !important;
-}
+/* spine-hidden hover не нужен — pointer-events: none */
 
 /* Active window spine - когда окно открыто */
 .floating-window:not(.floating-window-collapsed) .floating-window-spine {
@@ -4174,144 +4166,6 @@ body {
 
 .popup-validation-error.visible {
     display: block;
-}
-
-/* Templates Modal */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    pointer-events: none;
-    visibility: hidden;
-}
-
-.modal-overlay.active {
-    display: flex !important;
-    opacity: 1;
-    pointer-events: all;
-    visibility: visible;
-}
-
-.modal-overlay .modal {
-    position: relative;
-    z-index: 10000;
-    display: flex !important;
-    flex-direction: column;
-    opacity: 1 !important;
-    visibility: visible !important;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    width: 800px;
-    max-width: 90vw;
-    max-height: 80vh;
-    overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    margin: auto;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.modal-title {
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.modal-body {
-    padding: 20px;
-    overflow-y: auto;
-    max-height: 60vh;
-}
-
-.templates-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-}
-
-.template-card {
-    background: var(--bg-tertiary);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.template-card:hover {
-    border-color: var(--accent-blue);
-}
-
-.template-card.selected {
-    border-color: var(--accent-blue);
-    background: rgba(88, 166, 255, 0.1);
-}
-
-.template-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    margin-bottom: 12px;
-}
-
-.template-name {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.template-desc {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-}
-
-.template-meta {
-    display: flex;
-    gap: 12px;
-    font-size: 11px;
-    color: var(--text-secondary);
-}
-
-.template-meta span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.modal-footer {
-    padding: 16px 20px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
 }
 
 /* ============================================
@@ -5096,7 +4950,79 @@ body.floating-window-open .zoom-controls {
     color: var(--text-primary);
 }
 
-/* Section Headers with inline buttons */
+/* ── Ranking Mode Buttons ── */
+.eval-mode-buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.eval-mode-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.eval-mode-btn i {
+    font-size: 16px;
+    margin-bottom: 2px;
+}
+
+.eval-mode-btn .mode-btn-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.eval-mode-btn .mode-btn-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.eval-mode-btn:hover {
+    background: rgba(214, 51, 132, 0.1);
+    border-color: rgba(214, 51, 132, 0.35);
+    color: var(--text-primary);
+}
+
+.eval-mode-btn.active {
+    background: rgba(214, 51, 132, 0.18);
+    border-color: rgba(214, 51, 132, 0.6);
+    color: #d63384;
+}
+
+.eval-mode-btn.active .mode-btn-title {
+    color: #d63384;
+}
+
+/* Hint text under mode content */
+.eval-mode-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0 8px;
+    line-height: 1.4;
+}
+
+/* Direction hint inside metric checkbox */
+.metric-dir-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 2px;
+}
+
 .eval-section-header {
     display: flex;
     justify-content: space-between;
@@ -8036,4 +7962,118 @@ body.floating-window-open .zoom-controls {
 
 .btn-reset-date i {
     font-size: 11px;
+}
+
+/* ============================================
+   MODAL OVERLAY — base styles (used by My Strategies and other modals)
+   ============================================ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal {
+    background: var(--bg-secondary, #1a1f2e);
+    border: 1px solid var(--border-color, #2a3045);
+    border-radius: 12px;
+    width: 680px;
+    max-width: 96vw;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border-color, #2a3045);
+    flex-shrink: 0;
+}
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e6f0);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #8892a4);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.modal-close:hover {
+    color: var(--text-primary, #e0e6f0);
+    background: var(--bg-tertiary, #242938);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-color, #2a3045);
+    flex-shrink: 0;
+}
+
+.strategies-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-secondary, #8892a4);
+}
+
+.strategies-empty i {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.badge-current {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    background: var(--accent-blue, #58a6ff);
+    color: #000;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.strategy-card.current {
+    border-color: var(--accent-blue, #58a6ff);
 }

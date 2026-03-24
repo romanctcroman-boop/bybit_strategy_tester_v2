@@ -19,7 +19,7 @@ export const LogLevel = {
   INFO: 1,
   WARN: 2,
   ERROR: 3,
-  NONE: 4,
+  NONE: 4
 };
 
 // ============================================
@@ -46,10 +46,10 @@ export class Logger {
     this.level = options.level ?? Logger.globalLevel;
     this.enabled = options.enabled ?? Logger.globalEnabled;
     this.styles = {
-      debug: "color: #888",
-      info: "color: #2196F3",
-      warn: "color: #FF9800",
-      error: "color: #F44336; font-weight: bold",
+      debug: 'color: #888',
+      info: 'color: #2196F3',
+      warn: 'color: #FF9800',
+      error: 'color: #F44336; font-weight: bold'
     };
   }
 
@@ -96,7 +96,7 @@ export class Logger {
    * @param {...any} args
    */
   debug(...args) {
-    this._log(LogLevel.DEBUG, "debug", ...args);
+    this._log(LogLevel.DEBUG, 'debug', ...args);
   }
 
   /**
@@ -104,7 +104,7 @@ export class Logger {
    * @param {...any} args
    */
   info(...args) {
-    this._log(LogLevel.INFO, "info", ...args);
+    this._log(LogLevel.INFO, 'info', ...args);
   }
 
   /**
@@ -112,7 +112,7 @@ export class Logger {
    * @param {...any} args
    */
   warn(...args) {
-    this._log(LogLevel.WARN, "warn", ...args);
+    this._log(LogLevel.WARN, 'warn', ...args);
   }
 
   /**
@@ -120,7 +120,7 @@ export class Logger {
    * @param {...any} args
    */
   error(...args) {
-    this._log(LogLevel.ERROR, "error", ...args);
+    this._log(LogLevel.ERROR, 'error', ...args);
   }
 
   /**
@@ -199,7 +199,7 @@ export class Logger {
     const consoleFn = console[method] || console.log;
 
     // Use styled output in browsers
-    if (typeof window !== "undefined" && style) {
+    if (typeof window !== 'undefined' && style) {
       consoleFn(`%c${prefix}`, style, ...args);
     } else {
       consoleFn(prefix, ...args);
@@ -241,13 +241,13 @@ export function createLogger(module, options = {}) {
 
 // Detect production environment
 const isProduction = () => {
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     // Check if URL contains production indicators
-    const hostname = window.location?.hostname || "";
+    const hostname = window.location?.hostname || '';
     return (
-      !hostname.includes("localhost") &&
-      !hostname.includes("127.0.0.1") &&
-      !hostname.includes(".local")
+      !hostname.includes('localhost') &&
+      !hostname.includes('127.0.0.1') &&
+      !hostname.includes('.local')
     );
   }
   return false;
@@ -265,7 +265,7 @@ if (isProduction()) {
 export default Logger;
 
 // Attach to window for non-module scripts
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.Logger = Logger;
   window.LogLevel = LogLevel;
   window.getLogger = getLogger;

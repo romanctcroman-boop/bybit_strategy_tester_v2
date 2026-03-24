@@ -77,8 +77,10 @@ def passes_dynamic_constraints(result: dict, constraints: list[dict]) -> bool:
         if not all([metric, operator, threshold is not None]):
             continue
 
-        # Get metric value from result
-        value = result.get(metric, 0) or 0
+        # Get metric value from result.
+        # 'min_trades' is a constraint name (not a result key) — map to 'total_trades'.
+        _metric_key = "total_trades" if metric == "min_trades" else metric
+        value = result.get(_metric_key, 0) or 0
 
         # For negative drawdown values, use absolute
         if metric in ("max_drawdown", "avg_drawdown") and value < 0:

@@ -10,6 +10,17 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from backend.config.constants import (
+    COMMISSION_LINEAR_MAKER,
+    COMMISSION_LINEAR_TAKER,
+    COMMISSION_SPOT_TAKER,
+    COMMISSION_TV,
+    INITIAL_CAPITAL,
+    LEVERAGE_DEFAULT_BACKTEST,
+    LEVERAGE_MAX,
+    MAX_BACKTEST_DAYS,
+)
+
 
 class StrategyType(str, Enum):
     """Available strategy types"""
@@ -92,7 +103,7 @@ class BacktestConfig(BaseModel):
 
     # Capital and risk settings
     initial_capital: float = Field(
-        default=10000.0,
+        default=INITIAL_CAPITAL,
         ge=100,
         le=100_000_000,
         description="Initial capital (100 - 100M)",
@@ -103,7 +114,7 @@ class BacktestConfig(BaseModel):
         le=1.0,
         description="Fraction of capital per trade (0.01-1.0)",
     )
-    leverage: float = Field(default=1.0, ge=1.0, le=125.0, description="Leverage (1-125x, Bybit max)")
+    leverage: float = Field(default=LEVERAGE_DEFAULT_BACKTEST, ge=1.0, le=LEVERAGE_MAX, description="Leverage (1-125x, Bybit max)")
 
     # Trading direction: 'long', 'short', or 'both'
     direction: str = Field(
@@ -155,8 +166,10 @@ class BacktestConfig(BaseModel):
     )
 
     # Fees and slippage
-    maker_fee: float = Field(default=0.0002, ge=0, le=0.01)  # 0.02% default
-    taker_fee: float = Field(default=0.0004, ge=0, le=0.01)  # 0.04% default
+    # Bybit linear perpetuals: maker=0.02% (0.0002), taker=0.055% (0.00055)
+    # Bybit spot: maker=0.1% (0.001), taker=0.1% (0.001)
+    maker_fee: float = Field(default=COMMISSION_LINEAR_MAKER, ge=0, le=0.01)  # 0.02% Bybit linear maker
+    taker_fee: float = Field(default=COMMISSION_LINEAR_TAKER, ge=0, le=0.01)  # 0.055% Bybit linear taker (market orders)
     slippage: float = Field(default=0.0005, ge=0, le=0.05)  # max 5% slippage
     slippage_ticks: int = Field(
         default=0,
@@ -335,7 +348,7 @@ class BacktestConfig(BaseModel):
         description="Commission type: 'percent', 'cash_per_contract', 'cash_per_order'",
     )
     commission_value: float = Field(
-        default=0.0007,
+        default=COMMISSION_TV,
         ge=0.0,
         description="Commission value (0.0007 = 0.07% for TradingView parity)",
     )
@@ -714,6 +727,28 @@ class BacktestConfig(BaseModel):
         return v.lower()
 
     @model_validator(mode="after")
+    def auto_set_commission(self):
+        """Auto-set commission_value and taker_fee/maker_fee based on market_type.
+
+        When commission_value is NOT explicitly provided, uses real Bybit taker fees
+        (market orders = taker by default):
+          - linear perpetuals: 0.055% (0.00055)
+          - spot: 0.1% (0.001)
+
+        When commission_value IS explicitly provided, it takes precedence.
+        """
+        if "commission_value" not in self.model_fields_set:
+            if self.market_type == "spot":
+                self.commission_value = COMMISSION_SPOT_TAKER
+                self.taker_fee = COMMISSION_SPOT_TAKER
+                self.maker_fee = COMMISSION_SPOT_TAKER
+            else:  # linear perpetuals (default)
+                self.commission_value = COMMISSION_LINEAR_TAKER
+                self.taker_fee = COMMISSION_LINEAR_TAKER
+                self.maker_fee = COMMISSION_LINEAR_MAKER
+        return self
+
+    @model_validator(mode="after")
     def validate_dates(self):
         """Проверка корректности дат (DeepSeek рекомендация)"""
         # Normalise to naive UTC before comparing to avoid TypeError when
@@ -725,7 +760,7 @@ class BacktestConfig(BaseModel):
             raise ValueError("end_date must be after start_date")
 
         # Максимум 2 года для бэктеста (разумный предел)
-        max_duration = timedelta(days=730)
+        max_duration = timedelta(days=MAX_BACKTEST_DAYS)
         if e - s > max_duration:
             raise ValueError("Maximum backtest duration is 2 years")
 
@@ -962,6 +997,7 @@ class PerformanceMetrics(BaseModel):
     sortino_ratio: float = Field(default=0.0, description="Sortino ratio (monthly returns, downside deviation)")
     calmar_ratio: float = Field(default=0.0, description="Calmar ratio (annual return / max drawdown)")
     sqn: float = Field(default=0.0, description="System Quality Number (expectancy / stdev of trades)")
+    stability: float = Field(default=0.0, description="R-squared of linear regression of equity curve (0-1)")
     kelly_percent: float = Field(default=0.0, description="Kelly Criterion as fraction (0-1)")
     kelly_percent_long: float = Field(default=0.0, description="Kelly Criterion for long trades")
     kelly_percent_short: float = Field(default=0.0, description="Kelly Criterion for short trades")
@@ -1384,12 +1420,13 @@ class BacktestCreateRequest(BaseModel):
     end_date: datetime
     strategy_type: StrategyType = StrategyType.SMA_CROSSOVER
     strategy_params: dict[str, Any] = Field(default_factory=dict)
-    initial_capital: float = Field(default=10000.0, ge=100, le=100_000_000)
+    initial_capital: float = Field(default=INITIAL_CAPITAL, ge=100, le=100_000_000)
     position_size: float = Field(default=1.0, ge=0.01, le=1.0)
-    leverage: float = Field(default=1.0, ge=1.0, le=125.0)  # Bybit max leverage
-    direction: str = Field(default="long", description="Trading direction: 'long', 'short', or 'both'")
+    leverage: float = Field(default=LEVERAGE_DEFAULT_BACKTEST, ge=1.0, le=LEVERAGE_MAX)  # Bybit max leverage
+    direction: str = Field(default="both", description="Trading direction: 'long', 'short', or 'both'")
     stop_loss: float | None = None
     take_profit: float | None = None
+    market_type: str = Field(default="linear", description="Market type: 'linear' (futures) or 'spot'")
     save_to_db: bool = Field(default=True, description="Save backtest result to database")
 
 

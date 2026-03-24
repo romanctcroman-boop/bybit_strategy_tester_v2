@@ -9,21 +9,21 @@
  */
 
 // Base component
-export { Component } from "./Component.js";
+export { Component } from './Component.js';
 
 // UI Components
-export { Modal, confirm, alert } from "./Modal.js";
-export { Toast, toast } from "./Toast.js";
-export { DataTable } from "./DataTable.js";
-export { Form } from "./Form.js";
-export { Card } from "./Card.js";
-export { Loader, showLoading, hideLoading, LoadingState } from "./Loader.js";
+export { Modal, confirm, alert } from './Modal.js';
+export { Toast, toast } from './Toast.js';
+export { DataTable } from './DataTable.js';
+export { Form } from './Form.js';
+export { Card } from './Card.js';
+export { Loader, showLoading, hideLoading, LoadingState } from './Loader.js';
 
 // Chart Components
-export { TradingViewEquityChart } from "./TradingViewEquityChart.js";
-export { MonteCarloChart } from "./MonteCarloChart.js";
-export { OptimizationHeatmap } from "./OptimizationHeatmap.js";
-export { ParameterSensitivityChart } from "./ParameterSensitivityChart.js";
+export { TradingViewEquityChart } from './TradingViewEquityChart.js';
+export { MonteCarloChart } from './MonteCarloChart.js';
+export { OptimizationHeatmap } from './OptimizationHeatmap.js';
+export { ParameterSensitivityChart } from './ParameterSensitivityChart.js';
 
 // Component factory for dynamic component creation
 export function createComponent(type, options = {}) {
@@ -36,7 +36,7 @@ export function createComponent(type, options = {}) {
     loader: Loader,
     monteCarlo: MonteCarloChart,
     heatmap: OptimizationHeatmap,
-    sensitivity: ParameterSensitivityChart,
+    sensitivity: ParameterSensitivityChart
   };
 
   const ComponentClass = componentMap[type.toLowerCase()];
@@ -49,15 +49,15 @@ export function createComponent(type, options = {}) {
 }
 
 // Import for named imports
-import { Modal } from "./Modal.js";
-import { Toast } from "./Toast.js";
-import { DataTable } from "./DataTable.js";
-import { Form } from "./Form.js";
-import { Card } from "./Card.js";
-import { Loader } from "./Loader.js";
-import { MonteCarloChart } from "./MonteCarloChart.js";
-import { OptimizationHeatmap } from "./OptimizationHeatmap.js";
-import { ParameterSensitivityChart } from "./ParameterSensitivityChart.js";
+import { Modal } from './Modal.js';
+import { Toast } from './Toast.js';
+import { DataTable } from './DataTable.js';
+import { Form } from './Form.js';
+import { Card } from './Card.js';
+import { Loader } from './Loader.js';
+import { MonteCarloChart } from './MonteCarloChart.js';
+import { OptimizationHeatmap } from './OptimizationHeatmap.js';
+import { ParameterSensitivityChart } from './ParameterSensitivityChart.js';
 
 // Default export with all components
 export default {
@@ -70,5 +70,5 @@ export default {
   MonteCarloChart,
   OptimizationHeatmap,
   ParameterSensitivityChart,
-  createComponent,
+  createComponent
 };

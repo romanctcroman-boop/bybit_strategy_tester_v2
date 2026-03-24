@@ -19,14 +19,14 @@ import {
   StateManager,
   createStore,
   getStore,
-  StateMiddleware,
-} from "./StateManager.js";
+  StateMiddleware
+} from './StateManager.js';
 
 // Event System
-import { EventBus, getEventBus, Events } from "./EventBus.js";
+import { EventBus, getEventBus, Events } from './EventBus.js';
 
 // Router
-import { Router, getRouter } from "./Router.js";
+import { Router, getRouter } from './Router.js';
 
 // Service Layer
 import {
@@ -38,19 +38,19 @@ import {
   SettingsService,
   NotificationService,
   getServices,
-  getService,
-} from "./ServiceLayer.js";
+  getService
+} from './ServiceLayer.js';
 
 // API Client (NEW - CSRF protection, centralized error handling)
-import { ApiClient, ApiError, NetworkError, api } from "./ApiClient.js";
+import { ApiClient, ApiError, NetworkError, api } from './ApiClient.js';
 
 // WebSocket Client (NEW - auto-reconnect, heartbeat)
 import {
   WebSocketClient,
   BybitWebSocketClient,
   WS_STATE,
-  WS_EVENTS,
-} from "./WebSocketClient.js";
+  WS_EVENTS
+} from './WebSocketClient.js';
 
 // Sanitizer (NEW - XSS protection)
 import {
@@ -59,8 +59,8 @@ import {
   sanitizeToText,
   escapeHtml,
   setInnerHTML,
-  createElementFromHTML,
-} from "./Sanitizer.js";
+  createElementFromHTML
+} from './Sanitizer.js';
 
 // Safe DOM Operations (NEW - XSS-safe DOM manipulation)
 import SafeDOM, {
@@ -74,8 +74,8 @@ import SafeDOM, {
   tableRow,
   buildTable,
   $,
-  $$,
-} from "./SafeDOM.js";
+  $$
+} from './SafeDOM.js';
 
 // Lazy Loading (Phase 3)
 import {
@@ -86,8 +86,8 @@ import {
   LoadState,
   getLazyLoader,
   getImageLoader,
-  lazy,
-} from "./LazyLoader.js";
+  lazy
+} from './LazyLoader.js';
 
 // Resource Hints (Phase 3)
 import {
@@ -96,8 +96,8 @@ import {
   HintType,
   ResourceType,
   getResourceHints,
-  initResourceHints,
-} from "./ResourceHints.js";
+  initResourceHints
+} from './ResourceHints.js';
 
 // Performance Monitoring (Phase 3)
 import {
@@ -107,8 +107,8 @@ import {
   Rating,
   getRating,
   getPerformanceMonitor,
-  initPerformanceMonitoring,
-} from "./PerformanceMonitor.js";
+  initPerformanceMonitoring
+} from './PerformanceMonitor.js';
 
 // Re-export all
 export {
@@ -187,7 +187,7 @@ export {
   Rating,
   getRating,
   getPerformanceMonitor,
-  initPerformanceMonitoring,
+  initPerformanceMonitoring
 };
 
 // Convenience function to initialize all core systems
@@ -200,7 +200,7 @@ let initialized = false;
  */
 export function initCore(options = {}) {
   if (initialized) {
-    console.warn("Core systems already initialized");
+    console.warn('Core systems already initialized');
     return getCoreInstances();
   }
 
@@ -208,14 +208,14 @@ export function initCore(options = {}) {
     routes = [],
     initialState = {},
     middleware = [],
-    debug = false,
+    debug = false
   } = options;
 
   // Create store
   const store = createStore(initialState, {
     devTools: debug,
     persist: true,
-    persistKey: "bybit-strategy-tester",
+    persistKey: 'bybit-strategy-tester'
   });
 
   // Add middleware
@@ -227,7 +227,7 @@ export function initCore(options = {}) {
   // Initialize router
   const router = getRouter();
   routes.forEach((route) =>
-    router.addRoute(route.path, route.component, route.options),
+    router.addRoute(route.path, route.component, route.options)
   );
 
   // Get event bus
@@ -238,8 +238,8 @@ export function initCore(options = {}) {
 
   // Connect systems
   router.onNavigate((path, route) => {
-    store.set("router.currentPath", path);
-    store.set("router.currentRoute", route?.path || null);
+    store.set('router.currentPath', path);
+    store.set('router.currentRoute', route?.path || null);
     bus.emit(Events.ROUTE_CHANGED, { path, route });
   });
 
@@ -257,11 +257,11 @@ export function getCoreInstances() {
     store: getStore(),
     bus: getEventBus(),
     router: getRouter(),
-    services: getServices(),
+    services: getServices()
   };
 }
 
 export default {
   initCore,
-  getCoreInstances,
+  getCoreInstances
 };

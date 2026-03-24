@@ -23,6 +23,7 @@ import pandas as pd
 from loguru import logger
 
 from backend.agents.prompts.response_parser import StrategyDefinition
+from backend.config.constants import COMMISSION_TV
 
 
 class BacktestBridge:
@@ -47,7 +48,7 @@ class BacktestBridge:
     """
 
     # Commission rate — CRITICAL: must match TradingView parity
-    COMMISSION_RATE = 0.0007
+    COMMISSION_RATE = COMMISSION_TV
 
     def __init__(self) -> None:
         self._engine = None

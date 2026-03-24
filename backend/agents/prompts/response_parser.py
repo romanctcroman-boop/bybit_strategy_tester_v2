@@ -78,9 +78,37 @@ class Filter(BaseModel):
 class ExitCondition(BaseModel):
     """Exit condition (take-profit or stop-loss)."""
 
-    type: str = Field(description="Exit type: fixed_pct, trailing, atr_based")
-    value: float = Field(description="Exit value (percentage or multiplier)")
+    type: str = Field(description="Exit type: fixed_pct, trailing, atr_based, multi_level")
+    value: float = Field(default=0.0, description="Exit value (percentage or multiplier)")
     description: str = Field(default="")
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def coerce_list_to_float(cls, v: object) -> float:
+        """LLMs sometimes return complex value formats — coerce all to float:
+        - None / missing → 0.0
+        - [1.8, 3.2, 5.5] multi-TP list → first element
+        - {"multiplier": 2.5, ...} dict → first numeric value found
+        """
+        if v is None:
+            return 0.0
+        if isinstance(v, list):
+            if v:
+                return float(v[0])
+            return 0.0
+        if isinstance(v, dict):
+            # Try common numeric keys, then fall back to first numeric value
+            for key in ("value", "multiplier", "percentage", "pct", "atr_multiplier"):
+                if key in v and v[key] is not None:
+                    try:
+                        return float(v[key])
+                    except (TypeError, ValueError):
+                        continue
+            for val in v.values():
+                if isinstance(val, (int, float)):
+                    return float(val)
+            return 0.0
+        return float(v)
 
 
 class ExitConditions(BaseModel):
@@ -289,15 +317,37 @@ class ResponseParser:
         Returns:
             StrategyDefinition or None if parsing failed
         """
+        strategy, _ = self.parse_strategy_with_errors(llm_response, agent_name)
+        return strategy
+
+    def parse_strategy_with_errors(
+        self,
+        llm_response: str,
+        agent_name: str = "unknown",
+    ) -> tuple[StrategyDefinition | None, list[str]]:
+        """
+        Parse LLM response, returning both the result and structured error details.
+
+        Unlike parse_strategy(), this method returns a list of specific error
+        messages that can be injected into RefinementNode feedback so the LLM
+        understands exactly what was wrong with its output.
+
+        Returns:
+            (StrategyDefinition | None, list[str]) — (strategy or None, error messages)
+        """
+        errors: list[str] = []
+
         if not llm_response or not llm_response.strip():
-            logger.warning("Empty LLM response, cannot parse")
-            return None
+            msg = "Empty LLM response — no JSON returned"
+            logger.warning(msg)
+            return None, [msg]
 
         # Step 1: Extract JSON from response
         json_str = self._extract_json(llm_response)
         if not json_str:
-            logger.warning("No JSON found in LLM response")
-            return None
+            msg = "No JSON object found in LLM response (expected {...} block)"
+            logger.warning(msg)
+            return None, [msg]
 
         # Step 2: Parse JSON
         try:
@@ -308,22 +358,56 @@ class ResponseParser:
             if fixed:
                 try:
                     data = json.loads(fixed)
-                except json.JSONDecodeError:
-                    logger.error("JSON fix failed, giving up")
-                    return None
+                except json.JSONDecodeError as e2:
+                    msg = f"JSON syntax error (unfixable): {e2}"
+                    logger.error(msg)
+                    return None, [msg]
             else:
-                return None
+                msg = f"JSON syntax error: {e}"
+                logger.error(msg)
+                return None, [msg]
 
         # Step 3: Normalize and build StrategyDefinition
         try:
             strategy = self._build_strategy(data, agent_name)
-            logger.info(
-                f"Parsed strategy '{strategy.strategy_name}' with {len(strategy.signals)} signals from {agent_name}"
-            )
-            return strategy
         except Exception as e:
+            # Extract field-specific messages from Pydantic ValidationError
+            field_errors = self._extract_pydantic_errors(e)
+            errors.extend(field_errors)
             logger.error(f"Failed to build StrategyDefinition: {e}")
-            return None
+            return None, errors
+
+        # Step 4: Run validation to collect parameter range issues
+        validation = self.validate_strategy(strategy)
+        for issue in validation.issues:
+            errors.append(f"[{issue.severity.upper()}] {issue.field}: {issue.message}")
+        errors.extend(validation.warnings)
+
+        if not validation.is_valid:
+            logger.warning(
+                f"Strategy '{strategy.strategy_name}' has {len(errors)} validation error(s)"
+            )
+            return None, errors
+
+        logger.info(
+            f"Parsed strategy '{strategy.strategy_name}' with {len(strategy.signals)} signals from {agent_name}"
+        )
+        return strategy, errors
+
+    def _extract_pydantic_errors(self, exc: Exception) -> list[str]:
+        """Extract structured field-level messages from a Pydantic ValidationError."""
+        try:
+            # pydantic v2 ValidationError has .errors() method
+            if hasattr(exc, "errors"):
+                messages = []
+                for err in exc.errors():
+                    loc = " → ".join(str(l) for l in err.get("loc", []))
+                    msg = err.get("msg", str(err))
+                    messages.append(f"Field '{loc}': {msg}")
+                return messages
+        except Exception:
+            pass
+        return [str(exc)]
 
     def validate_strategy(self, strategy: StrategyDefinition) -> ValidationResult:
         """

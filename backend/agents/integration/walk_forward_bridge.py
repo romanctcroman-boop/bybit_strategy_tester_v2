@@ -22,6 +22,7 @@ import pandas as pd
 from loguru import logger
 
 from backend.agents.prompts.response_parser import StrategyDefinition
+from backend.config.constants import COMMISSION_TV
 from backend.services.walk_forward import (
     WalkForwardOptimizer,
     WalkForwardResult,
@@ -51,7 +52,7 @@ class WalkForwardBridge:
     """
 
     # Commission rate — must match TradingView parity (0.07%)
-    COMMISSION_RATE = 0.0007
+    COMMISSION_RATE = COMMISSION_TV
 
     # Default param ranges when OptimizationHints lacks specific ranges
     DEFAULT_PARAM_RANGES: dict[str, dict[str, list[Any]]] = {

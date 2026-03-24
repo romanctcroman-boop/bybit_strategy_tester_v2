@@ -202,6 +202,17 @@ function normalizeVolumes(volumes) {
 
 // Calculate SMA for volume (like Bybit's "Объём SMA 9")
 // eslint-disable-next-line no-unused-vars
+/**
+ * Calculate Volume Simple Moving Average (Volume SMA)
+ * @param {Array<{time: number, value: number}>} volumes - Volume series data
+ * @param {number} [period=9] - SMA period (default: 9)
+ * @returns {Array<{time: number, value: number}>} Volume SMA values
+ * @description Volume SMA smooths volume data to identify volume trends
+ * - Volume > SMA: Above average volume (high interest)
+ * - Volume < SMA: Below average volume (low interest)
+ * - Used to confirm price breakouts and reversals
+ * @note Commonly used period: 9, 14, 20
+ */
 function calculateVolumeSMA(volumes, period = 9) {
     if (!volumes || volumes.length < period) return [];
 
@@ -2110,6 +2121,17 @@ function removeIndicator(indicator) {
 }
 
 // Technical indicator calculations
+
+/**
+ * Calculate Simple Moving Average (SMA)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} period - SMA period
+ * @returns {Array<{time: number, value: number}>} SMA values
+ * @description SMA is the arithmetic mean of closing prices over a specified period
+ * - Price > SMA: Bullish
+ * - Price < SMA: Bearish
+ * @see https://www.investopedia.com/terms/s/sma.asp
+ */
 function calculateSMA(data, period) {
     const result = [];
     for (let i = period - 1; i < data.length; i++) {
@@ -2122,6 +2144,17 @@ function calculateSMA(data, period) {
     return result;
 }
 
+/**
+ * Calculate Exponential Moving Average (EMA)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} period - EMA period
+ * @returns {Array<{time: number, value: number}>} EMA values
+ * @description EMA gives more weight to recent prices, making it more responsive than SMA
+ * - Multiplier: 2 / (period + 1)
+ * - Price > EMA: Bullish
+ * - Price < EMA: Bearish
+ * @see https://www.investopedia.com/terms/e/ema.asp
+ */
 function calculateEMA(data, period) {
     const result = [];
     const multiplier = 2 / (period + 1);
@@ -2138,6 +2171,20 @@ function calculateEMA(data, period) {
     return result;
 }
 
+/**
+ * Calculate Bollinger Bands
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} period - Bands period (default: 20)
+ * @param {number} stdDev - Standard deviations (default: 2)
+ * @returns {{upper: Array<{time: number, value: number}>, middle: Array<{time: number, value: number}>, lower: Array<{time: number, value: number}>}} Bollinger Bands
+ * @description Bollinger Bands measure volatility and potential overbought/oversold levels
+ * - Upper Band = SMA + (stdDev * standard deviation)
+ * - Middle Band = SMA
+ * - Lower Band = SMA - (stdDev * standard deviation)
+ * - Price touches upper band: Potential overbought
+ * - Price touches lower band: Potential oversold
+ * @see https://www.investopedia.com/terms/b/bollingerbands.asp
+ */
 function calculateBollingerBands(data, period, stdDev) {
     const upper = [];
     const middle = [];
@@ -3836,6 +3883,17 @@ function highlightHighVolumeBars() {
     safeSetData(volumeSeries, highlightedVolumes, 'volumeSeries(highlightHighVolumeBars)');
 }
 
+/**
+ * Calculate On-Balance Volume (OBV)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} candles - OHLCV data
+ * @param {Array<{time: number, value: number}>} volumes - Volume series data
+ * @returns {Array<{time: number, value: number}>} OBV cumulative values
+ * @description OBV measures buying and selling pressure by adding volume on up days and subtracting on down days
+ * - OBV rising: Buying pressure (bullish)
+ * - OBV falling: Selling pressure (bearish)
+ * - OBV diverging from price: Potential reversal signal
+ * @see https://www.investopedia.com/terms/o/onbalancevolume.asp
+ */
 function calculateOBV(candles, volumes) {
     const result = [];
     let obv = 0;
@@ -3865,6 +3923,17 @@ function calculateOBV(candles, volumes) {
     return result;
 }
 
+/**
+ * Calculate Volume Delta (Buy/Sell Pressure)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} candles - OHLCV data
+ * @param {Array<{time: number, value: number}>} volumes - Volume series data
+ * @returns {Array<{time: number, value: number}>} Volume delta values (positive = buying, negative = selling)
+ * @description Volume Delta estimates buying vs selling pressure by analyzing candle body position
+ * - Positive delta: More buying pressure (close > open)
+ * - Negative delta: More selling pressure (close < open)
+ * - Larger absolute value: Stronger pressure
+ * @note Uses body ratio approximation: delta = volume * (bodySize / range) * direction
+ */
 function calculateVolumeDelta(candles, volumes) {
     const result = [];
 
@@ -5195,6 +5264,18 @@ function selectTimeframe(tf) {
 // ADDITIONAL INDICATOR CALCULATIONS
 // =====================================================
 
+/**
+ * Calculate Stochastic Oscillator
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [kPeriod=14] - %K period (default: 14)
+ * @param {number} [dPeriod=3] - %D period (default: 3)
+ * @param {number} [smooth=3] - %K smoothing (default: 3)
+ * @returns {{k: Array<{time: number, value: number}>, d: Array<{time: number, value: number}>}} Stochastic values
+ * @description Stochastic Oscillator measures momentum
+ * - %K > 80: Overbought
+ * - %K < 20: Oversold
+ * - %K crossing %D: Signal
+ */
 function calculateStochastic(data, kPeriod = 14, dPeriod = 3, smooth = 3) {
     const result = { k: [], d: [] };
     const kValues = [];
@@ -5233,6 +5314,131 @@ function calculateStochastic(data, kPeriod = 14, dPeriod = 3, smooth = 3) {
     return result;
 }
 
+/**
+ * Calculate Average Directional Index (ADX)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=14] - ADX period (default: 14)
+ * @returns {{adx: Array<{time: number, value: number}>, plusDI: Array<{time: number, value: number}>, minusDI: Array<{time: number, value: number}>}} ADX result
+ * @description ADX measures trend strength (not direction)
+ * - ADX > 25: Strong trend
+ * - ADX < 20: Weak/no trend
+ * - +DI > -DI: Bullish trend
+ * - -DI > +DI: Bearish trend
+ * @see https://www.investopedia.com/terms/a/adx.asp
+ */
+function calculateADX(data, period = 14) {
+    const result = {
+        adx: [],
+        plusDI: [],
+        minusDI: []
+    };
+
+    const n = data.length;
+    if (n < period + 1) {
+        return result;
+    }
+
+    // True Range
+    const tr = new Array(n).fill(0);
+    tr[0] = data[0].high - data[0].low;
+    for (let i = 1; i < n; i++) {
+        const high = data[i].high;
+        const low = data[i].low;
+        const prevClose = data[i - 1].close;
+
+        tr[i] = Math.max(
+            high - low,
+            Math.abs(high - prevClose),
+            Math.abs(low - prevClose)
+        );
+    }
+
+    // Directional Movement
+    const plusDM = new Array(n).fill(0);
+    const minusDM = new Array(n).fill(0);
+
+    for (let i = 1; i < n; i++) {
+        const upMove = data[i].high - data[i - 1].high;
+        const downMove = data[i - 1].low - data[i].low;
+
+        if (upMove > downMove && upMove > 0) {
+            plusDM[i] = upMove;
+        }
+        if (downMove > upMove && downMove > 0) {
+            minusDM[i] = downMove;
+        }
+    }
+
+    // Smoothed averages (Wilder's smoothing)
+    const atr = new Array(n).fill(0);
+    const smoothPlusDM = new Array(n).fill(0);
+    const smoothMinusDM = new Array(n).fill(0);
+
+    // Initial sum
+    for (let i = 1; i <= period; i++) {
+        atr[period] += tr[i];
+        smoothPlusDM[period] += plusDM[i];
+        smoothMinusDM[period] += minusDM[i];
+    }
+
+    // Wilder's smoothing
+    for (let i = period + 1; i < n; i++) {
+        atr[i] = atr[i - 1] - (atr[i - 1] / period) + tr[i];
+        smoothPlusDM[i] = smoothPlusDM[i - 1] - (smoothPlusDM[i - 1] / period) + plusDM[i];
+        smoothMinusDM[i] = smoothMinusDM[i - 1] - (smoothMinusDM[i - 1] / period) + minusDM[i];
+    }
+
+    // +DI and -DI
+    const plusDI = new Array(n).fill(0);
+    const minusDI = new Array(n).fill(0);
+
+    for (let i = period; i < n; i++) {
+        if (atr[i] !== 0) {
+            plusDI[i] = 100 * smoothPlusDM[i] / atr[i];
+            minusDI[i] = 100 * smoothMinusDM[i] / atr[i];
+        }
+    }
+
+    // DX and ADX
+    const dx = new Array(n).fill(0);
+    for (let i = period; i < n; i++) {
+        const diSum = plusDI[i] + minusDI[i];
+        if (diSum !== 0) {
+            dx[i] = 100 * Math.abs(plusDI[i] - minusDI[i]) / diSum;
+        }
+    }
+
+    // Smooth DX to get ADX
+    let adxSum = 0;
+    for (let i = period; i < 2 * period; i++) {
+        adxSum += dx[i];
+    }
+    const firstADX = adxSum / period;
+    result.adx.push({ time: data[2 * period - 1].time, value: firstADX });
+    result.plusDI.push({ time: data[period].time, value: plusDI[period] });
+    result.minusDI.push({ time: data[period].time, value: minusDI[period] });
+
+    let currentADX = firstADX;
+    for (let i = 2 * period; i < n; i++) {
+        currentADX = (currentADX * (period - 1) + dx[i]) / period;
+        result.adx.push({ time: data[i].time, value: currentADX });
+        result.plusDI.push({ time: data[i].time, value: plusDI[i] });
+        result.minusDI.push({ time: data[i].time, value: minusDI[i] });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Average True Range (ATR)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=14] - ATR period (default: 14)
+ * @returns {Array<{time: number, value: number}>} ATR values
+ * @description ATR measures market volatility using Wilder's smoothing
+ * - Higher ATR = Higher volatility
+ * - Lower ATR = Lower volatility
+ * @see https://www.investopedia.com/terms/a/atr.asp
+ */
 function calculateATR(data, period = 14) {
     const result = [];
     const trueRanges = [];
@@ -5250,7 +5456,7 @@ function calculateATR(data, period = 14) {
         trueRanges.push({ time: data[i].time, value: tr });
     }
 
-    // EMA of TR
+    // EMA of TR (Wilder's smoothing)
     if (trueRanges.length >= period) {
         let atr = trueRanges.slice(0, period).reduce((sum, tr) => sum + tr.value, 0) / period;
         result.push({ time: trueRanges[period - 1].time, value: atr });
@@ -5264,12 +5470,23 @@ function calculateATR(data, period = 14) {
     return result;
 }
 
+/**
+ * Calculate Relative Strength Index (RSI)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=14] - RSI period (default: 14)
+ * @returns {Array<{time: number, value: number}>} RSI values (0-100)
+ * @description RSI measures momentum using Wilder's smoothing
+ * - RSI > 70: Overbought
+ * - RSI < 30: Oversold
+ * - RSI = 50: Neutral
+ * @see https://www.investopedia.com/terms/r/rsi.asp
+ */
 function calculateRSI(data, period = 14) {
     const result = [];
     let gains = 0;
     let losses = 0;
 
-    // First RSI calculation
+    // First RSI calculation (initial average)
     for (let i = 1; i <= period && i < data.length; i++) {
         const change = data[i].close - data[i - 1].close;
         if (change > 0) gains += change;
@@ -5284,6 +5501,7 @@ function calculateRSI(data, period = 14) {
         const rsi = 100 - (100 / (1 + rs));
         result.push({ time: data[period].time, value: rsi });
 
+        // Wilder's smoothing for remaining values
         for (let i = period + 1; i < data.length; i++) {
             const change = data[i].close - data[i - 1].close;
             const gain = change > 0 ? change : 0;
@@ -5301,6 +5519,19 @@ function calculateRSI(data, period = 14) {
     return result;
 }
 
+/**
+ * Calculate Moving Average Convergence Divergence (MACD)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [fastPeriod=12] - Fast EMA period (default: 12)
+ * @param {number} [slowPeriod=26] - Slow EMA period (default: 26)
+ * @param {number} [signalPeriod=9] - Signal line period (default: 9)
+ * @returns {{macd: Array<{time: number, value: number}>, signal: Array<{time: number, value: number}>, histogram: Array<{time: number, value: number, color: string}>}} MACD result
+ * @description MACD shows trend direction and momentum
+ * - MACD > 0: Bullish momentum
+ * - MACD < 0: Bearish momentum
+ * - MACD crossing Signal: Trading signal
+ * @see https://www.investopedia.com/terms/m/macd.asp
+ */
 function calculateMACD(data, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
     const fastEMA = calculateEMA(data, fastPeriod);
     const slowEMA = calculateEMA(data, slowPeriod);
@@ -5347,7 +5578,17 @@ function calculateMACD(data, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9)
     return { macd: macdLine, signal: signalLine, histogram };
 }
 
-// VWAP Indicator calculation - resets at start of each trading day
+/**
+ * Calculate Volume-Weighted Average Price (VWAP) - Daily Reset
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @returns {Array<{time: number, value: number}>} VWAP values
+ * @description VWAP is the average price weighted by volume, resetting at the start of each trading day
+ * - Price > VWAP: Bullish (trading above average)
+ * - Price < VWAP: Bearish (trading below average)
+ * - Used by institutions as benchmark for execution quality
+ * @note Resets cumulativeTPV and cumulativeVolume at midnight (new trading day)
+ * @see https://www.investopedia.com/terms/v/vwap.asp
+ */
 function calculateVWAPIndicator(data) {
     const result = [];
     let cumulativeTPV = 0;
@@ -5383,10 +5624,17 @@ function calculateVWAPIndicator(data) {
     return result;
 }
 
-// Backward-compatible wrapper used by some UI update paths.
-// The main VWAP implementation in this file is calculateVWAPIndicator(data).
-// Some code paths call calculateVWAP(candles, volumes); keep that working by
-// computing proper VWAP using the provided volumes array.
+/**
+ * Calculate Volume-Weighted Average Price (VWAP) with External Volume Series
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} candles - OHLCV data
+ * @param {Array<{time: number, value: number}>} volumes - External volume series (optional, overrides candle.volume)
+ * @returns {Array<{time: number, value: number}>} VWAP values
+ * @description Backward-compatible VWAP implementation that accepts separate volume series
+ * - Uses provided volumes array if available
+ * - Falls back to candle.volume if volumes not provided
+ * - Skips candles with invalid or zero volume
+ * @note Prefer calculateVWAPIndicator() for single-data-source scenarios
+ */
 function calculateVWAP(candles, volumes) {
     if (!Array.isArray(candles) || candles.length === 0) return [];
 
@@ -5449,7 +5697,31 @@ function calculateVWAP(candles, volumes) {
     return result;
 }
 
-// Ichimoku Cloud calculation - Standard Parameters (9, 26, 52)
+/**
+ * Calculate Ichimoku Cloud (Ichimoku Kinko Hyo)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @returns {{
+ *   tenkan: Array<{time: number, value: number}>,
+ *   kijun: Array<{time: number, value: number}>,
+ *   senkouA: Array<{time: number, value: number}>,
+ *   senkouB: Array<{time: number, value: number}>,
+ *   chikou: Array<{time: number, value: number}>
+ * }} Ichimoku Cloud components
+ * @description Ichimoku Cloud is a comprehensive momentum and trend indicator
+ * - Tenkan-sen (Conversion Line): (9-period high + 9-period low) / 2
+ * - Kijun-sen (Base Line): (26-period high + 26-period low) / 2
+ * - Senkou Span A (Leading Span A): (Tenkan + Kijun) / 2, plotted 26 periods ahead
+ * - Senkou Span B (Leading Span B): (52-period high + 52-period low) / 2, plotted 26 periods ahead
+ * - Chikou Span (Lagging Span): Current close plotted 26 periods back
+ * - Cloud (Kumo): Area between Senkou A and Senkou B
+ * @interpretation
+ * - Price above cloud: Bullish trend
+ * - Price below cloud: Bearish trend
+ * - Price in cloud: Transition/consolidation
+ * - Tenkan crossing Kijun: Trading signal (TK cross)
+ * @note Standard parameters: (9, 26, 52) — optimized for Japanese trading calendar
+ * @see https://www.investopedia.com/terms/i/ichimoku-cloud.asp
+ */
 function calculateIchimoku(data) {
     const tenkanPeriod = 9;   // Conversion Line
     const kijunPeriod = 26;   // Base Line
@@ -5516,7 +5788,126 @@ function calculateIchimoku(data) {
     return { tenkan, kijun, senkouA, senkouB, chikou };
 }
 
-// Pivot Points calculation - Classic Floor Trader Pivots
+/**
+ * Calculate Commodity Channel Index (CCI)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=20] - CCI period (default: 20)
+ * @param {number} [constant=0.015] - Scaling constant (default: 0.015)
+ * @returns {Array<{time: number, value: number}>} CCI values
+ * @description CCI measures price deviation from statistical mean
+ * - CCI > 100: Overbought
+ * - CCI < -100: Oversold
+ * - CCI crossing +100: Bullish signal
+ * - CCI crossing -100: Bearish signal
+ * @note Typical Price = (H + L + C) / 3
+ * @see https://www.investopedia.com/terms/c/commoditychannelindex.asp
+ */
+function calculateCCI(data, period = 20, constant = 0.015) {
+    const result = [];
+    const n = data.length;
+
+    if (n < period) {
+        return result;
+    }
+
+    for (let i = period - 1; i < n; i++) {
+        // Calculate Typical Price for each bar in the window
+        const typicalPrices = [];
+        for (let j = 0; j < period; j++) {
+            const tp = (data[i - j].high + data[i - j].low + data[i - j].close) / 3;
+            typicalPrices.push(tp);
+        }
+
+        // SMA of Typical Price
+        const smaTp = typicalPrices.reduce((sum, tp) => sum + tp, 0) / period;
+
+        // Mean Deviation
+        let meanDev = 0;
+        for (let j = 0; j < period; j++) {
+            meanDev += Math.abs(typicalPrices[j] - smaTp);
+        }
+        meanDev /= period;
+
+        // Current Typical Price
+        const currentTp = (data[i].high + data[i].low + data[i].close) / 3;
+
+        // CCI formula
+        let cci = 0;
+        if (meanDev !== 0) {
+            cci = (currentTp - smaTp) / (constant * meanDev);
+        }
+
+        result.push({ time: data[i].time, value: cci });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Keltner Channels
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=20] - EMA period (default: 20)
+ * @param {number} [atrPeriod=10] - ATR period (default: 10)
+ * @param {number} [multiplier=2] - ATR multiplier (default: 2)
+ * @returns {{middle: Array<{time: number, value: number}>, upper: Array<{time: number, value: number}>, lower: Array<{time: number, value: number}>}} Keltner Channels
+ * @description Keltner Channels measure volatility and trend direction
+ * - Middle Band: EMA of close prices
+ * - Upper Band: EMA + (multiplier * ATR)
+ * - Lower Band: EMA - (multiplier * ATR)
+ * @interpretation
+ * - Price above upper band: Overbought, potential reversal
+ * - Price below lower band: Oversold, potential reversal
+ * - Price in middle: Trend continuation
+ * @note Alternative to Bollinger Bands, uses ATR instead of standard deviation
+ * @see https://www.investopedia.com/terms/k/keltnerchannel.asp
+ */
+function calculateKeltner(data, period = 20, atrPeriod = 10, multiplier = 2) {
+    const result = {
+        middle: [],
+        upper: [],
+        lower: []
+    };
+
+    const n = data.length;
+    if (n < period + atrPeriod - 1) {
+        return result;
+    }
+
+    // Calculate EMA for middle band
+    const ema = [];
+    let emaValue = data[0].close;
+    const emaMultiplier = 2 / (period + 1);
+
+    for (let i = 0; i < n; i++) {
+        if (i === 0) {
+            ema.push({ time: data[i].time, value: emaValue });
+        } else {
+            emaValue = (data[i].close - emaValue) * emaMultiplier + emaValue;
+            ema.push({ time: data[i].time, value: emaValue });
+        }
+    }
+
+    // Calculate ATR
+    const atr = calculateATR(data, atrPeriod);
+
+    // Build channels
+    for (let i = period - 1; i < n; i++) {
+        const middleValue = ema[i].value;
+        const atrValue = atr[i - (period - 1)]?.value || 0;
+
+        result.middle.push({ time: data[i].time, value: middleValue });
+        result.upper.push({ time: data[i].time, value: middleValue + (multiplier * atrValue) });
+        result.lower.push({ time: data[i].time, value: middleValue - (multiplier * atrValue) });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Pivot Points (Classic Floor Trader Pivots)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @returns {{pivot: Array<{time: number, value: number}>, r1: Array<{time: number, value: number}>, r2: Array<{time: number, value: number}>, r3: Array<{time: number, value: number}>, s1: Array<{time: number, value: number}>, s2: Array<{time: number, value: number}>, s3: Array<{time: number, value: number}>} | null} Pivot Point levels (or null if insufficient data)
+ */
 function calculatePivotPoints(data) {
     if (data.length < 50) return null;
 
@@ -5575,7 +5966,23 @@ function calculatePivotPoints(data) {
     return result;
 }
 
-// SuperTrend calculation - Standard (10, 3)
+/**
+ * Calculate SuperTrend Indicator
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=10] - ATR period (default: 10)
+ * @param {number} [multiplier=3] - ATR multiplier (default: 3)
+ * @returns {Array<{time: number, value: number, trend: number}>} SuperTrend values with trend direction
+ * @description SuperTrend is a trend-following indicator based on ATR
+ * - Upper Band: HL2 + (multiplier * ATR)
+ * - Lower Band: HL2 - (multiplier * ATR)
+ * - Trend: 1 (bullish, price above lower band), -1 (bearish, price below upper band)
+ * @interpretation
+ * - Price above SuperTrend line: Bullish trend (buy signal)
+ * - Price below SuperTrend line: Bearish trend (sell signal)
+ * - Trend flip: Potential entry/exit point
+ * @note Uses RMA (Wilder's smoothing) for ATR calculation
+ * @see https://www.investopedia.com/terms/s/supertrend.asp
+ */
 function calculateSuperTrend(data, period = 10, multiplier = 3) {
     const result = [];
     if (data.length < period) return result;
@@ -5662,6 +6069,278 @@ function calculateSuperTrend(data, period = 10, multiplier = 3) {
         prevClose = data[i].close;
         prevSuperTrend = superTrend;
     }
+
+    return result;
+}
+
+/**
+ * Calculate Donchian Channels
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [period=20] - Lookback period (default: 20)
+ * @returns {{middle: Array<{time: number, value: number}>, upper: Array<{time: number, value: number}>, lower: Array<{time: number, value: number}>}} Donchian Channels
+ * @description Donchian Channels measure breakouts and volatility
+ * - Upper Band: Highest high over N periods
+ * - Lower Band: Lowest low over N periods
+ * - Middle Band: (Upper + Lower) / 2
+ * @interpretation
+ * - Price breaks upper band: Bullish breakout (buy signal)
+ * - Price breaks lower band: Bearish breakout (sell signal)
+ * - Narrow channel: Low volatility, potential breakout soon
+ * @note Classic indicator used in Turtle Trading strategy
+ * @see https://www.investopedia.com/terms/d/donchianchannels.asp
+ */
+function calculateDonchian(data, period = 20) {
+    const result = {
+        middle: [],
+        upper: [],
+        lower: []
+    };
+
+    const n = data.length;
+    if (n < period) {
+        return result;
+    }
+
+    for (let i = period - 1; i < n; i++) {
+        let highestHigh = -Infinity;
+        let lowestLow = Infinity;
+
+        // Find highest high and lowest low over the period
+        for (let j = 0; j < period; j++) {
+            highestHigh = Math.max(highestHigh, data[i - j].high);
+            lowestLow = Math.min(lowestLow, data[i - j].low);
+        }
+
+        const middle = (highestHigh + lowestLow) / 2;
+
+        result.upper.push({ time: data[i].time, value: highestHigh });
+        result.lower.push({ time: data[i].time, value: lowestLow });
+        result.middle.push({ time: data[i].time, value: middle });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Parabolic SAR (Stop and Reverse)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [afStart=0.02] - Initial acceleration factor (default: 0.02)
+ * @param {number} [afIncrement=0.02] - AF increment on new extreme (default: 0.02)
+ * @param {number} [afMax=0.2] - Maximum acceleration factor (default: 0.2)
+ * @returns {Array<{time: number, value: number, trend: number}>} Parabolic SAR values with trend direction
+ * @description Parabolic SAR provides potential entry/exit points and trailing stop levels
+ * - SAR formula: SAR = SAR_prev + AF * (EP - SAR_prev)
+ * - EP (Extreme Point): Highest high in uptrend, lowest low in downtrend
+ * - AF (Acceleration Factor): Increases from afStart to afMax on new EP
+ * @interpretation
+ * - Price above SAR: Bullish trend (buy signal), SAR acts as support
+ * - Price below SAR: Bearish trend (sell signal), SAR acts as resistance
+ * - Trend flip: SAR crosses price, potential reversal
+ * @note Works best in trending markets, whipsaws in ranging markets
+ * @see https://www.investopedia.com/terms/p/parabolicindicator.asp
+ */
+function calculateParabolicSAR(data, afStart = 0.02, afIncrement = 0.02, afMax = 0.2) {
+    const result = [];
+    const n = data.length;
+
+    if (n < 2) {
+        return result;
+    }
+
+    // Initialize
+    let trend = 1; // 1 = uptrend, -1 = downtrend
+    let sar = data[0].low;
+    let ep = data[0].high; // Extreme Point
+    let af = afStart;
+
+    // First SAR value
+    result.push({ time: data[0].time, value: sar, trend: trend });
+
+    for (let i = 1; i < n; i++) {
+        // Calculate SAR
+        sar = sar + af * (ep - sar);
+
+        if (trend === 1) { // Uptrend
+            // SAR cannot be above prior two lows
+            sar = Math.min(sar, data[i - 1].low);
+            if (i >= 2) {
+                sar = Math.min(sar, data[i - 2].low);
+            }
+
+            // Check for reversal
+            if (data[i].low < sar) {
+                trend = -1;
+                sar = ep;
+                ep = data[i].low;
+                af = afStart;
+            } else {
+                if (data[i].high > ep) {
+                    ep = data[i].high;
+                    af = Math.min(af + afIncrement, afMax);
+                }
+            }
+        } else { // Downtrend
+            // SAR cannot be below prior two highs
+            sar = Math.max(sar, data[i - 1].high);
+            if (i >= 2) {
+                sar = Math.max(sar, data[i - 2].high);
+            }
+
+            // Check for reversal
+            if (data[i].high > sar) {
+                trend = 1;
+                sar = ep;
+                ep = data[i].high;
+                af = afStart;
+            } else {
+                if (data[i].low < ep) {
+                    ep = data[i].low;
+                    af = Math.min(af + afIncrement, afMax);
+                }
+            }
+        }
+
+        result.push({
+            time: data[i].time,
+            value: sar,
+            trend: trend
+        });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Accumulation/Distribution Line (AD Line)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} candles - OHLCV data
+ * @param {Array<{time: number, value: number}>} volumes - Volume series data
+ * @returns {Array<{time: number, value: number}>} AD Line cumulative values
+ * @description AD Line measures buying and selling pressure using volume and price position
+ * - Money Flow Multiplier (MFM): ((C - L) - (H - C)) / (H - L)
+ * - Money Flow Volume (MFV): MFM * Volume
+ * - AD Line: Cumulative sum of MFV
+ * @interpretation
+ * - AD Line rising: Accumulation (buying pressure)
+ * - AD Line falling: Distribution (selling pressure)
+ * - AD Line diverging from price: Potential reversal signal
+ * @note Similar to OBV but considers where price closes within the range
+ * @see https://www.investopedia.com/terms/a/adl.asp
+ */
+function calculateADLine(candles, volumes) {
+    const result = [];
+    let ad = 0;
+
+    for (let i = 0; i < candles.length; i++) {
+        const volume = volumes[i]?.value || 0;
+        const high = candles[i].high;
+        const low = candles[i].low;
+        const close = candles[i].close;
+
+        const hlRange = high - low;
+
+        if (hlRange > 0) {
+            // Money Flow Multiplier
+            const mfm = ((close - low) - (high - close)) / hlRange;
+            // Money Flow Volume
+            const mfv = mfm * volume;
+            ad += mfv;
+        }
+
+        result.push({
+            time: candles[i].time,
+            value: ad
+        });
+    }
+
+    return result;
+}
+
+/**
+ * Calculate Stochastic RSI (StochRSI)
+ * @param {Array<{time: number, open: number, high: number, low: number, close: number, volume: number}>} data - OHLCV data
+ * @param {number} [rsiPeriod=14] - RSI calculation period (default: 14)
+ * @param {number} [stochPeriod=14] - Stochastic lookback period (default: 14)
+ * @param {number} [kPeriod=3] - %K smoothing period (default: 3)
+ * @param {number} [dPeriod=3] - %D smoothing period (default: 3)
+ * @returns {{stochRsi: Array<{time: number, value: number}>, k: Array<{time: number, value: number}>, d: Array<{time: number, value: number}>}} StochRSI values
+ * @description Stochastic RSI applies stochastic formula to RSI values
+ * - More sensitive than standard RSI
+ * - StochRSI = (RSI - minRSI) / (maxRSI - minRSI) * 100
+ * - %K: Smoothed StochRSI
+ * - %D: SMA of %K
+ * @interpretation
+ * - StochRSI > 80: Overbought
+ * - StochRSI < 20: Oversold
+ * - %K crossing %D: Trading signal
+ * @note Generates more signals than standard RSI
+ * @see https://www.investopedia.com/terms/s/stochasticrsi.asp
+ */
+function calculateStochRSI(data, rsiPeriod = 14, stochPeriod = 14, kPeriod = 3, dPeriod = 3) {
+    const result = {
+        stochRsi: [],
+        k: [],
+        d: []
+    };
+
+    const n = data.length;
+    if (n < rsiPeriod + stochPeriod) {
+        return result;
+    }
+
+    // First calculate RSI
+    const rsi = calculateRSI(data, rsiPeriod);
+
+    // Apply Stochastic formula to RSI values
+    const rawStochRsi = [];
+    for (let i = rsiPeriod + stochPeriod - 2; i < n; i++) {
+        // Get RSI window
+        let minRsi = Infinity;
+        let maxRsi = -Infinity;
+        const currentRsi = rsi[i - (rsiPeriod - 1)]?.value;
+
+        if (currentRsi === undefined || isNaN(currentRsi)) {
+            rawStochRsi.push({ time: data[i].time, value: 50 });
+            continue;
+        }
+
+        // Find min/max RSI over stochPeriod
+        for (let j = 0; j < stochPeriod; j++) {
+            const rsiValue = rsi[i - j - (rsiPeriod - 1)]?.value;
+            if (rsiValue !== undefined && !isNaN(rsiValue)) {
+                minRsi = Math.min(minRsi, rsiValue);
+                maxRsi = Math.max(maxRsi, rsiValue);
+            }
+        }
+
+        // Calculate StochRSI
+        let stochRsi = 50;
+        if (maxRsi - minRsi > 1e-10) {
+            stochRsi = (currentRsi - minRsi) / (maxRsi - minRsi) * 100;
+        }
+
+        rawStochRsi.push({ time: data[i].time, value: stochRsi });
+    }
+
+    // Smooth %K with SMA
+    for (let i = kPeriod - 1; i < rawStochRsi.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < kPeriod; j++) {
+            sum += rawStochRsi[i - j].value;
+        }
+        result.k.push({ time: rawStochRsi[i].time, value: sum / kPeriod });
+    }
+
+    // Calculate %D as SMA of %K
+    for (let i = dPeriod - 1; i < result.k.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < dPeriod; j++) {
+            sum += result.k[i - j].value;
+        }
+        result.d.push({ time: result.k[i].time, value: sum / dPeriod });
+    }
+
+    // Store raw StochRSI
+    result.stochRsi = rawStochRsi;
 
     return result;
 }

@@ -29,7 +29,6 @@ function buildStrategyBuilderStore() {
         // Selection
         'strategyBuilder.selection.selectedBlockId': null,
         'strategyBuilder.selection.selectedBlockIds': [],
-        'strategyBuilder.selection.selectedTemplate': null,
         // Viewport
         'strategyBuilder.viewport.zoom': 1,
         'strategyBuilder.viewport.isDragging': false,
@@ -76,7 +75,6 @@ function buildShimSync(store) {
         connections: [],
         selectedBlockId: null,
         selectedBlockIds: [],
-        selectedTemplate: null,
         zoom: 1,
         isDragging: false,
         dragOffset: { x: 0, y: 0 },
@@ -97,7 +95,6 @@ function buildShimSync(store) {
     store.subscribe('strategyBuilder.graph.connections', (v) => { shim.connections.length = 0; if (Array.isArray(v)) shim.connections.push(...v); });
     store.subscribe('strategyBuilder.selection.selectedBlockId', (v) => { shim.selectedBlockId = v ?? null; });
     store.subscribe('strategyBuilder.selection.selectedBlockIds', (v) => { shim.selectedBlockIds = Array.isArray(v) ? v : []; });
-    store.subscribe('strategyBuilder.selection.selectedTemplate', (v) => { shim.selectedTemplate = v ?? null; });
     store.subscribe('strategyBuilder.viewport.zoom', (v) => { shim.zoom = v ?? 1; });
     store.subscribe('strategyBuilder.viewport.isDragging', (v) => { shim.isDragging = v ?? false; });
     store.subscribe('strategyBuilder.viewport.dragOffset', (v) => { if (v) { shim.dragOffset.x = v.x; shim.dragOffset.y = v.y; } });
@@ -140,7 +137,6 @@ describe('StrategyBuilder StateManager Integration (P0-3)', () => {
         it('should initialize selection paths with null/empty defaults', () => {
             expect(store.get('strategyBuilder.selection.selectedBlockId')).toBeNull();
             expect(store.get('strategyBuilder.selection.selectedBlockIds')).toEqual([]);
-            expect(store.get('strategyBuilder.selection.selectedTemplate')).toBeNull();
         });
 
         it('should initialize viewport paths with correct defaults', () => {

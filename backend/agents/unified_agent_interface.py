@@ -468,6 +468,24 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                 error=f"No active {request.agent_type.value} API keys",
             )
 
+        # Cost circuit breaker — hard spending limit check before ANY network call
+        try:
+            from backend.agents.cost_circuit_breaker import CostLimitExceededError, get_cost_circuit_breaker
+
+            get_cost_circuit_breaker().check_before_call(
+                agent=request.agent_type.value,
+                estimated_tokens=request.context.get("estimated_tokens", 2000),
+            )
+        except CostLimitExceededError as budget_err:
+            return AgentResponse(
+                success=False,
+                content="",
+                channel=AgentChannel.DIRECT_API,
+                error=f"Cost budget exceeded: {budget_err}",
+            )
+        except Exception as _cb_err:
+            logger.debug(f"Cost circuit breaker check failed (non-fatal): {_cb_err}")
+
         # Determine timeout based on task complexity
         is_complex_task = (
             request.context.get("use_file_access", False)
@@ -477,6 +495,39 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         timeout = 600.0 if is_complex_task else 120.0  # 10 min for complex, 2 min for standard
 
         logger.info(f"⏱️ Using timeout: {timeout}s ({'complex' if is_complex_task else 'standard'} task)")
+
+        # LLM response cache — check before network round-trip (Perplexity only)
+        _llm_cache = None
+        _llm_cache_key: str | None = None
+        _is_cacheable = request.agent_type == AgentType.PERPLEXITY and not request.context.get("no_cache")
+        if _is_cacheable:
+            try:
+                from backend.agents.llm_response_cache import get_llm_response_cache
+
+                _llm_cache = get_llm_response_cache()
+                _preview_payload = request.to_direct_api_format(include_tools=False)
+                _llm_cache_key = _llm_cache.key(
+                    _preview_payload["messages"],
+                    _preview_payload.get("model", "unknown"),
+                    request.agent_type.value,
+                )
+                _cached = _llm_cache.get(_llm_cache_key)
+                if _cached is not None:
+                    cached_content = _cached.get("content", "")
+                    if cached_content:
+                        latency = (time.time() - start_time) * 1000
+                        logger.info(f"🗃️ LLM cache HIT ({request.agent_type.value}, {latency:.0f}ms saved)")
+                        return AgentResponse(
+                            success=True,
+                            content=cached_content,
+                            channel=AgentChannel.DIRECT_API,
+                            api_key_index=0,
+                            latency_ms=latency,
+                            citations=_cached.get("citations"),
+                        )
+            except Exception as _cache_err:
+                logger.debug(f"LLM cache lookup failed (non-fatal): {_cache_err}")
+                _llm_cache = None
 
         # Retry configuration
         MAX_RETRIES = 3
@@ -653,7 +704,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                     else:
                         logger.warning("⚠️ Metrics disabled - skipping recording")
 
-                    # Record cost for dashboard tracking
+                    # Record cost for dashboard tracking + circuit breaker
                     if token_usage and token_usage.cost_usd:
                         try:
                             from backend.agents.cost_tracker import record_api_cost
@@ -671,6 +722,28 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                             )
                         except Exception as e:
                             logger.debug(f"Cost tracking failed: {e}")
+                        try:
+                            from backend.agents.cost_circuit_breaker import get_cost_circuit_breaker
+
+                            get_cost_circuit_breaker().record_actual(
+                                agent=request.agent_type.value,
+                                cost_usd=token_usage.cost_usd,
+                            )
+                        except Exception as e:
+                            logger.debug(f"Cost circuit breaker record failed: {e}")
+
+                    citations = self._extract_citations(data, request.agent_type)
+
+                    # Populate LLM response cache for Perplexity calls
+                    if _is_cacheable and _llm_cache and _llm_cache_key and content:
+                        try:
+                            _llm_cache.set(
+                                _llm_cache_key,
+                                {"content": content, "citations": citations},
+                                request.agent_type.value,
+                            )
+                        except Exception as _set_err:
+                            logger.debug(f"LLM cache set failed (non-fatal): {_set_err}")
 
                     return AgentResponse(
                         success=True,
@@ -680,7 +753,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                         latency_ms=latency,
                         reasoning_content=reasoning_content,  # DeepSeek V3.2 Thinking Mode
                         tokens_used=token_usage,  # Token usage tracking
-                        citations=self._extract_citations(data, request.agent_type),  # Perplexity sources
+                        citations=citations,  # Perplexity sources
                     )
 
                 # Max iterations reached

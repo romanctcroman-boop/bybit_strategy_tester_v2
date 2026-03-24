@@ -77,6 +77,7 @@ function setup({ blocks = [], connections = [] } = {}) {
         getStrategyIdFromURL: vi.fn().mockReturnValue(null),
         showNotification: vi.fn(),
         renderBlocks: vi.fn(),
+        renderConnections: vi.fn(),
         normalizeAllConnections: vi.fn(),
         syncStrategyNameDisplay: vi.fn(),
         renderBlockProperties: vi.fn(),

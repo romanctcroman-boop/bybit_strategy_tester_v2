@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -197,11 +197,11 @@ class PromptsAlerting:
 
             if failure_rate > self.config.validation_failure_threshold:
                 alert = Alert(
-                    alert_id=f"val_fail_{datetime.utcnow().isoformat()}",
+                    alert_id=f"val_fail_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.VALIDATION_FAILURE,
                     severity=AlertSeverity.WARNING,
                     message=f"High validation failure rate: {failure_rate:.0%} (threshold: {self.config.validation_failure_threshold:.0%})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "total_prompts": total,
                         "failed_validations": failed,
@@ -228,11 +228,11 @@ class PromptsAlerting:
 
             if self.config.injection_attempt_alert and injection_attempts > 0:
                 alert = Alert(
-                    alert_id=f"inj_attempt_{datetime.utcnow().isoformat()}",
+                    alert_id=f"inj_attempt_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.INJECTION_ATTEMPT,
                     severity=AlertSeverity.CRITICAL,
                     message=f"🚨 {injection_attempts} prompt injection attempt(s) detected!",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "injection_attempts": injection_attempts,
                         "period_hours": 1,
@@ -257,11 +257,11 @@ class PromptsAlerting:
 
             if total_hourly > self.config.hourly_cost_threshold:
                 alert = Alert(
-                    alert_id=f"cost_hourly_{datetime.utcnow().isoformat()}",
+                    alert_id=f"cost_hourly_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.HIGH_COST,
                     severity=AlertSeverity.WARNING,
                     message=f"High hourly cost: ${total_hourly:.2f} (threshold: ${self.config.hourly_cost_threshold:.2f})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "hourly_cost": total_hourly,
                         "threshold": self.config.hourly_cost_threshold,
@@ -275,11 +275,11 @@ class PromptsAlerting:
 
             if total_daily > self.config.daily_cost_threshold:
                 alert = Alert(
-                    alert_id=f"cost_daily_{datetime.utcnow().isoformat()}",
+                    alert_id=f"cost_daily_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.HIGH_COST,
                     severity=AlertSeverity.ERROR,
                     message=f"High daily cost: ${total_daily:.2f} (threshold: ${self.config.daily_cost_threshold:.2f})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "daily_cost": total_daily,
                         "threshold": self.config.daily_cost_threshold,
@@ -292,11 +292,11 @@ class PromptsAlerting:
 
             if projected > self.config.monthly_cost_threshold:
                 alert = Alert(
-                    alert_id=f"cost_monthly_{datetime.utcnow().isoformat()}",
+                    alert_id=f"cost_monthly_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.HIGH_COST,
                     severity=AlertSeverity.WARNING,
                     message=f"High projected monthly cost: ${projected:.2f} (threshold: ${self.config.monthly_cost_threshold:.2f})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "projected_monthly_cost": projected,
                         "threshold": self.config.monthly_cost_threshold,
@@ -318,13 +318,18 @@ class PromptsAlerting:
             cache_stats = monitor.get_cache_stats()
             hit_rate = cache_stats.get("cache_hit_rate", 0)
 
+            # Skip alert if no cache activity yet — avoid false alarms on startup
+            total_ops = cache_stats.get("cache_hits", 0) + cache_stats.get("cache_misses", 0)
+            if total_ops == 0:
+                return []
+
             if hit_rate < self.config.min_cache_hit_rate:
                 alert = Alert(
-                    alert_id=f"cache_low_{datetime.utcnow().isoformat()}",
+                    alert_id=f"cache_low_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.LOW_CACHE_HIT,
                     severity=AlertSeverity.WARNING,
                     message=f"Low cache hit rate: {hit_rate:.0%} (minimum: {self.config.min_cache_hit_rate:.0%})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "cache_hit_rate": hit_rate,
                         "minimum": self.config.min_cache_hit_rate,
@@ -351,11 +356,11 @@ class PromptsAlerting:
             if success_rate < (1 - self.config.max_failure_rate):
                 failure_rate = 1 - success_rate
                 alert = Alert(
-                    alert_id=f"service_health_{datetime.utcnow().isoformat()}",
+                    alert_id=f"service_health_{datetime.now(UTC).isoformat()}",
                     alert_type=AlertType.SERVICE_DEGRADATION,
                     severity=AlertSeverity.ERROR,
                     message=f"High service failure rate: {failure_rate:.0%} (maximum: {self.config.max_failure_rate:.0%})",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     details={
                         "failure_rate": failure_rate,
                         "maximum": self.config.max_failure_rate,

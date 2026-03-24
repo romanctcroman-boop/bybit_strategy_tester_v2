@@ -120,6 +120,23 @@ document.addEventListener('DOMContentLoaded', function () {
     updateSpinesVisibility();
     setTimeout(updateSpinesVisibility, 100);
 
+    // Публичный API: обновить видимость spine (для вызова из внешних скриптов)
+    window.updateSpinesVisibility = updateSpinesVisibility;
+
+    // Публичный API: открыть конкретное окно по его id (для использования из других скриптов)
+    window.openFloatingWindow = function (windowId) {
+        const win = document.getElementById(windowId);
+        if (!win) return;
+        if (!win.classList.contains('floating-window-collapsed')) return; // уже открыто
+        closeOtherWindows(windowId);
+        win.classList.remove('floating-window-collapsed');
+        document.body.classList.add('floating-window-open');
+        updateSpinesVisibility();
+        document.dispatchEvent(new CustomEvent('floatingWindowToggle', {
+            detail: { windowId: windowId, isOpen: true }
+        }));
+    };
+
     // Вспомогательная функция для парсинга translateX
     function parseTranslateX(el) {
         const t = (el.style.transform || '').match(/translateX\((-?\d+(?:\.\d+)?)px\)/);

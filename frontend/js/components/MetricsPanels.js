@@ -229,7 +229,7 @@ export function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     setValue('dyn-cagr-short', metrics.cagr_short || 0, 'percent');
 
     // Return on Capital (total_return is stored as decimal fraction 0-1, convert to %)
-    setValue('dyn-return-capital', (metrics.total_return || 0) * 100, 'percent');
+    setValue('dyn-return-capital', metrics.total_return || 0, 'percent');
     setValue('dyn-return-capital-long', metrics.long_pnl_pct || 0, 'percent');
     setValue('dyn-return-capital-short', metrics.short_pnl_pct || 0, 'percent');
 

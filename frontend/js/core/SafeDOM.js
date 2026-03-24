@@ -14,8 +14,8 @@ import {
   sanitize,
   escapeHtml,
   setInnerHTML,
-  createElementFromHTML,
-} from "./Sanitizer.js";
+  createElementFromHTML
+} from './Sanitizer.js';
 
 // ============================================
 // SAFE DOM UTILITIES
@@ -28,7 +28,7 @@ import {
  */
 export function safeText(element, text) {
   if (element) {
-    element.textContent = String(text ?? "");
+    element.textContent = String(text ?? '');
   }
 }
 
@@ -53,23 +53,23 @@ export function createElement(tag, attrs = {}, children = null) {
 
   // Set attributes safely
   for (const [key, value] of Object.entries(attrs)) {
-    if (key === "className") {
+    if (key === 'className') {
       element.className = escapeHtml(String(value));
-    } else if (key === "style" && typeof value === "object") {
+    } else if (key === 'style' && typeof value === 'object') {
       Object.assign(element.style, value);
-    } else if (key.startsWith("on") && typeof value === "function") {
+    } else if (key.startsWith('on') && typeof value === 'function') {
       // Event handlers - attach safely
       const eventName = key.slice(2).toLowerCase();
       element.addEventListener(eventName, value);
-    } else if (key === "data" && typeof value === "object") {
+    } else if (key === 'data' && typeof value === 'object') {
       // Data attributes
       for (const [dataKey, dataValue] of Object.entries(value)) {
         element.dataset[dataKey] = escapeHtml(String(dataValue));
       }
-    } else if (typeof value === "string") {
+    } else if (typeof value === 'string') {
       element.setAttribute(key, escapeHtml(value));
-    } else if (typeof value === "boolean" && value) {
-      element.setAttribute(key, "");
+    } else if (typeof value === 'boolean' && value) {
+      element.setAttribute(key, '');
     }
   }
 
@@ -96,7 +96,7 @@ export function appendChildren(parent, children) {
     children instanceof DocumentFragment
   ) {
     parent.appendChild(children);
-  } else if (typeof children === "string") {
+  } else if (typeof children === 'string') {
     // Text content - escape HTML
     parent.appendChild(document.createTextNode(children));
   } else if (children != null) {
@@ -111,7 +111,7 @@ export function appendChildren(parent, children) {
  * @returns {string} Sanitized HTML string
  */
 export function html(strings, ...values) {
-  let result = "";
+  let result = '';
   for (let i = 0; i < strings.length; i++) {
     result += strings[i];
     if (i < values.length) {
@@ -119,7 +119,7 @@ export function html(strings, ...values) {
       if (value instanceof TrustedHTML) {
         // Already trusted - use as is
         result += value.toString();
-      } else if (typeof value === "string") {
+      } else if (typeof value === 'string') {
         // Escape user content
         result += escapeHtml(value);
       } else if (value != null) {
@@ -163,14 +163,14 @@ export function trusted(html) {
  * @param {string} cellTag - 'td' or 'th'
  * @returns {HTMLElement}
  */
-export function tableRow(cells, cellTag = "td") {
-  const tr = document.createElement("tr");
+export function tableRow(cells, cellTag = 'td') {
+  const tr = document.createElement('tr');
   cells.forEach((content) => {
     const cell = document.createElement(cellTag);
     if (content instanceof HTMLElement) {
       cell.appendChild(content);
     } else {
-      cell.textContent = String(content ?? "");
+      cell.textContent = String(content ?? '');
     }
     tr.appendChild(cell);
   });
@@ -184,17 +184,17 @@ export function tableRow(cells, cellTag = "td") {
  * @returns {HTMLElement}
  */
 export function buildTable(rows, headers = null) {
-  const table = document.createElement("table");
+  const table = document.createElement('table');
 
   if (headers) {
-    const thead = document.createElement("thead");
-    thead.appendChild(tableRow(headers, "th"));
+    const thead = document.createElement('thead');
+    thead.appendChild(tableRow(headers, 'th'));
     table.appendChild(thead);
   }
 
-  const tbody = document.createElement("tbody");
+  const tbody = document.createElement('tbody');
   rows.forEach((row) => {
-    tbody.appendChild(tableRow(row, "td"));
+    tbody.appendChild(tableRow(row, 'td'));
   });
   table.appendChild(tbody);
 
@@ -229,7 +229,7 @@ export function $$(selector, parent = document) {
 // EXPORTS TO WINDOW
 // ============================================
 
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.SafeDOM = {
     safeText,
     safeHTML,
@@ -246,7 +246,7 @@ if (typeof window !== "undefined") {
     sanitize,
     escapeHtml,
     setInnerHTML,
-    createElementFromHTML,
+    createElementFromHTML
   };
 
   // Shorthand aliases
@@ -265,5 +265,5 @@ export default {
   tableRow,
   buildTable,
   $,
-  $$,
+  $$
 };

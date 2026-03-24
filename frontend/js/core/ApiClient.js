@@ -89,9 +89,9 @@ export class ApiClient {
    */
   constructor(baseUrl = '/api', options = {}) {
     this.baseUrl = baseUrl;
-    this.timeout = options.timeout || 30000;
-    this.retries = options.retries || 3;
-    this.retryDelay = options.retryDelay || 1000;
+    this.timeout = options.timeout ?? 30000;
+    this.retries = options.retries ?? 3;
+    this.retryDelay = options.retryDelay ?? 1000;
 
     // CSRF token management
     this.csrfToken = null;
@@ -334,16 +334,18 @@ export class ApiClient {
           throw new NetworkError('Request timeout');
         }
 
-        // Don't retry on client errors
-        if (error instanceof ApiError && error.isClientError()) {
+        // Don't retry on client errors — except 429 (rate-limit) which is retryable
+        if (error instanceof ApiError && error.isClientError() && error.status !== 429) {
           throw error;
         }
 
-        // Retry with exponential backoff
+        // Retry with exponential backoff, but honour Retry-After on 429
         if (attempt < maxRetries) {
-          const delay = this.retryDelay * Math.pow(2, attempt);
+          const serverDelay = error instanceof ApiError ? error.retryAfterMs : null;
+          const delay = serverDelay ?? this.retryDelay * Math.pow(2, attempt);
           console.warn(
-            `[ApiClient] Retry ${attempt + 1}/${maxRetries} after ${delay}ms`
+            `[ApiClient] Retry ${attempt + 1}/${maxRetries} after ${delay}ms` +
+            (serverDelay ? ' (Retry-After header)' : '')
           );
           await this._sleep(delay);
         }
@@ -378,6 +380,15 @@ export class ApiClient {
     if (!response.ok) {
       const message = data?.detail || data?.message || response.statusText;
       const error = new ApiError(response.status, message, data);
+      // Carry the Retry-After header value so the retry loop can honour it
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        if (retryAfterHeader) {
+          // Header may be a delay-in-seconds or an HTTP-date; parse seconds only
+          const seconds = parseFloat(retryAfterHeader);
+          error.retryAfterMs = Number.isFinite(seconds) ? Math.ceil(seconds * 1000) : null;
+        }
+      }
       this._notifyErrorHandlers(error);
       throw error;
     }

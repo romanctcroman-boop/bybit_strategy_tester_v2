@@ -114,7 +114,7 @@ def mock_service():
     svc.list_results = MagicMock(return_value=[])
     svc.get_result = MagicMock(return_value=None)
     svc.delete_result = MagicMock(return_value=True)
-    with patch("backend.api.routers.backtests.get_backtest_service", return_value=svc):
+    with patch("backend.api.routers.backtests.router.get_backtest_service", return_value=svc):
         yield svc
 
 
@@ -274,11 +274,11 @@ class TestCreateBacktest:
         assert call_args.taker_fee == pytest.approx(0.001)
 
     def test_create_backtest_default_commission_parity(self, mock_service, mock_db):
-        """commission_rate must default to 0.0007 (TradingView parity)."""
+        """commission_rate must default to 0.00055 (Bybit linear taker fee, TradingView parity)."""
         response = client.post("/api/v1/backtests/", json=_VALID_PAYLOAD)
         assert response.status_code == 200
         call_args = mock_service.run_backtest.call_args[0][0]
-        assert call_args.taker_fee == pytest.approx(0.0007)
+        assert call_args.taker_fee == pytest.approx(0.00055)
 
     def test_create_backtest_engine_failure_returns_400(self, mock_service, mock_db):
         failed_result = _make_result(BacktestStatus.FAILED)
@@ -305,6 +305,20 @@ class TestCreateBacktest:
         assert response.status_code == 422
 
     def test_create_backtest_direction_from_strategy_params(self, mock_service, mock_db):
+        """_direction in strategy_params wins when direction is NOT explicitly set."""
+        # When direction is NOT in request body, _direction from strategy_params is used
+        payload = {
+            **_VALID_PAYLOAD,
+            "strategy_params": {"_direction": "short"},
+        }
+        # _VALID_PAYLOAD has no explicit "direction" key, so model_fields_set won't include it
+        response = client.post("/api/v1/backtests/", json=payload)
+        assert response.status_code == 200
+        call_args = mock_service.run_backtest.call_args[0][0]
+        assert call_args.direction == "short"
+
+    def test_create_backtest_explicit_direction_overrides_strategy_params(self, mock_service, mock_db):
+        """Explicit direction in request overrides _direction from strategy_params."""
         payload = {
             **_VALID_PAYLOAD,
             "direction": "long",
@@ -313,7 +327,8 @@ class TestCreateBacktest:
         response = client.post("/api/v1/backtests/", json=payload)
         assert response.status_code == 200
         call_args = mock_service.run_backtest.call_args[0][0]
-        assert call_args.direction == "short"
+        # Explicit "long" wins over strategy_params "_direction"="short"
+        assert call_args.direction == "long"
 
     def test_create_backtest_fixed_amount_position_size(self, mock_service, mock_db):
         payload = {
@@ -379,7 +394,7 @@ class TestListStrategies:
 
     def test_list_strategies_returns_list(self):
         with patch(
-            "backend.api.routers.backtests.list_available_strategies",
+            "backend.api.routers.backtests.router.list_available_strategies",
             return_value=[{"name": "sma_crossover", "description": "SMA Crossover", "default_params": {}}],
         ):
             response = client.get("/api/v1/backtests/strategies")

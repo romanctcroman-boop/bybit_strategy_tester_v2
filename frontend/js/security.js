@@ -21,52 +21,52 @@
 
 const SRI_HASHES = {
   // Chart.js
-  "chart.js": {
-    version: "4.4.1",
-    url: "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
+  'chart.js': {
+    version: '4.4.1',
+    url: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
     integrity:
-      "sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4",
+      'sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4'
   },
 
   // Chart.js Date Adapter
-  "chartjs-adapter-date-fns": {
-    version: "3.0.0",
-    url: "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js",
+  'chartjs-adapter-date-fns': {
+    version: '3.0.0',
+    url: 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js',
     integrity:
-      "sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws",
+      'sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws'
   },
 
   // Bootstrap Icons
-  "bootstrap-icons": {
-    version: "1.11.1",
-    url: "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css",
+  'bootstrap-icons': {
+    version: '1.11.1',
+    url: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css',
     integrity:
-      "sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd",
+      'sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd'
   },
 
   // Bootstrap CSS
-  "bootstrap-css": {
-    version: "5.3.2",
-    url: "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
+  'bootstrap-css': {
+    version: '5.3.2',
+    url: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
     integrity:
-      "sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN",
+      'sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN'
   },
 
   // Bootstrap JS Bundle
-  "bootstrap-js": {
-    version: "5.3.2",
-    url: "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
+  'bootstrap-js': {
+    version: '5.3.2',
+    url: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
     integrity:
-      "sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL",
+      'sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL'
   },
 
   // Lightweight Charts (TradingView)
-  "lightweight-charts": {
-    version: "4.1.0",
-    url: "https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js",
+  'lightweight-charts': {
+    version: '4.1.0',
+    url: 'https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js',
     integrity:
-      "sha384-rcCMiCptH4kTlEbg0euOTUKWe72TESbrjElatnG+9BfbmUIV268UK/Pro5biJdGm",
-  },
+      'sha384-rcCMiCptH4kTlEbg0euOTUKWe72TESbrjElatnG+9BfbmUIV268UK/Pro5biJdGm'
+  }
 };
 
 // ============================================
@@ -112,37 +112,37 @@ function generateCSP(options = {}) {
     // Scripts - local + specific CDNs + nonce for inline
     scriptSrc: [
       "'self'",
-      "https://cdn.jsdelivr.net",
-      "https://unpkg.com",
-      `'nonce-${nonce}'`,
+      'https://cdn.jsdelivr.net',
+      'https://unpkg.com',
+      `'nonce-${nonce}'`
     ],
 
     // Styles - local + CDNs + nonce (NO unsafe-inline!)
     styleSrc: [
       "'self'",
-      "https://cdn.jsdelivr.net",
-      "https://fonts.googleapis.com",
-      `'nonce-${nonce}'`,
+      'https://cdn.jsdelivr.net',
+      'https://fonts.googleapis.com',
+      `'nonce-${nonce}'`
       // REMOVED: '\'unsafe-inline\'' - Security vulnerability!
     ],
 
     // Images
-    imgSrc: ["'self'", "data:", "https:"],
+    imgSrc: ["'self'", 'data:', 'https:'],
 
     // Fonts
     fontSrc: [
       "'self'",
-      "https://cdn.jsdelivr.net",
-      "https://fonts.gstatic.com",
+      'https://cdn.jsdelivr.net',
+      'https://fonts.gstatic.com'
     ],
 
     // API connections
     connectSrc: [
       "'self'",
-      "https://api.bybit.com",
-      "wss://stream.bybit.com",
-      "ws://localhost:*",
-      "http://localhost:*",
+      'https://api.bybit.com',
+      'wss://stream.bybit.com',
+      'ws://localhost:*',
+      'http://localhost:*'
     ],
 
     // Frames (none by default)
@@ -161,30 +161,30 @@ function generateCSP(options = {}) {
     frameAncestors: ["'none'"],
 
     // Upgrade insecure requests in production
-    upgradeInsecureRequests: options.production || false,
+    upgradeInsecureRequests: options.production || false
   };
 
   const policy = { ...defaults, ...options };
 
   const directives = [
-    `default-src ${policy.defaultSrc.join(" ")}`,
-    `script-src ${policy.scriptSrc.join(" ")}`,
-    `style-src ${policy.styleSrc.join(" ")}`,
-    `img-src ${policy.imgSrc.join(" ")}`,
-    `font-src ${policy.fontSrc.join(" ")}`,
-    `connect-src ${policy.connectSrc.join(" ")}`,
-    `frame-src ${policy.frameSrc.join(" ")}`,
-    `object-src ${policy.objectSrc.join(" ")}`,
-    `base-uri ${policy.baseUri.join(" ")}`,
-    `form-action ${policy.formAction.join(" ")}`,
-    `frame-ancestors ${policy.frameAncestors.join(" ")}`,
+    `default-src ${policy.defaultSrc.join(' ')}`,
+    `script-src ${policy.scriptSrc.join(' ')}`,
+    `style-src ${policy.styleSrc.join(' ')}`,
+    `img-src ${policy.imgSrc.join(' ')}`,
+    `font-src ${policy.fontSrc.join(' ')}`,
+    `connect-src ${policy.connectSrc.join(' ')}`,
+    `frame-src ${policy.frameSrc.join(' ')}`,
+    `object-src ${policy.objectSrc.join(' ')}`,
+    `base-uri ${policy.baseUri.join(' ')}`,
+    `form-action ${policy.formAction.join(' ')}`,
+    `frame-ancestors ${policy.frameAncestors.join(' ')}`
   ];
 
   if (policy.upgradeInsecureRequests) {
-    directives.push("upgrade-insecure-requests");
+    directives.push('upgrade-insecure-requests');
   }
 
-  return directives.join("; ");
+  return directives.join('; ');
 }
 
 /**
@@ -201,27 +201,27 @@ function getCSPMetaTag() {
 
 const SECURITY_HEADERS = {
   // CSP (will need nonce from server)
-  "Content-Security-Policy": generateCSP(),
+  'Content-Security-Policy': generateCSP(),
 
   // Prevent MIME sniffing
-  "X-Content-Type-Options": "nosniff",
+  'X-Content-Type-Options': 'nosniff',
 
   // XSS Protection (legacy, but still useful)
-  "X-XSS-Protection": "1; mode=block",
+  'X-XSS-Protection': '1; mode=block',
 
   // Clickjacking protection
-  "X-Frame-Options": "DENY",
+  'X-Frame-Options': 'DENY',
 
   // Referrer policy
-  "Referrer-Policy": "strict-origin-when-cross-origin",
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
 
   // Permissions policy
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 
   // Cross-Origin policies
-  "Cross-Origin-Embedder-Policy": "require-corp",
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Resource-Policy": "same-origin",
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin'
 
   // HSTS (only for production with HTTPS)
   // 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
@@ -239,7 +239,7 @@ let csrfToken = null;
 function initCsrfToken() {
   const meta = document.querySelector('meta[name="csrf-token"]');
   if (meta) {
-    csrfToken = meta.getAttribute("content");
+    csrfToken = meta.getAttribute('content');
   }
   return csrfToken;
 }
@@ -265,11 +265,11 @@ function setCsrfToken(token) {
   // Update meta tag if exists
   let meta = document.querySelector('meta[name="csrf-token"]');
   if (!meta) {
-    meta = document.createElement("meta");
-    meta.setAttribute("name", "csrf-token");
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'csrf-token');
     document.head.appendChild(meta);
   }
-  meta.setAttribute("content", token);
+  meta.setAttribute('content', token);
 }
 
 /**
@@ -282,7 +282,7 @@ function withCsrfToken(headers = {}) {
   if (token) {
     return {
       ...headers,
-      "X-CSRF-Token": token,
+      'X-CSRF-Token': token
     };
   }
   return headers;
@@ -302,7 +302,7 @@ function getScriptTag(name, options = {}) {
   const lib = SRI_HASHES[name];
   if (!lib) {
     console.warn(`Unknown library: ${name}`);
-    return "";
+    return '';
   }
 
   const nonce = options.nonce || getNonce();
@@ -310,13 +310,13 @@ function getScriptTag(name, options = {}) {
     `src="${lib.url}"`,
     `integrity="${lib.integrity}"`,
     'crossorigin="anonymous"',
-    `nonce="${nonce}"`,
+    `nonce="${nonce}"`
   ];
 
-  if (options.async) attrs.push("async");
-  if (options.defer) attrs.push("defer");
+  if (options.async) attrs.push('async');
+  if (options.defer) attrs.push('defer');
 
-  return `<script ${attrs.join(" ")}></script>`;
+  return `<script ${attrs.join(' ')}></script>`;
 }
 
 /**
@@ -329,7 +329,7 @@ function getLinkTag(name, options = {}) {
   const lib = SRI_HASHES[name];
   if (!lib) {
     console.warn(`Unknown library: ${name}`);
-    return "";
+    return '';
   }
 
   const nonce = options.nonce || getNonce();
@@ -376,11 +376,11 @@ export {
   getCsrfToken,
   setCsrfToken,
   withCsrfToken,
-  initCsrfToken,
+  initCsrfToken
 };
 
 // Attach to window
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.Security = {
     SRI_HASHES,
     generateCSP,
@@ -389,12 +389,12 @@ if (typeof window !== "undefined") {
     getNonce,
     getCsrfToken,
     setCsrfToken,
-    withCsrfToken,
+    withCsrfToken
   };
 
   // Auto-initialize CSRF token
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initCsrfToken);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCsrfToken);
   } else {
     initCsrfToken();
   }

@@ -12,6 +12,7 @@ from celery import Task
 from loguru import logger
 
 from backend.celery_app import celery_app
+from backend.config.constants import COMMISSION_TV
 from backend.core.engine_adapter import get_engine
 from backend.database import SessionLocal
 from backend.models import Optimization
@@ -306,7 +307,7 @@ def walk_forward_task(
         analyzer = WalkForwardAnalyzer(
             data=data,
             initial_capital=strategy_config.get("initial_capital", 10000.0),
-            commission=strategy_config.get("commission", 0.001),
+            commission=strategy_config.get("commission", COMMISSION_TV),
             is_window_days=train_size,
             oos_window_days=test_size,
             step_days=step_size,
@@ -467,7 +468,7 @@ def bayesian_optimization_task(
         optimizer = BayesianOptimizer(
             data=data,
             initial_capital=strategy_config.get("initial_capital", 10000.0),
-            commission=strategy_config.get("commission", 0.001),
+            commission=strategy_config.get("commission", COMMISSION_TV),
             n_trials=n_trials,
             n_jobs=n_jobs,
             random_state=random_state,

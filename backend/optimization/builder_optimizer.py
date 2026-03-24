@@ -437,6 +437,40 @@ DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
         "activation_profit_percent": {"type": "float", "low": 0.5, "high": 3.0, "step": 0.25, "default": 1.0},
         "move_to_profit_percent": {"type": "float", "low": 0.0, "high": 0.5, "step": 0.05, "default": 0.1},
     },
+    # --- MA variants (missing from original set) ---
+    "wma": {
+        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+    },
+    "dema": {
+        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+    },
+    "tema": {
+        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+    },
+    "hull_ma": {
+        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+    },
+    # --- Oscillator variants ---
+    "stoch_rsi": {
+        "rsi_period": {"type": "int", "low": 5, "high": 25, "step": 1, "default": 14},
+        "stoch_period": {"type": "int", "low": 5, "high": 25, "step": 1, "default": 14},
+        "k_smooth": {"type": "int", "low": 1, "high": 5, "step": 1, "default": 3},
+        "d_smooth": {"type": "int", "low": 1, "high": 5, "step": 1, "default": 3},
+        "stoch_rsi_cross_level_long": {"type": "float", "low": 10, "high": 30, "step": 5, "default": 20},
+        "stoch_rsi_cross_level_short": {"type": "float", "low": 70, "high": 90, "step": 5, "default": 80},
+    },
+    "roc": {
+        "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 14},
+    },
+    "cmo": {
+        "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 14},
+    },
+    "rvi": {
+        "period": {"type": "int", "low": 5, "high": 20, "step": 1, "default": 10},
+    },
+    "mfi": {
+        "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 14},
+    },
 }
 
 
@@ -2695,10 +2729,16 @@ def run_builder_grid_search(
 
     _log_info(f"🔍 Builder grid search: {total:,} combinations, metric={optimize_metric}, timeout={timeout_seconds}s")
 
+    # Quick DCA check — RSI threshold fast path is incompatible with DCA graphs.
+    # DCA strategies use the mixed batch path (below); skip RSI threshold path for them.
+    _has_dca_blocks_early = any(
+        b.get("type") in ("dca", "grid_orders") for b in base_graph.get("blocks", [])
+    )
+
     # ── Fast path: RSI threshold-only ────────────────────────────────────────
     # Only feasible when we have a materialized list (needs random access) AND
-    # the grid is small enough to hold in memory.
-    if _is_list and total <= FAST_PATH_MATERIALISE_CAP:
+    # the grid is small enough to hold in memory AND no DCA blocks present.
+    if _is_list and total <= FAST_PATH_MATERIALISE_CAP and not _has_dca_blocks_early:
         is_rsi_threshold, rsi_block_id = _is_rsi_threshold_only_optimization(param_combinations, base_graph)
         if is_rsi_threshold and rsi_block_id:
             _log_info(f"⚡ Using fast RSI threshold optimization path for block {rsi_block_id}")
@@ -3081,9 +3121,10 @@ def run_builder_grid_search(
                         )
                     continue
 
-                # Override base-graph SL/TP if this combo varies static_sltp params
+                # Override base-graph SL/TP/close_by_time if this combo varies those params
                 _trial_sl = _std_block_stop_loss
                 _trial_tp = _std_block_take_profit
+                _trial_max_bars = _std_block_max_bars_in_trade
                 for _ovr_path, _ovr_val in overrides.items():
                     if "." in _ovr_path:
                         _, _ovr_pk = _ovr_path.split(".", 1)
@@ -3091,6 +3132,8 @@ def run_builder_grid_search(
                             _trial_sl = float(_ovr_val) / 100.0
                         elif _ovr_pk == "take_profit_percent":
                             _trial_tp = float(_ovr_val) / 100.0
+                        elif _ovr_pk in ("bars_since_entry", "bars"):
+                            _trial_max_bars = int(_ovr_val)
 
                 result = _run_dca_with_signals(
                     signals=_signals,
@@ -3105,7 +3148,7 @@ def run_builder_grid_search(
                     block_breakeven_offset=_std_block_breakeven_offset,
                     block_close_only_in_profit=_std_block_close_only_in_profit,
                     block_sl_type=_std_block_sl_type,
-                    block_max_bars_in_trade=_std_block_max_bars_in_trade,
+                    block_max_bars_in_trade=_trial_max_bars,
                     close_indicator_cache=_std_dca_close_cache,
                 )
             except Exception as _trial_e:

@@ -2487,7 +2487,7 @@ Rules:
                     timeout_seconds=MAX_SWEEP_SECONDS,
                 )
             else:
-                param_combinations, _ = generate_builder_param_combinations(
+                param_combinations, _, _capped = generate_builder_param_combinations(
                     param_specs=active_specs,
                     custom_ranges=custom_ranges,
                     search_method="grid",

@@ -41,6 +41,9 @@ function makeDOM() {
     <input id="aiMinSharpe" value="0.5" />
     <input id="aiDeliberation" type="checkbox" />
     <input id="aiUseOptimizer" type="checkbox" />
+    <select id="aiExistingStrategy"><option value="">— Создать новую —</option></select>
+    <div id="aiExistingStrategyHint" style="display:none"></div>
+    <span id="aiNameHint"></span>
     <input id="strategyName" value="Test Strategy" />
     <input id="backtestSymbol" value="BTCUSDT" />
     <input id="strategyTimeframe" value="15" />
@@ -118,21 +121,25 @@ describe('openAiBuildModal', () => {
         expect(modal.style.display).toBe('flex');
     });
 
-    it('sets build mode when no existing strategy', () => {
+    it('sets build mode when no existing strategy', async () => {
         const deps = makeDeps({ getStrategyIdFromURL: () => null });
         const mod = createAiBuildModule(deps);
         mod.openAiBuildModal();
+        // Title is set inside a .then() callback — flush microtask queue
+        await new Promise((r) => setTimeout(r, 0));
         const title = document.querySelector('.ai-build-header h3');
         expect(title.innerHTML).toContain('AI Strategy Builder');
     });
 
-    it('sets optimize mode when strategy exists with canvas blocks', () => {
+    it('sets optimize mode when strategy exists with canvas blocks', async () => {
         const deps = makeDeps({
             getStrategyIdFromURL: () => 'abc123',
             getBlocks: () => [{ type: 'rsi' }]
         });
         const mod = createAiBuildModule(deps);
         mod.openAiBuildModal();
+        // Title is set inside a .then() callback — flush microtask queue
+        await new Promise((r) => setTimeout(r, 0));
         const title = document.querySelector('.ai-build-header h3');
         expect(title.innerHTML).toContain('AI Strategy Optimizer');
     });

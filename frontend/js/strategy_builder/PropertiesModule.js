@@ -1,6 +1,6 @@
 /**
  * Properties Module — Панель свойств
- * 
+ *
  * Отображение и редактирование свойств блоков
  */
 
@@ -12,16 +12,16 @@ export function createPropertiesModule(panelElement) {
   // State
   let selectedBlockId = null;
   let selectedBlock = null;
-  
+
   // Initialize from store
   function initialize() {
     if (!store) return;
-    
+
     store.subscribe('strategyBuilder.selection.selectedBlockId', (id) => {
       selectedBlockId = id;
       updatePanel();
     });
-    
+
     store.subscribe('strategyBuilder.graph.blocks', (blocks) => {
       if (selectedBlockId) {
         selectedBlock = blocks.find(b => b.id === selectedBlockId);
@@ -29,16 +29,16 @@ export function createPropertiesModule(panelElement) {
       }
     });
   }
-  
+
   // Update panel
   function updatePanel() {
     if (!panelElement) return;
-    
+
     if (!selectedBlockId || !selectedBlock) {
       panelElement.innerHTML = '<div class="empty-state">No block selected</div>';
       return;
     }
-    
+
     panelElement.innerHTML = `
       <div class="properties-panel">
         <h3>${selectedBlock.label}</h3>
@@ -60,15 +60,15 @@ export function createPropertiesModule(panelElement) {
         </div>
       </div>
     `;
-    
+
     attachEventListeners();
   }
-  
+
   function renderParameters(params) {
     if (!params || Object.keys(params).length === 0) {
       return '<span class="text-muted">No parameters</span>';
     }
-    
+
     return Object.entries(params).map(([key, value]) => `
       <div class="parameter-row">
         <label>${key}:</label>
@@ -76,7 +76,7 @@ export function createPropertiesModule(panelElement) {
       </div>
     `).join('');
   }
-  
+
   function attachEventListeners() {
     panelElement.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -88,7 +88,7 @@ export function createPropertiesModule(panelElement) {
         }
       });
     });
-    
+
     panelElement.querySelectorAll('input[data-param]').forEach(input => {
       input.addEventListener('change', (e) => {
         const param = e.target.dataset.param;
@@ -97,19 +97,19 @@ export function createPropertiesModule(panelElement) {
       });
     });
   }
-  
+
   function deleteBlock() {
     if (selectedBlockId) {
       store.dispatch('blocks/delete', selectedBlockId);
     }
   }
-  
+
   function duplicateBlock() {
     if (selectedBlockId) {
       store.dispatch('blocks/duplicate', selectedBlockId);
     }
   }
-  
+
   function updateParameter(key, value) {
     if (selectedBlockId) {
       store.dispatch('blocks/updateParameter', {
@@ -119,7 +119,7 @@ export function createPropertiesModule(panelElement) {
       });
     }
   }
-  
+
   // Show panel
   function show() {
     if (panelElement) {
@@ -127,17 +127,17 @@ export function createPropertiesModule(panelElement) {
       updatePanel();
     }
   }
-  
+
   // Hide panel
   function hide() {
     if (panelElement) {
       panelElement.style.display = 'none';
     }
   }
-  
+
   // Initialize
   initialize();
-  
+
   return {
     updatePanel,
     show,

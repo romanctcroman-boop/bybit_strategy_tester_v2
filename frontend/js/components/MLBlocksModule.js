@@ -1,6 +1,6 @@
 /**
  * ML Blocks Module — Machine Learning блоки
- * 
+ *
  * LSTM Predictor, ML Signal, Feature Engineering
  */
 
@@ -44,8 +44,8 @@ export function createMLBlocksModule() {
       icon: '⚙️',
       category: 'Machine Learning',
       parameters: {
-        features: { 
-          type: 'multiselect', 
+        features: {
+          type: 'multiselect',
           options: ['returns', 'volatility', 'rsi', 'macd', 'bollinger', 'volume_change'],
           default: ['returns', 'volatility', 'rsi']
         }
@@ -54,15 +54,15 @@ export function createMLBlocksModule() {
       outputs: ['features']
     }
   ];
-  
+
   function getBlocks() {
     return [...mlBlocks];
   }
-  
+
   function getBlock(blockId) {
     return mlBlocks.find(b => b.id === blockId);
   }
-  
+
   return {
     getBlocks,
     getBlock

@@ -8,6 +8,7 @@ Endpoints for AI-powered trading strategy generation:
 - Manage generated strategies
 """
 
+import asyncio
 import contextlib
 import logging
 from datetime import datetime
@@ -524,4 +525,166 @@ async def run_strategy_backtest(
         "symbol": symbol,
         "timeframe": timeframe,
         "days": days,
+    }
+
+
+# ============================================================================
+# Multi-Agent Strategy Builder Pipeline
+# ============================================================================
+
+
+class GenerateAndBuildRequest(BaseModel):
+    """Request for full AI pipeline: LLM strategy generation → graph → backtest."""
+
+    symbol: str = Field(default="BTCUSDT", description="Trading pair")
+    timeframe: str = Field(default="15", description="Candle interval (1/5/15/30/60/240/D)")
+    days: int = Field(default=90, ge=7, le=730, description="Historical data period in days")
+    agents: list[str] = Field(
+        default_factory=lambda: ["deepseek"],
+        description="LLM agents to use: deepseek, qwen, perplexity",
+    )
+    run_backtest: bool = Field(default=True, description="Backtest the generated strategy")
+    run_debate: bool = Field(default=True, description="Enable MAD multi-agent debate")
+    initial_capital: float = Field(default=10000.0, ge=100.0, description="Starting capital")
+    leverage: int = Field(default=1, ge=1, le=125, description="Trading leverage")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "days": 90,
+                "agents": ["deepseek", "qwen"],
+                "run_backtest": True,
+                "run_debate": True,
+            }
+        }
+    )
+
+
+@router.post(
+    "/generate-and-build",
+    summary="Full AI pipeline: generate strategy → build graph → backtest",
+    tags=["AI Strategy Generator"],
+)
+async def generate_and_build(request: GenerateAndBuildRequest):
+    """
+    Run the full multi-agent trading strategy pipeline:
+
+    1. **AnalyzeMarket** — build MarketContext from OHLCV data
+    2. **[MAD Debate]** — multi-agent deliberation on market conditions (optional)
+    3. **GenerateStrategies** — Self-MoA: 3× DeepSeek + QWEN critic synthesis
+    4. **ParseResponses** — parse LLM JSON into StrategyDefinition
+    5. **ConsensusNode** — select best strategy via weighted voting
+    6. **BuildGraph** — convert StrategyDefinition → strategy_graph (40+ block types)
+    7. **BacktestNode** — run via StrategyBuilderAdapter + FallbackEngineV4
+    8. **MemoryUpdate** — persist to HierarchicalMemory + Strategy ORM
+
+    Returns the generated strategy graph, backtest metrics, and saved strategy id.
+    """
+    import sqlite3
+    from datetime import UTC, datetime, timedelta
+    from pathlib import Path
+
+    import pandas as pd
+
+    from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+    # Load OHLCV from local SQLite (same pattern as BacktestEngine)
+    end_dt = datetime.now(UTC)
+    start_dt = end_dt - timedelta(days=request.days)
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000)
+    db_path = Path(__file__).parent.parent.parent.parent / "data.sqlite3"
+
+    def _load_ohlcv() -> pd.DataFrame:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            df = pd.read_sql(
+                """
+                SELECT open_time,
+                       open_price  AS open,
+                       high_price  AS high,
+                       low_price   AS low,
+                       close_price AS close,
+                       volume
+                FROM bybit_kline_audit
+                WHERE symbol   = ?
+                  AND interval = ?
+                  AND open_time >= ?
+                  AND open_time <= ?
+                ORDER BY open_time ASC
+                """,
+                conn,
+                params=[
+                    request.symbol.upper(),
+                    request.timeframe,
+                    start_ms,
+                    end_ms,
+                ],
+            )
+        finally:
+            conn.close()
+        if df.empty:
+            return df
+        df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
+        df.set_index("open_time", inplace=True)
+        for col in ("open", "high", "low", "close", "volume"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+
+    try:
+        df: pd.DataFrame = await asyncio.to_thread(_load_ohlcv)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to load OHLCV data: {exc}",
+        ) from exc
+
+    if df is None or df.empty:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No OHLCV data for {request.symbol}/{request.timeframe} in local DB",
+        )
+
+    # Run pipeline
+    try:
+        state = await run_strategy_pipeline(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            df=df,
+            agents=request.agents,
+            run_backtest=request.run_backtest,
+            run_debate=request.run_debate,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+        )
+    except Exception as exc:
+        logger.error(f"[generate-and-build] Pipeline failed: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Strategy pipeline failed: {exc}",
+        ) from exc
+
+    report = state.get_result("report") or {}
+    select_result = state.get_result("select_best") or {}
+    backtest_result = state.get_result("backtest") or {}
+    strategy_graph = state.context.get("strategy_graph")
+    graph_warnings = state.context.get("graph_warnings", [])
+    saved_strategy_id = state.context.get("saved_strategy_id")
+
+    selected = select_result.get("selected_strategy")
+    strategy_name = getattr(selected, "strategy_name", None) or "AI Strategy"
+
+    return {
+        "strategy_name": strategy_name,
+        "strategy_graph": strategy_graph,
+        "graph_warnings": graph_warnings,
+        "backtest_metrics": backtest_result.get("metrics", {}),
+        "saved_strategy_id": saved_strategy_id,
+        "proposals_count": report.get("proposals_count", 0),
+        "execution_path": state.execution_path,
+        "errors": state.errors,
+        "symbol": request.symbol,
+        "timeframe": request.timeframe,
     }

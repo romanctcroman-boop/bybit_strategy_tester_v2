@@ -44,6 +44,7 @@
  * @param {function(): number}     deps.getZoom              - Gets current canvas zoom
  * @param {function(string): string} deps.escapeHtml         - Escapes HTML entities
  * @param {function(string): string} deps.formatDate         - Formats an ISO date string
+ * @param {function(): void}       [deps.dispatchBlocksChanged] - Notifies optimization panel of block changes
  * @returns {object} Public API
  */
 export function createSaveLoadModule({
@@ -78,7 +79,8 @@ export function createSaveLoadModule({
     wsValidation,
     getZoom,
     escapeHtml,
-    formatDate
+    formatDate,
+    dispatchBlocksChanged
 }) {
 
     // -----------------------------------------------
@@ -325,6 +327,30 @@ export function createSaveLoadModule({
                 target: c.target,
                 type: c.type || 'data'
             })),
+            // Persist optimization + evaluation panel settings per-strategy (not just in localStorage)
+            optimizationConfig: (() => {
+                try {
+                    const raw = localStorage.getItem('optimizationConfigState');
+                    return raw ? JSON.parse(raw) : null;
+                } catch { return null; }
+            })(),
+            evaluationConfig: (() => {
+                try {
+                    const raw = localStorage.getItem('optimizationPanelsState');
+                    return raw ? JSON.parse(raw) : null;
+                } catch { return null; }
+            })(),
+            // Persist EvaluationCriteriaPanel state (primaryMetric, constraints, weights, etc.)
+            evaluationCriteriaConfig: (() => {
+                try {
+                    // Prefer live state from the panel if available (most up-to-date)
+                    if (window.evaluationCriteriaPanel?.state) {
+                        return window.evaluationCriteriaPanel.state;
+                    }
+                    const raw = localStorage.getItem('evaluationCriteriaState');
+                    return raw ? JSON.parse(raw) : null;
+                } catch { return null; }
+            })(),
             uiState: {
                 zoom: getZoom(),
                 strategyName: nameEl?.value || 'New Strategy',
@@ -616,6 +642,47 @@ export function createSaveLoadModule({
 
             renderBlocks();
             renderConnections();
+
+            // Notify optimization panel so Parameter Ranges refresh automatically
+            if (typeof dispatchBlocksChanged === 'function') {
+                dispatchBlocksChanged();
+            }
+
+            // Restore optimization + evaluation panel settings saved with this strategy
+            if (strategy.optimizationConfig) {
+                try {
+                    localStorage.setItem('optimizationConfigState', JSON.stringify(strategy.optimizationConfig));
+                    // Reload the panel if it's already initialised
+                    if (window.optimizationConfigPanel?.loadSavedState) {
+                        window.optimizationConfigPanel.loadSavedState();
+                    }
+                } catch (e) {
+                    console.warn('[SaveLoadModule] Could not restore optimizationConfig:', e);
+                }
+            }
+            if (strategy.evaluationConfig) {
+                try {
+                    localStorage.setItem('optimizationPanelsState', JSON.stringify(strategy.evaluationConfig));
+                    if (window.optimizationPanels?.loadSavedState) {
+                        window.optimizationPanels.loadSavedState();
+                    }
+                } catch (e) {
+                    console.warn('[SaveLoadModule] Could not restore evaluationConfig:', e);
+                }
+            }
+
+            // Restore EvaluationCriteriaPanel state (primaryMetric, constraints, weights, sort order)
+            if (strategy.evaluationCriteriaConfig) {
+                try {
+                    localStorage.setItem('evaluationCriteriaState', JSON.stringify(strategy.evaluationCriteriaConfig));
+                    if (window.evaluationCriteriaPanel?.loadSavedState) {
+                        window.evaluationCriteriaPanel.loadSavedState();
+                    }
+                } catch (e) {
+                    console.warn('[SaveLoadModule] Could not restore evaluationCriteriaConfig:', e);
+                }
+            }
+
             // Re-enable autosave now that state is fully restored
             setSkipNextAutoSave(false);
             showNotification('Стратегия успешно загружена!', 'success');

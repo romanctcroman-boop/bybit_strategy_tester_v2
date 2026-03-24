@@ -138,23 +138,29 @@ async function loadMetricsSummary() {
 
         const data = await response.json();
 
+        // Null-safe helper: silently skip missing DOM elements
+        const setEl = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+
         // Update stats cards
-        document.getElementById('totalBacktests').textContent = data.backtests.total;
-        document.getElementById('runningBacktests').textContent = data.backtests.running;
-        document.getElementById('completedBacktests').textContent = data.backtests.completed;
-        document.getElementById('failedBacktests').textContent = `${data.backtests.failed} failed`;
+        setEl('totalBacktests', data.backtests.total);
+        setEl('runningBacktests', data.backtests.running);
+        setEl('completedBacktests', data.backtests.completed);
+        setEl('failedBacktests', `${data.backtests.failed} failed`);
 
         const successRate = (data.backtests.success_rate * 100).toFixed(1);
-        document.getElementById('successRate').textContent = `${successRate}%`;
+        setEl('successRate', `${successRate}%`);
 
-        document.getElementById('activeStrategies').textContent = data.strategies.active;
-        document.getElementById('totalStrategies').textContent = data.strategies.total;
+        setEl('activeStrategies', data.strategies.active);
+        setEl('totalStrategies', data.strategies.total);
 
-        document.getElementById('totalOptimizations').textContent = data.optimizations.total;
-        document.getElementById('runningOptimizations').textContent = data.optimizations.running;
+        setEl('totalOptimizations', data.optimizations.total);
+        setEl('runningOptimizations', data.optimizations.running);
 
-        document.getElementById('totalTrades').textContent = formatNumber(data.performance.total_trades_analyzed);
-        document.getElementById('avgDuration').textContent = `${data.performance.avg_backtest_duration_sec.toFixed(1)}s`;
+        setEl('totalTrades', formatNumber(data.performance.total_trades_analyzed));
+        setEl('avgDuration', `${data.performance.avg_backtest_duration_sec.toFixed(1)}s`);
 
     } catch (error) {
         console.error('[Dashboard] loadMetricsSummary failed:', error.message);

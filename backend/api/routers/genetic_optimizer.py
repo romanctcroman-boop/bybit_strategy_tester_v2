@@ -38,7 +38,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
@@ -91,7 +91,8 @@ class GeneticOptimizationRequest(BaseModel):
     n_workers: int = Field(default=1, ge=1, le=8)
     random_state: int | None = Field(default=None)
 
-    @validator("param_ranges")
+    @field_validator("param_ranges")
+    @classmethod
     def validate_param_ranges(cls, v):
         """Validate parameter ranges"""
         for name, range_vals in v.items():

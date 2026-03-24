@@ -31,6 +31,13 @@ const BYBIT_INTERVALS = new Set(['1', '5', '15', '30', '60', '240', 'D', 'W', 'M
 const LEGACY_TF_MAP_DROPDOWN = { '3': '5', '120': '60', '360': '240', '720': 'D' };
 
 /**
+ * Earliest date for which kline data is available in the database.
+ * Must stay in sync with backend/config/database_policy.py → DATA_START_DATE.
+ * Format: 'YYYY-MM-DD'
+ */
+const DATA_START_DATE = '2025-01-01';
+
+/**
  * Нормализовать сохранённый таймфрейм к значению для выпадающего списка.
  * Поддерживает старый формат (1h, 15m) и нативный (15, 60, D). Устаревшие TF → ближайший.
  */
@@ -609,9 +616,17 @@ export function renderDrawdownChart(equityCurve) {
     const width = canvas.width - padding * 2;
     const height = canvas.height - padding * 2;
 
+    // BUG-FIX B-02: equity curve objects from the API have no 'drawdown' field.
+    // Previously this mapped every point to 0, producing a flat chart.
+    // Now we derive drawdown as (equity - runningPeak) / runningPeak which matches
+    // the standard definition used by TradingView and the backend MetricsCalculator.
+    let runningPeak = -Infinity;
     const values = equityCurve.map(p => {
-        const dd = p.drawdown !== undefined ? p.drawdown : 0;
-        return Math.min(dd, 0);
+        // Support both {equity} objects and plain numeric arrays
+        const eq = typeof p === 'number' ? p : (p.equity ?? p.value ?? p.close ?? 0);
+        if (eq > runningPeak) runningPeak = eq;
+        if (runningPeak <= 0) return 0;
+        return Math.min((eq - runningPeak) / runningPeak, 0); // always ≤ 0
     });
     const minVal = Math.min(...values, -0.001);
     const maxVal = 0;
@@ -725,8 +740,10 @@ export function createBacktestModule(deps) {
         const indicatorBlocks = strategyBlocks.filter(b =>
             blockLibrary.indicators.some(ind => ind.id === b.type)
         );
+        // BUG-FIX B-07: blockLibrary.filters category was deprecated and removed.
+        // Using optional chaining (?.) prevents TypeError when the property is undefined.
         const filterBlocks = strategyBlocks.filter(b =>
-            blockLibrary.filters.some(f => f.id === b.type)
+            blockLibrary.filters?.some(f => f.id === b.type) ?? false
         );
         const exitBlocks = strategyBlocks.filter(b =>
             (blockLibrary.exits && blockLibrary.exits.some(e => e.id === b.type)) ||
@@ -1049,7 +1066,7 @@ export function createBacktestModule(deps) {
         }
 
         // Validate date range before sending — avoids cryptic HTTP 422
-        const DATA_START_DATE = '2025-01-01'; // Must match backend/config/database_policy.py
+        // DATA_START_DATE is defined at module level (must match backend/config/database_policy.py)
         const startDateVal = document.getElementById('backtestStartDate')?.value || DATA_START_DATE;
         // Use LOCAL date (not UTC toISOString) to avoid off-by-one at midnight UTC+N
         const _nowD = new Date();
