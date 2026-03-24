@@ -1,4 +1,8 @@
 {
+  "statusLine": {
+    "type": "command",
+    "command": "bash /c/Users/roman/.claude/statusline-command.sh"
+  },
   "permissions": {
     "allow": [
       "Bash(git status)",
@@ -16,6 +20,7 @@
       "Bash(ruff check*)",
       "Bash(ruff format*)",
       "Bash(alembic*)",
+      "Bash(npx*)",
       "Read(*)",
       "Glob(*)",
       "Grep(*)",
@@ -33,6 +38,86 @@
   },
   "env": {
     "PYTHONIOENCODING": "utf-8",
-    "PYTHONUTF8": "1"
+    "PYTHONUTF8": "1",
+    "CLAUDE_CODE_GIT_BASH_PATH": "C:\\Users\\roman\\wsl-bash.bat"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_files.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/ruff_format.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_edit_tests.py\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_failure.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_compact_context.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_context.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_reminder.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }

@@ -32,6 +32,7 @@ def _warmup():
     """
     warmup_numba_dca()
 
+
 # Common constants
 CAPITAL = 10_000.0
 TAKER_FEE = 0.0007

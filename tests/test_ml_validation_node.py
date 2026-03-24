@@ -12,8 +12,7 @@ Covers:
 from __future__ import annotations
 
 import copy
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -24,7 +23,6 @@ from backend.agents.trading_strategy_graph import (
     MLValidationNode,
     build_trading_strategy_graph,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -119,9 +117,7 @@ class TestMLValidationNodeExecuteGuards:
 
 
 class TestMLValidationNodeExecuteHappyPath:
-    def _mock_run_strategy(
-        self, sharpe: float = 1.0, trades: int = 20
-    ):
+    def _mock_run_strategy(self, sharpe: float = 1.0, trades: int = 20):
         """Return a mock that patches _run_strategy on the node instance."""
         return MagicMock(
             return_value={
@@ -396,7 +392,7 @@ class TestCheckParameterStability:
             call_counter["n"] += 1
             if n == 0:
                 return {"sharpe_ratio": 1.0, "total_trades": 20}  # baseline
-            return {"sharpe_ratio": -0.5, "total_trades": 5}   # flip
+            return {"sharpe_ratio": -0.5, "total_trades": 5}  # flip
 
         node._run_strategy = _run
         result = node._check_parameter_stability(_minimal_graph(), df, {})
@@ -474,14 +470,10 @@ class TestGraphWiring:
         graph = build_trading_strategy_graph(run_backtest=True)
         # optimize_strategy should have an edge to ml_validation
         opt_targets = [e.target for e in graph.edges.get("optimize_strategy", [])]
-        assert "ml_validation" in opt_targets, (
-            f"No edge optimize_strategy → ml_validation; got: {opt_targets}"
-        )
+        assert "ml_validation" in opt_targets, f"No edge optimize_strategy → ml_validation; got: {opt_targets}"
         # ml_validation should have an edge to memory_update
         ml_targets = [e.target for e in graph.edges.get("ml_validation", [])]
-        assert "memory_update" in ml_targets, (
-            f"No edge ml_validation → memory_update; got: {ml_targets}"
-        )
+        assert "memory_update" in ml_targets, f"No edge ml_validation → memory_update; got: {ml_targets}"
 
     def test_ml_validation_node_is_correct_type(self):
         graph = build_trading_strategy_graph(run_backtest=True)
@@ -494,7 +486,7 @@ class TestGraphWiring:
 
     def test_ml_validation_timeout_reasonable(self):
         node = MLValidationNode()
-        assert node.timeout >= 60.0   # needs at least 60s for 3 checks
+        assert node.timeout >= 60.0  # needs at least 60s for 3 checks
 
 
 # ---------------------------------------------------------------------------

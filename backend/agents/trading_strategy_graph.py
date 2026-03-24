@@ -30,8 +30,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from backend.config.constants import COMMISSION_TV, INITIAL_CAPITAL
-
 import pandas as pd
 from loguru import logger
 
@@ -46,13 +44,14 @@ from backend.agents.langgraph_orchestrator import (
 from backend.agents.prompts.context_builder import MarketContextBuilder
 from backend.agents.prompts.prompt_engineer import PromptEngineer
 from backend.agents.prompts.response_parser import ResponseParser
+from backend.config.constants import COMMISSION_TV, INITIAL_CAPITAL
 
 # =============================================================================
 # SHARED ACCEPTANCE THRESHOLDS (single source of truth for all nodes + helpers)
 # =============================================================================
 
-_MIN_TRADES: int = 5        # minimum trades for a strategy to "pass"
-_MAX_DD_PCT: float = 30.0   # maximum drawdown % allowed
+_MIN_TRADES: int = 5  # minimum trades for a strategy to "pass"
+_MAX_DD_PCT: float = 30.0  # maximum drawdown % allowed
 
 # =============================================================================
 # GRAPH NODES
@@ -112,7 +111,7 @@ class DebateNode(AgentNode):
     """
 
     _MAX_ROUNDS = 3
-    _KS_STABILITY_THRESHOLD = 0.05   # p-value above which debate is considered stable
+    _KS_STABILITY_THRESHOLD = 0.05  # p-value above which debate is considered stable
 
     def __init__(self) -> None:
         super().__init__(
@@ -205,7 +204,7 @@ class MemoryRecallNode(AgentNode):
     TOP_K_WINS = 5
     TOP_K_FAILURES = 3
     TOP_K_REGIME = 3
-    MIN_WIN_IMPORTANCE = 0.5    # importance ≥ 0.5 = strategy with Sharpe > 1
+    MIN_WIN_IMPORTANCE = 0.5  # importance ≥ 0.5 = strategy with Sharpe > 1
     MIN_FAILURE_IMPORTANCE = 0.1
 
     def __init__(self) -> None:
@@ -261,29 +260,21 @@ class MemoryRecallNode(AgentNode):
                     snippet = m.content[:200].replace("\n", " ")
                     imp = getattr(m, "importance", 0.0)
                     win_lines.append(f"  {i}. [importance={imp:.2f}] {snippet}")
-                sections.append(
-                    "PAST SUCCESSFUL STRATEGIES (adapt, don't copy verbatim):\n"
-                    + "\n".join(win_lines)
-                )
+                sections.append("PAST SUCCESSFUL STRATEGIES (adapt, don't copy verbatim):\n" + "\n".join(win_lines))
 
             if failures:
                 fail_lines = []
                 for i, m in enumerate(failures, 1):
                     snippet = m.content[:150].replace("\n", " ")
                     fail_lines.append(f"  {i}. AVOID: {snippet}")
-                sections.append(
-                    "PAST FAILURES (do NOT repeat these patterns):\n"
-                    + "\n".join(fail_lines)
-                )
+                sections.append("PAST FAILURES (do NOT repeat these patterns):\n" + "\n".join(fail_lines))
 
             if regime_memories:
                 regime_lines = []
                 for m in regime_memories:
                     snippet = m.content[:150].replace("\n", " ")
                     regime_lines.append(f"  - {snippet}")
-                sections.append(
-                    f"REGIME KNOWLEDGE ({regime} market):\n" + "\n".join(regime_lines)
-                )
+                sections.append(f"REGIME KNOWLEDGE ({regime} market):\n" + "\n".join(regime_lines))
 
             if sections:
                 memory_context = (
@@ -310,8 +301,7 @@ class MemoryRecallNode(AgentNode):
                 )
             else:
                 logger.debug(
-                    f"[MemoryRecallNode] No relevant memories for {symbol}/{timeframe} — "
-                    "generating from scratch"
+                    f"[MemoryRecallNode] No relevant memories for {symbol}/{timeframe} — generating from scratch"
                 )
 
         except Exception as exc:
@@ -348,7 +338,7 @@ class GenerateStrategiesNode(AgentNode):
         super().__init__(
             name="generate_strategies",
             description="Call LLM agents to generate strategy proposals (Self-MoA)",
-            timeout=180.0,   # 3× parallel calls need more headroom
+            timeout=180.0,  # 3× parallel calls need more headroom
             retry_count=1,
             retry_delay=2.0,
         )
@@ -402,10 +392,7 @@ class GenerateStrategiesNode(AgentNode):
             moa_results = await asyncio.gather(*moa_tasks, return_exceptions=True)
             moa_texts = [r for r in moa_results if isinstance(r, str) and r]
 
-            logger.info(
-                f"🔀 Self-MoA: {len(moa_texts)}/{len(self._MOA_TEMPERATURES)} "
-                f"DeepSeek variants succeeded"
-            )
+            logger.info(f"🔀 Self-MoA: {len(moa_texts)}/{len(self._MOA_TEMPERATURES)} DeepSeek variants succeeded")
 
             if moa_texts:
                 # QWEN critic: synthesise the best strategy from all variants
@@ -457,8 +444,7 @@ class GenerateStrategiesNode(AgentNode):
         If QWEN is unavailable, returns None (caller falls back to T=0.7 variant).
         """
         variants_block = "\n\n".join(
-            f"--- VARIANT {i + 1} (T={self._MOA_TEMPERATURES[i]:.1f}) ---\n{text}"
-            for i, text in enumerate(moa_texts)
+            f"--- VARIANT {i + 1} (T={self._MOA_TEMPERATURES[i]:.1f}) ---\n{text}" for i, text in enumerate(moa_texts)
         )
         critic_prompt = (
             "You are a quantitative trading strategy critic.\n\n"
@@ -597,7 +583,7 @@ class ConsensusNode(AgentNode):
 
     def __init__(self) -> None:
         super().__init__(
-            name="select_best",            # keep name so downstream nodes still work
+            name="select_best",  # keep name so downstream nodes still work
             description="Consensus aggregation with dynamic agent weights",
             timeout=15.0,
         )
@@ -746,15 +732,16 @@ class BuildGraphNode(AgentNode):
 
             # Preserve optimization hints from LLM for OptimizationNode
             if strategy.optimization_hints is not None:
-                state.context["agent_optimization_hints"] = strategy.optimization_hints.model_dump(
-                    exclude_none=True
-                )
+                state.context["agent_optimization_hints"] = strategy.optimization_hints.model_dump(exclude_none=True)
                 logger.debug(
                     f"[BuildGraphNode] Saved agent optimization_hints: "
                     f"params={strategy.optimization_hints.parameters_to_optimize}"
                 )
 
-            state.set_result(self.name, {"blocks": len(graph["blocks"]), "connections": len(graph["connections"]), "warnings": warnings})
+            state.set_result(
+                self.name,
+                {"blocks": len(graph["blocks"]), "connections": len(graph["connections"]), "warnings": warnings},
+            )
         except Exception as exc:
             logger.warning(f"[BuildGraphNode] Graph conversion failed (non-fatal): {exc}")
             state.context["strategy_graph"] = None
@@ -797,6 +784,7 @@ class BacktestNode(AgentNode):
             # Fallback: legacy BacktestBridge (6 strategy types only)
             logger.debug("[BacktestNode] No strategy_graph — using BacktestBridge fallback")
             from backend.agents.integration.backtest_bridge import BacktestBridge
+
             bridge = BacktestBridge()
             metrics = await bridge.run_strategy(
                 strategy=strategy,
@@ -807,11 +795,14 @@ class BacktestNode(AgentNode):
                 leverage=state.context.get("leverage", 1),
             )
 
-        state.set_result(self.name, {
-            "metrics": metrics,
-            "engine_warnings": engine_warnings,
-            "sample_trades": sample_trades,
-        })
+        state.set_result(
+            self.name,
+            {
+                "metrics": metrics,
+                "engine_warnings": engine_warnings,
+                "sample_trades": sample_trades,
+            },
+        )
         state.add_message(
             "system",
             f"Backtest complete: {metrics.get('total_trades', 0)} trades, Sharpe={metrics.get('sharpe_ratio', 0):.2f}",
@@ -826,11 +817,7 @@ class BacktestNode(AgentNode):
             selected_agent = select_result.get("selected_agent", "unknown")
             strategy_type = getattr(strategy, "strategy_type", "unknown")
             sharpe = metrics.get("sharpe_ratio", 0.0)
-            passed = (
-                metrics.get("total_trades", 0) >= 5
-                and sharpe > 0
-                and metrics.get("max_drawdown", 100) < 30
-            )
+            passed = metrics.get("total_trades", 0) >= 5 and sharpe > 0 and metrics.get("max_drawdown", 100) < 30
             tracker.record_result(
                 agent_name=selected_agent,
                 metrics=metrics,
@@ -838,10 +825,7 @@ class BacktestNode(AgentNode):
                 passed=passed,
                 fitness_score=max(0.0, min(100.0, sharpe * 20 + (50 if passed else 0))),
             )
-            logger.info(
-                f"📊 AgentPerformanceTracker updated: {selected_agent} "
-                f"passed={passed}, sharpe={sharpe:.2f}"
-            )
+            logger.info(f"📊 AgentPerformanceTracker updated: {selected_agent} passed={passed}, sharpe={sharpe:.2f}")
         except Exception as _tracker_err:
             logger.debug(f"AgentPerformanceTracker update failed (non-fatal): {_tracker_err}")
 
@@ -898,9 +882,7 @@ class BacktestNode(AgentNode):
             # BacktestResult has `analysis_warnings` (static analysis).
             # DIRECTION_MISMATCH / NO_TRADES are NOT set by the engine — generate
             # them here from result metrics so RefinementNode gets meaningful feedback.
-            engine_warnings: list[str] = list(
-                getattr(result, "analysis_warnings", []) or []
-            )
+            engine_warnings: list[str] = list(getattr(result, "analysis_warnings", []) or [])
             trades_count = metrics.get("total_trades", 0)
             long_trades = metrics.get("long_trades", 0)
             short_trades = metrics.get("short_trades", 0)
@@ -934,10 +916,7 @@ class BacktestNode(AgentNode):
                     except Exception:
                         pass
                 elif hasattr(t, "__dict__"):
-                    sample_trades.append({
-                        k: v for k, v in t.__dict__.items()
-                        if not k.startswith("_")
-                    })
+                    sample_trades.append({k: v for k, v in t.__dict__.items() if not k.startswith("_")})
 
             return {
                 "metrics": metrics,
@@ -1011,7 +990,7 @@ class BacktestAnalysisNode(AgentNode):
             timeout=5.0,
         )
 
-    async def execute(self, state: AgentState) -> AgentState:  # noqa: C901
+    async def execute(self, state: AgentState) -> AgentState:
         backtest_result = state.get_result("backtest") or {}
         metrics: dict[str, Any] = backtest_result.get("metrics", {}) or {}
         engine_warnings: list[str] = list(backtest_result.get("engine_warnings", None) or [])
@@ -1022,18 +1001,13 @@ class BacktestAnalysisNode(AgentNode):
         win_rate: float = float(metrics.get("win_rate", 0.0))
 
         # ── Severity ──────────────────────────────────────────────────────────
-        passed = (
-            trades >= self.MIN_TRADES
-            and sharpe > 0
-            and dd < self.MAX_DD_PCT
-        )
+        passed = trades >= self.MIN_TRADES and sharpe > 0 and dd < self.MAX_DD_PCT
 
         if passed:
             severity = "pass"
         elif (
-            (-0.5 < sharpe <= 0 or (self.MIN_TRADES - 2 <= trades < self.MIN_TRADES) or 25.0 <= dd < self.MAX_DD_PCT)
-            and not (sharpe < -0.5 or trades < 3 or dd >= self.MAX_DD_PCT)
-        ):
+            -0.5 < sharpe <= 0 or (self.MIN_TRADES - 2 <= trades < self.MIN_TRADES) or 25.0 <= dd < self.MAX_DD_PCT
+        ) and not (sharpe < -0.5 or trades < 3 or dd >= self.MAX_DD_PCT):
             severity = "near_miss"
         elif sharpe < -1.5 or trades == 0 or dd >= 50.0:
             severity = "catastrophic"
@@ -1200,8 +1174,7 @@ class MemoryUpdateNode(AgentNode):
                 agent_namespace="strategy_gen",
             )
             logger.info(
-                f"🧠 MemoryUpdateNode: stored episodic memory "
-                f"(importance={importance:.2f}, sharpe={sharpe:.2f})"
+                f"🧠 MemoryUpdateNode: stored episodic memory (importance={importance:.2f}, sharpe={sharpe:.2f})"
             )
         except Exception as e:
             logger.warning(f"[MemoryUpdateNode] HierarchicalMemory store failed (non-fatal): {e}")
@@ -1245,11 +1218,7 @@ class MemoryUpdateNode(AgentNode):
         try:
             sharpe = metrics.get("sharpe_ratio", 0.0)
             total_return = metrics.get("total_return", 0.0)
-            description = (
-                f"AI-generated strategy. "
-                f"Sharpe={sharpe:.2f}, Return={total_return:.1f}%, "
-                f"Symbol={symbol}."
-            )
+            description = f"AI-generated strategy. Sharpe={sharpe:.2f}, Return={total_return:.1f}%, Symbol={symbol}."
             strategy_obj = Strategy(
                 name=strategy_name,
                 description=description,
@@ -1343,8 +1312,7 @@ class RefinementNode(AgentNode):
             failures.append(f"excessive drawdown ({dd:.1f}% >= {self.MAX_DD_PCT}% limit)")
             if not any("drawdown" in s.lower() or "risk" in s.lower() for s in suggestions):
                 suggestions.append(
-                    "Reduce risk: use ATR-based stop-loss, add volatility filter, "
-                    "or switch to a shorter-term strategy."
+                    "Reduce risk: use ATR-based stop-loss, add volatility filter, or switch to a shorter-term strategy."
                 )
         if not failures:
             # Shouldn't happen (router only calls us on failure) but be safe
@@ -1361,16 +1329,14 @@ class RefinementNode(AgentNode):
             f"=== REFINEMENT FEEDBACK (iteration {iteration}/{self.MAX_REFINEMENTS}) [{severity_prefix}] ===",
             f"Root cause diagnosis: {root_cause.upper().replace('_', ' ')}",
             f"The previous strategy FAILED backtesting due to: {'; '.join(failures)}.",
-            f"Backtest summary: {trades} trades, Sharpe={sharpe:.2f}, "
-            f"MaxDD={dd:.1f}%, Return={total_return:.1f}%.",
+            f"Backtest summary: {trades} trades, Sharpe={sharpe:.2f}, MaxDD={dd:.1f}%, Return={total_return:.1f}%.",
         ]
 
         # Append engine warnings (DIRECTION_MISMATCH, NO_TRADES, etc.)
         relevant_warnings = [
-            w for w in engine_warnings
-            if any(tag in str(w) for tag in (
-                "DIRECTION_MISMATCH", "NO_TRADES", "INVALID_OHLC", "BAR_MAGNIFIER"
-            ))
+            w
+            for w in engine_warnings
+            if any(tag in str(w) for tag in ("DIRECTION_MISMATCH", "NO_TRADES", "INVALID_OHLC", "BAR_MAGNIFIER"))
         ]
         if relevant_warnings:
             feedback_parts.append("\nENGINE WARNINGS (root cause clues):")
@@ -1451,10 +1417,7 @@ class RefinementNode(AgentNode):
             f"Refinement {iteration}/{self.MAX_REFINEMENTS}: {'; '.join(failures)}",
             self.name,
         )
-        logger.info(
-            f"🔄 [RefinementNode] iter={iteration}/{self.MAX_REFINEMENTS} "
-            f"failures={failures}"
-        )
+        logger.info(f"🔄 [RefinementNode] iter={iteration}/{self.MAX_REFINEMENTS} failures={failures}")
         return state
 
 
@@ -1515,10 +1478,7 @@ class OptimizationNode(AgentNode):
             "profit_factor": 0.20,
         }
 
-        logger.info(
-            f"🔧 [OptimizationNode] Starting {self.N_TRIALS}-trial Optuna search "
-            f"on {symbol} {timeframe}"
-        )
+        logger.info(f"🔧 [OptimizationNode] Starting {self.N_TRIALS}-trial Optuna search on {symbol} {timeframe}")
 
         try:
             opt_result = await asyncio.to_thread(
@@ -1606,10 +1566,7 @@ class OptimizationNode(AgentNode):
                 "best_metrics": {},
             }
 
-        logger.info(
-            f"[OptimizationNode] {len(param_specs)} param specs extracted, "
-            f"running {self.N_TRIALS} trials"
-        )
+        logger.info(f"[OptimizationNode] {len(param_specs)} param specs extracted, running {self.N_TRIALS} trials")
 
         return run_builder_optuna_search(
             base_graph=strategy_graph,
@@ -1699,12 +1656,12 @@ class MLValidationNode(AgentNode):
     """
 
     # Overfitting thresholds
-    IS_FRACTION = 0.70        # 70% in-sample, 30% OOS
-    OVERFIT_GAP_THRESHOLD = 0.5   # IS_sharpe - OOS_sharpe > this → overfit flag
-    OVERFIT_SCORE_DIVISOR = 2.0   # normalise gap into [0, 1] range
+    IS_FRACTION = 0.70  # 70% in-sample, 30% OOS
+    OVERFIT_GAP_THRESHOLD = 0.5  # IS_sharpe - OOS_sharpe > this → overfit flag
+    OVERFIT_SCORE_DIVISOR = 2.0  # normalise gap into [0, 1] range
 
     # Perturbation test
-    PERTURB_FRACTIONS = [-0.20, +0.20]   # ±20% of original period value
+    PERTURB_FRACTIONS = [-0.20, +0.20]  # ±20% of original period value
 
     def __init__(self) -> None:
         super().__init__(
@@ -1743,9 +1700,14 @@ class MLValidationNode(AgentNode):
                 self._check_overfitting,
                 strategy_graph,
                 df,
-                {"symbol": symbol, "timeframe": timeframe,
-                 "initial_capital": initial_capital, "leverage": leverage,
-                 "commission_value": COMMISSION_TV, "direction": "both"},
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "initial_capital": initial_capital,
+                    "leverage": leverage,
+                    "commission_value": COMMISSION_TV,
+                    "direction": "both",
+                },
             )
             validation["overfitting"] = overfit_result
             if overfit_result.get("is_overfit"):
@@ -1754,9 +1716,7 @@ class MLValidationNode(AgentNode):
                     f"OOS_sharpe={overfit_result['oos_sharpe']:.2f} "
                     f"gap={overfit_result['gap']:.2f} (threshold {self.OVERFIT_GAP_THRESHOLD})"
                 )
-                logger.warning(
-                    f"⚠️ [MLValidation] Overfitting detected: gap={overfit_result['gap']:.2f}"
-                )
+                logger.warning(f"⚠️ [MLValidation] Overfitting detected: gap={overfit_result['gap']:.2f}")
             else:
                 logger.info(
                     f"✅ [MLValidation] Overfitting check passed "
@@ -1775,22 +1735,22 @@ class MLValidationNode(AgentNode):
                 self._check_regimes,
                 strategy_graph,
                 df,
-                {"symbol": symbol, "timeframe": timeframe,
-                 "initial_capital": initial_capital, "leverage": leverage,
-                 "commission_value": COMMISSION_TV, "direction": "both"},
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "initial_capital": initial_capital,
+                    "leverage": leverage,
+                    "commission_value": COMMISSION_TV,
+                    "direction": "both",
+                },
             )
             validation["regime_analysis"] = regime_result
-            poor_regimes = [
-                r for r, s in regime_result.get("regime_sharpes", {}).items() if s < 0
-            ]
+            poor_regimes = [r for r, s in regime_result.get("regime_sharpes", {}).items() if s < 0]
             if poor_regimes:
                 validation["warnings"].append(
-                    f"[REGIME] Strategy performs poorly in: {poor_regimes}. "
-                    "Consider adding a regime filter block."
+                    f"[REGIME] Strategy performs poorly in: {poor_regimes}. Consider adding a regime filter block."
                 )
-                logger.info(
-                    f"ℹ️ [MLValidation] Poor regimes: {poor_regimes}"
-                )
+                logger.info(f"ℹ️ [MLValidation] Poor regimes: {poor_regimes}")
             else:
                 logger.info("✅ [MLValidation] Regime check: strategy viable across all regimes")
         except Exception as exc:
@@ -1805,18 +1765,21 @@ class MLValidationNode(AgentNode):
                 self._check_parameter_stability,
                 strategy_graph,
                 df,
-                {"symbol": symbol, "timeframe": timeframe,
-                 "initial_capital": initial_capital, "leverage": leverage,
-                 "commission_value": COMMISSION_TV, "direction": "both"},
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "initial_capital": initial_capital,
+                    "leverage": leverage,
+                    "commission_value": COMMISSION_TV,
+                    "direction": "both",
+                },
             )
             validation["parameter_stability"] = stability_result
             if not stability_result.get("is_stable", True):
                 validation["warnings"].append(
                     f"[STABILITY] Sensitive params: {stability_result.get('sensitive_params', [])}"
                 )
-                logger.warning(
-                    f"⚠️ [MLValidation] Parameter instability: {stability_result.get('sensitive_params')}"
-                )
+                logger.warning(f"⚠️ [MLValidation] Parameter instability: {stability_result.get('sensitive_params')}")
             else:
                 logger.info("✅ [MLValidation] Parameter stability check passed")
         except Exception as exc:
@@ -1843,9 +1806,9 @@ class MLValidationNode(AgentNode):
 
     def _run_strategy(self, strategy_graph: dict, df, config_params: dict) -> dict:
         """Run strategy_graph on the given df slice and return metrics dict."""
+        from backend.backtesting.engine import BacktestEngine
         from backend.backtesting.models import BacktestConfig
         from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
-        from backend.backtesting.engine import BacktestEngine
 
         adapter = StrategyBuilderAdapter(strategy_graph)
         signal_result = adapter.generate_signals(df)
@@ -1862,9 +1825,7 @@ class MLValidationNode(AgentNode):
         result = engine.run(data=df, signals=signal_result, config=cfg)
         return result.metrics if hasattr(result, "metrics") else {}
 
-    def _check_overfitting(
-        self, strategy_graph: dict, df, config_params: dict
-    ) -> dict:
+    def _check_overfitting(self, strategy_graph: dict, df, config_params: dict) -> dict:
         """7.1: In-sample vs out-of-sample Sharpe comparison."""
         n = len(df)
         if n < 100:
@@ -1900,9 +1861,7 @@ class MLValidationNode(AgentNode):
             "oos_trades": oos_metrics.get("total_trades", 0),
         }
 
-    def _check_regimes(
-        self, strategy_graph: dict, df, config_params: dict
-    ) -> dict:
+    def _check_regimes(self, strategy_graph: dict, df, config_params: dict) -> dict:
         """7.2: Per-regime Sharpe analysis."""
         import numpy as np
 
@@ -1912,11 +1871,13 @@ class MLValidationNode(AgentNode):
         # Detect regimes (try HMM, fallback to KMeans)
         try:
             from backend.ml.regime_detection import HMMRegimeDetector
+
             detector = HMMRegimeDetector(n_regimes=3, n_iter=50)
             regime_result = detector.fit_predict(df)
         except Exception:
             try:
                 from backend.ml.regime_detection import KMeansRegimeDetector
+
                 detector = KMeansRegimeDetector(n_regimes=3)
                 regime_result = detector.fit_predict(df)
             except Exception as exc:
@@ -1929,9 +1890,12 @@ class MLValidationNode(AgentNode):
         # Get entry signals for the full df (to split per regime)
         try:
             from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+
             adapter = StrategyBuilderAdapter(strategy_graph)
             signal_result = adapter.generate_signals(df)
-            entries = signal_result.entries.values if hasattr(signal_result.entries, "values") else signal_result.entries
+            entries = (
+                signal_result.entries.values if hasattr(signal_result.entries, "values") else signal_result.entries
+            )
         except Exception:
             entries = None
 
@@ -1955,15 +1919,11 @@ class MLValidationNode(AgentNode):
             "regime_sharpes": regime_sharpes,
             "current_regime": regime_result.current_regime_name,
             "regime_distribution": {
-                regime_names[i]: float(np.mean(regimes == i))
-                for i in range(n_regimes)
-                if i < len(regime_names)
+                regime_names[i]: float(np.mean(regimes == i)) for i in range(n_regimes) if i < len(regime_names)
             },
         }
 
-    def _check_parameter_stability(
-        self, strategy_graph: dict, df, config_params: dict
-    ) -> dict:
+    def _check_parameter_stability(self, strategy_graph: dict, df, config_params: dict) -> dict:
         """7.3: Perturb indicator periods ±20% and check Sharpe stability."""
         import copy
 
@@ -1971,7 +1931,7 @@ class MLValidationNode(AgentNode):
             return {"status": "skipped", "reason": "insufficient_data"}
 
         # Extract period params from blocks
-        period_params: list[tuple[int, str, int]] = []   # (block_idx, param_name, value)
+        period_params: list[tuple[int, str, int]] = []  # (block_idx, param_name, value)
         for b_idx, block in enumerate(strategy_graph.get("blocks", [])):
             params = block.get("params", {})
             for k, v in params.items():
@@ -1997,9 +1957,7 @@ class MLValidationNode(AgentNode):
                 perturbed_graph["blocks"][b_idx]["params"][param_name] = new_value
 
                 try:
-                    perturbed_metrics = self._run_strategy(
-                        perturbed_graph, df, config_params
-                    )
+                    perturbed_metrics = self._run_strategy(perturbed_graph, df, config_params)
                     p_sharpe = perturbed_metrics.get("sharpe_ratio", 0.0)
                     # Flag if Sharpe flips sign or drops more than 1.0 from baseline
                     if (base_sharpe > 0 and p_sharpe <= 0) or (base_sharpe - p_sharpe > 1.0):
@@ -2034,11 +1992,7 @@ def _backtest_passes(state: AgentState) -> bool:
     trades = metrics.get("total_trades", 0)
     sharpe = metrics.get("sharpe_ratio", -999.0)
     dd = metrics.get("max_drawdown", 100.0)
-    return (
-        trades >= _MIN_TRADES
-        and sharpe > 0
-        and dd < _MAX_DD_PCT
-    )
+    return trades >= _MIN_TRADES and sharpe > 0 and dd < _MAX_DD_PCT
 
 
 def _should_refine(state: AgentState) -> bool:
@@ -2216,7 +2170,7 @@ async def run_strategy_pipeline(
             graph.execute(initial_state),
             timeout=pipeline_timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(
             f"[Pipeline] Timeout after {pipeline_timeout}s — returning partial state "
             f"(nodes completed: {initial_state.visited_nodes})"

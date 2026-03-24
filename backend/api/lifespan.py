@@ -489,6 +489,7 @@ async def lifespan(app: "FastAPI"):
     # Happens when remote clients forcibly close connections — not a real error.
     # =========================================================================
     import sys
+
     if sys.platform == "win32":
         _loop = asyncio.get_event_loop()
         _orig_exception_handler = _loop.get_exception_handler()

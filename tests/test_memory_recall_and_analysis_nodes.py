@@ -14,28 +14,27 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch as _patch
 
 import pytest
 
-from unittest.mock import AsyncMock as _AM, patch as _patch
-
-from backend.agents.langgraph_orchestrator import AgentGraph, AgentState
+from backend.agents.langgraph_orchestrator import AgentState
 from backend.agents.trading_strategy_graph import (
+    _MAX_DD_PCT,
+    _MIN_TRADES,
     BacktestAnalysisNode,
     MemoryRecallNode,
     RefinementNode,
-    _MIN_TRADES,
-    _MAX_DD_PCT,
     _backtest_passes,
     _report_node,
     build_trading_strategy_graph,
     run_strategy_pipeline,
 )
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def make_state(**ctx) -> AgentState:
     state = AgentState()
@@ -67,6 +66,7 @@ def make_backtest_result(
 # =============================================================================
 # BacktestAnalysisNode — severity classification
 # =============================================================================
+
 
 class TestBacktestAnalysisNodeSeverity:
     node = BacktestAnalysisNode()
@@ -125,6 +125,7 @@ class TestBacktestAnalysisNodeSeverity:
 # BacktestAnalysisNode — root cause detection
 # =============================================================================
 
+
 class TestBacktestAnalysisNodeRootCause:
     node = BacktestAnalysisNode()
 
@@ -133,9 +134,9 @@ class TestBacktestAnalysisNodeRootCause:
 
     def test_direction_mismatch(self):
         state = make_state()
-        state.set_result("backtest", make_backtest_result(
-            trades=0, engine_warnings=["[DIRECTION_MISMATCH] long only vs both"]
-        ))
+        state.set_result(
+            "backtest", make_backtest_result(trades=0, engine_warnings=["[DIRECTION_MISMATCH] long only vs both"])
+        )
         out = self._run(state)
         assert out.context["backtest_analysis"]["root_cause"] == "direction_mismatch"
 
@@ -147,9 +148,9 @@ class TestBacktestAnalysisNodeRootCause:
 
     def test_signal_connectivity(self):
         state = make_state()
-        state.set_result("backtest", make_backtest_result(
-            trades=0, engine_warnings=["[NO_TRADES] signals exist but no executions"]
-        ))
+        state.set_result(
+            "backtest", make_backtest_result(trades=0, engine_warnings=["[NO_TRADES] signals exist but no executions"])
+        )
         out = self._run(state)
         assert out.context["backtest_analysis"]["root_cause"] == "signal_connectivity"
 
@@ -176,6 +177,7 @@ class TestBacktestAnalysisNodeRootCause:
 # BacktestAnalysisNode — suggestions and output structure
 # =============================================================================
 
+
 class TestBacktestAnalysisNodeOutput:
     node = BacktestAnalysisNode()
 
@@ -184,9 +186,7 @@ class TestBacktestAnalysisNodeOutput:
 
     def test_direction_mismatch_suggestion_mentions_port(self):
         state = make_state()
-        state.set_result("backtest", make_backtest_result(
-            trades=0, engine_warnings=["[DIRECTION_MISMATCH]"]
-        ))
+        state.set_result("backtest", make_backtest_result(trades=0, engine_warnings=["[DIRECTION_MISMATCH]"]))
         out = self._run(state)
         suggestions = out.context["backtest_analysis"]["suggestions"]
         assert any("long" in s.lower() or "port" in s.lower() for s in suggestions)
@@ -219,11 +219,14 @@ class TestBacktestAnalysisNodeOutput:
 
     def test_none_engine_warnings_does_not_crash(self):
         state = make_state()
-        state.set_result("backtest", {
-            "metrics": {"total_trades": 0, "sharpe_ratio": -1.0, "max_drawdown": 50.0, "win_rate": 0.0},
-            "engine_warnings": None,
-            "sample_trades": None,
-        })
+        state.set_result(
+            "backtest",
+            {
+                "metrics": {"total_trades": 0, "sharpe_ratio": -1.0, "max_drawdown": 50.0, "win_rate": 0.0},
+                "engine_warnings": None,
+                "sample_trades": None,
+            },
+        )
         out = self._run(state)
         assert "backtest_analysis" in out.context
 
@@ -231,6 +234,7 @@ class TestBacktestAnalysisNodeOutput:
 # =============================================================================
 # MemoryRecallNode
 # =============================================================================
+
 
 class TestMemoryRecallNode:
     node = MemoryRecallNode()
@@ -269,11 +273,13 @@ class TestMemoryRecallNode:
         mock_win.tags = ["BTCUSDT", "rsi"]
 
         mock_memory = MagicMock()
-        mock_memory.recall = AsyncMock(side_effect=[
-            [mock_win],  # wins
-            [],          # failures
-            [],          # regime
-        ])
+        mock_memory.recall = AsyncMock(
+            side_effect=[
+                [mock_win],  # wins
+                [],  # failures
+                [],  # regime
+            ]
+        )
 
         with patch(self._PATCH_PATH, return_value=mock_memory):
             out = self._run(state)
@@ -292,11 +298,13 @@ class TestMemoryRecallNode:
         mock_fail.tags = ["BTCUSDT", "macd", "failed"]
 
         mock_memory = MagicMock()
-        mock_memory.recall = AsyncMock(side_effect=[
-            [],           # wins
-            [mock_fail],  # failures
-            [],           # regime
-        ])
+        mock_memory.recall = AsyncMock(
+            side_effect=[
+                [],  # wins
+                [mock_fail],  # failures
+                [],  # regime
+            ]
+        )
 
         with patch(self._PATCH_PATH, return_value=mock_memory):
             out = self._run(state)
@@ -320,6 +328,7 @@ class TestMemoryRecallNode:
 # =============================================================================
 # RefinementNode uses BacktestAnalysisNode output
 # =============================================================================
+
 
 class TestRefinementNodeUsesAnalysis:
     node = RefinementNode()
@@ -387,6 +396,7 @@ class TestRefinementNodeUsesAnalysis:
 # Graph wiring
 # =============================================================================
 
+
 def _edge_pairs(g) -> set[tuple[str, str]]:
     """Extract (source, target) pairs from AgentGraph.edges dict."""
     pairs: set[tuple[str, str]] = set()
@@ -438,11 +448,20 @@ class TestGraphWiringWithNewNodes:
     def test_all_nodes_present(self):
         g = build_trading_strategy_graph(run_backtest=True, run_debate=True)
         expected = {
-            "analyze_market", "debate", "memory_recall",
-            "generate_strategies", "parse_responses", "select_best",
-            "build_graph", "backtest", "backtest_analysis",
-            "refine_strategy", "optimize_strategy", "ml_validation",
-            "memory_update", "report",
+            "analyze_market",
+            "debate",
+            "memory_recall",
+            "generate_strategies",
+            "parse_responses",
+            "select_best",
+            "build_graph",
+            "backtest",
+            "backtest_analysis",
+            "refine_strategy",
+            "optimize_strategy",
+            "ml_validation",
+            "memory_update",
+            "report",
         }
         assert expected.issubset(set(g.nodes.keys()))
 
@@ -450,6 +469,7 @@ class TestGraphWiringWithNewNodes:
 # =============================================================================
 # Module-level constants and _backtest_passes / _report_node
 # =============================================================================
+
 
 class TestModuleLevelConstants:
     def test_min_trades_value(self):
@@ -589,6 +609,7 @@ class TestPipelineTimeout:
     def test_timeout_default_is_300s(self):
         """Default pipeline_timeout parameter value must be 300 seconds."""
         import inspect
+
         sig = inspect.signature(run_strategy_pipeline)
         assert sig.parameters["pipeline_timeout"].default == 300.0
 

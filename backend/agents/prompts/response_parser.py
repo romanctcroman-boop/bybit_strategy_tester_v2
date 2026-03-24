@@ -384,9 +384,7 @@ class ResponseParser:
         errors.extend(validation.warnings)
 
         if not validation.is_valid:
-            logger.warning(
-                f"Strategy '{strategy.strategy_name}' has {len(errors)} validation error(s)"
-            )
+            logger.warning(f"Strategy '{strategy.strategy_name}' has {len(errors)} validation error(s)")
             return None, errors
 
         logger.info(

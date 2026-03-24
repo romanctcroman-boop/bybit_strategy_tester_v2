@@ -67,8 +67,8 @@ FastAPI router                                          → JSON response + warn
 | ------------------------ | ------------------------------------------------- | --------------------------------------------------------- |
 | `BacktestConfig`         | `backend/backtesting/models.py`                   | All backtest parameters (single Pydantic model)           |
 | `BacktestEngine`         | `backend/backtesting/engine.py`                   | FallbackEngineV4 — gold standard engine                   |
-| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder_adapter.py` | Graph → BaseStrategy (**3575 lines**)                     |
-| `indicator_handlers`     | `backend/backtesting/indicator_handlers.py`       | **40+** indicator handlers + INDICATOR_DISPATCH (**2217 lines**) |
+| `StrategyBuilderAdapter` | `backend/backtesting/strategy_builder/adapter.py` | Graph → BaseStrategy (**1399 lines**, Phase 3 package ✅) |
+| `indicator_handlers`     | `backend/backtesting/indicators/` (package)       | **40+** indicator handlers + INDICATOR_DISPATCH (trend/oscillators/volatility/volume/other) |
 | `MetricsCalculator`      | `backend/core/metrics_calculator.py`              | Single source of truth for 166 metrics                    |
 | `DataService`            | `backend/services/data_service.py`                | OHLCV loading                                             |
 | `UnifiedAgentInterface`  | `backend/agents/unified_agent_interface.py`       | All AI agent calls                                        |
@@ -243,8 +243,21 @@ d:/bybit_strategy_tester_v2/
 │   │   ├── engine_selector.py       # Engine selection: auto / fallback / numba / gpu
 │   │   ├── models.py                # BacktestConfig, BacktestResult, PerformanceMetrics
 │   │   ├── strategies/              # Built-in strategies: SMA, RSI, MACD, Bollinger, Grid, DCA
-│   │   ├── strategy_builder_adapter.py  # Builder graph → BaseStrategy (3575 lines)
-│   │   ├── indicator_handlers.py    # 40+ indicator handlers + INDICATOR_DISPATCH table (2217 lines)
+│   │   ├── strategy_builder/        # Builder graph → BaseStrategy (Phase 3 package ✅)
+│   │   │   ├── adapter.py           #   Main adapter (1399 lines)
+│   │   │   ├── block_executor.py    #   Block execution
+│   │   │   ├── graph_parser.py      #   Graph parsing & normalization
+│   │   │   ├── signal_router.py     #   Port aliases, routing
+│   │   │   ├── topology.py          #   Topological sort
+│   │   │   └── utils.py             #   Shared utilities
+│   │   ├── strategy_builder_adapter.py  # [WRAPPER] backward-compat re-export only
+│   │   ├── indicators/              # 40+ indicator handlers (Phase 3 package ✅)
+│   │   │   ├── trend.py             #   SMA/EMA/WMA/DEMA/TEMA/HullMA/ADX/Supertrend/...
+│   │   │   ├── oscillators.py       #   RSI/MACD/Stochastic/QQE/StochRSI/CCI/...
+│   │   │   ├── volatility.py        #   Bollinger/Keltner/Donchian/ATR/...
+│   │   │   ├── volume.py            #   OBV/VWAP/CMF/A-D Line/PVT/...
+│   │   │   └── other.py             #   Pivot Points/MTF/Filters/...
+│   │   ├── indicator_handlers.py    # [WRAPPER] backward-compat re-export only (178 lines)
 │   │   ├── numba_engine.py          # JIT engine (Numba)
 │   │   ├── vectorbt_sltp.py         # VectorBT SL/TP (for optimization only)
 │   │   ├── fast_optimizer.py        # [DEPRECATED] RSI-only Numba optimizer
@@ -325,7 +338,7 @@ d:/bybit_strategy_tester_v2/
 │   ├── dashboard.html               # Main dashboard
 │   ├── css/strategy_builder.css
 │   ├── js/
-│   │   ├── pages/strategy_builder.js   # Builder logic (blocks, connections, run) — 13378 lines
+│   │   ├── pages/strategy_builder.js   # Builder logic (blocks, connections, run) — ~7154 lines
 │   │   ├── pages/backtest_results.js   # Tables and charts
 │   │   ├── pages/optimization.js       # Optimization management
 │   │   ├── shared/leverageManager.js   # Shared leverage module
@@ -956,3 +969,41 @@ This update synchronizes CLAUDE.md with the actual codebase state.
 - Commission 0.001 defaults remain in: `optimize_tasks.py`, `fast_optimizer.py`, `ai_backtest_executor.py` (legacy/experimental paths)
 
 ---
+
+## 17. Memory Bank & Session Infrastructure (added 2026-03-15)
+
+### Memory Bank (`memory-bank/`)
+
+Persistent context files loaded via hooks at session start and after compaction:
+
+| File | Update freq | Contents |
+|------|------------|---------|
+| `memory-bank/projectBrief.md` | Rarely | Goals, invariants, entry point |
+| `memory-bank/productContext.md` | Rarely | Problem, users, constraints |
+| `memory-bank/systemPatterns.md` | On arch changes | Data flow, critical patterns, traps |
+| `memory-bank/techContext.md` | On stack changes | Tech stack, environment, allowed commands |
+| `memory-bank/activeContext.md` | **Often** | Current work, next steps, blockers |
+| `memory-bank/progress.md` | **Often** | What works, bugs, tech debt |
+
+**Rule for AI agents:** After completing a significant task, update `memory-bank/activeContext.md` with what was done and what comes next. Update `memory-bank/progress.md` when a bug is fixed or feature is added.
+
+### Hooks (`.claude/hooks/`)
+
+Three hooks are configured in `.claude/settings.json`:
+
+| Hook | Event | Trigger | Action |
+|------|-------|---------|--------|
+| `post_edit_tests.py` | PostToolUse Edit\|Write | Python backend file edited | Auto-run targeted pytest |
+| `post_compact_context.py` | PostCompact | Mid-session compaction | Re-inject critical constants + Memory Bank |
+| `session_start_context.py` | SessionStart compact\|startup | Session start | Load Memory Bank into context |
+
+**Hook test mapping** (`post_edit_tests.py`): maps edited file paths to targeted test directories (not full suite). Edit `backend/backtesting/engine.py` → runs `tests/backend/backtesting/test_engine.py`.
+
+### Sub-directory CLAUDE.md
+
+Context files exist in key modules and load on-demand when Claude reads files in those directories:
+- `backend/backtesting/CLAUDE.md` — engine hierarchy, adapter details, SignalResult contract
+- `backend/api/CLAUDE.md` — router patterns, direction trap, async rules
+- `frontend/CLAUDE.md` — no-build rule, commission conversion, direction mismatch CSS
+
+**Known limitation:** Sub-directory CLAUDE.md files load only when Claude uses `Read()` on files in that directory (Claude Code bug #2571, NOT_PLANNED). They do NOT load at session start. This is acceptable — we always read files before editing them.

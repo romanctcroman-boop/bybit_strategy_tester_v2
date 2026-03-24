@@ -84,9 +84,9 @@ class CostCircuitBreaker:
 
         # Approximate per-token costs for pre-call estimation (USD/token)
         self._token_costs: dict[str, float] = {
-            "perplexity": 0.60 / 1_000_000,   # sonar output rate
-            "deepseek":   0.28 / 1_000_000,   # deepseek-chat output rate
-            "qwen":       1.20 / 1_000_000,   # qwen3-max output rate
+            "perplexity": 0.60 / 1_000_000,  # sonar output rate
+            "deepseek": 0.28 / 1_000_000,  # deepseek-chat output rate
+            "qwen": 1.20 / 1_000_000,  # qwen3-max output rate
         }
 
         logger.info(

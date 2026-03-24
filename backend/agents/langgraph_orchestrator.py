@@ -525,13 +525,15 @@ class AgentGraph:
         }
         if self._last_state is not None:
             timing: dict[str, float] = dict(self._last_state.execution_path)
-            base.update({
-                "node_timing_s": timing,
-                "slowest_node": max(timing, key=timing.__getitem__) if timing else None,
-                "total_wall_time_s": round(sum(timing.values()), 3),
-                "total_cost_usd": round(self._last_state.total_cost_usd, 6),
-                "llm_call_count": self._last_state.llm_call_count,
-            })
+            base.update(
+                {
+                    "node_timing_s": timing,
+                    "slowest_node": max(timing, key=timing.__getitem__) if timing else None,
+                    "total_wall_time_s": round(sum(timing.values()), 3),
+                    "total_cost_usd": round(self._last_state.total_cost_usd, 6),
+                    "llm_call_count": self._last_state.llm_call_count,
+                }
+            )
         return base
 
     def visualize(self) -> str:

@@ -151,6 +151,7 @@ def _handle_mtf(
             values = src.rolling(period).mean()
         elif indicator == "rsi":
             from backend.core.indicators import calculate_rsi
+
             values = pd.Series(calculate_rsi(src.values, period=period), index=ohlcv.index)
         elif indicator == "atr":
             values = pd.Series(
@@ -187,6 +188,7 @@ def _handle_mtf(
             htf_values = src_htf.rolling(period).mean()
         elif indicator == "rsi":
             from backend.core.indicators import calculate_rsi
+
             htf_values = pd.Series(calculate_rsi(src_htf.values, period=period), index=src_htf.index)
         elif indicator == "atr":
             htf_values = pd.Series(

@@ -96,13 +96,28 @@ function Start-UvicornServer {
             -PassThru `
             -WindowStyle Hidden
         
-        # Wait a moment for process to start
-        Start-Sleep -Seconds 2
-        
-        # Save PID
-        if ($process -and $process.Id) {
+        # Wait for uvicorn to bind the port
+        Start-Sleep -Seconds 3
+
+        # Detect the actual python/uvicorn process via port 8000 (not the cmd.exe wrapper)
+        $uvicornProc = $null
+        try {
+            $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue 2>$null
+            if ($conn) {
+                $uvicornProc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+            }
+        }
+        catch { }
+
+        if ($uvicornProc) {
+            Set-Content -Path $PidFile -Value $uvicornProc.Id -Force
+            Write-Host "[OK] Uvicorn started (PID: $($uvicornProc.Id), process: $($uvicornProc.ProcessName))" -ForegroundColor Green
+            Write-Host "     Log file: $LogFile" -ForegroundColor Gray
+        }
+        elseif ($process -and $process.Id) {
+            # Fallback: save bat wrapper PID (port detection failed)
             Set-Content -Path $PidFile -Value $process.Id -Force
-            Write-Host "[OK] Uvicorn started (PID: $($process.Id))" -ForegroundColor Green
+            Write-Host "[OK] Uvicorn started (bat PID: $($process.Id))" -ForegroundColor Green
             Write-Host "     Log file: $LogFile" -ForegroundColor Gray
         }
         else {

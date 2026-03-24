@@ -1235,7 +1235,6 @@ class TestOptunaParallelNJobs:
     @pytest.mark.slow
     def test_n_jobs_capped_at_cpu_count(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
         """n_jobs > cpu_count is silently capped and still produces valid results."""
-        import os
 
         from backend.optimization.builder_optimizer import run_builder_optuna_search
 
@@ -1345,11 +1344,13 @@ def mixed_combos():
     combos = []
     for rsi_level in (25, 30):
         for tp in (1.0, 1.5, 2.0):
-            combos.append({
-                "rsi_1.cross_long_level": rsi_level,
-                "sltp_1.take_profit_percent": tp,
-                "sltp_1.stop_loss_percent": 5.0,
-            })
+            combos.append(
+                {
+                    "rsi_1.cross_long_level": rsi_level,
+                    "sltp_1.take_profit_percent": tp,
+                    "sltp_1.stop_loss_percent": 5.0,
+                }
+            )
     return combos
 
 
@@ -1366,14 +1367,20 @@ class TestRunDcaMixedBatchNumba:
             ohlcv=sample_ohlcv,
             param_combinations=mixed_combos,
             config_params=config,
-            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
-                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            final_dca_config={
+                "dca_enabled": True,
+                "dca_order_count": 3,
+                "dca_grid_size_percent": 5.0,
+                "dca_martingale_coef": 1.0,
+            },
             direction_str="long",
             sltp_block_ids=["sltp_1"],
         )
         assert len(results) == len(mixed_combos)
 
-    def test_non_none_results_have_required_keys(self, dca_rsi_graph, sample_ohlcv, backtest_config_params, mixed_combos):
+    def test_non_none_results_have_required_keys(
+        self, dca_rsi_graph, sample_ohlcv, backtest_config_params, mixed_combos
+    ):
         """Every non-None result contains the standard metric keys."""
         from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
 
@@ -1383,8 +1390,12 @@ class TestRunDcaMixedBatchNumba:
             ohlcv=sample_ohlcv,
             param_combinations=mixed_combos,
             config_params=config,
-            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
-                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            final_dca_config={
+                "dca_enabled": True,
+                "dca_order_count": 3,
+                "dca_grid_size_percent": 5.0,
+                "dca_martingale_coef": 1.0,
+            },
             direction_str="long",
             sltp_block_ids=["sltp_1"],
         )
@@ -1411,8 +1422,12 @@ class TestRunDcaMixedBatchNumba:
             ohlcv=sample_ohlcv,
             param_combinations=combos,
             config_params=config,
-            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
-                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            final_dca_config={
+                "dca_enabled": True,
+                "dca_order_count": 3,
+                "dca_grid_size_percent": 5.0,
+                "dca_martingale_coef": 1.0,
+            },
             direction_str="long",
             sltp_block_ids=["sltp_1"],
         )
@@ -1431,13 +1446,31 @@ class TestRunDcaMixedBatchNumba:
             "name": "test",
             "interval": "30",
             "blocks": [
-                {"id": "rsi_1", "type": "rsi", "name": "RSI",
-                 "params": {"period": 5, "source": "close", "timeframe": "30",
-                            "use_long_range": True, "long_rsi_more": 0, "long_rsi_less": 70}},
-                {"id": "dca_1", "type": "dca", "name": "DCA",
-                 "params": {"order_count": 2, "grid_size_percent": 3.0, "martingale_coef": 1.0}},
-                {"id": "sltp_1", "type": "static_sltp", "name": "SL/TP",
-                 "params": {"stop_loss_percent": 20.0, "take_profit_percent": 1.5, "sl_type": "average_price"}},
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {
+                        "period": 5,
+                        "source": "close",
+                        "timeframe": "30",
+                        "use_long_range": True,
+                        "long_rsi_more": 0,
+                        "long_rsi_less": 70,
+                    },
+                },
+                {
+                    "id": "dca_1",
+                    "type": "dca",
+                    "name": "DCA",
+                    "params": {"order_count": 2, "grid_size_percent": 3.0, "martingale_coef": 1.0},
+                },
+                {
+                    "id": "sltp_1",
+                    "type": "static_sltp",
+                    "name": "SL/TP",
+                    "params": {"stop_loss_percent": 20.0, "take_profit_percent": 1.5, "sl_type": "average_price"},
+                },
                 {"id": "strategy_1", "type": "strategy", "isMain": True, "params": {}},
             ],
             "connections": [
@@ -1456,8 +1489,12 @@ class TestRunDcaMixedBatchNumba:
             ohlcv=sample_ohlcv,
             param_combinations=combos,
             config_params=config,
-            final_dca_config={"dca_enabled": True, "dca_order_count": 2,
-                              "dca_grid_size_percent": 3.0, "dca_martingale_coef": 1.0},
+            final_dca_config={
+                "dca_enabled": True,
+                "dca_order_count": 2,
+                "dca_grid_size_percent": 3.0,
+                "dca_martingale_coef": 1.0,
+            },
             direction_str="long",
             sltp_block_ids=["sltp_1"],
         )
@@ -1474,8 +1511,12 @@ class TestRunDcaMixedBatchNumba:
             ohlcv=sample_ohlcv,
             param_combinations=[],
             config_params=backtest_config_params,
-            final_dca_config={"dca_enabled": True, "dca_order_count": 3,
-                              "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0},
+            final_dca_config={
+                "dca_enabled": True,
+                "dca_order_count": 3,
+                "dca_grid_size_percent": 5.0,
+                "dca_martingale_coef": 1.0,
+            },
             direction_str="long",
             sltp_block_ids=["sltp_1"],
         )
@@ -1495,11 +1536,15 @@ class TestRunDcaMixedBatchNumba:
             {"rsi_1.cross_long_level": 25, "sltp_1.take_profit_percent": 3.0, "sltp_1.stop_loss_percent": 5.0},
         ]
         config = {**backtest_config_params, "direction": "long"}
-        dca_config = {"dca_enabled": True, "dca_order_count": 3,
-                      "dca_grid_size_percent": 5.0, "dca_martingale_coef": 1.0}
+        dca_config = {
+            "dca_enabled": True,
+            "dca_order_count": 3,
+            "dca_grid_size_percent": 5.0,
+            "dca_martingale_coef": 1.0,
+        }
 
-        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
         import copy
+
         graph_with_rsi = copy.deepcopy(dca_rsi_graph)
         for b in graph_with_rsi["blocks"]:
             if b["id"] == "rsi_1":
@@ -1540,11 +1585,13 @@ class TestRunDcaMixedBatchNumba:
         combos = []
         for rsi_level in (20, 25, 30):
             for tp in (1.0, 1.5, 2.0):
-                combos.append({
-                    "rsi_1.cross_long_level": rsi_level,
-                    "sltp_1.take_profit_percent": tp,
-                    "sltp_1.stop_loss_percent": 5.0,
-                })
+                combos.append(
+                    {
+                        "rsi_1.cross_long_level": rsi_level,
+                        "sltp_1.take_profit_percent": tp,
+                        "sltp_1.stop_loss_percent": 5.0,
+                    }
+                )
 
         config = {**backtest_config_params, "direction": "long"}
         result = run_builder_grid_search(
@@ -1554,9 +1601,7 @@ class TestRunDcaMixedBatchNumba:
             config_params=config,
         )
         # Should use mixed fast path, not slow Python loop
-        assert result["method"] == "grid_numba_dca_mixed", (
-            f"Expected grid_numba_dca_mixed, got: {result['method']}"
-        )
+        assert result["method"] == "grid_numba_dca_mixed", f"Expected grid_numba_dca_mixed, got: {result['method']}"
         assert result.get("numba_accelerated") is True
         assert result["tested_combinations"] > 0
 
@@ -1619,9 +1664,16 @@ class TestProgressTracking:
         )
         entry = get_optimization_progress("strat-schema")
         required_fields = {
-            "status", "tested", "total", "percent",
-            "best_score", "results_found", "speed",
-            "eta_seconds", "started_at", "updated_at",
+            "status",
+            "tested",
+            "total",
+            "percent",
+            "best_score",
+            "results_found",
+            "speed",
+            "eta_seconds",
+            "started_at",
+            "updated_at",
         }
         missing = required_fields - set(entry.keys())
         assert not missing, f"Progress entry missing fields: {missing}"

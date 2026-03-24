@@ -11,11 +11,26 @@ from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 from pydantic_core import ValidationError as PydanticCoreValidationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.api.routers.backtests.formatters import (
+    _ensure_utc,
+    _get_side_value,
+    _safe_float,
+    _safe_int,
+    build_equity_curve_response,
+)
+from backend.api.routers.backtests.schemas import (
+    MTFBacktestRequest,
+    MTFBacktestResponse,
+    RunFromStrategyRequest,
+    RunFromStrategyResponse,
+    SaveOptimizationResultRequest,
+    SaveOptimizationResultResponse,
+)
 from backend.backtesting.engine import get_engine
 from backend.backtesting.interfaces import TradeDirection
 from backend.backtesting.models import (
@@ -36,24 +51,6 @@ from backend.database import get_db
 from backend.database.models import Backtest as BacktestModel
 from backend.database.models import BacktestStatus as DBBacktestStatus
 from backend.database.models import Strategy
-
-from backend.api.routers.backtests.formatters import (
-    _ensure_utc,
-    _get_side_value,
-    _safe_float,
-    _safe_int,
-    _safe_str,
-    build_equity_curve_response,
-    downsample_list,
-)
-from backend.api.routers.backtests.schemas import (
-    MTFBacktestRequest,
-    MTFBacktestResponse,
-    RunFromStrategyRequest,
-    RunFromStrategyResponse,
-    SaveOptimizationResultRequest,
-    SaveOptimizationResultResponse,
-)
 
 router = APIRouter(tags=["Backtests"])
 
@@ -1487,7 +1484,9 @@ async def run_backtest_from_strategy(
     leverage = float(params.get("_leverage", 1))
     direction = params.get("_direction", "both")
     pyramiding = int(params.get("_pyramiding", 1))
-    commission = float(params.get("_commission", COMMISSION_LINEAR_TAKER))  # Already decimal (0.00055 = Bybit linear taker)
+    commission = float(
+        params.get("_commission", COMMISSION_LINEAR_TAKER)
+    )  # Already decimal (0.00055 = Bybit linear taker)
     slippage = float(params.get("_slippage", 0.0005))  # Already decimal (0.0005 = 0.05%)
 
     # Handle position size based on type

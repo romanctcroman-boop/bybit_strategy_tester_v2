@@ -24,11 +24,11 @@ from backend.backtesting.strategy_builder_adapter import _clamp_period, _param
 from backend.core.indicators import (
     calculate_adx,
     calculate_aroon,
+    calculate_dema,
     calculate_hull_ma,
     calculate_ichimoku,
     calculate_parabolic_sar,
     calculate_supertrend,
-    calculate_dema,
     calculate_tema,
     calculate_wma,
 )

@@ -1811,9 +1811,9 @@ class DCAEngine(BaseBacktestEngine):
         else:
             # ATR TP check (takes precedence over fixed TP when ATR mode enabled)
             if self._atr_tp_price is not None:
-                if self.position.direction == "long" and high >= self._atr_tp_price:
-                    return self._close_position(bar_index, self._atr_tp_price, ExitReason.ATR_TP)
-                elif self.position.direction == "short" and low <= self._atr_tp_price:
+                if (self.position.direction == "long" and high >= self._atr_tp_price) or (
+                    self.position.direction == "short" and low <= self._atr_tp_price
+                ):
                     return self._close_position(bar_index, self._atr_tp_price, ExitReason.ATR_TP)
             elif self._check_single_tp(high, low):
                 # Single fixed TP check (only when not in ATR mode)
@@ -1863,10 +1863,9 @@ class DCAEngine(BaseBacktestEngine):
                 return self._close_position(bar_index, exit_price, ExitReason.BREAKEVEN_SL)
         elif self._atr_sl_price is not None:
             # ATR-based SL
-            if self.position.direction == "long" and low <= self._atr_sl_price:
-                exit_price = max(low, min(high, self._atr_sl_price))
-                return self._close_position(bar_index, exit_price, ExitReason.ATR_SL)
-            elif self.position.direction == "short" and high >= self._atr_sl_price:
+            if (self.position.direction == "long" and low <= self._atr_sl_price) or (
+                self.position.direction == "short" and high >= self._atr_sl_price
+            ):
                 exit_price = max(low, min(high, self._atr_sl_price))
                 return self._close_position(bar_index, exit_price, ExitReason.ATR_SL)
         elif self._stop_loss_pct is not None and self._stop_loss_pct > 0 and self._check_config_stop_loss(high, low):
@@ -2170,9 +2169,9 @@ class DCAEngine(BaseBacktestEngine):
         self._realized_equity += pnl_net
 
         # Reduce position size (remaining fraction stays open)
-        pos.total_size_coins *= (1.0 - fraction)
-        pos.total_cost_usd *= (1.0 - fraction)
-        pos.total_notional_usd *= (1.0 - fraction)
+        pos.total_size_coins *= 1.0 - fraction
+        pos.total_cost_usd *= 1.0 - fraction
+        pos.total_notional_usd *= 1.0 - fraction
 
     # =========================================================================
     # CLOSE CONDITIONS (Session 5.5)

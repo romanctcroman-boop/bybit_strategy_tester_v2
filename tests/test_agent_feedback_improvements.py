@@ -17,7 +17,6 @@ from backend.agents.langgraph_orchestrator import AgentState
 from backend.agents.prompts.response_parser import ResponseParser, StrategyDefinition
 from backend.agents.trading_strategy_graph import OptimizationNode, RefinementNode
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -218,10 +217,7 @@ class TestRefinementNodeSampleTrades:
     @pytest.mark.asyncio
     async def test_sample_trades_capped_at_five(self):
         """Even if 9 trades exist, we only show first 5 in feedback."""
-        trades_data = [
-            {"entry_price": float(100 + i), "exit_price": float(99 + i), "pnl": -1.0}
-            for i in range(9)
-        ]
+        trades_data = [{"entry_price": float(100 + i), "exit_price": float(99 + i), "pnl": -1.0} for i in range(9)]
         state = _state_with_backtest(trades=9, sharpe=-0.2, sample_trades=trades_data)
         node = RefinementNode()
         new_state = await node.execute(state)
@@ -229,6 +225,7 @@ class TestRefinementNodeSampleTrades:
         if "SAMPLE TRADES" in feedback:
             # Count how many "#N:" entries appear
             import re
+
             trade_lines = re.findall(r"#\d+:", feedback)
             assert len(trade_lines) <= 5
 
@@ -279,11 +276,14 @@ class TestRefinementNodeSafety:
         """engine_warnings=None in backtest result must not raise TypeError."""
         state = AgentState()
         state.context["refinement_iteration"] = 0
-        state.set_result("backtest", {
-            "metrics": {"total_trades": 0, "sharpe_ratio": -1.0, "max_drawdown": 50.0, "total_return": -5.0},
-            "engine_warnings": None,  # simulate missing/None
-            "sample_trades": None,
-        })
+        state.set_result(
+            "backtest",
+            {
+                "metrics": {"total_trades": 0, "sharpe_ratio": -1.0, "max_drawdown": 50.0, "total_return": -5.0},
+                "engine_warnings": None,  # simulate missing/None
+                "sample_trades": None,
+            },
+        )
         node = RefinementNode()
         new_state = await node.execute(state)  # must not raise
         assert new_state is not None

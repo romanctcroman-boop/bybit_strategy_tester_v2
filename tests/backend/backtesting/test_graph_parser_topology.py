@@ -9,8 +9,6 @@ are straightforward.
 
 from __future__ import annotations
 
-import pytest
-
 from backend.backtesting.strategy_builder.graph_parser import (
     normalize_connections,
     parse_source_id,
@@ -23,7 +21,6 @@ from backend.backtesting.strategy_builder.topology import (
     build_execution_order,
     infer_category,
 )
-
 
 # ---------------------------------------------------------------------------
 # graph_parser — parse_source_id

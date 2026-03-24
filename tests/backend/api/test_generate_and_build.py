@@ -19,7 +19,6 @@ Patch strategy:
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
@@ -121,9 +120,7 @@ def _make_state(
     # Context
     state.context["strategy_graph"] = strategy_graph or {
         "blocks": [{"id": "rsi_1", "type": "rsi"}, {"id": "strategy_node", "type": "strategy"}],
-        "connections": [
-            {"from": "rsi_1", "fromPort": "long", "to": "strategy_node", "toPort": "entry_long"}
-        ],
+        "connections": [{"from": "rsi_1", "fromPort": "long", "to": "strategy_node", "toPort": "entry_long"}],
         "name": "AI RSI Momentum",
     }
     state.context["graph_warnings"] = graph_warnings if graph_warnings is not None else []
@@ -169,7 +166,9 @@ class TestGenerateAndBuildHappyPath:
             patch(_TO_THREAD, new=AsyncMock(return_value=ohlcv)),
             patch(_PIPELINE, new=AsyncMock(return_value=state)),
         ):
-            resp = client.post("/ai-strategy-generator/generate-and-build", json={"symbol": "BTCUSDT", "timeframe": "15", "days": 90})
+            resp = client.post(
+                "/ai-strategy-generator/generate-and-build", json={"symbol": "BTCUSDT", "timeframe": "15", "days": 90}
+            )
 
         assert resp.status_code == 200
         body = resp.json()
@@ -250,7 +249,9 @@ class TestGenerateAndBuildHappyPath:
             patch(_TO_THREAD, new=AsyncMock(return_value=ohlcv)),
             patch(_PIPELINE, new=AsyncMock(return_value=state)),
         ):
-            resp = client.post("/ai-strategy-generator/generate-and-build", json={"symbol": "ETHUSDT", "timeframe": "60"})
+            resp = client.post(
+                "/ai-strategy-generator/generate-and-build", json={"symbol": "ETHUSDT", "timeframe": "60"}
+            )
 
         body = resp.json()
         assert body["symbol"] == "ETHUSDT"

@@ -11,20 +11,18 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 import asyncio
+
+import pytest
 
 from backend.agents.langgraph_orchestrator import AgentState
 from backend.agents.trading_strategy_graph import (
     BacktestAnalysisNode,
-    OptimizationNode,
     RefinementNode,
     _backtest_passes,
     _should_refine,
     build_trading_strategy_graph,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

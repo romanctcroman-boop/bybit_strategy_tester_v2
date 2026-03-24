@@ -20,9 +20,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
-
 from unittest.mock import patch
+
+import pytest
 
 from backend.agents.consensus.consensus_engine import (
     AgentPerformance,
@@ -491,7 +491,7 @@ class TestConsensusFallback:
         engine = ConsensusEngine()
         strategies = {
             "deepseek": _make_strategy("A", [_make_signal("RSI")]),
-            "qwen":     _make_strategy("B", [_make_signal("MACD")]),
+            "qwen": _make_strategy("B", [_make_signal("MACD")]),
         }
         result = engine.aggregate(strategies, method="weighted_voting")
         assert result is not None
@@ -539,23 +539,27 @@ class TestConsensusFallback:
     def test_consensus_node_falls_back_when_engine_raises(self):
         """If ConsensusEngine.aggregate() raises, ConsensusNode falls back to best_of."""
         import asyncio
+
         from backend.agents.langgraph_orchestrator import AgentState
-        from backend.agents.trading_strategy_graph import ConsensusNode
         from backend.agents.prompts.response_parser import ValidationResult
+        from backend.agents.trading_strategy_graph import ConsensusNode
 
         node = ConsensusNode()
         strategy_a = _make_strategy("FallbackStrategy", [_make_signal("RSI")])
-        strategy_b = _make_strategy("OtherStrategy",   [_make_signal("MACD")])
+        strategy_b = _make_strategy("OtherStrategy", [_make_signal("MACD")])
 
         val = ValidationResult(is_valid=True, quality_score=0.75)
 
         state = AgentState()
-        state.set_result("parse_responses", {
-            "proposals": [
-                {"agent": "deepseek", "strategy": strategy_a, "validation": val},
-                {"agent": "qwen",     "strategy": strategy_b, "validation": val},
-            ]
-        })
+        state.set_result(
+            "parse_responses",
+            {
+                "proposals": [
+                    {"agent": "deepseek", "strategy": strategy_a, "validation": val},
+                    {"agent": "qwen", "strategy": strategy_b, "validation": val},
+                ]
+            },
+        )
 
         # Patch at the source module — ConsensusEngine is lazy-imported inside execute()
         with patch(
@@ -574,7 +578,7 @@ class TestConsensusFallback:
         """Strategy with a rare signal type is still valid ConsensusEngine input."""
         engine = ConsensusEngine()
         # Both strategies have signals — StrategyDefinition requires at least 1
-        s_rsi   = _make_strategy("RSI Strategy",     [_make_signal("RSI")])
-        s_weird = _make_strategy("Weird Strategy",   [_make_signal("CUSTOM_INDICATOR_X")])
+        s_rsi = _make_strategy("RSI Strategy", [_make_signal("RSI")])
+        s_weird = _make_strategy("Weird Strategy", [_make_signal("CUSTOM_INDICATOR_X")])
         result = engine.aggregate({"deepseek": s_rsi, "qwen": s_weird})
         assert result.strategy is not None

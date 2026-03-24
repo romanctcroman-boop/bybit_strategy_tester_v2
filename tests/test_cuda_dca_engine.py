@@ -19,6 +19,7 @@ import pytest
 
 try:
     from numba import cuda as _numba_cuda
+
     _CUDA_AVAILABLE = _numba_cuda.is_available()
 except ImportError:
     _CUDA_AVAILABLE = False
@@ -161,7 +162,10 @@ class TestRunDcaBatchCuda:
         close, high, low = flat_ohlcv
         with pytest.raises(AssertionError):
             run_dca_batch_cuda(
-                close, high, low, signals_one_long,
+                close,
+                high,
+                low,
+                signals_one_long,
                 sl_pct_arr=np.array([0.03, 0.05]),
                 tp_pct_arr=np.array([0.06]),  # length mismatch
             )
@@ -179,28 +183,47 @@ class TestRunDcaBatchCuda:
         tp = np.array([0.06, 0.10, 0.15])
 
         cuda_res = run_dca_batch_cuda(
-            close, high, low, signals_one_long, sl, tp,
-            order_count=3, grid_size_pct=5.0,
-            initial_capital=10000.0, leverage=1.0,
+            close,
+            high,
+            low,
+            signals_one_long,
+            sl,
+            tp,
+            order_count=3,
+            grid_size_pct=5.0,
+            initial_capital=10000.0,
+            leverage=1.0,
         )
         cpu_res = run_dca_batch_numba(
-            close, high, low, signals_one_long, sl, tp,
-            order_count=3, grid_size_pct=5.0,
-            initial_capital=10000.0, leverage=1.0,
+            close,
+            high,
+            low,
+            signals_one_long,
+            sl,
+            tp,
+            order_count=3,
+            grid_size_pct=5.0,
+            initial_capital=10000.0,
+            leverage=1.0,
         )
 
         np.testing.assert_array_equal(
-            cuda_res["n_trades"], cpu_res["n_trades"],
+            cuda_res["n_trades"],
+            cpu_res["n_trades"],
             err_msg="CUDA n_trades differs from CPU Numba",
         )
         np.testing.assert_allclose(
-            cuda_res["net_profit"], cpu_res["net_profit"],
-            rtol=1e-4, atol=1e-4,
+            cuda_res["net_profit"],
+            cpu_res["net_profit"],
+            rtol=1e-4,
+            atol=1e-4,
             err_msg="CUDA net_profit differs from CPU Numba",
         )
         np.testing.assert_allclose(
-            cuda_res["win_rate"], cpu_res["win_rate"],
-            rtol=1e-4, atol=1e-4,
+            cuda_res["win_rate"],
+            cpu_res["win_rate"],
+            rtol=1e-4,
+            atol=1e-4,
             err_msg="CUDA win_rate differs from CPU Numba",
         )
 
@@ -218,9 +241,16 @@ class TestRunDcaBatchCuda:
         sl = np.array([0.25])
         tp = np.array([0.05])
         result = run_dca_batch_cuda(
-            close, high, low, sigs, sl, tp,
-            order_count=1, grid_size_pct=0.0,
-            initial_capital=10000.0, leverage=1.0,
+            close,
+            high,
+            low,
+            sigs,
+            sl,
+            tp,
+            order_count=1,
+            grid_size_pct=0.0,
+            initial_capital=10000.0,
+            leverage=1.0,
         )
         assert result["n_trades"][0] >= 1
         assert result["net_profit"][0] > 0
@@ -239,9 +269,16 @@ class TestRunDcaBatchCuda:
         sl = np.array([0.05])
         tp = np.array([0.30])
         result = run_dca_batch_cuda(
-            close, high, low, sigs, sl, tp,
-            order_count=1, grid_size_pct=0.0,
-            initial_capital=10000.0, leverage=1.0,
+            close,
+            high,
+            low,
+            sigs,
+            sl,
+            tp,
+            order_count=1,
+            grid_size_pct=0.0,
+            initial_capital=10000.0,
+            leverage=1.0,
         )
         assert result["n_trades"][0] >= 1
         assert result["net_profit"][0] < 0
@@ -265,7 +302,6 @@ class TestRunDcaBatchCuda:
         sigs[10] = 1
         sigs[40] = 1
 
-        result = run_dca_batch_cuda(close, high, low, sigs, sl, tp,
-                                    order_count=5, grid_size_pct=10.0)
+        result = run_dca_batch_cuda(close, high, low, sigs, sl, tp, order_count=5, grid_size_pct=10.0)
         assert len(result["n_trades"]) == N
         assert result["device"] == "cuda"

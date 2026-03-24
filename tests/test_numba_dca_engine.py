@@ -90,13 +90,26 @@ class TestRunDcaSingleNumba:
 
         close, high, low = flat_ohlcv
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_long,
-            sl_pct=0.05, tp_pct=0.10,
-            order_count=3, grid_size_pct=5.0,
+            sl_pct=0.05,
+            tp_pct=0.10,
+            order_count=3,
+            grid_size_pct=5.0,
         )
-        required = ["net_profit", "total_return", "max_drawdown", "win_rate",
-                    "sharpe_ratio", "profit_factor", "n_trades", "equity_curve", "trades_pnl"]
+        required = [
+            "net_profit",
+            "total_return",
+            "max_drawdown",
+            "win_rate",
+            "sharpe_ratio",
+            "profit_factor",
+            "n_trades",
+            "equity_curve",
+            "trades_pnl",
+        ]
         for key in required:
             assert key in result, f"Missing key: {key}"
 
@@ -106,9 +119,12 @@ class TestRunDcaSingleNumba:
 
         close, high, low = flat_ohlcv
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_long,
-            sl_pct=0.05, tp_pct=0.10,
+            sl_pct=0.05,
+            tp_pct=0.10,
         )
         assert len(result["equity_curve"]) == len(close)
 
@@ -118,9 +134,12 @@ class TestRunDcaSingleNumba:
 
         close, high, low = flat_ohlcv
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=no_signals,
-            sl_pct=0.05, tp_pct=0.10,
+            sl_pct=0.05,
+            tp_pct=0.10,
         )
         assert result["n_trades"] == 0
         assert result["net_profit"] == pytest.approx(0.0, abs=1e-6)
@@ -139,10 +158,12 @@ class TestRunDcaSingleNumba:
         signals[10] = 1  # enter at bar 10
 
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=signals,
-            sl_pct=0.30,   # wide SL — won't fire
-            tp_pct=0.05,   # 5% TP — will fire in rising market
+            sl_pct=0.30,  # wide SL — won't fire
+            tp_pct=0.05,  # 5% TP — will fire in rising market
             order_count=1,
             grid_size_pct=0.0,
             initial_capital=10000.0,
@@ -165,10 +186,12 @@ class TestRunDcaSingleNumba:
         signals[5] = 1
 
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=signals,
-            sl_pct=0.05,   # SL at 5% — should fire
-            tp_pct=0.30,   # wide TP
+            sl_pct=0.05,  # SL at 5% — should fire
+            tp_pct=0.30,  # wide TP
             order_count=1,
             grid_size_pct=0.0,
             initial_capital=10000.0,
@@ -184,9 +207,12 @@ class TestRunDcaSingleNumba:
         close, high, low = flat_ohlcv
         capital = 12345.0
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=no_signals,
-            sl_pct=0.05, tp_pct=0.10,
+            sl_pct=0.05,
+            tp_pct=0.10,
             initial_capital=capital,
         )
         assert result["equity_curve"][0] == pytest.approx(capital, rel=0.01)
@@ -197,9 +223,12 @@ class TestRunDcaSingleNumba:
 
         close, high, low = flat_ohlcv
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_multiple,
-            sl_pct=0.05, tp_pct=0.08,
+            sl_pct=0.05,
+            tp_pct=0.08,
         )
         assert isinstance(result["n_trades"], int)
         assert result["n_trades"] >= 0
@@ -210,9 +239,12 @@ class TestRunDcaSingleNumba:
 
         close, high, low = flat_ohlcv
         result = run_dca_single_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_multiple,
-            sl_pct=0.05, tp_pct=0.08,
+            sl_pct=0.05,
+            tp_pct=0.08,
         )
         assert 0.0 <= result["win_rate"] <= 100.0
 
@@ -232,9 +264,12 @@ class TestRunDcaBatchNumba:
         tp_arr = np.array([0.06, 0.10, 0.20], dtype=np.float64)
 
         result = run_dca_batch_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_long,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
         )
         assert "net_profit" in result
         assert "n_trades" in result
@@ -255,18 +290,26 @@ class TestRunDcaBatchNumba:
         tp_arr = np.array([c[1] for c in configs])
 
         batch = run_dca_batch_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=entry_signals_long,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr,
-            order_count=3, grid_size_pct=5.0,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
+            order_count=3,
+            grid_size_pct=5.0,
         )
 
         for i, (sl, tp) in enumerate(configs):
             single = run_dca_single_numba(
-                close=close, high=high, low=low,
+                close=close,
+                high=high,
+                low=low,
                 entry_signals=entry_signals_long,
-                sl_pct=sl, tp_pct=tp,
-                order_count=3, grid_size_pct=5.0,
+                sl_pct=sl,
+                tp_pct=tp,
+                order_count=3,
+                grid_size_pct=5.0,
             )
             assert batch["n_trades"][i] == single["n_trades"], (
                 f"Combo {i}: batch n_trades={batch['n_trades'][i]} != single={single['n_trades']}"
@@ -284,9 +327,12 @@ class TestRunDcaBatchNumba:
         tp_arr = np.array([0.04, 0.10, 0.16])
 
         result = run_dca_batch_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=no_signals,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
         )
         assert np.all(result["n_trades"] == 0)
         assert np.all(result["net_profit"] == pytest.approx(0.0, abs=1e-6))
@@ -303,10 +349,14 @@ class TestRunDcaBatchNumba:
         tp_arr = np.array([0.02, 0.10])  # narrow vs wide TP
 
         result = run_dca_batch_numba(
-            close=close, high=high, low=low,
+            close=close,
+            high=high,
+            low=low,
             entry_signals=signals,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr,
-            order_count=1, grid_size_pct=0.0,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
+            order_count=1,
+            grid_size_pct=0.0,
             leverage=1.0,
         )
         # Both should have at least 1 trade; wide TP allows more upside
@@ -325,14 +375,28 @@ class TestRunDcaBatchNumba:
 
         # Low vs high commission
         r_low = run_dca_batch_numba(
-            close=close, high=high, low=low, entry_signals=signals,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr, taker_fee=0.0001,
-            order_count=1, grid_size_pct=0.0, leverage=1.0,
+            close=close,
+            high=high,
+            low=low,
+            entry_signals=signals,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
+            taker_fee=0.0001,
+            order_count=1,
+            grid_size_pct=0.0,
+            leverage=1.0,
         )
         r_high = run_dca_batch_numba(
-            close=close, high=high, low=low, entry_signals=signals,
-            sl_pct_arr=sl_arr, tp_pct_arr=tp_arr, taker_fee=0.01,
-            order_count=1, grid_size_pct=0.0, leverage=1.0,
+            close=close,
+            high=high,
+            low=low,
+            entry_signals=signals,
+            sl_pct_arr=sl_arr,
+            tp_pct_arr=tp_arr,
+            taker_fee=0.01,
+            order_count=1,
+            grid_size_pct=0.0,
+            leverage=1.0,
         )
         for i in range(2):
             if r_low["n_trades"][i] > 0 and r_high["n_trades"][i] > 0:
@@ -347,7 +411,9 @@ class TestRunDcaBatchNumba:
         close, high, low = flat_ohlcv
         with pytest.raises(AssertionError):
             run_dca_batch_numba(
-                close=close, high=high, low=low,
+                close=close,
+                high=high,
+                low=low,
                 entry_signals=entry_signals_long,
                 sl_pct_arr=np.array([0.03, 0.05]),
                 tp_pct_arr=np.array([0.06]),  # length mismatch

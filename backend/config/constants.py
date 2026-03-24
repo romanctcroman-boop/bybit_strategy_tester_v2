@@ -17,7 +17,7 @@ COMMISSION_TV: float = 0.0007  # 0.07%
 
 # Bybit linear perpetuals (taker = market orders)
 COMMISSION_LINEAR_TAKER: float = 0.00055  # 0.055%
-COMMISSION_LINEAR_MAKER: float = 0.0002   # 0.02%
+COMMISSION_LINEAR_MAKER: float = 0.0002  # 0.02%
 
 # Bybit spot market
 COMMISSION_SPOT_TAKER: float = 0.001  # 0.1%

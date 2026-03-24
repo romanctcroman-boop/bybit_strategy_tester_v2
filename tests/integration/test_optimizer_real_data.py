@@ -15,9 +15,8 @@ Tests cover:
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-import pandas as pd
 import pytest
 
 from backend.optimization.builder_optimizer import (
@@ -32,8 +31,8 @@ from backend.optimization.builder_optimizer import (
 
 SYMBOL = "ETHUSDT"
 INTERVAL = "30"
-START = datetime(2025, 1, 1, tzinfo=timezone.utc)
-END = datetime(2025, 3, 1, tzinfo=timezone.utc)
+START = datetime(2025, 1, 1, tzinfo=UTC)
+END = datetime(2025, 3, 1, tzinfo=UTC)
 
 # Minimal RSI + SL/TP graph — mirrors RSI-1 strategy structure.
 RSI_GRAPH = {
@@ -216,12 +215,8 @@ class TestPositionSizeNotHardcoded:
     """Regression for BUG-1 (utils.py): position_size was hardcoded 0.1 / 1.0."""
 
     def test_larger_position_size_gives_larger_profit(self, real_ohlcv):
-        result_small = run_builder_backtest(
-            RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 0.1}
-        )
-        result_large = run_builder_backtest(
-            RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 0.5}
-        )
+        result_small = run_builder_backtest(RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 0.1})
+        result_large = run_builder_backtest(RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 0.5})
         assert result_small is not None and result_large is not None
 
         profit_small = abs(result_small.get("net_profit", 0))
@@ -240,9 +235,7 @@ class TestPositionSizeNotHardcoded:
         r1 = run_builder_backtest(RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 0.1})
         r2 = run_builder_backtest(RSI_GRAPH, real_ohlcv, {**BASE_CONFIG, "position_size": 1.0})
         assert r1 is not None and r2 is not None
-        assert r1.get("total_trades") == r2.get("total_trades"), (
-            "position_size must not affect trade count"
-        )
+        assert r1.get("total_trades") == r2.get("total_trades"), "position_size must not affect trade count"
 
 
 # ---------------------------------------------------------------------------
@@ -275,8 +268,7 @@ class TestLongShortBreakdownNonZero:
                 long_winning = result.get("long_winning_trades", 0)
                 if long_winning and long_winning > 0:
                     assert long_gross_profit > 0, (
-                        f"long_gross_profit={long_gross_profit} should be > 0 "
-                        f"when long_winning_trades={long_winning}"
+                        f"long_gross_profit={long_gross_profit} should be > 0 when long_winning_trades={long_winning}"
                     )
 
     def test_fallback_and_numba_breakdown_match(self, real_ohlcv):
@@ -294,9 +286,7 @@ class TestLongShortBreakdownNonZero:
             fb_val = r_fb.get(key)
             nb_val = r_nb.get(key)
             if fb_val is not None and nb_val is not None:
-                assert fb_val == nb_val, (
-                    f"Breakdown mismatch for {key}: FallbackV4={fb_val}, NumbaV2={nb_val}"
-                )
+                assert fb_val == nb_val, f"Breakdown mismatch for {key}: FallbackV4={fb_val}, NumbaV2={nb_val}"
 
 
 # ---------------------------------------------------------------------------
@@ -343,9 +333,7 @@ class TestNumbaParityRealData:
         assert r_fb is not None and r_nb is not None
         fb_sr = r_fb.get("sharpe_ratio", 0) or 0
         nb_sr = r_nb.get("sharpe_ratio", 0) or 0
-        assert abs(fb_sr - nb_sr) < 0.01, (
-            f"sharpe_ratio parity failed: V4={fb_sr:.4f}, Numba={nb_sr:.4f}"
-        )
+        assert abs(fb_sr - nb_sr) < 0.01, f"sharpe_ratio parity failed: V4={fb_sr:.4f}, Numba={nb_sr:.4f}"
 
 
 # ---------------------------------------------------------------------------
@@ -360,8 +348,22 @@ class TestGridSearchRealData:
     # 3 × 2 × 2 = 12 combinations — fast enough for integration tests
     PARAM_RANGES = [
         {"param_path": "rsi_test.period", "type": "int", "low": 10, "high": 14, "step": 2, "enabled": True},
-        {"param_path": "sltp_test.stop_loss_percent", "type": "float", "low": 1.5, "high": 2.5, "step": 1.0, "enabled": True},
-        {"param_path": "sltp_test.take_profit_percent", "type": "float", "low": 2.0, "high": 3.0, "step": 1.0, "enabled": True},
+        {
+            "param_path": "sltp_test.stop_loss_percent",
+            "type": "float",
+            "low": 1.5,
+            "high": 2.5,
+            "step": 1.0,
+            "enabled": True,
+        },
+        {
+            "param_path": "sltp_test.take_profit_percent",
+            "type": "float",
+            "low": 2.0,
+            "high": 3.0,
+            "step": 1.0,
+            "enabled": True,
+        },
     ]
 
     def _make_combos(self):
@@ -420,9 +422,7 @@ class TestGridSearchRealData:
         tops = result["top_results"]
         if len(tops) >= 2:
             sharpes = [r.get("sharpe_ratio", 0) or 0 for r in tops]
-            assert sharpes[0] >= sharpes[-1], (
-                f"Results not ranked: first={sharpes[0]:.4f}, last={sharpes[-1]:.4f}"
-            )
+            assert sharpes[0] >= sharpes[-1], f"Results not ranked: first={sharpes[0]:.4f}, last={sharpes[-1]:.4f}"
 
     def test_all_combinations_tested(self, real_ohlcv):
         combos_iter, total = self._make_combos()
@@ -435,25 +435,29 @@ class TestGridSearchRealData:
             max_results=5,
             total_combinations=total,
         )
-        assert result["tested_combinations"] == total, (
-            f"Expected {total} tested, got {result['tested_combinations']}"
-        )
+        assert result["tested_combinations"] == total, f"Expected {total} tested, got {result['tested_combinations']}"
 
     def test_different_metrics_give_different_rankings(self, real_ohlcv):
         combos_sharpe, total_s = self._make_combos()
         combos_profit, total_p = self._make_combos()
 
         res_sharpe = run_builder_grid_search(
-            base_graph=RSI_GRAPH, ohlcv=real_ohlcv,
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
             param_combinations=combos_sharpe,
-            config_params=BASE_CONFIG, optimize_metric="sharpe_ratio",
-            max_results=3, total_combinations=total_s,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            max_results=3,
+            total_combinations=total_s,
         )
         res_profit = run_builder_grid_search(
-            base_graph=RSI_GRAPH, ohlcv=real_ohlcv,
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
             param_combinations=combos_profit,
-            config_params=BASE_CONFIG, optimize_metric="net_profit",
-            max_results=3, total_combinations=total_p,
+            config_params=BASE_CONFIG,
+            optimize_metric="net_profit",
+            max_results=3,
+            total_combinations=total_p,
         )
 
         assert len(res_sharpe["top_results"]) > 0
@@ -515,8 +519,22 @@ class TestDCAPathRegressionRealData:
     def test_dca_grid_search_uses_dca_path(self, real_ohlcv):
         """DCA strategy optimization must return method='grid_numba_dca_mixed' or similar DCA path."""
         param_ranges = [
-            {"param_path": "rsi_dca.cross_long_level", "type": "float", "low": 25.0, "high": 35.0, "step": 5.0, "enabled": True},
-            {"param_path": "dca_block.dca_tp1_percent", "type": "float", "low": 1.0, "high": 2.0, "step": 0.5, "enabled": True},
+            {
+                "param_path": "rsi_dca.cross_long_level",
+                "type": "float",
+                "low": 25.0,
+                "high": 35.0,
+                "step": 5.0,
+                "enabled": True,
+            },
+            {
+                "param_path": "dca_block.dca_tp1_percent",
+                "type": "float",
+                "low": 1.0,
+                "high": 2.0,
+                "step": 0.5,
+                "enabled": True,
+            },
         ]
         combos_iter, total, _ = generate_builder_param_combinations(param_ranges)
         combos = list(combos_iter)
@@ -537,9 +555,7 @@ class TestDCAPathRegressionRealData:
         assert "top_results" in result
         # The key assertion: method should indicate DCA path was used
         method = result.get("method", "")
-        assert "rsi_threshold" not in method, (
-            f"DCA graph incorrectly took RSI threshold fast path: method={method!r}"
-        )
+        assert "rsi_threshold" not in method, f"DCA graph incorrectly took RSI threshold fast path: method={method!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -580,12 +596,24 @@ class TestOtherIndicatorTypes:
             },
         ],
         "connections": [
-            {"id": "c1", "source": {"blockId": "sltp_macd", "portId": "config"},
-             "target": {"blockId": "strategy_node", "portId": "sl_tp"}, "type": "config"},
-            {"id": "c2", "source": {"blockId": "macd_test", "portId": "long"},
-             "target": {"blockId": "strategy_node", "portId": "entry_long"}, "type": "condition"},
-            {"id": "c3", "source": {"blockId": "macd_test", "portId": "short"},
-             "target": {"blockId": "strategy_node", "portId": "entry_short"}, "type": "condition"},
+            {
+                "id": "c1",
+                "source": {"blockId": "sltp_macd", "portId": "config"},
+                "target": {"blockId": "strategy_node", "portId": "sl_tp"},
+                "type": "config",
+            },
+            {
+                "id": "c2",
+                "source": {"blockId": "macd_test", "portId": "long"},
+                "target": {"blockId": "strategy_node", "portId": "entry_long"},
+                "type": "condition",
+            },
+            {
+                "id": "c3",
+                "source": {"blockId": "macd_test", "portId": "short"},
+                "target": {"blockId": "strategy_node", "portId": "entry_short"},
+                "type": "condition",
+            },
         ],
         "interval": INTERVAL,
         "market_type": "linear",
@@ -622,12 +650,24 @@ class TestOtherIndicatorTypes:
             },
         ],
         "connections": [
-            {"id": "c1", "source": {"blockId": "sltp_bb", "portId": "config"},
-             "target": {"blockId": "strategy_node", "portId": "sl_tp"}, "type": "config"},
-            {"id": "c2", "source": {"blockId": "bb_test", "portId": "long"},
-             "target": {"blockId": "strategy_node", "portId": "entry_long"}, "type": "condition"},
-            {"id": "c3", "source": {"blockId": "bb_test", "portId": "short"},
-             "target": {"blockId": "strategy_node", "portId": "entry_short"}, "type": "condition"},
+            {
+                "id": "c1",
+                "source": {"blockId": "sltp_bb", "portId": "config"},
+                "target": {"blockId": "strategy_node", "portId": "sl_tp"},
+                "type": "config",
+            },
+            {
+                "id": "c2",
+                "source": {"blockId": "bb_test", "portId": "long"},
+                "target": {"blockId": "strategy_node", "portId": "entry_long"},
+                "type": "condition",
+            },
+            {
+                "id": "c3",
+                "source": {"blockId": "bb_test", "portId": "short"},
+                "target": {"blockId": "strategy_node", "portId": "entry_short"},
+                "type": "condition",
+            },
         ],
         "interval": INTERVAL,
         "market_type": "linear",
@@ -658,12 +698,24 @@ class TestOtherIndicatorTypes:
             },
         ],
         "connections": [
-            {"id": "c1", "source": {"blockId": "sltp_st", "portId": "config"},
-             "target": {"blockId": "strategy_node", "portId": "sl_tp"}, "type": "config"},
-            {"id": "c2", "source": {"blockId": "st_test", "portId": "long"},
-             "target": {"blockId": "strategy_node", "portId": "entry_long"}, "type": "condition"},
-            {"id": "c3", "source": {"blockId": "st_test", "portId": "short"},
-             "target": {"blockId": "strategy_node", "portId": "entry_short"}, "type": "condition"},
+            {
+                "id": "c1",
+                "source": {"blockId": "sltp_st", "portId": "config"},
+                "target": {"blockId": "strategy_node", "portId": "sl_tp"},
+                "type": "config",
+            },
+            {
+                "id": "c2",
+                "source": {"blockId": "st_test", "portId": "long"},
+                "target": {"blockId": "strategy_node", "portId": "entry_long"},
+                "type": "condition",
+            },
+            {
+                "id": "c3",
+                "source": {"blockId": "st_test", "portId": "short"},
+                "target": {"blockId": "strategy_node", "portId": "entry_short"},
+                "type": "condition",
+            },
         ],
         "interval": INTERVAL,
         "market_type": "linear",
@@ -691,16 +743,25 @@ class TestOtherIndicatorTypes:
     def test_macd_grid_search(self, real_ohlcv):
         """6-combo mini grid: 3 fast_period × 2 signal_period."""
         ranges = [
-            {"param_path": "macd_test.fast_period", "type": "int",
-             "low": 10, "high": 14, "step": 2, "enabled": True},
-            {"param_path": "sltp_macd.stop_loss_percent", "type": "float",
-             "low": 1.5, "high": 2.5, "step": 1.0, "enabled": True},
+            {"param_path": "macd_test.fast_period", "type": "int", "low": 10, "high": 14, "step": 2, "enabled": True},
+            {
+                "param_path": "sltp_macd.stop_loss_percent",
+                "type": "float",
+                "low": 1.5,
+                "high": 2.5,
+                "step": 1.0,
+                "enabled": True,
+            },
         ]
         combos_iter, total, _ = generate_builder_param_combinations(ranges)
         result = run_builder_grid_search(
-            base_graph=self.MACD_GRAPH, ohlcv=real_ohlcv,
-            param_combinations=combos_iter, config_params=BASE_CONFIG,
-            optimize_metric="sharpe_ratio", max_results=3, total_combinations=total,
+            base_graph=self.MACD_GRAPH,
+            ohlcv=real_ohlcv,
+            param_combinations=combos_iter,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            max_results=3,
+            total_combinations=total,
         )
         assert result["tested_combinations"] == total
         assert len(result["top_results"]) > 0
@@ -723,16 +784,18 @@ class TestOtherIndicatorTypes:
     def test_bollinger_grid_search(self, real_ohlcv):
         """6-combo: 3 keltner lengths × 2 bb lengths (keltner_bollinger block)."""
         ranges = [
-            {"param_path": "bb_test.keltner_length", "type": "int",
-             "low": 10, "high": 18, "step": 4, "enabled": True},
-            {"param_path": "bb_test.bb_length", "type": "int",
-             "low": 15, "high": 25, "step": 10, "enabled": True},
+            {"param_path": "bb_test.keltner_length", "type": "int", "low": 10, "high": 18, "step": 4, "enabled": True},
+            {"param_path": "bb_test.bb_length", "type": "int", "low": 15, "high": 25, "step": 10, "enabled": True},
         ]
         combos_iter, total, _ = generate_builder_param_combinations(ranges)
         result = run_builder_grid_search(
-            base_graph=self.BOLLINGER_GRAPH, ohlcv=real_ohlcv,
-            param_combinations=combos_iter, config_params=BASE_CONFIG,
-            optimize_metric="sharpe_ratio", max_results=3, total_combinations=total,
+            base_graph=self.BOLLINGER_GRAPH,
+            ohlcv=real_ohlcv,
+            param_combinations=combos_iter,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            max_results=3,
+            total_combinations=total,
         )
         assert result["tested_combinations"] == total
         assert len(result["top_results"]) > 0
@@ -754,16 +817,25 @@ class TestOtherIndicatorTypes:
     def test_supertrend_grid_search(self, real_ohlcv):
         """6-combo: 3 periods × 2 multipliers."""
         ranges = [
-            {"param_path": "st_test.period", "type": "int",
-             "low": 7, "high": 13, "step": 3, "enabled": True},
-            {"param_path": "st_test.multiplier", "type": "float",
-             "low": 2.0, "high": 3.5, "step": 1.5, "enabled": True},
+            {"param_path": "st_test.period", "type": "int", "low": 7, "high": 13, "step": 3, "enabled": True},
+            {
+                "param_path": "st_test.multiplier",
+                "type": "float",
+                "low": 2.0,
+                "high": 3.5,
+                "step": 1.5,
+                "enabled": True,
+            },
         ]
         combos_iter, total, _ = generate_builder_param_combinations(ranges)
         result = run_builder_grid_search(
-            base_graph=self.SUPERTREND_GRAPH, ohlcv=real_ohlcv,
-            param_combinations=combos_iter, config_params=BASE_CONFIG,
-            optimize_metric="sharpe_ratio", max_results=3, total_combinations=total,
+            base_graph=self.SUPERTREND_GRAPH,
+            ohlcv=real_ohlcv,
+            param_combinations=combos_iter,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            max_results=3,
+            total_combinations=total,
         )
         assert result["tested_combinations"] == total
         assert len(result["top_results"]) > 0
@@ -771,30 +843,24 @@ class TestOtherIndicatorTypes:
     # --- cross-type parity: all three must produce matching Numba/V4 trade counts ---
 
     def test_macd_numba_v4_parity(self, real_ohlcv):
-        r_fb = run_builder_backtest(self.MACD_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "fallback_v4"})
-        r_nb = run_builder_backtest(self.MACD_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "numba_v2"})
+        r_fb = run_builder_backtest(self.MACD_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "fallback_v4"})
+        r_nb = run_builder_backtest(self.MACD_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "numba_v2"})
         assert r_fb is not None and r_nb is not None
         assert r_fb.get("total_trades") == r_nb.get("total_trades"), (
             f"MACD parity fail: V4={r_fb.get('total_trades')}, Numba={r_nb.get('total_trades')}"
         )
 
     def test_bollinger_numba_v4_parity(self, real_ohlcv):
-        r_fb = run_builder_backtest(self.BOLLINGER_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "fallback_v4"})
-        r_nb = run_builder_backtest(self.BOLLINGER_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "numba_v2"})
+        r_fb = run_builder_backtest(self.BOLLINGER_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "fallback_v4"})
+        r_nb = run_builder_backtest(self.BOLLINGER_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "numba_v2"})
         assert r_fb is not None and r_nb is not None
         assert r_fb.get("total_trades") == r_nb.get("total_trades"), (
             f"Bollinger parity fail: V4={r_fb.get('total_trades')}, Numba={r_nb.get('total_trades')}"
         )
 
     def test_supertrend_numba_v4_parity(self, real_ohlcv):
-        r_fb = run_builder_backtest(self.SUPERTREND_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "fallback_v4"})
-        r_nb = run_builder_backtest(self.SUPERTREND_GRAPH, real_ohlcv,
-                                    {**BASE_CONFIG, "engine_type": "numba_v2"})
+        r_fb = run_builder_backtest(self.SUPERTREND_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "fallback_v4"})
+        r_nb = run_builder_backtest(self.SUPERTREND_GRAPH, real_ohlcv, {**BASE_CONFIG, "engine_type": "numba_v2"})
         assert r_fb is not None and r_nb is not None
         assert r_fb.get("total_trades") == r_nb.get("total_trades"), (
             f"Supertrend parity fail: V4={r_fb.get('total_trades')}, Numba={r_nb.get('total_trades')}"

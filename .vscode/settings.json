@@ -1,5 +1,41 @@
 {
+  // ═══════════════════════════════════════════════════════════
+  // Python — Interpreter & Environment
+  // ═══════════════════════════════════════════════════════════
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+
+  // ═══════════════════════════════════════════════════════════
+  // Editor — General
+  // ═══════════════════════════════════════════════════════════
   "editor.formatOnSave": true,
+  "editor.rulers": [120],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  // Sticky scroll — показывает текущий класс/функцию при прокрутке больших файлов
+  "editor.stickyScroll.enabled": true,
+  "editor.stickyScroll.maxLineCount": 5,
+  // Bracket pair guides — визуализация вложенности
+  "editor.guides.bracketPairs": "active",
+  "editor.bracketPairColorization.enabled": true,
+
+  // ═══════════════════════════════════════════════════════════
+  // Python Formatting — Ruff (matches pyproject.toml: line-length=120)
+  // ═══════════════════════════════════════════════════════════
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // JavaScript / TypeScript Formatting
+  // ═══════════════════════════════════════════════════════════
+  // Note: .prettierrc is in frontend/ — Prettier applies to frontend files only
   "prettier.requireConfig": true,
   "eslint.validate": [
     "javascript",
@@ -11,13 +47,6 @@
     {
       "mode": "auto"
     }
-  ],
-  "python.sortImports.path": [
-    "isort"
-  ],
-  "python.sortImports.args": [
-    "--settings-path",
-    "${workspaceFolder}\\.isort.cfg"
   ],
   "[javascript]": {
     "editor.defaultFormatter": "vscode.typescript-language-features",
@@ -43,6 +72,10 @@
       "source.fixAll.eslint": "explicit"
     }
   },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": false
+  },
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
@@ -52,12 +85,10 @@
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "[python]": {
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": "explicit"
-    }
-  },
-  // YAML Schema associations to prevent false schema validation errors
+
+  // ═══════════════════════════════════════════════════════════
+  // YAML Schema associations
+  // ═══════════════════════════════════════════════════════════
   "yaml.schemas": {
     "https://raw.githubusercontent.com/grafana/grafana/main/devenv/docker/provisioning/datasources/datasources.json": [
       "deployment/grafana/provisioning/datasources/*.yaml"
@@ -67,11 +98,19 @@
       "deployment/prometheus/*.yaml"
     ]
   },
-  // Hide nested Git repo (mcp-server) from the parent workspace Git view
+
+  // ═══════════════════════════════════════════════════════════
+  // Git — Hide nested mcp-server repo from parent workspace view
+  // ═══════════════════════════════════════════════════════════
   "git.ignoredRepositories": [
     "${workspaceFolder}/mcp-server"
   ],
-  // Exclude heavy directories from file watching (saves CPU + RAM)
+  // Автоматически скрывать в Explorer всё из .gitignore
+  "explorer.excludeGitIgnore": true,
+
+  // ═══════════════════════════════════════════════════════════
+  // File Watching — exclude heavy dirs to save CPU + RAM
+  // ═══════════════════════════════════════════════════════════
   "files.watcherExclude": {
     "mcp-server/**": true,
     "**/.venv/**": true,
@@ -95,9 +134,13 @@
     "**/agent_memory/**": true,
     "**/journal/**": true,
     "**/screenshots/**": true,
-    "**/data/**": true
+    "**/data/**": true,
+    "**/temp_analysis/**": true
   },
-  // Hide non-essential directories from Explorer sidebar
+
+  // ═══════════════════════════════════════════════════════════
+  // Explorer — hide non-essential dirs from sidebar
+  // ═══════════════════════════════════════════════════════════
   "files.exclude": {
     "**/.mypy_cache": true,
     "**/.ruff_cache": true,
@@ -111,9 +154,15 @@
     "test_e2e_test_*": true,
     "test_eval_test_*": true,
     "test_memory_test_*": true,
-    "**/screenshots": true
+    "**/screenshots": true,
+    "temp_analysis": true,
+    ".run": true,
+    "temp_*.py": true
   },
-  // Exclude from search results (Ctrl+Shift+F)
+
+  // ═══════════════════════════════════════════════════════════
+  // Search — exclude build artifacts and data dirs
+  // ═══════════════════════════════════════════════════════════
   "search.exclude": {
     "mcp-server/**": true,
     "**/.venv/**": true,
@@ -140,21 +189,32 @@
     "**/*.jpg": true,
     "**/*.jpeg": true,
     "**/*.gif": true,
-    "**/*.ico": true
+    "**/*.ico": true,
+    "temp_analysis/**": true,
+    ".run/**": true,
+    "temp_*.py": true,
+    "memory-bank/**": true
   },
-  // Auto-run tasks on folder open
+
+  // ═══════════════════════════════════════════════════════════
+  // Tasks
+  // ═══════════════════════════════════════════════════════════
   "task.allowAutomaticTasks": "on",
-  // Python testing configuration
+
+  // ═══════════════════════════════════════════════════════════
+  // Python Testing — pytest
+  // ═══════════════════════════════════════════════════════════
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": [
-    "tests"
+    "tests",
+    "--tb=short"
   ],
+
   // ═══════════════════════════════════════════════════════════
-  // Pylance / Pyright — Type Checking Configuration
+  // Pylance / Pyright — Type Checking
   // ═══════════════════════════════════════════════════════════
   "python.analysis.typeCheckingMode": "basic",
-  // Exclude non-Python files and heavy directories from Pylance analysis
   "python.analysis.exclude": [
     "**/*.md",
     "**/*.MD",
@@ -172,47 +232,37 @@
     "**/data/**",
     "**/screenshots/**",
     "**/temp_analysis/**",
-    // Exclude Windows TempState paths (VS Code chat screenshot attachments cause Mypy storm)
     "c:/Users/**",
     "C:/Users/**"
   ],
-  // Suppress SQLAlchemy 1.x Column[] type mismatches (pervasive false positives)
+  // Suppress SQLAlchemy 1.x Column[] type mismatches (false positives)
   "python.analysis.diagnosticSeverityOverrides": {
     "reportArgumentType": "none",
     "reportReturnType": "none",
     "reportCallIssue": "warning",
     "reportAssignmentType": "warning"
   },
+
   // ═══════════════════════════════════════════════════════════
-  // MyPy Type Checker — Disable (Pylance handles type checking)
+  // MyPy — disabled (Pylance + Ruff handle linting/types)
   // ═══════════════════════════════════════════════════════════
   "mypy-type-checker.enabled": false,
+
   // ═══════════════════════════════════════════════════════════
-  // GitHub Copilot — Maximum Agent Autonomy for Claude Sonnet 4 / Opus 4
+  // GitHub Copilot — Agent Mode
   // ═══════════════════════════════════════════════════════════
-  // Core Agent Mode
   "github.copilot.chat.agent.enabled": true,
-  // Increase iteration limit for complex multi-step tasks
   "chat.agent.maxRequests": 30,
-  // Allow agent to auto-run workspace tasks (build, test, lint)
   "chat.agent.runTasks": true,
-  // ⚡ CRITICAL: Enable prompt files (.github/prompts/)
   "chat.promptFiles": true,
-  // Enable organization-level custom agents (if any)
   "github.copilot.chat.organizationCustomAgents.enabled": true,
-  // Additional search locations for custom agents
   "chat.agentFilesLocations": [
     ".github/agents",
     ".agent"
   ],
-  // Additional search locations for agent skills
   "chat.agentSkillsLocations": [
     ".github/skills"
   ],
-  // Copilot instructions location (auto-loaded)
-  // Copilot instructions are now auto-loaded from .github/instructions/ files
-  // and .github/copilot-instructions.md (no manual config needed)
-  // Copilot completions tuning
   "github.copilot.enable": {
     "*": true,
     "plaintext": true,
@@ -224,32 +274,9 @@
     "json": true,
     "yaml": true
   },
-  "claudeCode.useTerminal": true,
-  "cursorpyright.analysis.diagnosticSeverityOverrides": {
-    "reportArgumentType": "none",
-    "reportReturnType": "none",
-    "reportCallIssue": "warning",
-    "reportAssignmentType": "warning"
-  },
-  "cursorpyright.analysis.exclude": [
-    "**/*.md",
-    "**/*.MD",
-    "mcp-server/**",
-    "**/.venv/**",
-    "**/__pycache__/**",
-    "**/.mypy_cache/**",
-    "test_e2e_test_*/**",
-    "test_eval_test_*/**",
-    "test_memory_test_*/**",
-    "**/agent_memory/**",
-    "**/journal/**",
-    "**/node_modules/**",
-    "**/logs/**",
-    "**/data/**",
-    "**/screenshots/**",
-    "**/temp_analysis/**",
-    "c:/Users/**",
-    "C:/Users/**"
-  ],
-  "cursorpyright.analysis.typeCheckingMode": "basic"
+
+  // ═══════════════════════════════════════════════════════════
+  // Claude Code
+  // ═══════════════════════════════════════════════════════════
+  "claudeCode.useTerminal": true
 }

@@ -146,6 +146,7 @@ class BacktestService:
                     _strategy_params = getattr(config, "strategy_params", None) or {}
                     if isinstance(_strategy_params, dict) and "blocks" in _strategy_params:
                         from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+
                         custom_strategy = StrategyBuilderAdapter(_strategy_params)
                         logger.info("DCAEngine: constructed StrategyBuilderAdapter from strategy_params")
                 result = _base_engine.run_from_config(config, ohlcv, custom_strategy=custom_strategy)

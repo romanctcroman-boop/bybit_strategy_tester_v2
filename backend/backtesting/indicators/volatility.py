@@ -21,12 +21,11 @@ except ImportError:
 
 from backend.backtesting.strategy_builder_adapter import _clamp_period, _param
 from backend.core.indicators import (
-    calculate_atr,
     calculate_atr_smoothed,
     calculate_atrp,
     calculate_bollinger,
-    calculate_keltner,
     calculate_donchian,
+    calculate_keltner,
     calculate_stddev,
 )
 

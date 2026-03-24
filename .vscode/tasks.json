@@ -1,617 +1,319 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Start Kline DB Service",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_kline_db_service.ps1",
-			"args": [
-				"start"
-			],
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "Start AI Agent Service",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_agent_service.ps1",
-			"args": [],
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		},
-		{
-			"label": "Start Uvicorn Server",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-Command",
-				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
-				"start",
-				"-AppModule",
-				"backend.api.app:app",
-				"-BindHost",
-				"0.0.0.0",
-				"-Port",
-				"8000",
-				"-Workers",
-				"4"
-			],
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "Start MCP Server",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_mcp_server.ps1",
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "Stop Uvicorn Server",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-Command",
-				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
-				"stop"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Uvicorn Status",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-Command",
-				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
-				"status"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Tail Uvicorn Logs",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-Command",
-				"& '${workspaceFolder}\\scripts\\start_uvicorn.ps1'",
-				"tail"
-			],
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "Run Database Migrations",
-			"type": "shell",
-			"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-			"args": [
-				"${workspaceFolder}\\main.py",
-				"migrate"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "System Health Check",
-			"type": "shell",
-			"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-			"args": [
-				"${workspaceFolder}\\main.py",
-				"health"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Clear Python Cache",
-			"type": "shell",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-Command",
-				"Get-ChildItem -Path '${workspaceFolder}' -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host '[OK] Python cache cleared'"
-			],
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "Start Redis Server",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_redis.ps1",
-			"args": [
-				"start"
-			],
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "Start DB Maintenance Server",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-			"args": [
-				"start"
-			],
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "silent",
-				"focus": false,
-				"panel": "dedicated",
-				"showReuseMessage": false,
-				"clear": false
-			}
-		},
-		{
-			"label": "Stop DB Maintenance Server",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-			"args": [
-				"stop"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "DB Maintenance Status",
-			"type": "shell",
-			"command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-			"args": [
-				"status"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Recreate Backend Container",
-			"type": "shell",
-			"command": "${workspaceFolder}\\deployment\\recreate_backend.ps1",
-			"group": "build",
-			"problemMatcher": []
-		},
-		{
-			"label": "Check Port 8000",
-			"type": "shell",
-			"command": "netstat -ano | findstr :8000",
-			"problemMatcher": []
-		},
-		{
-			"label": "Start All Services",
-			"dependsOrder": "sequence",
-			"dependsOn": [
-				"Clear Python Cache",
-				"Start Redis Server",
-				"Start Kline DB Service",
-				"Start DB Maintenance Server",
-				"Start Uvicorn Server",
-				"Start MCP Server",
-				"Start AI Agent Service"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Stop All Services",
-			"type": "shell",
-			"command": "${workspaceFolder}\\stop_all.ps1",
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "Restart All Services",
-			"dependsOrder": "sequence",
-			"dependsOn": [
-				"Stop All Services",
-				"Start All Services"
-			],
-			"problemMatcher": []
-		},
-		{
-			"label": "Test Signal Pipeline",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
-			"args": [
-				"d:\\bybit_strategy_tester_v2\\scripts\\test_generate_signals.py"
-			]
-		},
-		{
-			"label": "Test Signal Pipeline Output",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
-			"args": [
-				"d:\\bybit_strategy_tester_v2\\scripts\\test_generate_signals.py",
-				">",
-				"d:\\bybit_strategy_tester_v2\\scripts\\test_output.txt",
-				"2>&1"
-			]
-		},
-		{
-			"label": "Compare Entry Times",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
-			"args": [
-				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
-			]
-		},
-		{
-			"label": "Compare Entry Times Out",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
-			"args": [
-				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py",
-				">",
-				"d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_out.txt",
-				"2>&1"
-			]
-		},
-		{
-			"label": "Run Compare Entry",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\cmp_out.txt 2>&1"
-		},
-		{
-			"label": "Run Compare Entry 2",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
-		},
-		{
-			"label": "Run Compare Entry 3",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\compare_entry_times.py"
-		},
-		{
-			"label": "Full Trade Compare",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\full_trade_compare.py"
-		},
-		{
-			"label": "Health Check",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests; r=requests.get('http://localhost:8000/api/v1/health', timeout=5); print(r.status_code)\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\health.txt 2>&1"
-		},
-		{
-			"label": "Full Compare After Wait",
-			"type": "shell",
-			"command": "ping -n 40 127.0.0.1 > nul && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\full_trade_compare.py",
-			"isBackground": false
-		},
-		{
-			"label": "Check Server And Run Bar Compare",
-			"type": "shell",
-			"command": "netstat -ano | findstr \":8000.*LISTEN\" && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bar_index_compare.py",
-			"isBackground": false
-		},
-		{
-			"label": "Bar Index Compare After Wait",
-			"type": "shell",
-			"command": "ping -n 25 127.0.0.1 > nul && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bar_index_compare.py",
-			"isBackground": false
-		},
-		{
-			"label": "Server Health Check",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests; r=requests.get('http://localhost:8000/api/v1/health', timeout=5); print(r.status_code, r.text[:200])\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\server_check.txt 2>&1",
-			"isBackground": false
-		},
-		{
-			"label": "Srvchk2",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import requests, sys; f=open('d:/bybit_strategy_tester_v2/temp_analysis/sc.txt','w'); r=requests.get('http://localhost:8000/api/v1/health',timeout=5); f.write(str(r.status_code)+' '+r.text[:300]); f.close()\"",
-			"isBackground": false
-		},
-		{
-			"label": "Run Bar Compare PS1",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File d:\\bybit_strategy_tester_v2\\temp_analysis\\run_bar_compare.ps1",
-			"isBackground": false
-		},
-		{
-			"label": "Run Backtest Script",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\run_backtest.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\backtest_result.txt 2>&1"
-		},
-		{
-			"label": "BT Check",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_check.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_out.txt 2>&1"
-		},
-		{
-			"label": "BT Check2",
-			"type": "shell",
-			"command": "ping -n 30 127.0.0.1 && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_check.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_out.txt 2>&1"
-		},
-		{
-			"label": "Check BT DB",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\check_bt_db.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_db_out.txt 2>&1"
-		},
-		{
-			"label": "Check BT DB2",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\check_bt_db.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_db_out.txt 2>&1"
-		},
-		{
-			"label": "BT Check Final",
-			"type": "shell",
-			"command": "ping -n 35 127.0.0.1 > nul && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_check.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_final_out.txt 2>&1"
-		},
-		{
-			"label": "BT Check Final2",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_check.py > d:\\bybit_strategy_tester_v2\\temp_analysis\\bt_final_out.txt 2>&1"
-		},
-		{
-			"label": "Port Check After Start",
-			"type": "shell",
-			"command": "ping -n 40 127.0.0.1 > nul && netstat -ano | findstr \":8000.*LISTEN\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\port_check.txt 2>&1"
-		},
-		{
-			"label": "Read Uvicorn Log",
-			"type": "shell",
-			"command": "Get-ChildItem d:\\bybit_strategy_tester_v2\\logs -Filter '*.log' | Sort-Object LastWriteTime -Desc | Select-Object -First 3 | ForEach-Object { Write-Host $_.FullName; Get-Content $_.FullName -Tail 30 } > d:\\bybit_strategy_tester_v2\\temp_analysis\\uvi_log.txt 2>&1"
-		},
-		{
-			"label": "Check Port 8000 Now",
-			"type": "shell",
-			"command": "netstat -ano | findstr \":8000\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\port8000.txt 2>&1"
-		},
-		{
-			"label": "Recent Uvicorn Log",
-			"type": "shell",
-			"command": "Get-ChildItem d:\\bybit_strategy_tester_v2\\logs -Filter 'uvicorn*.log' | Sort-Object LastWriteTime -Desc | Select-Object -First 1 | ForEach-Object { Write-Host ('File: ' + $_.FullName); Get-Content $_.FullName -Tail 50 } > d:\\bybit_strategy_tester_v2\\temp_analysis\\uvi_recent.txt 2>&1"
-		},
-		{
-			"label": "Import Check App",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import sys; sys.path.insert(0, 'd:/bybit_strategy_tester_v2'); import backend.api.app; print('OK')\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\import_check.txt 2>&1"
-		},
-		{
-			"label": "Router Syntax Check",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -c \"import ast; ast.parse(open('d:/bybit_strategy_tester_v2/backend/api/routers/strategy_builder/router.py', encoding='utf-8').read()); print('router.py syntax OK')\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\router_syntax.txt 2>&1"
-		},
-		{
-			"label": "Syntax2",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -m py_compile d:\\bybit_strategy_tester_v2\\backend\\api\\routers\\strategy_builder\\router.py && echo SYNTAX_OK || echo SYNTAX_ERROR > d:\\bybit_strategy_tester_v2\\temp_analysis\\syn.txt 2>&1"
-		},
-		{
-			"label": "Syntax3",
-			"type": "shell",
-			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -m py_compile d:\\bybit_strategy_tester_v2\\backend\\api\\routers\\strategy_builder\\router.py 2> d:\\bybit_strategy_tester_v2\\temp_analysis\\syn2.txt; echo exit=$LASTEXITCODE >> d:\\bybit_strategy_tester_v2\\temp_analysis\\syn2.txt"
-		},
-		{
-			"label": "Uvicorn Direct Start",
-			"type": "shell",
-			"command": "cd d:\\bybit_strategy_tester_v2 && d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\uvicorn.exe backend.api.app:app --host 0.0.0.0 --port 8000 --workers 1 > d:\\bybit_strategy_tester_v2\\temp_analysis\\uvi_direct.txt 2>&1",
-			"isBackground": true
-		},
-		{
-			"label": "Check Listen After 20s",
-			"type": "shell",
-			"command": "ping -n 20 127.0.0.1 > nul && netstat -ano | findstr \":8000.*LISTEN\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\port_listen.txt 2>&1"
-		},
-		{
-			"label": "Read Run Log",
-			"type": "shell",
-			"command": "Get-Content d:\\bybit_strategy_tester_v2\\.run\\uvicorn.log -Tail 40 > d:\\bybit_strategy_tester_v2\\temp_analysis\\run_log.txt 2>&1; Get-Content d:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log -Tail 40 >> d:\\bybit_strategy_tester_v2\\temp_analysis\\run_log.txt 2>&1"
-		},
-		{
-			"label": "All Port 8000",
-			"type": "shell",
-			"command": "netstat -ano | findstr \":8000\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\all8000.txt 2>&1"
-		},
-		{
-			"label": "PID and Err Log",
-			"type": "shell",
-			"command": "Get-Content d:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid -ErrorAction SilentlyContinue; echo '---'; Get-Content d:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log -Tail 30 -ErrorAction SilentlyContinue > d:\\bybit_strategy_tester_v2\\temp_analysis\\pid_err.txt 2>&1"
-		},
-		{
-			"label": "Wait 50s then Check",
-			"type": "shell",
-			"command": "ping -n 50 127.0.0.1 > nul && netstat -ano | findstr \":8000\" > d:\\bybit_strategy_tester_v2\\temp_analysis\\port_50s.txt 2>&1 && Get-Content d:\\bybit_strategy_tester_v2\\.run\\uvicorn.log -Tail 10 >> d:\\bybit_strategy_tester_v2\\temp_analysis\\port_50s.txt 2>&1"
-		},
-		{
-			"label": "Kill Port 8000",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$conns = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue; foreach ($c in $conns) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue }; Write-Host 'All port 8000 processes killed'\""
-		},
-		{
-			"label": "Wait and Health Check",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 18; $r = Invoke-RestMethod -Uri 'http://localhost:8000/api/v1/health' -TimeoutSec 5 -ErrorAction SilentlyContinue; if ($r) { Write-Host 'SERVER UP:' ($r | ConvertTo-Json -Compress) } else { Write-Host 'SERVER DOWN'; Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log' -Tail 5 }\""
-		},
-		{
-			"label": "Health Check v2",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"try { $r = Invoke-WebRequest -Uri 'http://localhost:8000/api/v1/health' -TimeoutSec 5 -UseBasicParsing; Write-Host 'STATUS:' $r.StatusCode; Write-Host $r.Content } catch { Write-Host 'ERROR:' $_.Exception.Message; Write-Host '--- LOG TAIL ---'; Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log' -Tail 10 -ErrorAction SilentlyContinue }\""
-		},
-		{
-			"label": "Check Port and Log",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"netstat -ano | findstr ':8000' | findstr LISTEN; echo '---LOG---'; Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log' -Tail 15 -ErrorAction SilentlyContinue\" > D:\\bybit_strategy_tester_v2\\temp_analysis\\check_status.txt 2>&1; Get-Content D:\\bybit_strategy_tester_v2\\temp_analysis\\check_status.txt"
-		},
-		{
-			"label": "Wait 25s then Check Startup",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 25; Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log' -Tail 20 -ErrorAction SilentlyContinue | Out-File 'D:\\bybit_strategy_tester_v2\\temp_analysis\\startup_check.txt' -Encoding utf8; netstat -ano | findstr ':8000' >> 'D:\\bybit_strategy_tester_v2\\temp_analysis\\startup_check.txt' 2>&1\""
-		},
-		{
-			"label": "Wait and Check Server Status",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 30; $log = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -Tail 5 -ErrorAction SilentlyContinue; $pid_ = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -ErrorAction SilentlyContinue; $port = netstat -ano | findstr ':8000' | findstr LISTEN; [pscustomobject]@{PID=$pid_; Port=$port; LogTail=($log -join ' | ')} | ConvertTo-Json | Set-Content 'D:\\bybit_strategy_tester_v2\\temp_analysis\\srv_status.json' -Encoding utf8\""
-		},
-		{
-			"label": "Server Status v3",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$port = (netstat -ano | findstr ':8000' | findstr LISTEN); $pid_ = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -ErrorAction SilentlyContinue); $tail = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -Tail 3 -ErrorAction SilentlyContinue); $out = 'PORT=' + $port + ' PID=' + $pid_ + ' LOG=' + ($tail -join '||'); [System.IO.File]::WriteAllText('D:\\bybit_strategy_tester_v2\\temp_analysis\\srv2.txt', $out)\""
-		},
-		{
-			"label": "Wait 35s Check Server",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 35; $port = (netstat -ano | findstr ':8000' | findstr LISTEN); $pid_ = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -ErrorAction SilentlyContinue); $tail = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -Tail 4 -ErrorAction SilentlyContinue); $out = 'PORT=[' + $port + '] PID=[' + $pid_ + '] LOG=[' + ($tail -join '||') + ']'; [System.IO.File]::WriteAllText('D:\\bybit_strategy_tester_v2\\temp_analysis\\srv3.txt', $out)\""
-		},
-		{
-			"label": "Connection Check",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; $pid_ = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -ErrorAction SilentlyContinue; echo ('CONN='+($conn|ConvertTo-Json -Compress -ErrorAction SilentlyContinue)); echo ('PID_FILE='+$pid_) | Out-File D:\\bybit_strategy_tester_v2\\temp_analysis\\conn_check.txt -Encoding ascii\""
-		},
-		{
-			"label": "Direct Uvicorn Start",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"cd D:\\bybit_strategy_tester_v2; $proc = Start-Process -FilePath 'D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe' -ArgumentList '-m','uvicorn','backend.api.app:app','--host','0.0.0.0','--port','8000','--log-level','info' -WorkingDirectory 'D:\\bybit_strategy_tester_v2' -PassThru -WindowStyle Hidden -RedirectStandardOutput 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log' -RedirectStandardError 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log'; echo $proc.Id | Out-File D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid -Encoding ascii; echo ('Started PID:' + $proc.Id)\""
-		},
-		{
-			"label": "After 30s Status",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 30; $pid_ = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -Raw -ErrorAction SilentlyContinue; $port = netstat -ano | findstr ':8000' | findstr LISTEN; $tail4 = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -Tail 4 -ErrorAction SilentlyContinue; echo $port; echo ('PID='+$pid_); $tail4 | Out-File 'D:\\bybit_strategy_tester_v2\\temp_analysis\\after30s.txt' -Encoding ascii; echo $port >> 'D:\\bybit_strategy_tester_v2\\temp_analysis\\after30s.txt'; echo ('PID='+$pid_) >> 'D:\\bybit_strategy_tester_v2\\temp_analysis\\after30s.txt'\""
-		},
-		{
-			"label": "Force Start Uvicorn",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$conn = $null; try { $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction Stop } catch {}; if ($conn) { 'PORT_BUSY_PID=' + $conn.OwningProcess } else { 'PORT_FREE'; $p = Start-Process -FilePath 'D:\\bybit_strategy_tester_v2\\scripts\\run_uvicorn.bat' -ArgumentList '\"D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe\"','\"D:\\bybit_strategy_tester_v2\"','\"D:\\bybit_strategy_tester_v2\\.run\\uvicorn.log\"','\"D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log\"' -WorkingDirectory 'D:\\bybit_strategy_tester_v2' -PassThru -WindowStyle Hidden; Start-Sleep 2; 'STARTED PID=' + $p.Id; $p.Id | Out-File 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -Encoding ascii }\""
-		},
-		{
-			"label": "Wait 35s Then Check",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 35; $lines = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -Tail 6 -ErrorAction SilentlyContinue) -join '|'; $port = (netstat -ano | findstr ':8000' | findstr LISTEN) -join ' '; $pid2 = Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid' -Raw -ErrorAction SilentlyContinue; Add-Content 'D:\\bybit_strategy_tester_v2\\.run\\check.txt' ('PORT='+$port+' PID='+$pid2+' LOG='+$lines)\""
-		},
-		{
-			"label": "PS1 Direct Start",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\\bybit_strategy_tester_v2\\scripts\\start_uvicorn.ps1 start"
-		},
-		{
-			"label": "Check After 40s",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Start-Sleep 40; $lc = (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -ErrorAction SilentlyContinue).Count; $pf = Test-Path 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn.pid'; $port = netstat -ano 2>$null | Select-String ':8000.*LISTEN'; [System.IO.File]::WriteAllText('D:\\bybit_strategy_tester_v2\\.run\\chk.txt','LC='+$lc+' PF='+$pf+' PORT='+$port)\""
-		},
-		{
-			"label": "Netstat 8000",
-			"type": "shell",
-			"command": "netstat -ano | findstr \":8000\""
-		},
-		{
-			"label": "Uvicorn Inline Start",
-			"type": "shell",
-			"command": "cd /d D:\\bybit_strategy_tester_v2 && D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --log-level info",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "Port Check 35s",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -Command \"Start-Sleep 35; netstat -ano | findstr ':8000'\""
-		},
-		{
-			"label": "Kill Port 8000 v2",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$pids = (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue).OwningProcess | Sort-Object -Unique; foreach($p in $pids){ Write-EventLog -LogName Application -Source 'Application' -EntryType Information -EventId 1 -Message ('Killing PID '+$p) -ErrorAction SilentlyContinue; taskkill /F /PID $p 2>&1 }; Start-Sleep 3; $still = (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue).OwningProcess; Write-EventLog -LogName Application -Source 'Application' -EntryType Information -EventId 2 -Message ('Still on 8000: '+$still) -ErrorAction SilentlyContinue\""
-		},
-		{
-			"label": "Kill 8000 CMD",
-			"type": "shell",
-			"command": "FOR /F \"tokens=5\" %P IN ('netstat -ano ^| findstr \":8000 \" ^| findstr LISTEN') DO taskkill /F /PID %P"
-		},
-		{
-			"label": "Uvicorn Start v2",
-			"type": "shell",
-			"command": "cd /d D:\\bybit_strategy_tester_v2 && D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --log-level info",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "Log Tail After 40s",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -Command \"Start-Sleep 40; (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log')[-5..-1] -join '|'\""
-		},
-		{
-			"label": "Uvicorn Port 8001",
-			"type": "shell",
-			"command": "cd /d D:\\bybit_strategy_tester_v2 && D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe -m uvicorn backend.api.app:app --host 0.0.0.0 --port 8001 --log-level info",
-			"isBackground": true,
-			"problemMatcher": []
-		},
-		{
-			"label": "Log 45s",
-			"type": "shell",
-			"command": "powershell.exe -NoProfile -Command \"Start-Sleep 45; (Get-Content 'D:\\bybit_strategy_tester_v2\\.run\\uvicorn_err.log' -ErrorAction SilentlyContinue)[-3..-1] -join '|||'\""
-		},
-		{
-			"label": "Python Kill 8000",
-			"type": "shell",
-			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe D:\\bybit_strategy_tester_v2\\temp_analysis\\kill_8000.py"
-		},
-		{
-			"label": "Python Kill 8000 v2",
-			"type": "shell",
-			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe D:\\bybit_strategy_tester_v2\\temp_analysis\\kill_8000_v2.py"
-		},
-		{
-			"label": "Python Kill v3",
-			"type": "shell",
-			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe D:\\bybit_strategy_tester_v2\\temp_analysis\\kill_8000_v3.py"
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    // ─── Server lifecycle ─────────────────────────────────────────────────────
+    {
+      "label": "Start Uvicorn Server",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' start -AppModule backend.api.app:app -BindHost 0.0.0.0 -Port 8000 -Workers 4"
+      ],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Stop Uvicorn Server",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' stop"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Uvicorn Status",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Uvicorn Log Tail",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' tail"
+      ],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    // ─── Infrastructure services ──────────────────────────────────────────────
+    {
+      "label": "Start Redis Server",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_redis.ps1",
+      "args": ["start"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Start Kline DB Service",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_kline_db_service.ps1",
+      "args": ["start"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Start DB Maintenance Server",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+      "args": ["start"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Stop DB Maintenance Server",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+      "args": ["stop"],
+      "problemMatcher": []
+    },
+    {
+      "label": "DB Maintenance Status",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
+      "args": ["status"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Start MCP Server",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_mcp_server.ps1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Start AI Agent Service",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\start_agent_service.ps1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    // ─── Compound: start / stop / restart all ─────────────────────────────────
+    {
+      "label": "🚀 Start All (start_all.ps1)",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}\\start_all.ps1",
+        "-NoBrowser"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": true
+      }
+    },
+    {
+      "label": "Start All Services",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Clear Python Cache",
+        "Start Redis Server",
+        "Start Kline DB Service",
+        "Start DB Maintenance Server",
+        "Start Uvicorn Server",
+        "Start MCP Server",
+        "Start AI Agent Service"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop All Services",
+      "type": "shell",
+      "command": "${workspaceFolder}\\stop_all.ps1",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Restart All Services",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Stop All Services",
+        "Start All Services"
+      ],
+      "problemMatcher": []
+    },
+    // ─── Database & migrations ────────────────────────────────────────────────
+    {
+      "label": "Run Database Migrations",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["${workspaceFolder}\\main.py", "migrate"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Recreate Backend Container",
+      "type": "shell",
+      "command": "${workspaceFolder}\\deployment\\recreate_backend.ps1",
+      "group": "build",
+      "problemMatcher": []
+    },
+    // ─── Diagnostics & health ─────────────────────────────────────────────────
+    {
+      "label": "System Health Check",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["${workspaceFolder}\\main.py", "health"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Check Port 8000",
+      "type": "shell",
+      "command": "netstat -ano | findstr :8000",
+      "problemMatcher": []
+    },
+    {
+      "label": "Kill Port 8000",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "$pids = (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue).OwningProcess | Sort-Object -Unique; foreach ($p in $pids) { taskkill /F /PID $p 2>&1 }; Write-Host 'Done'"
+      ],
+      "problemMatcher": []
+    },
+    // ─── Maintenance ──────────────────────────────────────────────────────────
+    {
+      "label": "Clear Python Cache",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Get-ChildItem -Path '${workspaceFolder}' -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host '[OK] Python cache cleared'"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    // ─── Tests ────────────────────────────────────────────────────────────────
+    {
+      "label": "Run All Tests",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "tests/", "-x", "-q"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests (fast — skip slow)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "tests/", "-x", "-q", "-m", "not slow"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Engine Tests",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "tests/backend/backtesting/test_engine.py", "-v"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    // ─── Lint & format ────────────────────────────────────────────────────────
+    {
+      "label": "Ruff Check + Fix",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ruff", "check", ".", "--fix"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Ruff Format",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ruff", "format", "."],
+      "problemMatcher": []
+    }
+  ]
 }

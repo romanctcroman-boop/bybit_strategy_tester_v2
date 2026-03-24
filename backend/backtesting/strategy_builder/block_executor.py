@@ -52,7 +52,6 @@ from backend.core.indicators import (
     calculate_stochastic,
 )
 
-
 # ---------------------------------------------------------------------------
 # apply_signal_memory — single signal persistence helper
 # ---------------------------------------------------------------------------
@@ -296,9 +295,7 @@ def execute_logic(
 # ---------------------------------------------------------------------------
 
 
-def execute_input(
-    input_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
-) -> dict[str, pd.Series]:
+def execute_input(input_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
     """Execute an input block.
 
     Args:
@@ -1477,9 +1474,7 @@ def execute_position_sizing(sizing_type: str, params: dict[str, Any]) -> dict[st
 # ---------------------------------------------------------------------------
 
 
-def execute_time_filter(
-    time_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
-) -> dict[str, pd.Series]:
+def execute_time_filter(time_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
     """Execute time-based filter blocks.
 
     Time filters return boolean series based on time conditions.
@@ -1554,9 +1549,7 @@ def execute_time_filter(
 # ---------------------------------------------------------------------------
 
 
-def execute_price_action(
-    pattern_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
-) -> dict[str, pd.Series]:
+def execute_price_action(pattern_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
     """Execute price action pattern detection blocks.
 
     Returns signals when specific candlestick patterns are detected.
@@ -1744,9 +1737,7 @@ def execute_price_action(
 # ---------------------------------------------------------------------------
 
 
-def execute_divergence(
-    div_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
-) -> dict[str, pd.Series]:
+def execute_divergence(div_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
     """Execute unified divergence detection block.
 
     Detects divergences between price and one or more indicators.
@@ -2079,9 +2070,7 @@ def execute_close_condition(
             cross_long_level = float(params.get("rsi_cross_long_level", 70))
             cross_short_level = float(params.get("rsi_cross_short_level", 30))
             exit_long = exit_long | ((rsi_values < cross_long_level) & (rsi_values.shift(1) >= cross_long_level))
-            exit_short = exit_short | (
-                (rsi_values > cross_short_level) & (rsi_values.shift(1) <= cross_short_level)
-            )
+            exit_short = exit_short | ((rsi_values > cross_short_level) & (rsi_values.shift(1) <= cross_short_level))
 
         result["exit_long"] = exit_long.fillna(False)
         result["exit_short"] = exit_short.fillna(False)
@@ -2102,9 +2091,7 @@ def execute_close_condition(
 
         high = ohlcv["high"]
         low = ohlcv["low"]
-        stoch_k, _stoch_d = calculate_stochastic(
-            high.values, low.values, close.values, k_length, k_smooth, d_smooth
-        )
+        stoch_k, _stoch_d = calculate_stochastic(high.values, low.values, close.values, k_length, k_smooth, d_smooth)
         stoch_values = pd.Series(stoch_k, index=idx)
 
         exit_long = pd.Series([False] * n, index=idx)

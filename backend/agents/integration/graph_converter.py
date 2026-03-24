@@ -192,7 +192,7 @@ _SIGNAL_CAT_B: dict[str, dict[str, Any]] = {
         "param_renames": {},
         "default_params": {},
         # long when price > VWAP (need price block)
-        "long_condition": "crossover",   # uses price_block a, indicator b
+        "long_condition": "crossover",  # uses price_block a, indicator b
         "long_threshold_key": None,
         "long_threshold_default": None,
         "short_condition": "crossunder",
@@ -216,17 +216,17 @@ _SIGNAL_CAT_B: dict[str, dict[str, Any]] = {
     },
     "Bollinger": {
         "block_type": "bollinger",
-        "output_port": "lower",   # long: close crossover lower band
+        "output_port": "lower",  # long: close crossover lower band
         "param_renames": {},
         "default_params": {"period": 20, "std_dev": 2.0},
-        "long_condition": "crossover",   # close crosses above lower band
+        "long_condition": "crossover",  # close crosses above lower band
         "long_threshold_key": None,
         "long_threshold_default": None,
         "short_condition": "crossunder",  # close crosses below upper band
         "short_threshold_key": None,
         "short_threshold_default": None,
         "use_price_as_a": True,
-        "short_output_port": "upper",    # short: compare against upper band
+        "short_output_port": "upper",  # short: compare against upper band
     },
 }
 
@@ -326,20 +326,16 @@ class StrategyDefToGraphConverter:
         connections: list[dict[str, Any]] = []
 
         strategy_node_id = "strategy_node"
-        blocks.append(
-            {"id": strategy_node_id, "type": "strategy", "params": {}, "isMain": True}
-        )
+        blocks.append({"id": strategy_node_id, "type": "strategy", "params": {}, "isMain": True})
 
         logic = (strategy_def.entry_conditions.logic if strategy_def.entry_conditions else "AND").upper()
 
         # ── Build signal blocks ──────────────────────────────────────────
-        long_signal_ids: list[tuple[str, str]] = []   # (block_id, output_port)
+        long_signal_ids: list[tuple[str, str]] = []  # (block_id, output_port)
         short_signal_ids: list[tuple[str, str]] = []
 
         for signal in strategy_def.signals:
-            long_out, short_out, new_blocks, new_conns, warn = self._build_signal(
-                signal, blocks, interval
-            )
+            long_out, short_out, new_blocks, new_conns, warn = self._build_signal(signal, blocks, interval)
             warnings.extend(warn)
             blocks.extend(new_blocks)
             connections.extend(new_conns)
@@ -353,9 +349,7 @@ class StrategyDefToGraphConverter:
         filter_short_ids: list[tuple[str, str]] = []
 
         for flt in strategy_def.filters:
-            long_out, short_out, new_blocks, new_conns, warn = self._build_filter(
-                flt, blocks, interval
-            )
+            long_out, short_out, new_blocks, new_conns, warn = self._build_filter(flt, blocks, interval)
             warnings.extend(warn)
             blocks.extend(new_blocks)
             connections.extend(new_conns)
@@ -369,9 +363,7 @@ class StrategyDefToGraphConverter:
         all_short = short_signal_ids + filter_short_ids
 
         if all_long:
-            long_src, new_blocks, new_conns = self._combine_signals(
-                all_long, logic, "long"
-            )
+            long_src, new_blocks, new_conns = self._combine_signals(all_long, logic, "long")
             blocks.extend(new_blocks)
             connections.extend(new_conns)
             connections.append(
@@ -386,9 +378,7 @@ class StrategyDefToGraphConverter:
             warnings.append("No long signals generated — strategy_node entry_long will be empty")
 
         if all_short:
-            short_src, new_blocks, new_conns = self._combine_signals(
-                all_short, logic, "short"
-            )
+            short_src, new_blocks, new_conns = self._combine_signals(all_short, logic, "short")
             blocks.extend(new_blocks)
             connections.extend(new_conns)
             connections.append(
@@ -427,9 +417,9 @@ class StrategyDefToGraphConverter:
     ) -> tuple[
         tuple[str, str] | None,  # long (block_id, port)
         tuple[str, str] | None,  # short (block_id, port)
-        list[dict[str, Any]],    # new blocks
-        list[dict[str, Any]],    # new connections
-        list[str],               # warnings
+        list[dict[str, Any]],  # new blocks
+        list[dict[str, Any]],  # new connections
+        list[str],  # warnings
     ]:
         sig_type = signal.type
         new_blocks: list[dict[str, Any]] = []
@@ -453,9 +443,7 @@ class StrategyDefToGraphConverter:
             ):
                 params.setdefault("oversold", 30)
                 params.setdefault("overbought", 70)
-            new_blocks.append(
-                {"id": block_id, "type": cfg["block_type"], "params": params, "isMain": False}
-            )
+            new_blocks.append({"id": block_id, "type": cfg["block_type"], "params": params, "isMain": False})
             return (block_id, "long"), (block_id, "short"), new_blocks, new_conns, warn
 
         # Category B?
@@ -469,18 +457,12 @@ class StrategyDefToGraphConverter:
                 {},
                 interval,
             )
-            new_blocks.append(
-                {"id": ind_id, "type": cfg["block_type"], "params": ind_params, "isMain": False}
-            )
+            new_blocks.append({"id": ind_id, "type": cfg["block_type"], "params": ind_params, "isMain": False})
 
             # Build long condition block
-            long_out = self._build_cat_b_condition(
-                cfg, ind_id, signal.params, "long", new_blocks, new_conns
-            )
+            long_out = self._build_cat_b_condition(cfg, ind_id, signal.params, "long", new_blocks, new_conns)
             # Build short condition block
-            short_out = self._build_cat_b_condition(
-                cfg, ind_id, signal.params, "short", new_blocks, new_conns
-            )
+            short_out = self._build_cat_b_condition(cfg, ind_id, signal.params, "short", new_blocks, new_conns)
 
             warn.append(
                 f"Signal '{sig_type}' is a value-only indicator — "
@@ -528,9 +510,7 @@ class StrategyDefToGraphConverter:
         if use_price_as_a:
             # Need a price input block: close price for port "a"
             price_id = self._next_id("price_input")
-            new_blocks.append(
-                {"id": price_id, "type": "input", "params": {"input_type": "price"}, "isMain": False}
-            )
+            new_blocks.append({"id": price_id, "type": "input", "params": {"input_type": "price"}, "isMain": False})
             new_blocks.append(
                 {"id": cond_id, "type": "condition", "params": {"condition_type": condition_type}, "isMain": False}
             )
@@ -598,9 +578,7 @@ class StrategyDefToGraphConverter:
                 {},
                 interval,
             )
-            new_blocks.append(
-                {"id": ind_id, "type": cfg["block_type"], "params": ind_params, "isMain": False}
-            )
+            new_blocks.append({"id": ind_id, "type": cfg["block_type"], "params": ind_params, "isMain": False})
             threshold = float(flt.params.get("threshold", cfg.get("threshold_default", 25.0)))
             const_id = self._next_id("const")
             cond_id = self._next_id("cond")
@@ -634,9 +612,7 @@ class StrategyDefToGraphConverter:
             cfg.get("activate", {}),
             interval,
         )
-        new_blocks.append(
-            {"id": block_id, "type": cfg["block_type"], "params": params, "isMain": False}
-        )
+        new_blocks.append({"id": block_id, "type": cfg["block_type"], "params": params, "isMain": False})
         return (block_id, "long"), (block_id, "short"), new_blocks, new_conns, warn
 
     # ------------------------------------------------------------------
@@ -646,12 +622,12 @@ class StrategyDefToGraphConverter:
     def _combine_signals(
         self,
         signal_ids: list[tuple[str, str]],  # [(block_id, port), ...]
-        logic: str,                           # "AND" or "OR"
-        direction: str,                       # "long" or "short" (for id naming)
+        logic: str,  # "AND" or "OR"
+        direction: str,  # "long" or "short" (for id naming)
     ) -> tuple[
-        tuple[str, str],         # final output (block_id, port)
-        list[dict[str, Any]],   # new blocks
-        list[dict[str, Any]],   # new connections
+        tuple[str, str],  # final output (block_id, port)
+        list[dict[str, Any]],  # new blocks
+        list[dict[str, Any]],  # new connections
     ]:
         """Combine N signals using AND/OR logic blocks.
 
@@ -673,15 +649,11 @@ class StrategyDefToGraphConverter:
             remaining = current_signals[3:]
 
             gate_id = self._next_id(f"{logic_type}_{direction}")
-            new_blocks.append(
-                {"id": gate_id, "type": logic_type, "params": {}, "isMain": False}
-            )
+            new_blocks.append({"id": gate_id, "type": logic_type, "params": {}, "isMain": False})
 
             ports = ["a", "b", "c"]
             for port, (src_id, src_port) in zip(ports, chunk):
-                new_conns.append(
-                    {"from": src_id, "fromPort": src_port, "to": gate_id, "toPort": port}
-                )
+                new_conns.append({"from": src_id, "fromPort": src_port, "to": gate_id, "toPort": port})
 
             # The output of this gate becomes a new signal for the next round
             current_signals = [(gate_id, "output")] + remaining

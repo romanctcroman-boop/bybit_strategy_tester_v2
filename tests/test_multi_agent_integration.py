@@ -9,23 +9,23 @@ Run with:
 
 from __future__ import annotations
 
-import asyncio
 import time
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ─────────────────────────────────────────────────────────────────
 # 1. LLMResponseCache
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestLLMResponseCache:
     def _make_cache(self):
         import backend.agents.llm_response_cache as m
+
         m._instance = None
         from backend.agents.llm_response_cache import LLMResponseCache
+
         return LLMResponseCache()
 
     def test_miss_returns_none(self):
@@ -44,12 +44,14 @@ class TestLLMResponseCache:
 
     def test_normalize_strips_timestamps(self):
         from backend.agents.llm_response_cache import _normalize_text
+
         t1 = _normalize_text("BTC price on 2026-03-19 is up")
         t2 = _normalize_text("BTC price on 2026-03-20 is up")
         assert t1 == t2
 
     def test_normalize_strips_dollar_prices(self):
         from backend.agents.llm_response_cache import _normalize_text
+
         t1 = _normalize_text("BTC is trading at $84,000.00 right now")
         t2 = _normalize_text("BTC is trading at $91,500.00 right now")
         assert t1 == t2
@@ -90,8 +92,10 @@ class TestLLMResponseCache:
 
     def test_singleton(self):
         import backend.agents.llm_response_cache as m
+
         m._instance = None
         from backend.agents.llm_response_cache import get_llm_response_cache
+
         c1 = get_llm_response_cache()
         c2 = get_llm_response_cache()
         assert c1 is c2
@@ -101,9 +105,11 @@ class TestLLMResponseCache:
 # 2. CostCircuitBreaker
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestCostCircuitBreaker:
     def _make_breaker(self, per_call=2.0, per_hour=20.0, per_day=50.0):
         from backend.agents.cost_circuit_breaker import CostCircuitBreaker
+
         return CostCircuitBreaker(
             limit_per_call_usd=per_call,
             limit_per_hour_usd=per_hour,
@@ -116,6 +122,7 @@ class TestCostCircuitBreaker:
 
     def test_blocks_over_per_call(self):
         from backend.agents.cost_circuit_breaker import CostLimitExceededError
+
         b = self._make_breaker(per_call=0.50)
         with pytest.raises(CostLimitExceededError) as exc:
             b.check_before_call("perplexity", estimated_cost_usd=0.60)
@@ -123,6 +130,7 @@ class TestCostCircuitBreaker:
 
     def test_blocks_over_per_hour(self):
         from backend.agents.cost_circuit_breaker import CostLimitExceededError
+
         b = self._make_breaker(per_hour=1.0)
         b.record_actual("perplexity", cost_usd=0.90)
         with pytest.raises(CostLimitExceededError) as exc:
@@ -131,6 +139,7 @@ class TestCostCircuitBreaker:
 
     def test_blocks_over_per_day(self):
         from backend.agents.cost_circuit_breaker import CostLimitExceededError
+
         b = self._make_breaker(per_day=1.0)
         b.record_actual("perplexity", cost_usd=0.95)
         with pytest.raises(CostLimitExceededError) as exc:
@@ -152,8 +161,10 @@ class TestCostCircuitBreaker:
 
     def test_singleton(self):
         import backend.agents.cost_circuit_breaker as m
+
         m._breaker = None
         from backend.agents.cost_circuit_breaker import get_cost_circuit_breaker
+
         b1 = get_cost_circuit_breaker()
         b2 = get_cost_circuit_breaker()
         assert b1 is b2
@@ -164,9 +175,11 @@ class TestCostCircuitBreaker:
 # Patch the source module where PromptsMonitor is defined, not the caller
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestPromptsAlertingCacheFix:
     def _make_alerting(self):
         from backend.monitoring.prompts_alerting import AlertConfig, PromptsAlerting
+
         return PromptsAlerting(config=AlertConfig(min_cache_hit_rate=0.5))
 
     def test_no_alert_when_zero_ops(self):
@@ -211,6 +224,7 @@ class TestPromptsAlertingCacheFix:
 # 4. GenerateStrategiesNode — Self-MoA
 # Mock _prompt_engineer to avoid needing a real MarketContext object
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestGenerateStrategiesNodeMoA:
     def _make_state(self, agents=None):
@@ -328,6 +342,7 @@ class TestGenerateStrategiesNodeMoA:
 # 5. ConsensusNode — patch source modules for local imports
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestConsensusNode:
     def _make_state(self, proposals):
         try:
@@ -357,7 +372,7 @@ class TestConsensusNode:
 
         proposals = [
             {"agent": "deepseek", "strategy": self._mock_strategy("s1"), "validation": self._mock_validation(0.9)},
-            {"agent": "qwen",     "strategy": self._mock_strategy("s2"), "validation": self._mock_validation(0.7)},
+            {"agent": "qwen", "strategy": self._mock_strategy("s2"), "validation": self._mock_validation(0.7)},
         ]
         state = self._make_state(proposals)
 
@@ -367,8 +382,10 @@ class TestConsensusNode:
         mock_result.agent_weights = {"deepseek": 0.6, "qwen": 0.4}
 
         # Patch source modules — local imports inside execute() resolve from here
-        with patch("backend.agents.consensus.consensus_engine.ConsensusEngine") as MockCE, \
-             patch("backend.agents.self_improvement.agent_tracker.AgentPerformanceTracker") as MockAT:
+        with (
+            patch("backend.agents.consensus.consensus_engine.ConsensusEngine") as MockCE,
+            patch("backend.agents.self_improvement.agent_tracker.AgentPerformanceTracker") as MockAT,
+        ):
             MockCE.return_value.aggregate.return_value = mock_result
             MockCE.return_value.update_performance.return_value = None
             MockAT.return_value.compute_dynamic_weights.return_value = {"deepseek": 0.6, "qwen": 0.4}
@@ -388,15 +405,18 @@ class TestConsensusNode:
         s_low = self._mock_strategy("s1")
         s_high = self._mock_strategy("s2")
         proposals = [
-            {"agent": "deepseek", "strategy": s_low,  "validation": self._mock_validation(0.5)},
-            {"agent": "qwen",     "strategy": s_high, "validation": self._mock_validation(0.9)},
+            {"agent": "deepseek", "strategy": s_low, "validation": self._mock_validation(0.5)},
+            {"agent": "qwen", "strategy": s_high, "validation": self._mock_validation(0.9)},
         ]
         state = self._make_state(proposals)
 
-        with patch("backend.agents.consensus.consensus_engine.ConsensusEngine",
-                   side_effect=Exception("CE unavailable")), \
-             patch("backend.agents.self_improvement.agent_tracker.AgentPerformanceTracker",
-                   side_effect=Exception("tracker unavailable")):
+        with (
+            patch("backend.agents.consensus.consensus_engine.ConsensusEngine", side_effect=Exception("CE unavailable")),
+            patch(
+                "backend.agents.self_improvement.agent_tracker.AgentPerformanceTracker",
+                side_effect=Exception("tracker unavailable"),
+            ),
+        ):
             node = ConsensusNode()
             result_state = await node.execute(state)
 
@@ -409,6 +429,7 @@ class TestConsensusNode:
 # 6. MemoryUpdateNode — patch source module
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestMemoryUpdateNode:
     def _make_state(self, metrics, selected_agent="deepseek"):
         try:
@@ -420,10 +441,13 @@ class TestMemoryUpdateNode:
         strategy = MagicMock()
         strategy.strategy_name = "RSI_test"
         strategy.strategy_type = "rsi"
-        state.set_result("select_best", {
-            "selected_strategy": strategy,
-            "selected_agent": selected_agent,
-        })
+        state.set_result(
+            "select_best",
+            {
+                "selected_strategy": strategy,
+                "selected_agent": selected_agent,
+            },
+        )
         state.set_result("backtest", {"metrics": metrics})
         state.context.update({"symbol": "BTCUSDT", "timeframe": "15"})
         return state
@@ -432,16 +456,20 @@ class TestMemoryUpdateNode:
     async def test_store_called_on_successful_backtest(self):
         from backend.agents.trading_strategy_graph import MemoryUpdateNode
 
-        metrics = {"sharpe_ratio": 1.5, "max_drawdown": 10.0, "total_trades": 20,
-                   "win_rate": 0.55, "profit_factor": 1.8}
+        metrics = {
+            "sharpe_ratio": 1.5,
+            "max_drawdown": 10.0,
+            "total_trades": 20,
+            "win_rate": 0.55,
+            "profit_factor": 1.8,
+        }
         state = self._make_state(metrics)
 
         mock_memory = AsyncMock()
         mock_memory.store = AsyncMock(return_value=MagicMock())
 
         # Patch source module
-        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory",
-                   return_value=mock_memory):
+        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory", return_value=mock_memory):
             node = MemoryUpdateNode()
             await node.execute(state)
 
@@ -454,12 +482,12 @@ class TestMemoryUpdateNode:
     async def test_no_error_when_memory_raises(self):
         from backend.agents.trading_strategy_graph import MemoryUpdateNode
 
-        metrics = {"sharpe_ratio": 2.0, "max_drawdown": 5.0, "total_trades": 30,
-                   "win_rate": 0.6, "profit_factor": 2.2}
+        metrics = {"sharpe_ratio": 2.0, "max_drawdown": 5.0, "total_trades": 30, "win_rate": 0.6, "profit_factor": 2.2}
         state = self._make_state(metrics)
 
-        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory",
-                   side_effect=Exception("DB unavailable")):
+        with patch(
+            "backend.agents.memory.hierarchical_memory.HierarchicalMemory", side_effect=Exception("DB unavailable")
+        ):
             node = MemoryUpdateNode()
             result = await node.execute(state)
 
@@ -468,6 +496,7 @@ class TestMemoryUpdateNode:
     @pytest.mark.asyncio
     async def test_skipped_when_no_backtest_metrics(self):
         from backend.agents.trading_strategy_graph import MemoryUpdateNode
+
         try:
             from backend.agents.langgraph_orchestrator import AgentState
         except ImportError:
@@ -478,8 +507,7 @@ class TestMemoryUpdateNode:
         state.set_result("backtest", {"metrics": {}})
 
         mock_memory = AsyncMock()
-        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory",
-                   return_value=mock_memory):
+        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory", return_value=mock_memory):
             node = MemoryUpdateNode()
             await node.execute(state)
 
@@ -489,6 +517,7 @@ class TestMemoryUpdateNode:
 # ─────────────────────────────────────────────────────────────────
 # 7. DebateNode — patch source module
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestDebateNode:
     def _make_state(self, regime="bullish"):
@@ -514,8 +543,10 @@ class TestDebateNode:
         mock_result.rounds_completed = 2
 
         # Patch the function in its source module
-        with patch("backend.agents.consensus.real_llm_deliberation.deliberate_with_llm",
-                   new=AsyncMock(return_value=mock_result)):
+        with patch(
+            "backend.agents.consensus.real_llm_deliberation.deliberate_with_llm",
+            new=AsyncMock(return_value=mock_result),
+        ):
             node = DebateNode()
             state = self._make_state()
             result = await node.execute(state)
@@ -529,8 +560,10 @@ class TestDebateNode:
     async def test_debate_failure_is_nonfatal(self):
         from backend.agents.trading_strategy_graph import DebateNode
 
-        with patch("backend.agents.consensus.real_llm_deliberation.deliberate_with_llm",
-                   new=AsyncMock(side_effect=RuntimeError("API down"))):
+        with patch(
+            "backend.agents.consensus.real_llm_deliberation.deliberate_with_llm",
+            new=AsyncMock(side_effect=RuntimeError("API down")),
+        ):
             node = DebateNode()
             state = self._make_state()
             result = await node.execute(state)
@@ -542,6 +575,7 @@ class TestDebateNode:
     @pytest.mark.asyncio
     async def test_debate_skips_without_market_analysis(self):
         from backend.agents.trading_strategy_graph import DebateNode
+
         try:
             from backend.agents.langgraph_orchestrator import AgentState
         except ImportError:
@@ -557,19 +591,23 @@ class TestDebateNode:
 # 8. Full pipeline graph smoke test
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestGraphBuilds:
     def test_full_graph_build_with_all_nodes(self):
         from backend.agents.trading_strategy_graph import build_trading_strategy_graph
+
         graph = build_trading_strategy_graph(run_backtest=True, run_debate=True)
         assert graph is not None
 
     def test_graph_without_debate(self):
         from backend.agents.trading_strategy_graph import build_trading_strategy_graph
+
         graph = build_trading_strategy_graph(run_backtest=True, run_debate=False)
         assert graph is not None
 
     def test_graph_without_backtest(self):
         from backend.agents.trading_strategy_graph import build_trading_strategy_graph
+
         graph = build_trading_strategy_graph(run_backtest=False, run_debate=False)
         assert graph is not None
 
@@ -579,12 +617,13 @@ class TestGraphBuilds:
 # Patch source module — get_cost_circuit_breaker is imported locally
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestCostCircuitBreakerInAgent:
     @pytest.mark.asyncio
     async def test_agent_blocked_by_cost_breaker(self):
         try:
-            from backend.agents.unified_agent_interface import UnifiedAgentInterface
             from backend.agents.models import AgentType
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
         except ImportError:
             pytest.skip("unified_agent_interface not importable")
 
@@ -592,9 +631,7 @@ class TestCostCircuitBreakerInAgent:
 
         interface = UnifiedAgentInterface.__new__(UnifiedAgentInterface)
         interface.key_manager = AsyncMock()
-        interface.key_manager.get_active_key = AsyncMock(
-            return_value=MagicMock(index=0, value="fake")
-        )
+        interface.key_manager.get_active_key = AsyncMock(return_value=MagicMock(index=0, value="fake"))
 
         request = MagicMock()
         request.agent_type = AgentType.PERPLEXITY
@@ -605,9 +642,7 @@ class TestCostCircuitBreakerInAgent:
         # Patch in the source module so the local import inside _execute_api_call sees it
         with patch("backend.agents.cost_circuit_breaker.get_cost_circuit_breaker") as mock_fn:
             mock_breaker = MagicMock()
-            mock_breaker.check_before_call.side_effect = CostLimitExceededError(
-                "over budget", "per_hour", 20.0, 21.0
-            )
+            mock_breaker.check_before_call.side_effect = CostLimitExceededError("over budget", "per_hour", 20.0, 21.0)
             mock_fn.return_value = mock_breaker
 
             response = await interface._execute_api_call(request, time.time())

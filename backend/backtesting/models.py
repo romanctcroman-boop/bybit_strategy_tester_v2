@@ -114,7 +114,9 @@ class BacktestConfig(BaseModel):
         le=1.0,
         description="Fraction of capital per trade (0.01-1.0)",
     )
-    leverage: float = Field(default=LEVERAGE_DEFAULT_BACKTEST, ge=1.0, le=LEVERAGE_MAX, description="Leverage (1-125x, Bybit max)")
+    leverage: float = Field(
+        default=LEVERAGE_DEFAULT_BACKTEST, ge=1.0, le=LEVERAGE_MAX, description="Leverage (1-125x, Bybit max)"
+    )
 
     # Trading direction: 'long', 'short', or 'both'
     direction: str = Field(
@@ -169,7 +171,9 @@ class BacktestConfig(BaseModel):
     # Bybit linear perpetuals: maker=0.02% (0.0002), taker=0.055% (0.00055)
     # Bybit spot: maker=0.1% (0.001), taker=0.1% (0.001)
     maker_fee: float = Field(default=COMMISSION_LINEAR_MAKER, ge=0, le=0.01)  # 0.02% Bybit linear maker
-    taker_fee: float = Field(default=COMMISSION_LINEAR_TAKER, ge=0, le=0.01)  # 0.055% Bybit linear taker (market orders)
+    taker_fee: float = Field(
+        default=COMMISSION_LINEAR_TAKER, ge=0, le=0.01
+    )  # 0.055% Bybit linear taker (market orders)
     slippage: float = Field(default=0.0005, ge=0, le=0.05)  # max 5% slippage
     slippage_ticks: int = Field(
         default=0,

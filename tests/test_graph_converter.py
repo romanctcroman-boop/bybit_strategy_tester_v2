@@ -14,18 +14,13 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
-
 from backend.agents.integration.graph_converter import StrategyDefToGraphConverter
 from backend.agents.prompts.response_parser import (
     EntryConditions,
-    ExitCondition,
-    ExitConditions,
     Filter,
     Signal,
     StrategyDefinition,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -96,9 +91,7 @@ def test_graph_name_and_interval():
 
 def test_rsi_legacy_mode():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="RSI", params={"period": 14, "oversold": 30, "overbought": 70})]
-    )
+    strat = make_strategy([Signal(id="s1", type="RSI", params={"period": 14, "oversold": 30, "overbought": 70})])
     graph, warnings = conv.convert(strat)
 
     rsi_blocks = _blocks_by_type(graph, "rsi")
@@ -124,9 +117,7 @@ def test_rsi_defaults_when_no_params():
 
 def test_macd_activation_flag():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="MACD", params={"fast_period": 12, "slow_period": 26})]
-    )
+    strat = make_strategy([Signal(id="s1", type="MACD", params={"fast_period": 12, "slow_period": 26})])
     graph, _ = conv.convert(strat)
 
     macd_block = _blocks_by_type(graph, "macd")[0]
@@ -135,9 +126,7 @@ def test_macd_activation_flag():
 
 def test_stochastic_param_rename_and_activation():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="Stochastic", params={"k_period": 14, "d_period": 3, "smooth": 3})]
-    )
+    strat = make_strategy([Signal(id="s1", type="Stochastic", params={"k_period": 14, "d_period": 3, "smooth": 3})])
     graph, _ = conv.convert(strat)
 
     stoch = _blocks_by_type(graph, "stochastic")[0]
@@ -149,9 +138,7 @@ def test_stochastic_param_rename_and_activation():
 
 def test_supertrend_activation():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="SuperTrend", params={"period": 10, "multiplier": 3.0})]
-    )
+    strat = make_strategy([Signal(id="s1", type="SuperTrend", params={"period": 10, "multiplier": 3.0})])
     graph, _ = conv.convert(strat)
 
     st = _blocks_by_type(graph, "supertrend")[0]
@@ -161,9 +148,7 @@ def test_supertrend_activation():
 
 def test_ema_crossover_maps_to_two_mas():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="EMA_Crossover", params={"fast_period": 9, "slow_period": 21})]
-    )
+    strat = make_strategy([Signal(id="s1", type="EMA_Crossover", params={"fast_period": 9, "slow_period": 21})])
     graph, _ = conv.convert(strat)
 
     tm = _blocks_by_type(graph, "two_mas")[0]
@@ -175,9 +160,7 @@ def test_ema_crossover_maps_to_two_mas():
 
 def test_sma_crossover_maps_to_two_mas():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="SMA_Crossover", params={"fast_period": 10, "slow_period": 30})]
-    )
+    strat = make_strategy([Signal(id="s1", type="SMA_Crossover", params={"fast_period": 10, "slow_period": 30})])
     graph, _ = conv.convert(strat)
 
     tm = _blocks_by_type(graph, "two_mas")[0]
@@ -187,9 +170,7 @@ def test_sma_crossover_maps_to_two_mas():
 
 def test_ema_single_maps_to_ma1_filter():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="EMA", params={"period": 50})]
-    )
+    strat = make_strategy([Signal(id="s1", type="EMA", params={"period": 50})])
     graph, _ = conv.convert(strat)
 
     tm = _blocks_by_type(graph, "two_mas")[0]
@@ -215,9 +196,7 @@ def test_sma_single_maps_to_ma1_filter():
 
 def test_cci_generates_condition_blocks():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="CCI", params={"period": 20, "oversold": -100, "overbought": 100})]
-    )
+    strat = make_strategy([Signal(id="s1", type="CCI", params={"period": 20, "oversold": -100, "overbought": 100})])
     graph, warnings = conv.convert(strat)
 
     assert _blocks_by_type(graph, "cci"), "CCI indicator block missing"
@@ -237,9 +216,7 @@ def test_williams_r_generates_condition_blocks():
 
 def test_bollinger_generates_condition_blocks_with_price_input():
     conv = StrategyDefToGraphConverter()
-    strat = make_strategy(
-        [Signal(id="s1", type="Bollinger", params={"period": 20, "std_dev": 2.0})]
-    )
+    strat = make_strategy([Signal(id="s1", type="Bollinger", params={"period": 20, "std_dev": 2.0})])
     graph, warnings = conv.convert(strat)
 
     assert _blocks_by_type(graph, "bollinger")

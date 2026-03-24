@@ -2731,9 +2731,7 @@ def run_builder_grid_search(
 
     # Quick DCA check — RSI threshold fast path is incompatible with DCA graphs.
     # DCA strategies use the mixed batch path (below); skip RSI threshold path for them.
-    _has_dca_blocks_early = any(
-        b.get("type") in ("dca", "grid_orders") for b in base_graph.get("blocks", [])
-    )
+    _has_dca_blocks_early = any(b.get("type") in ("dca", "grid_orders") for b in base_graph.get("blocks", []))
 
     # ── Fast path: RSI threshold-only ────────────────────────────────────────
     # Only feasible when we have a materialized list (needs random access) AND

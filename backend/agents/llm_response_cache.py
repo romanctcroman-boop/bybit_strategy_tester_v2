@@ -26,16 +26,16 @@ from backend.agents.prompts.context_cache import ContextCache
 
 # Per-provider TTL in seconds
 _TTL_BY_AGENT: dict[str, int] = {
-    "perplexity": 300,   # 5 min — market regime doesn't change that fast
-    "deepseek":    60,   # 1 min — strategy generation is more query-specific
-    "qwen":        90,   # 1.5 min
+    "perplexity": 300,  # 5 min — market regime doesn't change that fast
+    "deepseek": 60,  # 1 min — strategy generation is more query-specific
+    "qwen": 90,  # 1.5 min
 }
 
 # Patterns to strip before hashing (ephemeral, frequently-changing values)
 _STRIP_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?\b"),  # ISO timestamps
-    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),           # date strings  2026-03-19
-    re.compile(r"\$[\d,]+(?:\.\d+)?\b"),             # dollar prices $84,000.50
+    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),  # date strings  2026-03-19
+    re.compile(r"\$[\d,]+(?:\.\d+)?\b"),  # dollar prices $84,000.50
     re.compile(r"\b\d{4,6}(?:\.\d+)?\s*(?:USDT?|BTC|ETH)\b", re.IGNORECASE),  # "84000 USDT"
     re.compile(r"\bcurrent(?:ly)? (?:at|trading at|price)[^.]*\.", re.IGNORECASE),  # "currently at …."
     re.compile(r"\btoday[''']?s price[^.]*\.", re.IGNORECASE),

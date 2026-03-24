@@ -16,8 +16,8 @@ param(
     [Parameter(Mandatory = $false)]
     [ValidateSet('start', 'stop', 'status')]
     [string]$Action = 'start',
-    
-    [string]$PidFile = '.kline_db.pid',
+
+    [string]$PidFile = '.run/kline_db.pid',
     [string]$LogFile = 'logs/kline_db_service.log'
 )
 

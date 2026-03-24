@@ -979,19 +979,23 @@ async def get_market_tickers(
         for ticker in tickers:
             sym = ticker.get("symbol", "")
             default_name = sym.replace("USDT", "")
-            meta = metadata.get(sym, {"name": default_name, "icon": default_name[0] if default_name else "•", "color": "#888888"})
-            result.append({
-                "symbol": sym,
-                "name": meta["name"],
-                "icon": meta["icon"],
-                "color": meta["color"],
-                "price": ticker.get("price"),
-                "change": ticker.get("change_24h", 0),
-                "volume_24h": ticker.get("volume_24h"),
-                "turnover_24h": ticker.get("turnover_24h"),
-                "high_24h": ticker.get("high_24h"),
-                "low_24h": ticker.get("low_24h"),
-            })
+            meta = metadata.get(
+                sym, {"name": default_name, "icon": default_name[0] if default_name else "•", "color": "#888888"}
+            )
+            result.append(
+                {
+                    "symbol": sym,
+                    "name": meta["name"],
+                    "icon": meta["icon"],
+                    "color": meta["color"],
+                    "price": ticker.get("price"),
+                    "change": ticker.get("change_24h", 0),
+                    "volume_24h": ticker.get("volume_24h"),
+                    "turnover_24h": ticker.get("turnover_24h"),
+                    "high_24h": ticker.get("high_24h"),
+                    "low_24h": ticker.get("low_24h"),
+                }
+            )
         return result
 
     try:

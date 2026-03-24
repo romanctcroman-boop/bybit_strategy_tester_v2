@@ -34,7 +34,7 @@ function Stop-PortProcess {
 # 1. Attempt to save state (Placeholder for future persistence logic)
 Write-Host "[INFO] Saving application state..." -ForegroundColor Cyan
 # Add any specific save/flush API calls here if needed in the future
-Start-Sleep -Seconds 1 
+Start-Sleep -Seconds 1
 Write-Host "[OK] State saved." -ForegroundColor Green
 Write-Host ""
 
@@ -53,10 +53,10 @@ if (Test-Path $klineDbScript) {
     & $klineDbScript stop
 }
 
-# Stop DB Maintenance Server
-Write-Host "[INFO] Stopping DB Maintenance Server..." -ForegroundColor Yellow
+# Stop DB Maintenance Server (optional — script may not exist)
 $dbMaintScript = Join-Path $ProjectRoot "scripts\start_db_maintenance.ps1"
 if (Test-Path $dbMaintScript) {
+    Write-Host "[INFO] Stopping DB Maintenance Server..." -ForegroundColor Yellow
     & $dbMaintScript stop
 }
 
@@ -87,23 +87,10 @@ if (-not $listening8001) {
 # Port 6379 (Redis - if local)
 Stop-PortProcess -Port 6379
 
-# 4. Cleanup Python Processes (Safety Net)
-Write-Host ""
-Write-Host "[INFO] Cleaning up lingering Python processes..." -ForegroundColor Yellow
-# This is aggressive, but ensures a clean slate for the project
-# We filter by command line to avoid killing system python scripts if possible, 
-# but Get-Process doesn't always show command line without elevation/WMI.
-# For now, we rely on port killing. 
-
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  ALL SERVICES STOPPED" -ForegroundColor Green
-Write-Host "============================================" -ForegroundColor Cyan
-
-# Stop project Python processes (skip VS Code extensions)
+# 4. Stop project Python processes tracked by PID files
 Write-Host ""
 Write-Host "[INFO] Stopping project Python processes..." -ForegroundColor Yellow
 
-# Only stop processes tracked by PID files
 $runDir = Join-Path $ProjectRoot ".run"
 if (Test-Path $runDir) {
     $pidFiles = Get-ChildItem -Path $runDir -Filter "*.pid" -ErrorAction SilentlyContinue
@@ -124,7 +111,7 @@ if (Test-Path $runDir) {
 }
 Write-Host "[OK] Project processes stopped" -ForegroundColor Green
 
-# Clean Python Cache (skip .venv to avoid locking issues with VS Code)
+# 5. Clean Python Cache (skip .venv to avoid locking issues with VS Code)
 Write-Host ""
 Write-Host "[INFO] Clearing Python cache..." -ForegroundColor Yellow
 $cacheCount = 0
@@ -136,9 +123,27 @@ ForEach-Object {
 }
 Write-Host "[OK] Cleared $cacheCount cache directories" -ForegroundColor Green
 
+# 6. Rotate AI agent service logs (keep last 20, delete the rest)
+$logsDir = Join-Path $ProjectRoot "logs"
+if (Test-Path $logsDir) {
+    $agentLogs = Get-ChildItem -Path $logsDir -Filter "ai_agent_service_*.log" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending
+    if ($agentLogs.Count -gt 20) {
+        $toDelete = $agentLogs | Select-Object -Skip 20
+        $deleted = 0
+        foreach ($f in $toDelete) {
+            try { Remove-Item $f.FullName -Force -ErrorAction Stop; $deleted++ }
+            catch { <# skip locked #> }
+        }
+        if ($deleted -gt 0) {
+            Write-Host "[OK] Rotated agent logs: removed $deleted old files (kept 20)" -ForegroundColor Green
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  All services stopped" -ForegroundColor Green
+Write-Host "  ALL SERVICES STOPPED" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 
 # Reset $LASTEXITCODE for both & (shared scope) and -File (separate process) modes

@@ -84,20 +84,20 @@ if _CUDA_AVAILABLE:
 
     @_cuda.jit
     def _dca_kernel(
-        close,           # float64[n_bars]
-        high,            # float64[n_bars]
-        low,             # float64[n_bars]
-        signals,         # int8[n_bars]
-        sl_pct_dev,      # float64[N]
-        tp_pct_dev,      # float64[N]
+        close,  # float64[n_bars]
+        high,  # float64[n_bars]
+        low,  # float64[n_bars]
+        signals,  # int8[n_bars]
+        sl_pct_dev,  # float64[N]
+        tp_pct_dev,  # float64[N]
         # DCA config scalars passed as 1-element arrays (CUDA can't pass Python scalars directly)
-        cfg,             # float64[7]: [direction, order_count, grid_size_pct, martingale_coef,
-                         #              initial_capital, position_size_frac, leverage, taker_fee]
+        cfg,  # float64[7]: [direction, order_count, grid_size_pct, martingale_coef,
+        #              initial_capital, position_size_frac, leverage, taker_fee]
         # Outputs
         out_net_profit,  # float64[N]
-        out_max_dd,      # float64[N]
-        out_win_rate,    # float64[N]
-        out_n_trades,    # int32[N]
+        out_max_dd,  # float64[N]
+        out_win_rate,  # float64[N]
+        out_n_trades,  # int32[N]
         out_profit_factor,  # float64[N]
     ) -> None:
         """
@@ -109,14 +109,14 @@ if _CUDA_AVAILABLE:
             return
 
         # Unpack config
-        direction    = int(cfg[0])
-        order_count  = int(cfg[1])
-        grid_size    = cfg[2]
-        mart_coef    = cfg[3]
-        init_cap     = cfg[4]
-        pos_frac     = cfg[5]
-        leverage     = cfg[6]
-        taker_fee    = cfg[7]
+        direction = int(cfg[0])
+        order_count = int(cfg[1])
+        grid_size = cfg[2]
+        mart_coef = cfg[3]
+        init_cap = cfg[4]
+        pos_frac = cfg[5]
+        leverage = cfg[6]
+        taker_fee = cfg[7]
 
         n_bars = len(close)
         sl_pct = sl_pct_dev[i]
@@ -176,9 +176,7 @@ if _CUDA_AVAILABLE:
                 for k in range(pos_n_orders):
                     if not g_filled[k]:
                         fill = False
-                        if pos_dir == 0 and cur_low <= g_prices[k]:
-                            fill = True
-                        elif pos_dir == 1 and cur_high >= g_prices[k]:
+                        if (pos_dir == 0 and cur_low <= g_prices[k]) or (pos_dir == 1 and cur_high >= g_prices[k]):
                             fill = True
                         if fill:
                             g_filled[k] = True
@@ -358,12 +356,20 @@ def run_dca_batch_cuda(
         from backend.backtesting.numba_dca_engine import run_dca_batch_numba
 
         result = run_dca_batch_numba(
-            close=close, high=high, low=low, entry_signals=entry_signals,
-            sl_pct_arr=sl_pct_arr, tp_pct_arr=tp_pct_arr,
-            direction=direction, order_count=order_count,
-            grid_size_pct=grid_size_pct, martingale_coef=martingale_coef,
-            initial_capital=initial_capital, position_size_frac=position_size_frac,
-            leverage=leverage, taker_fee=taker_fee,
+            close=close,
+            high=high,
+            low=low,
+            entry_signals=entry_signals,
+            sl_pct_arr=sl_pct_arr,
+            tp_pct_arr=tp_pct_arr,
+            direction=direction,
+            order_count=order_count,
+            grid_size_pct=grid_size_pct,
+            martingale_coef=martingale_coef,
+            initial_capital=initial_capital,
+            position_size_frac=position_size_frac,
+            leverage=leverage,
+            taker_fee=taker_fee,
         )
         result["device"] = "cpu_numba"
         return result
@@ -382,11 +388,19 @@ def run_dca_batch_cuda(
     tp_arr = np.asarray(tp_pct_arr, dtype=np.float64)
 
     # Config array (scalars → float64 array for CUDA)
-    cfg = np.array([
-        float(direction), float(order_count), float(grid_size_pct),
-        float(martingale_coef), float(initial_capital), float(position_size_frac),
-        float(leverage), float(taker_fee),
-    ], dtype=np.float64)
+    cfg = np.array(
+        [
+            float(direction),
+            float(order_count),
+            float(grid_size_pct),
+            float(martingale_coef),
+            float(initial_capital),
+            float(position_size_frac),
+            float(leverage),
+            float(taker_fee),
+        ],
+        dtype=np.float64,
+    )
 
     # Transfer to device
     d_close = _cuda_mod.to_device(close)
@@ -407,9 +421,18 @@ def run_dca_batch_cuda(
     # Launch kernel
     n_blocks = math.ceil(n / _CUDA_BLOCK_SIZE)
     _dca_kernel[n_blocks, _CUDA_BLOCK_SIZE](
-        d_close, d_high, d_low, d_signals,
-        d_sl, d_tp, d_cfg,
-        d_net_profit, d_max_dd, d_win_rate, d_n_trades, d_profit_factor,
+        d_close,
+        d_high,
+        d_low,
+        d_signals,
+        d_sl,
+        d_tp,
+        d_cfg,
+        d_net_profit,
+        d_max_dd,
+        d_win_rate,
+        d_n_trades,
+        d_profit_factor,
     )
     _cuda_mod.synchronize()
 
@@ -456,9 +479,9 @@ def warmup_cuda_dca() -> None:
         sigs[3] = 1
         sl = np.array([0.03, 0.05])
         tp = np.array([0.06, 0.10])
-        run_dca_batch_cuda(close, high, low, sigs, sl, tp,
-                           order_count=2, grid_size_pct=3.0,
-                           initial_capital=100.0, leverage=1.0)
+        run_dca_batch_cuda(
+            close, high, low, sigs, sl, tp, order_count=2, grid_size_pct=3.0, initial_capital=100.0, leverage=1.0
+        )
         info = cuda_device_info()
         logger.info(f"CUDA DCA engine warmed up on {info.get('name', 'GPU')}")
     except Exception as exc:

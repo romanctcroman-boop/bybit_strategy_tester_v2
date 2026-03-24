@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from loguru import logger
 
@@ -36,28 +35,8 @@ from backend.backtesting.strategy_builder.topology import (
     build_execution_order,
     infer_category,
 )
-from backend.backtesting.strategy_builder.utils import _clamp_period, _param
 
 # Import our custom indicators for extended coverage
-from backend.core.indicators import (
-    calculate_adx,
-    calculate_atr,
-    calculate_atr_smoothed,
-    calculate_bollinger,
-    calculate_cci,
-    calculate_cmf,
-    calculate_ema,
-    calculate_keltner,
-    calculate_macd,
-    calculate_mfi,
-    calculate_obv,
-    calculate_parabolic_sar,
-    calculate_roc,
-    calculate_rsi,
-    calculate_sma,
-    calculate_stochastic,
-)
-
 
 
 class StrategyBuilderAdapter(BaseStrategy):
@@ -514,6 +493,7 @@ class StrategyBuilderAdapter(BaseStrategy):
     ) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_filter`."""
         return execute_filter(filter_type, params, ohlcv, inputs)
+
     def _execute_signal_block(
         self, signal_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
@@ -525,30 +505,37 @@ class StrategyBuilderAdapter(BaseStrategy):
     ) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_action`."""
         return execute_action(action_type, params, inputs)
+
     def _execute_exit(
         self, exit_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_exit`."""
         return execute_exit(exit_type, params, ohlcv, inputs)
+
     def _execute_position_sizing(self, sizing_type: str, params: dict[str, Any]) -> dict[str, Any]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_position_sizing`."""
         return execute_position_sizing(sizing_type, params)
+
     def _execute_time_filter(self, time_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_time_filter`."""
         return execute_time_filter(time_type, params, ohlcv)
+
     def _execute_price_action(
         self, pattern_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
     ) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_price_action`."""
         return execute_price_action(pattern_type, params, ohlcv)
+
     def _execute_divergence(self, div_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_divergence`."""
         return execute_divergence(div_type, params, ohlcv)
+
     def _execute_close_condition(
         self, close_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
         """Delegates to :func:`backend.backtesting.strategy_builder.block_executor.execute_close_condition`."""
         return execute_close_condition(close_type, params, ohlcv, inputs)
+
     def _execute_dca_block(self, block_type: str, params: dict[str, Any]) -> dict[str, pd.Series]:
         """
         Process DCA/Grid configuration blocks.
