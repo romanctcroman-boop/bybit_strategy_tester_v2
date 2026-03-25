@@ -113,7 +113,10 @@ PAGE_KEY_ELEMENTS = {
         "body",
     ],
     "/frontend/ai-pipeline.html": [
-        "body",
+        "#btnGenerate",
+        "#symbol",
+        "#enableHitl",
+        "#hitlPanel",
     ],
     "/frontend/health-dashboard.html": [
         "body",

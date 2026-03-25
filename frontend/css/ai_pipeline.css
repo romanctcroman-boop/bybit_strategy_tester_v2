@@ -870,3 +870,42 @@
 .alerts-list {
   margin-top: 16px;
 }
+
+/* ── HITL Approval Panel ─────────────────────────────── */
+.hitl-panel {
+    background: var(--color-surface, #1e2130);
+    border: 2px solid var(--color-warning, #f59e0b);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+}
+.hitl-panel.hidden { display: none; }
+.hitl-description { color: var(--color-text-muted, #8b949e); margin-bottom: 16px; }
+.hitl-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.hitl-stat {
+    background: var(--color-bg, #0d1117);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.hitl-label { font-size: 0.75rem; color: var(--color-text-muted, #8b949e); text-transform: uppercase; }
+.hitl-value { font-size: 1rem; font-weight: 600; color: var(--color-text, #e6edf3); }
+.hitl-actions { display: flex; gap: 12px; }
+.btn-danger {
+    background: var(--color-danger, #ef4444);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.btn-danger:hover { background: #dc2626; }

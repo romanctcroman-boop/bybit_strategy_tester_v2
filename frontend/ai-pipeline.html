@@ -209,6 +209,10 @@
             <input type="checkbox" id="walkForward" />
             <span>Walk-Forward Validation</span>
           </label>
+          <label class="toggle-option">
+            <input type="checkbox" id="enableHitl" />
+            <span>Require Approval (HITL)</span>
+          </label>
         </div>
 
         <!-- Actions -->
@@ -294,6 +298,23 @@
         <h3><i class="bi bi-activity"></i> Agent Monitoring</h3>
         <div class="monitor-grid" id="monitorGrid"></div>
         <div class="alerts-list" id="alertsList"></div>
+      </section>
+
+      <!-- HITL Approval Panel -->
+      <section class="hitl-panel hidden" id="hitlPanel">
+        <h3><i class="bi bi-person-check"></i> Strategy Approval Required</h3>
+        <p class="hitl-description">The AI pipeline has paused for your review. Approve to save the strategy, or reject to discard it.</p>
+        <div class="hitl-summary">
+          <div class="hitl-stat"><span class="hitl-label">Strategy</span><span class="hitl-value" id="hitlStrategyName">—</span></div>
+          <div class="hitl-stat"><span class="hitl-label">Sharpe</span><span class="hitl-value" id="hitlSharpe">—</span></div>
+          <div class="hitl-stat"><span class="hitl-label">Max DD</span><span class="hitl-value" id="hitlDrawdown">—</span></div>
+          <div class="hitl-stat"><span class="hitl-label">Trades</span><span class="hitl-value" id="hitlTrades">—</span></div>
+          <div class="hitl-stat"><span class="hitl-label">Regime</span><span class="hitl-value" id="hitlRegime">—</span></div>
+        </div>
+        <div class="hitl-actions">
+          <button type="button" class="btn-primary" onclick="approveHitl()"><i class="bi bi-check-lg"></i> Approve &amp; Save</button>
+          <button type="button" class="btn-danger" onclick="rejectHitl()"><i class="bi bi-x-lg"></i> Reject</button>
+        </div>
       </section>
     </div>
 

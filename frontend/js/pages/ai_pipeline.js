@@ -48,15 +48,26 @@ function showNotification(message, type = 'info') {
 /* ============================================
    PROGRESS
    ============================================ */
-const PIPELINE_STAGES = [
-    'context_analysis',
-    'strategy_generation',
-    'response_parsing',
-    'consensus',
-    'backtest',
-    'walk_forward',
-    'report'
-];
+const NODE_DISPLAY = {
+    analyze_market:    'Market Analysis',
+    regime_classifier: 'Regime Classification',
+    debate:            'Agent Debate',
+    memory_recall:     'Memory Recall',
+    generate_strategies: 'Strategy Generation',
+    parse_responses:   'Response Parsing',
+    select_best:       'Consensus',
+    build_graph:       'Graph Building',
+    backtest:          'Backtesting',
+    backtest_analysis: 'Backtest Analysis',
+    wf_validation:     'Walk-Forward Gate',
+    refine_strategy:   'Refinement',
+    optimize_strategy: 'Optimization',
+    ml_validation:     'ML Validation',
+    hitl_check:        'HITL Review',
+    memory_update:     'Memory Update',
+    reflection:        'Self-Reflection',
+    report:            'Report',
+};
 
 function showProgress(label) {
     const section = document.getElementById('progressSection');
@@ -88,80 +99,219 @@ function renderStages(stages) {
         .join('');
 }
 
+function renderNodeStages(nodes) {
+    const container = document.getElementById('stagesList');
+    container.innerHTML = nodes
+        .map((n) => {
+            const label = NODE_DISPLAY[n.node] || n.node;
+            const icon = n.success ? '✅' : '❌';
+            const cls = n.success ? 'completed' : 'failed';
+            return `<span class="stage-item ${cls}">${icon} ${label}</span>`;
+        })
+        .join('');
+}
+
 /* ============================================
    RUN PIPELINE
    ============================================ */
+let _activeWs = null;
+let _completedNodes = [];
+let _useHitl = false;
+let _progressInterval = null;
+
 async function runPipeline() {
     const btn = document.getElementById('btnGenerate');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Generating...';
-
-    // Hide previous results
     document.getElementById('resultsSection').classList.remove('visible');
+    _completedNodes = [];
 
     const payload = {
         symbol: document.getElementById('symbol').value,
         timeframe: document.getElementById('timeframe').value,
         agents: getSelectedAgents(),
         run_backtest: document.getElementById('runBacktest').checked,
-        enable_walk_forward: document.getElementById('walkForward').checked,
+        run_debate: true,
         initial_capital: parseFloat(document.getElementById('initialCapital').value) || 10000,
         leverage: parseInt(document.getElementById('leverage').value) || 10,
         start_date: document.getElementById('startDate').value,
-        end_date: document.getElementById('endDate').value
+        end_date: document.getElementById('endDate').value,
     };
 
-    // Validate
     if (!payload.start_date || !payload.end_date) {
         showNotification('Please set start and end dates', 'error');
         resetButton(btn);
         return;
     }
 
-    showProgress('Starting AI pipeline...');
+    _useHitl = document.getElementById('enableHitl')?.checked || false;
 
-    // Simulate progress stages
-    const progressInterval = setInterval(() => {
-        const bar = document.getElementById('progressBar');
-        const current = parseFloat(bar.style.width) || 0;
-        if (current < 85) {
-            updateProgress(current + 2);
-        }
-    }, 500);
+    showProgress('Connecting to pipeline...');
 
     try {
-        const response = await fetch(`${API_BASE}/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        clearInterval(progressInterval);
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.detail || `API error: ${response.status}`);
+        if (_useHitl) {
+            await runHitlPipeline(payload, btn);
+        } else {
+            await runStreamingPipeline(payload, btn);
         }
-
-        const data = await response.json();
-        updateProgress(100, 'Pipeline completed!');
-
-        setTimeout(() => {
-            hideProgress();
-            displayResults(data);
-            showNotification('Strategy generated successfully!', 'success');
-        }, 500);
     } catch (error) {
-        clearInterval(progressInterval);
         hideProgress();
-        console.error('Pipeline error:', error);
         showNotification(`Pipeline failed: ${error.message}`, 'error');
-    } finally {
         resetButton(btn);
     }
 }
 
+async function runStreamingPipeline(payload, btn) {
+    // Step 1: start background job
+    const startResp = await fetch(`${API_BASE}/generate-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!startResp.ok) {
+        const err = await startResp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${startResp.status}`);
+    }
+    const { pipeline_id } = await startResp.json();
+
+    updateProgress(5, 'Pipeline started — waiting for first node...');
+
+    // Step 2: open WebSocket
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${location.host}/api/v1/ai-pipeline/stream/${pipeline_id}`;
+
+    await new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsUrl);
+        _activeWs = ws;
+
+        ws.onopen = () => updateProgress(8, 'Connected — running pipeline...');
+
+        ws.onmessage = (evt) => {
+            let msg;
+            try { msg = JSON.parse(evt.data); } catch { return; }
+
+            if (msg.type === 'heartbeat') return;
+
+            if (msg.status === 'done') {
+                ws.close();
+                clearInterval(_progressInterval);
+                updateProgress(100, 'Pipeline complete!');
+                setTimeout(() => {
+                    hideProgress();
+                    if (msg.success && msg.result) {
+                        displayStreamResult(msg.result, msg);
+                        showNotification('Strategy generated!', 'success');
+                    } else {
+                        const errMsg = (msg.errors || []).map(e => e.error_message).join('; ') || 'Unknown error';
+                        showNotification(`Pipeline failed: ${errMsg}`, 'error');
+                    }
+                    resetButton(btn);
+                    resolve();
+                }, 400);
+                return;
+            }
+
+            // Node completion event
+            const nodeName = msg.node || 'unknown';
+            _completedNodes.push({ node: nodeName, success: !msg.errors, error: msg.errors > 0 });
+            const pct = Math.min(10 + (_completedNodes.length / 18) * 85, 95);
+            const label = NODE_DISPLAY[nodeName] || nodeName;
+            updateProgress(pct, `${label}...`);
+            renderNodeStages(_completedNodes);
+        };
+
+        ws.onerror = () => reject(new Error('WebSocket connection error'));
+        ws.onclose = (evt) => {
+            if (!evt.wasClean && evt.code !== 1000) {
+                reject(new Error(`WebSocket closed unexpectedly (${evt.code})`));
+            }
+        };
+    });
+}
+
+async function runHitlPipeline(payload, btn) {
+    updateProgress(10, 'Starting HITL pipeline...');
+
+    const resp = await fetch(`${API_BASE}/generate-hitl`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const pipelineId = data.pipeline_id;
+
+    if (data.status === 'hitl_pending') {
+        hideProgress();
+        showHitlPanel(pipelineId, data.hitl_request || {});
+        resetButton(btn);
+        return;
+    }
+
+    // Completed without HITL pause
+    updateProgress(100, 'Complete!');
+    setTimeout(() => {
+        hideProgress();
+        if (data.final_state) displayStreamResult(data.final_state, {});
+        showNotification('Strategy generated!', 'success');
+        resetButton(btn);
+    }, 400);
+}
+
+function showHitlPanel(pipelineId, hitlPayload) {
+    const panel = document.getElementById('hitlPanel');
+    if (!panel) return;
+
+    const strategy = hitlPayload.strategy_summary || {};
+    const metrics = hitlPayload.backtest_metrics || {};
+
+    document.getElementById('hitlStrategyName').textContent =
+        strategy.strategy_name || 'Generated Strategy';
+    document.getElementById('hitlSharpe').textContent =
+        (metrics.sharpe_ratio ?? 'N/A');
+    document.getElementById('hitlDrawdown').textContent =
+        metrics.max_drawdown != null ? `${metrics.max_drawdown.toFixed(1)}%` : 'N/A';
+    document.getElementById('hitlTrades').textContent =
+        metrics.total_trades ?? 'N/A';
+    document.getElementById('hitlRegime').textContent =
+        hitlPayload.regime || 'N/A';
+
+    panel.dataset.pipelineId = pipelineId;
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function approveHitl() {
+    const panel = document.getElementById('hitlPanel');
+    const pipelineId = panel?.dataset.pipelineId;
+    if (!pipelineId) return;
+
+    try {
+        const resp = await fetch(`${API_BASE}/pipeline/${pipelineId}/hitl/approve`, {
+            method: 'POST',
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        panel.classList.add('hidden');
+        showNotification('Strategy approved and saved!', 'success');
+    } catch (err) {
+        showNotification(`Approval failed: ${err.message}`, 'error');
+    }
+}
+
+function rejectHitl() {
+    const panel = document.getElementById('hitlPanel');
+    if (panel) panel.classList.add('hidden');
+    showNotification('Strategy rejected.', 'info');
+}
+
 function resetButton(btn) {
+    if (_activeWs && _activeWs.readyState === WebSocket.OPEN) {
+        _activeWs.close();
+        _activeWs = null;
+    }
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-lightning-charge"></i> Generate Strategy';
 }
@@ -308,6 +458,100 @@ function displayResults(data) {
                 </div>
             `;
         }
+    }
+}
+
+/* ============================================
+   DISPLAY STREAM RESULT
+   ============================================ */
+function displayStreamResult(report, meta) {
+    const section = document.getElementById('resultsSection');
+    section.classList.add('visible');
+
+    // Strategy card (from selected)
+    const selected = report.selected || {};
+    const strat = selected.selected_strategy || {};
+    if (strat.strategy_name || strat.name) {
+        const card = document.getElementById('strategyCard');
+        card.classList.remove('hidden');
+        document.getElementById('strategyInfo').innerHTML = `
+            <div class="info-item"><span class="info-label">Strategy Name</span>
+                <span class="info-value">${escapeHtml(strat.strategy_name || strat.name || 'N/A')}</span></div>
+            <div class="info-item"><span class="info-label">Agent</span>
+                <span class="info-value">${escapeHtml(selected.selected_agent || 'N/A')}</span></div>
+            <div class="info-item"><span class="info-label">Agreement</span>
+                <span class="info-value">${((selected.agreement_score || 0) * 100).toFixed(0)}%</span></div>
+            <div class="info-item"><span class="info-label">Proposals</span>
+                <span class="info-value">${report.proposals_count || 0}</span></div>
+            ${strat.description ? `<div class="info-item" style="grid-column:1/-1">
+                <span class="info-label">Description</span>
+                <span class="info-value" style="font-weight:normal">${escapeHtml(strat.description)}</span></div>` : ''}
+        `;
+    }
+
+    // Backtest metrics
+    const bt = report.backtest || {};
+    const m = bt.metrics || {};
+    if (Object.keys(m).length > 0) {
+        const card = document.getElementById('metricsCard');
+        card.classList.remove('hidden');
+        const items = [
+            { label: 'Net Profit', value: formatPct((m.total_return || 0) / 100), key: 'profit' },
+            { label: 'Sharpe Ratio', value: formatNum(m.sharpe_ratio), key: 'sharpe' },
+            { label: 'Max Drawdown', value: `${(m.max_drawdown || 0).toFixed(1)}%`, key: 'dd' },
+            { label: 'Win Rate', value: `${(m.win_rate || 0).toFixed(1)}%`, key: 'wr' },
+            { label: 'Profit Factor', value: formatNum(m.profit_factor), key: 'pf' },
+            { label: 'Total Trades', value: m.total_trades || m.total_closed_trades || 0, key: 'trades' },
+            { label: 'Sortino', value: formatNum(m.sortino_ratio), key: 'sortino' },
+            { label: 'Calmar', value: formatNum(m.calmar_ratio), key: 'calmar' },
+        ];
+        document.getElementById('metricsGrid').innerHTML = items.map(item => {
+            let cls = '';
+            if (item.key === 'profit' || item.key === 'sharpe' || item.key === 'pf') {
+                const raw = parseFloat(String(item.value).replace('%', ''));
+                cls = raw > 0 ? 'positive' : raw < 0 ? 'negative' : '';
+            }
+            if (item.key === 'dd') {
+                const raw = Math.abs(parseFloat(String(item.value).replace('%', '')));
+                cls = raw > 15 ? 'negative' : 'positive';
+            }
+            return `<div class="metric-card">
+                <div class="metric-label">${item.label}</div>
+                <div class="metric-value ${cls}">${item.value}</div>
+            </div>`;
+        }).join('');
+
+        // Engine warnings
+        const warnings = bt.engine_warnings || [];
+        if (warnings.length > 0) {
+            warnings.forEach(w => showNotification(w, 'warning'));
+        }
+    }
+
+    // Pipeline stages timeline
+    const execPath = report.execution_path || [];
+    if (execPath.length > 0) {
+        const card = document.getElementById('stagesCard');
+        card.classList.remove('hidden');
+        const pm = report.pipeline_metrics || {};
+        document.getElementById('stagesTimeline').innerHTML =
+            execPath.map(([node, dur]) => `
+                <div class="timeline-item">
+                    <span class="timeline-icon">✅</span>
+                    <span class="timeline-label">${escapeHtml(NODE_DISPLAY[node] || node)}</span>
+                    <span class="timeline-duration">${(dur * 1000).toFixed(0)}ms</span>
+                </div>
+            `).join('') +
+            `<div class="timeline-item" style="border-top:1px solid var(--color-border);margin-top:4px;padding-top:12px">
+                <span class="timeline-icon">⏱️</span>
+                <span class="timeline-label"><strong>Total</strong></span>
+                <span class="timeline-duration"><strong>${(pm.total_wall_time_s || 0).toFixed(2)}s</strong></span>
+            </div>
+            <div class="timeline-item">
+                <span class="timeline-icon">💰</span>
+                <span class="timeline-label">LLM Cost</span>
+                <span class="timeline-duration">$${(pm.total_cost_usd || 0).toFixed(4)} (${pm.llm_call_count || 0} calls)</span>
+            </div>`;
     }
 }
 
