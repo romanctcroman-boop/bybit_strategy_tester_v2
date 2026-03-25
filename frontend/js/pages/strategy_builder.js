@@ -972,10 +972,10 @@ function renderBlockLibrary() {
     const groupDiv = document.createElement('div');
     groupDiv.className = 'block-category-group';
     groupDiv.innerHTML = `
-      <div class="category-group-header" style="--group-color: ${group.groupColor}">
+      <div class="category-group-header" style="--group-color: ${escapeHtml(group.groupColor)}">
         <i class="bi bi-chevron-right group-chevron"></i>
-        <i class="bi bi-${group.groupIcon}" style="color: ${group.groupColor}"></i>
-        <span class="group-name">${group.groupName}</span>
+        <i class="bi bi-${escapeHtml(group.groupIcon)}" style="color: ${escapeHtml(group.groupColor)}"></i>
+        <span class="group-name">${escapeHtml(group.groupName)}</span>
         <span class="group-count">(${totalBlocks})</span>
       </div>
       <div class="category-group-content"></div>
@@ -997,7 +997,7 @@ function renderBlockLibrary() {
         <div class="category-header subcategory">
           <i class="bi bi-chevron-right"></i>
           <span class="category-count">(${blocks.length})</span>
-          <span class="category-title">${cat.name}</span>
+          <span class="category-title">${escapeHtml(cat.name)}</span>
         </div>
         <div class="block-list">
           ${blocks
@@ -1005,10 +1005,10 @@ function renderBlockLibrary() {
             (block) => `
               <div class="block-item"
                    draggable="true"
-                   data-block-id="${block.id}"
-                   data-block-type="${blockCategory}">
-                <div class="block-icon ${cat.iconType}">
-                  <i class="bi bi-${block.icon}"></i>
+                   data-block-id="${escapeHtml(block.id)}"
+                   data-block-type="${escapeHtml(blockCategory)}">
+                <div class="block-icon ${escapeHtml(cat.iconType)}">
+                  <i class="bi bi-${escapeHtml(block.icon)}"></i>
                 </div>
                 <div class="block-info">
                   <div class="block-name">${escapeHtml(block.name)}</div>
@@ -4713,10 +4713,10 @@ function showQuickAddCategory(category) {
     const item = document.createElement('div');
     item.className = 'quick-add-item';
     item.innerHTML = `
-      <i class="bi bi-${block.icon || 'box'}"></i>
+      <i class="bi bi-${escapeHtml(block.icon || 'box')}"></i>
       <div class="quick-add-item-info">
-        <span class="quick-add-item-name">${block.name}</span>
-        <span class="quick-add-item-desc">${block.desc || ''}</span>
+        <span class="quick-add-item-name">${escapeHtml(block.name)}</span>
+        <span class="quick-add-item-desc">${escapeHtml(block.desc || '')}</span>
       </div>
     `;
     item.addEventListener('click', () => {
@@ -4774,10 +4774,10 @@ function filterQuickAddResults(query) {
     const item = document.createElement('div');
     item.className = 'quick-add-item';
     item.innerHTML = `
-      <i class="bi bi-${block.icon || 'box'}"></i>
+      <i class="bi bi-${escapeHtml(block.icon || 'box')}"></i>
       <div class="quick-add-item-info">
-        <span class="quick-add-item-name">${block.name}</span>
-        <span class="quick-add-item-desc">${block.desc || ''}</span>
+        <span class="quick-add-item-name">${escapeHtml(block.name)}</span>
+        <span class="quick-add-item-desc">${escapeHtml(block.desc || '')}</span>
       </div>
     `;
     item.addEventListener('click', () => {
@@ -5071,13 +5071,13 @@ function showPresetsPanel() {
       : presets
         .map(
           (p) => `
-          <div class="preset-item" data-preset-id="${p.id}">
+          <div class="preset-item" data-preset-id="${escapeHtml(p.id)}">
             <div class="preset-item-info">
-              <div class="preset-item-name">${p.name}</div>
+              <div class="preset-item-name">${escapeHtml(p.name)}</div>
               <div class="preset-item-meta">
                 ${p.blockCount} блоков, ${p.connectionCount} связей
               </div>
-              ${p.description ? `<div class="preset-item-desc">${p.description}</div>` : ''}
+              ${p.description ? `<div class="preset-item-desc">${escapeHtml(p.description)}</div>` : ''}
             </div>
             <div class="preset-item-actions">
               <button class="btn-insert-preset" title="Вставить на canvas">
@@ -5789,7 +5789,7 @@ async function syncBtcSourceForNode(blockId) {
     const el = _getBtcStatusEl();
     if (!el) return;
     el.style.borderColor = color || 'var(--border-color, #3d4460)';
-    el.innerHTML = `<span style="margin-right:5px">${icon}</span>${text}`;
+    el.innerHTML = `<span style="margin-right:5px">${escapeHtml(icon)}</span>${escapeHtml(text)}`;
   }
 
   // Check cache — skip if synced recently (same logic as main sync, 10s grace)

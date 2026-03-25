@@ -201,7 +201,7 @@ async function loadTopPerformers(metric = null) {
                     <tr>
                         <td class="rank">${index + 1}</td>
                         <td class="strategy-name">${escapeHtml(item.strategy_name)}</td>
-                        <td>${item.symbol}</td>
+                        <td>${escapeHtml(item.symbol)}</td>
                         <td class="metric-value">${item.sharpe_ratio.toFixed(2)}</td>
                         <td class="${item.total_return >= 0 ? 'positive' : 'negative'}">${item.total_return.toFixed(1)}%</td>
                         <td>${wr.toFixed(1)}%</td>
@@ -292,7 +292,7 @@ function updateRecentActivity(performers) {
                     <div class="activity-content">
                         <div class="title">Backtest completed: ${escapeHtml(item.strategy_name)}</div>
                         <div class="details">
-                            ${item.symbol} • Sharpe: ${item.sharpe_ratio.toFixed(2)} • Return: ${item.total_return.toFixed(1)}%
+                            ${escapeHtml(item.symbol)} • Sharpe: ${item.sharpe_ratio.toFixed(2)} • Return: ${item.total_return.toFixed(1)}%
                         </div>
                     </div>
                     <div class="activity-time">${formatDate(item.completed_at)}</div>
@@ -1310,14 +1310,14 @@ async function loadAIRecommendations() {
 
         if (data.recommendations && data.recommendations.length > 0) {
             container.innerHTML = data.recommendations.map(rec => `
-                        <div class="ai-recommendation ${rec.priority}-priority">
+                        <div class="ai-recommendation ${escapeHtml(rec.priority)}-priority">
                             <div class="rec-header">
-                                <span class="rec-type">${rec.type}</span>
-                                <span class="rec-priority">${rec.priority.toUpperCase()}</span>
+                                <span class="rec-type">${escapeHtml(rec.type)}</span>
+                                <span class="rec-priority">${escapeHtml(rec.priority.toUpperCase())}</span>
                             </div>
-                            <div class="rec-title">${rec.title || 'Recommendation'}</div>
-                            <div class="rec-message">${rec.description || ''}</div>
-                            ${rec.action ? `<div class="rec-action">💡 <a href="${rec.action}">${rec.action}</a></div>` : ''}
+                            <div class="rec-title">${escapeHtml(rec.title || 'Recommendation')}</div>
+                            <div class="rec-message">${escapeHtml(rec.description || '')}</div>
+                            ${rec.action ? `<div class="rec-action">💡 <a href="${escapeHtml(rec.action)}">${escapeHtml(rec.action)}</a></div>` : ''}
                         </div>
                     `).join('');
         } else {
@@ -1415,7 +1415,7 @@ async function loadStrategyLeaderboard() {
                 return `
                             <tr class="${rankClass}">
                                 <td>${i + 1}</td>
-                                <td>${s.strategy_name}</td>
+                                <td>${escapeHtml(s.strategy_name)}</td>
                                 <td class="${pnlClass}">${pnl >= 0 ? '+' : ''}${Math.abs(pnl).toFixed(2)}%</td>
                                 <td>${(winRate * (winRate <= 1 ? 100 : 1)).toFixed(1)}%</td>
                                 <td>${tradeCount}</td>
@@ -2201,12 +2201,12 @@ function renderWatchlist() {
         const name = priceData.name || symbol.replace('USDT', '');
 
         return `
-                    <div class="watchlist-item" data-symbol="${symbol}">
+                    <div class="watchlist-item" data-symbol="${escapeHtml(symbol)}">
                         <div class="watchlist-left">
-                            <span class="watchlist-star" onclick="removeFromWatchlist('${symbol}')" title="Remove from watchlist">★</span>
+                            <span class="watchlist-star" data-remove-symbol="${escapeHtml(symbol)}" title="Remove from watchlist">★</span>
                             <div>
-                                <div class="market-symbol">${symbol.replace('USDT', '/USDT')}</div>
-                                <div class="market-name">${name}</div>
+                                <div class="market-symbol">${escapeHtml(symbol.replace('USDT', '/USDT'))}</div>
+                                <div class="market-name">${escapeHtml(name)}</div>
                             </div>
                         </div>
                         <div class="watchlist-right">
@@ -2218,6 +2218,11 @@ function renderWatchlist() {
     }).join('');
 
     container.innerHTML = html;
+
+    // Event delegation — безопасная замена inline onclick
+    container.querySelectorAll('[data-remove-symbol]').forEach(el => {
+        el.addEventListener('click', () => removeFromWatchlist(el.dataset.removeSymbol));
+    });
 }
 
 function addToWatchlist() {
