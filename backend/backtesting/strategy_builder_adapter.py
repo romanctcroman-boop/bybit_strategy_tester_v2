@@ -11,11 +11,8 @@ All existing imports of the form:
 continue to work unchanged via this re-export stub.
 """
 
-from backend.backtesting.strategy_builder.adapter import (
-    StrategyBuilderAdapter,
-    _clamp_period,
-    _param,
-)
+from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
+from backend.backtesting.strategy_builder.utils import _clamp_period, _param
 
 __all__ = [
     "StrategyBuilderAdapter",
