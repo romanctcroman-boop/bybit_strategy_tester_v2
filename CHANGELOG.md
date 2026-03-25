@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(frontend): migrate LightweightCharts v4→v5 across all chart files (2026-03-25)**
+
+    Full migration of LightweightCharts from v4 to v5 API across all 5 JS chart files and 6 HTML pages.
+
+    **Breaking API changes handled:**
+    - `chart.addCandlestickSeries(opts)` → `chart.addSeries(LightweightCharts.CandlestickSeries, opts)` (and all other series types)
+    - `series.setMarkers([...])` → `createSeriesMarkers(series, [])` primitive pattern with `.setMarkers()` on the returned primitive object
+    - CDN: `lightweight-charts@4.x` → `lightweight-charts@5` (jsdelivr) in all 6 HTML files
+
+    **Files changed:**
+    - HTML CDN (6 files): `trading.html`, `market-chart.html`, `backtest-results.html`, `tick-chart.html`, `test_excursion_bars.html`, `test_mfe_mae_fix.html`
+    - `trading.js`: 3 series calls migrated
+    - `tick_chart.js`: 2 series calls migrated
+    - `market_chart.js`: 35 calls (3 main + 32 indicator series) + `patchSeriesSetData()` rewrite + `_candleMarkersPrimitive` pattern (4 call sites)
+    - `TradingViewEquityChart.js`: 3 series calls + `_equityMarkersPrimitive`
+    - `backtest_results.js`: 11 series calls + `_btCandleMarkersPrimitive` with full lifecycle management (create on series init, null on destroy, recreate on chart type switch, `?.` null-safety at 2 call sites)
+
+    **Commit:** `831190e4e`
+
 - **feat(agents): P1+P2 agent improvements — reflection, walk-forward, few-shot, budget, checkpointing, regime, S²-MAD, HITL, streaming, composite score (2026-03-25)**
 
     Two batches of improvements to the 13-node LangGraph pipeline, informed by 2025 academic literature (TradingGroup self-reflection, S²-MAD convergence detection, walk-forward acceptance gate, dynamic few-shot, Lee et al. 2025).
