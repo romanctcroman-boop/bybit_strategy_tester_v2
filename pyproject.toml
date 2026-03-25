@@ -173,6 +173,12 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+# pytest-xdist: используем "loadscope" чтобы тесты одного класса шли в одном worker
+# (важно для session-браузера в e2e: каждый worker имеет свой browser fixture)
+# Запуск:
+#   pytest tests/ -n auto                  — все тесты параллельно
+#   pytest tests/frontend/ -n 4            — e2e на 4 воркерах (~30-40 сек вместо ~2 мин)
+#   pytest tests/ -n auto -m "not e2e"     — только быстрые тесты без e2e
 
 # ==============================================================================
 # Coverage Configuration

@@ -10,10 +10,23 @@ E2E Frontend Page Tests — Playwright + Chromium
 Запуск:
     pytest tests/frontend/test_pages_e2e.py -v
     pytest tests/frontend/test_pages_e2e.py -v -k "strategy_builder"
+
+Параллельный запуск (требует pytest-xdist):
+    pytest tests/frontend/test_pages_e2e.py -n auto -v
+
+CI traces (при провале теста):
+    PLAYWRIGHT_TRACES=always pytest tests/frontend/test_pages_e2e.py -v
+    # или автоматически на CI (GITHUB_ACTIONS=true / CI=true)
+    # trace-файлы сохраняются в test-traces/*.zip
+    # просмотр: playwright show-trace test-traces/<file>.zip
 """
 
 import pytest
-from playwright.sync_api import ConsoleMessage, Page, sync_playwright
+from playwright.sync_api import ConsoleMessage, Page
+
+# Маркируем весь модуль как e2e — для запуска только e2e: pytest -m e2e
+# Исключить e2e из быстрых тестов: pytest -m "not e2e"
+pytestmark = pytest.mark.e2e
 
 BASE_URL = "http://localhost:8000"
 
@@ -141,41 +154,9 @@ IGNORED_PATTERNS = [
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Fixtures — определены в conftest.py:
+#   browser, context, page (с trace/screenshot/html при провале), server_available
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def browser():
-    """Один браузер на всю сессию."""
-    with sync_playwright() as p:
-        b = p.chromium.launch(headless=True)
-        yield b
-        b.close()
-
-
-@pytest.fixture(scope="session")
-def server_available():
-    """Проверяем доступность сервера один раз."""
-    import requests
-
-    try:
-        r = requests.get(f"{BASE_URL}/api/v1/health", timeout=5)
-        assert r.status_code == 200, f"Server returned {r.status_code}"
-    except Exception as e:
-        pytest.skip(f"Server not available at {BASE_URL}: {e}")
-
-
-@pytest.fixture
-def page(browser):
-    """Новый контекст + страница для каждого теста."""
-    context = browser.new_context(
-        viewport={"width": 1440, "height": 900},
-        ignore_https_errors=True,
-    )
-    p = context.new_page()
-    yield p
-    context.close()
 
 
 # ---------------------------------------------------------------------------

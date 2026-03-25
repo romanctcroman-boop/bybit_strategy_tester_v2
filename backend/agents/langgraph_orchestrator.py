@@ -44,6 +44,15 @@ class ExecutionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class BudgetExceededError(RuntimeError):
+    """Raised when AgentState.max_cost_usd is exceeded during pipeline execution."""
+
+    def __init__(self, spent: float, limit: float) -> None:
+        super().__init__(f"LLM cost budget exceeded: spent ${spent:.4f} > limit ${limit:.4f}")
+        self.spent = spent
+        self.limit = limit
+
+
 @dataclass
 class AgentState:
     """State object passed between agents in the graph."""
@@ -64,6 +73,10 @@ class AgentState:
     # Observability — LLM cost & call count accumulated across all nodes
     total_cost_usd: float = 0.0
     llm_call_count: int = 0
+
+    # Cost budget — 0.0 means unlimited
+    max_cost_usd: float = 0.0
+    budget_exceeded: bool = False
 
     # Metadata
     session_id: str = field(default_factory=lambda: str(uuid4()))
