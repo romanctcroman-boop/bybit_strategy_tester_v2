@@ -233,10 +233,15 @@ class TestGraphWiring:
         assert "generate_strategies" in targets
 
     def test_optimization_is_default_route(self):
+        # P1-2: with wf_validation enabled (default), backtest_analysis → wf_validation → optimize
         graph = build_trading_strategy_graph(run_backtest=True)
         router = graph.routers["backtest_analysis"]
-        # Default route (passing case) goes to optimize_strategy (Phase 6)
-        assert router.default_route == "optimize_strategy"
+        assert router.default_route == "wf_validation"
+
+        # When wf_validation disabled, backtest_analysis → optimize directly
+        graph_no_wf = build_trading_strategy_graph(run_backtest=True, run_wf_validation=False)
+        router_no_wf = graph_no_wf.routers["backtest_analysis"]
+        assert router_no_wf.default_route == "optimize_strategy"
 
     def test_optimization_node_present(self):
         graph = build_trading_strategy_graph(run_backtest=True)
@@ -278,22 +283,28 @@ class TestRefinementIntegration:
     async def test_router_picks_optimize_on_pass(self):
         from backend.agents.langgraph_orchestrator import ConditionalRouter
 
+        # P1-2: passing path now goes backtest_analysis → wf_validation → optimize
         state = _state_with_backtest(trades=10, sharpe=1.5, max_drawdown=15.0, refinement_iteration=0)
         graph = build_trading_strategy_graph(run_backtest=True)
         router: ConditionalRouter = graph.routers["backtest_analysis"]
         next_node = router.get_next_node(state)
+        assert next_node == "wf_validation"  # P1-2 gate inserted
+
+        # wf_validation router also defaults to optimize_strategy when not refining
+        wf_router: ConditionalRouter = graph.routers["wf_validation"]
+        next_node = wf_router.get_next_node(state)
         assert next_node == "optimize_strategy"
 
     @pytest.mark.asyncio
     async def test_router_picks_optimize_on_max_iterations(self):
         from backend.agents.langgraph_orchestrator import ConditionalRouter
 
-        # Failed strategy but max iterations reached → should go to optimize (not refine)
+        # Failed strategy but max iterations reached → goes to wf_validation (then optimize)
         state = _state_with_backtest(trades=1, sharpe=-1.0, max_drawdown=50.0, refinement_iteration=3)
         graph = build_trading_strategy_graph(run_backtest=True)
         router: ConditionalRouter = graph.routers["backtest_analysis"]
         next_node = router.get_next_node(state)
-        assert next_node == "optimize_strategy"
+        assert next_node == "wf_validation"  # max iter → no refine → wf gate
 
     @pytest.mark.asyncio
     async def test_two_iterations_then_pass(self):

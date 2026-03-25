@@ -418,9 +418,9 @@ class TestGraphWiringWithNewNodes:
 
     def test_memory_recall_wired_before_generate(self):
         g = build_trading_strategy_graph(run_backtest=False, run_debate=False)
-        # analyze_market → memory_recall → generate_strategies
+        # P2-1: analyze_market → regime_classifier → memory_recall → generate_strategies
         edges = _edge_pairs(g)
-        assert ("analyze_market", "memory_recall") in edges
+        assert ("regime_classifier", "memory_recall") in edges
         assert ("memory_recall", "generate_strategies") in edges
 
     def test_debate_wired_through_memory_recall(self):
