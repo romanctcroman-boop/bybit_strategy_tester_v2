@@ -909,3 +909,41 @@
     font-weight: 600;
 }
 .btn-danger:hover { background: #dc2626; }
+
+/* ============================================
+   SEED PANEL — Analyze Existing Strategy
+   ============================================ */
+.seed-panel {
+    margin-top: var(--spacing-lg, 24px);
+    border-left: 3px solid var(--color-primary, #3b82f6);
+}
+.seed-description {
+    color: var(--color-text-muted, #8b949e);
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.seed-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+}
+.seed-select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 260px;
+}
+.seed-select-group select {
+    flex: 1;
+}
+.seed-status {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #8b949e);
+    min-height: 1.4em;
+}
+.seed-status.error { color: var(--color-danger, #ef4444); }
+.seed-status.success { color: var(--color-success, #22c55e); }

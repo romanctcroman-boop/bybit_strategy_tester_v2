@@ -24,6 +24,12 @@ BASE_URL = "http://localhost:8000"
 PAGE_URL = f"{BASE_URL}/frontend/ai-pipeline.html"
 
 
+# Require server to be running — all tests in this file are skipped otherwise
+@pytest.fixture(scope="session", autouse=True)
+def require_server(server_available):
+    """Skip entire module if server is unavailable."""
+
+
 @pytest.fixture(autouse=True)
 def collect_js_errors(page: Page):
     """Collect JS errors during the test."""

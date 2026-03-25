@@ -240,6 +240,37 @@
         </div>
       </section>
 
+      <!-- Analyze Existing Strategy Panel -->
+      <section class="config-panel seed-panel" id="seedPanel">
+        <h2><i class="bi bi-robot"></i> Analyze Existing Strategy</h2>
+        <p class="seed-description">
+          Pick a saved strategy from the Builder — agents will backtest it, debate its metrics,
+          argue about weaknesses, and propose improvements.
+        </p>
+        <div class="seed-controls">
+          <div class="form-group seed-select-group">
+            <label for="seedStrategySelect">Saved Strategy</label>
+            <select id="seedStrategySelect">
+              <option value="">— select a strategy —</option>
+            </select>
+            <button type="button" class="btn-sm" onclick="loadStrategiesForSeed()" title="Refresh list">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="seedRunDebate" checked />
+              <span>Multi-agent Debate</span>
+            </label>
+          </div>
+          <button type="button" class="btn-primary" id="btnAnalyzeStrategy" onclick="analyzeExistingStrategy()" disabled>
+            <i class="bi bi-cpu"></i>
+            Let Agents Analyse
+          </button>
+        </div>
+        <div class="seed-status" id="seedStatus"></div>
+      </section>
+
       <!-- Progress Section -->
       <section class="progress-section" id="progressSection">
         <div class="progress-label" id="progressLabel">

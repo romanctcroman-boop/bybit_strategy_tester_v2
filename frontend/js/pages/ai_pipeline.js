@@ -868,6 +868,167 @@ async function loadDeliberationHistory() {
 }
 
 /* ============================================
+   SEED PANEL — Analyze Existing Strategy
+   ============================================ */
+
+/**
+ * Load saved strategies into the seed dropdown.
+ * Called on DOMContentLoaded and by the refresh button.
+ */
+async function loadStrategiesForSeed() {
+    const select = document.getElementById('seedStrategySelect');
+    const btn = document.getElementById('btnAnalyzeStrategy');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Loading...</option>';
+    try {
+        const resp = await fetch('/api/strategies/?limit=100');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const strategies = Array.isArray(data) ? data : (data.items || data.strategies || []);
+
+        if (!strategies.length) {
+            select.innerHTML = '<option value="">— no saved strategies —</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">— select a strategy —</option>';
+        strategies.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `#${s.id} ${s.name || 'Unnamed'} (${s.strategy_type || 'builder'})`;
+            select.appendChild(opt);
+        });
+    } catch (err) {
+        select.innerHTML = '<option value="">— failed to load —</option>';
+        setSeedStatus(`Error loading strategies: ${escapeHtml(err.message)}`, 'error');
+    }
+
+    select.onchange = () => {
+        if (btn) btn.disabled = !select.value;
+        setSeedStatus('');
+    };
+}
+
+function setSeedStatus(msg, type) {
+    const el = document.getElementById('seedStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `seed-status${type ? ' ' + type : ''}`;
+}
+
+/**
+ * Submit the selected strategy to POST /ai-pipeline/analyze-strategy.
+ * The backend runs seed_graph mode: backtest → debate → refine → report.
+ */
+async function analyzeExistingStrategy() {
+    const select = document.getElementById('seedStrategySelect');
+    const strategyId = select ? parseInt(select.value, 10) : 0;
+    if (!strategyId) { setSeedStatus('Select a strategy first.', 'error'); return; }
+
+    const btn = document.getElementById('btnAnalyzeStrategy');
+    const runDebate = document.getElementById('seedRunDebate')?.checked !== false;
+    const symbol = document.getElementById('symbol')?.value || 'BTCUSDT';
+    const timeframe = document.getElementById('timeframe')?.value || '15';
+    const startDate = document.getElementById('startDate')?.value || '2025-01-01';
+    const endDate = document.getElementById('endDate')?.value || '2025-06-01';
+    const initialCapital = parseFloat(document.getElementById('initialCapital')?.value) || 10000;
+    const leverage = parseInt(document.getElementById('leverage')?.value, 10) || 1;
+    const agents = getSelectedAgents();
+
+    if (btn) btn.disabled = true;
+    setSeedStatus('Running analysis — this may take 1–3 minutes…');
+    _showProgress('Analysing existing strategy with AI agents…');
+
+    try {
+        const resp = await fetch('/ai-pipeline/analyze-strategy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                strategy_id: strategyId,
+                symbol, timeframe, agents,
+                run_debate: runDebate,
+                initial_capital: initialCapital,
+                leverage,
+                start_date: startDate,
+                end_date: endDate,
+                pipeline_timeout: 300,
+            }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const result = await resp.json();
+        _hideProgress();
+        _displayAnalysisResult(result);
+        setSeedStatus(`Analysis complete — pipeline ${escapeHtml(result.pipeline_id)}`, 'success');
+    } catch (err) {
+        _hideProgress();
+        setSeedStatus(`Failed: ${escapeHtml(err.message)}`, 'error');
+        showNotification(`Analysis failed: ${err.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = !select?.value;
+    }
+}
+
+function _showProgress(msg) {
+    const section = document.getElementById('progressSection');
+    const label = document.getElementById('progressLabel');
+    if (section) section.classList.add('visible');
+    if (label) label.textContent = msg || 'Running…';
+}
+
+function _hideProgress() {
+    const section = document.getElementById('progressSection');
+    if (section) section.classList.remove('visible');
+}
+
+function _displayAnalysisResult(result) {
+    const section = document.getElementById('resultsSection');
+    if (section) section.classList.add('visible');
+
+    // Strategy card
+    const stratCard = document.getElementById('strategyCard');
+    const stratInfo = document.getElementById('strategyInfo');
+    if (stratCard && stratInfo) {
+        stratCard.classList.remove('hidden');
+        const refined = result.refinement_applied
+            ? ' <span style="color:var(--color-warning,#f59e0b)">(refined by agents)</span>'
+            : '';
+        stratInfo.innerHTML = `
+            <div><strong>Strategy:</strong> ${escapeHtml(result.strategy_name)}${refined}</div>
+            <div><strong>Regime:</strong> ${escapeHtml(result.regime || 'unknown')}</div>
+            <div style="margin-top:8px;color:var(--color-text-muted)">${escapeHtml(result.agent_verdict || '')}</div>
+        `;
+    }
+
+    // Backtest metrics card
+    const metricsCard = document.getElementById('metricsCard');
+    const metricsGrid = document.getElementById('metricsGrid');
+    const m = result.backtest_metrics || {};
+    if (metricsCard && metricsGrid && Object.keys(m).length) {
+        metricsCard.classList.remove('hidden');
+        metricsGrid.innerHTML = [
+            ['Total Return', m.total_return != null ? `${m.total_return.toFixed(2)}%` : 'N/A'],
+            ['Sharpe Ratio', m.sharpe_ratio != null ? m.sharpe_ratio.toFixed(3) : 'N/A'],
+            ['Max Drawdown', m.max_drawdown != null ? `${Math.abs(m.max_drawdown).toFixed(2)}%` : 'N/A'],
+            ['Total Trades', m.total_trades ?? 'N/A'],
+            ['Win Rate', m.win_rate != null ? `${m.win_rate.toFixed(1)}%` : 'N/A'],
+            ['Profit Factor', m.profit_factor != null ? m.profit_factor.toFixed(2) : 'N/A'],
+        ].map(([label, val]) => `
+            <div class="metric-item">
+                <div class="metric-label">${escapeHtml(label)}</div>
+                <div class="metric-value">${escapeHtml(String(val))}</div>
+            </div>
+        `).join('');
+    }
+
+    if (result.errors && result.errors.length) {
+        showNotification(`Pipeline completed with ${result.errors.length} warning(s)`, 'warning');
+    }
+}
+
+/* ============================================
    UTILITIES
    ============================================ */
 function escapeHtml(str) {
@@ -890,3 +1051,8 @@ function formatNum(value) {
     if (isNaN(num)) return 'N/A';
     return num.toFixed(2);
 }
+
+// On page load: populate the seed strategy dropdown
+document.addEventListener('DOMContentLoaded', () => {
+    loadStrategiesForSeed();
+});

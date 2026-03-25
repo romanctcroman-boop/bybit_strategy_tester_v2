@@ -1024,6 +1024,190 @@ async def approve_hitl_pipeline(pipeline_id: str) -> HITLApproveResponse:
 
 
 # =============================================================================
+# ANALYZE EXISTING STRATEGY (seed_graph mode)
+# =============================================================================
+
+
+class AnalyzeStrategyRequest(BaseModel):
+    """Request to analyze an existing Strategy Builder strategy with AI agents."""
+
+    strategy_id: int | None = Field(None, description="DB id of saved strategy (loads graph from DB)")
+    strategy_graph: dict[str, Any] | None = Field(None, description="Raw strategy_graph dict (blocks+connections)")
+    symbol: str = Field("BTCUSDT", description="Trading pair for backtest")
+    timeframe: str = Field("15", description="Candle interval")
+    agents: list[str] = Field(default_factory=lambda: ["deepseek"])
+    run_debate: bool = Field(True, description="Run multi-agent debate on results")
+    initial_capital: float = Field(10000, ge=100)
+    leverage: int = Field(1, ge=1, le=125)
+    start_date: str = Field("2025-01-01")
+    end_date: str = Field("2025-06-01")
+    pipeline_timeout: float = Field(300.0, ge=10.0, le=600.0)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "strategy_id": 42,
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "agents": ["deepseek", "qwen"],
+                "run_debate": True,
+                "start_date": "2025-01-01",
+                "end_date": "2025-04-01",
+            }
+        }
+    }
+
+
+class AnalyzeStrategyResponse(BaseModel):
+    """Result of AI agent analysis on an existing strategy."""
+
+    success: bool
+    pipeline_id: str
+    strategy_name: str = ""
+    backtest_metrics: dict[str, Any] = Field(default_factory=dict)
+    regime: str = ""
+    agent_verdict: str = ""  # summary from report node
+    refinement_applied: bool = False
+    errors: list[dict[str, Any]] = Field(default_factory=list)
+    report: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/analyze-strategy", response_model=AnalyzeStrategyResponse)
+async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeStrategyResponse:
+    """
+    Analyze an existing Strategy Builder strategy with AI agents.
+
+    **Seed-graph mode**: skips LLM strategy generation and runs the pipeline
+    directly on your existing blocks+connections graph:
+
+    1. analyze_market — load OHLCV, build market context
+    2. regime_classifier — classify current market regime
+    3. backtest — run your strategy via StrategyBuilderAdapter (all 40+ block types)
+    4. backtest_analysis — diagnose failures (no_signal, direction_mismatch, low_sharpe…)
+    5. debate (optional) — agents argue whether the strategy is viable
+    6. walk-forward validation — overfitting gate
+    7. optimize + ml_validation — auto-tune parameters
+    8. report — final verdict, recommended changes
+
+    Provide either `strategy_id` (loads saved strategy from DB) or
+    `strategy_graph` (raw blocks+connections dict).
+    """
+    # --- resolve strategy_graph ---
+    graph: dict[str, Any] | None = request.strategy_graph
+    strategy_name = "Existing Strategy"
+
+    if graph is None and request.strategy_id is not None:
+        # Load strategy graph from DB
+        try:
+            import asyncio as _asyncio
+
+            from backend.database.session import get_session
+
+            def _load_strategy() -> dict[str, Any] | None:
+                with get_session() as session:
+                    from backend.database.models.strategy import Strategy as StrategyModel
+
+                    row = session.get(StrategyModel, request.strategy_id)
+                    if row is None:
+                        return None
+                    return {
+                        "name": row.name,
+                        "blocks": row.builder_blocks or [],
+                        "connections": row.builder_connections or [],
+                        "interval": row.timeframe or request.timeframe,
+                    }
+
+            loaded = await _asyncio.to_thread(_load_strategy)
+            if loaded is None:
+                raise HTTPException(status_code=404, detail=f"Strategy {request.strategy_id} not found")
+            graph = loaded
+            strategy_name = graph.get("name", strategy_name)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(f"[analyze-strategy] DB load failed: {exc}")
+            raise HTTPException(status_code=500, detail=f"Failed to load strategy: {exc}")
+
+    if graph is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either strategy_id or strategy_graph.",
+        )
+
+    if not graph.get("blocks"):
+        raise HTTPException(status_code=400, detail="Strategy has no blocks — cannot analyse.")
+
+    strategy_name = graph.get("name", strategy_name)
+
+    # --- run pipeline in seed_graph mode ---
+    _evict_stale_jobs()
+    pipeline_id = str(uuid.uuid4())[:12]
+    _pipeline_jobs[pipeline_id] = {
+        "status": "running",
+        "created_at": datetime.now(UTC).isoformat(),
+        "seed_strategy": strategy_name,
+    }
+
+    try:
+        from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+        df = await _load_ohlcv_data(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+
+        state = await run_strategy_pipeline(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            df=df,
+            agents=request.agents,
+            run_backtest=True,          # always backtest in analysis mode
+            run_debate=request.run_debate,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            pipeline_timeout=request.pipeline_timeout,
+            seed_graph=graph,
+        )
+
+        report = state.get_result("report") or {}
+        backtest = state.get_result("backtest") or {}
+        metrics = backtest.get("metrics", {})
+        regime_result = state.get_result("regime_classifier") or {}
+        regime = regime_result.get("regime", "unknown")
+
+        refinement_applied = state.context.get("refinement_iteration", 0) > 0
+
+        _pipeline_jobs[pipeline_id].update(
+            {
+                "status": "completed",
+                "completed_at": datetime.now(UTC).isoformat(),
+                "result": report,
+            }
+        )
+
+        return AnalyzeStrategyResponse(
+            success=len(state.errors) == 0,
+            pipeline_id=pipeline_id,
+            strategy_name=strategy_name,
+            backtest_metrics=metrics,
+            regime=regime,
+            agent_verdict=report.get("summary", report.get("recommendation", "")),
+            refinement_applied=refinement_applied,
+            errors=state.errors,
+            report=report,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        logger.error(f"[analyze-strategy] {pipeline_id} failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# =============================================================================
 # HELPERS
 # =============================================================================
 

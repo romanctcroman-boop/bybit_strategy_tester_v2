@@ -491,6 +491,12 @@ class GenerateStrategiesNode(AgentNode):
         self._prompt_engineer = PromptEngineer()
 
     async def execute(self, state: AgentState) -> AgentState:
+        # seed_mode: existing strategy graph provided — skip LLM generation
+        if state.context.get("seed_mode"):
+            logger.info("[GenerateStrategies] seed_mode — skipping LLM generation")
+            state.set_result(self.name, {"responses": [], "seed_mode": True})
+            return state
+
         market_result = state.get_result("analyze_market")
         if not market_result:
             state.add_error(self.name, ValueError("No market analysis result"))
@@ -712,6 +718,12 @@ class ParseResponsesNode(AgentNode):
         self._parser = ResponseParser()
 
     async def execute(self, state: AgentState) -> AgentState:
+        # seed_mode: skip parse — no LLM responses to parse
+        if state.context.get("seed_mode"):
+            logger.info("[ParseResponses] seed_mode — skipping parse")
+            state.set_result(self.name, {"proposals": [], "seed_mode": True})
+            return state
+
         gen_result = state.get_result("generate_strategies")
         if not gen_result:
             state.add_error(self.name, ValueError("No generation results"))
@@ -760,6 +772,23 @@ class ConsensusNode(AgentNode):
         )
 
     async def execute(self, state: AgentState) -> AgentState:
+        # seed_mode: create a synthetic select_best result from the seeded strategy_graph
+        if state.context.get("seed_mode"):
+            seed_name = state.context.get("seed_strategy_name", "Existing Strategy")
+            logger.info(f"[ConsensusNode] seed_mode — using seeded graph '{seed_name}'")
+            state.set_result(
+                self.name,
+                {
+                    "selected_strategy": {"name": seed_name, "seed_mode": True},
+                    "selected_agent": "seed",
+                    "candidates_count": 1,
+                    "agreement_score": 1.0,
+                    "seed_mode": True,
+                },
+            )
+            state.context["selected_strategy"] = {"name": seed_name, "seed_mode": True}
+            return state
+
         parse_result = state.get_result("parse_responses")
         if not parse_result:
             state.add_error(self.name, ValueError("No parsed proposals"))
@@ -882,6 +911,22 @@ class BuildGraphNode(AgentNode):
     async def execute(self, state: AgentState) -> AgentState:
         from backend.agents.integration.graph_converter import StrategyDefToGraphConverter
 
+        # seed_mode: strategy_graph already in context — skip LLM conversion
+        if state.context.get("seed_mode"):
+            graph = state.context.get("strategy_graph")
+            if graph:
+                logger.info("[BuildGraphNode] seed_mode — using existing strategy_graph")
+                state.set_result(
+                    self.name,
+                    {
+                        "blocks": len(graph.get("blocks", [])),
+                        "connections": len(graph.get("connections", [])),
+                        "warnings": [],
+                        "seed_mode": True,
+                    },
+                )
+            return state
+
         select_result = state.get_result("select_best")
         if not select_result:
             logger.debug("[BuildGraphNode] No select_best result — skipping graph conversion")
@@ -932,16 +977,22 @@ class BacktestNode(AgentNode):
         )
 
     async def execute(self, state: AgentState) -> AgentState:
-        select_result = state.get_result("select_best")
-        if not select_result:
-            state.add_error(self.name, ValueError("No selected strategy"))
-            return state
-
-        strategy = select_result["selected_strategy"]
         df = state.context.get("df")
         symbol = state.context.get("symbol", "BTCUSDT")
         timeframe = state.context.get("timeframe", "15")
         strategy_graph = state.context.get("strategy_graph")
+
+        # seed_mode: run directly via adapter — no LLM-generated select_best needed
+        if state.context.get("seed_mode"):
+            if not strategy_graph:
+                state.add_error(self.name, ValueError("seed_mode but no strategy_graph in context"))
+                return state
+            logger.info(f"[BacktestNode] seed_mode — backtesting '{state.context.get('seed_strategy_name')}'")
+        else:
+            select_result = state.get_result("select_best")
+            if not select_result:
+                state.add_error(self.name, ValueError("No selected strategy"))
+                return state
 
         # Prefer StrategyBuilderAdapter path (full 40+ block universe)
         engine_warnings: list[str] = []
@@ -957,8 +1008,10 @@ class BacktestNode(AgentNode):
             from backend.agents.integration.backtest_bridge import BacktestBridge
 
             bridge = BacktestBridge()
+            # strategy is only available in non-seed_mode (select_result was retrieved above)
+            bridge_strategy = state.get_result("select_best", {}).get("selected_strategy")
             metrics = await bridge.run_strategy(
-                strategy=strategy,
+                strategy=bridge_strategy,
                 symbol=symbol,
                 timeframe=timeframe,
                 df=df,
@@ -2722,6 +2775,7 @@ async def run_strategy_pipeline(
     hitl_enabled: bool = False,
     hitl_approved: bool = False,
     event_fn: "Callable[[str, dict[str, Any]], None] | None" = None,
+    seed_graph: "dict[str, Any] | None" = None,
 ) -> AgentState:
     """
     Convenience function to run the full strategy generation pipeline.
@@ -2753,6 +2807,11 @@ async def run_strategy_pipeline(
         event_fn: P2-4 streaming callback attached to AgentGraph.event_fn.
             Called after each node with (node_name, event_dict).
             Use make_pipeline_event_queue() to get a (queue, event_fn) pair.
+        seed_graph: Existing Strategy Builder graph dict (blocks + connections).
+            When provided, skips LLM generation and runs the pipeline in
+            "analysis mode": analyze_market → regime → backtest the existing
+            graph → analyze → debate/refine/optimize → report.
+            Useful for: "I have a strategy — let agents analyse, debate and improve it."
 
     Returns:
         AgentState with all results in state.results
@@ -2766,16 +2825,29 @@ async def run_strategy_pipeline(
         event_fn=event_fn,
     )
 
+    context: dict[str, Any] = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "df": df,
+        "agents": agents or ["deepseek"],
+        "initial_capital": initial_capital,
+        "leverage": leverage,
+        "hitl_approved": hitl_approved,  # P2-3: HITL approval flag
+    }
+
+    # seed_graph mode: inject existing strategy graph, skip LLM generation nodes
+    if seed_graph is not None:
+        context["strategy_graph"] = seed_graph
+        context["seed_mode"] = True
+        context["seed_strategy_name"] = seed_graph.get("name", "Existing Strategy")
+        logger.info(
+            f"[Pipeline] seed_mode active — strategy='{context['seed_strategy_name']}', "
+            f"blocks={len(seed_graph.get('blocks', []))}, "
+            f"connections={len(seed_graph.get('connections', []))}"
+        )
+
     initial_state = AgentState(
-        context={
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "df": df,
-            "agents": agents or ["deepseek"],
-            "initial_capital": initial_capital,
-            "leverage": leverage,
-            "hitl_approved": hitl_approved,  # P2-3: HITL approval flag
-        },
+        context=context,
         max_cost_usd=max_cost_usd,  # P1-5: cost budget
     )
 
