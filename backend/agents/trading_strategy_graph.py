@@ -179,10 +179,7 @@ class RegimeClassifierNode(AgentNode):
         }
         state.context["regime_classification"] = classification
         state.set_result(self.name, classification)
-        logger.info(
-            f"🏷️ [RegimeClassifier] {regime} "
-            f"(adx≈{adx_proxy:.0f}, atr={atr_pct:.2f}%, conf={confidence:.0%})"
-        )
+        logger.info(f"[RegimeClassifier] {regime} (adx≈{adx_proxy:.0f}, atr={atr_pct:.2f}%, conf={confidence:.0%})")
         return state
 
 
@@ -533,6 +530,7 @@ class GenerateStrategiesNode(AgentNode):
             logger.info(f"🎯 [GenerateStrategies] Injecting {len(few_shot_examples)} few-shot examples")
 
         responses: list[dict[str, Any]] = []
+        failed_agents: list[str] = []
 
         # --- Self-MoA: 3× DeepSeek in parallel if DeepSeek is in the agent list ---
         if "deepseek" in agents:
@@ -594,6 +592,12 @@ class GenerateStrategiesNode(AgentNode):
                     responses.append({"agent": agent_name, "response": response_text})
             except Exception as e:
                 logger.warning(f"[Graph] LLM call failed for {agent_name}: {e}")
+                failed_agents.append(agent_name)
+
+        if failed_agents:
+            state.context["partial_generation"] = True
+            state.context["failed_agents"] = failed_agents
+            logger.warning(f"[Graph] Partial generation: {len(failed_agents)} agent(s) failed: {failed_agents}")
 
         state.set_result(self.name, {"responses": responses})
         state.add_message(
@@ -1168,7 +1172,7 @@ class BacktestAnalysisNode(AgentNode):
         win_rate: float = float(metrics.get("win_rate", 0.0))
 
         # ── Severity ──────────────────────────────────────────────────────────
-        passed = trades >= self.MIN_TRADES and sharpe > 0 and dd < self.MAX_DD_PCT
+        passed = trades >= self.MIN_TRADES and sharpe > -1e-9 and dd < self.MAX_DD_PCT
 
         if passed:
             severity = "pass"
@@ -1562,7 +1566,9 @@ class RefinementNode(AgentNode):
 
         state.context["refinement_feedback"] = feedback
 
-        # Clear stale results so downstream nodes run fresh
+        # Clear stale results from the previous iteration so downstream nodes re-run fresh.
+        # These keys are always regenerated in the next loop by parse_responses → select_best
+        # → build_graph → backtest nodes. Clearing here prevents stale data from being used.
         for stale_key in ("parse_responses", "select_best", "build_graph", "backtest"):
             state.results.pop(stale_key, None)
 
@@ -2521,7 +2527,7 @@ def _backtest_passes(state: AgentState) -> bool:
     trades = metrics.get("total_trades", 0)
     sharpe = metrics.get("sharpe_ratio", -999.0)
     dd = metrics.get("max_drawdown", 100.0)
-    return trades >= _MIN_TRADES and sharpe > 0 and dd < _MAX_DD_PCT
+    return trades >= _MIN_TRADES and sharpe > -1e-9 and dd < _MAX_DD_PCT
 
 
 def _should_refine(state: AgentState) -> bool:

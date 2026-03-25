@@ -63,7 +63,7 @@ def _evict_stale_jobs() -> None:
     if len(_pipeline_jobs) > _PIPELINE_JOBS_MAX:
         sorted_ids = sorted(
             _pipeline_jobs,
-            key=lambda k: _pipeline_jobs[k].get("created_at", ""),
+            key=lambda k: _pipeline_jobs[k].get("created_at", "0"),
         )
         for jid in sorted_ids[: len(_pipeline_jobs) - _PIPELINE_JOBS_MAX]:
             _pipeline_jobs.pop(jid, None)

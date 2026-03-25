@@ -419,6 +419,9 @@ class AgentGraph:
         for t in targets:
             if t not in self.nodes and t != "END":
                 raise ValueError(f"Target node '{t}' not found")
+            if t == "END":
+                # Nodes with edges to "END" are terminal — treat same as add_exit_point()
+                self.exit_points.add(source)
 
         edge = Edge(
             source=source,
@@ -533,7 +536,7 @@ class AgentGraph:
                 try:
                     self.checkpoint_fn(state, completed)
                 except Exception as _cp_exc:  # noqa: BLE001
-                    logger.debug(f"[Checkpoint] Non-critical error: {_cp_exc}")
+                    logger.warning(f"[Checkpoint] Non-critical error: {_cp_exc}")
 
             # P2-4: emit lightweight streaming event (no full state serialisation)
             if self.event_fn is not None:
@@ -864,6 +867,7 @@ def make_pipeline_event_queue() -> "tuple[asyncio.Queue[dict[str, Any]], Callabl
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
+            logger.debug(f"[Pipeline] Event queue full — dropping node event for node {node_name!r}")
             pass  # non-blocking — drop if consumer is slow
 
     return q, _event_fn
