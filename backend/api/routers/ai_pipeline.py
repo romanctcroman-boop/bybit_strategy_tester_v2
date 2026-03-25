@@ -13,12 +13,14 @@ Endpoints for the new LLM-powered strategy generation pipeline:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -29,6 +31,10 @@ from backend.services.distributed_lock import get_distributed_lock
 _pipeline_jobs: dict[str, dict[str, Any]] = {}
 _PIPELINE_JOBS_MAX = 200
 _PIPELINE_JOB_TTL_SECONDS = 3600  # 1 hour
+
+# P2-4: per-pipeline event queues for WebSocket streaming
+# Populated by POST /generate-stream; consumed by WS /stream/{pipeline_id}
+_pipeline_queues: dict[str, asyncio.Queue] = {}
 
 
 def _evict_stale_jobs() -> None:
@@ -601,6 +607,406 @@ async def get_pipeline_result(pipeline_id: str) -> PipelineResultResponse:
         result=pipeline_resp,
         error=job.get("error"),
     )
+
+
+# =============================================================================
+# P2-4: Async streaming pipeline (background task + WebSocket)
+# =============================================================================
+
+
+class StreamGenerateRequest(BaseModel):
+    """Request for async streaming strategy generation (P2-4)."""
+
+    symbol: str = Field("BTCUSDT", description="Trading pair")
+    timeframe: str = Field("15", description="Candle interval")
+    agents: list[str] = Field(default_factory=lambda: ["deepseek"])
+    run_backtest: bool = Field(False)
+    run_debate: bool = Field(True)
+    initial_capital: float = Field(10000, ge=100)
+    leverage: int = Field(1, ge=1, le=125)
+    start_date: str = Field("2025-01-01")
+    end_date: str = Field("2025-06-01")
+    pipeline_timeout: float = Field(300.0, ge=10.0, le=600.0)
+
+
+class StreamJobResponse(BaseModel):
+    """Returned immediately from POST /generate-stream."""
+
+    pipeline_id: str
+    ws_url: str
+    message: str = "Pipeline started. Connect to ws_url to stream events."
+
+
+@router.post("/generate-stream", response_model=StreamJobResponse)
+async def generate_strategy_stream(request: StreamGenerateRequest) -> StreamJobResponse:
+    """
+    Start async strategy generation and return a pipeline_id for WebSocket streaming.
+
+    **P2-4**: Node completion events are streamed in real-time via WebSocket.
+
+    Workflow:
+    1. POST /ai-pipeline/generate-stream → get `pipeline_id`
+    2. Connect to `ws://host/ai-pipeline/stream/{pipeline_id}`
+    3. Receive JSON events: `{"node": "analyze_market", "status": "completed", ...}`
+    4. Final event has `"status": "done"` with the full result
+
+    Events shape::
+
+        {"node": "analyze_market", "status": "completed", "iteration": 1, "errors": 0}
+        ...
+        {"status": "done", "success": true, "pipeline_id": "...", "result": {...}}
+    """
+    _evict_stale_jobs()
+    pipeline_id = str(uuid.uuid4())[:12]
+
+    from backend.agents.langgraph_orchestrator import make_pipeline_event_queue
+
+    queue, event_fn = make_pipeline_event_queue()
+    _pipeline_queues[pipeline_id] = queue
+
+    _pipeline_jobs[pipeline_id] = {
+        "status": "running",
+        "created_at": datetime.now(UTC).isoformat(),
+        "current_stage": "starting",
+        "stream_request": request.model_dump(),
+    }
+
+    async def _run_pipeline_bg() -> None:
+        """Background coroutine: runs pipeline, feeds events into queue."""
+        try:
+            from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+            df = await _load_ohlcv_data(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+                start_date=request.start_date,
+                end_date=request.end_date,
+            )
+
+            state = await run_strategy_pipeline(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+                df=df,
+                agents=request.agents,
+                run_backtest=request.run_backtest,
+                run_debate=request.run_debate,
+                initial_capital=request.initial_capital,
+                leverage=request.leverage,
+                pipeline_timeout=request.pipeline_timeout,
+                event_fn=event_fn,
+            )
+
+            report = state.get_result("report") or {}
+            _pipeline_jobs[pipeline_id].update(
+                {
+                    "status": "completed",
+                    "completed_at": datetime.now(UTC).isoformat(),
+                    "current_stage": "report",
+                    "result": report,
+                }
+            )
+            await queue.put(
+                {
+                    "status": "done",
+                    "success": len(state.errors) == 0,
+                    "pipeline_id": pipeline_id,
+                    "errors": state.errors,
+                    "llm_call_count": state.llm_call_count,
+                    "total_cost_usd": round(state.total_cost_usd, 6),
+                    "result": report,
+                }
+            )
+        except Exception as exc:
+            logger.error(f"[StreamPipeline] {pipeline_id} failed: {exc}")
+            _pipeline_jobs[pipeline_id].update(
+                {"status": "failed", "error": str(exc), "completed_at": datetime.now(UTC).isoformat()}
+            )
+            await queue.put({"status": "done", "success": False, "error": str(exc), "pipeline_id": pipeline_id})
+
+    asyncio.create_task(_run_pipeline_bg())
+
+    return StreamJobResponse(
+        pipeline_id=pipeline_id,
+        ws_url=f"/ai-pipeline/stream/{pipeline_id}",
+    )
+
+
+@router.websocket("/stream/{pipeline_id}")
+async def stream_pipeline_events(websocket: WebSocket, pipeline_id: str) -> None:
+    """
+    WebSocket endpoint for streaming pipeline node events (P2-4).
+
+    Connects to a running pipeline job and receives a JSON event for each
+    completed node.  The connection closes automatically when the pipeline
+    finishes (event with ``"status": "done"``).
+
+    Usage::
+
+        ws = new WebSocket("ws://localhost:8000/ai-pipeline/stream/<pipeline_id>")
+        ws.onmessage = (e) => console.log(JSON.parse(e.data))
+
+    Each event::
+
+        {"node": "analyze_market", "status": "completed", "iteration": 1, ...}
+
+    Final event::
+
+        {"status": "done", "success": true/false, "result": {...}}
+    """
+    queue = _pipeline_queues.get(pipeline_id)
+    if queue is None:
+        await websocket.accept()
+        await websocket.send_json({"error": f"Pipeline '{pipeline_id}' not found or already completed"})
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    logger.info(f"[WS] Client connected to pipeline stream: {pipeline_id}")
+
+    try:
+        while True:
+            try:
+                # Wait up to 30s for next event to avoid holding connection forever
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send keepalive ping
+                await websocket.send_json({"status": "heartbeat", "pipeline_id": pipeline_id})
+                continue
+
+            await websocket.send_json(event)
+
+            if event.get("status") == "done":
+                # Pipeline finished — clean up queue and close
+                _pipeline_queues.pop(pipeline_id, None)
+                logger.info(f"[WS] Pipeline {pipeline_id} done — closing stream")
+                break
+
+    except WebSocketDisconnect:
+        logger.info(f"[WS] Client disconnected from pipeline stream: {pipeline_id}")
+        _pipeline_queues.pop(pipeline_id, None)
+    except Exception as exc:
+        logger.error(f"[WS] Stream error for {pipeline_id}: {exc}")
+        _pipeline_queues.pop(pipeline_id, None)
+        with contextlib.suppress(Exception):
+            await websocket.send_json({"status": "error", "error": str(exc)})
+    finally:
+        with contextlib.suppress(Exception):
+            await websocket.close()
+
+
+# =============================================================================
+# P2-3: HITL (Human-in-the-Loop) endpoints
+# =============================================================================
+
+
+class HITLGenerateRequest(BaseModel):
+    """Request for HITL-enabled strategy generation (P2-3)."""
+
+    symbol: str = Field("BTCUSDT")
+    timeframe: str = Field("15")
+    agents: list[str] = Field(default_factory=lambda: ["deepseek"])
+    run_backtest: bool = Field(True)
+    initial_capital: float = Field(10000, ge=100)
+    leverage: int = Field(1, ge=1, le=125)
+    start_date: str = Field("2025-01-01")
+    end_date: str = Field("2025-06-01")
+    pipeline_timeout: float = Field(300.0, ge=10.0)
+
+
+class HITLStatusResponse(BaseModel):
+    """HITL pending status for a pipeline job."""
+
+    pipeline_id: str
+    hitl_pending: bool
+    hitl_payload: dict[str, Any] = Field(default_factory=dict)
+    message: str = ""
+
+
+class HITLApproveResponse(BaseModel):
+    """Result of approving a HITL-paused pipeline."""
+
+    pipeline_id: str
+    status: str
+    message: str
+    result: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/generate-hitl", response_model=HITLStatusResponse)
+async def generate_strategy_hitl(request: HITLGenerateRequest) -> HITLStatusResponse:
+    """
+    Generate strategy with Human-in-the-Loop checkpoint before memory update (P2-3).
+
+    The pipeline pauses after ML validation and before memory_update.
+    Returns `hitl_pending=True` with a `hitl_payload` summary for human review.
+
+    To resume: call ``POST /ai-pipeline/pipeline/{pipeline_id}/hitl/approve``.
+
+    Workflow::
+
+        POST /ai-pipeline/generate-hitl → {hitl_pending: true, hitl_payload: {...}}
+        # Human reviews strategy quality in hitl_payload
+        POST /ai-pipeline/pipeline/{id}/hitl/approve → pipeline resumes
+    """
+    _evict_stale_jobs()
+    pipeline_id = str(uuid.uuid4())[:12]
+    _pipeline_jobs[pipeline_id] = {
+        "status": "running",
+        "created_at": datetime.now(UTC).isoformat(),
+        "hitl_request": request.model_dump(),
+    }
+
+    try:
+        from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+        df = await _load_ohlcv_data(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+
+        state = await run_strategy_pipeline(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            df=df,
+            agents=request.agents,
+            run_backtest=request.run_backtest,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            pipeline_timeout=request.pipeline_timeout,
+            hitl_enabled=True,
+            hitl_approved=False,
+        )
+
+        hitl_pending = bool(state.context.get("hitl_pending", False))
+        hitl_payload = state.context.get("hitl_payload", {})
+
+        _pipeline_jobs[pipeline_id].update(
+            {
+                "status": "hitl_pending" if hitl_pending else "completed",
+                "hitl_pending": hitl_pending,
+                "hitl_payload": hitl_payload,
+                # Persist enough context to re-run the approval path
+                "_partial_state_session_id": state.session_id,
+                "_partial_results_keys": list(state.results.keys()),
+                "completed_at": datetime.now(UTC).isoformat() if not hitl_pending else None,
+            }
+        )
+
+        return HITLStatusResponse(
+            pipeline_id=pipeline_id,
+            hitl_pending=hitl_pending,
+            hitl_payload=hitl_payload,
+            message=(
+                f"Pipeline paused for human review. "
+                f"POST /ai-pipeline/pipeline/{pipeline_id}/hitl/approve to continue."
+                if hitl_pending
+                else "Pipeline completed without HITL pause."
+            ),
+        )
+
+    except Exception as exc:
+        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        logger.error(f"[HITL generate] {pipeline_id} failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/pipeline/{pipeline_id}/hitl", response_model=HITLStatusResponse)
+async def get_hitl_status(pipeline_id: str) -> HITLStatusResponse:
+    """
+    Check HITL pending status for a pipeline job (P2-3).
+
+    Returns whether the pipeline is paused awaiting human approval,
+    and the strategy summary payload for review.
+    """
+    _evict_stale_jobs()
+    job = _pipeline_jobs.get(pipeline_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_id}' not found")
+
+    return HITLStatusResponse(
+        pipeline_id=pipeline_id,
+        hitl_pending=bool(job.get("hitl_pending", False)),
+        hitl_payload=job.get("hitl_payload", {}),
+        message=(
+            "Pipeline is paused. POST /approve to resume."
+            if job.get("hitl_pending")
+            else f"Pipeline status: {job.get('status', 'unknown')}"
+        ),
+    )
+
+
+@router.post("/pipeline/{pipeline_id}/hitl/approve", response_model=HITLApproveResponse)
+async def approve_hitl_pipeline(pipeline_id: str) -> HITLApproveResponse:
+    """
+    Approve a HITL-paused pipeline and resume from memory_update (P2-3).
+
+    Re-runs the pipeline from scratch with ``hitl_approved=True`` so the
+    HITLCheckNode passes straight through to memory_update → reflection → report.
+
+    Returns the final pipeline report on completion.
+    """
+    _evict_stale_jobs()
+    job = _pipeline_jobs.get(pipeline_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_id}' not found")
+
+    if not job.get("hitl_pending"):
+        return HITLApproveResponse(
+            pipeline_id=pipeline_id,
+            status=job.get("status", "unknown"),
+            message="Pipeline is not in HITL-pending state.",
+        )
+
+    original_request = job.get("hitl_request", {})
+    if not original_request:
+        raise HTTPException(status_code=400, detail="Original request not stored — cannot resume.")
+
+    try:
+        from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+        df = await _load_ohlcv_data(
+            symbol=original_request["symbol"],
+            timeframe=original_request["timeframe"],
+            start_date=original_request.get("start_date", "2025-01-01"),
+            end_date=original_request.get("end_date", "2025-06-01"),
+        )
+
+        state = await run_strategy_pipeline(
+            symbol=original_request["symbol"],
+            timeframe=original_request["timeframe"],
+            df=df,
+            agents=original_request.get("agents", ["deepseek"]),
+            run_backtest=original_request.get("run_backtest", True),
+            initial_capital=original_request.get("initial_capital", 10000),
+            leverage=original_request.get("leverage", 1),
+            pipeline_timeout=original_request.get("pipeline_timeout", 300.0),
+            hitl_enabled=True,
+            hitl_approved=True,  # ← human approved
+        )
+
+        report = state.get_result("report") or {}
+        _pipeline_jobs[pipeline_id].update(
+            {
+                "status": "completed",
+                "hitl_pending": False,
+                "completed_at": datetime.now(UTC).isoformat(),
+                "result": report,
+            }
+        )
+
+        logger.info(f"[HITL approve] Pipeline {pipeline_id} resumed and completed")
+        return HITLApproveResponse(
+            pipeline_id=pipeline_id,
+            status="completed",
+            message="Pipeline resumed and completed after human approval.",
+            result=report,
+        )
+
+    except Exception as exc:
+        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        logger.error(f"[HITL approve] {pipeline_id} failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # =============================================================================

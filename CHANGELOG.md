@@ -33,7 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Two batches of improvements to the 13-node LangGraph pipeline, informed by 2025 academic literature (TradingGroup self-reflection, S²-MAD convergence detection, walk-forward acceptance gate, dynamic few-shot, Lee et al. 2025).
 
     **P1 — Core Pipeline Hardening** (`backend/agents/langgraph_orchestrator.py`, `backend/agents/trading_strategy_graph.py`)
-
     - **BudgetExceededError** (`P1-5`): `AgentState.max_cost_usd` + `record_llm_cost()` raises `BudgetExceededError` when limit exceeded mid-pipeline; `run_strategy_pipeline(max_cost_usd=0.0)` catches it and returns partial state with `"budget"` error entry
     - **SQLite checkpointer** (`P1-4`): `make_sqlite_checkpointer(db_path)` factory — persists `(session_id, node_name, ts, state_json)` to `data/pipeline_checkpoints.db` after every node; attach via `build_trading_strategy_graph(checkpoint_enabled=True)`
     - **PostRunReflectionNode** (`P1-1`): self-reflection node wired between `memory_update` and `report` — writes `{what_worked, what_failed, market_context, recommended_adjustments}` to `HierarchicalMemory(tag="reflection")` and `state.results["reflection"]`; non-fatal on memory errors
@@ -42,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Tests**: `tests/backend/agents/test_p1_features.py` (35 tests, 6 classes: budget, checkpointer, reflection, walk-forward, few-shot, graph builder) — all passing
 
     **P2 — Advanced Agent Capabilities** (`backend/agents/trading_strategy_graph.py`, `backend/agents/langgraph_orchestrator.py`, `backend/optimization/scoring.py`)
-
     - **RegimeClassifierNode** (`P2-1`): deterministic regime classification (no LLM) — ADX proxy + ATR% + trend direction → 5-category taxonomy (`trending_bull`, `trending_bear`, `volatile_ranging`, `ranging`, `crypto_risk_off`) with confidence score; wired `analyze_market → regime_classifier → [debate/memory_recall]`
     - **S²-MAD cosine similarity early stop** (`P2-2`): `DebateNode._cosine_similarity()` (bag-of-words) computes similarity between prior debate participant texts — if ≥ 0.9, skips re-debate; also logs per-round similarity; stores `_participant_texts` in `debate_consensus` for future checks
     - **HITLCheckNode** (`P2-3`): human-in-the-loop checkpoint before `memory_update` — if `state.context["hitl_approved"] != True`, sets `hitl_pending=True` + `hitl_payload` (strategy summary, backtest metrics, regime) and routes to report early; approve by re-calling with `hitl_approved=True`; wired via `build_trading_strategy_graph(hitl_enabled=True)`
@@ -50,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Composite quality score** (`P2-5`): `composite_quality_score(result)` in `backend/optimization/scoring.py` — formula: `Sharpe × Sortino × log(1+trades) / (1 + max_dd_frac)`, capped at 1000; available as `metric="composite_quality"` in `calculate_composite_score()`
     - **Tests**: `tests/backend/agents/test_p2_features.py` (45 tests, 8 classes: regime classifier, S²-MAD, HITL, event queue, composite score, graph builder params) — all passing
 
-    **Files changed**: `backend/agents/trading_strategy_graph.py` (+RegimeClassifierNode, HITLCheckNode, DebateNode._cosine_similarity, updated build/run functions), `backend/agents/langgraph_orchestrator.py` (+BudgetExceededError, make_sqlite_checkpointer, make_pipeline_event_queue, AgentGraph.event_fn), `backend/optimization/scoring.py` (+composite_quality_score), `tests/backend/agents/test_p1_features.py` (new, 35 tests), `tests/backend/agents/test_p2_features.py` (new, 45 tests)
+    **Files changed**: `backend/agents/trading_strategy_graph.py` (+RegimeClassifierNode, HITLCheckNode, DebateNode.\_cosine_similarity, updated build/run functions), `backend/agents/langgraph_orchestrator.py` (+BudgetExceededError, make_sqlite_checkpointer, make_pipeline_event_queue, AgentGraph.event_fn), `backend/optimization/scoring.py` (+composite_quality_score), `tests/backend/agents/test_p1_features.py` (new, 35 tests), `tests/backend/agents/test_p2_features.py` (new, 45 tests)
 
 - **feat: 10/10 readiness — real API pipeline tests, load tests, DebateROITracker (2026-03-25)**
 
@@ -88,17 +86,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **test(api): generate-and-build endpoint — 25 integration tests + datetime deprecation fix (2026-03-24)**
 
     Added full integration test coverage for `POST /ai-strategy-generator/generate-and-build`:
-
     - **`tests/backend/api/test_generate_and_build.py`** (new file, 25 tests, 4 classes):
-      - `TestGenerateAndBuildHappyPath` (10 tests): response shape keys, strategy_name from select_best,
-        backtest_metrics passthrough, strategy_graph passthrough, saved_strategy_id, execution_path,
-        symbol/timeframe echo, graph_warnings, proposals_count from report, pipeline errors surfaced as 200
-      - `TestGenerateAndBuildRequestForwarding` (4 tests): all request params forwarded to pipeline as kwargs,
-        default agents=["deepseek"], symbol forwarded as-is, pipeline called exactly once
-      - `TestGenerateAndBuildErrorPaths` (5 tests): empty DataFrame → 404, DB exception → 503,
-        pipeline RuntimeError → 500, None DataFrame → 404, pipeline ValueError message in detail
-      - `TestGenerateAndBuildEdgeCases` (6 tests): no select_best → "AI Strategy" fallback,
-        no backtest result → empty {}, no strategy_graph → None, empty body uses defaults, multiple warnings preserved
+        - `TestGenerateAndBuildHappyPath` (10 tests): response shape keys, strategy_name from select_best,
+          backtest_metrics passthrough, strategy_graph passthrough, saved_strategy_id, execution_path,
+          symbol/timeframe echo, graph_warnings, proposals_count from report, pipeline errors surfaced as 200
+        - `TestGenerateAndBuildRequestForwarding` (4 tests): all request params forwarded to pipeline as kwargs,
+          default agents=["deepseek"], symbol forwarded as-is, pipeline called exactly once
+        - `TestGenerateAndBuildErrorPaths` (5 tests): empty DataFrame → 404, DB exception → 503,
+          pipeline RuntimeError → 500, None DataFrame → 404, pipeline ValueError message in detail
+        - `TestGenerateAndBuildEdgeCases` (6 tests): no select_best → "AI Strategy" fallback,
+          no backtest result → empty {}, no strategy_graph → None, empty body uses defaults, multiple warnings preserved
 
     - **Patch strategy documented** (critical for future tests):
       `run_strategy_pipeline` is lazy-imported inside the endpoint function body →
@@ -137,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     **Total tests**: 210 passing across all new test classes.
 
-- **fix(agents): Code review fixes — constants dedup, _backtest_passes single source of truth, report includes analysis (2026-03-24)**
+- **fix(agents): Code review fixes — constants dedup, \_backtest_passes single source of truth, report includes analysis (2026-03-24)**
 
     Post-review fixes for P0 agent embodiment (`trading_strategy_graph.py`):
     - Extracted `_MIN_TRADES = 5` and `_MAX_DD_PCT = 30.0` as module-level constants.
@@ -215,42 +212,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
 
-    All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
-    changes that were not reflected in the tests.
+        All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+        changes that were not reflected in the tests.
 
-    **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
-    - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
-      now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
-    - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
-    - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
-    - `renderPagination` tests updated: pagination is always removed, no elements created.
-    - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+        **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+        - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+          now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+        - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+        - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+        - `renderPagination` tests updated: pagination is always removed, no elements created.
+        - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
 
-    **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
-    - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
-selected'`) but `setDom()` helper did not create the `#strategyTimeframe` element.
-    - Added `strategyTimeframe = '15'` parameter to `setDom()` and creates the element.
+        **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+        - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
 
-    **`frontend/tests/components/SaveLoadModule.test.js`** (1 test fixed)
-    - `loadStrategy` calls `renderConnections()` after loading, but this dependency was absent from
-      the mock `setup()` function → error thrown, success notification never fired.
-    - Added `renderConnections: vi.fn()` to the mocks in `setup()`.
+    selected'`) but `setDom()`helper did not create the`#strategyTimeframe`element.
+    - Added`strategyTimeframe = '15'`parameter to`setDom()` and creates the element.
 
-    **`frontend/tests/components/AiBuildModule.test.js`** (2 tests fixed)
-    - Tests checking modal title (`'AI Strategy Builder'` / `'AI Strategy Optimizer'`) were synchronous
-      but the title is set inside `_loadStrategiesList().then()` (a microtask).
-    - Made both tests `async` with `await new Promise(r => setTimeout(r, 0))` to flush microtask queue.
-    - Added missing `#aiExistingStrategy`, `#aiExistingStrategyHint`, `#aiNameHint` to `makeDOM()`.
+        **`frontend/tests/components/SaveLoadModule.test.js`** (1 test fixed)
+        - `loadStrategy` calls `renderConnections()` after loading, but this dependency was absent from
+          the mock `setup()` function → error thrown, success notification never fired.
+        - Added `renderConnections: vi.fn()` to the mocks in `setup()`.
 
-    **`frontend/tests/ticker-sync.test.js`** (8 tests fixed) + **`frontend/js/pages/strategy_builder.js`** (bug fix)
-    - Root cause: `setupEventListeners()` (line 826) called `symbolSync.initDunnahBasePanel()` at line
-      1288, but `symbolSync` is not created until line 830 (after `setupEventListeners` returns).
-      This threw `TypeError: Cannot read properties of null`, the catch swallowed it, and `symbolSync`
-      remained `null` — making all exported `syncSymbolData` calls no-ops.
-    - **Production bug fixed**: removed `symbolSync.initDunnahBasePanel()` from inside
-      `setupEventListeners()`; moved the call to after `symbolSync` is created (line ~840) in
-      `initializeStrategyBuilder()`.
-    - All 16 ticker-sync integration tests now pass.
+        **`frontend/tests/components/AiBuildModule.test.js`** (2 tests fixed)
+        - Tests checking modal title (`'AI Strategy Builder'` / `'AI Strategy Optimizer'`) were synchronous
+          but the title is set inside `_loadStrategiesList().then()` (a microtask).
+        - Made both tests `async` with `await new Promise(r => setTimeout(r, 0))` to flush microtask queue.
+        - Added missing `#aiExistingStrategy`, `#aiExistingStrategyHint`, `#aiNameHint` to `makeDOM()`.
+
+        **`frontend/tests/ticker-sync.test.js`** (8 tests fixed) + **`frontend/js/pages/strategy_builder.js`** (bug fix)
+        - Root cause: `setupEventListeners()` (line 826) called `symbolSync.initDunnahBasePanel()` at line
+          1288, but `symbolSync` is not created until line 830 (after `setupEventListeners` returns).
+          This threw `TypeError: Cannot read properties of null`, the catch swallowed it, and `symbolSync`
+          remained `null` — making all exported `syncSymbolData` calls no-ops.
+        - **Production bug fixed**: removed `symbolSync.initDunnahBasePanel()` from inside
+          `setupEventListeners()`; moved the call to after `symbolSync` is created (line ~840) in
+          `initializeStrategyBuilder()`.
+        - All 16 ticker-sync integration tests now pass.
 
 - **feat(agents): P0 Agent Embodiment — MemoryRecallNode + BacktestAnalysisNode (2026-03-24)**
 
@@ -1577,7 +1575,7 @@ function calculateADX(data, period = 14) {
     TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
     (bars_in_trade now uses inclusive counting to match TV).
 
-                              **File:** `scripts/_tv_calibration_check.py`
+                                **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 
