@@ -185,12 +185,38 @@ analyze_market → [debate] → generate_strategies → parse_responses
 
 **Дополнительный фикс:** `datetime.utcnow()` → `datetime.now(UTC)` в endpoint (deprecation)
 
+## Что сделано (2026-03-25)
+
+### P1/P2 AI Agent features ✅
+
+**P1 (5 фич) — 35 тестов в `test_p1_features.py`:**
+- P1-1: `PostRunReflectionNode` — self-reflection после memory_update, обновляет refinement guidance
+- P1-2: `WalkForwardValidationNode` — WF gate (wf_sharpe/is_sharpe ≥ 0.5), gate между backtest и memory
+- P1-3: Dynamic few-shot injection — `MemoryRecallNode` форматирует wins → `GenerateStrategiesNode` prepend
+- P1-4: `make_sqlite_checkpointer()` — SQLite checkpoint после каждого узла, Windows: ignore_cleanup_errors=True
+- P1-5: `BudgetExceededError` + `max_cost_usd` hard cap в `record_llm_cost()`
+
+**P2 (5 фич) — 45 тестов в `test_p2_features.py`:**
+- P2-1: `RegimeClassifierNode` — детерминированный 5-категорийный ADX+ATR классификатор
+- P2-2: S²-MAD cosine similarity early stop в `DebateNode` (порог 0.90)
+- P2-3: `HITLCheckNode` — human-in-the-loop checkpoint, wires hitl_enabled в граф
+- P2-4: `make_pipeline_event_queue()` — (Queue, event_fn), streaming через `AgentGraph.event_fn`
+- P2-5: `composite_quality_score()` = Sharpe × Sortino × log1p(trades) / (1 + max_dd_frac)
+
+**P2-3/P2-4 API endpoints — 18 тестов в `test_pipeline_streaming_hitl.py`:**
+- POST /ai-pipeline/generate-hitl + GET /pipeline/{id}/hitl + POST /pipeline/{id}/hitl/approve
+- POST /ai-pipeline/generate-stream + WS /ai-pipeline/stream/{pipeline_id}
+- `_pipeline_queues` dict для WebSocket routing
+
+**Коммиты:**
+- `0ede83bd6` — feat(agents): P2 agent improvements
+- `0dca643e4` — feat(api): P2-3 HITL + P2-4 streaming endpoints, 18 tests
+
 ## Следующие шаги
 
-- Обновить CHANGELOG.md
-- Деferred до отдельной сессии: real API integration tests, load tests
+- Deferred до отдельной сессии: real API integration tests (live keys), load tests (100+ requests), debate ROI measurement
 
 ## Открытые вопросы / Блокеры
 
 - Нет активных блокеров
-- generate-and-build endpoint теперь полностью покрыт тестами ✅
+- `test_pipeline_real_api.py` — 2 теста падают (требуют live API keys — ожидаемо)

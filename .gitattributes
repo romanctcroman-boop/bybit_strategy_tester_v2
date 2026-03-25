@@ -1,1 +1,5 @@
+# Normalize all text files to LF on commit (prevents CRLF pollution on Windows)
+* text=auto eol=lf
+
+# LFS
 scripts/test_tournament_fixed.py filter=lfs diff=lfs merge=lfs -text

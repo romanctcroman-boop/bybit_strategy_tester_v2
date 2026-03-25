@@ -31,6 +31,11 @@
   - BacktestAnalysisNode: severity + root_cause диагностика после backtest
   - Graph: analyze→[debate]→memory_recall→generate, backtest→backtest_analysis→[router]
   - 33 новых теста, 93 agent pipeline тестов проходят
+- AI Agent system 10/10 readiness (unit-testable portion) ✅ (2026-03-25)
+  - P1: PostRunReflectionNode, WalkForwardValidationNode, few-shot injection, SQLite checkpointer, cost budget
+  - P2: RegimeClassifierNode, S²-MAD early stop, HITLCheckNode, pipeline event queue, composite_quality_score
+  - P2 API: generate-hitl, pipeline/hitl, pipeline/hitl/approve, generate-stream, WS stream/{id}
+  - 98 new tests (35 P1 + 45 P2 agent + 18 P2 API)
 - AI Agent system 9.5/10 readiness ✅ (2026-03-24)
   - Global pipeline timeout (asyncio.wait_for, 300s default)
   - LLM cost observability: AgentState.total_cost_usd, llm_call_count, record_llm_cost()
