@@ -189,9 +189,9 @@ class TestPipelineRealApiStructure:
                 pipeline_timeout=120.0,
             )
         )
-        # errors dict may be non-empty for optional nodes, but must not be None
+        # errors is a list of dicts; may be non-empty for optional nodes, but must not be None
         assert state.errors is not None
-        assert isinstance(state.errors, dict)
+        assert isinstance(state.errors, list)
 
 
 # ---------------------------------------------------------------------------
@@ -215,8 +215,11 @@ class TestPipelineRealApiOutput:
                 pipeline_timeout=120.0,
             )
         )
-        parsed = state.results.get("parse_responses", [])
-        assert isinstance(parsed, list)
+        # parse_responses stores {"proposals": [...]} — check the proposals list
+        parsed = state.results.get("parse_responses", {})
+        assert isinstance(parsed, dict)
+        proposals = parsed.get("proposals", [])
+        assert isinstance(proposals, list)
 
     @skip_no_deepseek
     def test_select_best_returns_dict_or_none(self, ohlcv):
@@ -380,8 +383,9 @@ class TestPipelineRealApiTimeout:
             )
         )
         assert isinstance(state, AgentState)
-        # With 1ms timeout the pipeline MUST have timed out
-        assert "pipeline" in state.errors
+        # With 1ms timeout the pipeline MUST have timed out;
+        # state.errors is a list of dicts with "node" key
+        assert any(e.get("node") == "pipeline" for e in state.errors)
 
 
 # ---------------------------------------------------------------------------

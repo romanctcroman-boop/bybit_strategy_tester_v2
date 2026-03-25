@@ -1172,7 +1172,8 @@ class BacktestAnalysisNode(AgentNode):
         win_rate: float = float(metrics.get("win_rate", 0.0))
 
         # ── Severity ──────────────────────────────────────────────────────────
-        passed = trades >= self.MIN_TRADES and sharpe > -1e-9 and dd < self.MAX_DD_PCT
+        # sharpe > 0: strictly positive required — sharpe=0 means no alpha generated
+        passed = trades >= self.MIN_TRADES and sharpe > 0.0 and dd < self.MAX_DD_PCT
 
         if passed:
             severity = "pass"
@@ -2527,7 +2528,8 @@ def _backtest_passes(state: AgentState) -> bool:
     trades = metrics.get("total_trades", 0)
     sharpe = metrics.get("sharpe_ratio", -999.0)
     dd = metrics.get("max_drawdown", 100.0)
-    return trades >= _MIN_TRADES and sharpe > -1e-9 and dd < _MAX_DD_PCT
+    # sharpe > 0: strictly positive required — sharpe=0 means no alpha generated
+    return trades >= _MIN_TRADES and sharpe > 0.0 and dd < _MAX_DD_PCT
 
 
 def _should_refine(state: AgentState) -> bool:
