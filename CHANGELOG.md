@@ -9,6 +9,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(frontend): WebSocket streaming + HITL approval UI for AI pipeline page (2026-03-25)**
+
+    Connected the AI pipeline frontend to real backend APIs, replacing a fake `setInterval` progress bar
+    with live per-node WebSocket events and adding a full HITL approval flow.
+
+    **`frontend/js/pages/ai_pipeline.js`** (complete rewrite of pipeline execution logic)
+    - Replaced fake `PIPELINE_STAGES` array + `setInterval` ticker with `NODE_DISPLAY` map of 18 real
+      LangGraph node names → human-readable labels
+    - `runStreamingPipeline()`: `POST /generate-stream` → receives `pipeline_id` → opens `WS /stream/{id}` →
+      dispatches per-node progress chips in real time → calls `displayStreamResult()` on `done` event
+    - `runHitlPipeline()`: `POST /generate-hitl` → shows HITL approval panel on `hitl_pending` response
+    - `showHitlPanel(data)`: renders strategy name, Sharpe, drawdown, trade count, regime into approval panel
+    - `approveHitl()` / `rejectHitl()`: call `POST /pipeline/{id}/hitl/approve` or mark cancelled
+    - `renderNodeStages(nodes)`: renders completed node chips below progress bar
+    - `displayStreamResult(report, meta)`: renders strategy card, backtest metrics, execution timeline from
+      streaming `done.result` payload (different shape from sync `PipelineResponse`)
+    - `resetButton()`: closes active `_ws` WebSocket before re-enabling Generate button
+    - XSS: all user-derived strings passed through `escapeHtml()` in template literals
+
+    **`frontend/ai-pipeline.html`**
+    - Added `#enableHitl` checkbox to options row: "Require Approval (HITL)"
+    - Added `#hitlPanel` section: strategy name, 4 metric stats, Approve / Reject buttons
+
+    **`frontend/css/ai_pipeline.css`**
+    - Added `.hitl-panel`, `.hitl-summary`, `.hitl-stat`, `.btn-danger` styles
+
+    **`tests/frontend/test_ai_pipeline_page.py`** (new, 35 Playwright e2e tests)
+    - `TestAiPipelinePageLoad` (8): HTTP 200, no JS errors, required DOM elements present
+    - `TestAiPipelineOptions` (7): all checkboxes render, HITL unchecked by default, agent chip toggle
+    - `TestAiPipelineInitialState` (5): results/progress/hitlPanel hidden initially, stages container empty
+    - `TestAiPipelineJs` (15): function existence, NODE_DISPLAY count ≥ 10, `escapeHtml` XSS safety,
+      `displayStreamResult` renders results section, `showHitlPanel`/`rejectHitl` contract
+
+    **`tests/frontend/test_pages_e2e.py`**: updated `PAGE_KEY_ELEMENTS` for `ai-pipeline.html` to
+    check `#btnGenerate`, `#symbol`, `#enableHitl`, `#hitlPanel` instead of generic `"body"`.
+
+    **Commits:** `a3aaebb31` (temp cleanup), `34b8b0a35` (XSS fixes), `1f70530ec` (this feature)
+
+- **fix: 9 audit findings across agent pipeline, scoring, and test assertions (2026-03-25)**
+
+    Bug-fix sweep addressing findings from a full code audit of the AI agent system.
+
+    **`backend/api/routers/ai_pipeline.py`**
+    - `_evict_stale_jobs()`: both TTL and LRU eviction paths now call `_pipeline_queues.pop(jid, None)` —
+      previously orphaned `asyncio.Queue` objects accumulated for streams started but never subscribed
+    - Naive datetime in `_get_ohlcv_for_pipeline()`: `.strptime(...).replace(tzinfo=UTC)` avoids local-tz timestamp
+    - HITL approve: `original_request["symbol"]` → `.get("symbol")` with `HTTPException(400)` guard on missing keys
+    - LRU sort key changed from `""` → `"0"` for missing `created_at` (avoids string comparison errors)
+    - Added `logger.debug()` for dropped WebSocket events in `QueueFull` handler
+
+    **`backend/agents/langgraph_orchestrator.py`**
+    - Checkpoint failure: `logger.debug` → `logger.warning` (was silently swallowing persistence failures)
+    - `add_edge()` with `target="END"`: auto-adds source node to `self.exit_points`
+    - `make_pipeline_event_queue()`: added drop-event debug log
+
+    **`backend/optimization/scoring.py`**
+    - `composite_quality_score()`: added `math.isfinite()` guard before score calculation — NaN/inf inputs
+      (e.g. from upstream engine errors) returned 0.0 instead of propagating NaN
+    - `avg_drawdown` inverted metric: removed spurious `abs()` wrapper (`avg_drawdown` is already positive)
+
+    **`backend/agents/trading_strategy_graph.py`**
+    - `_backtest_passes()`: inline comment after `sharpe > 0.0` was truncating the `dd < MAX_DD_PCT`
+      condition (everything after `#` is a comment) — moved comment to its own line
+    - `GenerateStrategiesNode.execute()`: added `failed_agents: list[str]` tracking + sets
+      `state.context["partial_generation"]` / `state.context["failed_agents"]` on partial failure
+    - `RegimeClassifierNode.execute()`: removed `🏷️` emoji from `logger.info` call
+
+    **`tests/backend/agents/test_pipeline_real_api.py`**
+    - `test_pipeline_has_no_critical_errors`: fixed `isinstance(state.errors, dict)` → `list`
+    - `test_generate_strategies_produces_parsed_responses`: fixed to check `{"proposals": [...]}` dict shape
+    - `test_timeout_records_pipeline_error`: fixed `"pipeline" in state.errors` → `any(e.get("node") == "pipeline"...)`
+
+    **`tests/backend/api/test_pipeline_streaming_hitl.py`** (2 new tests in `TestEviction` class)
+    - `test_evict_stale_job_also_removes_orphaned_queue`: verifies queue cleaned on TTL eviction
+    - `test_active_jobs_not_evicted`: verifies active jobs survive eviction sweep
+
+    **Commits:** `d57d78fa8`, `9921de6d0`, `467a6fd64`
+
 - **fix(api): P2-3 HITL + P2-4 streaming WebSocket API endpoints + memory leak fix (2026-03-25)**
 
     Completed HTTP/WebSocket API surface for the HITL and streaming pipeline features, plus fixed a
