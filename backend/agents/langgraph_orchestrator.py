@@ -363,6 +363,7 @@ class AgentGraph:
         description: str = "",
         max_iterations: int = 50,
         checkpoint_fn: Callable[[AgentState, str], None] | None = None,
+        event_fn: Callable[[str, dict[str, Any]], None] | None = None,
     ):
         self.name = name
         self.description = description
@@ -371,6 +372,13 @@ class AgentGraph:
         # Optional checkpoint callback: called after each node with (state, node_name).
         # Use make_sqlite_checkpointer() to persist state to SQLite.
         self.checkpoint_fn = checkpoint_fn
+
+        # P2-4: Optional lightweight streaming callback: called after each node with
+        # (node_name, event_dict).  event_dict contains {"node", "status", "session_id",
+        # "iteration", "errors", "has_result"} — no full state to keep it cheap.
+        # Attach an asyncio.Queue consumer via make_pipeline_event_queue() to stream
+        # node completion events to a WebSocket or SSE endpoint.
+        self.event_fn = event_fn
 
         # Graph structure
         self.nodes: dict[str, AgentNode] = {}
@@ -519,13 +527,30 @@ class AgentGraph:
                 # Parallel execution
                 state = await self._execute_parallel(current_nodes, state)
 
-            # Checkpoint after every node transition (if configured)
+            # Checkpoint + event streaming after every node transition
+            completed = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
             if self.checkpoint_fn is not None:
                 try:
-                    completed = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
                     self.checkpoint_fn(state, completed)
                 except Exception as _cp_exc:  # noqa: BLE001
                     logger.debug(f"[Checkpoint] Non-critical error: {_cp_exc}")
+
+            # P2-4: emit lightweight streaming event (no full state serialisation)
+            if self.event_fn is not None:
+                try:
+                    self.event_fn(
+                        completed,
+                        {
+                            "node": completed,
+                            "status": "completed",
+                            "session_id": state.session_id,
+                            "iteration": iterations,
+                            "has_result": completed in state.results,
+                            "errors": len(state.errors),
+                        },
+                    )
+                except Exception as _ev_exc:  # noqa: BLE001
+                    logger.debug(f"[EventStream] Non-critical error: {_ev_exc}")
 
             # Check for exit AFTER execution
             if all(n in self.exit_points for n in current_nodes):
@@ -800,3 +825,45 @@ def make_sqlite_checkpointer(
             )
 
     return _checkpoint
+
+
+def make_pipeline_event_queue() -> "tuple[asyncio.Queue[dict[str, Any]], Callable[[str, dict[str, Any]], None]]":
+    """
+    P2-4: Create a (queue, event_fn) pair for streaming pipeline node events.
+
+    Usage::
+
+        queue, event_fn = make_pipeline_event_queue()
+        graph = build_trading_strategy_graph()
+        graph.event_fn = event_fn
+
+        # In a WebSocket handler:
+        while True:
+            event = await queue.get()
+            if event.get("status") == "done":
+                break
+            await ws.send_json(event)
+
+    The queue receives dicts with shape::
+
+        {
+            "node":       "analyze_market",
+            "status":     "completed",   # or "done" when pipeline finishes
+            "session_id": "...",
+            "iteration":  1,
+            "has_result": True,
+            "errors":     0,
+        }
+
+    Returns:
+        (queue, event_fn) — attach event_fn to ``AgentGraph.event_fn``.
+    """
+    q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    def _event_fn(node_name: str, event: dict[str, Any]) -> None:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            pass  # non-blocking — drop if consumer is slow
+
+    return q, _event_fn

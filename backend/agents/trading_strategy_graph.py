@@ -28,6 +28,7 @@ for better observability, retry logic, and conditional routing.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -40,6 +41,7 @@ from backend.agents.langgraph_orchestrator import (
     BudgetExceededError,
     ConditionalRouter,
     FunctionAgent,
+    make_pipeline_event_queue,
     make_sqlite_checkpointer,
     register_graph,
 )
@@ -99,6 +101,91 @@ class AnalyzeMarketNode(AgentNode):
         return state
 
 
+class RegimeClassifierNode(AgentNode):
+    """
+    Node 1.2: Deterministic market regime classifier (P2-1).
+
+    Uses ADX, ATR percentile, and trend direction to map the raw MarketContext
+    regime into a structured 5-category taxonomy with a confidence score.
+    No LLM call — runs in < 1 ms from already-computed context data.
+
+    Output stored in ``state.context["regime_classification"]``::
+
+        {
+            "regime":      "trending_bull",   # canonical tag
+            "adx_proxy":   28.5,              # trend strength proxy (ADX or EMA slope × 100)
+            "atr_pct":     1.8,               # volatility as % of price
+            "trend":       "bullish",         # raw trend direction
+            "confidence":  0.78,              # 0.0–1.0
+        }
+
+    Taxonomy:
+        trending_bull   — strong uptrend   (ADX-proxy ≥ 20, trend=bullish)
+        trending_bear   — strong downtrend (ADX-proxy ≥ 20, trend=bearish)
+        volatile_ranging— high ATR, low directional strength
+        ranging         — low ATR, low directional strength
+        crypto_risk_off — bearish + very high volatility (ATR > 3%)
+    """
+
+    _ADX_TREND_THRESHOLD = 20.0    # above → trending
+    _ATR_HIGH_THRESHOLD = 2.5      # % → high volatility
+    _ATR_RISK_OFF_THRESHOLD = 3.5  # % → crypto risk-off
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="regime_classifier",
+            description="Deterministic regime classification from ADX+ATR+trend",
+            timeout=5.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        market_result = state.get_result("analyze_market")
+        if not market_result:
+            logger.debug("[RegimeClassifier] No market result — skipping")
+            return state
+
+        ctx = market_result["market_context"]
+        atr_pct: float = getattr(ctx, "atr_pct", 0.0)
+        trend_dir: str = getattr(ctx, "trend_direction", "neutral")
+        trend_strength: str = getattr(ctx, "trend_strength", "weak")
+
+        # Approximate ADX proxy from trend_strength string
+        strength_map = {"strong": 30.0, "moderate": 20.0, "weak": 10.0}
+        adx_proxy = strength_map.get(trend_strength, 10.0)
+
+        # --- Classify ---
+        if atr_pct >= self._ATR_RISK_OFF_THRESHOLD and trend_dir == "bearish":
+            regime = "crypto_risk_off"
+            confidence = min(1.0, atr_pct / (self._ATR_RISK_OFF_THRESHOLD * 1.5))
+        elif adx_proxy >= self._ADX_TREND_THRESHOLD and trend_dir == "bullish":
+            regime = "trending_bull"
+            confidence = min(1.0, adx_proxy / 40.0)
+        elif adx_proxy >= self._ADX_TREND_THRESHOLD and trend_dir == "bearish":
+            regime = "trending_bear"
+            confidence = min(1.0, adx_proxy / 40.0)
+        elif atr_pct >= self._ATR_HIGH_THRESHOLD:
+            regime = "volatile_ranging"
+            confidence = min(1.0, atr_pct / (self._ATR_HIGH_THRESHOLD * 2))
+        else:
+            regime = "ranging"
+            confidence = max(0.3, 1.0 - adx_proxy / self._ADX_TREND_THRESHOLD)
+
+        classification = {
+            "regime": regime,
+            "adx_proxy": round(adx_proxy, 1),
+            "atr_pct": round(atr_pct, 2),
+            "trend": trend_dir,
+            "confidence": round(confidence, 2),
+        }
+        state.context["regime_classification"] = classification
+        state.set_result(self.name, classification)
+        logger.info(
+            f"🏷️ [RegimeClassifier] {regime} "
+            f"(adx≈{adx_proxy:.0f}, atr={atr_pct:.2f}%, conf={confidence:.0%})"
+        )
+        return state
+
+
 class DebateNode(AgentNode):
     """
     Node 1.5 (optional): Multi-Agent Debate on market regime before strategy generation.
@@ -108,19 +195,42 @@ class DebateNode(AgentNode):
     - Adaptive stopping: KS-test detects when positions have converged (p > 0.05)
     - Max 3 rounds to avoid over-deliberation
     - Debate consensus enriches the market context for GenerateStrategiesNode
+    - P2-2: S²-MAD cosine-similarity early stop (similarity > 0.9 → converged)
 
     Falls back gracefully if deliberation APIs are unavailable.
     """
 
     _MAX_ROUNDS = 3
     _KS_STABILITY_THRESHOLD = 0.05  # p-value above which debate is considered stable
+    _SIMILARITY_THRESHOLD = 0.90    # P2-2: cosine sim above this → responses converged
 
     def __init__(self) -> None:
         super().__init__(
             name="debate",
-            description="Multi-Agent Debate with KS-test adaptive stopping",
+            description="Multi-Agent Debate with KS-test adaptive stopping + S²-MAD cosine similarity",
             timeout=90.0,
         )
+
+    @staticmethod
+    def _cosine_similarity(a: str, b: str) -> float:
+        """
+        Bag-of-words cosine similarity between two text responses (P2-2).
+        Used to detect when debate participants have converged without LLM cost.
+        Returns 0.0–1.0; values above _SIMILARITY_THRESHOLD indicate convergence.
+        """
+        import re
+        from collections import Counter
+        from math import sqrt
+
+        tokens_a = Counter(re.findall(r"\w+", a.lower()))
+        tokens_b = Counter(re.findall(r"\w+", b.lower()))
+        all_tokens = set(tokens_a) | set(tokens_b)
+        dot = sum(tokens_a[t] * tokens_b[t] for t in all_tokens)
+        norm_a = sqrt(sum(v * v for v in tokens_a.values()))
+        norm_b = sqrt(sum(v * v for v in tokens_b.values()))
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return dot / (norm_a * norm_b)
 
     async def execute(self, state: AgentState) -> AgentState:
         market_result = state.get_result("analyze_market")
@@ -131,6 +241,18 @@ class DebateNode(AgentNode):
         market_context = market_result["market_context"]
         symbol = state.context.get("symbol", "BTCUSDT")
         agents = state.context.get("agents", ["deepseek", "qwen"])
+
+        # P2-2: S²-MAD — check if previous debate results already converged
+        prior_debate = state.context.get("debate_consensus")
+        if prior_debate:
+            prior_texts = prior_debate.get("_participant_texts", [])
+            if len(prior_texts) >= 2:
+                sim = self._cosine_similarity(prior_texts[0], prior_texts[1])
+                if sim >= self._SIMILARITY_THRESHOLD:
+                    logger.info(
+                        f"🔁 [DebateNode] S²-MAD early stop: cosine_sim={sim:.3f} ≥ {self._SIMILARITY_THRESHOLD} — skipping re-debate"
+                    )
+                    return state
 
         # Build debate question from market context
         regime = getattr(market_context, "market_regime", "unknown")
@@ -158,6 +280,12 @@ class DebateNode(AgentNode):
             confidence = getattr(debate_result, "confidence_score", 0.0)
             consensus = getattr(debate_result, "consensus_answer", "")
 
+            # P2-2: store participant texts for S²-MAD similarity check on future rounds
+            participant_texts = getattr(debate_result, "participant_texts", [])
+            if len(participant_texts) >= 2:
+                sim = self._cosine_similarity(participant_texts[0], participant_texts[1])
+                logger.info(f"🔁 [DebateNode] S²-MAD cosine_sim={sim:.3f} (threshold={self._SIMILARITY_THRESHOLD})")
+
             logger.info(
                 f"🗣️ Debate complete: confidence={confidence:.2f}, "
                 f"rounds={getattr(debate_result, 'rounds_completed', '?')}"
@@ -169,6 +297,7 @@ class DebateNode(AgentNode):
                 "consensus": consensus,
                 "confidence": confidence,
                 "participating_agents": agents,
+                "_participant_texts": participant_texts,  # P2-2: stored for S²-MAD check
             }
             state.set_result(self.name, {"consensus": consensus, "confidence": confidence})
             state.add_message(
@@ -2017,6 +2146,73 @@ class MLValidationNode(AgentNode):
 
 
 # =============================================================================
+# P2-3: Human-in-the-Loop (HITL) interrupt node
+# =============================================================================
+
+
+class HITLCheckNode(AgentNode):
+    """
+    P2-3: Human-in-the-loop checkpoint before memory is updated (optional).
+
+    When enabled, the node inspects ``state.context["hitl_approved"]``:
+    - If ``True``  → pipeline continues normally (human approved)
+    - If ``False`` or missing → sets ``state.context["hitl_pending"] = True``
+      and ``state.context["hitl_payload"]`` with the strategy summary for review,
+      then returns early.  ``run_strategy_pipeline()`` callers can detect this
+      and pause/resume by re-calling with ``hitl_approved=True`` in context.
+
+    The node is wired between ``ml_validation`` and ``memory_update`` when
+    ``build_trading_strategy_graph(hitl_enabled=True)`` is called.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="hitl_check",
+            description="HITL: pause pipeline for human review before memory update",
+            timeout=5.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        approved: bool = bool(state.context.get("hitl_approved", False))
+
+        if approved:
+            logger.info("✅ [HITL] Human approved — continuing to memory_update")
+            state.context.pop("hitl_pending", None)
+            return state
+
+        # Build a compact summary for the human reviewer
+        best = state.get_result("select_best") or {}
+        bt = state.get_result("backtest") or {}
+        wf = state.get_result("wf_validation") or {}
+
+        payload = {
+            "strategy_name": (best.get("strategy", {}) or {}).get("strategy_name", "unknown"),
+            "backtest_summary": {
+                "trades": bt.get("total_trades", 0),
+                "sharpe": round(bt.get("sharpe_ratio", 0.0), 3),
+                "max_dd": round(bt.get("max_drawdown", 0.0), 2),
+                "net_profit": round(bt.get("net_profit", 0.0), 2),
+            },
+            "wf_passed": wf.get("wf_passed", None),
+            "regime": state.context.get("regime_classification", {}).get("regime", "unknown"),
+            "message": (
+                "Pipeline paused for human review. "
+                "Set state.context['hitl_approved'] = True and re-run to continue."
+            ),
+        }
+
+        state.context["hitl_pending"] = True
+        state.context["hitl_payload"] = payload
+        logger.info(
+            f"⏸️ [HITL] Pipeline paused — strategy='{payload['strategy_name']}' "
+            f"sharpe={payload['backtest_summary']['sharpe']}. "
+            f"Set hitl_approved=True to continue."
+        )
+        state.set_result(self.name, payload)
+        return state
+
+
+# =============================================================================
 # P1-1: Post-run self-reflection node
 # =============================================================================
 
@@ -2366,6 +2562,8 @@ def build_trading_strategy_graph(
     run_debate: bool = True,
     run_wf_validation: bool = True,
     checkpoint_enabled: bool = False,
+    hitl_enabled: bool = False,
+    event_fn: "Callable[[str, dict[str, Any]], None] | None" = None,
 ) -> AgentGraph:
     """
     Build the full Trading Strategy generation graph.
@@ -2379,48 +2577,58 @@ def build_trading_strategy_graph(
         checkpoint_enabled: If True (default False), attach a SQLite checkpointer that
                             persists AgentState after every node transition.
                             P1-4: enables resume-after-crash and run audit trail.
+        hitl_enabled:       If True (default False), adds HITLCheckNode between
+                            ml_validation and memory_update (P2-3). Pipeline pauses
+                            if state.context["hitl_approved"] != True.
+        event_fn:           P2-4 streaming callback: called after each node completes
+                            with (node_name, event_dict). Use make_pipeline_event_queue()
+                            to create a queue-backed event_fn for WebSocket streaming.
 
     Returns:
         AgentGraph ready for execution
 
     Graph structure (full):
-        analyze_market → [debate] → memory_recall → generate_strategies → parse_responses
-                                          ↑                                      │
-                                          │                               select_best (Consensus)
-                                          │                                      │
-                                 refine_strategy ←                          build_graph
-                                 (iter < 3, fails)                               │
-                                                                             backtest
-                                                                                 │
-                                                                        backtest_analysis
-                                                                                 ├── fails, iter < 3 → refine_strategy (loop)
-                                                                                 └── passes / max iter → [wf_validation →] optimize_strategy
+        analyze_market → regime_classifier → [debate] → memory_recall
+                                                              → generate_strategies → parse_responses
+                                                                    ↑                       │
+                                                                    │               select_best (Consensus)
+                                                                    │                       │
+                                                           refine_strategy ←           build_graph
+                                                           (iter < 3, fails)                │
+                                                                                        backtest
+                                                                                            │
+                                                                                   backtest_analysis
+                                                                                            ├── fails → refine (loop)
+                                                                                            └── passes → [wf_validation →] optimize_strategy
                                                                                                                │
                                                                                                         ml_validation
                                                                                                                │
-                                                                                                        memory_update → reflection → report → END
+                                                                                              [hitl_check →] memory_update → reflection → report → END
     """
     graph = AgentGraph(
         name="trading_strategy_pipeline",
         description="AI-powered trading strategy generation with Self-MoA + MAD + ConsensusEngine",
         checkpoint_fn=make_sqlite_checkpointer() if checkpoint_enabled else None,
+        event_fn=event_fn,
     )
 
-    # Add nodes
+    # Add core nodes
     graph.add_node(AnalyzeMarketNode())
+    graph.add_node(RegimeClassifierNode())  # P2-1: deterministic regime classification
     graph.add_node(GenerateStrategiesNode())
     graph.add_node(ParseResponsesNode())
     graph.add_node(ConsensusNode())
     graph.add_node(FunctionAgent(name="report", func=_report_node, description="Final report"))
 
-    # Chain: analyze → [debate] → memory_recall → generate → parse → select
+    # Chain: analyze → regime_classifier → [debate] → memory_recall → generate → parse → select
+    graph.add_edge("analyze_market", "regime_classifier")
     graph.add_node(MemoryRecallNode())
     if run_debate:
         graph.add_node(DebateNode())
-        graph.add_edge("analyze_market", "debate")
+        graph.add_edge("regime_classifier", "debate")
         graph.add_edge("debate", "memory_recall")
     else:
-        graph.add_edge("analyze_market", "memory_recall")
+        graph.add_edge("regime_classifier", "memory_recall")
     graph.add_edge("memory_recall", "generate_strategies")
 
     graph.add_edge("generate_strategies", "parse_responses")
@@ -2441,21 +2649,16 @@ def build_trading_strategy_graph(
         if run_wf_validation:
             # P1-2: walk-forward gate between backtest_analysis and optimize
             graph.add_node(WalkForwardValidationNode())
-            # Conditional routing after backtest_analysis:
-            #   fails AND iterations left → refine_strategy (loop)
-            #   passes / max iter         → wf_validation
             backtest_router = ConditionalRouter(name="backtest_router")
             backtest_router.add_route(_should_refine, "refine_strategy")
             backtest_router.set_default("wf_validation")
             graph.add_conditional_edges("backtest_analysis", backtest_router)
 
-            # After wf_validation: if WF flags overfitting → refine, else → optimize
             wf_router = ConditionalRouter(name="wf_router")
             wf_router.add_route(_should_refine, "refine_strategy")
             wf_router.set_default("optimize_strategy")
             graph.add_conditional_edges("wf_validation", wf_router)
         else:
-            # No WF: original routing (backtest_analysis → refine or optimize)
             backtest_router = ConditionalRouter(name="backtest_router")
             backtest_router.add_route(_should_refine, "refine_strategy")
             backtest_router.set_default("optimize_strategy")
@@ -2464,10 +2667,26 @@ def build_trading_strategy_graph(
         # After refinement, loop back to regenerate strategies
         graph.add_edge("refine_strategy", "generate_strategies")
 
-        # Optimization → ML validation → memory_update → reflection (P1-1) → report
+        # Optimization → ML validation → [hitl_check →] memory_update → reflection → report
         graph.add_node(MLValidationNode())
         graph.add_edge("optimize_strategy", "ml_validation")
-        graph.add_edge("ml_validation", "memory_update")
+
+        if hitl_enabled:
+            # P2-3: HITL checkpoint before memory_update
+            graph.add_node(HITLCheckNode())
+            graph.add_edge("ml_validation", "hitl_check")
+
+            # After HITL: if pending → exit (caller inspects state); else → memory_update
+            def _hitl_not_pending(state: AgentState) -> bool:
+                return not state.context.get("hitl_pending", False)
+
+            hitl_router = ConditionalRouter(name="hitl_router")
+            hitl_router.add_route(_hitl_not_pending, "memory_update")
+            hitl_router.set_default("report")  # exit early with hitl_pending=True
+            graph.add_conditional_edges("hitl_check", hitl_router)
+        else:
+            graph.add_edge("ml_validation", "memory_update")
+
         graph.add_edge("memory_update", "reflection")   # P1-1: self-reflection before report
         graph.add_edge("reflection", "report")
     else:
@@ -2492,6 +2711,9 @@ async def run_strategy_pipeline(
     pipeline_timeout: float = 300.0,
     max_cost_usd: float = 0.0,
     checkpoint_enabled: bool = False,
+    hitl_enabled: bool = False,
+    hitl_approved: bool = False,
+    event_fn: "Callable[[str, dict[str, Any]], None] | None" = None,
 ) -> AgentState:
     """
     Convenience function to run the full strategy generation pipeline.
@@ -2516,6 +2738,13 @@ async def run_strategy_pipeline(
             partial state is returned with a ``"budget"`` error entry.
         checkpoint_enabled: If True, persist AgentState to SQLite after each node
             (P1-4). Enables run audit trail and post-mortem debugging.
+        hitl_enabled: If True (P2-3), add HITLCheckNode before memory_update.
+            Pipeline pauses unless hitl_approved=True.
+        hitl_approved: If True (P2-3), mark pipeline as human-approved so HITL
+            check passes without pausing. Use on second call after human review.
+        event_fn: P2-4 streaming callback attached to AgentGraph.event_fn.
+            Called after each node with (node_name, event_dict).
+            Use make_pipeline_event_queue() to get a (queue, event_fn) pair.
 
     Returns:
         AgentState with all results in state.results
@@ -2525,6 +2754,8 @@ async def run_strategy_pipeline(
         run_debate=run_debate,
         run_wf_validation=run_wf_validation,
         checkpoint_enabled=checkpoint_enabled,
+        hitl_enabled=hitl_enabled,
+        event_fn=event_fn,
     )
 
     initial_state = AgentState(
@@ -2535,6 +2766,7 @@ async def run_strategy_pipeline(
             "agents": agents or ["deepseek"],
             "initial_capital": initial_capital,
             "leverage": leverage,
+            "hitl_approved": hitl_approved,  # P2-3: HITL approval flag
         },
         max_cost_usd=max_cost_usd,  # P1-5: cost budget
     )

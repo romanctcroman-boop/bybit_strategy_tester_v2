@@ -94,6 +94,10 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
         drawdown_factor = 1 + max_drawdown
         return total_return / drawdown_factor
 
+    # P2-5: composite quality score (AI agent strategy selection)
+    elif metric == "composite_quality":
+        return composite_quality_score(result)
+
     # Default — net_profit
     return net_profit
 
@@ -203,6 +207,50 @@ def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -
         r.pop("_orig_idx", None)
 
     return results
+
+
+def composite_quality_score(result: dict) -> float:
+    """
+    P2-5: Composite quality score for AI agent strategy selection.
+
+    Formula::
+
+        score = Sharpe × Sortino × log(1 + trade_count) / (1 + max_drawdown_fraction)
+
+    This balances risk-adjusted return (Sharpe×Sortino) against trade activity
+    (log term prevents rewarding thin back-tests with 1-2 lucky trades) and
+    drawdown penalty.
+
+    Rules:
+    - Returns 0.0 when Sharpe or Sortino is non-positive (unprofitable strategies score 0)
+    - max_drawdown expected as PERCENT (e.g. 17.5 = 17.5%); converted to fraction internally
+    - Capped at 1000.0 to prevent extreme outliers skewing comparisons
+
+    Args:
+        result: Dict with backtest metric values (same format as MetricsCalculator output).
+
+    Returns:
+        Float score ≥ 0.0.  Higher = better.
+
+    Example::
+
+        >>> composite_quality_score({"sharpe_ratio": 1.2, "sortino_ratio": 1.8,
+        ...                          "total_trades": 50, "max_drawdown": 15.0})
+        # ≈ 1.2 × 1.8 × log(51) / 1.15 ≈ 6.84
+    """
+    import math
+
+    sharpe = result.get("sharpe_ratio", 0.0) or 0.0
+    sortino = result.get("sortino_ratio", 0.0) or 0.0
+    trades = int(result.get("total_trades", 0) or 0)
+    max_dd_pct = abs(result.get("max_drawdown", 0.0) or 0.0)
+
+    if sharpe <= 0 or sortino <= 0:
+        return 0.0
+
+    max_dd_frac = max_dd_pct / 100.0
+    score = sharpe * sortino * math.log1p(trades) / (1.0 + max_dd_frac)
+    return min(float(score), 1000.0)
 
 
 def apply_custom_sort_order(results: list[dict], sort_order: list[dict]) -> list[dict]:
