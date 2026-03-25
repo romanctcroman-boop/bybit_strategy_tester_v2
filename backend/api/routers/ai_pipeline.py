@@ -971,16 +971,24 @@ async def approve_hitl_pipeline(pipeline_id: str) -> HITLApproveResponse:
     try:
         from backend.agents.trading_strategy_graph import run_strategy_pipeline
 
+        symbol = original_request.get("symbol")
+        timeframe = original_request.get("timeframe")
+        if not symbol or not timeframe:
+            raise HTTPException(
+                status_code=400,
+                detail="Stored request is missing symbol or timeframe — cannot resume.",
+            )
+
         df = await _load_ohlcv_data(
-            symbol=original_request["symbol"],
-            timeframe=original_request["timeframe"],
+            symbol=symbol,
+            timeframe=timeframe,
             start_date=original_request.get("start_date", "2025-01-01"),
             end_date=original_request.get("end_date", "2025-06-01"),
         )
 
         state = await run_strategy_pipeline(
-            symbol=original_request["symbol"],
-            timeframe=original_request["timeframe"],
+            symbol=symbol,
+            timeframe=timeframe,
             df=df,
             agents=original_request.get("agents", ["deepseek"]),
             run_backtest=original_request.get("run_backtest", True),
@@ -1033,8 +1041,8 @@ async def _load_ohlcv_data(
     from backend.database.session import get_session
 
     def _fetch() -> pd.DataFrame:
-        start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000)
-        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000)
+        start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() * 1000)
+        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() * 1000)
         with get_session() as session:
             repo = KlineRepository(session)
             klines = repo.get_klines(

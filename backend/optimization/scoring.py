@@ -245,6 +245,10 @@ def composite_quality_score(result: dict) -> float:
     trades = int(result.get("total_trades", 0) or 0)
     max_dd_pct = abs(result.get("max_drawdown", 0.0) or 0.0)
 
+    # Guard against NaN/inf from upstream calculation errors
+    if not math.isfinite(sharpe) or not math.isfinite(sortino) or not math.isfinite(max_dd_pct):
+        return 0.0
+
     if sharpe <= 0 or sortino <= 0:
         return 0.0
 
