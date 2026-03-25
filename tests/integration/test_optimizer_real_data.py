@@ -138,10 +138,7 @@ def real_ohlcv():
             market_type="linear",
         )
 
-    try:
-        df = asyncio.get_event_loop().run_until_complete(_load())
-    except RuntimeError:
-        df = asyncio.run(_load())
+    df = asyncio.run(_load())
 
     if df is None or len(df) < 100:
         pytest.skip(f"Real OHLCV data unavailable or too short (got {len(df) if df is not None else 0} bars)")

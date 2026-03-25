@@ -85,7 +85,7 @@ def ohlcv() -> pd.DataFrame:
 
 def _run(coro):
     """Run an async coroutine in the test (pytest-asyncio not required)."""
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ---------------------------------------------------------------------------

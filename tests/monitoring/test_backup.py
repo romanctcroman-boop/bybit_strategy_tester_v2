@@ -8,7 +8,7 @@ import os
 import sqlite3
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, "d:/bybit_strategy_tester_v2")
@@ -51,7 +51,7 @@ class TestBackupFunctions:
         for i in range(10):
             cursor.execute(
                 "INSERT INTO prompt_logs VALUES (?, ?, ?, ?, ?, ?)",
-                (f"test_{i}", datetime.utcnow().isoformat(), "qwen", "test", f"Prompt {i}", 1),
+                (f"test_{i}", datetime.now(UTC).isoformat(), "qwen", "test", f"Prompt {i}", 1),
             )
 
         conn.commit()
@@ -155,11 +155,11 @@ class TestBackupFunctions:
         backup_dir = Path(temp_backup_dir)
 
         # Recent backup (should keep)
-        recent = backup_dir / f"prompt_logs_{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}.db"
+        recent = backup_dir / f"prompt_logs_{datetime.now(UTC).strftime('%Y-%m-%d_%H-%M-%S')}.db"
         recent.touch()
 
         # Old backup (should delete)
-        old_date = datetime.utcnow() - timedelta(days=40)
+        old_date = datetime.now(UTC) - timedelta(days=40)
         old = backup_dir / f"prompt_logs_{old_date.strftime('%Y-%m-%d_%H-%M-%S')}.db"
         old.touch()
 
@@ -251,7 +251,7 @@ class TestBackupIntegration:
             """)
             cursor.execute(
                 "INSERT INTO prompt_logs VALUES (?, ?, ?, ?, ?, ?)",
-                ("test_1", datetime.utcnow().isoformat(), "qwen", "test", "test_value", 1),
+                ("test_1", datetime.now(UTC).isoformat(), "qwen", "test", "test_value", 1),
             )
             conn.commit()
             conn.close()
