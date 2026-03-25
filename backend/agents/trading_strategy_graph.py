@@ -37,8 +37,10 @@ from backend.agents.langgraph_orchestrator import (
     AgentGraph,
     AgentNode,
     AgentState,
+    BudgetExceededError,
     ConditionalRouter,
     FunctionAgent,
+    make_sqlite_checkpointer,
     register_graph,
 )
 from backend.agents.prompts.context_builder import MarketContextBuilder
@@ -276,6 +278,24 @@ class MemoryRecallNode(AgentNode):
                     regime_lines.append(f"  - {snippet}")
                 sections.append(f"REGIME KNOWLEDGE ({regime} market):\n" + "\n".join(regime_lines))
 
+            # --- 4. Dynamic few-shot examples (P1-3) ---
+            # Format top winning memories as concrete examples for in-context learning.
+            # These are injected separately so GenerateStrategiesNode can place them
+            # right before the generation request for maximum impact.
+            few_shot_examples: list[str] = []
+            for m in wins[:3]:  # top-3 wins by importance
+                meta = getattr(m, "metadata", {}) or {}
+                sharpe = meta.get("sharpe_ratio", "?")
+                agent = meta.get("agent", "AI")
+                snippet = m.content[:300].replace("\n", " ")
+                few_shot_examples.append(
+                    f"EXAMPLE (Sharpe={sharpe}, agent={agent}): {snippet}"
+                )
+
+            if few_shot_examples:
+                state.context["few_shot_examples"] = few_shot_examples
+                logger.info(f"🎯 [MemoryRecallNode] {len(few_shot_examples)} few-shot examples ready")
+
             if sections:
                 memory_context = (
                     "## Prior Knowledge from Memory\n"
@@ -369,6 +389,20 @@ class GenerateStrategiesNode(AgentNode):
         # --- Memory context: inject past wins/failures recalled by MemoryRecallNode ---
         memory_context = state.context.get("memory_context", "")
 
+        # --- P1-3: Dynamic few-shot injection ---
+        # Prepend concrete past-success examples to anchor LLM output toward proven patterns.
+        few_shot_examples: list[str] = state.context.get("few_shot_examples", [])
+        few_shot_block = ""
+        if few_shot_examples:
+            few_shot_block = (
+                "## Proven Strategy Examples (few-shot)\n"
+                "The following strategies worked well in similar conditions. "
+                "Use them as inspiration — adapt, don't copy verbatim:\n\n"
+                + "\n\n".join(few_shot_examples)
+                + "\n"
+            )
+            logger.info(f"🎯 [GenerateStrategies] Injecting {len(few_shot_examples)} few-shot examples")
+
         responses: list[dict[str, Any]] = []
 
         # --- Self-MoA: 3× DeepSeek in parallel if DeepSeek is in the agent list ---
@@ -379,6 +413,8 @@ class GenerateStrategiesNode(AgentNode):
                 agent_name="deepseek",
                 include_examples=True,
             )
+            if few_shot_block:
+                prompt = f"{few_shot_block}\n\n{prompt}"
             if memory_context:
                 prompt = f"{memory_context}\n\n{prompt}"
             if refinement_feedback:
@@ -416,6 +452,8 @@ class GenerateStrategiesNode(AgentNode):
                 agent_name=agent_name,
                 include_examples=True,
             )
+            if few_shot_block:
+                prompt = f"{few_shot_block}\n\n{prompt}"
             if memory_context:
                 prompt = f"{memory_context}\n\n{prompt}"
             if refinement_feedback:
@@ -1978,6 +2016,301 @@ class MLValidationNode(AgentNode):
         }
 
 
+# =============================================================================
+# P1-1: Post-run self-reflection node
+# =============================================================================
+
+
+class PostRunReflectionNode(AgentNode):
+    """
+    P1-1: Self-reflection node — writes a structured retrospective after each pipeline run.
+
+    TradingGroup (arXiv 2025) pattern: agents record *why* a result succeeded or failed,
+    not just the raw metrics. Future runs retrieve these reflections via MemoryRecallNode
+    to improve generation quality iteratively.
+
+    Stores:
+    - ``state.results["reflection"]`` — structured dict in the current run
+    - HierarchicalMemory (EPISODIC, tagged "reflection") — persisted for future recall
+
+    Wired: memory_update → reflection → report
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="reflection",
+            description="Write structured retrospective after pipeline run (TradingGroup pattern)",
+            timeout=10.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        backtest = state.get_result("backtest") or {}
+        metrics = backtest.get("metrics", {}) or {}
+        analysis = state.get_result("backtest_analysis") or {}
+        selected = state.get_result("select_best") or {}
+        market = state.get_result("analyze_market") or {}
+
+        symbol = state.context.get("symbol", "BTCUSDT")
+        timeframe = state.context.get("timeframe", "15")
+        regime = market.get("regime", "unknown")
+        sharpe = metrics.get("sharpe_ratio")
+        dd = metrics.get("max_drawdown")
+        trades = metrics.get("total_trades")
+        passed = analysis.get("passed", False)
+        root_cause = analysis.get("root_cause", "unknown")
+        severity = analysis.get("severity", "unknown")
+        wf = state.context.get("wf_validation", {})
+        wf_ratio = wf.get("ratio")
+        errors = state.errors
+
+        # ── What worked ─────────────────────────────────────────────────────
+        what_worked: list[str] = []
+        if passed:
+            what_worked.append(f"Strategy passed acceptance criteria (Sharpe={sharpe:.2f})")
+        if trades and trades >= 10:
+            what_worked.append(f"Sufficient trade count ({trades} trades)")
+        if wf_ratio and wf_ratio >= 0.5:
+            what_worked.append(f"Walk-forward stable (wf/is ratio={wf_ratio:.2f})")
+        if not errors:
+            what_worked.append("Pipeline completed without errors")
+
+        # ── What failed ─────────────────────────────────────────────────────
+        what_failed: list[str] = []
+        if not passed:
+            what_failed.append(f"Strategy did not pass: severity={severity}, root_cause={root_cause}")
+        if sharpe is not None and sharpe <= 0:
+            what_failed.append(f"Negative Sharpe ratio ({sharpe:.2f})")
+        if dd is not None and dd >= 25.0:
+            what_failed.append(f"High drawdown ({dd:.1f}%)")
+        if wf_ratio is not None and wf_ratio < 0.5:
+            what_failed.append(f"Walk-forward overfitting detected (ratio={wf_ratio:.2f} < 0.5)")
+        if errors:
+            what_failed.extend([f"Error in {e['node']}: {e['error_message'][:80]}" for e in errors[:3]])
+
+        # ── Recommended adjustments ──────────────────────────────────────────
+        adjustments: list[str] = []
+        if root_cause == "direction_mismatch":
+            adjustments.append("Verify signal direction matches backtest direction setting")
+        elif root_cause == "no_signal":
+            adjustments.append("Add condition blocks or relax indicator thresholds to generate signals")
+        elif root_cause == "sl_too_tight":
+            adjustments.append("Increase stop-loss distance (e.g., ATR-based SL instead of fixed %)")
+        elif root_cause == "poor_risk_reward":
+            adjustments.append("Improve risk/reward ratio: widen TP or tighten SL")
+        elif root_cause == "low_activity":
+            adjustments.append("Reduce indicator period or oversold/overbought thresholds to increase signal frequency")
+        if regime in ("ranging", "low_vol"):
+            adjustments.append(f"In {regime} regime: prefer mean-reversion strategies (BB, RSI) over trend-following")
+        elif regime in ("trending_bull", "trending_bear"):
+            adjustments.append(f"In {regime} regime: prefer trend-following (EMA crossover, Supertrend) over oscillators")
+
+        reflection = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "regime": regime,
+            "passed": passed,
+            "sharpe_ratio": sharpe,
+            "max_drawdown": dd,
+            "total_trades": trades,
+            "severity": severity,
+            "root_cause": root_cause,
+            "what_worked": what_worked,
+            "what_failed": what_failed,
+            "recommended_adjustments": adjustments,
+            "wf_ratio": wf_ratio,
+            "llm_call_count": state.llm_call_count,
+            "total_cost_usd": round(state.total_cost_usd, 6),
+        }
+        state.set_result(self.name, reflection)
+
+        # ── Persist to HierarchicalMemory for future recall ──────────────────
+        reflection_text = (
+            f"Run reflection for {symbol}/{timeframe} regime={regime}: "
+            f"passed={passed}, sharpe={sharpe}, dd={dd:.1f}% if dd else '?', trades={trades}. "
+            f"What worked: {'; '.join(what_worked) or 'nothing'}. "
+            f"What failed: {'; '.join(what_failed) or 'nothing'}. "
+            f"Adjustments: {'; '.join(adjustments) or 'none'}."
+        )
+        importance = 0.6 if passed else 0.3  # failed runs are still valuable
+
+        try:
+            from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
+
+            memory = HierarchicalMemory()
+            await memory.store(
+                content=reflection_text,
+                memory_type=MemoryType.EPISODIC,
+                importance=importance,
+                tags=["reflection", symbol, timeframe, regime, "passed" if passed else "failed"],
+                metadata={
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "regime": regime,
+                    "passed": passed,
+                    "sharpe_ratio": sharpe,
+                    "root_cause": root_cause,
+                    "adjustments": adjustments,
+                },
+                source="post_run_reflection",
+                agent_namespace="strategy_gen",
+            )
+            logger.info(f"🪞 [Reflection] Stored retrospective (passed={passed}, sharpe={sharpe})")
+        except Exception as exc:
+            logger.warning(f"[Reflection] Memory store failed (non-fatal): {exc}")
+
+        return state
+
+
+# =============================================================================
+# P1-2: Walk-forward validation gate
+# =============================================================================
+
+
+class WalkForwardValidationNode(AgentNode):
+    """
+    P1-2: Walk-forward overfitting gate.
+
+    Academic consensus (TradingAgents, AI-Trader, StockBench, 2025):
+    In-sample Sharpe alone is the primary failure mode of AI-generated strategies.
+    Any strategy that passes the BacktestAnalysisNode must also survive walk-forward
+    validation before proceeding to optimization.
+
+    Acceptance criterion:
+        wf_sharpe / is_sharpe >= WF_RATIO_THRESHOLD (0.5)
+
+    If the walk-forward Sharpe is less than half the in-sample Sharpe, the strategy
+    is flagged as overfitted and the refinement loop is re-triggered.
+
+    Result stored in:
+    - ``state.context["wf_validation"]`` — {passed, wf_sharpe, is_sharpe, ratio, windows}
+    - ``state.results["wf_validation"]`` — same dict
+
+    Wired: backtest_analysis (passes) → wf_validation → [optimize | refine]
+    """
+
+    WF_RATIO_THRESHOLD: float = 0.5  # wf_sharpe / is_sharpe must exceed this
+    TRAIN_MONTHS: int = 3            # walk-forward training window
+    TEST_MONTHS: int = 1             # walk-forward test window
+    MIN_BARS_FOR_WF: int = 200       # skip WF if fewer bars available
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="wf_validation",
+            description="Walk-forward overfitting gate (wf_sharpe/is_sharpe >= 0.5)",
+            timeout=60.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        backtest_result = state.get_result("backtest") or {}
+        metrics = backtest_result.get("metrics", {}) or {}
+        is_sharpe: float = float(metrics.get("sharpe_ratio", 0.0))
+        strategy_graph = state.context.get("strategy_graph") or backtest_result.get("strategy_graph")
+        df: pd.DataFrame | None = state.context.get("df")
+
+        # Skip if no graph, no data, or in-sample sharpe already negative
+        if strategy_graph is None or df is None or df.empty or is_sharpe <= 0:
+            result = {
+                "passed": True,  # don't block on missing inputs
+                "skipped": True,
+                "reason": "no_graph_or_negative_is_sharpe",
+                "is_sharpe": is_sharpe,
+            }
+            state.set_result(self.name, result)
+            state.context["wf_validation"] = result
+            logger.debug(f"[WF] Skipped walk-forward: {result['reason']}")
+            return state
+
+        if len(df) < self.MIN_BARS_FOR_WF:
+            result = {
+                "passed": True,
+                "skipped": True,
+                "reason": f"insufficient_bars ({len(df)} < {self.MIN_BARS_FOR_WF})",
+                "is_sharpe": is_sharpe,
+            }
+            state.set_result(self.name, result)
+            state.context["wf_validation"] = result
+            return state
+
+        # Run lightweight rolling walk-forward
+        wf_sharpes: list[float] = []
+        try:
+            wf_sharpes = await asyncio.to_thread(
+                self._run_rolling_wf, strategy_graph, df, is_sharpe
+            )
+        except Exception as exc:
+            logger.warning(f"[WF] Walk-forward failed (non-fatal): {exc}")
+            result = {"passed": True, "skipped": True, "reason": f"wf_error: {exc}", "is_sharpe": is_sharpe}
+            state.set_result(self.name, result)
+            state.context["wf_validation"] = result
+            return state
+
+        wf_sharpe = sum(wf_sharpes) / len(wf_sharpes) if wf_sharpes else 0.0
+        ratio = wf_sharpe / is_sharpe if is_sharpe != 0 else 0.0
+        passed = ratio >= self.WF_RATIO_THRESHOLD
+
+        result = {
+            "passed": passed,
+            "skipped": False,
+            "is_sharpe": round(is_sharpe, 4),
+            "wf_sharpe": round(wf_sharpe, 4),
+            "ratio": round(ratio, 4),
+            "windows": len(wf_sharpes),
+            "threshold": self.WF_RATIO_THRESHOLD,
+        }
+        state.set_result(self.name, result)
+        state.context["wf_validation"] = result
+
+        if passed:
+            logger.info(f"✅ [WF] Walk-forward passed: ratio={ratio:.2f} ({wf_sharpe:.2f}/{is_sharpe:.2f})")
+        else:
+            logger.warning(
+                f"⚠️ [WF] Overfitting detected: ratio={ratio:.2f} < {self.WF_RATIO_THRESHOLD} "
+                f"(wf={wf_sharpe:.2f}, is={is_sharpe:.2f}) — flagging for refinement"
+            )
+            # Inject into backtest_analysis so _should_refine sees it
+            analysis = state.context.get("backtest_analysis", {})
+            analysis["passed"] = False
+            analysis["wf_failed"] = True
+            state.context["backtest_analysis"] = analysis
+
+        return state
+
+    def _run_rolling_wf(
+        self, strategy_graph: dict, df: pd.DataFrame, is_sharpe: float
+    ) -> list[float]:
+        """Synchronous: run rolling walk-forward windows, return list of test Sharpes."""
+        from backend.backtesting.engine import BacktestEngine
+        from backend.backtesting.models import BacktestConfig
+        from backend.config.constants import COMMISSION_TV
+
+        bars_per_month = max(1, len(df) // 12)  # approximate
+        train_bars = self.TRAIN_MONTHS * bars_per_month
+        test_bars = self.TEST_MONTHS * bars_per_month
+        step_bars = test_bars
+
+        results: list[float] = []
+        i = 0
+        while i + train_bars + test_bars <= len(df):
+            test_slice = df.iloc[i + train_bars: i + train_bars + test_bars]
+            if len(test_slice) < 30:
+                break
+            try:
+                config = BacktestConfig(
+                    initial_capital=10000.0,
+                    commission_value=COMMISSION_TV,
+                    direction="both",
+                )
+                engine = BacktestEngine(config)
+                bt_result = engine.run(test_slice, strategy_graph)
+                sharpe = (bt_result.metrics or {}).get("sharpe_ratio", 0.0)
+                results.append(float(sharpe))
+            except Exception:
+                results.append(0.0)
+            i += step_bars
+
+        return results
+
+
 def _backtest_passes(state: AgentState) -> bool:
     """Return True if backtest metrics meet acceptance criteria.
 
@@ -2031,13 +2364,21 @@ def _report_node(state: AgentState) -> AgentState:
 def build_trading_strategy_graph(
     run_backtest: bool = True,
     run_debate: bool = True,
+    run_wf_validation: bool = True,
+    checkpoint_enabled: bool = False,
 ) -> AgentGraph:
     """
     Build the full Trading Strategy generation graph.
 
     Args:
-        run_backtest: If True, includes the backtest + memory_update nodes
-        run_debate:   If True, includes the MAD debate node before generation
+        run_backtest:       If True, includes backtest + memory_update nodes
+        run_debate:         If True, includes the MAD debate node before generation
+        run_wf_validation:  If True (default), adds WalkForwardValidationNode as an
+                            overfitting gate between backtest_analysis and optimize.
+                            P1-2: wf_sharpe/is_sharpe < 0.5 → re-triggers refinement.
+        checkpoint_enabled: If True (default False), attach a SQLite checkpointer that
+                            persists AgentState after every node transition.
+                            P1-4: enables resume-after-crash and run audit trail.
 
     Returns:
         AgentGraph ready for execution
@@ -2053,15 +2394,16 @@ def build_trading_strategy_graph(
                                                                                  │
                                                                         backtest_analysis
                                                                                  ├── fails, iter < 3 → refine_strategy (loop)
-                                                                                 └── passes / max iter → optimize_strategy (Phase 6)
+                                                                                 └── passes / max iter → [wf_validation →] optimize_strategy
                                                                                                                │
-                                                                                                        ml_validation (Phase 7)
+                                                                                                        ml_validation
                                                                                                                │
-                                                                                                        memory_update → report → END
+                                                                                                        memory_update → reflection → report → END
     """
     graph = AgentGraph(
         name="trading_strategy_pipeline",
         description="AI-powered trading strategy generation with Self-MoA + MAD + ConsensusEngine",
+        checkpoint_fn=make_sqlite_checkpointer() if checkpoint_enabled else None,
     )
 
     # Add nodes
@@ -2091,26 +2433,43 @@ def build_trading_strategy_graph(
         graph.add_node(RefinementNode())
         graph.add_node(OptimizationNode())
         graph.add_node(MemoryUpdateNode())
+        graph.add_node(PostRunReflectionNode())  # P1-1
         graph.add_edge("select_best", "build_graph")
         graph.add_edge("build_graph", "backtest")
         graph.add_edge("backtest", "backtest_analysis")
 
-        # Conditional routing after backtest_analysis:
-        #   passes OR max iterations reached → optimize_strategy (Phase 6)
-        #   fails AND iterations left         → refine_strategy (loop)
-        backtest_router = ConditionalRouter(name="backtest_router")
-        backtest_router.add_route(_should_refine, "refine_strategy")
-        backtest_router.set_default("optimize_strategy")
-        graph.add_conditional_edges("backtest_analysis", backtest_router)
+        if run_wf_validation:
+            # P1-2: walk-forward gate between backtest_analysis and optimize
+            graph.add_node(WalkForwardValidationNode())
+            # Conditional routing after backtest_analysis:
+            #   fails AND iterations left → refine_strategy (loop)
+            #   passes / max iter         → wf_validation
+            backtest_router = ConditionalRouter(name="backtest_router")
+            backtest_router.add_route(_should_refine, "refine_strategy")
+            backtest_router.set_default("wf_validation")
+            graph.add_conditional_edges("backtest_analysis", backtest_router)
+
+            # After wf_validation: if WF flags overfitting → refine, else → optimize
+            wf_router = ConditionalRouter(name="wf_router")
+            wf_router.add_route(_should_refine, "refine_strategy")
+            wf_router.set_default("optimize_strategy")
+            graph.add_conditional_edges("wf_validation", wf_router)
+        else:
+            # No WF: original routing (backtest_analysis → refine or optimize)
+            backtest_router = ConditionalRouter(name="backtest_router")
+            backtest_router.add_route(_should_refine, "refine_strategy")
+            backtest_router.set_default("optimize_strategy")
+            graph.add_conditional_edges("backtest_analysis", backtest_router)
 
         # After refinement, loop back to regenerate strategies
         graph.add_edge("refine_strategy", "generate_strategies")
 
-        # Optimization → ML validation (Phase 7) → memory_update (non-blocking)
+        # Optimization → ML validation → memory_update → reflection (P1-1) → report
         graph.add_node(MLValidationNode())
         graph.add_edge("optimize_strategy", "ml_validation")
         graph.add_edge("ml_validation", "memory_update")
-        graph.add_edge("memory_update", "report")
+        graph.add_edge("memory_update", "reflection")   # P1-1: self-reflection before report
+        graph.add_edge("reflection", "report")
     else:
         graph.add_edge("select_best", "report")
 
@@ -2127,9 +2486,12 @@ async def run_strategy_pipeline(
     agents: list[str] | None = None,
     run_backtest: bool = False,
     run_debate: bool = True,
+    run_wf_validation: bool = True,
     initial_capital: float = INITIAL_CAPITAL,
     leverage: int = 1,
     pipeline_timeout: float = 300.0,
+    max_cost_usd: float = 0.0,
+    checkpoint_enabled: bool = False,
 ) -> AgentState:
     """
     Convenience function to run the full strategy generation pipeline.
@@ -2141,6 +2503,7 @@ async def run_strategy_pipeline(
         agents: LLM agents to use (default: ["deepseek"])
         run_backtest: Whether to backtest the generated strategy
         run_debate: Whether to run MAD debate before generation (default: True)
+        run_wf_validation: Whether to run walk-forward overfitting gate (P1-2, default True)
         initial_capital: Starting capital
         leverage: Trading leverage
         pipeline_timeout: Wall-clock timeout for the entire pipeline in seconds.
@@ -2148,11 +2511,21 @@ async def run_strategy_pipeline(
             (60–180 s); this cap prevents runaway refinement loops.
             On timeout, a partial AgentState is returned with a ``"pipeline"``
             error entry so callers can inspect partial results.
+        max_cost_usd: Hard LLM cost cap in USD (P1-5). 0.0 = unlimited (default).
+            When exceeded mid-pipeline, BudgetExceededError is caught and the
+            partial state is returned with a ``"budget"`` error entry.
+        checkpoint_enabled: If True, persist AgentState to SQLite after each node
+            (P1-4). Enables run audit trail and post-mortem debugging.
 
     Returns:
         AgentState with all results in state.results
     """
-    graph = build_trading_strategy_graph(run_backtest=run_backtest, run_debate=run_debate)
+    graph = build_trading_strategy_graph(
+        run_backtest=run_backtest,
+        run_debate=run_debate,
+        run_wf_validation=run_wf_validation,
+        checkpoint_enabled=checkpoint_enabled,
+    )
 
     initial_state = AgentState(
         context={
@@ -2162,7 +2535,8 @@ async def run_strategy_pipeline(
             "agents": agents or ["deepseek"],
             "initial_capital": initial_capital,
             "leverage": leverage,
-        }
+        },
+        max_cost_usd=max_cost_usd,  # P1-5: cost budget
     )
 
     try:
@@ -2179,6 +2553,14 @@ async def run_strategy_pipeline(
             "pipeline",
             TimeoutError(f"Pipeline exceeded {pipeline_timeout}s wall-clock limit"),
         )
+        return initial_state
+    except BudgetExceededError as exc:
+        # P1-5: cost budget exceeded — return partial state with budget error
+        logger.warning(
+            f"[Pipeline] Budget exceeded: ${exc.spent:.4f} > ${exc.limit:.4f} — "
+            f"returning partial state (nodes: {initial_state.visited_nodes})"
+        )
+        initial_state.add_error("budget", exc)
         return initial_state
 
     logger.info(

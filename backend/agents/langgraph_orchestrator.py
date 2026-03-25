@@ -105,9 +105,16 @@ class AgentState:
         return self.results.get(node)
 
     def record_llm_cost(self, cost_usd: float) -> None:
-        """Accumulate LLM API cost and increment call counter."""
+        """Accumulate LLM API cost and increment call counter.
+
+        Raises:
+            BudgetExceededError: if max_cost_usd > 0 and the new total exceeds it.
+        """
         self.total_cost_usd += cost_usd
         self.llm_call_count += 1
+        if self.max_cost_usd > 0 and self.total_cost_usd > self.max_cost_usd:
+            self.budget_exceeded = True
+            raise BudgetExceededError(self.total_cost_usd, self.max_cost_usd)
 
     def add_error(self, node: str, error: Exception):
         """Add an error to the state."""
@@ -350,10 +357,20 @@ class AgentGraph:
     Inspired by LangGraph patterns for multi-agent coordination.
     """
 
-    def __init__(self, name: str = "agent_graph", description: str = "", max_iterations: int = 50):
+    def __init__(
+        self,
+        name: str = "agent_graph",
+        description: str = "",
+        max_iterations: int = 50,
+        checkpoint_fn: Callable[[AgentState, str], None] | None = None,
+    ):
         self.name = name
         self.description = description
         self.max_iterations = max_iterations
+
+        # Optional checkpoint callback: called after each node with (state, node_name).
+        # Use make_sqlite_checkpointer() to persist state to SQLite.
+        self.checkpoint_fn = checkpoint_fn
 
         # Graph structure
         self.nodes: dict[str, AgentNode] = {}
@@ -501,6 +518,14 @@ class AgentGraph:
             else:
                 # Parallel execution
                 state = await self._execute_parallel(current_nodes, state)
+
+            # Checkpoint after every node transition (if configured)
+            if self.checkpoint_fn is not None:
+                try:
+                    completed = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
+                    self.checkpoint_fn(state, completed)
+                except Exception as _cp_exc:  # noqa: BLE001
+                    logger.debug(f"[Checkpoint] Non-critical error: {_cp_exc}")
 
             # Check for exit AFTER execution
             if all(n in self.exit_points for n in current_nodes):
@@ -702,3 +727,76 @@ def list_graphs() -> list[str]:
 
 # Register pre-built chains
 register_graph(TradingAnalysisChain.create_graph())
+
+
+# =============================================================================
+# Checkpoint helpers  (P1-4)
+# =============================================================================
+
+
+def make_sqlite_checkpointer(
+    db_path: str = "",
+    table: str = "pipeline_checkpoints",
+) -> Callable[[AgentState, str], None]:
+    """
+    Return a checkpoint function that persists AgentState snapshots to SQLite.
+
+    Each call stores (session_id, node_name, timestamp, state_json) so that
+    pipelines can be inspected or resumed after crashes.
+
+    Args:
+        db_path: SQLite file path.  Defaults to ``data/pipeline_checkpoints.db``.
+        table:   Table name (default ``pipeline_checkpoints``).
+
+    Returns:
+        A ``checkpoint_fn(state, node_name)`` callable for ``AgentGraph``.
+
+    Usage::
+
+        from backend.agents.langgraph_orchestrator import make_sqlite_checkpointer
+
+        graph = build_trading_strategy_graph()
+        graph.checkpoint_fn = make_sqlite_checkpointer()
+    """
+    import json
+    import os
+    import sqlite3
+    from datetime import UTC, datetime
+
+    if not db_path:
+        _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        db_path = os.path.join(_root, "data", "pipeline_checkpoints.db")
+
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    # Create table once
+    with sqlite3.connect(db_path) as _conn:
+        _conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                node_name   TEXT NOT NULL,
+                ts          TEXT NOT NULL,
+                state_json  TEXT NOT NULL
+            )
+            """
+        )
+        _conn.commit()
+
+    def _checkpoint(state: AgentState, node_name: str) -> None:
+        snapshot = {
+            "visited_nodes": state.visited_nodes,
+            "results_keys": list(state.results.keys()),
+            "errors": state.errors,
+            "total_cost_usd": state.total_cost_usd,
+            "llm_call_count": state.llm_call_count,
+            "budget_exceeded": state.budget_exceeded,
+        }
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                f"INSERT INTO {table} (session_id, node_name, ts, state_json) VALUES (?,?,?,?)",
+                (state.session_id, node_name, datetime.now(UTC).isoformat(), json.dumps(snapshot)),
+            )
+
+    return _checkpoint
