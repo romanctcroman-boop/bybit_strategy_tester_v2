@@ -2797,7 +2797,7 @@ function renderResultsList(results) {
 
       return `
                     <div class="result-item ${isSelected ? 'selected' : ''} ${isCheckedForDelete ? 'marked-for-delete' : ''}"
-                         data-id="${rowId}">
+                         data-id="${escapeHtml(rowId)}">
                         ${compareMode
           ? `
                             <input type="checkbox" class="form-check-input compare-checkbox me-2"
@@ -2819,11 +2819,11 @@ function renderResultsList(results) {
                             </div>
                             <div class="result-strategy">
                                 <span class="text-secondary" style="font-size:0.75rem;font-weight:600;">
-                                    ${r.config?.strategy_type || r.strategy_type || '—'}
+                                    ${escapeHtml(r.config?.strategy_type || r.strategy_type || '—')}
                                 </span>
                             </div>
                             <div class="result-meta">
-                                ${r.symbol} • ${r.interval}
+                                ${escapeHtml(r.symbol)} • ${escapeHtml(r.interval)}
                             </div>
                         </div>
                         <button class="btn btn-sm delete-btn"
@@ -4674,7 +4674,7 @@ function showToast(message, type = 'info') {
     'top: 80px; right: 20px; z-index: 9999; min-width: 250px;';
   toast.innerHTML = `
                 <i class="bi bi-${type === 'error' ? 'x-circle' : type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
-                ${message}
+                ${escapeHtml(message)}
             `;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
@@ -5207,7 +5207,7 @@ async function updatePriceChart(backtest) {
         `<div>Exit:&nbsp; <b>${exitPrice}</b></div>`,
         `<div>PnL:&nbsp;&nbsp; <b style="color:${pnlColor}">${pnlStr}</b></div>`,
         `<div>Dur:&nbsp;&nbsp; <b>${duration}</b></div>`,
-        `<div style="color:#8b949e;font-size:11px;margin-top:3px">${exitReason}</div>`
+        `<div style="color:#8b949e;font-size:11px;margin-top:3px">${escapeHtml(exitReason)}</div>`
       ].join('');
 
       // Position tooltip near the cursor but keep it inside the chart container
@@ -6913,19 +6913,19 @@ function renderWalkForwardViz(wfData) {
     const degrad = ((w.sharpe_degradation ?? 0) * 100).toFixed(1);
     const degradClass = (w.sharpe_degradation ?? 0) < 0 ? 'text-danger' : 'text-success';
     const bestParams = w.best_params
-      ? Object.entries(w.best_params).map(([k, v]) => `${k}=${v}`).join(', ')
+      ? Object.entries(w.best_params).map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(String(v))}`).join(', ')
       : '--';
 
     return `<tr>
       <td>${i + 1}</td>
-      <td class="text-secondary">${w.train_start ? w.train_start.slice(0, 10) : '--'}</td>
-      <td class="text-secondary">${w.test_end ? w.test_end.slice(0, 10) : '--'}</td>
+      <td class="text-secondary">${w.train_start ? escapeHtml(w.train_start.slice(0, 10)) : '--'}</td>
+      <td class="text-secondary">${w.test_end ? escapeHtml(w.test_end.slice(0, 10)) : '--'}</td>
       <td>${isSharpe}</td>
       <td>${oosSharpe}</td>
       <td class="${degradClass}">${degrad}%</td>
       <td>${isRet}%</td>
       <td>${oosRet}%</td>
-      <td class="text-secondary small">${bestParams}</td>
+      <td class="text-secondary small">${escapeHtml(bestParams)}</td>
     </tr>`;
   }).join('');
 
@@ -6958,7 +6958,7 @@ function renderWalkForwardViz(wfData) {
         const stab = (stats.stability_pct ?? 0).toFixed(1);
         const stabClass = parseFloat(stab) >= 70 ? 'text-success' : parseFloat(stab) >= 40 ? 'text-warning' : 'text-danger';
         return `<tr>
-          <td>${param}</td>
+          <td>${escapeHtml(param)}</td>
           <td>${(stats.mean ?? 0).toFixed(4)}</td>
           <td>${(stats.std ?? 0).toFixed(4)}</td>
           <td>${cv}%</td>
