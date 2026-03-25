@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(agents): P1+P2 agent improvements — reflection, walk-forward, few-shot, budget, checkpointing, regime, S²-MAD, HITL, streaming, composite score (2026-03-25)**
+
+    Two batches of improvements to the 13-node LangGraph pipeline, informed by 2025 academic literature (TradingGroup self-reflection, S²-MAD convergence detection, walk-forward acceptance gate, dynamic few-shot, Lee et al. 2025).
+
+    **P1 — Core Pipeline Hardening** (`backend/agents/langgraph_orchestrator.py`, `backend/agents/trading_strategy_graph.py`)
+
+    - **BudgetExceededError** (`P1-5`): `AgentState.max_cost_usd` + `record_llm_cost()` raises `BudgetExceededError` when limit exceeded mid-pipeline; `run_strategy_pipeline(max_cost_usd=0.0)` catches it and returns partial state with `"budget"` error entry
+    - **SQLite checkpointer** (`P1-4`): `make_sqlite_checkpointer(db_path)` factory — persists `(session_id, node_name, ts, state_json)` to `data/pipeline_checkpoints.db` after every node; attach via `build_trading_strategy_graph(checkpoint_enabled=True)`
+    - **PostRunReflectionNode** (`P1-1`): self-reflection node wired between `memory_update` and `report` — writes `{what_worked, what_failed, market_context, recommended_adjustments}` to `HierarchicalMemory(tag="reflection")` and `state.results["reflection"]`; non-fatal on memory errors
+    - **WalkForwardValidationNode** (`P1-2`): overfitting gate between `backtest_analysis` and `optimize_strategy` — runs rolling walk-forward (3M train / 1M test), checks `wf_sharpe / is_sharpe ≥ 0.5`; on fail sets `backtest_analysis.passed=False` → triggers refinement loop; skips gracefully when insufficient data
+    - **Dynamic few-shot injection** (`P1-3`): `MemoryRecallNode` formats top-3 past winning strategies as concrete examples → `state.context["few_shot_examples"]`; `GenerateStrategiesNode` prepends "Proven Strategy Examples" block before memory context in all LLM prompts
+    - **Tests**: `tests/backend/agents/test_p1_features.py` (35 tests, 6 classes: budget, checkpointer, reflection, walk-forward, few-shot, graph builder) — all passing
+
+    **P2 — Advanced Agent Capabilities** (`backend/agents/trading_strategy_graph.py`, `backend/agents/langgraph_orchestrator.py`, `backend/optimization/scoring.py`)
+
+    - **RegimeClassifierNode** (`P2-1`): deterministic regime classification (no LLM) — ADX proxy + ATR% + trend direction → 5-category taxonomy (`trending_bull`, `trending_bear`, `volatile_ranging`, `ranging`, `crypto_risk_off`) with confidence score; wired `analyze_market → regime_classifier → [debate/memory_recall]`
+    - **S²-MAD cosine similarity early stop** (`P2-2`): `DebateNode._cosine_similarity()` (bag-of-words) computes similarity between prior debate participant texts — if ≥ 0.9, skips re-debate; also logs per-round similarity; stores `_participant_texts` in `debate_consensus` for future checks
+    - **HITLCheckNode** (`P2-3`): human-in-the-loop checkpoint before `memory_update` — if `state.context["hitl_approved"] != True`, sets `hitl_pending=True` + `hitl_payload` (strategy summary, backtest metrics, regime) and routes to report early; approve by re-calling with `hitl_approved=True`; wired via `build_trading_strategy_graph(hitl_enabled=True)`
+    - **Pipeline event streaming** (`P2-4`): `make_pipeline_event_queue()` → `(asyncio.Queue, event_fn)` pair; `AgentGraph.event_fn` fires after each node with `{node, status, session_id, iteration, has_result, errors}` dict; attach via `build_trading_strategy_graph(event_fn=...)` or `run_strategy_pipeline(event_fn=...)`
+    - **Composite quality score** (`P2-5`): `composite_quality_score(result)` in `backend/optimization/scoring.py` — formula: `Sharpe × Sortino × log(1+trades) / (1 + max_dd_frac)`, capped at 1000; available as `metric="composite_quality"` in `calculate_composite_score()`
+    - **Tests**: `tests/backend/agents/test_p2_features.py` (45 tests, 8 classes: regime classifier, S²-MAD, HITL, event queue, composite score, graph builder params) — all passing
+
+    **Files changed**: `backend/agents/trading_strategy_graph.py` (+RegimeClassifierNode, HITLCheckNode, DebateNode._cosine_similarity, updated build/run functions), `backend/agents/langgraph_orchestrator.py` (+BudgetExceededError, make_sqlite_checkpointer, make_pipeline_event_queue, AgentGraph.event_fn), `backend/optimization/scoring.py` (+composite_quality_score), `tests/backend/agents/test_p1_features.py` (new, 35 tests), `tests/backend/agents/test_p2_features.py` (new, 45 tests)
+
 - **feat: 10/10 readiness — real API pipeline tests, load tests, DebateROITracker (2026-03-25)**
 
     Final three items closing the gap from 9.5/10 → 10/10:
