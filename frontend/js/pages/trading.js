@@ -215,7 +215,7 @@ function initCharts() {
         handleScroll: { vertTouchDrag: false }
     });
 
-    candleSeries = chart.addCandlestickSeries({
+    candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
         upColor: '#00c853',
         downColor: '#ff1744',
         borderDownColor: '#ff1744',
@@ -252,13 +252,13 @@ function initCharts() {
         }
     });
 
-    volumeSeries = volumeChart.addHistogramSeries({
+    volumeSeries = volumeChart.addSeries(LightweightCharts.HistogramSeries, {
         priceFormat: { type: 'volume' },
         priceScaleId: ''
     });
 
     // SMA line on volume
-    volumeSmaSeries = volumeChart.addLineSeries({
+    volumeSmaSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#58a6ff',
         lineWidth: 1,
         priceScaleId: '',

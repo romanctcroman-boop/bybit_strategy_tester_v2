@@ -11,8 +11,8 @@
     <title>Tick Chart - Bybit Strategy Tester</title>
     <!-- Production Init (must load before all other scripts) -->
     <script src="js/init-production.js"></script>
-    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"
-        integrity="sha384-rcCMiCptH4kTlEbg0euOTUKWe72TESbrjElatnG+9BfbmUIV268UK/Pro5biJdGm"
+    <script
+        src="https://cdn.jsdelivr.net/npm/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"
         crossorigin="anonymous"></script>
     <link rel="stylesheet" href="./css/tick_chart.css">
     <script src="js/core/auto-event-binding.js"></script>
@@ -52,7 +52,7 @@
             <button id="stopBtn" class="stop hidden" onclick="stopTickService()">⏹ Stop</button>
         </div>
     </div>
-    
+
     <div class="main-container">
         <div class="chart-container">
             <div id="tickChart"></div>
@@ -67,15 +67,15 @@
                 ▶▶ Now
             </button>
         </div>
-        
+
         <div class="sidebar">
             <div class="sidebar-header">📈 Live Stats</div>
-            
+
             <div class="status-indicator">
                 <div class="status-dot" id="statusDot"></div>
                 <span class="status-text" id="statusText">Disconnected</span>
             </div>
-            
+
             <div class="current-candle-info">
                 <div class="title">Current Candle Progress</div>
                 <div class="progress-bar">
@@ -86,7 +86,7 @@
                 </div>
                 <div class="eta-text" id="etaText">ETA: calculating...</div>
             </div>
-            
+
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-label">Current Ticks</div>
@@ -114,7 +114,7 @@
                     <div class="stat-sub" id="fpsStat">60 FPS</div>
                 </div>
             </div>
-            
+
             <div class="sidebar-header">🔄 Recent Trades</div>
             <div class="trades-list" id="tradesList"></div>
         </div>

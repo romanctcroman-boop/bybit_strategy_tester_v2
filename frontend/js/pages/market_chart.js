@@ -69,6 +69,8 @@ const COMPARE_COLORS = ['#58a6ff', '#00c853', '#d29922', '#ff1744', '#a371f7', '
 let chart = null;
 let volumeChart = null;
 let candleSeries = null;
+// eslint-disable-next-line prefer-const -- reassigned after series creation
+let _candleMarkersPrimitive = null; // v5: createSeriesMarkers primitive for candleSeries
 let volumeSeries = null;
 let volumeSmaSeries = null;
 
@@ -163,32 +165,24 @@ function safeSetData(series, data, seriesName = 'series') {
 
 // Patch LightweightCharts series creation so ANY setData call is filtered.
 // This protects against crashes from other indicator paths that still call series.setData directly.
+// v5: all series are created via chart.addSeries(SeriesType, options).
 function patchSeriesSetData(chartObj, chartName) {
     if (!chartObj || chartObj.__setDataPatched) return;
-    const methods = [
-        'addLineSeries',
-        'addHistogramSeries',
-        'addAreaSeries',
-        'addBaselineSeries',
-        'addCandlestickSeries'
-    ];
-    for (const m of methods) {
-        const orig = chartObj[m];
-        if (typeof orig !== 'function') continue;
-        chartObj[m] = function (...args) {
-            const series = orig.apply(this, args);
-            if (series && typeof series.setData === 'function' && !series.__setDataWrapped) {
-                const seriesLabel = `${chartName}.${m}`;
-                const origSetData = series.setData.bind(series);
-                series.setData = function (data) {
-                    // Always sanitize BEFORE reaching LightweightCharts.
-                    safeSetData({ setData: origSetData }, data, seriesLabel);
-                };
-                series.__setDataWrapped = true;
-            }
-            return series;
-        };
-    }
+    const origAddSeries = chartObj.addSeries;
+    if (typeof origAddSeries !== 'function') return;
+    chartObj.addSeries = function (...args) {
+        const series = origAddSeries.apply(this, args);
+        if (series && typeof series.setData === 'function' && !series.__setDataWrapped) {
+            const seriesLabel = `${chartName}.addSeries`;
+            const origSetData = series.setData.bind(series);
+            series.setData = function (data) {
+                // Always sanitize BEFORE reaching LightweightCharts.
+                safeSetData({ setData: origSetData }, data, seriesLabel);
+            };
+            series.__setDataWrapped = true;
+        }
+        return series;
+    };
     chartObj.__setDataPatched = true;
 }
 
@@ -471,7 +465,7 @@ function initCharts() {
     // Wrap all future series.setData calls on this chart.
     patchSeriesSetData(chart, 'chart');
 
-    candleSeries = chart.addCandlestickSeries({
+    candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
         upColor: '#00c853',       // Brighter green like Bybit
         downColor: '#ff1744',      // Brighter red like Bybit
         borderDownColor: '#ff1744',
@@ -484,6 +478,7 @@ function initCharts() {
             minMove: 0.01
         }
     });
+    _candleMarkersPrimitive = LightweightCharts.createSeriesMarkers(candleSeries, []);
 
     // Volume chart
     const volumeContainer = document.getElementById('volumeChart');
@@ -516,7 +511,7 @@ function initCharts() {
     // Force initial resize to ensure alignment
     resizeCharts();
 
-    volumeSeries = volumeChart.addHistogramSeries({
+    volumeSeries = volumeChart.addSeries(LightweightCharts.HistogramSeries, {
         priceFormat: {
             type: 'custom',
             minMove: 1,
@@ -537,7 +532,7 @@ function initCharts() {
     });
 
     // Volume SMA 9 line (like Bybit)
-    volumeSmaSeries = volumeChart.addLineSeries({
+    volumeSmaSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#58a6ff',
         lineWidth: 1,
         // priceScaleId: 'right', // Default
@@ -1747,7 +1742,7 @@ function addIndicator(indicator) {
 function addSMA(data, period, color) {
     const smaData = calculateSMA(data, period);
     // console.log('[SMA] Period:', period, 'Data points:', smaData.length);
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LightweightCharts.LineSeries, {
         color: color,
         lineWidth: 2,
         priceLineVisible: false,
@@ -1761,7 +1756,7 @@ function addSMA(data, period, color) {
 function addEMA(data, period, color) {
     const emaData = calculateEMA(data, period);
     // console.log('[EMA] Period:', period, 'Data points:', emaData.length);
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LightweightCharts.LineSeries, {
         color: color,
         lineWidth: 2,
         priceLineVisible: false,
@@ -1776,7 +1771,7 @@ function addBollingerBands(data) {
     const bb = calculateBollingerBands(data, 20, 2);
     // console.log('[BB] Upper:', bb.upper.length, 'Middle:', bb.middle.length, 'Lower:', bb.lower.length);
 
-    const upperSeries = chart.addLineSeries({
+    const upperSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: 'rgba(139, 148, 158, 0.7)',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Solid,
@@ -1786,7 +1781,7 @@ function addBollingerBands(data) {
     upperSeries.setData(bb.upper);
     indicatorSeries['bb-upper'] = upperSeries;
 
-    const middleSeries = chart.addLineSeries({
+    const middleSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#58a6ff',
         lineWidth: 1,
         priceLineVisible: false,
@@ -1796,7 +1791,7 @@ function addBollingerBands(data) {
     middleSeries.setData(bb.middle);
     indicatorSeries['bb-middle'] = middleSeries;
 
-    const lowerSeries = chart.addLineSeries({
+    const lowerSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: 'rgba(139, 148, 158, 0.7)',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Solid,
@@ -1811,7 +1806,7 @@ function addBollingerBands(data) {
 function addRSI(data, period) {
     const rsiData = calculateRSI(data, period);
     // Create RSI line on volume chart area (since it's 0-100 scale)
-    const rsiSeries = volumeChart.addLineSeries({
+    const rsiSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#a855f7',
         lineWidth: 2,
         priceScaleId: 'rsi',
@@ -1829,7 +1824,7 @@ function addRSI(data, period) {
     const rsi70 = data.map(d => ({ time: d.time, value: 70 }));
     const rsi30 = data.map(d => ({ time: d.time, value: 30 }));
 
-    const rsi70Series = volumeChart.addLineSeries({
+    const rsi70Series = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#f85149',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
@@ -1840,7 +1835,7 @@ function addRSI(data, period) {
     rsi70Series.setData(rsi70);
     indicatorSeries['rsi-70'] = rsi70Series;
 
-    const rsi30Series = volumeChart.addLineSeries({
+    const rsi30Series = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#3fb950',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
@@ -1857,7 +1852,7 @@ function addMACD(data, fast, slow, signal) {
     const macdResult = calculateMACD(data, fast, slow, signal);
 
     // MACD histogram on volume chart
-    const histogramSeries = volumeChart.addHistogramSeries({
+    const histogramSeries = volumeChart.addSeries(LightweightCharts.HistogramSeries, {
         priceScaleId: 'macd',
         priceLineVisible: false,
         lastValueVisible: false
@@ -1866,7 +1861,7 @@ function addMACD(data, fast, slow, signal) {
     indicatorSeries['macd-histogram'] = histogramSeries;
 
     // MACD line
-    const macdLine = volumeChart.addLineSeries({
+    const macdLine = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#58a6ff',
         lineWidth: 1,
         priceScaleId: 'macd',
@@ -1877,7 +1872,7 @@ function addMACD(data, fast, slow, signal) {
     indicatorSeries['macd-line'] = macdLine;
 
     // Signal line
-    const signalLine = volumeChart.addLineSeries({
+    const signalLine = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#f97316',
         lineWidth: 1,
         priceScaleId: 'macd',
@@ -1896,7 +1891,7 @@ function addMACD(data, fast, slow, signal) {
 // VWAP - Volume Weighted Average Price
 function addVWAP(data) {
     const vwapData = calculateVWAPIndicator(data);
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#06b6d4',
         lineWidth: 2,
         priceLineVisible: false,
@@ -1910,7 +1905,7 @@ function addVWAP(data) {
 function addStochastic(data, kPeriod, kSmooth, dPeriod) {
     const stochData = calculateStochastic(data, kPeriod, kSmooth, dPeriod);
 
-    const kLine = volumeChart.addLineSeries({
+    const kLine = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#3b82f6',
         lineWidth: 1,
         priceScaleId: 'stoch',
@@ -1920,7 +1915,7 @@ function addStochastic(data, kPeriod, kSmooth, dPeriod) {
     kLine.setData(stochData.k);
     indicatorSeries['stoch-k'] = kLine;
 
-    const dLine = volumeChart.addLineSeries({
+    const dLine = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#f97316',
         lineWidth: 1,
         priceScaleId: 'stoch',
@@ -1939,7 +1934,7 @@ function addStochastic(data, kPeriod, kSmooth, dPeriod) {
 // ATR - Average True Range
 function addATR(data, period) {
     const atrData = calculateATR(data, period);
-    const series = volumeChart.addLineSeries({
+    const series = volumeChart.addSeries(LightweightCharts.LineSeries, {
         color: '#eab308',
         lineWidth: 1,
         priceScaleId: 'atr',
@@ -1965,7 +1960,7 @@ function addIchimoku(data) {
     }
 
     // Tenkan-sen (Conversion Line) - blue, fast line
-    const tenkanSeries = chart.addLineSeries({
+    const tenkanSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#2563eb',
         lineWidth: 1,
         priceLineVisible: false,
@@ -1976,7 +1971,7 @@ function addIchimoku(data) {
     indicatorSeries['ichimoku-tenkan'] = tenkanSeries;
 
     // Kijun-sen (Base Line) - maroon, slow line
-    const kijunSeries = chart.addLineSeries({
+    const kijunSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#dc2626',
         lineWidth: 1,
         priceLineVisible: false,
@@ -1987,7 +1982,7 @@ function addIchimoku(data) {
     indicatorSeries['ichimoku-kijun'] = kijunSeries;
 
     // Senkou Span A (Leading Span A) - green cloud boundary
-    const senkouASeries = chart.addLineSeries({
+    const senkouASeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: 'rgba(34, 197, 94, 0.6)',
         lineWidth: 1,
         priceLineVisible: false,
@@ -1997,7 +1992,7 @@ function addIchimoku(data) {
     indicatorSeries['ichimoku-senkouA'] = senkouASeries;
 
     // Senkou Span B (Leading Span B) - red cloud boundary
-    const senkouBSeries = chart.addLineSeries({
+    const senkouBSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: 'rgba(239, 68, 68, 0.6)',
         lineWidth: 1,
         priceLineVisible: false,
@@ -2007,7 +2002,7 @@ function addIchimoku(data) {
     indicatorSeries['ichimoku-senkouB'] = senkouBSeries;
 
     // Chikou Span (Lagging Span) - purple, lagging close
-    const chikouSeries = chart.addLineSeries({
+    const chikouSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#8b5cf6',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
@@ -2031,7 +2026,7 @@ function addPivotPoints(data) {
     };
 
     Object.entries(pivots).forEach(([key, lineData]) => {
-        const series = chart.addLineSeries({
+        const series = chart.addSeries(LightweightCharts.LineSeries, {
             color: colors[key] || '#8b949e',
             lineWidth: 1,
             lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -2077,7 +2072,7 @@ function addSuperTrend(data, period, multiplier) {
 
     // Bullish line (green - below price in uptrend)
     if (bullishData.length > 0) {
-        const upSeries = chart.addLineSeries({
+        const upSeries = chart.addSeries(LightweightCharts.LineSeries, {
             color: '#22c55e',
             lineWidth: 2,
             priceLineVisible: false,
@@ -2090,7 +2085,7 @@ function addSuperTrend(data, period, multiplier) {
 
     // Bearish line (red - above price in downtrend)
     if (bearishData.length > 0) {
-        const downSeries = chart.addLineSeries({
+        const downSeries = chart.addSeries(LightweightCharts.LineSeries, {
             color: '#ef4444',
             lineWidth: 2,
             priceLineVisible: false,
@@ -2471,7 +2466,7 @@ let compareBaseline = null;
 
 function addCompareBaseline() {
     if (compareBaseline) return;
-    compareBaseline = chart.addLineSeries({
+    compareBaseline = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#666',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -2507,7 +2502,7 @@ function addToCompare(symbol) {
     }
 
     const color = COMPARE_COLORS[compareSymbols.length];
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LightweightCharts.LineSeries, {
         color: color,
         lineWidth: 2,
         priceLineVisible: true,
@@ -3623,7 +3618,7 @@ function applyVolumeIndicators() {
         const smaPoints = buildAlignedPoints(smaData, Math.max(0, volumeSettings.smaPeriod - 1));
 
         if (!volumeSmaSeries) {
-            volumeSmaSeries = volumeChart.addLineSeries({
+            volumeSmaSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
                 color: '#2196F3',
                 lineWidth: 2,
                 priceScaleId: 'volume',
@@ -3644,7 +3639,7 @@ function applyVolumeIndicators() {
         const emaPoints = buildAlignedPoints(emaData, 0);
 
         if (!volumeEmaSeries) {
-            volumeEmaSeries = volumeChart.addLineSeries({
+            volumeEmaSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
                 color: '#FF9800',
                 lineWidth: 2,
                 priceScaleId: 'volume',
@@ -3678,7 +3673,7 @@ function applyVolumeIndicators() {
             : [];
 
         if (!volumeBBUpperSeries) {
-            volumeBBUpperSeries = volumeChart.addLineSeries({
+            volumeBBUpperSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
                 color: 'rgba(156, 39, 176, 0.7)',
                 lineWidth: 1,
                 lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -3686,7 +3681,7 @@ function applyVolumeIndicators() {
                 lastValueVisible: false,
                 priceLineVisible: false
             });
-            volumeBBLowerSeries = volumeChart.addLineSeries({
+            volumeBBLowerSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
                 color: 'rgba(156, 39, 176, 0.7)',
                 lineWidth: 1,
                 lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -3718,7 +3713,7 @@ function applyVolumeIndicators() {
             // Only create series if calculateVWAP returned valid data.
             if (Array.isArray(vwapData) && vwapData.length > 0) {
                 if (!vwapSeries) {
-                    vwapSeries = chart.addLineSeries({
+                    vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
                         color: '#E91E63',
                         lineWidth: 2,
                         lastValueVisible: true,
@@ -3748,7 +3743,7 @@ function applyVolumeIndicators() {
         const obvData = calculateOBV(currentCandles, currentVolumes);
 
         if (!obvSeries) {
-            obvSeries = volumeChart.addLineSeries({
+            obvSeries = volumeChart.addSeries(LightweightCharts.LineSeries, {
                 color: '#00BCD4',
                 lineWidth: 2,
                 priceScaleId: 'obv',
@@ -3772,7 +3767,7 @@ function applyVolumeIndicators() {
         const deltaData = calculateVolumeDelta(currentCandles, currentVolumes);
 
         if (!volumeDeltaSeries) {
-            volumeDeltaSeries = volumeChart.addHistogramSeries({
+            volumeDeltaSeries = volumeChart.addSeries(LightweightCharts.HistogramSeries, {
                 priceScaleId: 'delta',
                 priceFormat: { type: 'volume' },
                 lastValueVisible: false,
@@ -4292,9 +4287,9 @@ function renderTradeMarkers(enabled) {
                 });
             }
         }
-        candleSeries.setMarkers(markers);
+        _candleMarkersPrimitive?.setMarkers(markers);
     } else {
-        candleSeries.setMarkers([]);
+        _candleMarkersPrimitive?.setMarkers([]);
         // If patterns enabled, re-run updatePatternMarkers()
         const anyPatternEnabled = chartSettings.patternDoji || chartSettings.patternHammer;
         if (anyPatternEnabled) {
@@ -4736,7 +4731,7 @@ function updatePatternMarkers() {
         }
 
         // Set markers on chart
-        candleSeries.setMarkers(markers);
+        _candleMarkersPrimitive?.setMarkers(markers);
         patternMarkers = markers;
 
         if (markers.length > 0) {
@@ -4749,7 +4744,7 @@ function updatePatternMarkers() {
 
 function clearPatternMarkers() {
     if (candleSeries) {
-        candleSeries.setMarkers([]);
+        _candleMarkersPrimitive?.setMarkers([]);
         patternMarkers = [];
     }
 }

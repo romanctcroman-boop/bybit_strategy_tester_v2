@@ -108,7 +108,7 @@ function initChart() {
         }
     });
 
-    candleSeries = chart.addCandlestickSeries({
+    candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
         upColor: '#00c853',
         downColor: '#ff1744',
         borderDownColor: '#ff1744',
@@ -117,7 +117,7 @@ function initChart() {
         wickUpColor: '#00c853'
     });
 
-    volumeSeries = chart.addHistogramSeries({
+    volumeSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
         color: '#2962ff',
         priceFormat: { type: 'volume' },
         priceScaleId: '',

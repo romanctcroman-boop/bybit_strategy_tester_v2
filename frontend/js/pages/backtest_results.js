@@ -116,6 +116,8 @@ let benchmarkingChart = null;
 // Price Chart (LightweightCharts candlestick)
 let btPriceChart = null;
 let btCandleSeries = null;
+// eslint-disable-next-line prefer-const -- reassigned when series is rebuilt
+let _btCandleMarkersPrimitive = null; // v5: createSeriesMarkers primitive for btCandleSeries
 // eslint-disable-next-line prefer-const -- reassigned on chart rebuild
 let _btVolumeSeries = null;          // histogram volume series (same chart, separate scale)
 // eslint-disable-next-line prefer-const -- populated on chart rebuild
@@ -2441,6 +2443,7 @@ function clearAllDisplayData() {
     btPriceChart.remove();
     btPriceChart = null;
     btCandleSeries = null;
+    _btCandleMarkersPrimitive = null;
     setPriceChart(null);
     setPriceChartCandleSeries(null);
   }
@@ -2793,11 +2796,11 @@ function renderResultsList(results) {
       const isCheckedForDelete = selectedForDelete.has(rowId);
 
       return `
-                    <div class="result-item ${isSelected ? 'selected' : ''} ${isCheckedForDelete ? 'marked-for-delete' : ''}" 
+                    <div class="result-item ${isSelected ? 'selected' : ''} ${isCheckedForDelete ? 'marked-for-delete' : ''}"
                          data-id="${rowId}">
                         ${compareMode
           ? `
-                            <input type="checkbox" class="form-check-input compare-checkbox me-2" 
+                            <input type="checkbox" class="form-check-input compare-checkbox me-2"
                                    ${isCompareSelected ? 'checked' : ''}>
                         `
           : `
@@ -2823,7 +2826,7 @@ function renderResultsList(results) {
                                 ${r.symbol} • ${r.interval}
                             </div>
                         </div>
-                        <button class="btn btn-sm delete-btn" 
+                        <button class="btn btn-sm delete-btn"
                                 title="Удалить">
                             <i class="bi bi-x-lg"></i>
                         </button>
@@ -4813,12 +4816,12 @@ function addNavigationHighlight(targetTimeSec, tradeInfo = null) {
     highlightMarker
   ].sort((a, b) => a.time - b.time);
 
-  btCandleSeries.setMarkers(markersWithHighlight);
+  _btCandleMarkersPrimitive?.setMarkers(markersWithHighlight);
 
   // Auto-remove highlight after 5 seconds, restore original markers
   setTimeout(() => {
-    if (btCandleSeries) {
-      btCandleSeries.setMarkers(btPriceChartMarkers);
+    if (btCandleSeries && _btCandleMarkersPrimitive) {
+      _btCandleMarkersPrimitive.setMarkers(btPriceChartMarkers);
     }
   }, 5000);
 }
@@ -4959,6 +4962,7 @@ async function updatePriceChart(backtest) {
       btPriceChart.remove();
       btPriceChart = null;
       btCandleSeries = null;
+      _btCandleMarkersPrimitive = null;
       _btVolumeSeries = null;
       _btOpenPositionLine = null;  // series was removed with the chart above
       _btDcaGridLines = [];        // series were removed with the chart above
@@ -5037,7 +5041,7 @@ async function updatePriceChart(backtest) {
       }
     });
 
-    btCandleSeries = btPriceChart.addCandlestickSeries({
+    btCandleSeries = btPriceChart.addSeries(LightweightCharts.CandlestickSeries, {
       upColor: '#26a69a',           // TV-standard teal green
       downColor: '#ef5350',         // TV-standard muted red
       borderDownColor: '#ef5350',
@@ -5046,11 +5050,13 @@ async function updatePriceChart(backtest) {
       wickUpColor: '#26a69a',
       lastValueVisible: false  // replaced by our two-row custom label; priceLineVisible stays true (dashed line kept)
     });
+    // v5: create markers primitive for this series instance
+    _btCandleMarkersPrimitive = LightweightCharts.createSeriesMarkers(btCandleSeries, []);
 
     btCandleSeries.setData(candles);
 
     // ── Volume histogram (same pane, separate price scale, bottom 20%) ─────────
-    _btVolumeSeries = btPriceChart.addHistogramSeries({
+    _btVolumeSeries = btPriceChart.addSeries(LightweightCharts.HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',       // isolated scale — does not affect price Y-axis
       lastValueVisible: false,
@@ -5255,7 +5261,7 @@ async function updatePriceChart(backtest) {
 
       if (btPriceChartMarkers.length > 0 && btCandleSeries) {
         try {
-          btCandleSeries.setMarkers(btPriceChartMarkers);
+          _btCandleMarkersPrimitive.setMarkers(btPriceChartMarkers);
           console.log(`[PriceChart] setMarkers OK: ${btPriceChartMarkers.length} markers`);
           if (badgesHost) { const b = document.getElementById('_markerCountBadge'); if (b) b.title = 'setMarkers OK'; }
         } catch (e) {
@@ -5283,7 +5289,7 @@ async function updatePriceChart(backtest) {
         const lineColor = isLongOpen ? '#f9a825' : '#f06292';
         const entryTimeSec = snapToCandle(parseTradeTime(openTrade.entry_time), candles);
         const lastCandleTime = candles[candles.length - 1].time;
-        _btOpenPositionLine = btPriceChart.addLineSeries({
+        _btOpenPositionLine = btPriceChart.addSeries(LightweightCharts.LineSeries, {
           color: lineColor,
           lineWidth: 1,
           lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -5433,7 +5439,7 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
   const g1Fill = filledMap[1];
   const g1Price = g1Fill ? g1Fill.price : trade.entry_price;
   if (g1Price && g1Price > 0) {
-    const g1s = chart.addLineSeries({
+    const g1s = chart.addSeries(LightweightCharts.LineSeries, {
       color: '#FFD700',   // yellow — filled/triggered level
       lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -5462,7 +5468,7 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
       const levelPrice = gridPrice;
       const lineColor = isFilled ? '#FFD700' : '#2196F3';  // yellow=filled/triggered, blue=pending
 
-      const gs = chart.addLineSeries({
+      const gs = chart.addSeries(LightweightCharts.LineSeries, {
         color: lineColor,
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dashed,
@@ -5478,7 +5484,7 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
 
   // TP line (green dashed)
   if (trade.tp_price && trade.tp_price > 0) {
-    const tpS = chart.addLineSeries({
+    const tpS = chart.addSeries(LightweightCharts.LineSeries, {
       color: '#26a69a', lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
       priceLineVisible: false, lastValueVisible: true,
@@ -5490,7 +5496,7 @@ function _renderDcaGridForTrade(chart, idx, seriesData, seriesArray) {
 
   // SL line (red dashed)
   if (trade.sl_price && trade.sl_price > 0) {
-    const slS = chart.addLineSeries({
+    const slS = chart.addSeries(LightweightCharts.LineSeries, {
       color: '#ef5350', lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dashed,
       priceLineVisible: false, lastValueVisible: true,
@@ -5732,7 +5738,7 @@ function rebuildTradeMarkers() {
   const _TZ = 10800;
   const shiftedCandles = _btCachedCandles.map(c => ({ ...c, time: c.time + _TZ }));
   btPriceChartMarkers = buildTradeMarkers(currentBacktest.trades, shiftedCandles);
-  btCandleSeries.setMarkers(btPriceChartMarkers);
+  _btCandleMarkersPrimitive.setMarkers(btPriceChartMarkers);
   console.log(`[PriceChart] Rebuilt ${btPriceChartMarkers.length} markers (PnL=${document.getElementById('markerShowPnl')?.checked}, Price=${document.getElementById('markerShowEntryPrice')?.checked})`);
 }
 
@@ -5758,41 +5764,45 @@ function switchPriceChartType(type) {
   // Remove current price series
   try { btPriceChart.removeSeries(btCandleSeries); } catch (_e) { /* ignore */ }
   btCandleSeries = null;
+  _btCandleMarkersPrimitive = null;
 
   // Create new series of the requested type
   if (type === 'candlestick') {
-    btCandleSeries = btPriceChart.addCandlestickSeries({
+    btCandleSeries = btPriceChart.addSeries(LightweightCharts.CandlestickSeries, {
       upColor: '#26a69a', downColor: '#ef5350',
       borderUpColor: '#26a69a', borderDownColor: '#ef5350',
       wickUpColor: '#26a69a', wickDownColor: '#ef5350',
       lastValueVisible: false
     });
+    _btCandleMarkersPrimitive = LightweightCharts.createSeriesMarkers(btCandleSeries, []);
   } else if (type === 'bar') {
-    btCandleSeries = btPriceChart.addBarSeries({
+    btCandleSeries = btPriceChart.addSeries(LightweightCharts.BarSeries, {
       upColor: '#26a69a', downColor: '#ef5350',
       thinBars: false,
       lastValueVisible: false
     });
+    _btCandleMarkersPrimitive = LightweightCharts.createSeriesMarkers(btCandleSeries, []);
   } else {
     // line — use close price
-    btCandleSeries = btPriceChart.addLineSeries({
+    btCandleSeries = btPriceChart.addSeries(LightweightCharts.LineSeries, {
       color: '#58a6ff',
       lineWidth: 2,
       lastValueVisible: false,
       priceLineVisible: false
     });
+    _btCandleMarkersPrimitive = LightweightCharts.createSeriesMarkers(btCandleSeries, []);
     // Line series takes {time, value} not OHLC
     btCandleSeries.setData(candles.map((c) => ({ time: c.time, value: c.close })));
     _btChartType = type;
     // Restore markers and sync state
-    if (btPriceChartMarkers.length > 0) btCandleSeries.setMarkers(btPriceChartMarkers);
+    if (btPriceChartMarkers.length > 0) _btCandleMarkersPrimitive.setMarkers(btPriceChartMarkers);
     setPriceChartCandleSeries(btCandleSeries);
     return;
   }
 
   btCandleSeries.setData(candles);
   _btChartType = type;
-  if (btPriceChartMarkers.length > 0) btCandleSeries.setMarkers(btPriceChartMarkers);
+  if (btPriceChartMarkers.length > 0) _btCandleMarkersPrimitive.setMarkers(btPriceChartMarkers);
   setPriceChartCandleSeries(btCandleSeries);
 }
 
@@ -5867,7 +5877,7 @@ function buildTradePriceLines(trades, candles, chart) {
     if (points.length === 0) return null;
     // Sort by time — required by LightweightCharts (NaN breaks don't affect sort)
     points.sort((a, b) => (a.time || 0) - (b.time || 0));
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LightweightCharts.LineSeries, {
       color,
       lineWidth: 1,
       lineStyle,
@@ -6076,7 +6086,7 @@ function _applyLiveSignals(timeSec, signals) {
     // Merge with historical markers and update chart
     const allMarkers = [...btPriceChartMarkers, ..._liveChartMarkers]
       .sort((a, b) => a.time - b.time);
-    btCandleSeries.setMarkers(allMarkers);
+    _btCandleMarkersPrimitive?.setMarkers(allMarkers);
   }
 }
 

@@ -254,7 +254,7 @@ class TradingViewEquityChart {
     // No histogram series needed here — _buildExcursionSeries handles everything.
     // ── 1. Equity as BASELINE series — added AFTER bars so it draws ON TOP ──
     // We ALWAYS display P&L (equity − initialCapital), so baseValue = 0.
-    this._equitySeries = this._lwChart.addBaselineSeries({
+    this._equitySeries = this._lwChart.addSeries(LightweightCharts.BaselineSeries, {
       baseValue: { type: 'price', price: 0 },
       // Above zero: teal (profit) — fill is 15% more transparent than before
       topLineColor: '#26a69a',
@@ -365,7 +365,9 @@ class TradingViewEquityChart {
           })
           .filter(Boolean)
           .sort((a, b) => a.time - b.time);
-        if (markers.length) this._equitySeries.setMarkers(markers);
+        if (markers.length) {
+          this._equityMarkersPrimitive = LightweightCharts.createSeriesMarkers(this._equitySeries, markers);
+        }
       }
     }
 
@@ -464,7 +466,7 @@ class TradingViewEquityChart {
     const points = this._dedup(raw);
     if (!points.length) return;
 
-    this._bhSeries = this._lwChart.addLineSeries({
+    this._bhSeries = this._lwChart.addSeries(LightweightCharts.LineSeries, {
       color: '#2962ff',              // TV-style: bright blue — matches legend badge colour
       lineWidth: 1,
       priceLineVisible: false,
@@ -1282,7 +1284,7 @@ class TradingViewEquityChart {
       const eq = (data.equity || []).filter(v => v != null);
       const top = eq.length ? Math.max(...eq) * 1.10 : 12000;
 
-      const series = this._lwChart.addHistogramSeries({
+      const series = this._lwChart.addSeries(LightweightCharts.HistogramSeries, {
         color: col,
         priceScaleId: '',
         lastValueVisible: false,

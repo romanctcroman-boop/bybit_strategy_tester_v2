@@ -121,7 +121,7 @@
     <div class="container">
         <h1>🔍 Тест исправления MFE/MAE</h1>
         <p>Проверка корректности отображения баров MFE/MAE на графике equity curve</p>
-        
+
         <div>
             <button onclick="loadData()">📊 Загрузить данные</button>
             <button class="secondary" onclick="runTests()">🧪 Запустить тесты</button>
@@ -163,13 +163,13 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
     <script src="js/components/TradingViewEquityChart.js"></script>
-    
+
     <script>
         let chartInstance = null;
         let currentData = null;
-        
+
         function log(message, type = 'info') {
             const logDiv = document.getElementById('log');
             const entry = document.createElement('div');
@@ -189,15 +189,15 @@
             const statsDiv = document.getElementById('stats');
             const trades = data.trades || [];
             const equityCurve = data.equity_curve || {};
-            
+
             const tradesWithMfe = trades.filter(t => t.mfe !== undefined && t.mfe !== null && t.mfe !== 0).length;
             const tradesWithMae = trades.filter(t => t.mae !== undefined && t.mae !== null && t.mae !== 0).length;
             const tradesWithMfePct = trades.filter(t => t.mfe_pct !== undefined && t.mfe_pct !== null && t.mfe_pct !== 0).length;
             const tradesWithMaePct = trades.filter(t => t.mae_pct !== undefined && t.mae_pct !== null && t.mae_pct !== 0).length;
-            
+
             const equityPoints = equityCurve.timestamps?.length || 0;
             const matchRate = equityPoints > 0 ? ((trades.length / equityPoints) * 100).toFixed(2) : 0;
-            
+
             statsDiv.innerHTML = `
                 <div class="metric">
                     <div class="metric-label">Всего сделок</div>
@@ -233,13 +233,13 @@
         function updateTradesTable(data) {
             const tbody = document.querySelector('#tradesTable tbody');
             const trades = (data.trades || []).slice(0, 20);
-            
+
             tbody.innerHTML = trades.map((t, i) => {
                 const hasMfe = t.mfe !== undefined && t.mfe !== null && t.mfe !== 0;
                 const hasMae = t.mae !== undefined && t.mae !== null && t.mae !== 0;
                 const hasMfePct = t.mfe_pct !== undefined && t.mfe_pct !== null && t.mfe_pct !== 0;
                 const hasMaePct = t.mae_pct !== undefined && t.mae_pct !== null && t.mae_pct !== 0;
-                
+
                 let status = '✅';
                 const issues = [];
                 if (!hasMfe && !hasMfePct) issues.push('нет MFE');
@@ -247,11 +247,11 @@
                 if (issues.length > 0) {
                     status = `<span class="status-warning">⚠️ ${issues.join(', ')}</span>`;
                 }
-                
+
                 const exitTime = t.exit_time ? new Date(t.exit_time).toLocaleString('ru-RU') : 'N/A';
                 const side = (t.side || t.direction || 'unknown').toUpperCase();
                 const pnlClass = (t.pnl || 0) >= 0 ? 'status-ok' : 'status-error';
-                
+
                 return `
                     <tr>
                         <td>${i + 1}</td>
@@ -271,25 +271,25 @@
         async function loadData() {
             clearLog();
             log('Загрузка данных backtest...', 'info');
-            
+
             try {
                 // Используем тот же backtest ID, что и в debug_mfe.html
                 const resp = await fetch('http://localhost:8000/api/v1/backtests/fd69829a-4ba9-4b11-acdc-e351d8d42ad2');
-                
+
                 if (!resp.ok) {
                     throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
                 }
-                
+
                 const data = await resp.json();
                 currentData = data;
-                
+
                 log(`Данные загручены: ${data.trades?.length || 0} сделок`, 'success');
                 log(`Equity curve: ${data.equity_curve?.timestamps?.length || 0} точек`, 'success');
-                
+
                 updateStats(data);
                 updateTradesTable(data);
                 renderChart(data);
-                
+
             } catch (error) {
                 log(`Ошибка загрузки: ${error.message}`, 'error');
                 console.error(error);
@@ -300,13 +300,13 @@
             if (chartInstance) {
                 chartInstance.destroy();
             }
-            
+
             chartInstance = new TradingViewEquityChart('chart', {
                 showBuyHold: false,
                 showTradeExcursions: true,
                 displayMode: 'absolute'
             });
-            
+
             log('Рендеринг графика с MFE/MAE...', 'info');
             chartInstance.render(data);
             log('График отрисован', 'success');
@@ -317,28 +317,28 @@
                 log('Сначала загрузите данные!', 'error');
                 return;
             }
-            
+
             clearLog();
             log('=== ЗАПУСК ТЕСТОВ ===', 'info');
-            
+
             const trades = currentData.trades || [];
             const equityCurve = currentData.equity_curve || {};
             const timestamps = equityCurve.timestamps || [];
-            
+
             let passed = 0;
             let failed = 0;
-            
+
             // Test 1: Все сделки имеют MFE/MAE
             log('Тест 1: Проверка наличия MFE/MAE во всех сделках...', 'info');
             let mfeMissing = 0;
             let maeMissing = 0;
-            
+
             trades.forEach((t, i) => {
                 const hasMfe = t.mfe !== undefined && t.mfe !== null && t.mfe !== 0;
                 const hasMae = t.mae !== undefined && t.mae !== null && t.mae !== 0;
                 const hasMfePct = t.mfe_pct !== undefined && t.mfe_pct !== null && t.mfe_pct !== 0;
                 const hasMaePct = t.mae_pct !== undefined && t.mae_pct !== null && t.mae_pct !== 0;
-                
+
                 if (!hasMfe && !hasMfePct) {
                     mfeMissing++;
                     log(`Сделка #${i + 1}: отсутствует MFE`, 'warning');
@@ -348,7 +348,7 @@
                     log(`Сделка #${i + 1}: отсутствует MAE`, 'warning');
                 }
             });
-            
+
             if (mfeMissing === 0 && maeMissing === 0) {
                 log('✅ Тест 1 пройден: Все сделки имеют MFE и MAE', 'success');
                 passed++;
@@ -356,11 +356,11 @@
                 log(`❌ Тест 1 провален: ${mfeMissing} без MFE, ${maeMissing} без MAE`, 'error');
                 failed++;
             }
-            
+
             // Test 2: Временные метки exit_time корректны
             log('Тест 2: Проверка корректности exit_time...', 'info');
             let invalidExitTimes = 0;
-            
+
             trades.forEach((t, i) => {
                 if (!t.exit_time) {
                     invalidExitTimes++;
@@ -373,7 +373,7 @@
                     }
                 }
             });
-            
+
             if (invalidExitTimes === 0) {
                 log('✅ Тест 2 пройден: Все exit_time корректны', 'success');
                 passed++;
@@ -381,11 +381,11 @@
                 log(`❌ Тест 2 провален: ${invalidExitTimes} некорректных exit_time`, 'error');
                 failed++;
             }
-            
+
             // Test 3: Equity curve timestamps корректны
             log('Тест 3: Проверка equity curve timestamps...', 'info');
             let invalidTimestamps = 0;
-            
+
             timestamps.forEach((ts, i) => {
                 const tsMs = new Date(ts).getTime();
                 if (isNaN(tsMs)) {
@@ -393,7 +393,7 @@
                     log(`Timestamp #${i}: некорректный: ${ts}`, 'error');
                 }
             });
-            
+
             if (invalidTimestamps === 0) {
                 log('✅ Тест 3 пройден: Все timestamps корректны', 'success');
                 passed++;
@@ -401,23 +401,23 @@
                 log(`❌ Тест 3 провален: ${invalidTimestamps} некорректных timestamps`, 'error');
                 failed++;
             }
-            
+
             // Test 4: MFE/MAE значения в разумных пределах
             log('Тест 4: Проверка разумности MFE/MAE значений...', 'info');
             let unreasonableValues = 0;
-            
+
             trades.forEach((t, i) => {
                 const mfe = Math.abs(t.mfe || 0);
                 const mae = Math.abs(t.mae || 0);
                 const pnl = Math.abs(t.pnl || 0);
-                
+
                 // MFE и MAE не должны превышать |PnL| более чем в 10 раз (разумный лимит)
                 if (pnl > 0 && (mfe > pnl * 10 || mae > pnl * 10)) {
                     unreasonableValues++;
                     log(`Сделка #${i + 1}: подозрительные значения MFE=${mfe.toFixed(2)}, MAE=${mae.toFixed(2)}, PnL=${pnl.toFixed(2)}`, 'warning');
                 }
             });
-            
+
             if (unreasonableValues === 0) {
                 log('✅ Тест 4 пройден: Все значения в разумных пределах', 'success');
                 passed++;
@@ -425,11 +425,11 @@
                 log(`❌ Тест 4 провален: ${unreasonableValues} сделок с подозрительными значениями`, 'error');
                 failed++;
             }
-            
+
             // Test 5: Корректный маппинг exit_time → equity point
             log('Тест 5: Проверка маппинга exit_time → equity point...', 'info');
             let mappingIssues = 0;
-            
+
             // Создаём карту timestamp → index
             const tsToIdx = new Map();
             timestamps.forEach((ts, i) => {
@@ -438,14 +438,14 @@
                     tsToIdx.set(epoch, i);
                 }
             });
-            
+
             // Проверяем, что каждый exit_time имеет соответствие в equity curve
             trades.forEach((t, i) => {
                 if (!t.exit_time) return;
-                
+
                 const exitEpoch = new Date(t.exit_time).getTime();
                 if (isNaN(exitEpoch)) return;
-                
+
                 // Ищем ближайший timestamp
                 let found = false;
                 for (const [tsEpoch, idx] of tsToIdx.entries()) {
@@ -455,13 +455,13 @@
                         break;
                     }
                 }
-                
+
                 if (!found) {
                     mappingIssues++;
                     log(`Сделка #${i + 1}: exit_time ${t.exit_time} не найден в equity curve`, 'warning');
                 }
             });
-            
+
             if (mappingIssues === 0) {
                 log('✅ Тест 5 пройден: Все exit_time маппятся на equity curve', 'success');
                 passed++;
@@ -469,12 +469,12 @@
                 log(`❌ Тест 5 провален: ${mappingIssues} сделок без маппинга`, 'error');
                 failed++;
             }
-            
+
             // Итоговый отчёт
             log('=== ИТОГИ ===', 'info');
             log(`Пройдено: ${passed}`, 'success');
             log(`Провалено: ${failed}`, failed > 0 ? 'error' : 'success');
-            
+
             if (failed === 0) {
                 log('🎉 Все тесты пройдены!', 'success');
             } else {
