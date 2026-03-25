@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **fix(api): P2-3 HITL + P2-4 streaming WebSocket API endpoints + memory leak fix (2026-03-25)**
+
+    Completed HTTP/WebSocket API surface for the HITL and streaming pipeline features, plus fixed a
+    memory leak in the job eviction logic.
+
+    **New endpoints (`backend/api/routers/ai_pipeline.py`)**
+    - `POST /ai-pipeline/generate-hitl` — starts pipeline with `hitl_enabled=True`; returns `hitl_request` payload when the `HITLCheckNode` halts for approval
+    - `GET /ai-pipeline/pipeline/{id}/hitl` — poll current HITL status for a running job
+    - `POST /ai-pipeline/pipeline/{id}/hitl/approve` — resume a halted pipeline by injecting `hitl_approved=True` into context
+    - `POST /ai-pipeline/generate-stream` — starts a background pipeline task and returns a `pipeline_id` for WebSocket subscription
+    - `WS /ai-pipeline/stream/{pipeline_id}` — WebSocket endpoint; pushes per-node `{node, status, session_id, iteration}` events; 30 s heartbeat; closes with `{"type":"done"}` on completion
+
+    **Memory leak fix (`_evict_stale_jobs`)**
+    - Jobs evicted by TTL (>1 h) or LRU cap (>500) now also remove the corresponding entry from `_pipeline_queues`
+    - Previously, streams started but never subscribed would accumulate unbounded `asyncio.Queue` objects
+    - Both eviction paths (stale TTL loop and LRU trim loop) now call `_pipeline_queues.pop(jid, None)`
+
+    **Tests (`tests/backend/api/test_pipeline_streaming_hitl.py`, 20 tests)**
+    - `TestHITLEndpoints` (5 tests): generate-hitl happy path, poll status, approve, reject 404 on unknown id
+    - `TestStreamEndpoints` (7 tests): generate-stream returns pipeline_id, WS sends node events + done, heartbeat, 404 on unknown id
+    - `TestStreamingIntegration` (4 tests): WS + background task integration with mocked pipeline
+    - `TestEviction` (2 tests): stale job evicts orphaned queue; active job preserved
+    - `TestHITLApproveResume` (2 tests): approve injects approved flag into context
+
+    **Commit:** `53dc483cf`
+
 - **feat(frontend): migrate LightweightCharts v4→v5 across all chart files (2026-03-25)**
 
     Full migration of LightweightCharts from v4 to v5 API across all 5 JS chart files and 6 HTML pages.
