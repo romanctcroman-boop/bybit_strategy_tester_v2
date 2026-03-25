@@ -38,7 +38,11 @@ _pipeline_queues: dict[str, asyncio.Queue] = {}
 
 
 def _evict_stale_jobs() -> None:
-    """Remove jobs older than TTL and enforce max size."""
+    """Remove jobs older than TTL and enforce max size.
+
+    Also cleans up any orphaned WebSocket queues whose job has been evicted
+    (e.g. /generate-stream was called but no WS client ever connected).
+    """
     now = datetime.now(UTC)
     stale_ids = []
     for jid, job in _pipeline_jobs.items():
@@ -53,6 +57,7 @@ def _evict_stale_jobs() -> None:
             stale_ids.append(jid)  # malformed — evict
     for jid in stale_ids:
         _pipeline_jobs.pop(jid, None)
+        _pipeline_queues.pop(jid, None)  # clean up orphaned WS queue if any
 
     # If still over limit, remove oldest first
     if len(_pipeline_jobs) > _PIPELINE_JOBS_MAX:
@@ -62,6 +67,7 @@ def _evict_stale_jobs() -> None:
         )
         for jid in sorted_ids[: len(_pipeline_jobs) - _PIPELINE_JOBS_MAX]:
             _pipeline_jobs.pop(jid, None)
+            _pipeline_queues.pop(jid, None)  # clean up orphaned WS queue if any
 
 
 router = APIRouter(

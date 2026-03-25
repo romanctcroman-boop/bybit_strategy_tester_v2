@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -346,3 +347,41 @@ class TestApproveHITL:
                     client.post(f"/ai-pipeline/pipeline/{pid}/hitl/approve")
         assert _pipeline_jobs[pid]["status"] == "completed"
         assert _pipeline_jobs[pid]["hitl_pending"] is False
+
+
+# ---------------------------------------------------------------------------
+# Eviction: _evict_stale_jobs cleans up orphaned WS queues
+# ---------------------------------------------------------------------------
+
+
+class TestEviction:
+    def test_evict_stale_job_also_removes_orphaned_queue(self):
+        """If a streaming job is never consumed via WS, eviction must clean the queue."""
+        import asyncio
+        from datetime import timedelta
+        from backend.api.routers.ai_pipeline import _pipeline_jobs, _pipeline_queues, _evict_stale_jobs
+
+        pid = "evict_test_orphan_001"
+        old_time = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+
+        # Simulate: job created 2h ago (past TTL), queue never consumed
+        _pipeline_jobs[pid] = {"status": "completed", "created_at": old_time}
+        q: asyncio.Queue = asyncio.Queue()
+        _pipeline_queues[pid] = q
+
+        _evict_stale_jobs()
+
+        assert pid not in _pipeline_jobs
+        assert pid not in _pipeline_queues
+
+    def test_active_jobs_not_evicted(self):
+        """Jobs within TTL must be kept."""
+        from backend.api.routers.ai_pipeline import _pipeline_jobs, _evict_stale_jobs
+
+        pid = "evict_test_active_001"
+        _pipeline_jobs[pid] = {"status": "running", "created_at": datetime.now(UTC).isoformat()}
+
+        _evict_stale_jobs()
+
+        assert pid in _pipeline_jobs
+        _pipeline_jobs.pop(pid, None)  # cleanup
