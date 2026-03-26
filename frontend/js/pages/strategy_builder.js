@@ -15,7 +15,7 @@
 import { createMLBlocksModule as _createMLBlocksModule } from '../components/MLBlocksModule.js';
 import { createSentimentBlocksModule as _createSentimentBlocksModule } from '../components/SentimentBlocksModule.js';
 import { createOrderFlowBlocksModule as _createOrderFlowBlocksModule } from '../components/OrderFlowBlocksModule.js';
-import { formatDate, debounce } from '../utils.js';
+import { formatDate } from '../utils.js';
 import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
 import { blockLibrary } from '../strategy_builder/blockLibrary.js';
 import { createSymbolSyncModule } from '../strategy_builder/SymbolSyncModule.js';
@@ -320,6 +320,8 @@ let zoom = 1;
 let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
 let currentBacktestResults = null; // Legacy shim — mirrored from store (strategyBuilder.ui.currentBacktestResults)
+let currentSyncSymbol = null;      // Legacy shim — mirrored from store (strategyBuilder.sync.currentSyncSymbol)
+let currentSyncStartTime = 0;      // Legacy shim — mirrored from store (strategyBuilder.sync.currentSyncStartTime)
 let _backtestModule = null;        // Initialized in initializeStrategyBuilder() via _initBacktestModule()
 let _aiModule = null;              // Initialized in initializeStrategyBuilder() via _initAiBuildModule()
 let _myStrategiesModule = null;    // Initialized in initializeStrategyBuilder() via _initMyStrategiesModule()
