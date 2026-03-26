@@ -12,53 +12,74 @@ Create and modify trading strategies that generate buy/sell signals using techni
 ## Strategy Template
 
 ```python
-from backend.backtesting.strategies.base import BaseStrategy
+from backend.backtesting.strategies import BaseStrategy, SignalResult
 import pandas as pd
 import pandas_ta as ta
+from typing import Any
 
 class MyStrategy(BaseStrategy):
     """
     Brief description of the strategy.
 
-    Signals:
-        1 = Long entry
-        -1 = Short entry
-        0 = No action
+    Signals (via SignalResult):
+        entries       = Boolean Series — long entry
+        exits         = Boolean Series — long exit
+        short_entries = Boolean Series — short entry (optional)
+        short_exits   = Boolean Series — short exit (optional)
     """
 
-    def __init__(self, params: dict):
-        super().__init__(params)
-        self.required_params = ['period', 'threshold']
-        self._validate_params()
+    name: str = "my_strategy"
+    description: str = "Brief description"
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+    def __init__(self, params: dict[str, Any] | None = None):
+        super().__init__(params)  # calls _validate_params() internally
+
+    def _validate_params(self) -> None:
+        """Validate required parameters."""
+        required = ['period', 'threshold']
+        for key in required:
+            if key not in self.params:
+                raise ValueError(f"Missing required param: {key}")
+
+    def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
         """Generate trading signals from OHLCV data."""
-        signals = data.copy()
-        signals['signal'] = 0
+        rsi = ta.rsi(ohlcv['close'], length=self.params['period'])
 
-        # Calculate indicator
-        indicator = ta.rsi(signals['close'], length=self.params['period'])
+        entries = rsi < self.params['threshold']               # Long entry
+        exits   = rsi > (100 - self.params['threshold'])       # Long exit
+        short_entries = rsi > (100 - self.params['threshold']) # Short entry
+        short_exits   = rsi < self.params['threshold']         # Short exit
 
-        # Generate signals
-        signals.loc[indicator < self.params['threshold'], 'signal'] = 1   # Long
-        signals.loc[indicator > (100 - self.params['threshold']), 'signal'] = -1  # Short
+        return SignalResult(
+            entries=entries.fillna(False),
+            exits=exits.fillna(False),
+            short_entries=short_entries.fillna(False),
+            short_exits=short_exits.fillna(False),
+        )
 
-        return signals
+    @classmethod
+    def get_default_params(cls) -> dict[str, Any]:
+        return {'period': 14, 'threshold': 30}
 ```
 
 ## File Location
 
-All strategies go in `backend/backtesting/strategies/`.
+All strategies go in **`backend/backtesting/strategies.py`** (single file, not a directory).
+`BaseStrategy` and `SignalResult` are defined in this file.
+
+```python
+# Correct import — from the module, NOT from a sub-package
+from backend.backtesting.strategies import BaseStrategy, SignalResult
+```
 
 ## Required Interface
 
 Every strategy MUST:
 
-1. Inherit from `BaseStrategy`
-2. Define `self.required_params` list
-3. Call `self._validate_params()` in `__init__`
-4. Implement `generate_signals(data: pd.DataFrame) -> pd.DataFrame`
-5. Return DataFrame with a `signal` column containing only -1, 0, 1
+1. Inherit from `BaseStrategy` (defined in `backend/backtesting/strategies.py`)
+2. Implement `_validate_params(self) -> None` — raise `ValueError` on bad params
+3. Implement `generate_signals(ohlcv: pd.DataFrame) -> SignalResult`
+4. Return a `SignalResult` with boolean `entries`/`exits` Series (not a signal column)
 
 ## Input DataFrame Columns
 
@@ -73,13 +94,16 @@ Every strategy MUST:
 
 ## Registration
 
-Register new strategies in the strategy registry:
+Add new strategies to `backend/backtesting/strategies.py` directly (no sub-package):
 
 ```python
-# backend/backtesting/strategies/__init__.py
-from .my_strategy import MyStrategy
+# In backend/backtesting/strategies.py — add class at the bottom
+class MyStrategy(BaseStrategy):
+    ...
 
-STRATEGY_REGISTRY = {
+# Then register in the STRATEGY_MAP dict (if one exists in the router/engine):
+# backend/api/routers/strategy_builder/router.py or similar
+STRATEGY_MAP = {
     # ... existing strategies ...
     'my_strategy': MyStrategy,
 }
@@ -90,11 +114,15 @@ STRATEGY_REGISTRY = {
 Every strategy needs:
 
 ```python
+from backend.backtesting.strategies import MyStrategy, SignalResult
+
 def test_my_strategy_generates_valid_signals(sample_ohlcv):
     strategy = MyStrategy({"period": 14, "threshold": 30})
     result = strategy.generate_signals(sample_ohlcv)
-    assert "signal" in result.columns
-    assert set(result["signal"].unique()).issubset({-1, 0, 1})
+    assert isinstance(result, SignalResult)
+    assert hasattr(result, "entries")
+    assert hasattr(result, "exits")
+    assert result.entries.dtype == bool
 
 def test_my_strategy_with_missing_params():
     with pytest.raises(ValueError):

@@ -7,7 +7,7 @@ description: "Work with the 166-metric TradingView-parity metrics calculator. Un
 
 ## Overview
 
-The project maintains TradingView metric parity through a centralized calculator at `backend/core/metrics_calculator.py` (1483 lines). All metric calculations MUST go through this module.
+The project maintains TradingView metric parity through a centralized calculator at `backend/core/metrics_calculator.py` (1303 lines). All metric calculations MUST go through this module.
 
 ## Usage
 
