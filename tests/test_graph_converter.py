@@ -200,30 +200,39 @@ def test_cci_generates_condition_blocks():
     graph, warnings = conv.convert(strat)
 
     assert _blocks_by_type(graph, "cci"), "CCI indicator block missing"
-    cond_blocks = _blocks_by_type(graph, "condition")
-    assert len(cond_blocks) == 2, "Expected 2 condition blocks (long + short)"
+    # Condition blocks use operation-specific types: "less_than" (long) and "greater_than" (short)
+    long_conds = _blocks_by_type(graph, "less_than")
+    short_conds = _blocks_by_type(graph, "greater_than")
+    assert len(long_conds) == 1, "Expected 1 'less_than' condition block for CCI long"
+    assert len(short_conds) == 1, "Expected 1 'greater_than' condition block for CCI short"
     assert any("CCI" in w for w in warnings)
 
 
 def test_williams_r_generates_condition_blocks():
     conv = StrategyDefToGraphConverter()
     strat = make_strategy([Signal(id="s1", type="Williams_R", params={"period": 14})])
-    graph, warnings = conv.convert(strat)
+    graph, _ = conv.convert(strat)
 
     assert _blocks_by_type(graph, "williams_r")
-    assert len(_blocks_by_type(graph, "condition")) == 2
+    # Condition blocks use operation-specific types: "less_than" (long) and "greater_than" (short)
+    assert len(_blocks_by_type(graph, "less_than")) == 1
+    assert len(_blocks_by_type(graph, "greater_than")) == 1
 
 
 def test_bollinger_generates_condition_blocks_with_price_input():
+    """Bollinger is now Cat A via keltner_bollinger — direct long/short output."""
     conv = StrategyDefToGraphConverter()
     strat = make_strategy([Signal(id="s1", type="Bollinger", params={"period": 20, "std_dev": 2.0})])
-    graph, warnings = conv.convert(strat)
+    graph, _ = conv.convert(strat)
 
-    assert _blocks_by_type(graph, "bollinger")
-    # Should have input blocks for price
-    input_blocks = _blocks_by_type(graph, "input")
-    price_inputs = [b for b in input_blocks if b["params"].get("input_type") == "price"]
-    assert price_inputs, "Expected price input block for Bollinger"
+    # Should produce a keltner_bollinger block (Cat A), not condition/input blocks
+    kb_blocks = _blocks_by_type(graph, "keltner_bollinger")
+    assert len(kb_blocks) == 1, "Expected keltner_bollinger block for Bollinger"
+    params = kb_blocks[0]["params"]
+    assert params.get("channel_type") == "Bollinger Bands"
+    assert params.get("use_channel") is True
+    assert params.get("bb_length") == 20
+    assert params.get("bb_deviation") == 2.0
 
 
 def test_unknown_signal_type_skipped_with_warning():

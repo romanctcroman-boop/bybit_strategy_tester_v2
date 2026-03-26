@@ -29,7 +29,16 @@ class Signal(BaseModel):
 
     id: str = Field(description="Unique signal ID, e.g. 'signal_1'")
     type: str = Field(
-        description="Indicator type: RSI, MACD, EMA_Crossover, SMA_Crossover, Bollinger, SuperTrend, Stochastic, CCI"
+        description=(
+            "Indicator type — MUST be one of: "
+            "RSI, MACD, EMA_Crossover, SMA_Crossover, EMA, SMA, "
+            "Bollinger, SuperTrend, Stochastic, CCI, ADX, "
+            "Williams_R, VWAP. "
+            "Do NOT use ATR or OBV as signals (use Volatility filter for ATR). "
+            "Use MULTIPLE signals (2-4) for robust entry logic. "
+            "Avoid SuperTrend alone in ranging markets — combine with RSI or CCI. "
+            "RSI fires only on threshold crossing (edge-triggered) — good for precise entries."
+        )
     )
     params: dict[str, Any] = Field(default_factory=dict, description="Indicator parameters")
     weight: float = Field(default=1.0, ge=0.0, le=1.0, description="Signal weight 0-1")
@@ -48,13 +57,11 @@ class Signal(BaseModel):
             "SuperTrend",
             "Stochastic",
             "CCI",
-            "ATR",
             "ADX",
             "Williams_R",
             "EMA",
             "SMA",
             "VWAP",
-            "OBV",
         }
         # Normalize common variations
         normalized = v.replace(" ", "_").replace("-", "_")
@@ -70,7 +77,14 @@ class Filter(BaseModel):
     """A trade filter condition."""
 
     id: str = Field(description="Unique filter ID, e.g. 'filter_1'")
-    type: str = Field(description="Filter type: Volume, Trend, Volatility, Time, ADX")
+    type: str = Field(
+        description=(
+            "Filter type — MUST be exactly one of: "
+            "Volume, Trend, Volatility, ADX, Time. "
+            "Do NOT use: 'Volume Filter', 'ATR Volatility', 'Volume Confirmation', etc. "
+            "Use the exact single word: Volume, Trend, Volatility, ADX, or Time."
+        )
+    )
     params: dict[str, Any] = Field(default_factory=dict)
     condition: str = Field(default="", description="Human-readable condition")
 
@@ -399,7 +413,7 @@ class ResponseParser:
             if hasattr(exc, "errors"):
                 messages = []
                 for err in exc.errors():
-                    loc = " → ".join(str(l) for l in err.get("loc", []))
+                    loc = " → ".join(str(part) for part in err.get("loc", []))
                     msg = err.get("msg", str(err))
                     messages.append(f"Field '{loc}': {msg}")
                 return messages
@@ -546,7 +560,13 @@ class ResponseParser:
         First attempts Pydantic model_validate for schema-level pre-validation.
         Falls back to manual construction for LLM responses that use
         non-standard field names or structures.
+        Also handles blocks/connections (Strategy Builder) format that LLMs
+        sometimes return instead of the signals/filters format.
         """
+        # Pre-normalise: Strategy Builder format (blocks/connections) → signals/filters
+        if "blocks" in data and "connections" in data and "signals" not in data:
+            data = self._convert_blocks_to_signals(data)
+
         # Attempt 1: Direct Pydantic schema validation (fast path)
         try:
             data_copy = dict(data)
@@ -565,6 +585,111 @@ class ResponseParser:
 
         # Attempt 2: Manual construction (handles non-standard LLM output)
         return self._build_strategy_manual(data, agent_name)
+
+    def _convert_blocks_to_signals(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Convert Strategy Builder blocks/connections JSON → signals/filters StrategyDefinition format.
+
+        LLMs trained on the Strategy Builder docs sometimes return blocks/connections
+        instead of the signals/filters format the pipeline expects. This converter
+        extracts indicator blocks as Signal objects and filter blocks as Filter objects.
+        """
+        signals: list[dict] = []
+        filters: list[dict] = []
+
+        # Map common Strategy Builder block type names to StrategyDefinition indicator types
+        block_type_map = {
+            "RSI": "RSI",
+            "MACD": "MACD",
+            "EMA": "EMA_Crossover",
+            "SMA": "SMA_Crossover",
+            "two_mas": "EMA_Crossover",
+            "TWO_MAS": "EMA_Crossover",
+            "BOLLINGER": "Bollinger",
+            "bollinger_bands": "Bollinger",
+            "SUPERTREND": "SuperTrend",
+            "supertrend": "SuperTrend",
+            "STOCHASTIC": "Stochastic",
+            "stochastic": "Stochastic",
+            "QQE": "RSI",
+            "CCI": "CCI",
+            "ATR": "ATR",
+            "ADX": "ADX",
+        }
+
+        filter_block_types = {
+            "volume_filter",
+            "VOLUME_FILTER",
+            "atr_volatility",
+            "ATR_VOLATILITY",
+            "adx_filter",
+            "ADX_FILTER",
+            "time_filter",
+            "TIME_FILTER",
+        }
+
+        for block in data.get("blocks", []):
+            block_type = block.get("type", "")
+            block_id = block.get("id", f"block_{len(signals)}")
+            params = block.get("params", {})
+
+            if block_type in filter_block_types or "filter" in block_type.lower():
+                filters.append(
+                    {
+                        "id": block_id,
+                        "type": block_type.replace("_", " ").title(),
+                        "params": params,
+                        "condition": f"{block_type} filter",
+                    }
+                )
+            elif block_type.upper() in {k.upper() for k in block_type_map}:
+                mapped_type = next(
+                    (v for k, v in block_type_map.items() if k.upper() == block_type.upper()),
+                    "RSI",
+                )
+                signals.append(
+                    {
+                        "id": block_id,
+                        "type": mapped_type,
+                        "params": params,
+                        "weight": 1.0,
+                        "condition": f"{mapped_type} signal from block '{block_id}'",
+                    }
+                )
+
+        # Fallback: if no signals extracted but we have blocks, add a generic RSI signal
+        if not signals:
+            signals.append(
+                {
+                    "id": "signal_1",
+                    "type": "RSI",
+                    "params": {"period": 14, "overbought": 70, "oversold": 30},
+                    "weight": 1.0,
+                    "condition": "RSI-based signal (auto-generated from blocks)",
+                }
+            )
+            logger.warning(
+                "[ResponseParser] blocks/connections format: could not map any blocks to signals; "
+                "inserted fallback RSI signal"
+            )
+
+        result = {
+            "strategy_name": data.get("strategy_name", data.get("name", "LLM_Generated_Strategy")),
+            "description": data.get("description", "Strategy converted from blocks/connections format"),
+            "signals": signals,
+            "filters": filters,
+        }
+
+        # Carry over exit conditions if present in blocks format
+        for key in ("entry_conditions", "exit_conditions", "position_management", "optimization_hints"):
+            if key in data:
+                result[key] = data[key]
+
+        logger.info(
+            f"[ResponseParser] Converted blocks/connections format: "
+            f"{len(data.get('blocks', []))} blocks → {len(signals)} signals, {len(filters)} filters"
+        )
+        return result
 
     def _build_strategy_manual(self, data: dict[str, Any], agent_name: str) -> StrategyDefinition:
         """Manual StrategyDefinition construction for non-standard LLM output."""

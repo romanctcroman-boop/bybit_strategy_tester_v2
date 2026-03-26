@@ -24,6 +24,7 @@ Output graph format matches StrategyBuilderAdapter.__init__(strategy_graph):
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 from typing import Any
 
@@ -73,9 +74,28 @@ _SIGNAL_CAT_A: dict[str, dict[str, Any]] = {
     },
     "SuperTrend": {
         "block_type": "supertrend",
-        "activate": {"use_supertrend": True},
+        # generate_on_trend_change=True fires only on direction flip (not every bar).
+        # Without it, SuperTrend outputs True on ~50% of all bars → commission bleed.
+        "activate": {"use_supertrend": True, "generate_on_trend_change": True},
         "param_renames": {},
         "default_params": {"period": 10, "multiplier": 3.0},
+    },
+    # Bollinger Bands — use keltner_bollinger block (outputs long/short bool directly)
+    # Rebound mode: long when price bounces off lower band, short when off upper band
+    "Bollinger": {
+        "block_type": "keltner_bollinger",
+        "activate": {
+            "use_channel": True,
+            "channel_type": "Bollinger Bands",
+            "channel_mode": "Rebound",
+            "enter_conditions": "Out-of-band closure",
+        },
+        "param_renames": {
+            "period": "bb_length",
+            "std_dev": "bb_deviation",
+            "bb_period": "bb_length",
+        },
+        "default_params": {"bb_length": 20, "bb_deviation": 2.0},
     },
     # EMA/SMA crossovers map to two_mas with use_ma_cross
     "EMA_Crossover": {
@@ -122,6 +142,19 @@ _SIGNAL_CAT_A: dict[str, dict[str, Any]] = {
             "ma1_smoothing": "SMA",
             "ma2_length": 50,
             "ma2_smoothing": "SMA",
+        },
+    },
+    # VWAP: price-relative signal using MA1 filter (price > MA1 → long, price < MA1 → short)
+    # Approximates VWAP behaviour with a 50-period EMA (volume-weighting not available in blocks)
+    "VWAP": {
+        "block_type": "two_mas",
+        "activate": {"use_ma1_filter": True},
+        "param_renames": {"period": "ma1_length"},
+        "default_params": {
+            "ma1_length": 50,
+            "ma1_smoothing": "EMA",
+            "ma2_length": 100,
+            "ma2_smoothing": "EMA",
         },
     },
 }
@@ -173,61 +206,11 @@ _SIGNAL_CAT_B: dict[str, dict[str, Any]] = {
         "short_threshold_key": "threshold",
         "short_threshold_default": 25.0,
     },
-    "ATR": {
-        "block_type": "atr",
-        "output_port": "value",
-        "param_renames": {},
-        "default_params": {"period": 14},
-        # ATR > threshold = high volatility filter
-        "long_condition": "greater_than",
-        "long_threshold_key": "threshold",
-        "long_threshold_default": 0.0,
-        "short_condition": "greater_than",
-        "short_threshold_key": "threshold",
-        "short_threshold_default": 0.0,
-    },
-    "VWAP": {
-        "block_type": "vwap",
-        "output_port": "value",
-        "param_renames": {},
-        "default_params": {},
-        # long when price > VWAP (need price block)
-        "long_condition": "crossover",  # uses price_block a, indicator b
-        "long_threshold_key": None,
-        "long_threshold_default": None,
-        "short_condition": "crossunder",
-        "short_threshold_key": None,
-        "short_threshold_default": None,
-        "use_price_as_a": True,  # special: compare close price vs indicator value
-    },
-    "OBV": {
-        "block_type": "obv",
-        "output_port": "value",
-        "param_renames": {},
-        "default_params": {},
-        # OBV is typically used as a divergence / trend-confirmation filter.
-        # Fallback: greater_than 0 (rising OBV → long)
-        "long_condition": "greater_than",
-        "long_threshold_key": "threshold",
-        "long_threshold_default": 0.0,
-        "short_condition": "less_than",
-        "short_threshold_key": "threshold",
-        "short_threshold_default": 0.0,
-    },
-    "Bollinger": {
-        "block_type": "bollinger",
-        "output_port": "lower",  # long: close crossover lower band
-        "param_renames": {},
-        "default_params": {"period": 20, "std_dev": 2.0},
-        "long_condition": "crossover",  # close crosses above lower band
-        "long_threshold_key": None,
-        "long_threshold_default": None,
-        "short_condition": "crossunder",  # close crosses below upper band
-        "short_threshold_key": None,
-        "short_threshold_default": None,
-        "use_price_as_a": True,
-        "short_output_port": "upper",  # short: compare against upper band
-    },
+    # ATR removed from Cat B signals — ATR > 0 is always true (useless).
+    # Use "Volatility" filter type instead for ATR-based volatility gating.
+    # Bollinger moved to Cat A via keltner_bollinger (see _SIGNAL_CAT_A)
+    # VWAP moved to Cat A via two_mas (use_price_as_a path requires unsupported "input" block)
+    # OBV removed — threshold comparisons on cumulative OBV are unreliable; use Volume filter instead
 }
 
 # Category A filter blocks: produce long/short directly when activated
@@ -274,6 +257,56 @@ _FILTER_BLOCK_MAP: dict[str, dict[str, Any]] = {
         "threshold_default": 25.0,
     },
     "Time": None,  # No equivalent block — skip with warning
+}
+
+# Aliases for filter type names the LLM commonly produces that differ from canonical names
+_FILTER_TYPE_ALIASES: dict[str, str] = {
+    # Volatility
+    "ATR Volatility": "Volatility",
+    "ATR_Volatility": "Volatility",
+    "Volatility Filter": "Volatility",
+    "ATR Filter": "Volatility",
+    # Volume
+    "Volume Filter": "Volume",
+    "Volume_Filter": "Volume",
+    "Volume Confirmation": "Volume",
+    # Trend
+    "Trend Filter": "Trend",
+    "Trend_Filter": "Trend",
+    "MA Filter": "Trend",
+    "EMA Filter": "Trend",
+    "Moving Average Filter": "Trend",
+    # ADX
+    "ADX Filter": "ADX",
+    "ADX Trend": "ADX",
+    "Trend Strength": "ADX",
+}
+
+# Aliases for signal type names the LLM commonly produces
+_SIGNAL_TYPE_ALIASES: dict[str, str] = {
+    # Bollinger variants
+    "Bollinger Bands": "Bollinger",
+    "Bollinger Band": "Bollinger",
+    "Bollinger Channel": "Bollinger",
+    "Keltner/Bollinger Channel": "Bollinger",
+    "BB": "Bollinger",
+    # VWAP variants
+    "VWAP Filter": "VWAP",
+    "Volume Weighted": "VWAP",
+    # SuperTrend variants
+    "Supertrend": "SuperTrend",
+    "Super Trend": "SuperTrend",
+    # EMA/SMA crossover variants
+    "EMA Cross": "EMA_Crossover",
+    "EMA Crossover": "EMA_Crossover",
+    "SMA Cross": "SMA_Crossover",
+    "SMA Crossover": "SMA_Crossover",
+    # MACD variants
+    "MACD Cross": "MACD",
+    "MACD Crossover": "MACD",
+    # Stochastic variants
+    "Stoch": "Stochastic",
+    "Stochastic RSI": "Stochastic",
 }
 
 
@@ -359,36 +392,50 @@ class StrategyDefToGraphConverter:
                 filter_short_ids.append(short_out)
 
         # ── Combine signals + filters and wire to strategy_node ──────────
-        all_long = long_signal_ids + filter_long_ids
-        all_short = short_signal_ids + filter_short_ids
+        # IMPORTANT: Filters are symmetric (same True/False for long and short).
+        # They must ALWAYS be AND-combined with the signal result — never OR-combined.
+        # OR-combining a symmetric filter with signals creates simultaneous long+short
+        # entries on the same bar, causing engine confusion and 0 completed trades.
+        # Strategy: combine signals with entry logic (AND/OR), then AND all filters.
 
-        if all_long:
-            long_src, new_blocks, new_conns = self._combine_signals(all_long, logic, "long")
-            blocks.extend(new_blocks)
-            connections.extend(new_conns)
-            connections.append(
-                {
-                    "from": long_src[0],
-                    "fromPort": long_src[1],
-                    "to": strategy_node_id,
-                    "toPort": "entry_long",
-                }
-            )
-        else:
-            warnings.append("No long signals generated — strategy_node entry_long will be empty")
+        def _wire_direction(
+            signal_ids: list[tuple[str, str]],
+            filter_ids: list[tuple[str, str]],
+            direction: str,
+            port: str,
+        ) -> None:
+            if not signal_ids and not filter_ids:
+                warnings.append(f"No {direction} signals generated — strategy_node {port} will be empty")
+                return
 
-        if all_short:
-            short_src, new_blocks, new_conns = self._combine_signals(all_short, logic, "short")
-            blocks.extend(new_blocks)
-            connections.extend(new_conns)
-            connections.append(
-                {
-                    "from": short_src[0],
-                    "fromPort": short_src[1],
-                    "to": strategy_node_id,
-                    "toPort": "entry_short",
-                }
-            )
+            # Combine directional signals with the strategy's entry logic
+            if signal_ids:
+                sig_src, new_b, new_c = self._combine_signals(signal_ids, logic, direction)
+                blocks.extend(new_b)
+                connections.extend(new_c)
+            else:
+                sig_src = None
+
+            # Always AND-combine filters with the signal result
+            if filter_ids and sig_src is not None:
+                # AND gate: [signals_result, filter1, filter2, ...]
+                final_src, new_b, new_c = self._combine_signals(
+                    [sig_src, *filter_ids], "AND", f"{direction}_filter_gate"
+                )
+                blocks.extend(new_b)
+                connections.extend(new_c)
+            elif filter_ids:
+                # No signal blocks — only filters: AND-combine filters only
+                final_src, new_b, new_c = self._combine_signals(filter_ids, "AND", f"{direction}_filter_gate")
+                blocks.extend(new_b)
+                connections.extend(new_c)
+            else:
+                final_src = sig_src
+
+            connections.append({"from": final_src[0], "fromPort": final_src[1], "to": strategy_node_id, "toPort": port})
+
+        _wire_direction(long_signal_ids, filter_long_ids, "long", "entry_long")
+        _wire_direction(short_signal_ids, filter_short_ids, "short", "entry_short")
 
         graph = {
             "name": strategy_def.strategy_name,
@@ -421,7 +468,9 @@ class StrategyDefToGraphConverter:
         list[dict[str, Any]],  # new connections
         list[str],  # warnings
     ]:
-        sig_type = signal.type
+        sig_type = _SIGNAL_TYPE_ALIASES.get(signal.type, signal.type)
+        if sig_type != signal.type:
+            logger.debug(f"[GraphConverter] Signal alias: '{signal.type}' → '{sig_type}'")
         new_blocks: list[dict[str, Any]] = []
         new_conns: list[dict[str, Any]] = []
         warn: list[str] = []
@@ -437,12 +486,17 @@ class StrategyDefToGraphConverter:
                 cfg["activate"],
                 interval,
             )
-            # RSI legacy mode: if no range/cross flags set, ensure oversold/overbought are present
-            if sig_type == "RSI" and not any(
-                params.get(k) for k in ("use_long_range", "use_cross_level", "use_short_range")
-            ):
-                params.setdefault("oversold", 30)
-                params.setdefault("overbought", 70)
+            # RSI: always force edge-triggered (cross_level) mode to prevent high-frequency signals.
+            # Range mode fires 8-69% of bars → commission bleed. Cross mode fires only at threshold crossing.
+            if sig_type == "RSI":
+                oversold = float(params.get("oversold", params.get("cross_long_level", 30)))
+                overbought = float(params.get("overbought", params.get("cross_short_level", 70)))
+                params["use_cross_level"] = True
+                params["cross_long_level"] = oversold
+                params["cross_short_level"] = overbought
+                # Clear range-mode flags so they don't interfere
+                params.pop("use_long_range", None)
+                params.pop("use_short_range", None)
             new_blocks.append({"id": block_id, "type": cfg["block_type"], "params": params, "isMain": False})
             return (block_id, "long"), (block_id, "short"), new_blocks, new_conns, warn
 
@@ -500,40 +554,30 @@ class StrategyDefToGraphConverter:
         threshold_key_name = cfg.get(thresh_key)
         threshold_value = cfg.get(thresh_default)
         if threshold_key_name and threshold_key_name in signal_params:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 threshold_value = float(signal_params[threshold_key_name])
-            except (TypeError, ValueError):
-                pass
 
         cond_id = self._next_id("cond")
 
         if use_price_as_a:
-            # Need a price input block: close price for port "a"
-            price_id = self._next_id("price_input")
-            new_blocks.append({"id": price_id, "type": "input", "params": {"input_type": "price"}, "isMain": False})
-            new_blocks.append(
-                {"id": cond_id, "type": "condition", "params": {"condition_type": condition_type}, "isMain": False}
-            )
-            new_conns.append({"from": price_id, "fromPort": "close", "to": cond_id, "toPort": "a"})
-            new_conns.append({"from": ind_id, "fromPort": out_port, "to": cond_id, "toPort": "b"})
+            # VWAP-like compare: price vs indicator value.
+            # "input"/"price" block types are not in BLOCK_REGISTRY — skip this path.
+            # Callers should use Cat A (two_mas) instead of Cat B for VWAP.
+            return None
         elif threshold_value is not None:
-            # Use a constant block for the threshold
-            const_id = self._next_id("const")
+            # Use the actual condition block type (e.g. "greater_than", "less_than")
+            # and embed the threshold in params["threshold_b"] — no constant block needed.
             new_blocks.append(
                 {
-                    "id": const_id,
-                    "type": "input",
-                    "params": {"input_type": "constant", "value": threshold_value},
+                    "id": cond_id,
+                    "type": condition_type,  # "greater_than" / "less_than" — in BLOCK_CATEGORY_MAP
+                    "params": {"threshold_b": threshold_value},
                     "isMain": False,
                 }
             )
-            new_blocks.append(
-                {"id": cond_id, "type": "condition", "params": {"condition_type": condition_type}, "isMain": False}
-            )
             new_conns.append({"from": ind_id, "fromPort": out_port, "to": cond_id, "toPort": "a"})
-            new_conns.append({"from": const_id, "fromPort": "value", "to": cond_id, "toPort": "b"})
         else:
-            # No threshold, no price — skip
+            # No threshold — skip
             return None
 
         return cond_id, "result"
@@ -558,14 +602,16 @@ class StrategyDefToGraphConverter:
         new_conns: list[dict[str, Any]] = []
         warn: list[str] = []
 
-        # Normalize filter type
-        flt_type = flt.type
+        # Normalize filter type (apply aliases first)
+        flt_type = _FILTER_TYPE_ALIASES.get(flt.type, flt.type)
+        if flt_type != flt.type:
+            logger.debug(f"[GraphConverter] Filter alias: '{flt.type}' → '{flt_type}'")
         cfg = _FILTER_BLOCK_MAP.get(flt_type)
         if cfg is None:
             if flt_type == "Time":
                 warn.append("Time filter not supported as a block — skipped")
             else:
-                warn.append(f"Unknown filter type '{flt_type}' — skipped")
+                warn.append(f"Unknown filter type '{flt.type}' — skipped")
             return None, None, new_blocks, new_conns, warn
 
         if cfg.get("needs_condition"):
@@ -580,26 +626,17 @@ class StrategyDefToGraphConverter:
             )
             new_blocks.append({"id": ind_id, "type": cfg["block_type"], "params": ind_params, "isMain": False})
             threshold = float(flt.params.get("threshold", cfg.get("threshold_default", 25.0)))
-            const_id = self._next_id("const")
+            cond_type = cfg.get("condition_type", "greater_than")
             cond_id = self._next_id("cond")
             new_blocks.append(
                 {
-                    "id": const_id,
-                    "type": "input",
-                    "params": {"input_type": "constant", "value": threshold},
-                    "isMain": False,
-                }
-            )
-            new_blocks.append(
-                {
                     "id": cond_id,
-                    "type": "condition",
-                    "params": {"condition_type": cfg.get("condition_type", "greater_than")},
+                    "type": cond_type,  # actual type e.g. "greater_than" — in BLOCK_CATEGORY_MAP
+                    "params": {"threshold_b": threshold},
                     "isMain": False,
                 }
             )
             new_conns.append({"from": ind_id, "fromPort": "value", "to": cond_id, "toPort": "a"})
-            new_conns.append({"from": const_id, "fromPort": "value", "to": cond_id, "toPort": "b"})
             # Filter applies equally to both directions
             return (cond_id, "result"), (cond_id, "result"), new_blocks, new_conns, warn
 
@@ -652,11 +689,11 @@ class StrategyDefToGraphConverter:
             new_blocks.append({"id": gate_id, "type": logic_type, "params": {}, "isMain": False})
 
             ports = ["a", "b", "c"]
-            for port, (src_id, src_port) in zip(ports, chunk):
+            for port, (src_id, src_port) in zip(ports, chunk, strict=False):
                 new_conns.append({"from": src_id, "fromPort": src_port, "to": gate_id, "toPort": port})
 
             # The output of this gate becomes a new signal for the next round
-            current_signals = [(gate_id, "output")] + remaining
+            current_signals = [(gate_id, "output"), *remaining]
 
         return current_signals[0], new_blocks, new_conns
 

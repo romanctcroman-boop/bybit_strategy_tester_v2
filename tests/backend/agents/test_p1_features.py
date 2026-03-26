@@ -15,7 +15,6 @@ import asyncio
 import os
 import sqlite3
 import tempfile
-import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
@@ -24,7 +23,6 @@ import pytest
 
 from backend.agents.langgraph_orchestrator import (
     AgentGraph,
-    AgentNode,
     AgentState,
     BudgetExceededError,
     FunctionAgent,
@@ -35,7 +33,6 @@ from backend.agents.trading_strategy_graph import (
     WalkForwardValidationNode,
     build_trading_strategy_graph,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -198,10 +195,18 @@ class TestPostRunReflectionNode:
     def _make_passing_state(self) -> AgentState:
         state = AgentState(context={"symbol": "BTCUSDT", "timeframe": "15"})
         state.set_result("analyze_market", {"regime": "trending_bull", "trend": "up"})
-        state.set_result("backtest", {"metrics": {
-            "sharpe_ratio": 1.2, "max_drawdown": 8.0, "total_trades": 25,
-            "win_rate": 0.60, "profit_factor": 1.8,
-        }})
+        state.set_result(
+            "backtest",
+            {
+                "metrics": {
+                    "sharpe_ratio": 1.2,
+                    "max_drawdown": 8.0,
+                    "total_trades": 25,
+                    "win_rate": 0.60,
+                    "profit_factor": 1.8,
+                }
+            },
+        )
         state.set_result("backtest_analysis", {"passed": True, "severity": "pass", "root_cause": "none"})
         state.context["backtest_analysis"] = {"passed": True, "severity": "pass", "root_cause": "none"}
         return state
@@ -209,23 +214,32 @@ class TestPostRunReflectionNode:
     def _make_failing_state(self) -> AgentState:
         state = AgentState(context={"symbol": "ETHUSDT", "timeframe": "60"})
         state.set_result("analyze_market", {"regime": "ranging", "trend": "sideways"})
-        state.set_result("backtest", {"metrics": {
-            "sharpe_ratio": -0.3, "max_drawdown": 35.0, "total_trades": 2,
-            "win_rate": 0.10, "profit_factor": 0.5,
-        }})
-        state.set_result("backtest_analysis", {
-            "passed": False, "severity": "catastrophic", "root_cause": "poor_risk_reward"
-        })
+        state.set_result(
+            "backtest",
+            {
+                "metrics": {
+                    "sharpe_ratio": -0.3,
+                    "max_drawdown": 35.0,
+                    "total_trades": 2,
+                    "win_rate": 0.10,
+                    "profit_factor": 0.5,
+                }
+            },
+        )
+        state.set_result(
+            "backtest_analysis", {"passed": False, "severity": "catastrophic", "root_cause": "poor_risk_reward"}
+        )
         state.context["backtest_analysis"] = {
-            "passed": False, "severity": "catastrophic", "root_cause": "poor_risk_reward"
+            "passed": False,
+            "severity": "catastrophic",
+            "root_cause": "poor_risk_reward",
         }
         return state
 
     def test_reflection_sets_result(self):
         node = PostRunReflectionNode()
         state = self._make_passing_state()
-        with patch("backend.agents.trading_strategy_graph.PostRunReflectionNode.execute",
-                   wraps=node.execute):
+        with patch("backend.agents.trading_strategy_graph.PostRunReflectionNode.execute", wraps=node.execute):
             with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory") as mock_mem:
                 mock_mem.return_value.store = AsyncMock()
                 result_state = _run(node.execute(state))
@@ -300,27 +314,36 @@ class TestPostRunReflectionNode:
 
 
 class TestWalkForwardValidationNode:
-    def _make_state_with_backtest(
-        self, sharpe: float = 1.0, df_size: int = 400
-    ) -> AgentState:
-        state = AgentState(context={
-            "symbol": "BTCUSDT",
-            "timeframe": "15",
-            "df": _make_df(df_size),
-            "strategy_graph": {"name": "test", "blocks": [], "connections": []},
-        })
-        state.set_result("backtest", {"metrics": {
-            "sharpe_ratio": sharpe, "max_drawdown": 10.0, "total_trades": 20,
-        }})
+    def _make_state_with_backtest(self, sharpe: float = 1.0, df_size: int = 400) -> AgentState:
+        state = AgentState(
+            context={
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "df": _make_df(df_size),
+                "strategy_graph": {"name": "test", "blocks": [], "connections": []},
+            }
+        )
+        state.set_result(
+            "backtest",
+            {
+                "metrics": {
+                    "sharpe_ratio": sharpe,
+                    "max_drawdown": 10.0,
+                    "total_trades": 20,
+                }
+            },
+        )
         return state
 
     def test_skip_when_negative_is_sharpe(self):
+        """Negative IS Sharpe → hard reject (not skip) — strategy is unprofitable."""
         node = WalkForwardValidationNode()
         state = self._make_state_with_backtest(sharpe=-0.5)
         result_state = _run(node.execute(state))
         r = result_state.results["wf_validation"]
-        assert r["skipped"] is True
-        assert r["passed"] is True  # don't block
+        assert r["skipped"] is False  # Not skipped — explicitly rejected
+        assert r["passed"] is False  # Hard reject: unprofitable strategy
+        assert r["reason"] == "negative_is_sharpe"
 
     def test_skip_when_no_df(self):
         node = WalkForwardValidationNode()
@@ -398,10 +421,12 @@ class TestFewShotInjection:
         from backend.agents.trading_strategy_graph import MemoryRecallNode
 
         node = MemoryRecallNode()
-        state = AgentState(context={
-            "symbol": "BTCUSDT",
-            "timeframe": "15",
-        })
+        state = AgentState(
+            context={
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+            }
+        )
         state.set_result("analyze_market", {"regime": "trending_bull"})
 
         # Mock memory returning wins
@@ -414,8 +439,7 @@ class TestFewShotInjection:
         mock_memory = MagicMock()
         mock_memory.recall = AsyncMock(return_value=[mock_win])
 
-        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory",
-                   return_value=mock_memory):
+        with patch("backend.agents.memory.hierarchical_memory.HierarchicalMemory", return_value=mock_memory):
             result_state = _run(node.execute(state))
 
         # few_shot_examples should be in context
@@ -429,12 +453,14 @@ class TestFewShotInjection:
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
 
         node = GenerateStrategiesNode()
-        state = AgentState(context={
-            "symbol": "BTCUSDT",
-            "timeframe": "15",
-            "agents": ["deepseek"],
-            "few_shot_examples": ["EXAMPLE (Sharpe=1.2, agent=deepseek): RSI period=14 works well in trend."],
-        })
+        state = AgentState(
+            context={
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "agents": ["deepseek"],
+                "few_shot_examples": ["EXAMPLE (Sharpe=1.2, agent=deepseek): RSI period=14 works well in trend."],
+            }
+        )
         _market_ctx = MagicMock(market_regime="trending_bull", trend_direction="up", current_price=40000.0)
         _market_ctx.to_prompt_vars.return_value = {
             "symbol": "BTCUSDT",
@@ -453,10 +479,13 @@ class TestFewShotInjection:
             "indicators_summary": "RSI=55",
             "volume_summary": "Avg volume: 1000, Profile: high",
         }
-        state.set_result("analyze_market", {
-            "market_context": _market_ctx,
-            "regime": "trending_bull",
-        })
+        state.set_result(
+            "analyze_market",
+            {
+                "market_context": _market_ctx,
+                "regime": "trending_bull",
+            },
+        )
 
         prompts_captured = []
 

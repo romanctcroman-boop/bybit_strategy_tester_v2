@@ -28,6 +28,7 @@ for better observability, retry logic, and conditional routing.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 from typing import Any
 
@@ -41,7 +42,6 @@ from backend.agents.langgraph_orchestrator import (
     BudgetExceededError,
     ConditionalRouter,
     FunctionAgent,
-    make_pipeline_event_queue,
     make_sqlite_checkpointer,
     register_graph,
 )
@@ -127,8 +127,8 @@ class RegimeClassifierNode(AgentNode):
         crypto_risk_off — bearish + very high volatility (ATR > 3%)
     """
 
-    _ADX_TREND_THRESHOLD = 20.0    # above → trending
-    _ATR_HIGH_THRESHOLD = 2.5      # % → high volatility
+    _ADX_TREND_THRESHOLD = 20.0  # above → trending
+    _ATR_HIGH_THRESHOLD = 2.5  # % → high volatility
     _ATR_RISK_OFF_THRESHOLD = 3.5  # % → crypto risk-off
 
     def __init__(self) -> None:
@@ -199,7 +199,7 @@ class DebateNode(AgentNode):
 
     _MAX_ROUNDS = 3
     _KS_STABILITY_THRESHOLD = 0.05  # p-value above which debate is considered stable
-    _SIMILARITY_THRESHOLD = 0.90    # P2-2: cosine sim above this → responses converged
+    _SIMILARITY_THRESHOLD = 0.90  # P2-2: cosine sim above this → responses converged
 
     def __init__(self) -> None:
         super().__init__(
@@ -414,9 +414,7 @@ class MemoryRecallNode(AgentNode):
                 sharpe = meta.get("sharpe_ratio", "?")
                 agent = meta.get("agent", "AI")
                 snippet = m.content[:300].replace("\n", " ")
-                few_shot_examples.append(
-                    f"EXAMPLE (Sharpe={sharpe}, agent={agent}): {snippet}"
-                )
+                few_shot_examples.append(f"EXAMPLE (Sharpe={sharpe}, agent={agent}): {snippet}")
 
             if few_shot_examples:
                 state.context["few_shot_examples"] = few_shot_examples
@@ -529,9 +527,7 @@ class GenerateStrategiesNode(AgentNode):
             few_shot_block = (
                 "## Proven Strategy Examples (few-shot)\n"
                 "The following strategies worked well in similar conditions. "
-                "Use them as inspiration — adapt, don't copy verbatim:\n\n"
-                + "\n\n".join(few_shot_examples)
-                + "\n"
+                "Use them as inspiration — adapt, don't copy verbatim:\n\n" + "\n\n".join(few_shot_examples) + "\n"
             )
             logger.info(f"🎯 [GenerateStrategies] Injecting {len(few_shot_examples)} few-shot examples")
 
@@ -938,9 +934,58 @@ class BuildGraphNode(AgentNode):
 
         timeframe = state.context.get("timeframe", "15")
 
+        # Log the StrategyDefinition for debugging signal/filter counts
+        n_signals = len(strategy.signals) if hasattr(strategy, "signals") else 0
+        n_filters = len(strategy.filters) if hasattr(strategy, "filters") else 0
+        sig_types = [s.type for s in strategy.signals] if hasattr(strategy, "signals") else []
+        logger.info(
+            f"[BuildGraphNode] Converting '{getattr(strategy, 'strategy_name', '?')}': "
+            f"{n_signals} signals={sig_types}, {n_filters} filters"
+        )
+
         try:
             converter = StrategyDefToGraphConverter()
             graph, warnings = converter.convert(strategy, interval=timeframe)
+
+            # Count non-strategy indicator blocks
+            indicator_blocks = [b for b in graph.get("blocks", []) if b.get("type") != "strategy"]
+            skipped_warnings = [w for w in warnings if "skipped" in w.lower()]
+            if skipped_warnings:
+                logger.warning(f"[BuildGraphNode] Signals dropped during conversion: {skipped_warnings}")
+
+            # Hard guard: if graph has 0 indicator blocks, it will overtrade or do nothing
+            if len(indicator_blocks) == 0:
+                msg = (
+                    f"Graph conversion produced 0 indicator blocks "
+                    f"(strategy_name='{getattr(strategy, 'strategy_name', '?')}', "
+                    f"signals={sig_types}, skipped={skipped_warnings}). "
+                    f"All signals were unrecognised or filtered out."
+                )
+                logger.error(f"[BuildGraphNode] {msg}")
+                state.add_error(self.name, ValueError(msg))
+                state.context["strategy_graph"] = None
+                state.context["graph_warnings"] = [*warnings, msg]
+                return state
+
+            # Soft guard: if >50% of original signals+filters were dropped, refinement is needed.
+            # A strategy missing most of its logic cannot validate the LLM's hypothesis.
+            n_original = n_signals + n_filters
+            n_dropped = len(skipped_warnings)
+            if n_original > 1 and n_dropped > n_original // 2:
+                msg = (
+                    f"Graph conversion dropped {n_dropped}/{n_original} signals/filters "
+                    f"({skipped_warnings}). Only {len(indicator_blocks)} indicator block(s) remain. "
+                    f"Regenerate with ONLY supported types: "
+                    f"RSI, MACD, EMA_Crossover, SMA_Crossover, EMA, SMA, Bollinger, SuperTrend, "
+                    f"Stochastic, CCI, ATR, ADX, Williams_R, VWAP, OBV. "
+                    f"Filters: Volatility, Volume, Trend, ADX."
+                )
+                logger.warning(f"[BuildGraphNode] {msg}")
+                state.add_error(self.name, ValueError(msg))
+                state.context["strategy_graph"] = None
+                state.context["graph_warnings"] = [*warnings, msg]
+                return state
+
             state.context["strategy_graph"] = graph
             state.context["graph_warnings"] = warnings
             if warnings:
@@ -956,7 +1001,12 @@ class BuildGraphNode(AgentNode):
 
             state.set_result(
                 self.name,
-                {"blocks": len(graph["blocks"]), "connections": len(graph["connections"]), "warnings": warnings},
+                {
+                    "blocks": len(graph["blocks"]),
+                    "connections": len(graph["connections"]),
+                    "indicator_blocks": len(indicator_blocks),
+                    "warnings": warnings,
+                },
             )
         except Exception as exc:
             logger.warning(f"[BuildGraphNode] Graph conversion failed (non-fatal): {exc}")
@@ -1009,7 +1059,7 @@ class BacktestNode(AgentNode):
 
             bridge = BacktestBridge()
             # strategy is only available in non-seed_mode (select_result was retrieved above)
-            bridge_strategy = state.get_result("select_best", {}).get("selected_strategy")
+            bridge_strategy = (state.get_result("select_best") or {}).get("selected_strategy")
             metrics = await bridge.run_strategy(
                 strategy=bridge_strategy,
                 symbol=symbol,
@@ -1039,7 +1089,7 @@ class BacktestNode(AgentNode):
 
             tracker = AgentPerformanceTracker()
             selected_agent = select_result.get("selected_agent", "unknown")
-            strategy_type = getattr(strategy, "strategy_type", "unknown")
+            strategy_type = getattr(bridge_strategy, "strategy_type", "unknown")
             sharpe = metrics.get("sharpe_ratio", 0.0)
             passed = metrics.get("total_trades", 0) >= 5 and sharpe > 0 and metrics.get("max_drawdown", 100) < 30
             tracker.record_result(
@@ -1070,25 +1120,89 @@ class BacktestNode(AgentNode):
         from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
 
         def _run_sync() -> dict:
+            from datetime import UTC
+
             adapter = StrategyBuilderAdapter(strategy_graph)
             signal_result = adapter.generate_signals(df)
 
+            # Derive start/end dates from the OHLCV DataFrame index
+            # (BacktestConfig requires interval, start_date, end_date as mandatory fields)
+            df_start = df.index[0]
+            df_end = df.index[-1]
+            if hasattr(df_start, "to_pydatetime"):
+                df_start = df_start.to_pydatetime()
+            if hasattr(df_end, "to_pydatetime"):
+                df_end = df_end.to_pydatetime()
+            # Ensure timezone-aware datetimes
+            if df_start.tzinfo is None:
+                df_start = df_start.replace(tzinfo=UTC)
+            if df_end.tzinfo is None:
+                df_end = df_end.replace(tzinfo=UTC)
+
+            # Extract SL/TP from StrategyDefinition so positions actually close.
+            # Without SL/TP and no exit signals, positions stay open → total_trades=0.
+            _sl: float = 0.02  # default 2%
+            _tp: float = 0.03  # default 3%
+            _selected = (state.get_result("select_best") or {}).get("selected_strategy")
+            if _selected is not None and not isinstance(_selected, dict):
+                try:
+                    ec = getattr(_selected, "exit_conditions", None)
+                    if ec:
+                        if getattr(ec, "stop_loss", None):
+                            v = float(ec.stop_loss.value)
+                            _sl = v / 100 if v > 1 else v
+                        if getattr(ec, "take_profit", None):
+                            v = float(ec.take_profit.value)
+                            _tp = v / 100 if v > 1 else v
+                except Exception:
+                    pass
+            # Clamp to BacktestConfig valid ranges: SL ∈ [0.001, 0.5], TP ∈ [0.001, 1.0]
+            # Enforce sensible minimums: SL ≥ 0.5% and TP ≥ 0.5% to avoid instant SL/TP hits
+            _sl = max(0.005, min(_sl, 0.49))
+            _tp = max(0.005, min(_tp, 0.99))
+            # Enforce TP ≥ SL: inverted R:R (TP < SL) requires >67% win rate just to break even —
+            # most LLM-generated strategies can't sustain that. Fall back to TP = SL * 1.5.
+            if _tp < _sl:
+                logger.warning(
+                    f"[BacktestNode] Inverted R:R: TP={_tp:.3f} < SL={_sl:.3f} — correcting TP to SL*1.5"
+                )
+                _tp = min(_sl * 1.5, 0.99)
+            logger.info(f"[BacktestNode] SL={_sl:.4f} ({_sl * 100:.2f}%)  TP={_tp:.4f} ({_tp * 100:.2f}%)")
+
             cfg = BacktestConfig(
                 symbol=symbol,
-                timeframe=timeframe,
+                interval=timeframe,  # BacktestConfig field is 'interval', not 'timeframe'
+                start_date=df_start,
+                end_date=df_end,
                 initial_capital=state.context.get("initial_capital", INITIAL_CAPITAL),
                 leverage=state.context.get("leverage", 1),
                 direction="both",
                 commission_value=COMMISSION_TV,
+                stop_loss=_sl,
+                take_profit=_tp,
             )
 
             from backend.backtesting.engine import BacktestEngine
+            from backend.backtesting.strategies import BaseStrategy
+
+            # Wrap the pre-computed SignalResult so BacktestEngine can consume it
+            # via the `custom_strategy` parameter (signature: run(config, ohlcv, ..., custom_strategy))
+            _precomputed = signal_result
+
+            class _PrecomputedStrategy(BaseStrategy):
+                """Thin wrapper that returns already-generated signals to BacktestEngine."""
+
+                def _validate_params(self) -> None:
+                    pass
+
+                def generate_signals(self, ohlcv):
+                    return _precomputed
 
             engine = BacktestEngine()
             result = engine.run(
-                data=df,
-                signals=signal_result,
                 config=cfg,
+                ohlcv=df,
+                custom_strategy=_PrecomputedStrategy(),
             )
 
             # Convert PerformanceMetrics Pydantic model → plain dict so
@@ -1108,9 +1222,12 @@ class BacktestNode(AgentNode):
             # them here from result metrics so RefinementNode gets meaningful feedback.
             engine_warnings: list[str] = list(getattr(result, "analysis_warnings", []) or [])
             trades_count = metrics.get("total_trades", 0)
+            open_count = metrics.get("open_trades", 0)
+            # effective count: closed + end-of-backtest positions (is_open=True, TV parity)
+            effective_count = trades_count + open_count
             long_trades = metrics.get("long_trades", 0)
             short_trades = metrics.get("short_trades", 0)
-            if trades_count == 0:
+            if effective_count == 0:
                 engine_warnings.append(
                     "[NO_TRADES] Signals were generated but no trades executed. "
                     "Check that port names are correct (use 'long'/'short', not 'signal'/'output') "
@@ -1135,10 +1252,8 @@ class BacktestNode(AgentNode):
                     sample_trades.append(t)
                 elif hasattr(t, "model_dump"):
                     # Pydantic models: model_dump() gives clean field-only dict
-                    try:
+                    with contextlib.suppress(Exception):
                         sample_trades.append(t.model_dump())
-                    except Exception:
-                        pass
                 elif hasattr(t, "__dict__"):
                     sample_trades.append({k: v for k, v in t.__dict__.items() if not k.startswith("_")})
 
@@ -1220,21 +1335,32 @@ class BacktestAnalysisNode(AgentNode):
         engine_warnings: list[str] = list(backtest_result.get("engine_warnings", None) or [])
 
         trades: int = int(metrics.get("total_trades", 0))
+        # Include open (end-of-backtest) positions in the activity count — a position
+        # closed at EOB is counted as is_open=True by the engine (TV parity) and
+        # therefore excluded from closed-trade metrics.  For the purpose of deciding
+        # whether the strategy generated *any* market activity, count them together.
+        open_trades: int = int(metrics.get("open_trades", 0))
+        effective_trades: int = trades + open_trades
         sharpe: float = float(metrics.get("sharpe_ratio", -999.0))
         dd: float = float(metrics.get("max_drawdown", 100.0))
         win_rate: float = float(metrics.get("win_rate", 0.0))
 
         # ── Severity ──────────────────────────────────────────────────────────
         # sharpe > 0: strictly positive required — sharpe=0 means no alpha generated
-        passed = trades >= self.MIN_TRADES and sharpe > 0.0 and dd < self.MAX_DD_PCT
+        # Use effective_trades (closed + open/EOB) for activity check so that
+        # a position closed at end-of-backtest (is_open=True, TV parity) is not
+        # wrongly treated as "no activity".
+        passed = effective_trades >= self.MIN_TRADES and sharpe > 0.0 and dd < self.MAX_DD_PCT
 
         if passed:
             severity = "pass"
         elif (
-            -0.5 < sharpe <= 0 or (self.MIN_TRADES - 2 <= trades < self.MIN_TRADES) or 25.0 <= dd < self.MAX_DD_PCT
-        ) and not (sharpe < -0.5 or trades < 3 or dd >= self.MAX_DD_PCT):
+            -0.5 < sharpe <= 0
+            or (self.MIN_TRADES - 2 <= effective_trades < self.MIN_TRADES)
+            or 25.0 <= dd < self.MAX_DD_PCT
+        ) and not (sharpe < -0.5 or effective_trades < 3 or dd >= self.MAX_DD_PCT):
             severity = "near_miss"
-        elif sharpe < -1.5 or trades == 0 or dd >= 50.0:
+        elif sharpe < -1.5 or effective_trades == 0 or dd >= 50.0:
             severity = "catastrophic"
         else:
             severity = "moderate"
@@ -1243,15 +1369,15 @@ class BacktestAnalysisNode(AgentNode):
         warning_str = " ".join(engine_warnings)
         if "DIRECTION_MISMATCH" in warning_str:
             root_cause = "direction_mismatch"
-        elif trades == 0 and not engine_warnings:
+        elif effective_trades == 0 and not engine_warnings:
             root_cause = "no_signal"
         elif "NO_TRADES" in warning_str:
             root_cause = "signal_connectivity"
-        elif trades > 0 and win_rate < 0.05:
+        elif effective_trades > 0 and win_rate < 0.05:
             root_cause = "sl_too_tight"
-        elif dd >= self.MAX_DD_PCT and trades < self.MIN_TRADES:
+        elif dd >= self.MAX_DD_PCT and effective_trades < self.MIN_TRADES:
             root_cause = "excessive_risk"
-        elif trades < self.MIN_TRADES:
+        elif effective_trades < self.MIN_TRADES:
             root_cause = "low_activity"
         elif sharpe <= 0:
             root_cause = "poor_risk_reward"
@@ -1315,6 +1441,8 @@ class BacktestAnalysisNode(AgentNode):
             "suggestions": suggestions,
             "metrics_snapshot": {
                 "total_trades": trades,
+                "open_trades": open_trades,
+                "effective_trades": effective_trades,
                 "sharpe_ratio": round(sharpe, 3),
                 "max_drawdown": round(dd, 2),
                 "win_rate": round(win_rate, 4),
@@ -1327,7 +1455,7 @@ class BacktestAnalysisNode(AgentNode):
 
         logger.info(
             f"🔬 [BacktestAnalysisNode] severity={severity}, root_cause={root_cause}, "
-            f"trades={trades}, sharpe={sharpe:.2f}, dd={dd:.1f}%"
+            f"trades={trades}+{open_trades}open={effective_trades}eff, sharpe={sharpe:.2f}, dd={dd:.1f}%"
         )
         return state
 
@@ -1691,10 +1819,10 @@ class OptimizationNode(AgentNode):
 
         config_params = {
             "symbol": symbol,
-            "timeframe": timeframe,
+            "interval": timeframe,  # build_backtest_input expects 'interval', not 'timeframe'
             "initial_capital": initial_capital,
             "leverage": leverage,
-            "commission_value": COMMISSION_TV,
+            "commission": COMMISSION_TV,  # build_backtest_input key is 'commission'
             "direction": "both",
         }
 
@@ -2120,11 +2248,9 @@ class MLValidationNode(AgentNode):
 
             adapter = StrategyBuilderAdapter(strategy_graph)
             signal_result = adapter.generate_signals(df)
-            entries = (
-                signal_result.entries.values if hasattr(signal_result.entries, "values") else signal_result.entries
-            )
+            _ = signal_result.entries.values if hasattr(signal_result.entries, "values") else signal_result.entries
         except Exception:
-            entries = None
+            pass
 
         regime_sharpes: dict[str, float] = {}
         for i in range(n_regimes):
@@ -2180,7 +2306,7 @@ class MLValidationNode(AgentNode):
         for b_idx, param_name, orig_value in period_params:
             for frac in self.PERTURB_FRACTIONS:
                 perturbed_graph = copy.deepcopy(strategy_graph)
-                new_value = max(2, int(round(orig_value * (1.0 + frac))))
+                new_value = max(2, round(orig_value * (1.0 + frac)))
                 perturbed_graph["blocks"][b_idx]["params"][param_name] = new_value
 
                 try:
@@ -2256,8 +2382,7 @@ class HITLCheckNode(AgentNode):
             "wf_passed": wf.get("wf_passed", None),
             "regime": state.context.get("regime_classification", {}).get("regime", "unknown"),
             "message": (
-                "Pipeline paused for human review. "
-                "Set state.context['hitl_approved'] = True and re-run to continue."
+                "Pipeline paused for human review. Set state.context['hitl_approved'] = True and re-run to continue."
             ),
         }
 
@@ -2303,7 +2428,6 @@ class PostRunReflectionNode(AgentNode):
         backtest = state.get_result("backtest") or {}
         metrics = backtest.get("metrics", {}) or {}
         analysis = state.get_result("backtest_analysis") or {}
-        selected = state.get_result("select_best") or {}
         market = state.get_result("analyze_market") or {}
 
         symbol = state.context.get("symbol", "BTCUSDT")
@@ -2358,7 +2482,9 @@ class PostRunReflectionNode(AgentNode):
         if regime in ("ranging", "low_vol"):
             adjustments.append(f"In {regime} regime: prefer mean-reversion strategies (BB, RSI) over trend-following")
         elif regime in ("trending_bull", "trending_bear"):
-            adjustments.append(f"In {regime} regime: prefer trend-following (EMA crossover, Supertrend) over oscillators")
+            adjustments.append(
+                f"In {regime} regime: prefer trend-following (EMA crossover, Supertrend) over oscillators"
+            )
 
         reflection = {
             "symbol": symbol,
@@ -2445,9 +2571,9 @@ class WalkForwardValidationNode(AgentNode):
     """
 
     WF_RATIO_THRESHOLD: float = 0.5  # wf_sharpe / is_sharpe must exceed this
-    TRAIN_MONTHS: int = 3            # walk-forward training window
-    TEST_MONTHS: int = 1             # walk-forward test window
-    MIN_BARS_FOR_WF: int = 200       # skip WF if fewer bars available
+    TRAIN_MONTHS: int = 3  # walk-forward training window
+    TEST_MONTHS: int = 1  # walk-forward test window
+    MIN_BARS_FOR_WF: int = 200  # skip WF if fewer bars available
 
     def __init__(self) -> None:
         super().__init__(
@@ -2463,17 +2589,37 @@ class WalkForwardValidationNode(AgentNode):
         strategy_graph = state.context.get("strategy_graph") or backtest_result.get("strategy_graph")
         df: pd.DataFrame | None = state.context.get("df")
 
-        # Skip if no graph, no data, or in-sample sharpe already negative
-        if strategy_graph is None or df is None or df.empty or is_sharpe <= 0:
+        # Skip if missing inputs (graph or data not available)
+        if strategy_graph is None or df is None or df.empty:
             result = {
-                "passed": True,  # don't block on missing inputs
+                "passed": True,
                 "skipped": True,
-                "reason": "no_graph_or_negative_is_sharpe",
+                "reason": "no_graph_or_data",
                 "is_sharpe": is_sharpe,
             }
             state.set_result(self.name, result)
             state.context["wf_validation"] = result
             logger.debug(f"[WF] Skipped walk-forward: {result['reason']}")
+            return state
+
+        # Hard quality gate: negative IS Sharpe means strategy is unprofitable regardless of overfitting
+        if is_sharpe <= 0:
+            result = {
+                "passed": False,
+                "skipped": False,
+                "reason": "negative_is_sharpe",
+                "is_sharpe": round(is_sharpe, 4),
+                "wf_sharpe": None,
+                "ratio": None,
+            }
+            state.set_result(self.name, result)
+            state.context["wf_validation"] = result
+            # Flag backtest_analysis so _should_refine sees it
+            analysis = state.context.get("backtest_analysis", {})
+            analysis["passed"] = False
+            analysis["wf_failed"] = True
+            state.context["backtest_analysis"] = analysis
+            logger.warning(f"⚠️ [WF] Hard reject: IS Sharpe={is_sharpe:.3f} ≤ 0 — strategy is unprofitable")
             return state
 
         if len(df) < self.MIN_BARS_FOR_WF:
@@ -2490,9 +2636,8 @@ class WalkForwardValidationNode(AgentNode):
         # Run lightweight rolling walk-forward
         wf_sharpes: list[float] = []
         try:
-            wf_sharpes = await asyncio.to_thread(
-                self._run_rolling_wf, strategy_graph, df, is_sharpe
-            )
+            symbol = state.context.get("symbol", "BTCUSDT")
+            wf_sharpes = await asyncio.to_thread(self._run_rolling_wf, strategy_graph, df, is_sharpe, symbol)
         except Exception as exc:
             logger.warning(f"[WF] Walk-forward failed (non-fatal): {exc}")
             result = {"passed": True, "skipped": True, "reason": f"wf_error: {exc}", "is_sharpe": is_sharpe}
@@ -2501,8 +2646,10 @@ class WalkForwardValidationNode(AgentNode):
             return state
 
         wf_sharpe = sum(wf_sharpes) / len(wf_sharpes) if wf_sharpes else 0.0
-        ratio = wf_sharpe / is_sharpe if is_sharpe != 0 else 0.0
-        passed = ratio >= self.WF_RATIO_THRESHOLD
+        # Ratio only meaningful when IS Sharpe is positive (already guaranteed above).
+        # wf_sharpe must also be positive to pass; two-negative ratio is a false positive.
+        ratio = wf_sharpe / is_sharpe if is_sharpe > 0 else 0.0
+        passed = is_sharpe > 0 and wf_sharpe > 0 and ratio >= self.WF_RATIO_THRESHOLD
 
         result = {
             "passed": passed,
@@ -2531,12 +2678,14 @@ class WalkForwardValidationNode(AgentNode):
 
         return state
 
-    def _run_rolling_wf(
-        self, strategy_graph: dict, df: pd.DataFrame, is_sharpe: float
-    ) -> list[float]:
+    def _run_rolling_wf(self, strategy_graph: dict, df: pd.DataFrame, is_sharpe: float, symbol: str = "BTCUSDT") -> list[float]:
         """Synchronous: run rolling walk-forward windows, return list of test Sharpes."""
+        from datetime import UTC
+
         from backend.backtesting.engine import BacktestEngine
         from backend.backtesting.models import BacktestConfig
+        from backend.backtesting.strategies import BaseStrategy
+        from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
         from backend.config.constants import COMMISSION_TV
 
         bars_per_month = max(1, len(df) // 12)  # approximate
@@ -2544,23 +2693,100 @@ class WalkForwardValidationNode(AgentNode):
         test_bars = self.TEST_MONTHS * bars_per_month
         step_bars = test_bars
 
+        # Pre-compute signals once over the full dataset to avoid repeated adapter init
+        try:
+            adapter = StrategyBuilderAdapter(strategy_graph)
+            full_signals = adapter.generate_signals(df)
+        except Exception as e:
+            logger.warning(f"[WF] Failed to generate signals for WF windows: {e}")
+            return []
+
         results: list[float] = []
         i = 0
         while i + train_bars + test_bars <= len(df):
-            test_slice = df.iloc[i + train_bars: i + train_bars + test_bars]
+            test_slice = df.iloc[i + train_bars : i + train_bars + test_bars]
             if len(test_slice) < 30:
                 break
             try:
-                config = BacktestConfig(
+                # Derive timezone-aware start/end from this window's index
+                t_start = test_slice.index[0]
+                t_end = test_slice.index[-1]
+                if hasattr(t_start, "to_pydatetime"):
+                    t_start = t_start.to_pydatetime()
+                if hasattr(t_end, "to_pydatetime"):
+                    t_end = t_end.to_pydatetime()
+                if t_start.tzinfo is None:
+                    t_start = t_start.replace(tzinfo=UTC)
+                if t_end.tzinfo is None:
+                    t_end = t_end.replace(tzinfo=UTC)
+
+                # Slice pre-computed signals to this window
+                window_entries = full_signals.entries.iloc[i + train_bars : i + train_bars + test_bars]
+                window_exits = full_signals.exits.iloc[i + train_bars : i + train_bars + test_bars]
+                window_short_entries = (
+                    full_signals.short_entries.iloc[i + train_bars : i + train_bars + test_bars]
+                    if full_signals.short_entries is not None
+                    else None
+                )
+                window_short_exits = (
+                    full_signals.short_exits.iloc[i + train_bars : i + train_bars + test_bars]
+                    if full_signals.short_exits is not None
+                    else None
+                )
+
+                from backend.backtesting.strategies import SignalResult as _SR
+
+                window_signals = _SR(
+                    entries=window_entries,
+                    exits=window_exits,
+                    short_entries=window_short_entries,
+                    short_exits=window_short_exits,
+                    entry_sizes=None,
+                    short_entry_sizes=None,
+                    extra_data=None,
+                )
+
+                class _WindowStrategy(BaseStrategy):
+                    def _validate_params(self) -> None:
+                        pass
+
+                    def generate_signals(self, ohlcv, _sig=window_signals):
+                        return _sig
+
+                # Detect timeframe from graph interval; fall back to "15"
+                tf = str(strategy_graph.get("interval", "15"))
+
+                cfg = BacktestConfig(
+                    symbol=symbol,
+                    interval=tf,
+                    start_date=t_start,
+                    end_date=t_end,
                     initial_capital=10000.0,
                     commission_value=COMMISSION_TV,
                     direction="both",
+                    stop_loss=0.02,
+                    take_profit=0.03,
                 )
-                engine = BacktestEngine(config)
-                bt_result = engine.run(test_slice, strategy_graph)
-                sharpe = (bt_result.metrics or {}).get("sharpe_ratio", 0.0)
-                results.append(float(sharpe))
-            except Exception:
+
+                engine = BacktestEngine()
+                bt_result = engine.run(
+                    config=cfg,
+                    ohlcv=test_slice,
+                    silent=True,
+                    custom_strategy=_WindowStrategy(),
+                )
+                raw_m = bt_result.metrics
+                if raw_m is None:
+                    sharpe = 0.0
+                elif hasattr(raw_m, "model_dump"):
+                    sharpe = raw_m.model_dump().get("sharpe_ratio", 0.0)
+                elif isinstance(raw_m, dict):
+                    sharpe = raw_m.get("sharpe_ratio", 0.0)
+                else:
+                    sharpe = getattr(raw_m, "sharpe_ratio", 0.0)
+                results.append(float(sharpe or 0.0))
+            except Exception as exc:
+                logger.debug(f"[WF] Window {i}: error — {exc}")
                 results.append(0.0)
             i += step_bars
 
@@ -2624,7 +2850,7 @@ def build_trading_strategy_graph(
     run_wf_validation: bool = True,
     checkpoint_enabled: bool = False,
     hitl_enabled: bool = False,
-    event_fn: "Callable[[str, dict[str, Any]], None] | None" = None,
+    event_fn: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> AgentGraph:
     """
     Build the full Trading Strategy generation graph.
@@ -2748,7 +2974,7 @@ def build_trading_strategy_graph(
         else:
             graph.add_edge("ml_validation", "memory_update")
 
-        graph.add_edge("memory_update", "reflection")   # P1-1: self-reflection before report
+        graph.add_edge("memory_update", "reflection")  # P1-1: self-reflection before report
         graph.add_edge("reflection", "report")
     else:
         graph.add_edge("select_best", "report")
@@ -2774,8 +3000,8 @@ async def run_strategy_pipeline(
     checkpoint_enabled: bool = False,
     hitl_enabled: bool = False,
     hitl_approved: bool = False,
-    event_fn: "Callable[[str, dict[str, Any]], None] | None" = None,
-    seed_graph: "dict[str, Any] | None" = None,
+    event_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    seed_graph: dict[str, Any] | None = None,
 ) -> AgentState:
     """
     Convenience function to run the full strategy generation pipeline.

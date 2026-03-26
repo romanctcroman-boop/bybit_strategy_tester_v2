@@ -167,12 +167,21 @@ def execute_condition(
 
     if condition_type == "greater_than":
         a = inputs.get("a", inputs.get("left", _empty_numeric()))
-        b = inputs.get("b", inputs.get("right", _empty_numeric()))
+        # Fall back to threshold_b param when no "b" input is wired (graph_converter Cat B)
+        if "b" not in inputs and "right" not in inputs and "threshold_b" in params:
+            b_val = float(params["threshold_b"])
+            b = pd.Series([b_val] * len(a), index=a.index) if ref is not None else _empty_numeric()
+        else:
+            b = inputs.get("b", inputs.get("right", _empty_numeric()))
         return {"result": a > b}
 
     if condition_type == "less_than":
         a = inputs.get("a", inputs.get("left", _empty_numeric()))
-        b = inputs.get("b", inputs.get("right", _empty_numeric()))
+        if "b" not in inputs and "right" not in inputs and "threshold_b" in params:
+            b_val = float(params["threshold_b"])
+            b = pd.Series([b_val] * len(a), index=a.index) if ref is not None else _empty_numeric()
+        else:
+            b = inputs.get("b", inputs.get("right", _empty_numeric()))
         return {"result": a < b}
 
     if condition_type == "equals":
