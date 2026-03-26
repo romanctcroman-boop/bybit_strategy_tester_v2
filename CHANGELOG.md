@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **fix: AI pipeline 8 bugs — BacktestConfig, engine.run(), effective_trades, WF validation (2026-03-26)**
+
+    Fixed 8 critical bugs in the AI pipeline that caused every backtest to fail with
+    `severity=catastrophic`, optimizer to produce 0 trials, and response parser to reject
+    valid LLM output. Pipeline now exits 0 with productive ~$0.036/run.
+
+    **`backend/agents/trading_strategy_graph.py`**
+    - Bug 1: BacktestConfig — use `interval` (not `timeframe`), add required `start_date`/`end_date`
+    - Bug 4: BacktestEngine.run() — use `config`/`ohlcv`/`custom_strategy` kwargs (not `data`/`signals`)
+    - Bug 5: BacktestAnalysisNode — count `open_trades` in `effective_trades` for severity/root_cause (TV parity)
+    - Bug 6: False `[NO_TRADES]` warning — check `effective_count` not just `trades_count`
+    - Bug 7: OptimizationNode — use `interval`/`commission` keys for `build_backtest_input`
+    - BuildGraphNode: add 0-block guard and >50% signal drop guard
+    - WalkForwardValidationNode: hard reject negative IS Sharpe (was: skip+pass)
+    - _run_rolling_wf(): pre-compute signals, correct engine kwargs, proper signal slicing
+
+    **`backend/agents/prompts/response_parser.py`**
+    - Bug 2: Add `_convert_blocks_to_signals()` for LLM blocks/connections format
+    - Expand `Signal.type` description for better LLM output
+
+    **`backend/agents/integration/graph_converter.py`**
+    - Move Bollinger from Cat B → Cat A (keltner_bollinger block)
+    - Move VWAP from Cat B → Cat A (two_mas), remove ATR from Cat B
+    - Add SuperTrend `generate_on_trend_change=True`
+    - Fix ruff: `contextlib.suppress`, `zip strict=False`, list unpacking
+
+    **`backend/backtesting/strategy_builder/block_executor.py`**
+    - `greater_than`/`less_than`: fall back to `threshold_b` param when no wired input (Cat B support)
+
+    **Tests (1821 passed, 0 failed):**
+    - `test_p1_features.py`: WF negative Sharpe → `passed=False, skipped=False, reason="negative_is_sharpe"`
+    - `test_graph_converter.py`: CCI/Williams_R condition blocks → `less_than`/`greater_than` types
+    - `test_graph_converter.py`: Bollinger → Cat A `keltner_bollinger` assertions
+
+    **Documentation:**
+    - `docs/PIPELINE_BUGFIX_2026-03-26.md`: detailed 8-bug report with before/after metrics
+    - `CLAUDE_CODE.md`: 18-section Claude Code-optimized project context document (1260 lines)
+    - `.github/skills/`: corrected SignalResult interface, import paths, line counts
+    - `cspell.json`: added synthesise, sharpes, hitl, hasattr
+
+    **Frontend:** `strategy_builder.js` — removed unused `debounce` import, added sync shim variables
+
 - **feat(frontend): WebSocket streaming + HITL approval UI for AI pipeline page (2026-03-25)**
 
     Connected the AI pipeline frontend to real backend APIs, replacing a fake `setInterval` progress bar
