@@ -1,9 +1,9 @@
 # CLAUDE_CODE.md — Полный Контекст для Claude Code
 
-> **Версия:** 2.0 | **Создан:** 2026-03-26 | **Обновлён:** 2026-03-27
+> **Версия:** 2.1 | **Создан:** 2026-03-26 | **Обновлён:** 2026-03-27
 > **Назначение:** Единый документ для Claude Code — структура, переменные, связи, роутинг, хранение, потоки
 > **Обновляй:** после каждого структурного изменения
-> **Покрытие:** ~95% систем проекта (30 секций, ~2500 строк)
+> **Покрытие:** ~100% систем проекта (31 секция, ~2700 строк)
 
 ---
 
@@ -41,6 +41,7 @@
 | [§28](#28-optimization-system-deep-dive) | Ray optimizer, advanced engine, filters             |
 | [§29](#29-frontend-architecture)         | StateManager, EventBus, 25 components, core modules |
 | [§30](#30-services-layer-deep-dive)      | 60+ services, LLM clients, event bus, reliability   |
+| [§31](#31-auxiliary--experimental-modules)| Celery, reports, social, research, L2 LOB, benchmark |
 
 ---
 
@@ -1996,6 +1997,231 @@ TokenBudget:
 
 ---
 
+## 31. Auxiliary & Experimental Modules
+
+> Вспомогательные модули, не входящие в core-пайплайн, но присутствующие в кодовой базе.
+> Большинство — research/experimental стадии или инфраструктурные утилиты.
+
+### 31.1 Celery Task Queue
+
+```
+backend/celery_app.py                      (81 строк)   # Конфигурация Celery
+backend/tasks/
+├── backtest_tasks.py                      (199 строк)  # Celery tasks для бэктестов
+├── optimize_tasks.py                      (558 строк)  # Grid search, walk-forward, Bayesian tasks
+└── __init__.py
+```
+
+**Архитектура:**
+
+```python
+celery_app = Celery("backend", broker="redis://127.0.0.1:6379/1", backend="redis://127.0.0.1:6379/2")
+
+# Очереди:
+# optimizations.grid  — Grid search tasks
+# optimizations.walk  — Walk-forward tasks
+# optimizations.bayes — Bayesian optimization tasks
+# backtests           — Backtest tasks
+
+# Лимиты:
+task_time_limit     = 3600   # 1 час max
+task_soft_time_limit = 3300  # 55 мин soft limit
+result_expires      = 86400  # Результаты истекают через 24ч
+
+# Reliability:
+task_acks_late = True              # Acknowledge после выполнения
+task_reject_on_worker_lost = True  # Reject при потере worker
+```
+
+**Задачи:**
+
+| Task                           | Queue                | Retries | Описание                          |
+| ------------------------------ | -------------------- | ------- | --------------------------------- |
+| `run_backtest_task`            | `backtests`          | 3       | Одиночный бэктест с atomic claim  |
+| `bulk_backtest_task`           | `backtests`          | 0       | Celery `group()` для параллельных |
+| `grid_search_task`             | `optimizations.grid` | 2       | Grid search + progress tracking   |
+| `walk_forward_task`            | `optimizations.walk` | 2       | IS/OOS rolling window             |
+| `bayesian_optimization_task`   | `optimizations.bayes`| 2       | Optuna-based Bayesian             |
+
+**⚠️ Зависимости:** Требует Redis-брокер. `CELERY_EAGER=1` — синхронный режим для тестов.
+
+### 31.2 Reports & Email
+
+```
+backend/reports/
+├── generator.py       (317 строк)  # ReportGenerator: HTML/PDF/Email
+├── pdf_generator.py   (277 строк)  # PDFGenerator: ReportLab-based PDF
+├── email_sender.py    (177 строк)  # EmailSender: SMTP с TLS
+└── __init__.py
+```
+
+**ReportGenerator** — центральный класс:
+
+```python
+class ReportGenerator:
+    """Генерирует отчёты по результатам бэктестов"""
+
+    def generate_html(data: ReportData) -> str       # HTML с метриками и графиками
+    def generate_pdf(data: ReportData) -> bytes       # Через PDFGenerator (ReportLab)
+    async def send_email(data, recipient) -> bool     # Через EmailSender (SMTP)
+
+# ReportData:
+#   backtest_id, strategy_name, symbol, timeframe,
+#   start_date, end_date, metrics, equity_curve,
+#   trades, monthly_returns, optimization_results
+
+# Категории метрик в отчёте:
+#   Performance: total_return, annual_return, sharpe_ratio, sortino_ratio, calmar, profit_factor
+#   Risk: volatility, max_drawdown, avg_drawdown, VaR 95%, CVaR 95%
+#   Trades: total_trades, win_rate, avg_win, avg_loss
+#   Timing: avg_trade_duration, market_exposure, turnover
+```
+
+**PDFGenerator** — A4/Letter, 3 секции (Summary, Performance Metrics, Risk Metrics, Trade History).
+Fallback на простой PDF если ReportLab не установлен.
+
+**EmailSender** — SMTP (по умолчанию Gmail:587), TLS, HTML + PDF attachment. Mock-режим без SMTP credentials.
+
+### 31.3 Social Trading
+
+```
+backend/social/
+├── copy_trading.py   (200 строк)  # CopyTradingEngine
+├── leaderboard.py    (140 строк)  # Leaderboard
+├── models.py         (126 строк)  # PublicStrategy, StrategyRating, CopyTrade
+└── __init__.py
+```
+
+**CopyTradingEngine:**
+
+```python
+class CopyTradingEngine:
+    """Copy trading — in-memory, NOT production-ready"""
+
+    def start_copy(follower_id, strategy_id, allocation, copy_ratio=1.0, max_positions=10) -> bool
+    def stop_copy(follower_id, strategy_id) -> bool
+    def copy_trade(strategy_id, trade_data) -> list[CopyPosition]
+    def get_follower_positions(follower_id) -> list[CopyPosition]
+    def get_copy_stats(follower_id) -> dict
+
+# CopyPosition: original_trade_id, strategy_id, follower_id, symbol, side, quantity, entry_price, copy_ratio, pnl
+```
+
+**Leaderboard:**
+
+```python
+class Leaderboard:
+    """Рейтинги стратегий и трейдеров — in-memory storage"""
+
+    def get_top_traders(by="return"|"sharpe"|"followers", limit=10) -> list[dict]
+    def get_top_strategies(by="sharpe"|"return"|"copies"|"rating", limit=10) -> list[dict]
+```
+
+**Модели:** `PublicStrategy` (dataclass с followers/copies/rating), `StrategyRating` (1-5 stars + comment), `CopyTrade`.
+
+**⚠️ Статус:** Proof-of-concept. In-memory storage, не персистентный. Нет интеграции с live trading.
+
+### 31.4 Research & Experimental
+
+```
+backend/research/
+├── explainable_ai.py          (259 строк)  # SHAPExplainer, LIMEExplainer
+├── blockchain_verification.py (178 строк)  # BacktestVerifier: SHA-256 proof chain
+├── federated_learning.py      (196 строк)  # FederatedLearning: privacy-preserving
+├── multi_agent_simulation.py  (253 строк)  # MarketSimulator: multi-agent ABM
+├── parameter_adaptation.py    (172 строк)  # ParameterAdapter: regime-based tuning
+└── __init__.py
+```
+
+| Модуль                     | Класс              | Описание                                                            |
+| -------------------------- | ------------------- | ------------------------------------------------------------------ |
+| `explainable_ai`           | `SHAPExplainer`     | Simplified SHAP for ML signal interpretation (no real SHAP lib)    |
+|                            | `LIMEExplainer`     | LIME-style local linear explanations                               |
+| `blockchain_verification`  | `BacktestVerifier`  | SHA-256 hashes → cryptographic proof of backtest integrity         |
+| `federated_learning`       | `FederatedLearning` | FedAvg aggregation, N клиентов, global/local weights               |
+| `multi_agent_simulation`   | `MarketSimulator`   | ABM: momentum/mean_reversion/market_maker/random/RL agents         |
+| `parameter_adaptation`     | `ParameterAdapter`  | Regime-based param tuning (trending/ranging/volatile/calm presets) |
+
+**⚠️ Статус:** Research stubs. Используют simplified алгоритмы (не production SHAP/LIME). Не интегрированы в основной пайплайн.
+
+### 31.5 Experimental: L2 Order Book
+
+```
+backend/experimental/l2_lob/
+├── models.py                  (74 строки)  # L2Level, L2Snapshot
+├── collector.py               (263 строки) # L2OrderBookCollector (WebSocket)
+├── websocket_collector.py                  # Alternative WS collector
+├── bybit_client.py                         # REST API client for L2
+├── replay.py                               # Replay saved snapshots in simulator
+├── generative_cgan.py                      # CGAN для синтеза стакана
+├── generative_research.py                  # Research: LOB generation
+└── README.md                               # Документация модуля
+```
+
+**Функционал:**
+- **Сбор:** Bybit REST + WebSocket → L2 snapshots (NDJSON)
+- **Replay:** `load_snapshots_ndjson()` → `OrderBookSimulator` для бэктеста с L2
+- **Generative:** CGAN research для синтеза реалистичного стакана
+- **Модели:** `L2Snapshot` (bids/asks, mid_price, spread_bps), совместим с `OrderBookLevel`
+
+**⚠️ Статус:** Experimental. WebSocket к `wss://stream.bybit.com/v5/public/linear`.
+
+### 31.6 Benchmarking
+
+```
+backend/benchmarking/
+├── performance.py   (511 строк)  # BenchmarkSuite
+└── __pycache__/
+```
+
+**BenchmarkSuite:**
+
+```python
+class BenchmarkSuite:
+    """Полный benchmark suite для AI agent system"""
+
+    async def run_benchmark(name, func, iterations=100, warmup=10) -> BenchmarkResult
+    async def run_load_test(func, concurrent_users=10, duration=60) -> LoadTestResult
+    def set_baseline(name, result) -> None
+    def check_regression(name, current, threshold=0.2) -> (is_regression, msg)
+    def detect_bottlenecks() -> list[str]
+    def generate_recommendations() -> list[str]
+    def generate_report() -> BenchmarkReport
+
+# BenchmarkResult: avg_time, min/max, median, std_dev, p95, p99, success_rate
+# LoadTestResult: concurrent_users, rps, avg/p95/p99 response, error_rate
+# Bottleneck detection: high variance (>50%), tail latency (p99>3×avg), low success (<95%)
+```
+
+**Singleton:** `get_benchmark_suite()` — глобальный экземпляр.
+
+### 31.7 Unified API (Backtest ↔ Live)
+
+```
+backend/unified_api/
+├── interface.py   (243 строки)  # Abstract interfaces
+└── __init__.py
+```
+
+**Абстракции для переключения backtest ↔ live:**
+
+```python
+# DataProvider (ABC)
+#   ├── HistoricalDataProvider  — dict[str, DataFrame], для бэктеста
+#   └── LiveDataProvider        — WebSocket + current_prices dict
+
+# OrderExecutor (ABC)
+#   ├── SimulatedExecutor       — Paper trading (in-memory positions/balance)
+#   └── LiveExecutor            — Exchange client (stub)
+
+# TradingSystem (facade):
+#   data_provider + order_executor + strategy → run()
+```
+
+**⚠️ Статус:** Interface layer. SimulatedExecutor работает, LiveExecutor — stub.
+
+---
+
 ## Deprecated (НЕ использовать в новом коде)
 
 | Item                            | Replacement                             |
@@ -2047,4 +2273,7 @@ mcp-server/                            — MCP disabled
 frontend/dist/                         — Build artifacts
 data/archive/                          — Logs
 deployment/                            — DevOps (k8s, helm, docker)
+backend/research/                      — Research stubs (XAI, federated, blockchain)
+backend/social/                        — Copy trading PoC (in-memory)
+backend/experimental/                  — L2 LOB (experimental)
 ```

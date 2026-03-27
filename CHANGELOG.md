@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **docs: CLAUDE_CODE.md v2.1 — §31 Auxiliary & Experimental Modules → 100% coverage (2026-03-27)**
+
+    Added §31 with 7 subsections covering remaining undocumented modules:
+    - §31.1 Celery Task Queue: celery_app.py config, backtest/optimize tasks, queues, reliability
+    - §31.2 Reports & Email: ReportGenerator (HTML/PDF), PDFGenerator (ReportLab), EmailSender (SMTP)
+    - §31.3 Social Trading: CopyTradingEngine, Leaderboard, PublicStrategy models (PoC)
+    - §31.4 Research: SHAPExplainer, LIMEExplainer, BacktestVerifier, FederatedLearning, MarketSimulator, ParameterAdapter
+    - §31.5 Experimental L2 LOB: WebSocket collector, replay, CGAN generative research
+    - §31.6 Benchmarking: BenchmarkSuite (response time, load test, regression detection, bottlenecks)
+    - §31.7 Unified API: DataProvider/OrderExecutor abstractions for backtest↔live switching
+
+    Updated: navigation table (+§31), version 2.0→2.1, "Обычно ИГНОРИРОВАТЬ" section expanded.
+
 - **docs: CLAUDE_CODE.md v2.0 — expanded from 1260 to 2045 lines, 30 sections (~95% project coverage) (2026-03-27)**
 
     Added 12 new sections (§19-§30) covering previously undocumented subsystems:
