@@ -1,33 +1,46 @@
 # CLAUDE_CODE.md — Полный Контекст для Claude Code
 
-> **Версия:** 1.0 | **Создан:** 2026-03-26
+> **Версия:** 2.0 | **Создан:** 2026-03-26 | **Обновлён:** 2026-03-27
 > **Назначение:** Единый документ для Claude Code — структура, переменные, связи, роутинг, хранение, потоки
 > **Обновляй:** после каждого структурного изменения
+> **Покрытие:** ~95% систем проекта (30 секций, ~2500 строк)
 
 ---
 
 ## 📑 Навигация
 
-| Раздел                                | Содержание                                       |
-| ------------------------------------- | ------------------------------------------------ |
-| [§1](#1-окружение)                    | Окружение, запуск, команды                       |
-| [§2](#2-архитектура-слои)             | 6-слойная архитектура                            |
-| [§3](#3-полная-библиотека-переменных) | Все переменные, типы, диапазоны, файлы           |
-| [§4](#4-граф-зависимостей-переменных) | Логические связи, глубина проникновения          |
-| [§5](#5-кросс-системные-переменные)   | 7 high-risk параметров, 12+ файлов каждый        |
-| [§6](#6-блоки-strategy-builder)       | 40+ блоков, порты, расширения                    |
-| [§7](#7-роутинг-данных)               | 70+ роутеров, маршрутизация запросов             |
-| [§8](#8-хранение-данных)              | SQLite, Redis, кэши, ORM модели                  |
-| [§9](#9-чтение-данных)                | KlineDataManager, DataService, adapters          |
-| [§10](#10-преобразование-данных)      | Pipeline: raw OHLCV → signals → trades → metrics |
-| [§11](#11-потоковая-обработка)        | WebSocket, SSE, Redis pub/sub                    |
-| [§12](#12-middleware-pipeline)        | 10 middleware в фиксированном порядке            |
-| [§13](#13-движки-бэктестинга)         | V4, Numba, DCA — выбор и паритет                 |
-| [§14](#14-метрики)                    | MetricsCalculator — 166 метрик, TV-parity        |
-| [§15](#15-ai-agent-system)            | LangGraph pipeline, LLM providers, memory        |
-| [§16](#16-инфраструктура-claude-code) | Hooks, slash commands, memory-bank               |
-| [§17](#17-критические-инварианты)     | НИКОГДА не нарушай                               |
-| [§18](#18-рефакторинг-чеклист)        | Pre-flight → Post-flight                         |
+| Раздел                                   | Содержание                                          |
+| ---------------------------------------- | --------------------------------------------------- |
+| [§1](#1-окружение)                       | Окружение, запуск, команды                          |
+| [§2](#2-архитектура-слои)                | 6-слойная архитектура                               |
+| [§3](#3-полная-библиотека-переменных)    | Все переменные, типы, диапазоны, файлы              |
+| [§4](#4-граф-зависимостей-переменных)    | Логические связи, глубина проникновения             |
+| [§5](#5-кросс-системные-переменные)      | 7 high-risk параметров, 12+ файлов каждый           |
+| [§6](#6-блоки-strategy-builder)          | 40+ блоков, порты, расширения                       |
+| [§7](#7-роутинг-данных)                  | 70+ роутеров, маршрутизация запросов                |
+| [§8](#8-хранение-данных)                 | SQLite, Redis, кэши, ORM модели                     |
+| [§9](#9-чтение-данных)                   | KlineDataManager, DataService, adapters             |
+| [§10](#10-преобразование-данных)         | Pipeline: raw OHLCV → signals → trades → metrics    |
+| [§11](#11-потоковая-обработка)           | WebSocket, SSE, Redis pub/sub                       |
+| [§12](#12-middleware-pipeline)           | 10 middleware в фиксированном порядке               |
+| [§13](#13-движки-бэктестинга)            | V4, Numba, DCA — выбор и паритет                    |
+| [§14](#14-метрики)                       | MetricsCalculator — 166 метрик, TV-parity           |
+| [§15](#15-ai-agent-system)               | LangGraph pipeline, LLM providers, memory           |
+| [§16](#16-инфраструктура-claude-code)    | Hooks, slash commands, memory-bank                  |
+| [§17](#17-критические-инварианты)        | НИКОГДА не нарушай                                  |
+| [§18](#18-рефакторинг-чеклист)           | Pre-flight → Post-flight                            |
+| [§19](#19-live-trading-subsystem)        | Live trading, WebSocket, order execution            |
+| [§20](#20-risk-management)               | RiskEngine, position sizing, stop loss, exposure    |
+| [§21](#21-agent-memory-system)           | 4-tier memory, vector store, BM25, SQLite backend   |
+| [§22](#22-agent-consensus--debate)       | ConsensusEngine, deliberation, RiskVetoGuard        |
+| [§23](#23-agent-self-improvement)        | FeedbackLoop, evolution, RLHF, pattern extraction   |
+| [§24](#24-security-layer)                | Prompt guards, AES-256-GCM, Shamir, HSM             |
+| [§25](#25-mlrl-subsystem)                | Regime detection, RL agents, Gymnasium env          |
+| [§26](#26-monte-carlo--walk-forward)     | Monte Carlo simulation, walk-forward validation     |
+| [§27](#27-monitoring--observability)     | Prometheus, health checks, cost tracking, alerts    |
+| [§28](#28-optimization-system-deep-dive) | Ray optimizer, advanced engine, filters             |
+| [§29](#29-frontend-architecture)         | StateManager, EventBus, 25 components, core modules |
+| [§30](#30-services-layer-deep-dive)      | 60+ services, LLM clients, event bus, reliability   |
 
 ---
 
@@ -1213,6 +1226,776 @@ If touching `commission_rate`, `initial_capital`, `position_size`, `leverage`, `
 
 ---
 
+## 19. Live Trading Subsystem
+
+### 19.1 Архитектура
+
+```
+backend/services/live_trading/          # Production live trading
+├── strategy_runner.py   (821 строк)   # Main orchestrator
+├── order_executor.py                   # Bybit order placement
+├── position_manager.py                 # Open position tracking
+├── bybit_websocket.py                  # Real-time market data
+├── graceful_shutdown.py                # Safe shutdown with open positions
+
+backend/trading/                        # Lower-level trading primitives
+├── order_executor.py    (354 строк)   # Order dataclass + execution logic
+├── paper_trading.py                    # Simulated execution (no real orders)
+├── position_tracker.py                 # Position state machine
+├── risk_limits.py                      # Pre-trade risk checks
+├── circuit_breakers.py                 # Emergency halt
+└── websocket_client.py                 # Generic WS client
+```
+
+### 19.2 Ключевые классы
+
+| Класс                  | Файл                               | Описание                                                            |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------------------- |
+| `StrategyRunner`       | `live_trading/strategy_runner.py`  | Главный оркестратор: WebSocket → signal → order → position tracking |
+| `OrderExecutor`        | `live_trading/order_executor.py`   | Bybit REST API execution, retry, partial fill handling              |
+| `PositionManager`      | `live_trading/position_manager.py` | Tracks open positions, calculates unrealized PnL                    |
+| `BybitWebSocketClient` | `live_trading/bybit_websocket.py`  | Real-time klines + trades stream                                    |
+| `TradingSignal`        | `strategy_runner.py`               | Signal dataclass: type, symbol, price, qty, SL/TP, confidence       |
+| `Order`                | `trading/order_executor.py`        | Order dataclass: Market/Limit, Buy/Sell, status tracking            |
+
+### 19.3 Signal Flow
+
+```
+WebSocket (kline/trade) → parse_kline_message()
+    → Strategy.generate_signals(df) → TradingSignal
+        → RiskEngine.assess_trade() → approved?
+            → OrderExecutor.place_order(Order)
+                → PositionManager.track()
+                    → StopLossManager.monitor()
+```
+
+### 19.4 ⚠️ Ловушки
+
+- **commission_rate** = 0.0007 в `TradingConfig` — НЕ менять
+- **position_size units:** live = absolute qty, engine = fraction 0-1 — конвертировать!
+- **GracefulShutdown**: при SIGTERM закрывает все открытые позиции перед выходом
+- **Paper trading** (`paper_trading.py`) НЕ отправляет реальные ордера — проверь mode перед деплоем
+
+---
+
+## 20. Risk Management
+
+### 20.1 Архитектура
+
+```
+backend/services/risk_management/
+├── risk_engine.py          (768 строк)  # Unified risk management
+├── exposure_controller.py  (669 строк)  # Position/portfolio limits
+├── position_sizing.py      (525 строк)  # Sizing methods
+├── stop_loss_manager.py    (548 строк)  # SL strategies
+└── trade_validator.py      (688 строк)  # Pre-trade validation
+```
+
+### 20.2 RiskEngine — центральный координатор
+
+```python
+RiskEngine(config: RiskEngineConfig)
+    ├── ExposureController    # Лимиты экспозиции
+    ├── PositionSizer         # Размер позиции
+    ├── StopLossManager       # Управление стоп-лоссами
+    └── TradeValidator        # Пре-trade проверки
+```
+
+### 20.3 Position Sizing Methods
+
+| Метод            | Enum               | Описание                               |
+| ---------------- | ------------------ | -------------------------------------- |
+| Fixed Percentage | `FIXED_PERCENTAGE` | Фиксированный % equity per trade       |
+| Kelly Criterion  | `KELLY_CRITERION`  | Оптимальный по win rate + payoff ratio |
+| Half Kelly       | `HALF_KELLY`       | 50% Kelly — консервативнее             |
+| Volatility (ATR) | `VOLATILITY_BASED` | Размер по волатильности                |
+| Fixed Fractional | `FIXED_FRACTIONAL` | Фиксированная доля equity              |
+| Optimal f        | `OPTIMAL_F`        | Максимизация geometric growth          |
+
+### 20.4 Stop Loss Types
+
+| Тип        | Enum               | Описание                    |
+| ---------- | ------------------ | --------------------------- |
+| Fixed      | `FIXED`            | Фиксированный % от entry    |
+| Trailing   | `TRAILING`         | Следует за ценой            |
+| Trailing % | `TRAILING_PERCENT` | Trailing по процентам       |
+| Breakeven  | `BREAKEVEN`        | Переход в безубыток при +X% |
+| ATR-based  | `ATR_BASED`        | По ATR × multiplier         |
+| Chandelier | `CHANDELIER`       | Chandelier exit             |
+| Time-based | `TIME_BASED`       | Закрытие по времени         |
+
+### 20.5 Exposure Limits (defaults)
+
+```python
+max_position_size_pct = 20.0     # Max 20% equity per position
+max_total_exposure_pct = 200.0   # Max 200% total (allows 2x leverage)
+max_leverage = 10.0              # Max 10x per position
+max_portfolio_leverage = 3.0     # Max 3x portfolio
+max_correlated_positions = 3     # Max positions with >0.7 correlation
+max_drawdown_pct = 20.0          # Auto-stop at 20% drawdown
+daily_loss_limit_pct = 5.0       # Daily loss cap
+```
+
+### 20.6 Trade Rejection Reasons
+
+`RejectionReason` enum (18 причин): `INSUFFICIENT_BALANCE`, `POSITION_SIZE_EXCEEDED`, `EXPOSURE_LIMIT_EXCEEDED`, `LEVERAGE_LIMIT_EXCEEDED`, `DAILY_LOSS_LIMIT`, `DRAWDOWN_LIMIT`, `CORRELATION_LIMIT`, `SYMBOL_BLOCKED`, `TRADING_PAUSED`, `INVALID_ORDER_PARAMS`, `MIN_ORDER_SIZE`, `MAX_ORDER_SIZE`, `PRICE_OUT_OF_RANGE`, `MARGIN_REQUIREMENT`, `RISK_REWARD_RATIO`, `STRATEGY_LIMIT`, `COOLDOWN_ACTIVE`, `MAX_TRADES_REACHED`
+
+---
+
+## 21. Agent Memory System
+
+### 21.1 Архитектура
+
+```
+backend/agents/memory/
+├── hierarchical_memory.py  (997 строк)  # 4-tier cognitive memory
+├── sqlite_backend.py       (462 строк)  # Persistent storage (WAL mode)
+├── vector_store.py         (602 строк)  # ChromaDB semantic search
+├── bm25_ranker.py          (203 строк)  # BM25 keyword ranking
+├── auto_tagger.py          (292 строк)  # Auto-tag generation
+├── tag_normalizer.py                     # Tag dedup + normalization
+├── shared_memory.py                      # Cross-agent shared store
+└── backend_interface.py                  # Abstract storage interface
+```
+
+### 21.2 4-Tier Memory Model (inspired by ACT-R / LIDA)
+
+| Tier | Type         | Max Items | TTL       | Use Case                         |
+| ---- | ------------ | --------- | --------- | -------------------------------- |
+| 1    | `WORKING`    | 10        | Short     | Current context, active analysis |
+| 2    | `EPISODIC`   | 1,000     | Medium    | Session-specific experiences     |
+| 3    | `SEMANTIC`   | 10,000    | Long      | Generalized knowledge, facts     |
+| 4    | `PROCEDURAL` | 500       | Very long | Learned skills, patterns         |
+
+### 21.3 MemoryItem (unified dataclass)
+
+```python
+@dataclass
+class MemoryItem:
+    id: str                          # content hash + timestamp
+    content: str                     # Text content
+    memory_type: MemoryType          # WORKING/EPISODIC/SEMANTIC/PROCEDURAL
+    agent_namespace: str = "shared"  # Per-agent isolation
+    importance: float = 0.5          # 0.0-1.0 relevance
+    embedding: list[float] | None    # 384-dim MiniLM vector
+    tags: list[str]                  # Normalized tags
+    source: str | None               # Origin (agent name, etc.)
+    related_ids: list[str]           # Cross-references
+```
+
+### 21.4 Retrieval Pipeline
+
+```
+Query → BM25Ranker (keyword) ─┐
+                                ├→ Hybrid score → Rank → Top-K
+Query → VectorStore (semantic) ┘
+          ChromaDB + MiniLM-L6-v2 (384-dim)
+```
+
+### 21.5 SQLite Backend
+
+- **WAL mode** for concurrent reads
+- **Schema v2** — unified MemoryItem fields
+- Auto-migration from v1 (float timestamps → ISO-8601)
+- Indexes: `memory_type`, `(namespace, type)`, `importance`
+- TTL-based expiration + LRU eviction
+
+### 21.6 ⚠️ Ловушки
+
+- `agent_namespace = "shared"` — доступно ВСЕМ агентам; для изоляции указывай имя агента
+- `embedding` = None при отсутствии ChromaDB/sentence-transformers — fallback на BM25
+- `_SQLITE_TS_FMT = "%Y-%m-%d %H:%M:%S"` — ОБЯЗАТЕЛЬНО space separator (не 'T')
+
+---
+
+## 22. Agent Consensus & Debate
+
+### 22.1 Архитектура
+
+```
+backend/agents/consensus/
+├── consensus_engine.py       (896 строк)  # Strategy-level aggregation
+├── deliberation.py           (1411 строк) # Multi-agent text debate
+├── domain_agents.py                        # Specialized domain perspectives
+├── real_llm_deliberation.py                # LLM-backed debate rounds
+├── risk_veto_guard.py        (297 строк)  # Post-consensus safety override
+└── perplexity_integration.py               # External market research
+```
+
+### 22.2 ConsensusEngine — strategy aggregation
+
+3 метода:
+
+| Метод                  | Описание                                                       |
+| ---------------------- | -------------------------------------------------------------- |
+| `weighted_voting`      | Signal-level aggregation by agent weight (performance history) |
+| `bayesian_aggregation` | Prior × likelihood update based on historical accuracy         |
+| `best_of`              | Pick single best strategy by heuristic score                   |
+
+```python
+engine = ConsensusEngine()
+engine.update_performance("deepseek", sharpe=1.8, win_rate=0.55)
+result = engine.aggregate({"deepseek": s1, "qwen": s2}, method="weighted_voting")
+# result.agreement_score → 0.85 (Jaccard similarity)
+```
+
+### 22.3 Deliberation — multi-agent text debate
+
+4 фазы:
+
+1. **Initial Opinion** — каждый агент формулирует позицию
+2. **Cross-Examination** — агенты критикуют друг друга
+3. **Refinement** — обновление позиций на основе feedback
+4. **Final Vote** — consensus decision с confidence scoring
+
+Voting strategies: `MAJORITY`, `WEIGHTED`, `UNANIMOUS`, `RANKED_CHOICE`, `SUPERMAJORITY`
+
+### 22.4 RiskVetoGuard — last line of defense
+
+```python
+# Veto conditions (ANY triggers block):
+max_drawdown_pct = 5.0       # Block if drawdown > 5%
+max_open_positions = 5        # Block if too many positions
+daily_loss_limit_pct = 3.0    # Block if daily loss exceeded
+emergency_stop = False        # Manual kill switch
+min_agreement_score = 0.3     # Block if agents strongly disagree
+```
+
+**КРИТИЧНО:** VetoGuard работает ПОСЛЕ consensus — это mandatory post-filter, не soft recommendation.
+
+---
+
+## 23. Agent Self-Improvement
+
+### 23.1 Архитектура
+
+```
+backend/agents/self_improvement/
+├── feedback_loop.py         (687 строк)  # Backtest → reflect → improve cycle
+├── strategy_evolution.py    (772 строк)  # Autonomous evolution pipeline
+├── self_reflection.py                     # Heuristic-based analysis
+├── llm_reflection.py        (471 строк)  # LLM-backed deep reflection
+├── pattern_extractor.py     (413 строк)  # Discover winning patterns from history
+├── rlhf_module.py           (782 строк)  # RLHF/RLAIF preference learning
+├── performance_evaluator.py               # Fitness scoring
+└── agent_tracker.py                       # Agent performance tracking
+```
+
+### 23.2 Evolution Pipeline
+
+```
+Generate Strategy (LLM)
+    → Backtest (FallbackEngineV4)
+        → Reflect (LLM analysis)
+            → Extract Patterns
+                → RLHF Rank (A vs B)
+                    → Improve Prompt
+                        → Generate New Strategy ↺
+                            (until convergence or max iterations)
+```
+
+### 23.3 FeedbackLoop
+
+```python
+class FeedbackLoop:
+    """Cycle: backtest → analysis → prompt improvement"""
+    async def run(self, strategy, data, max_iterations=5):
+        for i in range(max_iterations):
+            metrics = await self.backtest(strategy)
+            reflection = await self.reflect(metrics)
+            improvements = self.extract_improvements(reflection)
+            strategy = await self.improve(strategy, improvements)
+            if self.converged(metrics):
+                break
+```
+
+### 23.4 RLHF Module
+
+- **Preference types:** `HUMAN`, `AI` (RLAIF), `SELF`, `CONSENSUS`
+- **Response quality:** 1-5 scale (UNACCEPTABLE → EXCELLENT)
+- Collects A/B preference pairs, trains reward model
+- References: Ouyang et al. 2022, Constitutional AI (Anthropic 2023)
+
+### 23.5 PatternExtractor
+
+Анализирует backtest history → извлекает паттерны:
+
+- Лучшие стратегии по символам/таймфреймам
+- Оптимальные parameter ranges
+- Market-regime корреляции
+- Win-rate/Sharpe distribution по конфигурациям
+
+---
+
+## 24. Security Layer
+
+### 24.1 Agent Security (prompt injection protection)
+
+```
+backend/agents/security/
+├── security_orchestrator.py  (214 строк)  # Fusion of all guards
+├── prompt_guard.py           (235 строк)  # Regex-based detection
+├── semantic_guard.py         (258 строк)  # Semantic analysis
+├── strategy_validator.py                    # Strategy output validation
+├── output_validator.py                      # LLM output sanitization
+└── rate_limiter.py                          # Per-agent rate limiting
+```
+
+### 24.2 SecurityOrchestrator — fusion policy
+
+3 policy:
+
+- `BLOCK_ANY` — block if ANY guard flags (strictest)
+- `BLOCK_ALL` — block only if ALL guards agree
+- `WEIGHTED` — block based on weighted score threshold (default)
+
+### 24.3 PromptGuard — regex layer
+
+Детектирует 5 категорий угроз:
+
+- `DIRECT_INJECTION` — "ignore all previous instructions"
+- `ROLE_MANIPULATION` — "you are now a..."
+- `DATA_EXFILTRATION` — "print your system prompt"
+- `JAILBREAK` — known jailbreak patterns
+- `ENCODING_ATTACK` — base64, hex, unicode tricks
+
+### 24.4 SemanticGuard — 3-layer analysis
+
+1. **Layer 1:** Fast regex patterns (existing)
+2. **Layer 2:** Keyword density + role confusion heuristics
+3. **Layer 3:** Structure analysis (suspicious formatting)
+
+### 24.5 Backend Security (key management)
+
+```
+backend/security/
+├── crypto.py                (322 строк)  # AES-256-GCM encryption
+├── hsm_provider.py                        # HSM integration
+├── shamir_sharing.py                      # Shamir's Secret Sharing
+├── master_key_manager.py                  # Master key lifecycle
+├── key_manager.py                         # API key CRUD
+├── memory_protection.py                   # Secure memory handling
+└── api_key_rotation.py                    # Auto-rotation
+```
+
+### 24.6 Crypto Module
+
+- **AES-256-GCM** authenticated encryption (NIST recommended)
+- **Argon2id** key derivation for password-based keys
+- `SecureBytes` — auto-zeroing secure container (prevents accidental logging)
+- Backward compatible with legacy `ENCRYPTED:` format
+
+---
+
+## 25. ML/RL Subsystem
+
+### 25.1 Архитектура
+
+```
+backend/ml/
+├── regime_detection.py       (501 строк)  # Market regime detection
+├── rl_trading_agent.py       (820 строк)  # DQN/PPO trading agents
+├── ai_backtest_executor.py                 # ML-driven backtest
+├── ai_feature_engineer.py                  # Feature extraction
+├── mlflow_adapter.py                       # MLflow experiment tracking
+├── news_nlp_analyzer.py                    # News sentiment NLP
+├── enhanced/                               # Enhanced ML models
+└── rl/
+    ├── trading_env.py        (597 строк)  # Gymnasium RL environment
+    ├── rewards.py                          # Reward functions
+    └── wrapper.py                          # Env wrappers
+
+backend/rl/                               # Standalone RL module
+├── trading_env.py
+└── rewards.py, wrapper.py
+```
+
+### 25.2 Regime Detection
+
+3 алгоритма:
+
+- **KMeans** — быстрый, simple clustering
+- **Gaussian Mixture Model** (GMM) — probabilistic clustering
+- **Hidden Markov Model** (HMM) — temporal transitions
+
+6 режимов: `BULL_LOW_VOL`, `BULL_HIGH_VOL`, `BEAR_LOW_VOL`, `BEAR_HIGH_VOL`, `SIDEWAYS`, `UNKNOWN`
+
+### 25.3 RL Trading Agent
+
+| Agent | Алгоритм                     | Описание                            |
+| ----- | ---------------------------- | ----------------------------------- |
+| DQN   | Deep Q-Network               | Experience replay + target networks |
+| PPO   | Proximal Policy Optimization | Policy gradient с clipping          |
+
+Actions: `HOLD(0)`, `BUY(1)`, `SELL(2)`, `CLOSE(3)`
+
+### 25.4 Trading Environment (Gymnasium-compatible)
+
+```python
+TradingConfig:
+    initial_balance = 10000.0
+    commission_rate = 0.0007    # ⚠️ MUST match TradingView parity
+    max_position_size = 1.0
+    leverage = 1.0
+    slippage = 0.0001
+
+# Register: gymnasium.make("TradingEnv-v1")
+```
+
+Reward functions: `pnl`, `log_return`, `sharpe`, `sortino`, `calmar`, `drawdown_penalty`
+
+### 25.5 Зависимости (опциональные)
+
+```python
+SKLEARN_AVAILABLE   # sklearn — regime detection
+HMM_AVAILABLE       # hmmlearn — HMM regime detection
+GYM_AVAILABLE       # gymnasium/gym — RL environment
+RAY_AVAILABLE       # ray — distributed computing
+```
+
+**⚠️ Все ML зависимости опциональны** — graceful fallback при ImportError.
+
+---
+
+## 26. Monte Carlo & Walk-Forward
+
+### 26.1 Monte Carlo Simulation
+
+```python
+# backend/services/monte_carlo.py (561 строк)
+class MonteCarloSimulator:
+    """Statistical robustness analysis via:
+    - Trade sequence shuffling (permutation tests)
+    - Return distribution bootstrapping
+    - Drawdown probability estimation
+    - Confidence intervals (VaR, CVaR)
+    - Worst-case scenario analysis"""
+
+    def __init__(self, n_simulations=10000):
+        ...
+
+    def analyze_strategy(self, backtest_results) -> MonteCarloResult:
+        ...
+
+    # Methods:
+    # - probability_of_return(target) → float
+    # - drawdown_confidence_interval(level) → (lower, upper)
+    # - value_at_risk(confidence) → float
+    # - conditional_var(confidence) → float
+```
+
+### 26.2 Walk-Forward Optimization
+
+```python
+# backend/services/walk_forward.py (525 строк)
+class WalkForwardOptimizer:
+    """Rolling window validation:
+    - Train on N bars → test on M bars → slide forward
+    - Detects overfitting via out-of-sample degradation
+    - Stability metrics for parameter robustness"""
+
+    def __init__(self, n_splits=5, train_ratio=0.7):
+        ...
+
+    def optimize(self, data, strategy_class, param_grid, initial_capital=10000):
+        ...
+
+    # Key output:
+    # - per-window train vs test metrics
+    # - stability_score (lower std = more stable)
+    # - overfitting_ratio (train_sharpe / test_sharpe)
+```
+
+### 26.3 ⚠️ Ловушки
+
+- Walk-forward использует `initial_capital=10000` — должен совпадать с engine default
+- Monte Carlo `n_simulations=10000` — на больших trade sets может быть медленным
+
+---
+
+## 27. Monitoring & Observability
+
+### 27.1 Backend Monitoring
+
+```
+backend/monitoring/
+├── prometheus_exporter.py   (322 строк)  # Prometheus text format export
+├── prometheus_metrics.py                   # Metric definitions
+├── extended_metrics.py                     # Additional metrics
+├── health_checks.py                        # Readiness/liveness probes
+├── db_monitor.py                           # SQLite stats monitoring
+├── agent_metrics.py                        # AI agent performance metrics
+├── cost_tracker.py                         # LLM API cost tracking
+├── cost_alerts.py                          # Cost budget alerts
+├── alerts/                                 # Alert definitions
+├── ab_testing.py                           # A/B test metrics
+├── breaker_telemetry.py                    # Circuit breaker telemetry
+├── redis_cache.py                          # Redis cache stats
+├── self_learning_signal_service.py         # Signal quality feedback
+├── prompts_monitor.py                      # Prompt versioning metrics
+└── prompt_versioning.py                    # Prompt A/B tracking
+```
+
+### 27.2 Agent Monitoring
+
+```
+backend/agents/monitoring/
+├── metrics_collector.py     # Agent-level metrics
+├── system_monitor.py        # System health (CPU, mem, disk)
+├── alerting.py              # Alert rule engine
+├── dashboard.py             # Real-time dashboard data
+├── ml_anomaly.py            # Anomaly detection in metrics
+├── prometheus_grafana.py    # Grafana integration
+└── tracing.py               # Distributed tracing
+```
+
+### 27.3 Prometheus Metrics
+
+| Metric                                       | Type      | Description                  |
+| -------------------------------------------- | --------- | ---------------------------- |
+| `http_requests_total`                        | counter   | HTTP request count by status |
+| `http_request_duration_seconds`              | histogram | Request latency              |
+| `ai_agent_requests_total`                    | counter   | LLM API calls by provider    |
+| `ai_agent_request_duration_seconds`          | histogram | LLM latency                  |
+| `cache_hits_total` / `cache_misses_total`    | counter   | Cache effectiveness          |
+| `backtest_total` / `backtest_failures_total` | counter   | Backtest throughput          |
+| `cost_usd_total`                             | counter   | LLM API cost accumulation    |
+
+---
+
+## 28. Optimization System (Deep Dive)
+
+### 28.1 Полная структура
+
+```
+backend/optimization/
+├── optuna_optimizer.py      # Bayesian TPE/CMA-ES (ОСНОВНОЙ)
+├── builder_optimizer.py     # Strategy Builder-specific optimization
+├── ray_optimizer.py   (464 строк)  # Ray distributed + multiprocessing fallback
+├── advanced_engine.py (386 строк)  # Unified interface (regime + walk-forward + optimize)
+├── scoring.py               # 20 scoring metrics
+├── filters.py         (104 строк)  # Static + dynamic constraint filters
+├── recommendations.py       # Auto-recommendations based on results
+├── models.py                # OptimizationConfig, result models
+├── workers.py               # Background optimization workers
+├── utils.py                 # Shared utilities
+└── CLAUDE.md                # Sub-directory context
+```
+
+### 28.2 Optimizer Hierarchy
+
+```
+AdvancedOptimizationEngine (advanced_engine.py)
+    ├── OptunaOptimizer        # Bayesian (TPE, CMA-ES)
+    ├── RayParallelOptimizer   # Distributed (Ray cluster)
+    ├── MultiprocessingOptimizer  # Local multiprocessing fallback
+    ├── WalkForwardValidator   # OOS validation
+    └── RegimeDetector         # Market context
+```
+
+### 28.3 RayParallelOptimizer
+
+- Использует Ray для distributed computing across cores/nodes
+- GPU support для hybrid workloads
+- Fault tolerance для long-running optimizations
+- **Fallback:** `MultiprocessingOptimizer` если Ray недоступен (`RAY_AVAILABLE = False`)
+
+### 28.4 Filters (pre/post optimization)
+
+```python
+passes_filters(result, request_params) → bool
+# Checks: min_trades, max_drawdown_limit, min_profit_factor, min_win_rate
+# + dynamic constraints from frontend EvaluationCriteriaPanel
+```
+
+**⚠️ Unit mismatch:** `max_drawdown_limit` в request = fraction (0-1), в result = percentage (0-100)
+
+---
+
+## 29. Frontend Architecture
+
+### 29.1 Модульная структура
+
+```
+frontend/js/
+├── core/                       # Framework-level modules
+│   ├── StateManager.js  (565 строк)  # Redux-like state (subscribe, persist, undo/redo)
+│   ├── EventBus.js      (382 строк)  # Pub/sub (namespaced, wildcards, history)
+│   ├── Router.js                      # SPA routing (hash-based)
+│   ├── ApiClient.js                   # Fetch wrapper + interceptors
+│   ├── WebSocketClient.js             # WS reconnect, heartbeat
+│   ├── LazyLoader.js                  # Dynamic module loading
+│   ├── Logger.js                      # Structured logging
+│   ├── SafeDOM.js                     # XSS-safe DOM manipulation
+│   ├── Sanitizer.js                   # Input sanitization
+│   ├── ServiceLayer.js                # DI container
+│   └── PerformanceMonitor.js          # Core Web Vitals
+
+├── components/                 # Reusable UI components
+│   ├── AiBuildModule.js               # AI strategy builder widget
+│   ├── BacktestModule.js              # Backtest results display
+│   ├── ChartManager.js                # TradingView chart integration
+│   ├── MetricsPanels.js               # Metric display panels
+│   ├── OptimizationHeatmap.js         # Parameter optimization heatmap
+│   ├── MonteCarloChart.js             # Monte Carlo distribution chart
+│   ├── ParameterSensitivityChart.js   # Param sensitivity visualization
+│   ├── TradingViewEquityChart.js      # Equity curve chart
+│   ├── TradesTable.js                 # Trade list table
+│   ├── SaveLoadModule.js              # Strategy save/load
+│   ├── ValidateModule.js              # Strategy validation
+│   ├── UndoRedoModule.js              # Undo/redo for graph edits
+│   ├── DataTable.js, Form.js, Modal.js, Toast.js, Card.js, Loader.js
+│   ├── MLBlocksModule.js             # ML block types
+│   ├── OrderFlowBlocksModule.js      # Order flow block types
+│   ├── SentimentBlocksModule.js      # Sentiment block types
+│   ├── ConnectionsModule.js          # Graph connection management
+│   └── MyStrategiesModule.js         # Strategy portfolio view
+
+├── pages/                      # Page-level modules
+│   └── strategy_builder.js  (3000+ строк)  # Main strategy builder page
+
+├── strategy_builder/           # Strategy builder sub-modules
+
+├── services/
+│   └── liveTrading.js         # Live trading frontend service
+
+├── shared/                    # Shared utilities
+├── utils/                     # Helper functions
+├── testing/                   # Test infrastructure
+└── tests/                     # Frontend tests
+```
+
+### 29.2 StateManager (Redux-like)
+
+```javascript
+const store = new StateManager({
+    user: null, theme: 'dark', settings: {}
+}, { persist: true, maxHistory: 50 });
+
+store.subscribe('user', (user) => ...);   // Per-key subscription
+store.set('user', { name: 'John' });      // Update state
+store.undo();                              // Undo last change
+```
+
+### 29.3 EventBus (Pub/Sub)
+
+```javascript
+const bus = new EventBus();
+bus.on('user:*', (data, event) => ...);   // Wildcard
+bus.once('app:ready', () => ...);          // One-time
+bus.emit('user:login', { name: 'John' }); // Emit
+```
+
+### 29.4 ⚠️ Ловушки
+
+- **Commission conversion:** UI показывает 0.07 (percent) → backend получает 0.0007 (decimal)
+- **No build step** — pure ES modules, no webpack/vite
+- **Leverage slider** ≤ 125, color-coded по уровню risk
+- Все strategy params проходят через Properties panel → `strategy_params` dict
+
+---
+
+## 30. Services Layer (Deep Dive)
+
+### 30.1 Core Services
+
+| Service                | File                     | Lines | Description                     |
+| ---------------------- | ------------------------ | ----- | ------------------------------- |
+| `DataService`          | `data_service.py`        | —     | Repository pattern for CRUD     |
+| `KlineDataManager`     | `kline_manager.py`       | —     | Singleton kline data provider   |
+| `SmartKlineService`    | `smart_kline_service.py` | —     | Intelligent kline aggregation   |
+| `EventBus`             | `event_bus.py`           | 643   | Redis + local pub/sub messaging |
+| `MonteCarloSimulator`  | `monte_carlo.py`         | 561   | Statistical robustness analysis |
+| `WalkForwardOptimizer` | `walk_forward.py`        | 525   | Rolling window validation       |
+
+### 30.2 Trading Services
+
+| Service                  | File                         | Description                             |
+| ------------------------ | ---------------------------- | --------------------------------------- |
+| `PaperTrading`           | `paper_trading.py`           | Simulated execution without real orders |
+| `UnifiedTrading`         | `unified_trading/`           | Abstraction over live/paper/backtest    |
+| `TradingHalt`            | `trading_halt.py`            | Emergency trading halt                  |
+| `TournamentOrchestrator` | `tournament_orchestrator.py` | Strategy tournament/competition         |
+
+### 30.3 Data Quality & Integrity
+
+| Service              | File                      | Description                       |
+| -------------------- | ------------------------- | --------------------------------- |
+| `DataQualityService` | `data_quality_service.py` | OHLCV quality checks              |
+| `DataIntegrity`      | `data_integrity.py`       | Hash-based integrity verification |
+| `DataGapRepair`      | `data_gap_repair.py`      | Auto-fill missing candles         |
+| `ArchivalService`    | `archival_service.py`     | Data archiving/cleanup            |
+
+### 30.4 Infrastructure Services
+
+| Service               | File                      | Description                     |
+| --------------------- | ------------------------- | ------------------------------- |
+| `CacheWarming`        | `cache_warming.py`        | Pre-populate caches on startup  |
+| `MultiLevelCache`     | `multi_level_cache.py`    | L1 (memory) + L2 (Redis) cache  |
+| `RateLimiter`         | `rate_limiter.py`         | API rate limiting               |
+| `ServiceRegistry`     | `service_registry.py`     | Service discovery/DI            |
+| `GracefulDegradation` | `graceful_degradation.py` | Fallback when services fail     |
+| `DistributedLock`     | `distributed_lock.py`     | Redis-based distributed locking |
+
+### 30.5 Reliability & Testing
+
+| Service               | File                      | Description                    |
+| --------------------- | ------------------------- | ------------------------------ |
+| `ChaosEngineering`    | `chaos_engineering.py`    | Fault injection testing        |
+| `SyntheticMonitoring` | `synthetic_monitoring.py` | Synthetic health probes        |
+| `PropertyTesting`     | `property_testing.py`     | Property-based test generation |
+| `SLOErrorBudget`      | `slo_error_budget.py`     | SLO compliance tracking        |
+| `ABTesting`           | `ab_testing.py`           | A/B test framework             |
+
+### 30.6 Security Services
+
+| Service             | File                     | Description                  |
+| ------------------- | ------------------------ | ---------------------------- |
+| `APIKeyRotation`    | `api_key_rotation.py`    | Auto-rotation of API keys    |
+| `GitSecretsScanner` | `git_secrets_scanner.py` | Scan repo for leaked secrets |
+| `IPWhitelist`       | `ip_whitelist.py`        | IP allowlist enforcement     |
+| `KMSIntegration`    | `kms_integration.py`     | Key Management Service       |
+| `SecureConfig`      | `secure_config.py`       | Encrypted configuration      |
+
+### 30.7 LLM Client Architecture
+
+```
+backend/agents/llm/
+├── base_client.py    (551 строк)  # Abstract base + session management
+├── rate_limiter.py   (197 строк)  # Token-aware rate limiting
+├── prompt_optimizer.py              # Prompt compression/optimization
+├── connections.py                   # Connection pool management
+└── clients/
+    ├── deepseek.py                  # DeepSeek V3.2
+    ├── qwen.py                      # Alibaba DashScope
+    ├── perplexity.py                # Market research
+    └── ollama.py                    # Local LLM (offline)
+```
+
+### 30.8 BaseLLMClient Features
+
+```python
+class BaseLLMClient(ABC):
+    """All LLM clients inherit from this:
+    - aiohttp persistent sessions
+    - Token bucket rate limiting (per-provider budgets)
+    - Retry with exponential backoff
+    - Circuit breaker integration (optional)
+    - Usage statistics (tokens, cost, latency)"""
+
+# Supported providers: DEEPSEEK, PERPLEXITY, OPENAI, ANTHROPIC, OLLAMA, QWEN, CUSTOM
+
+# Rate limits:
+TokenBudget:
+    max_tokens_per_minute = 100_000
+    max_tokens_per_hour = 2_000_000
+    max_tokens_per_day = 20_000_000
+    max_cost_per_hour_usd = 5.0
+    max_cost_per_day_usd = 50.0
+```
+
+---
+
 ## Deprecated (НЕ использовать в новом коде)
 
 | Item                            | Replacement                             |
@@ -1246,6 +2029,15 @@ backend/backtesting/indicator_handlers.py          — Если добавляе
 backend/backtesting/strategy_builder/adapter.py    — Если меняешь Builder
 backend/services/adapters/bybit.py                 — Если меняешь API
 frontend/js/pages/strategy_builder.js              — Если меняешь UI
+backend/services/live_trading/strategy_runner.py   — Если меняешь live trading
+backend/services/risk_management/risk_engine.py    — Если меняешь risk management
+backend/agents/memory/hierarchical_memory.py       — Если меняешь agent memory
+backend/agents/consensus/consensus_engine.py       — Если меняешь consensus
+backend/agents/self_improvement/feedback_loop.py   — Если меняешь self-improvement
+backend/agents/security/security_orchestrator.py   — Если меняешь agent security
+backend/optimization/advanced_engine.py            — Если меняешь optimization
+backend/ml/regime_detection.py                     — Если меняешь ML pipeline
+frontend/js/core/StateManager.js                   — Если меняешь frontend state
 ```
 
 ### Обычно ИГНОРИРОВАТЬ
@@ -1254,6 +2046,5 @@ frontend/js/pages/strategy_builder.js              — Если меняешь U
 mcp-server/                            — MCP disabled
 frontend/dist/                         — Build artifacts
 data/archive/                          — Logs
-backend/ml/                            — ML optional
-deployment/                            — DevOps
+deployment/                            — DevOps (k8s, helm, docker)
 ```

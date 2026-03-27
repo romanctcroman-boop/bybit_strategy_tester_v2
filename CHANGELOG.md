@@ -9,6 +9,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **docs: CLAUDE_CODE.md v2.0 — expanded from 1260 to 2045 lines, 30 sections (~95% project coverage) (2026-03-27)**
+
+    Added 12 new sections (§19-§30) covering previously undocumented subsystems:
+    - §19 Live Trading: StrategyRunner, OrderExecutor, WebSocket, signal flow
+    - §20 Risk Management: RiskEngine, 6 sizing methods, 7 SL types, 18 rejection reasons
+    - §21 Agent Memory: 4-tier cognitive memory, VectorStore, BM25, SQLite backend
+    - §22 Agent Consensus: ConsensusEngine (3 methods), 4-phase deliberation, RiskVetoGuard
+    - §23 Agent Self-Improvement: FeedbackLoop, StrategyEvolution, RLHF, PatternExtractor
+    - §24 Security Layer: SecurityOrchestrator (3 policies), PromptGuard, SemanticGuard, AES-256-GCM
+    - §25 ML/RL: RegimeDetection (KMeans/GMM/HMM), DQN/PPO agents, Gymnasium environment
+    - §26 Monte Carlo & Walk-Forward: statistical robustness, rolling window validation
+    - §27 Monitoring: Prometheus metrics, health checks, cost tracking, agent metrics
+    - §28 Optimization Deep Dive: Ray, AdvancedEngine, filters, recommendations
+    - §29 Frontend Architecture: StateManager, EventBus, 25 components, core modules
+    - §30 Services Layer: 60+ services, LLM client architecture, reliability, data quality
+
+    Updated navigation table, file priority reading list, and version to 2.0.
+
+- **fix: AI pipeline — WF crash, signal counts in state.set_result, run script hardening (2026-03-27)**
+
+    Three follow-up fixes after Run #10 identified remaining issues:
+
+    **`backend/agents/trading_strategy_graph.py`**
+    - `BacktestNode.execute()`: `state.set_result()` was not including `signal_long_count`/`signal_short_count`
+      even though `_run_sync()` returned them. Fixed by extracting counts to top-level variables (initialized
+      to `-1` for unknown) and always including them in `state.set_result`. Resolves `signals: ?L + ?S` display.
+
+    **`run_pipeline_r9.py`**
+    - Fixed `TypeError: unsupported format string passed to NoneType.__format__` at WF print line:
+      `wf_sh = wf.get("wf_sharpe") or 0.0` and `is_sh = wf.get("is_sharpe") or 0.0`.
+      Triggered when WF hard-rejects a strategy (IS Sharpe ≤ 0) — node stores `None` not `0`.
+    - Same fix applied to `opt_sh` (optimization best Sharpe) and `total_cost_usd`.
+    - Footer updated to "Run #10 done".
+
+    **Run #11 results** (first crash-free run): IS Sharpe iter1=-0.89 → iter2=-0.74 → iter3=-0.21 → final=-1.64;
+    WF hard-reject; optimizer found **best Sharpe=0.29** (50 trials, net_profit=+$1589).
+    Signal counts confirmed working: `signals=210L+289S` visible in analysis log.
+    Pipeline: 701.9s, $0.0764, 16 LLM calls, 1 error (debate timeout — expected).
+
+- **fix: AI pipeline refinement loop degradation — sparse_signals root_cause + signal count feedback (2026-03-27)**
+
+    Fixed a critical bug where the refinement loop progressively destroyed strategy quality:
+    iteration 1 had 28L+18S signals, iteration 2 had 1+3, iteration 3 had 0+0 — because
+    `DIRECTION_MISMATCH` fired incorrectly on trade imbalance (not signal imbalance), causing the
+    LLM to add restrictive `AND(RSI_cross)` gates that collapsed signals to near-zero.
+
+    **Root cause:** `BacktestNode` generated `DIRECTION_MISMATCH` when `short_trades==0 and long_trades>0`,
+    even when raw signals existed in both directions (28 long + 18 short). With `pyramiding=1`,
+    clustered signals naturally produce trade imbalance without any direction wiring problem.
+
+    **`backend/agents/trading_strategy_graph.py`**
+    - `BacktestNode._run_sync()`: Capture `_sig_long`/`_sig_short` from `signal_result.entries/short_entries`
+      before the engine runs; include as `signal_long_count`/`signal_short_count` in returned dict.
+    - `BacktestNode`: `DIRECTION_MISMATCH` now uses **signal counts** (`_sig_long==0 or _sig_short==0`),
+      not trade counts. Prevents false positive when signals are bidirectional but trades cluster.
+    - `BacktestAnalysisNode`: New `sparse_signals` root_cause fires when `sig_long + sig_short < 10`
+      (AND-gate over-filtering). Checked before `direction_mismatch` in priority order.
+      Signal counts added to `metrics_snapshot`. Log now shows `signals=NL+NS`.
+    - `BacktestAnalysisNode`: New `sparse_signals` suggestion explains AND-gate sparsity multiplication
+      and recommends RSI `range` mode over `cross` mode.
+    - `RefinementNode`: Reads `signal_long_count`/`signal_short_count` from backtest result.
+      Injects `RAW SIGNAL COUNTS` paragraph into LLM feedback with AND-gate sparsity warning
+      when `sig_long + sig_short < 10`.
+
+    **`run_pipeline_r9.py`**
+    - Fixed crash: `state.errors.items()` → `for err in state.errors` (errors is a list, not a dict).
+    - Updated to Run #10 with signal count display in backtest summary.
+
 - **fix: AI pipeline 8 bugs — BacktestConfig, engine.run(), effective_trades, WF validation (2026-03-26)**
 
     Fixed 8 critical bugs in the AI pipeline that caused every backtest to fail with
@@ -23,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Bug 7: OptimizationNode — use `interval`/`commission` keys for `build_backtest_input`
     - BuildGraphNode: add 0-block guard and >50% signal drop guard
     - WalkForwardValidationNode: hard reject negative IS Sharpe (was: skip+pass)
-    - _run_rolling_wf(): pre-compute signals, correct engine kwargs, proper signal slicing
+    - \_run_rolling_wf(): pre-compute signals, correct engine kwargs, proper signal slicing
 
     **`backend/agents/prompts/response_parser.py`**
     - Bug 2: Add `_convert_blocks_to_signals()` for LLM blocks/connections format
@@ -358,19 +426,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
 
-        All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
-        changes that were not reflected in the tests.
+            All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+            changes that were not reflected in the tests.
 
-        **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
-        - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
-          now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
-        - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
-        - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
-        - `renderPagination` tests updated: pagination is always removed, no elements created.
-        - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+            **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+            - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+              now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+            - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+            - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+            - `renderPagination` tests updated: pagination is always removed, no elements created.
+            - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
 
-        **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
-        - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
+            **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+            - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
 
     selected'`) but `setDom()`helper did not create the`#strategyTimeframe`element.
     - Added`strategyTimeframe = '15'`parameter to`setDom()` and creates the element.
@@ -1721,7 +1789,7 @@ function calculateADX(data, period = 14) {
     TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
     (bars_in_trade now uses inclusive counting to match TV).
 
-                                **File:** `scripts/_tv_calibration_check.py`
+                                    **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 
