@@ -4,84 +4,76 @@ applyTo: "**/backtesting/**/*.py"
 
 # Backtester Engine Rules
 
-
-## Data Flow - PRESERVE THIS (CRITICAL)
+## Data Flow — PRESERVE THIS (CRITICAL)
 
 ```
-DataService.load_ohlcv(symbol, timeframe, start, end)
+DataService.get_market_data(symbol, timeframe, start_time, end_time)
     ↓ returns: pd.DataFrame[open, high, low, close, volume, timestamp]
 
-Strategy.generate_signals(data)
-    ↓ returns: pd.DataFrame with 'signal' column (1, -1, 0)
+Strategy.generate_signals(ohlcv: pd.DataFrame) -> SignalResult
+    ↓ returns: SignalResult(entries=bool Series, exits=bool Series,
+    ↓                       short_entries=bool|None, short_exits=bool|None)
+    ↓ NOT a DataFrame with 'signal' column — that API is DEPRECATED
 
-BacktestEngine.run(data, signals, config)
-    ↓ uses: initial_capital, commission_rate=0.0007
-    ↓ returns: BacktestResults
+BacktestEngine.run(data, strategy_config, ...)
+    ↓ entry on NEXT bar open after signal (not signal bar!)
+    ↓ commission=0.0007 on margin (NOT on leveraged value)
+    ↓ returns: dict with metrics + trades
 
-MetricsCalculator.calculate(results)
-    ↓ returns: Dict with 166 metrics
+MetricsCalculator.calculate_all(trades, equity, config)
+    ↓ returns: dict with 166 TV-parity metrics
 ```
 
-## Critical Parameters - NEVER LOSE
+## Gold Standard Engine: FallbackEngineV4
 
 ```python
-from dataclasses import dataclass
+# ✅ CORRECT
+from backend.backtesting.engines.fallback_engine_v4 import FallbackEngine
 
-@dataclass
-class BacktestConfig:
-    initial_capital: float = 10000.0
-    commission_rate: float = 0.0007  # 0.07% - MUST match TradingView
-    slippage: float = 0.0005         # 0.05%
-    position_size: float = 1.0       # fraction of capital
-    leverage: int = 1                # leverage multiplier
+# ❌ WRONG — deprecated, do not use for new code
+# from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 ```
 
-## FallbackEngineV2 - Gold Standard
+**Engine selection via `engine_selector.py`:**
 
 ```python
-from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+from backend.core.engine_adapter import get_engine
 
-# This is the reference implementation
-# All other engines must produce identical results
-engine = FallbackEngineV2(config)
-results = engine.run(data, strategy_params)
+engine = get_engine(
+    engine_type=None,          # None → auto-selects FallbackEngineV4
+    initial_capital=10000.0,
+    commission=0.0007,
+    slippage=0.0001,
+)
+results = engine.run(data=candles, strategy_config=strategy_config)
+```
 
-# Validate against TradingView:
-# - Same number of trades
-# - Same entry/exit prices (within 0.01%)
-# - Same PnL (within 0.1%)
+## Critical Parameters — NEVER LOSE
+
+```python
+# From backend/backtesting/models.py — BacktestConfig (100+ fields)
+commission_value: float = 0.0007   # 0.07% — MUST match TradingView — NEVER CHANGE
+initial_capital: float = 10000.0
+position_size: float = 1.0         # fraction (1.0 = 100% capital)
+leverage: float = 1.0              # ⚠️ optimizer default = 10, frontend = 10
+direction: str = "both"            # ⚠️ POST /api/backtests/ default = "long"!
+pyramiding: int = 1                # ⚠️ hardcoded to 1 in optimizer
+
+# Commission is calculated on MARGIN (not leveraged value) — TradingView style:
+# commission = trade_value × commission_value  (NOT leveraged_value × commission_value)
 ```
 
 ## Trade Execution Logic
 
 ```python
-from typing import Optional
-from dataclasses import dataclass
+# Entry: on OPEN of bar AFTER signal bar
+entry_price = next_bar.open
 
-@dataclass
-class Trade:
-    entry_time: pd.Timestamp
-    exit_time: Optional[pd.Timestamp]
-    entry_price: float
-    exit_price: Optional[float]
-    direction: int  # 1=long, -1=short
-    quantity: float
-    pnl: Optional[float]
-    pnl_percent: Optional[float]
-    commission: float
-    mfe: float  # Maximum Favorable Excursion
-    mae: float  # Maximum Adverse Excursion
+# PnL for long:
+pnl = (exit_price - entry_price) / entry_price * leveraged_position_value - 2 * commission
 
-def calculate_pnl(trade: Trade, commission_rate: float = 0.0007) -> float:
-    """Calculate trade PnL with commission"""
-    if trade.direction == 1:  # Long
-        gross_pnl = (trade.exit_price - trade.entry_price) * trade.quantity
-    else:  # Short
-        gross_pnl = (trade.entry_price - trade.exit_price) * trade.quantity
-
-    # Commission on both entry and exit
-    commission = trade.entry_price * trade.quantity * commission_rate * 2
-    return gross_pnl - commission
+# SL check (long): bar.low ≤ entry_price * (1 - stop_loss)
+# TP check (long): bar.high ≥ entry_price * (1 + take_profit)
 ```
 
 ## Performance Optimization
@@ -89,68 +81,14 @@ def calculate_pnl(trade: Trade, commission_rate: float = 0.0007) -> float:
 Use vectorized operations (NumPy/Pandas), avoid Python loops:
 
 ```python
-import numpy as np
-import pandas as pd
+# GOOD — Vectorized
+data['position'] = data['signal'].shift(1).fillna(0)
+data['returns'] = data['close'].pct_change()
+data['strategy_returns'] = data['position'] * data['returns']
 
-# GOOD - Vectorized
-def calculate_returns(prices: pd.Series) -> pd.Series:
-    return prices.pct_change()
-
-def apply_signals(data: pd.DataFrame) -> pd.DataFrame:
-    data['position'] = data['signal'].shift(1).fillna(0)
-    data['returns'] = data['close'].pct_change()
-    data['strategy_returns'] = data['position'] * data['returns']
-    return data
-
-# BAD - Avoid loops
-def calculate_returns_slow(prices: pd.Series) -> list:
-    returns = []
-    for i in range(1, len(prices)):
-        returns.append((prices[i] - prices[i-1]) / prices[i-1])
-    return returns  # DON'T DO THIS
-```
-
-## Caching
-
-```python
-import functools
-import hashlib
-
-@functools.lru_cache(maxsize=128)
-def calculate_indicator(close_tuple: tuple, period: int, indicator: str) -> tuple:
-    """Cache indicator calculations for performance"""
-    close = pd.Series(close_tuple)
-    if indicator == 'rsi':
-        result = ta.rsi(close, length=period)
-    elif indicator == 'ema':
-        result = ta.ema(close, length=period)
-    return tuple(result.values)
-
-# Convert Series to tuple for caching
-close_tuple = tuple(df['close'].values)
-rsi_values = calculate_indicator(close_tuple, 14, 'rsi')
-```
-
-## Walk-Forward Optimization
-
-```python
-from backend.backtesting.walk_forward import WalkForwardOptimizer
-
-optimizer = WalkForwardOptimizer(
-    in_sample_size=252,   # 1 year training
-    out_of_sample_size=63, # 3 months testing
-    step_size=21           # 1 month steps
-)
-
-results = optimizer.run(
-    data=data,
-    strategy_class=RSIStrategy,
-    param_grid={
-        'rsi_period': [10, 14, 21],
-        'overbought': [65, 70, 75],
-        'oversold': [25, 30, 35]
-    }
-)
+# BAD — avoid loops over price data
+for i in range(1, len(prices)):
+    ...  # DON'T DO THIS
 ```
 
 ## Metrics Requirements
@@ -166,8 +104,9 @@ MetricsCalculator must produce all 166 metrics:
 
 ## DO NOT
 
-- Change commission_rate from 0.0007
+- Change `commission_value` from `0.0007`
 - Use loops for price calculations
 - Skip MFE/MAE calculation
-- Modify FallbackEngineV2 without approval
-- Lose initial_capital or strategy_params variables
+- Use or reference `FallbackEngineV2/V3` for new code
+- Return `pd.DataFrame` with `'signal'` column from `generate_signals`
+- Lose `initial_capital` or `strategy_params` variables

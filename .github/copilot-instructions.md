@@ -1,7 +1,7 @@
 # Bybit Strategy Tester v2 - Copilot Instructions
 
-> **Last updated:** 2026-02-21  
-> **Stack:** Python 3.11-3.14, FastAPI, SQLAlchemy, SQLite, Pandas, NumPy, Bybit API v5  
+> **Last updated:** 2026-03-28
+> **Stack:** Python 3.11-3.14, FastAPI, SQLAlchemy, SQLite, Pandas, NumPy, Bybit API v5
 > **Purpose:** Backtesting system for Bybit trading strategies with TradingView metric parity
 
 ---
@@ -13,26 +13,29 @@ Bybit API (REST + WebSocket)
     ↓
 DataService → SQLite (data.sqlite3, bybit_klines_15m.db)
     ↓
-Strategy → generate_signals(df) → pd.DataFrame with 'signal' column
+Strategy.generate_signals(ohlcv) → SignalResult (entries/exits bool Series)
     ↓
 BacktestEngine → FallbackEngineV4 (gold standard), commission=0.0007
     ↓
 MetricsCalculator → 166 TradingView-parity metrics
     ↓
-FastAPI → 753 routes at /api/v1/
+FastAPI → 753+ routes at /api/v1/
     ↓
 Frontend → Static HTML/JS/CSS at /frontend/
 ```
 
 ### Key Directories
 
-| Path                                    | Purpose                                                         |
-| --------------------------------------- | --------------------------------------------------------------- |
-| `backend/backtesting/engines/`          | Backtest engines: FallbackV2(deprecated)/V3/V4, GPU, Numba, DCA |
-| `backend/api/routers/`                  | 70+ API router files                                            |
-| `backend/services/adapters/bybit.py`    | Bybit API integration with rate limiting                        |
-| `backend/config/database_policy.py`     | Data retention constants (DATA_START_DATE=2025-01-01)           |
-| `frontend/js/pages/strategy_builder.js` | Main UI logic (~3000 lines)                                     |
+| Path                                            | Purpose                                          |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `backend/backtesting/engines/fallback_engine_v4.py` | Gold standard engine (3204 lines)            |
+| `backend/backtesting/strategies.py`             | ALL strategies + BaseStrategy + SignalResult     |
+| `backend/core/metrics_calculator.py`            | 166 TV-parity metrics                            |
+| `backend/api/routers/`                          | 70+ API router files                             |
+| `backend/services/adapters/bybit.py`            | Bybit API integration (1710 lines)               |
+| `backend/config/constants.py`                   | COMMISSION_TV, ALL_TIMEFRAMES, DEFAULT_CAPITAL   |
+| `backend/config/database_policy.py`             | DATA_START_DATE=2025-01-01                       |
+| `frontend/js/pages/strategy_builder.js`         | Main UI logic (13378 lines)                      |
 
 ---
 
@@ -112,22 +115,41 @@ ruff format .
 
 ## 📝 Code Patterns
 
-### Strategy Class
+### Strategy Class (CORRECT API — returns SignalResult, NOT DataFrame)
 
 ```python
-from backend.backtesting.strategies.base import BaseStrategy
+# ALL strategies are in backend/backtesting/strategies.py (single file)
+from backend.backtesting.strategies import BaseStrategy, SignalResult
+import pandas as pd
 import pandas_ta as ta
+from typing import Any
 
 class MyStrategy(BaseStrategy):
-    def __init__(self, params: dict):
-        super().__init__(params)
-        self.required_params = ['period', 'threshold']
-        self._validate_params()
+    name: str = "my_strategy"
+    description: str = "Brief description"
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        signals = data.copy()
-        # Add 'signal' column: 1=long, -1=short, 0=no action
-        return signals
+    def __init__(self, params: dict[str, Any] | None = None):
+        super().__init__(params)  # calls _validate_params() internally
+
+    def _validate_params(self) -> None:
+        if 'period' not in self.params:
+            raise ValueError("Missing required param: period")
+
+    def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
+        rsi = ta.rsi(ohlcv['close'], length=self.params['period'])
+        return SignalResult(
+            entries=(rsi < 30).fillna(False),
+            exits=(rsi > 70).fillna(False),
+            short_entries=(rsi > 70).fillna(False),
+            short_exits=(rsi < 30).fillna(False),
+        )
+
+    @classmethod
+    def get_default_params(cls) -> dict[str, Any]:
+        return {'period': 14}
+
+# Register in STRATEGY_REGISTRY dict (near end of strategies.py):
+# STRATEGY_REGISTRY["my_strategy"] = MyStrategy
 ```
 
 ### FastAPI Endpoint
@@ -222,20 +244,22 @@ See `AGENTS.MD` section "VS Code Agent Mode Configuration" for full details.
 
 ---
 
-## 🔒 CLAUDE.md — Mandatory Context for Risky Changes
+## 🔒 CLAUDE_CODE.md — Mandatory Context for Risky Changes
 
-> **Full project map:** `CLAUDE.md` in repository root (15 sections, 780+ lines).
+> **Full project map:** `CLAUDE_CODE.md` in repository root (31 sections, 2279 lines, 100% coverage).
 > Copilot MUST read relevant sections before modifying core subsystems.
 
-### Before ANY change to these areas, read `CLAUDE.md` sections:
+### Before ANY change to these areas, read `CLAUDE_CODE.md` sections:
 
-| Area                                               | Sections to read                                                                 |
-| -------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `BacktestConfig`, engine, `MetricsCalculator`      | §5 (Critical Constants), §7 (Cross-cutting Parameters), §15 (Refactor Checklist) |
-| Strategy Builder adapter, strategies               | §3 (Architecture), §6 (Strategy Parameters), §15                                 |
-| Optimization, scoring                              | §7 (Key Optimization Metrics, Cross-cutting Parameters), §15                     |
-| Risk management, position sizing                   | §7 (Global Parameters, MM Dependencies), §15                                     |
-| Frontend (strategy_builder.js, leverageManager.js) | §3 (Direction Defaults), §7 (Cross-cutting Parameters), §15                      |
+| Area                                               | Sections to read                                          |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| `BacktestConfig`, engine, `MetricsCalculator`      | §5 (Cross-cutting vars), §13 (Engines), §14 (Metrics)     |
+| Strategy Builder adapter, strategies               | §6 (Builder blocks), §10 (Data transform pipeline)        |
+| Optimization, scoring                              | §28 (Optimization deep dive)                              |
+| Risk management, position sizing                   | §20 (Risk Management)                                     |
+| Live trading                                       | §19 (Live Trading subsystem)                              |
+| Frontend (strategy_builder.js, leverageManager.js) | §29 (Frontend Architecture)                               |
+| AI agent system                                    | §15, §21-§25, §30 (Memory, Consensus, Security, Services) |
 
 ### High-risk parameters — NEVER change without explicit plan
 

@@ -102,28 +102,38 @@ def backtest_config() -> dict:
 
 ```python
 import pytest
-from backend.backtesting.strategies.rsi import RSIStrategy
+from backend.backtesting.strategies import RSIStrategy, SignalResult
 
 class TestRSIStrategy:
     """Unit tests for RSI strategy"""
 
-    def test_init_with_valid_params(self, sample_strategy_params):
+    def test_init_with_valid_params(self):
         """Test strategy initialization"""
-        strategy = RSIStrategy(sample_strategy_params)
-        assert strategy.params['rsi_period'] == 14
+        strategy = RSIStrategy({"period": 14, "oversold": 30, "overbought": 70})
+        assert strategy.params['period'] == 14
 
     def test_init_missing_params_raises_error(self):
         """Test that missing params raises ValueError"""
-        with pytest.raises(ValueError, match="Missing required parameter"):
+        with pytest.raises(ValueError):
             RSIStrategy({})
 
-    def test_generate_signals_returns_correct_columns(self, sample_ohlcv, sample_strategy_params):
-        """Test signal generation output format"""
-        strategy = RSIStrategy(sample_strategy_params)
+    def test_generate_signals_returns_signal_result(self, sample_ohlcv):
+        """Test signal generation output type — must be SignalResult, NOT DataFrame"""
+        strategy = RSIStrategy({"period": 14, "oversold": 30, "overbought": 70})
         result = strategy.generate_signals(sample_ohlcv)
 
-        assert 'signal' in result.columns
-        assert set(result['signal'].unique()).issubset({-1, 0, 1})
+        # ✅ Correct: check for SignalResult
+        assert isinstance(result, SignalResult)
+        assert hasattr(result, "entries")
+        assert hasattr(result, "exits")
+        assert result.entries.dtype == bool
+        # ✅ len(result.entries), NOT len(result) — SignalResult has no __len__
+        assert len(result.entries) == len(sample_ohlcv)
+        assert not result.entries.isna().any()
+
+    # ❌ WRONG pattern — do NOT use:
+    # assert 'signal' in result.columns       ← old DataFrame API, no longer valid
+    # assert set(result['signal'].unique())... ← old API
 ```
 
 ### Integration Test

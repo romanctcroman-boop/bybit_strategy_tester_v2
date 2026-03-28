@@ -49,7 +49,8 @@ class BacktestRequest(BaseModel):
 
     @validator('interval')
     def validate_interval(cls, v):
-        valid = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
+        # ✅ Correct: Bybit/internal format uses numeric strings, not '15m'
+        valid = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
         if v not in valid:
             raise ValueError(f'Invalid interval. Must be one of: {valid}')
         return v
