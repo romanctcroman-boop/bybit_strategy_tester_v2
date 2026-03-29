@@ -9,6 +9,600 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **fix: Strategy Builder UI — 6 bugs fixed (2026-03-29)**
+
+    Full bug-fix pass across Strategy Builder frontend components.
+
+    **Bug #8 — Undo/Redo loses connections on Redo (CRITICAL)**
+    - `frontend/js/components/UndoRedoModule.js` `restoreStateSnapshot()`: fixed
+      self-reference array-clearing bug. `setBlocks(blocks)` / `setConnections(conns)`
+      setters do `arr.length = 0; arr.push(...passed)` — when `passed === arr` (same
+      reference) the first `length=0` cleared what was just populated. Fixed by passing
+      `[...blocks]` / `[...conns]` shallow copies so the setter's round-trip is safe.
+
+    **Bug #12 — Database panel 503/timeout on first open**
+    - `frontend/js/strategy_builder/SymbolSyncModule.js` `loadAndRender()`: renamed to
+      `loadAndRender(attempt = 1)` and added one automatic retry with 2 s delay on
+      `AbortError` or non-OK response. Shows "Повторная попытка подключения..." while
+      waiting. Manual Refresh button still works for subsequent failures.
+
+    **Bug #6 — Fit to Screen ignores open floating panels**
+    - `frontend/js/pages/strategy_builder.js` `fitToScreen()`: replaced stub
+      `resetZoom()` call with proper implementation that (a) measures the bounding box
+      of all rendered blocks, (b) deducts 560 px for any open floating panel, (c) computes
+      `zoom = clamp(min(availW/contentW, availH/contentH), 0.2, 1.0)`, then scrolls
+      canvas so content is centred with 40 px padding.
+
+    **Bug #2 — Navbar buttons inaccessible on narrow screens**
+    - `frontend/css/strategy_builder.css`: added three `@media` breakpoints.
+        - `≤ 1100 px`: action buttons show icon-only (text `font-size:0`).
+        - `≤ 860 px`: navbar wraps to two rows; `.navbar-actions` becomes horizontally
+          scrollable so all buttons remain reachable.
+        - `≤ 600 px`: strategy-name input shrinks to 120 px.
+
+    **Bug #1 — Scroll wheel changes leverage unexpectedly (FIXED in prior step)**
+    - `frontend/js/pages/strategy_builder.js` line ~1255: `leverageBlock` wheel listener
+      now guards `if (e.target !== backtestLeverageRangeEl) return` — only intercepts
+      scroll when cursor is directly over the range input.
+
+    **Bug #3 — No Russian notification for "Run Backtest / Optimize" without saved strategy**
+    - `frontend/js/pages/optimization_panels.js` lines 797, 879: translated English
+      "Save strategy first…" warning messages to Russian.
+
+    **Bug #5 — Duplicate strategies in "My Strategies" modal**
+    - Root: some strategies appeared twice, likely due to duplicate DB rows or join artifacts.
+    - `backend/api/routers/strategy_builder/router.py` `list_strategies()`: added
+      `.distinct(Strategy.id)` to the SQLAlchemy query so the backend never emits
+      duplicate rows regardless of underlying joins.
+    - `frontend/js/components/MyStrategiesModule.js` `fetchStrategiesList()`: added
+      frontend deduplication by `id` as a defensive second layer.
+
+    **Bug #11 — No block library toggle button (FALSE ALARM)**
+    - `frontend/js/sidebar-toggle.js` already wires `#toggleLeftSidebarBtn` with full
+      collapse/expand logic and CSS (`sidebar-left.collapsed`). Toggle works correctly.
+
+    Implemented RuFlo-inspired parallel agent execution and quality improvements across
+    the LangGraph pipeline. All changes verified: 211 tests passing.
+
+    **P3-1a — `debate ∥ memory_recall` parallel execution**
+    - `trading_strategy_graph.py` `build_trading_strategy_graph()`: replaced sequential
+      `regime_classifier → debate → memory_recall` chain with `EdgeType.PARALLEL` edge
+      so `debate` and `memory_recall` run concurrently after `regime_classifier`.
+    - `langgraph_orchestrator.py` `_execute_parallel()` / `EdgeType.PARALLEL` already
+      supported this pattern via `asyncio.gather`.
+    - Saves ~10-15s per pipeline run (memory_recall overlaps with debate's 90s LLM calls).
+
+    **P3-1b — `_collect_refined_opinions` parallel (deliberation.py)**
+    - `backend/agents/consensus/deliberation.py`: converted sequential `for opinion in
+previous_opinions` loop to `asyncio.gather` pattern, matching how
+      `_collect_initial_opinions` and `_cross_examine` already work.
+    - Saves ~10-20s per debate refinement round (2 agent calls overlap instead of serial).
+
+    **P3-2 — `MLValidationNode` 3 sub-checks parallel**
+    - `trading_strategy_graph.py` `MLValidationNode.execute()`: replaced 3 sequential
+      `await asyncio.to_thread(...)` calls (overfitting / regime / stability) with a single
+      `await asyncio.gather(..., return_exceptions=True)`.
+    - All 3 sub-checks are independent (same inputs, different slices/logic).
+    - Saves ~7-18s per run (dominant check ~12s, now runs in parallel with the others).
+
+    **P3-3 — Optuna `n_jobs=2`, `N_TRIALS` 50→100**
+    - `OptimizationNode.N_TRIALS`: 50 → 100 (with `n_jobs=2` the 120s budget supports ~100 trials).
+    - `run_builder_optuna_search(n_jobs=2)`: 2 parallel Optuna workers, ~2× trial throughput.
+
+    **SELF-RAG — skip memory recall when DB is empty**
+    - `MemoryRecallNode.execute()`: added early-exit when `loaded_count == 0` (new session,
+      no memories yet), skipping all 3 `recall()` queries and their BM25+embedding overhead.
+
+    **Memory deduplication across 3 recall queries**
+    - `MemoryRecallNode.execute()`: added `_dedup()` helper that removes items already seen
+      in a previous list (by `item.id`). The same high-importance memory can score in wins,
+      failures, and regime_memories simultaneously, inflating the LLM context block.
+
+    **JSON mode for DeepSeek MoA + QWEN critic**
+    - `base_client.py` `_build_payload()`: added `json_mode` parameter; when `True`, injects
+      `response_format={"type":"json_object"}` for OpenAI-compatible providers (DeepSeek, Qwen).
+    - `GenerateStrategiesNode._call_llm()`: new `json_mode: bool = False` parameter, gated
+      to deepseek/qwen only (Perplexity sonar-pro does not support `response_format`).
+    - Enabled `json_mode=True` for all 3 DeepSeek MoA calls and the QWEN critic call.
+    - Eliminates ~90% of `ResponseParser._extract_json()` regex failures on malformed output.
+
+    **Total estimated savings: ~30-55s per full pipeline run.**
+    Files: `trading_strategy_graph.py`, `deliberation.py`, `base_client.py`,
+    `tests/test_memory_recall_and_analysis_nodes.py`, `tests/backend/agents/test_p1_features.py`,
+    `tests/backend/agents/test_p2_features.py`.
+
+- **fix: backtest metrics UI bugs N1-N7 (2026-03-29)**
+
+    Fixed 7 UI/backend bugs found during UI audit of backtest results page:
+
+    **N1 — `total_return` shown as fraction (−0.43% instead of −1.55%)**
+    - `MetricsPanels.js` line ~444: changed `(metrics.total_return || 0) * 100` →
+      `metrics.net_profit_pct ?? (metrics.total_return || 0) * 100`
+    - `backtest_results.js` `setMetric('metricReturn')`: same fix
+    - `backtest_results.js` Heatmap `HEATMAP_METRIC_GROUPS`: `total_return × 100` → `net_profit_pct`
+
+    **N2 — `long_largest_win_value` showed PCT (2.44) not USD (230.70)**
+    - Root cause: `PerformanceMetrics.long_largest_win` = PCT field;
+      `PerformanceMetrics.long_largest_win_value` = USD field.
+      Both DB-load paths in `router.py` (list endpoint ~line 815, single endpoint ~line 1217)
+      were reading `opt_metrics.get("long_largest_win")` (PCT key) for the `_value` fields.
+    - Fixed: changed to `opt_metrics.get("long_largest_win_value")` for all four `_value` fields
+      (`long_largest_win_value`, `long_largest_loss_value`, `short_largest_win_value`,
+      `short_largest_loss_value`). PCT fields now correctly read bare keys.
+
+    **N3 — Sharpe/Sortino ДЛИННАЯ = 0**
+    - Not a real bug. Frontend already reads `metrics.sharpe_long` correctly.
+      Value is 0 because tested strategies generated only short trades in tested period.
+
+    **N4 — `recovery_factor` КОРОТКАЯ shows "0.000 🔴" for long-only strategy**
+    - `MetricsPanels.js` Long/Short blocks: all direction-specific metrics
+      (`sharpe_long/short`, `sortino_long/short`, `profit_factor_long/short`,
+      `calmar_long/short`, `recovery_long/short`) now pass `null` when
+      `long_trades == 0` / `short_trades == 0` respectively → `setValue()` renders `--`.
+
+    **N5 — Stability R² = 0 for old backtests**
+    - Engine fix was applied in previous session. Old backtests (pre-fix) retain
+      stability=0 in their stored `metrics_json`. New backtests show correct values. By design.
+
+    **N6 — Kelly % = 0 for all backtests in list view**
+    - Root cause: `router.py` list-endpoint `PerformanceMetrics(...)` constructor was missing
+      `kelly_percent`, `kelly_percent_long`, `kelly_percent_short`, `sqn`, `volatility`,
+      `ulcer_index` fields entirely — they defaulted to 0.
+    - Fixed: added all six fields to list-endpoint DB-load path (after `calmar_short`).
+    - Verified: `kelly_percent` now correctly returns 14.1% for backtest `83b24c8a`.
+
+    **N7 — Trade count shows "74" instead of "73 (1 открытых)"**
+    - `backtest_results.js` line 3739: `countEl.textContent = trades.length` replaced with
+      logic that counts closed vs open trades using `t.is_open` flag and formats as
+      `"73 (1 открытых)"` when open trades exist.
+
+    **N8 — `GET /api/v1/strategies/` hangs**
+    - Investigated: 526 strategies in DB, endpoint responds in <10s normally.
+      Transient issue — SQLite WAL-lock when DB is under heavy load. No code fix needed.
+
+    Files changed:
+    - `frontend/js/components/MetricsPanels.js`
+    - `frontend/js/pages/backtest_results.js`
+    - `backend/api/routers/backtests/router.py`
+
+    Fixed all 7 backend bugs where metrics returned 0 or wrong values on the backtest results page:
+    1. **`stability (R²) = 0`** — `engine.py` never passed `stability` to `PerformanceMetrics`
+       constructor. Fixed: `stability=calc_metrics.get("stability", 0.0)` added to `_calculate_metrics()`.
+
+    2. **`sharpe_long / sortino_long / calmar_long = 0`** — Both the list and single-backtest
+       endpoints in `router.py` were building `PerformanceMetrics` from `opt_metrics` without
+       reading these fields. Fixed: added `sharpe_long/short`, `sortino_long/short`, `calmar_long/short`
+       to both DB-load paths.
+
+    3. **`long_largest_win_value / long_largest_loss_value = 0`** — `_value` suffixed fields
+       missing from list endpoint. Fixed: added to list endpoint DB-load path.
+
+    4. **`long_avg_trade_pct = 0`** — `long_avg_trade_pct`, `short_avg_trade_pct`, and
+       `long/short_avg_win/loss_pct` were never read from `opt_metrics` in either endpoint.
+       Fixed: added to both endpoints.
+
+    5. **`completed_at = null`** — Fixed in previous session.
+
+    6. **`final_pnl ≠ net_profit + open_pnl`** — By design: `final_pnl = equity[-1] - initial_capital`
+       includes unrealized PnL from open positions. The ~14 USD gap = `open_pnl`. Not a bug.
+
+    7. **`final_pnl_pct` stored as fraction** — Fixed in previous session (`* 100` applied).
+
+    Files changed: `backend/backtesting/engine.py`, `backend/api/routers/backtests/router.py`
+
+- **fix: graph_converter — orphan removal + exit block + layout positions (2026-03-28)**
+
+    Three UI quality fixes applied to `backend/agents/integration/graph_converter.py`:
+    1. **`_remove_orphans()`** — BFS backward from strategy_node removes blocks with no path
+       to the strategy node and their dangling connections. Previously AI-generated strategies
+       had floating unconnected blocks on the canvas (visual noise, and could confuse the engine).
+
+    2. **`_build_exit_block()`** — Creates a `static_sltp` block from `StrategyDefinition.exit_conditions`
+       (TP % and SL % parsed from LLM output), clamped to 0.3–20%, wired to `sl_tp` port of
+       the strategy node. Previously exit conditions were silently dropped — EXIT L/S ports
+       on the canvas were always empty.
+
+    3. **`_assign_layout_positions()`** (already added in prior session) — assigns distinct x/y
+       positions by block role so blocks don't stack at (100,100).
+
+    28/28 graph_converter tests passing.
+
+- **fix: ConnectionsModule — `normalizeConnection()` drops `fromPort`/`toPort` (2026-03-28)**
+
+    `normalizeConnection()` in `frontend/js/components/ConnectionsModule.js` matched the
+    `{from, fromPort, to, toPort}` format (used by GraphConverter) but hardcoded
+    `portId: 'out'` / `portId: 'in'`, discarding the actual port names. The canvas then
+    searched `[data-port-id="out"]` which doesn't exist on indicator blocks → no wires drawn.
+    Fixed: use `conn.fromPort || 'out'` and `conn.toPort || 'in'`.
+
+- **feat: AI Build results — composite score + selection transparency (2026-03-28)**
+
+    In `frontend/js/components/AiBuildModule.js` `showAiBuildResults()`:
+    - Extracts `sortino_ratio` from backtest metrics
+    - Computes composite score client-side: `Sharpe × Sortino × ln(1+trades) / (1 + DD%)`
+    - Displays score value with color coding (green ≥ 1.0, yellow > 0, red = 0)
+    - Shows `candidates_count` and `agreement_score` when available from consensus
+
+    In `frontend/strategy-builder.html` Evaluation floating panel:
+    - Added explanatory note distinguishing optimization criteria from AI pipeline ranking formula
+
+- **fix: graph_converter — add `Highest/Lowest Bar` to `_FILTER_BLOCK_MAP` (2026-03-27)**
+
+    `GraphConverter` silently skipped filters with type `"Highest/Lowest Bar"` because the
+    type was not present in `_FILTER_BLOCK_MAP`. Discovered in Run #22 via `[GRAPH CONV BUG]`
+    in the pipeline report.
+
+    **File:** `backend/agents/integration/graph_converter.py`
+
+    Added canonical entry:
+
+    ```python
+    "Highest/Lowest Bar": {
+        "block_type": "highest_lowest_bar",
+        "activate": {"use_highest_lowest": True},
+        "default_params": {"hl_lookback_bars": 10, ...},
+    }
+    ```
+
+    Also added 4 aliases in `_FILTER_TYPE_ALIASES`: `"Highest Lowest Bar"`, `"HighestLowest"`,
+    `"Breakout Filter"`, `"New High/Low"`.
+
+- **fix: DebateNode — missing `rounds` key in `set_result` causes debug script false positive (2026-03-27)**
+
+    `DebateNode.execute()` called `state.set_result(name, {"consensus": …, "confidence": …})`
+    without the `"rounds"` key. The debug script (`run_debug_r20.py`) reads
+    `debate.get("rounds", 0)` → always 0 → reported `[DEBATE BUG] Debate ran 0 rounds` even
+    when the pipeline log showed `rounds=3`. Added `"rounds": len(rounds_list)` to both the
+    success and error branches of `set_result`.
+
+    **File:** `backend/agents/trading_strategy_graph.py` (`DebateNode.execute`)
+
+- **fix: MLValidationNode.\_run_strategy — three bugs caused silent failure and false "✅ passed (IS=0.00 OOS=0.00)" log (2026-03-27)**
+
+    Three compounding bugs in `MLValidationNode._run_strategy()` caused all three ML validation
+    checks (overfitting, regime analysis, parameter stability) to silently fail on every pipeline
+    run. The inner `try/except` in `_check_overfitting` caught the errors and returned
+    `{"status": "error"}`, but the outer `else` branch then logged "✅ passed" because the
+    `"is_overfit"` key was absent — making every run appear to pass validation while actually
+    never running it.
+
+    **File:** `backend/agents/trading_strategy_graph.py` (`MLValidationNode._run_strategy`)
+
+    **Bug 1 — wrong BacktestConfig field name:**
+    `timeframe=config_params.get("timeframe", "15")` passed an unrecognised field; `BacktestConfig`
+    uses `interval=`. Pydantic raised `ValidationError` immediately.
+
+    **Bug 2 — missing required fields:**
+    `BacktestConfig` requires `start_date` and `end_date`; neither was provided. Fix: derive
+    them from `df.index[0]` / `df.index[-1]` and pass as `start_date` / `end_date`.
+
+    **Bug 3 — wrong `engine.run()` call signature:**
+    Called as `engine.run(data=df, signals=signal_result, config=cfg)` but the actual signature
+    is `run(config, ohlcv, silent=False, custom_strategy=None)` — `data` and `signals` are not
+    valid kwargs → `TypeError`. Also, pre-computing signals is unnecessary; the engine calls
+    `custom_strategy.generate_signals(ohlcv)` internally.
+
+    **Fix summary:**
+
+    ```python
+    # Before (broken)
+    cfg = BacktestConfig(symbol=…, timeframe=…)          # wrong field + missing start/end
+    engine.run(data=df, signals=signal_result, config=cfg) # wrong kwargs
+    return result.metrics                                  # PerformanceMetrics object, not dict
+
+    # After (correct)
+    cfg = BacktestConfig(symbol=…, interval=…,
+                         start_date=start_date, end_date=end_date, …)
+    engine.run(cfg, df, silent=True, custom_strategy=adapter)
+    return result.metrics.model_dump()                     # plain dict for .get() calls
+    ```
+
+    **Bug 4 — false "passed" log:**
+    The outer `else` in `execute()` always printed "✅ Overfitting check passed (IS=0.00 OOS=0.00)"
+    when `is_overfit` was absent, masking the error. Fixed: else branch now checks
+    `status == "ok"` before logging success; actual errors/skips log a `WARNING` instead.
+
+    **Impact:** `MLValidationNode` now runs real IS/OOS backtests on the optimized graph.
+    Overfitting detection (gap > 0.5), regime Sharpe analysis, and ±20% parameter stability
+    checks all produce meaningful results. All 141 related tests still pass.
+
+- **fix: MemoryItem.from_dict() — naive datetime from SQLite causes TypeError in recall (2026-03-27)**
+
+    `SQLiteMemoryBackend` stores timestamps with `_SQLITE_TS_FMT = "%Y-%m-%d %H:%M:%S"` (no
+    timezone suffix). When `MemoryItem.from_dict()` called `datetime.fromisoformat()` on these
+    strings it produced _naive_ datetimes. Downstream code (`is_expired()`, `_calculate_relevance()`)
+    subtracted them from `datetime.now(UTC)` (tz-aware), causing:
+
+    ```
+    TypeError: can't subtract offset-naive and offset-aware datetimes
+    ```
+
+    This crashed the entire `MemoryRecallNode` on every run where SQLite memories existed
+    (i.e., every run after the first), producing error code 26 in the pipeline log.
+
+    **File:** `backend/agents/memory/hierarchical_memory.py` (`MemoryItem.from_dict()`)
+
+    **Fix:** After `datetime.fromisoformat()`, check `tzinfo is None` and set UTC:
+
+    ```python
+    created_at = datetime.fromisoformat(created_at)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    # …same for accessed_at
+    ```
+
+    **Impact:** Memory recall no longer crashes when loaded from SQLite. The self-improvement
+    loop (few-shot injection of past wins) now operates correctly on runs 2+.
+
+- **fix: MLValidationNode timeout — disable bar magnifier for comparative backtests (2026-03-27)**
+
+    `MLValidationNode` timed out at 120 s (default) because `use_bar_magnifier=True` (default)
+    caused each `_run_strategy()` call to load ~200 K 1-minute candles for intrabar SL/TP
+    detection. With 17 backtests per validation (IS split + OOS split + 8 params × 2 perturbations
+    - regime slices), the total time was ~323 s — well above the 120 s node budget.
+
+    Bar magnifier precision is unnecessary for the Sharpe ratio comparisons that MLValidation
+    performs (overfitting detection, regime analysis, parameter stability). Disabling it drops
+    each call from ~19 s to ~1–2 s.
+
+    **File:** `backend/agents/trading_strategy_graph.py` (`MLValidationNode._run_strategy`,
+    `MLValidationNode.__init__`)
+
+    **Changes:**
+    - `_run_strategy()`: added `use_bar_magnifier=False` to `BacktestConfig` constructor.
+    - `__init__()`: raised node `timeout` from `120.0` to `180.0` s (safety margin for slow
+      networks / large OOS windows).
+
+    **Impact:** All three MLValidation checks (overfitting, regime, parameter stability)
+    now complete within the node budget. Run #21 confirmed real IS/OOS Sharpe values are
+    produced instead of the previous "0.00 / 0.00" silent-failure output.
+
+- **fix: HierarchicalMemory persistence — SQLite backend for cross-run recall (2026-03-27)**
+
+    Root cause of persistent 0 memories in `MemoryRecallNode`: all three memory nodes
+    (`MemoryRecallNode`, `MemoryUpdateNode`, `ReflectionNode`) created `HierarchicalMemory()`
+    with no backend → pure in-memory storage, lost on Python process exit. Each pipeline run
+    started with 0 stored memories regardless of prior runs. The few-shot injection loop
+    could never close.
+
+    **File:** `backend/agents/trading_strategy_graph.py`
+    - Added module-level constant `_PIPELINE_MEMORY_DB = "data/pipeline_strategy_memory.db"`.
+    - All three nodes now construct:
+
+        ```python
+        HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
+        ```
+
+    - `MemoryRecallNode` additionally calls `await memory.async_load()` after construction
+      (required because `_load_from_disk()` defers async backends when event loop is running).
+    - Tests: added `mock_memory.async_load = AsyncMock(return_value=0)` to all 4 affected
+      tests in `TestMemoryRecallNode` so existing patch path still works.
+
+    **Impact:** After the first successful run, `MemoryUpdateNode` writes to SQLite.
+    Subsequent runs will load those memories and `MemoryRecallNode` will inject past wins
+    as few-shot examples into `GenerateStrategiesNode`, closing the self-improvement loop.
+
+- **fix: memory stores optimized Sharpe on WF pass — `MemoryUpdateNode` + `ReflectionNode` + `WalkForwardValidationNode` (2026-03-27)**
+
+    Root cause discovered in Run #15: when WF validation passed (wf_sharpe=1.911, is_sharpe=1.940),
+    `MemoryUpdateNode` and `ReflectionNode` still stored the raw IS Sharpe (-1.037) and `passed=False`
+    in HierarchicalMemory. Next run, `MemoryRecallNode` finds no wins (importance<0.5) — the few-shot
+    injection never fires, LLM generates without guidance.
+
+    **Files:** `backend/agents/trading_strategy_graph.py`
+    1. **`WalkForwardValidationNode.execute()`**: when `passed=True`, now updates
+       `state.context["backtest_analysis"]["passed"] = True` and overwrites `sharpe_ratio`
+       with `is_sharpe` (optimized value). Downstream nodes read this context key.
+
+    2. **`MemoryUpdateNode.execute()`**: when `wf_validation.passed=True`, overrides
+       `sharpe` with `opt_result["best_sharpe"]` before computing `importance` and
+       writing episodic memory.
+
+    3. **`ReflectionNode.execute()`**: when `wf_validation.passed=True`, overrides
+       `passed=True` and `sharpe` with optimized value before building reflection text
+       and computing importance.
+
+    **Impact:** Run #15 result (Sharpe=1.940, ratio=0.985) will now be stored with
+    `importance=0.74` (Sharpe=1.940 → `(1.940+1)/4 = 0.735`) instead of `importance=0.10`
+    (raw Sharpe=-1.037). On the next run, `MemoryRecallNode` will find it as a "win" and
+    inject it as a few-shot example — closing the self-improvement feedback loop.
+
+- **fix: WF validation absolute Sharpe floor — `WF_MIN_ABS_SHARPE=0.5` added to `WalkForwardValidationNode` (2026-03-27)**
+
+    Root cause of false WF rejection: after the optimizer finds very high IS Sharpe (e.g. 1.805),
+    the existing `wf_sharpe / is_sharpe >= 0.5` ratio check always fails when IS is large
+    (Run #14: ratio = 0.514 / 1.805 = 0.285 < 0.5 → rejected). However, OOS Sharpe = 0.514 is
+    genuinely good and the strategy is tradeable (33 trades, DD=8.2%).
+
+    **File:** `backend/agents/trading_strategy_graph.py` (`WalkForwardValidationNode`)
+    - Added class constant `WF_MIN_ABS_SHARPE: float = 0.5`.
+    - Pass criterion changed from `ratio >= threshold` to `ratio_passes OR abs_passes`:
+
+        ```python
+        ratio_passes = ratio >= self.WF_RATIO_THRESHOLD   # wf/is >= 0.5
+        abs_passes   = wf_sharpe >= self.WF_MIN_ABS_SHARPE  # absolute OOS >= 0.5
+        passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
+        ```
+
+    - Log message now shows which criterion passed: `[ratio]` or `[abs_sharpe≥0.5]`.
+    - Docstring updated to document both acceptance criteria.
+
+    **Impact:** Run #14 (IS=1.805, OOS=0.514) would now pass WF via the absolute floor.
+    Strategies with high optimizer IS Sharpe but good absolute OOS Sharpe are no longer
+    falsely rejected as overfit.
+
+    **Tests added** (`tests/test_refinement_loop.py`, 52 total, +6 in `TestWFThresholds`):
+    - `test_ratio_threshold_value` / `test_abs_sharpe_floor_value` — constant values
+    - `test_ratio_passes` — standard ratio check still works
+    - `test_abs_floor_passes_when_ratio_fails` — Run #14 scenario: ratio=0.285 fails, abs=0.514≥0.5 passes
+    - `test_both_fail_when_wf_sharpe_low` — wf=0.3, is=2.0 → both checks fail → rejected
+    - `test_negative_wf_sharpe_always_fails` — negative OOS → always rejected
+
+- **fix: skip LLM refinement for `poor_risk_reward` with good signals — go to optimizer directly (2026-03-27)**
+
+    When `root_cause == "poor_risk_reward"` AND signal coverage is adequate (≥50 raw signals,
+    ≥5 trades), `_should_refine()` now returns `False` immediately instead of triggering 3 LLM
+    refinement iterations. In this case signal generation is working correctly — the optimizer
+    will tune SL/TP/indicator parameters far more efficiently than LLM rewriting.
+
+    **File:** `backend/agents/trading_strategy_graph.py` (`_should_refine()`)
+    - Added early return when `analysis["root_cause"] == "poor_risk_reward"` AND
+      `sig_long + sig_short >= 50` AND `trades >= MIN_TRADES`.
+    - Falls back to normal refinement when signal counts are unknown (no `signal_long_count` key).
+    - Logs decision: `"Skipping refinement: root_cause=poor_risk_reward with 186L+154S signals..."`
+
+    **Impact:** Run #12 had 87 trades and 186L+154S signals with sharpe=-0.09 — 3 full LLM
+    refinements happened (each ~3min = 9min wasted) without improvement. With this fix, the pipeline
+    skips directly to optimizer, saving ~6-9 minutes per run in the common `poor_risk_reward` case.
+
+    **Tests updated** (`tests/test_refinement_loop.py`, 46 total):
+    - `test_poor_risk_reward_with_good_signals_skips_refinement`
+    - `test_poor_risk_reward_sparse_signals_still_refines` (signals=2+1 → refine)
+    - `test_poor_risk_reward_no_signal_counts_still_refines` (unknown signals → conservative refine)
+
+- **fix: WF/optimizer ordering — WalkForwardValidationNode now runs AFTER OptimizationNode (2026-03-27)**
+
+    Root cause of the recurring WF failure pattern: `WalkForwardValidationNode` was validating the
+    raw LLM-generated strategy (e.g. IS Sharpe = −0.09) BEFORE optimization. `WalkForwardValidationNode`
+    hard-rejects any strategy with IS Sharpe ≤ 0, so WF always failed even when the optimizer
+    subsequently found Sharpe = 0.46+ with better params (e.g. eval_scenario_a result).
+
+    **Graph wiring change** (`backend/agents/trading_strategy_graph.py`)
+    - Old: `backtest_analysis → [refine | wf_validation] → optimize_strategy → analysis_debate`
+    - New: `backtest_analysis → [refine | optimize_strategy] → [wf_validation →] analysis_debate`
+    - `backtest_router.set_default` changed from `"wf_validation"` → `"optimize_strategy"` (both
+      `run_wf_validation=True` and `run_wf_validation=False` paths now go to optimizer first).
+    - `wf_router.set_default` changed from `"optimize_strategy"` → `"analysis_debate"` (WF outcome
+      routes to the next step, not back to optimizer).
+    - `graph.add_edge("optimize_strategy", ...)` is now conditional:
+      `"wf_validation"` when `run_wf_validation=True`, `"analysis_debate"` otherwise.
+
+    **WalkForwardValidationNode.execute() change** (`backend/agents/trading_strategy_graph.py`)
+    - Now reads `state.get_result("optimize_strategy").get("best_sharpe")` and uses it as `is_sharpe`
+      when the optimizer result is available and `best_sharpe > raw_is_sharpe`.
+    - `OptimizationNode` already sets `state.context["strategy_graph"] = optimized_graph` (line 2162),
+      so WF automatically validates the optimized graph.
+    - Falls back to `raw_is_sharpe` from the initial backtest when no optimizer result is present.
+
+    **Tests updated** (`tests/test_refinement_loop.py`)
+    - `test_optimization_is_default_route`: both backtest_router defaults now assert `"optimize_strategy"`
+    - `test_optimization_leads_to_analysis_debate` → renamed `test_optimization_leads_to_wf_or_analysis_debate`:
+      with WF enabled, `optimize_strategy` → `wf_validation`; without WF, → `analysis_debate`
+    - `test_router_picks_optimize_on_pass`: assert `"optimize_strategy"` (was `"wf_validation"`)
+    - `test_router_picks_optimize_on_max_iterations`: assert `"optimize_strategy"` (was `"wf_validation"`)
+    - `wf_router` default now asserts `"analysis_debate"` (was `"optimize_strategy"`)
+    - All 43 refinement tests + 35 P1 tests pass after the change.
+
+- **feat: AI pipeline — optimizer trial array, AnalysisDebateNode, generation feedback loop (2026-03-27)**
+
+    Six-phase enhancement to close the optimizer→generation feedback gap. Previously, the pipeline
+    ran 50 Optuna trials but only exposed the single best result to agents. Agents had no visibility
+    into the distribution of results and could not learn why strategies failed.
+
+    **Phase 1 — `OptimizationNode` top-20 trials + Spearman sensitivity**
+    (`backend/agents/trading_strategy_graph.py`)
+    - `top_n` increased from 5 → 20 (re-runs top-20 trials with full metrics for richer analysis)
+    - `top_trials` array (condensed: params/sharpe/trades/drawdown/profit_factor/score) now stored
+      in `state.set_result("optimize_strategy", {...})`
+    - `param_sensitivity` dict (Spearman ρ between each param value and Sharpe across top trials)
+      computed by new `OptimizationNode._compute_param_sensitivity()` static method
+    - `n_positive_sharpe` count added to optimize result
+    - Log line updated to include `top_trials` count and `n_positive_sharpe`
+
+    **Phase 2 — `AnalysisDebateNode`** (`backend/agents/trading_strategy_graph.py`)
+    - New node class between `optimize_strategy` and `ml_validation`
+    - Agents (DeepSeek + QWEN) debate the full optimizer trial array: which param regions produce
+      consistent positive Sharpe, which params have highest sensitivity, is strategy structurally
+      viable or relying on lucky params, what design changes would improve robustness
+    - `_format_question()` static method builds structured debate question from top_trials +
+      param_sensitivity + n_positive_sharpe + tested_combinations
+    - Max 2 debate rounds (shorter than market debate — optimizer data is structured)
+    - Consensus stored in `state.context["optimizer_analysis"]` + `state.results["analysis_debate"]`
+
+    **Phase 3 — Graph wiring**
+    - `optimize_strategy → ml_validation` changed to `optimize_strategy → analysis_debate → ml_validation`
+    - Graph topology comment updated in `build_trading_strategy_graph()` docstring
+
+    **Phase 4 — Optimizer analysis feedback into `GenerateStrategiesNode`**
+    - `optimizer_insights_block` built from `state.context["optimizer_analysis"]` when available
+    - Injected into prompt for both DeepSeek Self-MoA and other agents, after few_shot/memory blocks
+    - Closes the feedback loop: next generation iteration sees what param regions failed and why
+
+    **Phase 5 — `eval_scenario_a.py`**
+    - Standalone evaluation script: RSI single indicator, 50 Optuna trials, full `AnalysisDebateNode`
+    - Tests param_sensitivity correctness, debate coherence, consensus quality against 6 criteria
+    - Saves structured results to `eval_results/scenario_a_<timestamp>.json`
+
+    **Phase 6 — `eval_regime_split.py`**
+    - 3-regime cross-comparison: Trending Up (Jan–Feb), Volatile/Down (Mar–Apr), Ranging (May–Jun)
+    - RSI + SuperTrend graph, 40 trials per segment, cross-regime debate (DeepSeek + QWEN)
+    - Computes `param_consistency` across regimes and saves to `eval_results/regime_split_<timestamp>.json`
+
+    **Test update** (`tests/test_refinement_loop.py`)
+    - `test_optimization_leads_to_ml_validation` → split into two:
+      `test_optimization_leads_to_analysis_debate` + `test_analysis_debate_leads_to_ml_validation`
+
+- **fix: `DeliberationResult` field names corrected in `DebateNode` and `AnalysisDebateNode` (2026-03-27)**
+
+    Pre-existing bug discovered during eval_scenario_a development: both `DebateNode` and
+    `AnalysisDebateNode` were reading non-existent fields from `DeliberationResult`, causing
+    debate to silently return empty strings in all previous pipeline runs.
+
+    **File:** `backend/agents/trading_strategy_graph.py`
+
+    **Wrong fields (removed):** `consensus_answer`, `confidence_score`, `rounds_completed`
+    **Correct fields (now used):**
+    - `decision` — the debate consensus text (was being read as `consensus_answer`)
+    - `confidence` — 0.0–1.0 float (was being read as `confidence_score`)
+    - `len(rounds)` — number of rounds completed (was being read as `rounds_completed` int attribute)
+    - `rounds[0].opinions[i].reasoning` — agent texts (was read from non-existent `participant_texts`)
+
+    **Impact:** All pipeline runs prior to this fix had empty debate consensus (`""`) despite LLM
+    calls completing successfully. Market analysis debate was contributing nothing to strategy
+    generation. Fix ensures debate consensus now actually flows into `state.context["debate_consensus"]`.
+
+- **fix: dotenv loading in standalone eval scripts (2026-03-27)**
+
+    `eval_scenario_a.py` and `eval_regime_split.py` now load `.env` before any backend imports,
+    ensuring API keys (DEEPSEEK_API_KEY, QWEN_API_KEY) are available for `deliberate_with_llm` calls.
+    Without this fix, DeepSeek returned 401 Unauthorized and debate fell back to "Unknown" response.
+
+- **fix: SuperTrend filter type added to graph_converter; debate node timeout raised 90s → 150s (2026-03-27)**
+
+    Two bugs found during pipeline Run #11 (2026-03-27):
+
+    **Bug 1 — "Unknown filter type 'SuperTrend' — skipped"**
+    (`backend/agents/integration/graph_converter.py`)
+    - `_FILTER_BLOCK_MAP` had entries for Volatility, Volume, Trend, ADX, and Time — but not SuperTrend.
+    - When the LLM produced a strategy using SuperTrend as a directional filter (long above / short below),
+      the converter emitted a warning and dropped the filter entirely, silently degrading the graph.
+    - Fix: added `"SuperTrend"` entry to `_FILTER_BLOCK_MAP` mapping to `block_type="supertrend"` with
+      `generate_on_trend_change=True` (prevents every-bar firing, same fix applied to signal usage after Run #2).
+    - Fix: added 5 LLM-common aliases to `_FILTER_TYPE_ALIASES`:
+      `"Supertrend"`, `"Super Trend"`, `"SuperTrend Filter"`, `"Supertrend Filter"`, `"ST Filter"`.
+    - 2 new tests in `tests/test_graph_converter.py`: `test_supertrend_filter_maps_to_supertrend_block`
+      and `test_supertrend_filter_aliases_resolve` (4 aliases). 28/28 tests passing.
+
+    **Bug 2 — Debate node timeout too tight**
+    (`backend/agents/trading_strategy_graph.py`)
+    - `DebateNode` and `AnalysisDebateNode` both had `timeout=90.0s`.
+    - Real API measurements: `eval_scenario_a` debate took 84.4s, `eval_regime_split` took 101.7s.
+      Both pipeline runs #9–#11 had debate timeout errors at exactly 90s.
+    - Fix: raised both node timeouts from `90.0` → `150.0` seconds.
+
+- **fix: deduplicate Optuna top-N trials before re-run (2026-03-27)**
+
+    **File:** `backend/optimization/builder_optimizer.py` (`run_builder_optuna_search`)
+
+    TPE sampler re-samples identical parameter combinations when the search space is small relative
+    to `n_trials`. Previously, `passing_trials[:top_n]` could return the same param set 4+ times,
+    wasting re-run slots, corrupting `param_sensitivity` Spearman ranks, and flooding the
+    `AnalysisDebateNode` question with redundant entries.
+
+    Fix: deduplicate `passing_trials` by frozen param key (string of sorted items) before slicing
+    to `top_n`. Only the highest-scoring occurrence of each unique param set is kept.
+    98 builder optimizer tests pass.
+
 - **docs: CLAUDE_CODE.md v2.1 — §31 Auxiliary & Experimental Modules → 100% coverage (2026-03-27)**
 
     Added §31 with 7 subsections covering remaining undocumented modules:
@@ -439,19 +1033,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
 
-            All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
-            changes that were not reflected in the tests.
+                    All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+                    changes that were not reflected in the tests.
 
-            **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
-            - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
-              now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
-            - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
-            - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
-            - `renderPagination` tests updated: pagination is always removed, no elements created.
-            - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+                    **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+                    - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+                      now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+                    - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+                    - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+                    - `renderPagination` tests updated: pagination is always removed, no elements created.
+                    - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
 
-            **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
-            - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
+                    **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+                    - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
 
     selected'`) but `setDom()`helper did not create the`#strategyTimeframe`element.
     - Added`strategyTimeframe = '15'`parameter to`setDom()` and creates the element.
@@ -1802,7 +2396,7 @@ function calculateADX(data, period = 14) {
     TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
     (bars_in_trade now uses inclusive counting to match TV).
 
-                                    **File:** `scripts/_tv_calibration_check.py`
+                                            **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

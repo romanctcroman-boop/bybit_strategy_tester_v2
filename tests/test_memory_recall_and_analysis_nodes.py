@@ -249,6 +249,7 @@ class TestMemoryRecallNode:
         """With no HierarchicalMemory data, node runs without injecting memory_context."""
         state = make_state()
         mock_memory = MagicMock()
+        mock_memory.async_load = AsyncMock(return_value=0)
         mock_memory.recall = AsyncMock(return_value=[])
         with patch(self._PATCH_PATH, return_value=mock_memory):
             out = self._run(state)
@@ -271,8 +272,12 @@ class TestMemoryRecallNode:
         mock_win.content = "RSI(14) strategy on BTCUSDT — Sharpe=1.5, profitable"
         mock_win.importance = 0.7
         mock_win.tags = ["BTCUSDT", "rsi"]
+        mock_win.id = "mem_win_1"
+        mock_win.metadata = {}
 
         mock_memory = MagicMock()
+        # async_load must return > 0: SELF-RAG skips recall when count == 0
+        mock_memory.async_load = AsyncMock(return_value=1)
         mock_memory.recall = AsyncMock(
             side_effect=[
                 [mock_win],  # wins
@@ -296,8 +301,11 @@ class TestMemoryRecallNode:
         mock_fail.content = "MACD crossover failed — 0 trades generated"
         mock_fail.importance = 0.2
         mock_fail.tags = ["BTCUSDT", "macd", "failed"]
+        mock_fail.id = "mem_fail_1"
 
         mock_memory = MagicMock()
+        # async_load must return > 0: SELF-RAG skips recall when count == 0
+        mock_memory.async_load = AsyncMock(return_value=1)
         mock_memory.recall = AsyncMock(
             side_effect=[
                 [],  # wins
@@ -316,6 +324,7 @@ class TestMemoryRecallNode:
         """Result must contain memory_context_available, symbol, timeframe, regime."""
         state = make_state(symbol="ETHUSDT", timeframe="60")
         mock_memory = MagicMock()
+        mock_memory.async_load = AsyncMock(return_value=0)
         mock_memory.recall = AsyncMock(return_value=[])
         with patch(self._PATCH_PATH, return_value=mock_memory):
             out = self._run(state)
@@ -423,10 +432,13 @@ class TestGraphWiringWithNewNodes:
         assert ("regime_classifier", "memory_recall") in edges
         assert ("memory_recall", "generate_strategies") in edges
 
-    def test_debate_wired_through_memory_recall(self):
+    def test_debate_and_memory_recall_run_in_parallel(self):
+        # P3-1: debate and memory_recall run in parallel after regime_classifier
         g = build_trading_strategy_graph(run_backtest=False, run_debate=True)
         edges = _edge_pairs(g)
-        assert ("debate", "memory_recall") in edges
+        assert ("regime_classifier", "debate") in edges
+        assert ("regime_classifier", "memory_recall") in edges
+        assert ("debate", "generate_strategies") in edges
         assert ("memory_recall", "generate_strategies") in edges
 
     def test_backtest_analysis_node_in_graph(self):

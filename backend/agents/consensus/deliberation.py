@@ -667,15 +667,12 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
         previous_opinions: list[AgentVote],
         critiques: list[Critique],
     ) -> list[AgentVote]:
-        """Collect refined opinions after critique phase"""
-        refined = []
+        """Collect refined opinions after critique phase (parallel if enabled — P3-1)."""
+        import asyncio
 
-        for opinion in previous_opinions:
+        async def refine_one(opinion: AgentVote) -> AgentVote:
             agent_type = opinion.agent_type
-
-            # Gather critiques for this agent
             agent_critiques = [c for c in critiques if c.target_agent == opinion.agent_id]
-
             critiques_text = "\n".join(
                 [
                     f"- From {c.critic_agent}: "
@@ -684,21 +681,24 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
                     for c in agent_critiques
                 ]
             )
-
             prompt = self.PHASE_PROMPTS["refine"].format(
                 question=question,
                 original_position=opinion.position,
                 critiques=critiques_text or "No critiques received.",
             )
-
             response = await self._ask_agent(agent_type, prompt)
             vote = self._parse_opinion(agent_type, response)
-
-            # Preserve original agent_id
             vote.agent_id = opinion.agent_id
-            refined.append(vote)
+            return vote
 
-        return refined
+        if self.enable_parallel_calls and len(previous_opinions) > 1:
+            results = await asyncio.gather(*[refine_one(op) for op in previous_opinions])
+            return list(results)
+        else:
+            refined = []
+            for opinion in previous_opinions:
+                refined.append(await refine_one(opinion))
+            return refined
 
     async def _cross_examine(
         self,

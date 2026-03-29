@@ -423,9 +423,13 @@ class TestBuildGraphP2:
         assert "memory_recall" in edges
 
     def test_regime_classifier_connects_to_debate_when_enabled(self):
+        # P3-1: parallel edge — target is a list ["debate", "memory_recall"]
         graph = build_trading_strategy_graph(run_backtest=False, run_debate=True)
-        edges = [e.target for e in graph.edges.get("regime_classifier", [])]
-        assert "debate" in edges
+        all_targets: list[str] = []
+        for e in graph.edges.get("regime_classifier", []):
+            t = e.target
+            all_targets.extend(t if isinstance(t, list) else [t])
+        assert "debate" in all_targets
 
     def test_hitl_node_added_when_enabled(self):
         graph = build_trading_strategy_graph(run_backtest=True, hitl_enabled=True)

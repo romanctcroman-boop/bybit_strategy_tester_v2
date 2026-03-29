@@ -41,6 +41,7 @@ from backend.agents.langgraph_orchestrator import (
     AgentState,
     BudgetExceededError,
     ConditionalRouter,
+    EdgeType,
     FunctionAgent,
     make_sqlite_checkpointer,
     register_graph,
@@ -56,6 +57,9 @@ from backend.config.constants import COMMISSION_TV, INITIAL_CAPITAL
 
 _MIN_TRADES: int = 5  # minimum trades for a strategy to "pass"
 _MAX_DD_PCT: float = 30.0  # maximum drawdown % allowed
+
+# SQLite DB used by all three memory nodes so memories survive across runs
+_PIPELINE_MEMORY_DB: str = "data/pipeline_strategy_memory.db"
 
 # =============================================================================
 # GRAPH NODES
@@ -205,7 +209,7 @@ class DebateNode(AgentNode):
         super().__init__(
             name="debate",
             description="Multi-Agent Debate with KS-test adaptive stopping + S²-MAD cosine similarity",
-            timeout=90.0,
+            timeout=150.0,  # raised from 90s — eval runs show debate takes 84–102s
         )
 
     @staticmethod
@@ -273,19 +277,24 @@ class DebateNode(AgentNode):
                 use_memory=True,
             )
 
-            # Apply KS-test adaptive stopping retrospectively (log result)
-            confidence = getattr(debate_result, "confidence_score", 0.0)
-            consensus = getattr(debate_result, "consensus_answer", "")
+            # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
+            confidence = getattr(debate_result, "confidence", 0.0)
+            consensus = getattr(debate_result, "decision", "")
 
             # P2-2: store participant texts for S²-MAD similarity check on future rounds
-            participant_texts = getattr(debate_result, "participant_texts", [])
+            # Extract from first round opinions (DeliberationRound.opinions → AgentVote.reasoning)
+            rounds_list = getattr(debate_result, "rounds", [])
+            if rounds_list:
+                participant_texts = [v.reasoning for v in rounds_list[0].opinions if getattr(v, "reasoning", "")]
+            else:
+                participant_texts = []
             if len(participant_texts) >= 2:
                 sim = self._cosine_similarity(participant_texts[0], participant_texts[1])
                 logger.info(f"🔁 [DebateNode] S²-MAD cosine_sim={sim:.3f} (threshold={self._SIMILARITY_THRESHOLD})")
 
             logger.info(
                 f"🗣️ Debate complete: confidence={confidence:.2f}, "
-                f"rounds={getattr(debate_result, 'rounds_completed', '?')}"
+                f"rounds={len(rounds_list)}"
             )
 
             # Enrich state with debate consensus for GenerateStrategiesNode
@@ -296,7 +305,7 @@ class DebateNode(AgentNode):
                 "participating_agents": agents,
                 "_participant_texts": participant_texts,  # P2-2: stored for S²-MAD check
             }
-            state.set_result(self.name, {"consensus": consensus, "confidence": confidence})
+            state.set_result(self.name, {"consensus": consensus, "confidence": confidence, "rounds": len(rounds_list)})
             state.add_message(
                 "system",
                 f"Debate consensus (confidence={confidence:.0%}): {consensus[:200]}",
@@ -305,9 +314,153 @@ class DebateNode(AgentNode):
 
         except Exception as e:
             logger.warning(f"[DebateNode] Deliberation failed (non-fatal, continuing): {e}")
-            state.set_result(self.name, {"consensus": None, "confidence": 0.0, "error": str(e)})
+            state.set_result(self.name, {"consensus": None, "confidence": 0.0, "rounds": 0, "error": str(e)})
 
         return state
+
+
+class AnalysisDebateNode(AgentNode):
+    """
+    Post-optimization debate node (between optimize_strategy and ml_validation).
+
+    Agents analyze the full optimizer trial array — not just the single best result —
+    to surface statistical patterns:
+    - Which parameter regions consistently produce positive Sharpe?
+    - Which params have the highest sensitivity (Spearman ρ with Sharpe)?
+    - Is the strategy structurally viable or does performance rely on lucky param choices?
+    - What concrete design changes would improve robustness?
+
+    Consensus stored in:
+    - state.context["optimizer_analysis"]  → fed into next GenerateStrategiesNode call
+    - state.results["analysis_debate"]     → surfaced in pipeline report
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="analysis_debate",
+            description="Agents debate optimizer trial patterns for strategy improvement",
+            timeout=150.0,  # raised from 90s — eval runs show debate takes 84–102s
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        opt_result = state.get_result("optimize_strategy")
+        if not opt_result:
+            logger.debug("[AnalysisDebateNode] No optimization result — skipping")
+            return state
+
+        top_trials: list[dict] = opt_result.get("top_trials", [])
+        if not top_trials:
+            logger.debug("[AnalysisDebateNode] Empty top_trials — skipping")
+            return state
+
+        param_sensitivity: dict = opt_result.get("param_sensitivity", {})
+        n_positive: int = opt_result.get("n_positive_sharpe", 0)
+        tested: int = opt_result.get("tested_combinations", 0)
+        best_sharpe: float = float(opt_result.get("best_sharpe", 0.0))
+        symbol: str = state.context.get("symbol", "BTCUSDT")
+        agents: list[str] = state.context.get("agents", ["deepseek", "qwen"])
+
+        question = self._format_question(
+            top_trials=top_trials,
+            param_sensitivity=param_sensitivity,
+            n_positive=n_positive,
+            tested=tested,
+            best_sharpe=best_sharpe,
+            symbol=symbol,
+        )
+
+        try:
+            from backend.agents.consensus.real_llm_deliberation import deliberate_with_llm
+
+            debate_result = await deliberate_with_llm(
+                question=question,
+                agents=[a for a in agents if a in ("deepseek", "qwen")],
+                max_rounds=2,  # shorter — optimizer data is structured, less ambiguity
+                min_confidence=0.60,
+                symbol=symbol,
+                strategy_type="optimizer_analysis",
+                enrich_with_perplexity=False,
+                use_memory=True,
+            )
+
+            # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
+            consensus: str = getattr(debate_result, "decision", "")
+            confidence: float = getattr(debate_result, "confidence", 0.0)
+            rounds_done = len(getattr(debate_result, "rounds", []))
+
+            logger.info(
+                f"📊 [AnalysisDebateNode] Done: confidence={confidence:.2f}, rounds={rounds_done}, "
+                f"best_sharpe={best_sharpe:.2f}, n_positive={n_positive}/{len(top_trials)}"
+            )
+
+            # Store for GenerateStrategiesNode (Phase 4: close the feedback loop)
+            state.context["optimizer_analysis"] = {
+                "consensus": consensus,
+                "confidence": confidence,
+                "n_positive_sharpe": n_positive,
+                "n_trials": len(top_trials),
+                "best_sharpe": best_sharpe,
+                "top_params": top_trials[0].get("params", {}) if top_trials else {},
+                "param_sensitivity": param_sensitivity,
+            }
+            state.set_result(
+                self.name,
+                {"consensus": consensus, "confidence": confidence, "n_positive_sharpe": n_positive},
+            )
+            state.add_message(
+                "system",
+                f"Optimizer analysis (confidence={confidence:.0%}): {consensus[:200]}",
+                self.name,
+            )
+
+        except Exception as exc:
+            logger.warning(f"[AnalysisDebateNode] Analysis failed (non-fatal): {exc}")
+
+        return state
+
+    @staticmethod
+    def _format_question(
+        top_trials: list[dict],
+        param_sensitivity: dict[str, float],
+        n_positive: int,
+        tested: int,
+        best_sharpe: float,
+        symbol: str,
+    ) -> str:
+        """Format a structured debate question from the optimizer trial array."""
+        trial_lines = []
+        for i, t in enumerate(top_trials[:10]):
+            params_str = ", ".join(f"{k}={v}" for k, v in sorted(t.get("params", {}).items()))
+            trial_lines.append(
+                f"  #{i + 1}: {params_str} → sharpe={t['sharpe']:.3f}, "
+                f"trades={t['trades']}, dd={t['drawdown']:.1f}%, pf={t['profit_factor']:.2f}"
+            )
+        trial_block = "\n".join(trial_lines) if trial_lines else "  (no trial data)"
+
+        if param_sensitivity:
+            sorted_sens = sorted(param_sensitivity.items(), key=lambda x: abs(x[1]), reverse=True)
+            sens_str = ", ".join(f"{k}={v:+.3f}" for k, v in sorted_sens[:6])
+        else:
+            sens_str = "insufficient data (< 3 trials)"
+
+        pct_pos = round(n_positive / len(top_trials) * 100) if top_trials else 0
+
+        return (
+            f"Optimizer ran {tested} trials on {symbol} strategy. "
+            f"{n_positive}/{len(top_trials)} top re-run trials have positive Sharpe ({pct_pos}%). "
+            f"Best Sharpe={best_sharpe:.3f}.\n\n"
+            f"TOP 10 TRIAL RESULTS (sorted by composite score: Sharpe×50%+Sortino×30%+PF×20%):\n"
+            f"{trial_block}\n\n"
+            f"PARAM SENSITIVITY (Spearman ρ with Sharpe, range [-1,+1]):\n"
+            f"  {sens_str}\n\n"
+            f"Questions for debate:\n"
+            f"1. Which parameter values and ranges produce consistent positive Sharpe?\n"
+            f"2. Which params have the highest impact on performance (per sensitivity)?\n"
+            f"3. Is this strategy structurally viable or does it rely on lucky param choices?\n"
+            f"4. What specific design changes (new indicators, different logic, param ranges) "
+            f"would improve robustness?\n"
+            f"Provide concrete, data-backed recommendations for the next strategy generation."
+        )
 
 
 class MemoryRecallNode(AgentNode):
@@ -332,7 +485,7 @@ class MemoryRecallNode(AgentNode):
     TOP_K_WINS = 5
     TOP_K_FAILURES = 3
     TOP_K_REGIME = 3
-    MIN_WIN_IMPORTANCE = 0.5  # importance ≥ 0.5 = strategy with Sharpe > 1
+    MIN_WIN_IMPORTANCE = 0.35  # importance ≥ 0.35 = optimized Sharpe ≥ 0.4 (was 0.5 → Sharpe > 1, too strict)
     MIN_FAILURE_IMPORTANCE = 0.1
 
     def __init__(self) -> None:
@@ -351,33 +504,61 @@ class MemoryRecallNode(AgentNode):
             regime = market_result.get("regime", "unknown")
 
         try:
+            from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory
 
-            memory = HierarchicalMemory()
-
-            # --- 1. Successful strategies (high importance) ---
-            wins = await memory.recall(
-                query=f"successful strategy {symbol} {timeframe} high sharpe profit",
-                top_k=self.TOP_K_WINS,
-                min_importance=self.MIN_WIN_IMPORTANCE,
-                agent_namespace="strategy_gen",
+            memory = HierarchicalMemory(
+                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
             )
+            # Event loop is already running inside execute() → must async_load explicitly
+            loaded_count = await memory.async_load()
+            logger.debug(f"[MemoryRecallNode] async_load loaded {loaded_count} memories from SQLite")
 
-            # --- 2. Recent failures (low sharpe, no trades) ---
-            failures = await memory.recall(
-                query=f"failed strategy {symbol} {timeframe} low sharpe no trades",
-                top_k=self.TOP_K_FAILURES,
-                min_importance=self.MIN_FAILURE_IMPORTANCE,
-                agent_namespace="strategy_gen",
-            )
+            # SELF-RAG: skip all recall queries if memory is empty
+            if loaded_count == 0:
+                logger.debug("[MemoryRecallNode] Memory is empty — skipping recall queries")
+                wins, failures, regime_memories = [], [], []
+            else:
+                # --- 1. Successful strategies (high importance) ---
+                wins = await memory.recall(
+                    query=f"successful strategy {symbol} {timeframe} high sharpe profit",
+                    top_k=self.TOP_K_WINS,
+                    min_importance=self.MIN_WIN_IMPORTANCE,
+                    agent_namespace="strategy_gen",
+                )
 
-            # --- 3. Regime-specific patterns ---
-            regime_memories = await memory.recall(
-                query=f"market regime {regime} {symbol} best strategy approach",
-                top_k=self.TOP_K_REGIME,
-                min_importance=0.3,
-                agent_namespace="strategy_gen",
-            )
+                # --- 2. Recent failures (low sharpe, no trades) ---
+                failures = await memory.recall(
+                    query=f"failed strategy {symbol} {timeframe} low sharpe no trades",
+                    top_k=self.TOP_K_FAILURES,
+                    min_importance=self.MIN_FAILURE_IMPORTANCE,
+                    agent_namespace="strategy_gen",
+                )
+
+                # --- 3. Regime-specific patterns ---
+                regime_memories = await memory.recall(
+                    query=f"market regime {regime} {symbol} best strategy approach",
+                    top_k=self.TOP_K_REGIME,
+                    min_importance=0.3,
+                    agent_namespace="strategy_gen",
+                )
+
+                # Deduplicate across all 3 lists by item id: the same memory can
+                # score high in multiple queries, inflating the LLM context block.
+                _seen_ids: set[str] = set()
+
+                def _dedup(items: list) -> list:
+                    result = []
+                    for m in items:
+                        mid = str(getattr(m, "id", id(m)))
+                        if mid not in _seen_ids:
+                            _seen_ids.add(mid)
+                            result.append(m)
+                    return result
+
+                wins = _dedup(wins)
+                failures = _dedup(failures)
+                regime_memories = _dedup(regime_memories)
 
             # --- Build memory context block for the LLM prompt ---
             sections: list[str] = []
@@ -531,6 +712,28 @@ class GenerateStrategiesNode(AgentNode):
             )
             logger.info(f"🎯 [GenerateStrategies] Injecting {len(few_shot_examples)} few-shot examples")
 
+        # --- Phase 4: Optimizer analysis feedback (AnalysisDebateNode consensus) ---
+        # Inject post-optimization insights so the next generation iteration can
+        # learn from which param regions / designs produced positive Sharpe.
+        optimizer_analysis = state.context.get("optimizer_analysis")
+        optimizer_insights_block = ""
+        if optimizer_analysis and optimizer_analysis.get("consensus"):
+            n_pos = optimizer_analysis.get("n_positive_sharpe", 0)
+            n_trials = optimizer_analysis.get("n_trials", 0)
+            best_sh = optimizer_analysis.get("best_sharpe", 0.0)
+            optimizer_insights_block = (
+                "## Optimizer Evidence (previous run)\n"
+                f"Ran {n_trials} optimizer trials — {n_pos} had positive Sharpe "
+                f"(best Sharpe={best_sh:.3f}).\n"
+                f"Agent analysis consensus:\n{optimizer_analysis['consensus']}\n\n"
+                "IMPORTANT: Use these insights to design a better strategy. "
+                "Avoid parameter regions that the optimizer identified as consistently negative.\n"
+            )
+            logger.info(
+                f"📊 [GenerateStrategies] Injecting optimizer insights "
+                f"(n_pos={n_pos}/{n_trials}, best_sharpe={best_sh:.2f})"
+            )
+
         responses: list[dict[str, Any]] = []
         failed_agents: list[str] = []
 
@@ -546,12 +749,14 @@ class GenerateStrategiesNode(AgentNode):
                 prompt = f"{few_shot_block}\n\n{prompt}"
             if memory_context:
                 prompt = f"{memory_context}\n\n{prompt}"
+            if optimizer_insights_block:
+                prompt = f"{prompt}\n\n{optimizer_insights_block}"
             if refinement_feedback:
                 prompt = f"{prompt}\n\n{refinement_feedback}"
             system_msg = self._prompt_engineer.get_system_message("deepseek")
 
             moa_tasks = [
-                self._call_llm("deepseek", prompt, system_msg, temperature=t, state=state)
+                self._call_llm("deepseek", prompt, system_msg, temperature=t, state=state, json_mode=True)
                 for t in self._MOA_TEMPERATURES
             ]
             moa_results = await asyncio.gather(*moa_tasks, return_exceptions=True)
@@ -585,6 +790,8 @@ class GenerateStrategiesNode(AgentNode):
                 prompt = f"{few_shot_block}\n\n{prompt}"
             if memory_context:
                 prompt = f"{memory_context}\n\n{prompt}"
+            if optimizer_insights_block:
+                prompt = f"{prompt}\n\n{optimizer_insights_block}"
             if refinement_feedback:
                 prompt = f"{prompt}\n\n{refinement_feedback}"
             system_msg = self._prompt_engineer.get_system_message(agent_name)
@@ -637,6 +844,7 @@ class GenerateStrategiesNode(AgentNode):
                 critic_prompt,
                 "You are a precision strategy synthesiser. Output valid JSON only.",
                 temperature=0.3,  # deterministic for critic role
+                json_mode=True,
             )
         except Exception as e:
             logger.debug(f"QWEN critic call failed: {e}")
@@ -649,12 +857,18 @@ class GenerateStrategiesNode(AgentNode):
         system_msg: str,
         temperature: float | None = None,
         state: AgentState | None = None,
+        json_mode: bool = False,
     ) -> str | None:
         """Call LLM using the connections module (temperature override supported).
 
         Args:
-            state: If provided, LLM cost and call count are recorded on the state
-                   for pipeline-level observability via ``state.total_cost_usd``.
+            state:     If provided, LLM cost and call count are recorded on the state
+                       for pipeline-level observability via ``state.total_cost_usd``.
+            json_mode: If True, passes ``response_format={"type":"json_object"}`` to
+                       OpenAI-compatible providers (deepseek, qwen).  The system_msg
+                       MUST contain the word "JSON" (API requirement).  Eliminates
+                       regex-based extraction in ResponseParser.  Not set for
+                       Perplexity (unsupported by sonar-pro model).
         """
         from backend.agents.llm.base_client import (
             LLMClientFactory,
@@ -689,12 +903,17 @@ class GenerateStrategiesNode(AgentNode):
             max_tokens=4096,
         )
         client = LLMClientFactory.create(config)
+        # json_mode is only supported by OpenAI-compatible providers
+        _supports_json_mode = agent_name in ("deepseek", "qwen")
         try:
             messages = [
                 LLMMessage(role="system", content=system_msg),
                 LLMMessage(role="user", content=prompt),
             ]
-            response = await client.chat(messages)
+            response = await client.chat(
+                messages,
+                json_mode=(json_mode and _supports_json_mode),
+            )
             if state is not None:
                 state.record_llm_cost(response.estimated_cost)
             return response.content
@@ -1047,11 +1266,15 @@ class BacktestNode(AgentNode):
         # Prefer StrategyBuilderAdapter path (full 40+ block universe)
         engine_warnings: list[str] = []
         sample_trades: list[dict] = []
+        sig_long_count: int = -1
+        sig_short_count: int = -1
         if strategy_graph is not None:
             run_data = await self._run_via_adapter(strategy_graph, df, symbol, timeframe, state)
             metrics = run_data.get("metrics", {})
             engine_warnings = run_data.get("engine_warnings", [])
             sample_trades = run_data.get("sample_trades", [])
+            sig_long_count = run_data.get("signal_long_count", -1)
+            sig_short_count = run_data.get("signal_short_count", -1)
         else:
             # Fallback: legacy BacktestBridge (6 strategy types only)
             logger.debug("[BacktestNode] No strategy_graph — using BacktestBridge fallback")
@@ -1075,6 +1298,8 @@ class BacktestNode(AgentNode):
                 "metrics": metrics,
                 "engine_warnings": engine_warnings,
                 "sample_trades": sample_trades,
+                "signal_long_count": sig_long_count,
+                "signal_short_count": sig_short_count,
             },
         )
         state.add_message(
@@ -1125,6 +1350,11 @@ class BacktestNode(AgentNode):
             adapter = StrategyBuilderAdapter(strategy_graph)
             signal_result = adapter.generate_signals(df)
 
+            # Capture raw signal counts before the engine runs — used by
+            # BacktestAnalysisNode and RefinementNode for better diagnostics.
+            _sig_long = int(signal_result.entries.sum()) if signal_result.entries is not None else 0
+            _sig_short = int(signal_result.short_entries.sum()) if signal_result.short_entries is not None else 0
+
             # Derive start/end dates from the OHLCV DataFrame index
             # (BacktestConfig requires interval, start_date, end_date as mandatory fields)
             df_start = df.index[0]
@@ -1156,18 +1386,23 @@ class BacktestNode(AgentNode):
                             _tp = v / 100 if v > 1 else v
                 except Exception:
                     pass
-            # Clamp to BacktestConfig valid ranges: SL ∈ [0.001, 0.5], TP ∈ [0.001, 1.0]
-            # Enforce sensible minimums: SL ≥ 0.5% and TP ≥ 0.5% to avoid instant SL/TP hits
-            _sl = max(0.005, min(_sl, 0.49))
-            _tp = max(0.005, min(_tp, 0.99))
+            # Clamp to realistic intraday ranges (15m–1h strategies):
+            # SL > 7% means BTC must move $7k+ before stopping out → position held forever.
+            # TP > 15% means BTC must move $15k+ → equally unrealistic for short-term.
+            # These caps protect against LLM hallucinating values like SL=20%, TP=90%.
+            _sl = max(0.005, min(_sl, 0.07))
+            _tp = max(0.005, min(_tp, 0.15))
             # Enforce TP ≥ SL: inverted R:R (TP < SL) requires >67% win rate just to break even —
             # most LLM-generated strategies can't sustain that. Fall back to TP = SL * 1.5.
             if _tp < _sl:
                 logger.warning(
                     f"[BacktestNode] Inverted R:R: TP={_tp:.3f} < SL={_sl:.3f} — correcting TP to SL*1.5"
                 )
-                _tp = min(_sl * 1.5, 0.99)
+                _tp = min(_sl * 1.5, 0.15)
             logger.info(f"[BacktestNode] SL={_sl:.4f} ({_sl * 100:.2f}%)  TP={_tp:.4f} ({_tp * 100:.2f}%)")
+            # Store for OptimizationNode so it uses the same SL/TP in Numba trials
+            state.context["backtest_sl"] = _sl
+            state.context["backtest_tp"] = _tp
 
             cfg = BacktestConfig(
                 symbol=symbol,
@@ -1225,20 +1460,23 @@ class BacktestNode(AgentNode):
             open_count = metrics.get("open_trades", 0)
             # effective count: closed + end-of-backtest positions (is_open=True, TV parity)
             effective_count = trades_count + open_count
-            long_trades = metrics.get("long_trades", 0)
-            short_trades = metrics.get("short_trades", 0)
             if effective_count == 0:
                 engine_warnings.append(
                     "[NO_TRADES] Signals were generated but no trades executed. "
                     "Check that port names are correct (use 'long'/'short', not 'signal'/'output') "
                     "and that SL/TP values are realistic."
                 )
-            elif long_trades == 0 and short_trades > 0:
+            # Only fire DIRECTION_MISMATCH when the SIGNALS themselves are one-directional.
+            # If signals exist in both directions (e.g. 28 long + 18 short) but trades end up
+            # one-directional due to clustering / pyramiding-1 blocking, that is NOT a mismatch
+            # — firing this warning causes the LLM to add restrictive AND gates trying to "fix"
+            # something that isn't broken, which reduces signals to zero on the next iteration.
+            elif _sig_long == 0 and _sig_short > 0:
                 engine_warnings.append(
                     "[DIRECTION_MISMATCH] Strategy generates only SHORT signals but direction='both'. "
                     "Ensure 'long' port is connected to entry_long on the strategy node."
                 )
-            elif short_trades == 0 and long_trades > 0:
+            elif _sig_short == 0 and _sig_long > 0:
                 engine_warnings.append(
                     "[DIRECTION_MISMATCH] Strategy generates only LONG signals but direction='both'. "
                     "Ensure 'short' port is connected to entry_short on the strategy node."
@@ -1261,6 +1499,8 @@ class BacktestNode(AgentNode):
                 "metrics": metrics,
                 "engine_warnings": engine_warnings,
                 "sample_trades": sample_trades,
+                "signal_long_count": _sig_long,
+                "signal_short_count": _sig_short,
             }
 
         try:
@@ -1333,6 +1573,9 @@ class BacktestAnalysisNode(AgentNode):
         backtest_result = state.get_result("backtest") or {}
         metrics: dict[str, Any] = backtest_result.get("metrics", {}) or {}
         engine_warnings: list[str] = list(backtest_result.get("engine_warnings", None) or [])
+        # Raw signal counts from generate_signals (before engine execution)
+        sig_long: int = int(backtest_result.get("signal_long_count", -1))
+        sig_short: int = int(backtest_result.get("signal_short_count", -1))
 
         trades: int = int(metrics.get("total_trades", 0))
         # Include open (end-of-backtest) positions in the activity count — a position
@@ -1367,12 +1610,22 @@ class BacktestAnalysisNode(AgentNode):
 
         # ── Root cause ────────────────────────────────────────────────────────
         warning_str = " ".join(engine_warnings)
-        if "DIRECTION_MISMATCH" in warning_str:
+        # sparse_signals: AND-gate chaining reduced raw signals to near-zero before
+        # the engine even runs.  Check before direction_mismatch so the LLM gets
+        # the right corrective feedback (simplify gates, not "add both directions").
+        _signals_known = sig_long >= 0 and sig_short >= 0
+        if _signals_known and sig_long + sig_short < 10:
+            root_cause = "sparse_signals"
+        elif "DIRECTION_MISMATCH" in warning_str:
             root_cause = "direction_mismatch"
         elif effective_trades == 0 and not engine_warnings:
             root_cause = "no_signal"
         elif "NO_TRADES" in warning_str:
             root_cause = "signal_connectivity"
+        elif trades == 0 and open_trades > 0 and sharpe < 0:
+            # Position opened but never hit SL or TP for the entire period →
+            # SL/TP too wide (e.g. SL=20%, TP=90% for a 15m BTC strategy).
+            root_cause = "sl_tp_too_wide"
         elif effective_trades > 0 and win_rate < 0.05:
             root_cause = "sl_too_tight"
         elif dd >= self.MAX_DD_PCT and effective_trades < self.MIN_TRADES:
@@ -1386,7 +1639,19 @@ class BacktestAnalysisNode(AgentNode):
 
         # ── Suggestions (root-cause specific) ─────────────────────────────────
         suggestions: list[str] = []
-        if root_cause == "direction_mismatch":
+        if root_cause == "sparse_signals":
+            _sl = f"{sig_long}" if _signals_known else "?"
+            _ss = f"{sig_short}" if _signals_known else "?"
+            suggestions.append(
+                f"⚠️ CRITICAL: AND-gate filters reduced signals to {_sl} long + {_ss} short "
+                f"over the entire 6-month period — far too few to backtest. "
+                "AND(gate_A, RSI_cross) = max(RSI_cross_count) which may be 0-2. "
+                "Fix: (1) Replace RSI 'cross' mode with 'range' mode. "
+                "(2) Remove deeply nested AND gates. "
+                "(3) Each indicator in an AND chain must independently produce ≥50 signals "
+                "per year. Check each block's signal count before combining."
+            )
+        elif root_cause == "direction_mismatch":
             suggestions.append(
                 "Your blocks output signals in only ONE direction. "
                 "Add BOTH 'long' and 'short' port connections to the strategy node, "
@@ -1403,6 +1668,13 @@ class BacktestAnalysisNode(AgentNode):
                 "Signals exist but no trades executed — likely a port name mismatch. "
                 "Use 'long'/'short' port names, not 'signal'/'output'. "
                 "Also verify SL/TP values are not so tight they immediately close every entry."
+            )
+        elif root_cause == "sl_tp_too_wide":
+            suggestions.append(
+                "Position opened but NEVER closed (held entire 6-month period). "
+                "Your SL/TP values are unrealistically large for a 15m strategy. "
+                "Use SL=1-3% and TP=2-5% for intraday mean reversion. "
+                "Do NOT use SL > 5% or TP > 10% — price must actually reach these levels within 1-5 bars."
             )
         elif root_cause == "sl_too_tight":
             suggestions.append(
@@ -1446,6 +1718,8 @@ class BacktestAnalysisNode(AgentNode):
                 "sharpe_ratio": round(sharpe, 3),
                 "max_drawdown": round(dd, 2),
                 "win_rate": round(win_rate, 4),
+                "signal_long_count": sig_long if _signals_known else None,
+                "signal_short_count": sig_short if _signals_known else None,
             },
             "engine_warnings": engine_warnings,
         }
@@ -1453,9 +1727,11 @@ class BacktestAnalysisNode(AgentNode):
         state.context["backtest_analysis"] = analysis
         state.set_result(self.name, analysis)
 
+        _sig_info = f", signals={sig_long}L+{sig_short}S" if _signals_known else ""
         logger.info(
             f"🔬 [BacktestAnalysisNode] severity={severity}, root_cause={root_cause}, "
             f"trades={trades}+{open_trades}open={effective_trades}eff, sharpe={sharpe:.2f}, dd={dd:.1f}%"
+            f"{_sig_info}"
         )
         return state
 
@@ -1497,24 +1773,39 @@ class MemoryUpdateNode(AgentNode):
         dd = metrics.get("max_drawdown", 0.0)
         trades = metrics.get("total_trades", 0)
 
+        # Prefer optimized Sharpe when WF validation passed — the optimizer found better params.
+        # Raw IS Sharpe may be negative while optimized IS Sharpe is strongly positive.
+        wf_ctx = state.context.get("wf_validation", {})
+        opt_result = state.get_result("optimize_strategy") or {}
+        if wf_ctx.get("passed") and opt_result.get("best_sharpe") is not None:
+            sharpe = float(opt_result["best_sharpe"])
+            logger.debug(f"[MemoryUpdateNode] Using optimized sharpe={sharpe:.3f} (raw IS was {metrics.get('sharpe_ratio', 0):.3f})")
+
+        importance = min(1.0, max(0.1, (sharpe + 1.0) / 4.0))  # 0→0.25, 2→0.75
+        # Outcome label helps BM25 recall: MemoryRecallNode queries "successful strategy … high sharpe profit"
+        # and "failed strategy … low sharpe no trades". Without matching keywords, BM25 returns 0 hits.
+        outcome_label = "successful profitable high sharpe" if sharpe >= 0.4 else "failed poor low sharpe"
         episodic_content = (
-            f"Strategy backtest result: {strategy_name} by {selected_agent} "
+            f"{outcome_label} strategy backtest result: {strategy_name} by {selected_agent} "
             f"on {symbol}/{timeframe} — "
             f"Sharpe={sharpe:.2f}, MaxDD={dd:.1f}%, Trades={trades}, "
             f"WinRate={metrics.get('win_rate', 0):.0%}, "
             f"ProfitFactor={metrics.get('profit_factor', 0):.2f}"
         )
-        importance = min(1.0, max(0.1, (sharpe + 1.0) / 4.0))  # 0→0.25, 2→0.75
+        outcome_tag = "successful" if sharpe >= 0.4 else "failed"
 
         try:
+            from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
 
-            memory = HierarchicalMemory()
+            memory = HierarchicalMemory(
+                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
+            )
             await memory.store(
                 content=episodic_content,
                 memory_type=MemoryType.EPISODIC,
                 importance=importance,
-                tags=["backtest", symbol, timeframe, selected_agent, strategy_name],
+                tags=["backtest", outcome_tag, symbol, timeframe, selected_agent, strategy_name],
                 metadata={
                     "symbol": symbol,
                     "timeframe": timeframe,
@@ -1631,6 +1922,9 @@ class RefinementNode(AgentNode):
         metrics = backtest_result.get("metrics", {}) or {}
         engine_warnings: list[str] = list(backtest_result.get("engine_warnings", None) or [])
         sample_trades: list[dict] = list(backtest_result.get("sample_trades", None) or [])
+        sig_long: int = int(backtest_result.get("signal_long_count", -1))
+        sig_short: int = int(backtest_result.get("signal_short_count", -1))
+        _signals_known = sig_long >= 0 and sig_short >= 0
 
         trades = metrics.get("total_trades", 0)
         sharpe = metrics.get("sharpe_ratio", 0.0)
@@ -1684,6 +1978,27 @@ class RefinementNode(AgentNode):
             f"The previous strategy FAILED backtesting due to: {'; '.join(failures)}.",
             f"Backtest summary: {trades} trades, Sharpe={sharpe:.2f}, MaxDD={dd:.1f}%, Return={total_return:.1f}%.",
         ]
+        # Signal counts from generate_signals — critical context for the LLM to
+        # understand WHY trades=0 or direction imbalance occurred.
+        if _signals_known:
+            feedback_parts.append(
+                f"\nRAW SIGNAL COUNTS (before engine): long_entries={sig_long}, short_entries={sig_short}. "
+                + (
+                    "⚠️ NEAR-ZERO SIGNALS: AND-gate chains are killing all signals. "
+                    "AND(A, B) produces at most min(count_A, count_B) signals. "
+                    "If RSI 'cross' mode produces 0-2 signals in 6 months, AND(RSI, anything) = 0-2. "
+                    "Fix: use RSI 'range' mode (oversold/overbought zones), use OR gates, "
+                    "or remove deep AND chains. Each indicator block must produce ≥50 signals independently."
+                    if sig_long + sig_short < 10
+                    else (
+                        "Signals exist in both directions — execution imbalance is due to "
+                        "trade clustering (pyramiding=1 blocks new entries while position is open). "
+                        "DO NOT add more conditions to 'fix' direction balance — it will reduce signals further."
+                        if sig_long > 5 and sig_short > 5
+                        else "One direction has very few signals — ensure both 'long' and 'short' ports are well-connected."
+                    )
+                )
+            )
 
         # Append engine warnings (DIRECTION_MISMATCH, NO_TRADES, etc.)
         relevant_warnings = [
@@ -1734,6 +2049,15 @@ class RefinementNode(AgentNode):
 
         feedback_parts.append("\nREQUIRED IMPROVEMENTS:")
         feedback_parts.extend(f"  {i + 1}. {s}" for i, s in enumerate(suggestions))
+
+        # Always remind about SL/TP hard limits — the most common source of trades=0
+        feedback_parts.append(
+            "\n⚠️ HARD LIMITS (ALWAYS APPLY):\n"
+            "  stop_loss value: 0.5% – 5.0%  (NEVER exceed 5% — BTC 15m bars move ~0.3% avg)\n"
+            "  take_profit value: 1.0% – 10.0% (NEVER exceed 10%)\n"
+            "  take_profit MUST be >= stop_loss (positive R:R)\n"
+            "  Violating these limits causes trades=0 because price never reaches your SL/TP."
+        )
 
         regeneration_instruction = (
             "\nGenerate a DIFFERENT strategy that directly addresses these specific failures. "
@@ -1793,7 +2117,7 @@ class OptimizationNode(AgentNode):
     Non-blocking: optimization failure does not abort the pipeline.
     """
 
-    N_TRIALS = 50
+    N_TRIALS = 100  # P3-3: n_jobs=2 → ~2× throughput; 100 trials fills the 120s budget
     TIMEOUT_SECONDS = 120  # 2 min max to keep the pipeline responsive
 
     def __init__(self) -> None:
@@ -1817,6 +2141,11 @@ class OptimizationNode(AgentNode):
         leverage = state.context.get("leverage", 1)
         agent_hints = state.context.get("agent_optimization_hints", {})
 
+        # Use IS-backtest SL/TP so optimization trials share the same exit mechanics.
+        # builder_optimizer._run_standard_block_backtest reads "stop_loss_pct" (percent, e.g. 2.0)
+        # and converts to decimal internally.
+        opt_sl = state.context.get("backtest_sl", 0.02)
+        opt_tp = state.context.get("backtest_tp", 0.03)
         config_params = {
             "symbol": symbol,
             "interval": timeframe,  # build_backtest_input expects 'interval', not 'timeframe'
@@ -1824,6 +2153,8 @@ class OptimizationNode(AgentNode):
             "leverage": leverage,
             "commission": COMMISSION_TV,  # build_backtest_input key is 'commission'
             "direction": "both",
+            "stop_loss_pct": opt_sl * 100.0,   # decimal → percent (e.g. 0.02 → 2.0)
+            "take_profit_pct": opt_tp * 100.0,  # decimal → percent (e.g. 0.03 → 3.0)
         }
 
         # Multi-objective weights: Sharpe 50%, Sortino 30%, ProfitFactor 20%
@@ -1850,9 +2181,32 @@ class OptimizationNode(AgentNode):
             best_score = opt_result.get("best_score", 0.0)
             tested = opt_result.get("tested_combinations", 0)
 
+            # Build condensed top_trials array (up to 20 entries)
+            raw_top = opt_result.get("top_results", [])
+            top_trials: list[dict] = []
+            for r in raw_top[:20]:
+                top_trials.append(
+                    {
+                        "params": r.get("params", {}),
+                        "sharpe": round(float(r.get("sharpe_ratio", 0.0)), 4),
+                        "trades": int(r.get("total_trades", 0)),
+                        "drawdown": round(float(r.get("max_drawdown", 0.0)), 2),
+                        "profit_factor": round(float(r.get("profit_factor", 0.0)), 3),
+                        "score": round(float(r.get("score", 0.0)), 4),
+                    }
+                )
+
+            # Spearman rank correlation: each param → sharpe_ratio
+            param_sensitivity: dict[str, float] = {}
+            if len(top_trials) >= 3:
+                param_sensitivity = self._compute_param_sensitivity(top_trials)
+
+            n_positive_sharpe = sum(1 for t in top_trials if t["sharpe"] > 0)
+
             logger.info(
                 f"✅ [OptimizationNode] {tested} trials, best_score={best_score:.3f}, "
-                f"Sharpe={best_metrics.get('sharpe_ratio', 0):.2f}"
+                f"Sharpe={best_metrics.get('sharpe_ratio', 0):.2f}, "
+                f"top_trials={len(top_trials)}, n_positive_sharpe={n_positive_sharpe}"
             )
 
             state.context["optimization_result"] = opt_result
@@ -1876,6 +2230,10 @@ class OptimizationNode(AgentNode):
                     "best_trades": best_metrics.get("total_trades", 0),
                     "best_drawdown": best_metrics.get("max_drawdown", 0.0),
                     "status": opt_result.get("status", "unknown"),
+                    # --- Phase 1: optimizer array for agent analysis ---
+                    "top_trials": top_trials,
+                    "param_sensitivity": param_sensitivity,
+                    "n_positive_sharpe": n_positive_sharpe,
                 },
             )
             state.add_message(
@@ -1932,9 +2290,9 @@ class OptimizationNode(AgentNode):
             weights=weights,
             n_trials=self.N_TRIALS,
             sampler_type="tpe",
-            top_n=5,
+            top_n=20,  # Re-run top-20 for full metrics (was 5) — needed for param_sensitivity
             timeout_seconds=self.TIMEOUT_SECONDS,
-            n_jobs=1,
+            n_jobs=2,  # P3-3: 2 parallel Optuna workers → ~2x trials within same 120s budget
         )
 
     @staticmethod
@@ -1983,6 +2341,45 @@ class OptimizationNode(AgentNode):
 
         return updated
 
+    @staticmethod
+    def _compute_param_sensitivity(top_trials: list[dict]) -> dict[str, float]:
+        """Spearman rank correlation: each numeric param → sharpe_ratio across top_trials.
+
+        Returns {param_key: rho} where rho ∈ [-1, 1].
+        Positive rho → higher param value correlates with higher Sharpe.
+        Only params that vary (≥2 unique values) and are fully numeric are included.
+        """
+
+        def rank_list(vals: list[float]) -> list[float]:
+            order = sorted(range(len(vals)), key=lambda i: vals[i])
+            ranks = [0.0] * len(vals)
+            for rank, idx in enumerate(order, 1):
+                ranks[idx] = float(rank)
+            return ranks
+
+        sharpe_vals = [t["sharpe"] for t in top_trials]
+        sharpe_ranks = rank_list(sharpe_vals)
+        n = len(top_trials)
+
+        all_keys: set[str] = set()
+        for t in top_trials:
+            all_keys.update(t.get("params", {}).keys())
+
+        result: dict[str, float] = {}
+        for key in sorted(all_keys):
+            values = [t.get("params", {}).get(key) for t in top_trials]
+            if any(v is None or not isinstance(v, (int, float)) for v in values):
+                continue
+            float_vals = [float(v) for v in values]  # type: ignore[arg-type]
+            if len(set(float_vals)) < 2:
+                continue  # constant param — sensitivity undefined
+            param_ranks = rank_list(float_vals)
+            d2 = sum((pr - sr) ** 2 for pr, sr in zip(param_ranks, sharpe_ranks, strict=True))
+            rho = 1.0 - 6.0 * d2 / (n * (n * n - 1)) if n > 1 else 0.0
+            result[key] = round(rho, 3)
+
+        return result
+
 
 class MLValidationNode(AgentNode):
     """
@@ -2022,7 +2419,7 @@ class MLValidationNode(AgentNode):
         super().__init__(
             name="ml_validation",
             description="Phase 7: Overfitting detection + regime analysis + parameter stability",
-            timeout=120.0,
+            timeout=180.0,
         )
 
     async def execute(self, state: AgentState) -> AgentState:
@@ -2048,22 +2445,30 @@ class MLValidationNode(AgentNode):
         }
 
         # ------------------------------------------------------------------
-        # 7.1  Overfitting detection
+        # 7.1-7.3  Overfitting / Regime / Stability — run in parallel (P3-2)
+        # All three sub-checks are independent: same inputs, different slices/logic.
         # ------------------------------------------------------------------
-        try:
-            overfit_result = await asyncio.to_thread(
-                self._check_overfitting,
-                strategy_graph,
-                df,
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "initial_capital": initial_capital,
-                    "leverage": leverage,
-                    "commission_value": COMMISSION_TV,
-                    "direction": "both",
-                },
-            )
+        _cfg = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "initial_capital": initial_capital,
+            "leverage": leverage,
+            "commission_value": COMMISSION_TV,
+            "direction": "both",
+        }
+        overfit_raw, regime_raw, stability_raw = await asyncio.gather(
+            asyncio.to_thread(self._check_overfitting, strategy_graph, df, _cfg),
+            asyncio.to_thread(self._check_regimes, strategy_graph, df, _cfg),
+            asyncio.to_thread(self._check_parameter_stability, strategy_graph, df, _cfg),
+            return_exceptions=True,
+        )
+
+        # 7.1 process overfitting result
+        if isinstance(overfit_raw, Exception):
+            logger.warning(f"[MLValidationNode] Overfitting check failed (non-fatal): {overfit_raw}")
+            validation["overfitting"] = {"status": "error", "error": str(overfit_raw)}
+        else:
+            overfit_result = overfit_raw
             validation["overfitting"] = overfit_result
             if overfit_result.get("is_overfit"):
                 validation["warnings"].append(
@@ -2072,33 +2477,24 @@ class MLValidationNode(AgentNode):
                     f"gap={overfit_result['gap']:.2f} (threshold {self.OVERFIT_GAP_THRESHOLD})"
                 )
                 logger.warning(f"⚠️ [MLValidation] Overfitting detected: gap={overfit_result['gap']:.2f}")
-            else:
+            elif overfit_result.get("status") == "ok":
                 logger.info(
                     f"✅ [MLValidation] Overfitting check passed "
                     f"(IS={overfit_result.get('is_sharpe', 0):.2f} "
                     f"OOS={overfit_result.get('oos_sharpe', 0):.2f})"
                 )
-        except Exception as exc:
-            logger.warning(f"[MLValidationNode] Overfitting check failed (non-fatal): {exc}")
-            validation["overfitting"] = {"status": "error", "error": str(exc)}
+            else:
+                logger.warning(
+                    f"⚠️ [MLValidation] Overfitting check skipped/errored: "
+                    f"status={overfit_result.get('status')} reason={overfit_result.get('reason') or overfit_result.get('error', '')}"
+                )
 
-        # ------------------------------------------------------------------
-        # 7.2  Regime analysis
-        # ------------------------------------------------------------------
-        try:
-            regime_result = await asyncio.to_thread(
-                self._check_regimes,
-                strategy_graph,
-                df,
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "initial_capital": initial_capital,
-                    "leverage": leverage,
-                    "commission_value": COMMISSION_TV,
-                    "direction": "both",
-                },
-            )
+        # 7.2 process regime result
+        if isinstance(regime_raw, Exception):
+            logger.warning(f"[MLValidationNode] Regime analysis failed (non-fatal): {regime_raw}")
+            validation["regime_analysis"] = {"status": "error", "error": str(regime_raw)}
+        else:
+            regime_result = regime_raw
             validation["regime_analysis"] = regime_result
             poor_regimes = [r for r, s in regime_result.get("regime_sharpes", {}).items() if s < 0]
             if poor_regimes:
@@ -2108,27 +2504,13 @@ class MLValidationNode(AgentNode):
                 logger.info(f"ℹ️ [MLValidation] Poor regimes: {poor_regimes}")
             else:
                 logger.info("✅ [MLValidation] Regime check: strategy viable across all regimes")
-        except Exception as exc:
-            logger.warning(f"[MLValidationNode] Regime analysis failed (non-fatal): {exc}")
-            validation["regime_analysis"] = {"status": "error", "error": str(exc)}
 
-        # ------------------------------------------------------------------
-        # 7.3  Parameter stability
-        # ------------------------------------------------------------------
-        try:
-            stability_result = await asyncio.to_thread(
-                self._check_parameter_stability,
-                strategy_graph,
-                df,
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "initial_capital": initial_capital,
-                    "leverage": leverage,
-                    "commission_value": COMMISSION_TV,
-                    "direction": "both",
-                },
-            )
+        # 7.3 process stability result
+        if isinstance(stability_raw, Exception):
+            logger.warning(f"[MLValidationNode] Stability check failed (non-fatal): {stability_raw}")
+            validation["parameter_stability"] = {"status": "error", "error": str(stability_raw)}
+        else:
+            stability_result = stability_raw
             validation["parameter_stability"] = stability_result
             if not stability_result.get("is_stable", True):
                 validation["warnings"].append(
@@ -2137,9 +2519,6 @@ class MLValidationNode(AgentNode):
                 logger.warning(f"⚠️ [MLValidation] Parameter instability: {stability_result.get('sensitive_params')}")
             else:
                 logger.info("✅ [MLValidation] Parameter stability check passed")
-        except Exception as exc:
-            logger.warning(f"[MLValidationNode] Stability check failed (non-fatal): {exc}")
-            validation["parameter_stability"] = {"status": "error", "error": str(exc)}
 
         # Store results
         state.context["ml_validation"] = validation
@@ -2166,19 +2545,35 @@ class MLValidationNode(AgentNode):
         from backend.backtesting.strategy_builder.adapter import StrategyBuilderAdapter
 
         adapter = StrategyBuilderAdapter(strategy_graph)
-        signal_result = adapter.generate_signals(df)
+
+        # Derive start/end from the df slice (BacktestConfig requires these fields)
+        idx = df.index
+        _start = idx[0]
+        _end = idx[-1]
+        start_date = _start.to_pydatetime() if hasattr(_start, "to_pydatetime") else _start
+        end_date = _end.to_pydatetime() if hasattr(_end, "to_pydatetime") else _end
 
         cfg = BacktestConfig(
             symbol=config_params.get("symbol", "BTCUSDT"),
-            timeframe=config_params.get("timeframe", "15"),
+            interval=config_params.get("timeframe", "15"),  # BacktestConfig uses interval=
+            start_date=start_date,
+            end_date=end_date,
             initial_capital=config_params.get("initial_capital", INITIAL_CAPITAL),
             leverage=config_params.get("leverage", 1),
             direction=config_params.get("direction", "both"),
             commission_value=config_params.get("commission_value", 0.0007),
+            # Disable bar magnifier: ML validation runs many quick comparative backtests;
+            # intrabar SL/TP precision is unnecessary and loading 200K 1m candles per
+            # backtest would cause timeout (17 perturbation backtests × ~19s > 120s).
+            use_bar_magnifier=False,
         )
         engine = BacktestEngine()
-        result = engine.run(data=df, signals=signal_result, config=cfg)
-        return result.metrics if hasattr(result, "metrics") else {}
+        # Pass adapter as custom_strategy so the engine calls adapter.generate_signals()
+        result = engine.run(cfg, df, silent=True, custom_strategy=adapter)
+        if not result.metrics:
+            return {}
+        # Return as plain dict so downstream .get() calls work correctly
+        return result.metrics.model_dump()
 
     def _check_overfitting(self, strategy_graph: dict, df, config_params: dict) -> dict:
         """7.1: In-sample vs out-of-sample Sharpe comparison."""
@@ -2443,6 +2838,14 @@ class PostRunReflectionNode(AgentNode):
         wf_ratio = wf.get("ratio")
         errors = state.errors
 
+        # When WF passed, the run ultimately succeeded — override passed/sharpe with
+        # the optimized values so memory stores an accurate, high-quality entry.
+        if wf.get("passed"):
+            passed = True
+            opt_result = state.get_result("optimize_strategy") or {}
+            if opt_result.get("best_sharpe") is not None:
+                sharpe = float(opt_result["best_sharpe"])
+
         # ── What worked ─────────────────────────────────────────────────────
         what_worked: list[str] = []
         if passed:
@@ -2516,9 +2919,12 @@ class PostRunReflectionNode(AgentNode):
         importance = 0.6 if passed else 0.3  # failed runs are still valuable
 
         try:
+            from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
 
-            memory = HierarchicalMemory()
+            memory = HierarchicalMemory(
+                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
+            )
             await memory.store(
                 content=reflection_text,
                 memory_type=MemoryType.EPISODIC,
@@ -2557,20 +2963,25 @@ class WalkForwardValidationNode(AgentNode):
     Any strategy that passes the BacktestAnalysisNode must also survive walk-forward
     validation before proceeding to optimization.
 
-    Acceptance criterion:
-        wf_sharpe / is_sharpe >= WF_RATIO_THRESHOLD (0.5)
+    Acceptance criterion (either condition passes):
+        1. wf_sharpe / is_sharpe >= WF_RATIO_THRESHOLD (0.5)  — ratio check
+        2. wf_sharpe >= WF_MIN_ABS_SHARPE (0.5)               — absolute OOS floor
 
-    If the walk-forward Sharpe is less than half the in-sample Sharpe, the strategy
-    is flagged as overfitted and the refinement loop is re-triggered.
+    The absolute floor handles high-IS optimized strategies: if optimizer finds
+    IS Sharpe=1.8 but OOS Sharpe=0.51, ratio=0.28 fails the ratio check, but the
+    strategy is genuinely tradeable (positive OOS edge) and should not be rejected.
 
     Result stored in:
     - ``state.context["wf_validation"]`` — {passed, wf_sharpe, is_sharpe, ratio, windows}
     - ``state.results["wf_validation"]`` — same dict
 
-    Wired: backtest_analysis (passes) → wf_validation → [optimize | refine]
+    Wired: optimize_strategy → wf_validation → [analysis_debate | refine]
+    is_sharpe is taken from the optimizer's best_sharpe when available (optimized params),
+    falling back to the raw IS backtest Sharpe.
     """
 
-    WF_RATIO_THRESHOLD: float = 0.5  # wf_sharpe / is_sharpe must exceed this
+    WF_RATIO_THRESHOLD: float = 0.5   # wf_sharpe / is_sharpe must exceed this
+    WF_MIN_ABS_SHARPE: float = 0.5    # OR: absolute OOS Sharpe floor (passes even if ratio < threshold)
     TRAIN_MONTHS: int = 3  # walk-forward training window
     TEST_MONTHS: int = 1  # walk-forward test window
     MIN_BARS_FOR_WF: int = 200  # skip WF if fewer bars available
@@ -2585,7 +2996,19 @@ class WalkForwardValidationNode(AgentNode):
     async def execute(self, state: AgentState) -> AgentState:
         backtest_result = state.get_result("backtest") or {}
         metrics = backtest_result.get("metrics", {}) or {}
-        is_sharpe: float = float(metrics.get("sharpe_ratio", 0.0))
+        raw_is_sharpe: float = float(metrics.get("sharpe_ratio", 0.0))
+
+        # Prefer optimizer best_sharpe — WF now runs AFTER optimization so it validates
+        # optimized params, not the raw LLM-generated strategy with default values.
+        # OptimizationNode also sets state.context["strategy_graph"] to the optimized graph.
+        opt_result = state.get_result("optimize_strategy") or {}
+        opt_best_sharpe = opt_result.get("best_sharpe")
+        if opt_best_sharpe is not None and float(opt_best_sharpe) > raw_is_sharpe:
+            is_sharpe = float(opt_best_sharpe)
+            logger.info(f"[WF] Using optimizer best_sharpe={is_sharpe:.3f} (raw IS={raw_is_sharpe:.3f})")
+        else:
+            is_sharpe = raw_is_sharpe
+
         strategy_graph = state.context.get("strategy_graph") or backtest_result.get("strategy_graph")
         df: pd.DataFrame | None = state.context.get("df")
 
@@ -2649,7 +3072,13 @@ class WalkForwardValidationNode(AgentNode):
         # Ratio only meaningful when IS Sharpe is positive (already guaranteed above).
         # wf_sharpe must also be positive to pass; two-negative ratio is a false positive.
         ratio = wf_sharpe / is_sharpe if is_sharpe > 0 else 0.0
-        passed = is_sharpe > 0 and wf_sharpe > 0 and ratio >= self.WF_RATIO_THRESHOLD
+        # Pass if ratio >= threshold (OOS is at least 50% of IS),
+        # OR if absolute OOS Sharpe is strong enough (≥ WF_MIN_ABS_SHARPE).
+        # The second clause handles high-IS optimized strategies where ratio is low
+        # but OOS Sharpe is genuinely good (e.g. IS=1.8, OOS=0.51 → ratio=0.28 but tradeable).
+        ratio_passes = ratio >= self.WF_RATIO_THRESHOLD
+        abs_passes = wf_sharpe >= self.WF_MIN_ABS_SHARPE
+        passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
 
         result = {
             "passed": passed,
@@ -2664,11 +3093,13 @@ class WalkForwardValidationNode(AgentNode):
         state.context["wf_validation"] = result
 
         if passed:
-            logger.info(f"✅ [WF] Walk-forward passed: ratio={ratio:.2f} ({wf_sharpe:.2f}/{is_sharpe:.2f})")
+            how = "ratio" if ratio_passes else f"abs_sharpe≥{self.WF_MIN_ABS_SHARPE}"
+            logger.info(f"✅ [WF] Walk-forward passed [{how}]: ratio={ratio:.2f} ({wf_sharpe:.2f}/{is_sharpe:.2f})")
         else:
             logger.warning(
                 f"⚠️ [WF] Overfitting detected: ratio={ratio:.2f} < {self.WF_RATIO_THRESHOLD} "
-                f"(wf={wf_sharpe:.2f}, is={is_sharpe:.2f}) — flagging for refinement"
+                f"AND wf_sharpe={wf_sharpe:.2f} < {self.WF_MIN_ABS_SHARPE} "
+                f"(is={is_sharpe:.2f}) — flagging for refinement"
             )
             # Inject into backtest_analysis so _should_refine sees it
             analysis = state.context.get("backtest_analysis", {})
@@ -2812,9 +3243,41 @@ def _backtest_passes(state: AgentState) -> bool:
 
 
 def _should_refine(state: AgentState) -> bool:
-    """Return True if we should trigger refinement (failed + iterations left)."""
+    """Return True if we should trigger refinement (failed + iterations left).
+
+    Skips refinement when root_cause is ``poor_risk_reward`` AND the strategy has
+    adequate signal coverage (≥50 raw signals, ≥5 trades).  In this case LLM
+    refinement rarely helps because signal generation is fine — only parameter
+    tuning is needed, which the OptimizationNode handles far more efficiently.
+    """
+    if _backtest_passes(state):
+        return False
     iteration = state.context.get("refinement_iteration", 0)
-    return not _backtest_passes(state) and iteration < RefinementNode.MAX_REFINEMENTS
+    if iteration >= RefinementNode.MAX_REFINEMENTS:
+        return False
+
+    # Skip refinement for poor_risk_reward with good signal coverage — the
+    # optimizer will tune SL/TP/periods far more effectively than LLM rewriting.
+    analysis = state.context.get("backtest_analysis", {})
+    if analysis.get("root_cause") == "poor_risk_reward":
+        backtest = state.get_result("backtest") or {}
+        sig_long = int(backtest.get("signal_long_count", -1))
+        sig_short = int(backtest.get("signal_short_count", -1))
+        trades = int((backtest.get("metrics", {}) or {}).get("total_trades", 0))
+        if (
+            sig_long >= 0
+            and sig_short >= 0
+            and sig_long + sig_short >= 50
+            and trades >= RefinementNode.MIN_TRADES
+        ):
+            logger.info(
+                f"[_should_refine] Skipping refinement: root_cause=poor_risk_reward "
+                f"with {sig_long}L+{sig_short}S signals, {trades} trades — "
+                f"sending to optimizer instead"
+            )
+            return False
+
+    return True
 
 
 def _report_node(state: AgentState) -> AgentState:
@@ -2875,7 +3338,7 @@ def build_trading_strategy_graph(
         AgentGraph ready for execution
 
     Graph structure (full):
-        analyze_market → regime_classifier → [debate] → memory_recall
+        analyze_market → regime_classifier → [debate ∥ memory_recall]  (P3-1: parallel)
                                                               → generate_strategies → parse_responses
                                                                     ↑                       │
                                                                     │               select_best (Consensus)
@@ -2886,8 +3349,10 @@ def build_trading_strategy_graph(
                                                                                             │
                                                                                    backtest_analysis
                                                                                             ├── fails → refine (loop)
-                                                                                            └── passes → [wf_validation →] optimize_strategy
-                                                                                                               │
+                                                                                            └── passes → optimize_strategy → [wf_validation →] analysis_debate
+                                                                                                                                      ↕ refine if fails
+                                                                                                       analysis_debate  ← (AnalysisDebateNode: agents debate optimizer array)
+                                                                                                               │         ↓ optimizer_analysis → next GenerateStrategiesNode call
                                                                                                         ml_validation
                                                                                                                │
                                                                                               [hitl_check →] memory_update → reflection → report → END
@@ -2907,13 +3372,19 @@ def build_trading_strategy_graph(
     graph.add_node(ConsensusNode())
     graph.add_node(FunctionAgent(name="report", func=_report_node, description="Final report"))
 
-    # Chain: analyze → regime_classifier → [debate] → memory_recall → generate → parse → select
+    # Chain: analyze → regime_classifier → [debate ∥ memory_recall] → generate → parse → select
+    # P3-1: debate and memory_recall are independent (both only read analyze_market results)
+    # — run them in parallel to save ~10-15 s per pipeline run.
     graph.add_edge("analyze_market", "regime_classifier")
     graph.add_node(MemoryRecallNode())
     if run_debate:
         graph.add_node(DebateNode())
-        graph.add_edge("regime_classifier", "debate")
-        graph.add_edge("debate", "memory_recall")
+        graph.add_edge(
+            "regime_classifier",
+            ["debate", "memory_recall"],
+            edge_type=EdgeType.PARALLEL,
+        )
+        graph.add_edge("debate", "generate_strategies")
     else:
         graph.add_edge("regime_classifier", "memory_recall")
     graph.add_edge("memory_recall", "generate_strategies")
@@ -2933,30 +3404,33 @@ def build_trading_strategy_graph(
         graph.add_edge("build_graph", "backtest")
         graph.add_edge("backtest", "backtest_analysis")
 
-        if run_wf_validation:
-            # P1-2: walk-forward gate between backtest_analysis and optimize
-            graph.add_node(WalkForwardValidationNode())
-            backtest_router = ConditionalRouter(name="backtest_router")
-            backtest_router.add_route(_should_refine, "refine_strategy")
-            backtest_router.set_default("wf_validation")
-            graph.add_conditional_edges("backtest_analysis", backtest_router)
+        # backtest_analysis → [refine | optimize_strategy] (both WF and no-WF paths go to optimizer first)
+        backtest_router = ConditionalRouter(name="backtest_router")
+        backtest_router.add_route(_should_refine, "refine_strategy")
+        backtest_router.set_default("optimize_strategy")
+        graph.add_conditional_edges("backtest_analysis", backtest_router)
 
+        if run_wf_validation:
+            # P1-2: walk-forward gate AFTER optimization — WF validates optimized params,
+            # not raw IS params.  OptimizationNode stores best_params in state.context
+            # ["strategy_graph"] so WalkForwardValidationNode uses the optimized graph.
+            graph.add_node(WalkForwardValidationNode())
             wf_router = ConditionalRouter(name="wf_router")
             wf_router.add_route(_should_refine, "refine_strategy")
-            wf_router.set_default("optimize_strategy")
+            wf_router.set_default("analysis_debate")
             graph.add_conditional_edges("wf_validation", wf_router)
-        else:
-            backtest_router = ConditionalRouter(name="backtest_router")
-            backtest_router.add_route(_should_refine, "refine_strategy")
-            backtest_router.set_default("optimize_strategy")
-            graph.add_conditional_edges("backtest_analysis", backtest_router)
 
         # After refinement, loop back to regenerate strategies
         graph.add_edge("refine_strategy", "generate_strategies")
 
-        # Optimization → ML validation → [hitl_check →] memory_update → reflection → report
+        # Optimization → [wf_validation if enabled, else analysis_debate] → ML validation
+        graph.add_node(AnalysisDebateNode())
         graph.add_node(MLValidationNode())
-        graph.add_edge("optimize_strategy", "ml_validation")
+        if run_wf_validation:
+            graph.add_edge("optimize_strategy", "wf_validation")  # WF validates optimized params
+        else:
+            graph.add_edge("optimize_strategy", "analysis_debate")
+        graph.add_edge("analysis_debate", "ml_validation")
 
         if hitl_enabled:
             # P2-3: HITL checkpoint before memory_update

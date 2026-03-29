@@ -489,7 +489,7 @@ class TestFewShotInjection:
 
         prompts_captured = []
 
-        async def fake_call_llm(agent, prompt, system_msg=None, temperature=0.7, state=None):
+        async def fake_call_llm(agent, prompt, system_msg=None, temperature=0.7, state=None, json_mode=False):
             prompts_captured.append(prompt)
             return '{"strategy_name": "TestRSI", "blocks": []}'
 

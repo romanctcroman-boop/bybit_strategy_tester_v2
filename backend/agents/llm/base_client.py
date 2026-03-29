@@ -280,12 +280,18 @@ class OpenAICompatibleClient(LLMClient):
 
     def _build_payload(self, messages: list[LLMMessage], **kwargs: Any) -> dict[str, Any]:
         """Build request payload. Override in subclasses for custom fields."""
-        return {
+        payload: dict[str, Any] = {
             "model": kwargs.get("model", self.model),
             "messages": [m.to_dict() for m in messages],
             "temperature": kwargs.get("temperature", self.config.temperature),
             "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
         }
+        # JSON mode: forces OpenAI-compatible APIs (DeepSeek, Qwen) to return valid
+        # JSON, eliminating regex-based extraction in ResponseParser.
+        # Caller must include "JSON" in the prompt/system message (API requirement).
+        if kwargs.get("json_mode"):
+            payload["response_format"] = {"type": "json_object"}
+        return payload
 
     def _parse_response(self, data: dict[str, Any], latency: float) -> LLMResponse:
         """Parse API response. Override in subclasses for custom parsing."""
