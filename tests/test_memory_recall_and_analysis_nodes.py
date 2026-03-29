@@ -265,7 +265,8 @@ class TestMemoryRecallNode:
         assert result is not None
         assert result["memory_context_available"] is False
 
-    def test_wins_inject_memory_context(self):
+    @pytest.mark.asyncio
+    async def test_wins_inject_memory_context(self):
         """When wins are recalled, memory_context is set in state.context."""
         state = make_state()
         mock_win = MagicMock()
@@ -287,14 +288,15 @@ class TestMemoryRecallNode:
         )
 
         with patch(self._PATCH_PATH, return_value=mock_memory):
-            out = self._run(state)
+            out = await self.node.execute(state)
 
         assert "memory_context" in out.context
         assert "Prior Knowledge" in out.context["memory_context"]
         assert "past_attempts" in out.context
         assert len(out.context["past_attempts"]) == 1
 
-    def test_failures_inject_avoid_section(self):
+    @pytest.mark.asyncio
+    async def test_failures_inject_avoid_section(self):
         """When failures are recalled, AVOID section appears in memory_context."""
         state = make_state()
         mock_fail = MagicMock()
@@ -302,6 +304,7 @@ class TestMemoryRecallNode:
         mock_fail.importance = 0.2
         mock_fail.tags = ["BTCUSDT", "macd", "failed"]
         mock_fail.id = "mem_fail_1"
+        mock_fail.metadata = {}
 
         mock_memory = MagicMock()
         # async_load must return > 0: SELF-RAG skips recall when count == 0
@@ -315,7 +318,7 @@ class TestMemoryRecallNode:
         )
 
         with patch(self._PATCH_PATH, return_value=mock_memory):
-            out = self._run(state)
+            out = await self.node.execute(state)
 
         assert "memory_context" in out.context
         assert "AVOID" in out.context["memory_context"]

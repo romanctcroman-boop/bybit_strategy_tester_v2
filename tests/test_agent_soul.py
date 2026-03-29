@@ -520,7 +520,7 @@ class TestSelfMoADiversity:
         ]
         call_count = [0]
 
-        async def fake_call_llm(self_node, agent_name, prompt, system_msg, temperature=None, state=None):
+        async def fake_call_llm(self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
             idx = min(call_count[0], len(moa_responses) - 1)
             call_count[0] += 1
             if agent_name == "qwen":
@@ -576,7 +576,7 @@ class TestSelfMoADiversity:
 
         moa_texts = [_DEEPSEEK_STRATEGY_JSON, _QWEN_STRATEGY_JSON, _DEEPSEEK_HIGH_TEMP_JSON]
 
-        async def fake_critic_call(self_node, agent_name, prompt, system_msg, temperature=None):
+        async def fake_critic_call(self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
             # QWEN возвращает синтез (берём DeepSeek консерватора как базу)
             assert agent_name == "qwen", f"Критик должен быть qwen, получено {agent_name}"
             assert temperature == 0.3, f"Критик должен использовать T=0.3, получено {temperature}"
@@ -1443,10 +1443,11 @@ class TestFullPipelineSanity:
         )
 
         # Мокируем deliberate_with_llm
+        # DeliberationResult fields: .decision (str), .confidence (float), .rounds (list)
         mock_result = MagicMock()
-        mock_result.confidence_score = 0.78
-        mock_result.consensus_answer = "LONG bias — trend is bullish with strong momentum"
-        mock_result.rounds_completed = 2
+        mock_result.decision = "LONG bias — trend is bullish with strong momentum"
+        mock_result.confidence = 0.78
+        mock_result.rounds = [MagicMock(), MagicMock()]  # 2 rounds
 
         with patch(
             "backend.agents.consensus.real_llm_deliberation.deliberate_with_llm", AsyncMock(return_value=mock_result)
