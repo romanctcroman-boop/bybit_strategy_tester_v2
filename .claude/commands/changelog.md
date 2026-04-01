@@ -1,3 +1,9 @@
+---
+name: changelog
+description: Add an entry to CHANGELOG.md for recent changes in Bybit Strategy Tester v2. Use proactively after completing any feature, fix, or refactor. Always run before committing.
+argument-hint: "[brief description of change]"
+---
+
 Add an entry to CHANGELOG.md for recent changes.
 
 Usage: /changelog [brief description of change]

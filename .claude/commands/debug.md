@@ -1,3 +1,10 @@
+---
+name: debug
+description: Start a structured debug session for a bug or unexpected behaviour in Bybit Strategy Tester v2. Use proactively when the user reports wrong results, missing trades, unexpected errors, or test failures.
+argument-hint: "[description of the problem]"
+effort: high
+---
+
 Start a structured debug session for a bug or unexpected behaviour in Bybit Strategy Tester v2.
 
 Usage: /debug [description of the problem]
@@ -12,6 +19,7 @@ Steps:
    - Any error messages or stack traces?
 
 2. Identify the likely layer (use the data flow as a guide):
+
    ```
    Frontend (strategy_builder.js)
      → API (routers/strategy_builder.py)

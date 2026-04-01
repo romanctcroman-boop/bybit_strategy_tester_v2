@@ -28,6 +28,9 @@ TEST_MAP = [
     ("backend/optimization/builder_optimizer", "tests/test_builder_optimizer.py"),
     ("backend/optimization/", "tests/backend/"),
     ("backend/agents/", "tests/backend/agents/"),
+    ("backend/services/live_trading/", "tests/backend/services/"),
+    ("backend/services/risk_management/", "tests/backend/services/"),
+    ("backend/services/", "tests/backend/services/"),
     ("backend/", "tests/backend/"),
 ]
 

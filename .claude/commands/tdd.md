@@ -1,3 +1,11 @@
+---
+name: tdd
+description: Write tests for a specified function, module, or feature using the project's testing conventions. Use when the user asks to add tests, wants TDD coverage, or after implementing new logic.
+argument-hint: "[module or function to test]"
+effort: high
+allowed-tools: Read, Grep, Glob, Write, Edit, Bash(pytest*)
+---
+
 Write tests for a specified function, module, or feature using the project's testing conventions.
 
 Usage: /tdd [module or function to test]
@@ -22,12 +30,14 @@ Steps:
    - Use `@pytest.mark.asyncio` for async functions
    - Mock Bybit API with `unittest.mock.AsyncMock` — never call real API
    - Use `@pytest.mark.parametrize` for multiple input variants
+   - asyncio: use `asyncio.run()` NOT `get_event_loop().run_until_complete()` (breaks Python 3.13)
 
 4. For AI agent tests, follow the pattern in `tests/ai_agents/test_divergence_block_ai_agents.py`:
    - Each test class covers one logical grouping
    - Use descriptive docstrings in Russian (matching project convention)
 
 5. Show the test file content, then remind the user to run:
+
    ```bash
    pytest [test_file_path] -v
    pytest [test_file_path] --cov=[module_path] --cov-report=term-missing

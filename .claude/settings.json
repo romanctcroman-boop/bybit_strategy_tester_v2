@@ -36,10 +36,16 @@
       "Bash(curl * | bash*)"
     ]
   },
+  "effortLevel": "medium",
   "env": {
     "PYTHONIOENCODING": "utf-8",
     "PYTHONUTF8": "1",
-    "CLAUDE_CODE_GIT_BASH_PATH": "C:\\Users\\roman\\wsl-bash.bat"
+    "CLAUDE_CODE_GIT_BASH_PATH": "C:\\Users\\roman\\wsl-bash.bat",
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "5",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70",
+    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "16000",
+    "CLAUDE_CODE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "CLAUDE_CODE_RESUME_INTERRUPTED_TURN": "1"
   },
   "hooks": {
     "PreToolUse": [
@@ -49,6 +55,11 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_files.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/commission_guard.py\"",
             "timeout": 5
           }
         ]
@@ -115,6 +126,43 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_reminder.py\"",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_end.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/user_prompt_submit.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/notification.py\"",
+            "timeout": 10,
+            "async": true
           }
         ]
       }

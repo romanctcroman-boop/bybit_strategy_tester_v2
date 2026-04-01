@@ -1,3 +1,13 @@
+---
+name: review
+description: Perform a code review of recent changes or specified files in Bybit Strategy Tester v2. Use proactively after implementing features, fixing bugs, or any significant code changes. Always run before suggesting a commit.
+argument-hint: "[file or description]"
+context: fork
+agent: Explore
+effort: high
+allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*)
+---
+
 Perform a code review of recent changes or specified files in Bybit Strategy Tester v2.
 
 Usage: /review [file or description]
@@ -38,6 +48,7 @@ Steps:
 - No debug print/console.log left in
 
 Output the review in this format:
+
 ```
 ## Review: [files]
 ### ❌ Critical Issues  /  ⚠️ Warnings  /  ✅ Looks Good

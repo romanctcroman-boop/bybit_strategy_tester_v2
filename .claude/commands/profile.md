@@ -1,3 +1,13 @@
+---
+name: profile
+description: Profile performance bottlenecks in Bybit Strategy Tester v2 engine or adapter code. Use when investigating slow backtests or optimization runs.
+argument-hint: "[file_or_component]"
+context: fork
+agent: Explore
+effort: high
+disable-model-invocation: true
+---
+
 Profile performance bottlenecks in Bybit Strategy Tester v2 engine or adapter code.
 
 Usage: /profile [file_or_component]
@@ -30,60 +40,29 @@ Steps:
 
 2. Read the target file. Look for these anti-patterns:
 
-**Python loops (O(n) where vectorization is possible):**
-```python
-# BAD — row-by-row loop
-for i, row in df.iterrows():
-    result.append(some_calc(row))
+   **Python loops (O(n) where vectorization is possible):**
+   BAD:  `for i, row in df.iterrows(): result.append(some_calc(row))`
+   GOOD: `result = df['close'].rolling(14).mean()`
 
-# GOOD — vectorized
-result = df['close'].rolling(14).mean()
-```
+   **Repeated DataFrame copies in hot path:**
+   BAD:  `df = data.copy()` inside a handler called 40× per bar
+   GOOD: operate in-place or use views
 
-**Repeated DataFrame copies:**
-```python
-# BAD — copy on every call
-def handler(data, params):
-    df = data.copy()   # expensive if called 40x per bar
+   **Missing Numba JIT opportunities:**
+   Candidate: tight numeric loops over arrays → `@numba.njit(cache=True)`
 
-# GOOD — operate in-place or use views
-```
-
-**Missing Numba JIT opportunities:**
-```python
-# Candidate: tight loops over arrays → @numba.njit
-@numba.njit(cache=True)
-def compute_rsi_wilder(closes, period): ...
-```
-
-**Inefficient indicator dispatch:**
-```python
-# BAD — long elif chain (was in adapter before refactor)
-if block_type == 'rsi': ...
-elif block_type == 'macd': ...
-
-# GOOD — dict dispatch (now in INDICATOR_DISPATCH)
-handler = INDICATOR_DISPATCH.get(block_type)
-```
-
-**Queue/deque misuse:**
-```python
-# BAD — list.pop(0) is O(n)
-queue = []; queue.pop(0)
-
-# GOOD — deque.popleft() is O(1) (already fixed in adapter)
-from collections import deque; queue = deque(); queue.popleft()
-```
+   **Queue/deque misuse:**
+   BAD:  `queue.pop(0)` is O(n)
+   GOOD: `deque.popleft()` is O(1) (already fixed in adapter)
 
 3. Estimate the bottleneck severity:
-   - If bar loop contains Python-level work per bar → HIGH: consider Numba
-   - If indicator called multiple times with same params → MEDIUM: memoize
-   - If DataFrame.copy() called in hot path → MEDIUM: audit necessity
-   - If pure Python dict lookups → LOW: already fast
+   - Python-level work per bar in bar loop → HIGH: consider Numba
+   - Indicator called multiple times with same params → MEDIUM: memoize
+   - DataFrame.copy() in hot path → MEDIUM: audit necessity
 
 4. For Numba engine (numba_engine.py):
-   - Check @njit(cache=True) on all hot functions — cold start kills benchmark
-   - Verify parallel=True only where thread-safety is confirmed
+   - Check `@njit(cache=True)` on all hot functions — cold start kills benchmark
+   - Verify `parallel=True` only where thread-safety is confirmed
    - Check array dtypes: float64 everywhere (Numba hates mixed types)
 
 5. Output the profile report:
@@ -93,9 +72,6 @@ from collections import deque; queue = deque(); queue.popleft()
 
 ### Hot Paths Found
 | Location | Pattern | Severity | Fix |
-|----------|---------|----------|-----|
-| engine.py:L412 | iterrows() loop | HIGH | vectorize with np.where |
-| adapter.py:L89 | df.copy() per block | MEDIUM | pass view instead |
 
 ### Numba Candidates
 [functions that would benefit from @njit]
@@ -112,5 +88,4 @@ from collections import deque; queue = deque(); queue.popleft()
 Rules:
 - Never change commission_value (0.0007) as a "performance optimization"
 - Numba JIT functions must produce bit-identical results to Python reference
-- Run parity tests after any engine optimization: pytest tests/backend/backtesting/test_strategy_builder_parity.py -v
-- Benchmark with: python -m cProfile -s cumulative main.py backtest ...
+- Run parity tests after any engine optimization

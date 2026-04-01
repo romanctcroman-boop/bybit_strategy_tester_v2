@@ -1,3 +1,11 @@
+---
+name: backtest
+description: Run a backtest for a strategy in Bybit Strategy Tester v2. Use when the user wants to test a strategy with specific parameters.
+argument-hint: "[symbol] [timeframe] [strategy_type] [params...]"
+disable-model-invocation: true
+effort: medium
+---
+
 Run a backtest for the specified strategy and parameters.
 
 Usage: /backtest [symbol] [timeframe] [strategy_type] [params...]

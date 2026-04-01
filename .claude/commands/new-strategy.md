@@ -1,3 +1,10 @@
+---
+name: new-strategy
+description: Scaffold a new trading strategy class for the Bybit Strategy Tester v2 platform. Use when the user wants to create a new built-in strategy.
+argument-hint: "[strategy_name] [description]"
+effort: high
+---
+
 Scaffold a new trading strategy class for the Bybit Strategy Tester v2 platform.
 
 Usage: /new-strategy [strategy_name] [description]

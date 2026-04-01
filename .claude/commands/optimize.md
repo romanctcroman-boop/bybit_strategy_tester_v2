@@ -1,3 +1,11 @@
+---
+name: optimize
+description: Run parameter optimization for a strategy via the Bybit Strategy Tester v2 optimization API.
+argument-hint: "[symbol] [timeframe] [strategy_type] [params...]"
+disable-model-invocation: true
+effort: medium
+---
+
 Run parameter optimization for a strategy via the Bybit Strategy Tester v2 optimization API.
 
 Usage: /optimize [symbol] [timeframe] [strategy_type] [params...]
@@ -20,25 +28,11 @@ Steps:
    - Parameter search space (ask user if not specified — e.g. RSI: period 5–30, overbought 60–80)
 
 3. Build the JSON request and show it:
+
    POST http://localhost:8000/api/v1/optimizations/
-   {
-     "symbol": "...",
-     "interval": "...",
-     "strategy_type": "...",
-     "start_date": "...",
-     "end_date": "...",
-     "initial_capital": 10000.0,
-     "leverage": 1,
-     "direction": "both",
-     "n_trials": 100,
-     "metric": "sharpe_ratio",
-     "commission_value": 0.0007,
-     "param_ranges": { ... }
-   }
 
 4. If server is accessible, submit and poll for results. Display top-5 parameter sets:
    Rank | Params | Metric Value | Net Profit | Win Rate | Max DD | Trades
-   -----|--------|-------------|------------|----------|--------|-------
 
 5. For the best result, show:
    - Full metrics in standard backtest report format

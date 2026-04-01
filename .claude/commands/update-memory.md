@@ -1,3 +1,10 @@
+---
+name: update-memory
+description: Manually sync the Memory Bank files to reflect the current state of the project and session.
+argument-hint: "[optional: focus area]"
+disable-model-invocation: true
+---
+
 Manually sync the Memory Bank files to reflect the current state of the project and session.
 
 Usage: /update-memory [optional: focus area]

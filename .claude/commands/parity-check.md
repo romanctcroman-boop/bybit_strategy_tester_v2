@@ -1,3 +1,19 @@
+---
+name: parity-check
+description: Verify TradingView parity for a backtest engine file or a specific metric. Use proactively after any changes to engine.py, metrics_calculator.py, fallback_engine_v4.py, or commission/SL/TP logic.
+argument-hint: "[file_or_description]"
+context: fork
+agent: Explore
+effort: high
+allowed-tools: Read, Grep, Glob, Bash(pytest*)
+paths:
+  - "backend/backtesting/engines/**"
+  - "backend/core/metrics_calculator.py"
+  - "backend/backtesting/engine.py"
+  - "backend/backtesting/formulas.py"
+  - "backend/backtesting/pyramiding.py"
+---
+
 Verify TradingView parity for a backtest engine file or a specific metric.
 
 Usage: /parity-check [file_or_description]
@@ -26,7 +42,7 @@ Steps:
 - [ ] commission computed on margin (trade_value), not on leveraged_position_value
   Correct:   commission = trade_value × 0.0007
   Wrong:     commission = trade_value × leverage × 0.0007
-- [ ] grep: `grep -n commission <file>` — every occurrence uses 0.0007
+- [ ] grep: every occurrence uses 0.0007
 
 **Engine execution parity:**
 - [ ] Entries execute at next bar open (not signal bar close)
