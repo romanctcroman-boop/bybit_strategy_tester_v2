@@ -692,6 +692,15 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
             if param_key in added_param_keys:
                 continue  # already added above
             current_value = block_params.get(param_key, user_override.get("low", 0))
+            second_pass_type = user_override.get("type", "float")
+            second_pass_step = user_override.get("step", 1)
+            # Normalize step for int params (same guard as first pass)
+            if second_pass_type == "int" and float(second_pass_step) < 1:
+                logger.warning(
+                    f"[OptExtract] Block '{block_id}' param '{param_key}' (extra): "
+                    f"type=int but step={second_pass_step} < 1 — clamping to 1"
+                )
+                second_pass_step = 1
             params.append(
                 {
                     "block_id": block_id,
@@ -699,10 +708,10 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "block_name": block_name,
                     "param_key": param_key,
                     "param_path": f"{block_id}.{param_key}",
-                    "type": user_override.get("type", "float"),
+                    "type": second_pass_type,
                     "low": user_override["low"],
                     "high": user_override["high"],
-                    "step": user_override.get("step", 1),
+                    "step": second_pass_step,
                     "default": current_value,
                     "current_value": current_value,
                 }
