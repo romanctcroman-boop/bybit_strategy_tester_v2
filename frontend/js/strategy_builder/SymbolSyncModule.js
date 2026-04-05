@@ -34,7 +34,7 @@ export function createSymbolSyncModule({
   escapeHtml,
   showGlobalLoading,
   hideGlobalLoading,
-  updateRunButtonsState,
+  updateRunButtonsState
 }) {
 
   // ── Caches ──────────────────────────────────────────────────────────────────
@@ -556,7 +556,7 @@ export function createSymbolSyncModule({
     const btnRefresh = document.getElementById('btnDunnahRefresh');
     if (!container) return;
 
-    async function loadAndRender() {
+    async function loadAndRender(attempt = 1) {
       container.innerHTML = '<p class="text-muted text-sm">Загрузка...</p>';
       try {
         const ctrl = new AbortController();
@@ -602,9 +602,9 @@ export function createSymbolSyncModule({
             <div class="dunnah-group-actions">
               <button type="button" class="btn-dunnah-delete" data-symbol="${sym}" data-market="${mt}">🗑️ Удалить</button>
               ${isBlocked
-              ? `<button type="button" class="btn-dunnah-unblock" data-symbol="${sym}">🔓 Разблокировать</button>`
-              : `<button type="button" class="btn-dunnah-block" data-symbol="${sym}">🔒 Блокировать</button>`
-            }
+                ? `<button type="button" class="btn-dunnah-unblock" data-symbol="${sym}">🔓 Разблокировать</button>`
+                : `<button type="button" class="btn-dunnah-block" data-symbol="${sym}">🔒 Блокировать</button>`
+              }
             </div>
           </div>`;
           })
@@ -668,12 +668,17 @@ export function createSymbolSyncModule({
         });
       } catch (e) {
         console.error('[База данных]', e);
+        if (attempt < 2) {
+          container.innerHTML = '<p class="text-muted text-sm">Повторная попытка подключения...</p>';
+          await new Promise((r) => setTimeout(r, 2000));
+          return loadAndRender(attempt + 1);
+        }
         const msg = e.name === 'AbortError' ? 'Таймаут запроса (15 с)' : e.message;
         container.innerHTML = `<p class="text-danger text-sm">Ошибка: ${escapeHtml(msg)}</p><p class="text-muted text-sm" style="font-size:12px">Проверьте, что сервер запущен. Нажмите «Обновить» для повтора.</p>`;
       }
     }
 
-    if (btnRefresh) btnRefresh.addEventListener('click', loadAndRender);
+    if (btnRefresh) btnRefresh.addEventListener('click', () => loadAndRender());
     refreshDunnahBasePanel = loadAndRender;
 
     let _dunnahPanelLoaded = false;
@@ -1014,6 +1019,6 @@ export function createSymbolSyncModule({
     getBybitSymbolsCache: () => bybitSymbolsCache,
     getLocalSymbolsCache: () => localSymbolsCache,
     getBlockedSymbolsCache: () => blockedSymbolsCache,
-    getTickersDataCache: () => tickersDataCache,
+    getTickersDataCache: () => tickersDataCache
   };
 }

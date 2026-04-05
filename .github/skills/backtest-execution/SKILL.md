@@ -61,13 +61,17 @@ py -3.14 scripts/calibrate_166_metrics.py
 
 ## Supported Strategies
 
-| Strategy        | Key Params                   | File                                                |
-| --------------- | ---------------------------- | --------------------------------------------------- |
-| RSI             | period, overbought, oversold | `backend/backtesting/strategies/rsi.py`             |
-| MACD            | fast, slow, signal           | `backend/backtesting/strategies/macd.py`            |
-| Bollinger       | period, std_dev              | `backend/backtesting/strategies/bollinger.py`       |
-| EMA Cross       | fast_period, slow_period     | `backend/backtesting/strategies/ema_cross.py`       |
-| Multi-Indicator | varies                       | `backend/backtesting/strategies/multi_indicator.py` |
+All built-in strategies are defined in `backend/backtesting/strategies.py` (single file).
+Register new strategies via `STRATEGY_REGISTRY["name"] = MyStrategy` in the same file.
+
+| Strategy         | Key Params                   | Strategy type key   |
+| ---------------- | ---------------------------- | ------------------- |
+| SMA Crossover    | fast_period, slow_period     | `sma_crossover`     |
+| RSI              | period, overbought, oversold | `rsi`               |
+| MACD             | fast_period, slow_period, signal_period | `macd`  |
+| Bollinger Bands  | period, std_dev              | `bollinger_bands`   |
+| Grid             | grid_levels, grid_spacing    | `grid`              |
+| DCA              | dca_order_count, dca_grid_size_percent | `dca`   |
 
 ## Response Structure
 

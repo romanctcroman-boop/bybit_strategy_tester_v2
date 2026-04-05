@@ -15,7 +15,7 @@ frontend/
     strategy_builder.css  — Стили Builder
   js/
     pages/
-      strategy_builder.js    — Builder логика (~7154 строк, Phase 5 рефакторинг)
+      strategy_builder.js    — Builder логика (~13378 строк, Phase 5 рефакторинг ✅)
       backtest_results.js    — Таблицы и графики
       optimization_*.js      — Панели оптимизации
     shared/
@@ -77,3 +77,27 @@ Frontend тесты в `tests/frontend/` (JavaScript).
 - `js/pages/strategy_builder_debug.js` — debug утилиты
 - Canvas координаты делятся на `zoom` (баг был исправлен 2026-02-21)
 - Block IDs: `block_${Date.now()}_${random}` (суффикс добавлен 2026-02-21)
+
+## Известные исправленные баги (2026-03-28)
+
+### ConnectionsModule — `normalizeConnection()` portId
+
+`normalizeConnection()` всегда ставил `portId: 'out'/'in'`, игнорируя реальные имена портов.
+Canvas искал `[data-port-id="out"]` → провода не рендерились для AI-стратегий.
+**Исправление:** `conn.fromPort || 'out'` и `conn.toPort || 'in'` вместо хардкода.
+
+### AiBuildModule — символ не обновляется в панели
+
+AI панель "Symbol: —" обновляется только при открытии `openAiBuildModal()`, не при смене символа пока модал открыт.
+Это косметично — `runAiBuild()` читает `backtestSymbol` свежим при клике.
+**Workaround:** закрой и снова открой AI панель после смены символа.
+
+### SymbolSync — инициализация до создания объекта
+
+`setupEventListeners()` вызывал `symbolSync.initDunnahBasePanel()` до того, как `symbolSync` был создан → `symbolSync` оставался null → все `syncSymbolData()` были no-op.
+**Исправление:** перенос `initDunnahBasePanel()` после создания `symbolSync` (~line 840 в `strategy_builder.js`).
+
+## Тесты
+
+Frontend тесты в `tests/frontend/` (JavaScript). 759/759 passing (2026-03-24).
+Запуск описан в `tests/frontend/README.md` (если есть).

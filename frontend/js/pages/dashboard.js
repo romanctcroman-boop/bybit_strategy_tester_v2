@@ -159,7 +159,9 @@ async function loadMetricsSummary() {
         setEl('totalOptimizations', data.optimizations.total);
         setEl('runningOptimizations', data.optimizations.running);
 
-        setEl('totalTrades', formatNumber(data.performance.total_trades_analyzed));
+        setEl('totalTrades', Number.isInteger(data.performance.total_trades_analyzed)
+            ? data.performance.total_trades_analyzed.toLocaleString()
+            : formatNumber(data.performance.total_trades_analyzed));
         setEl('avgDuration', `${data.performance.avg_backtest_duration_sec.toFixed(1)}s`);
 
     } catch (error) {
@@ -1010,6 +1012,21 @@ function handleWsMessage(data) {
             }
             break;
 
+        case 'pnl_update':
+            // Real-time P&L update from server (sent every ~5s)
+            if (data.data) {
+                const pnlEl = document.getElementById('currentPnL');
+                if (pnlEl) {
+                    const v = data.data.current_pnl ?? 0;
+                    pnlEl.textContent = (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
+                    pnlEl.className = 'pnl-value ' + (v >= 0 ? 'positive' : 'negative');
+                }
+                updatePnLStat('pnlToday', data.data.today_pnl);
+                updatePnLStat('pnlWeek', data.data.week_pnl);
+                updatePnLStat('pnlMonth', data.data.month_pnl);
+            }
+            break;
+
         default:
             console.log('Unknown WebSocket message type:', data.type);
     }
@@ -1349,7 +1366,7 @@ async function loadCurrentPnL() {
         const pnlValue = document.getElementById('currentPnL');
         if (pnlValue) {
             const value = data.current_pnl || 0;
-            pnlValue.textContent = (value >= 0 ? '+' : '') + '$' + Math.abs(value).toFixed(2);
+            pnlValue.textContent = (value >= 0 ? '+' : '-') + '$' + Math.abs(value).toFixed(2);
             pnlValue.className = 'pnl-value ' + (value >= 0 ? 'positive' : 'negative');
         }
 
@@ -1380,7 +1397,7 @@ function updatePnLStat(id, value) {
     const el = document.getElementById(id);
     if (el) {
         const v = value || 0;
-        el.textContent = (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2);
+        el.textContent = (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
         el.className = 'value ' + (v >= 0 ? 'positive' : 'negative');
     }
 }

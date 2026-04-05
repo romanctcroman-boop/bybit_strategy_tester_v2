@@ -22,6 +22,7 @@ Added 2026-02-14 — Agent x Strategy Builder Integration.
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import re
 import time
@@ -39,8 +40,10 @@ from backend.agents.mcp.tools.strategy_builder import (
     builder_add_block,
     builder_connect_blocks,
     builder_create_strategy,
+    builder_disconnect_blocks,
     builder_generate_code,
     builder_get_block_library,
+    builder_remove_block,
     builder_run_backtest,
     builder_update_block_params,
     builder_validate_strategy,
@@ -517,6 +520,42 @@ class BuilderWorkflow:
                             f"({sum(1 for b in self._result.blocks_added if b.get('params'))} with params), "
                             f"{len(self._result.connections_made)} connections"
                         )
+
+                        # ── Sync payload connections to DB ──────────────────────────
+                        # If the payload provided connections (filtered by caller),
+                        # write them to DB immediately so that subsequent
+                        # builder_update_block_params GET/PUT cycles preserve the
+                        # correct topology rather than restoring removed connections.
+                        _payload_conn_ids = {c.get("id") for c in config.connections}
+                        _raw_conn_ids = {c.get("id") for c in raw_connections}
+                        if config.connections and _payload_conn_ids != _raw_conn_ids:
+                            try:
+                                sync_payload = {
+                                    "name": existing.get("name", config.name),
+                                    "description": existing.get("description", ""),
+                                    "symbol": existing.get("symbol", config.symbol),
+                                    "timeframe": existing.get("timeframe", config.timeframe),
+                                    "direction": existing.get("direction", config.direction),
+                                    "market_type": existing.get("market_type", "linear"),
+                                    "initial_capital": existing.get("initial_capital", config.initial_capital),
+                                    "leverage": existing.get("leverage", round(config.leverage)),
+                                    "blocks": config.blocks,
+                                    "connections": config.connections,
+                                }
+                                from backend.agents.mcp.tools.strategy_builder import _api_put
+                                await _api_put(
+                                    f"/strategies/{config.existing_strategy_id}",
+                                    json_data=sync_payload,
+                                )
+                                logger.info(
+                                    f"[BuilderWorkflow] Synced {len(config.connections)} payload connections "
+                                    f"to DB (was {len(raw_connections)} — removed "
+                                    f"{len(raw_connections) - len(config.connections)} filtered connections)"
+                                )
+                            except Exception as _sync_err:
+                                logger.warning(
+                                    f"[BuilderWorkflow] Could not sync connections to DB: {_sync_err}"
+                                )
                     else:
                         logger.warning(
                             f"[BuilderWorkflow] Could not load existing strategy details: "
@@ -525,6 +564,41 @@ class BuilderWorkflow:
                 except Exception as e:
                     logger.warning(
                         f"[BuilderWorkflow] Failed to fetch existing strategy: {e}. Continuing with optimize anyway."
+                    )
+
+            # ── Auto-fix: inject SL/TP config when no exit block present ──────
+            # Instead of adding a structural block (which can get lost from builder_blocks
+            # during the long LLM/optimizer cycle), we set stop_loss / take_profit at the
+            # config level so the backtest engine enforces them directly.
+            # The backtest endpoint is also patched to accept these as valid exit conditions.
+            if config.existing_strategy_id and config.blocks:
+                _exit_types = {
+                    "static_sltp", "exit", "trailing_stop", "atr_exit", "multi_tp",
+                    "trailing_stop_exit", "time_exit", "session_exit", "break_even_exit",
+                    "chandelier_exit", "partial_close", "multi_tp_exit", "tp_percent",
+                    "sl_percent", "rsi_close", "stoch_close", "channel_close", "ma_close",
+                    "psar_close", "time_bars_close",
+                }
+                if not any(b.get("type") in _exit_types for b in config.blocks):
+                    if config.stop_loss is None:
+                        config.stop_loss = 0.02  # 2% SL
+                    if config.take_profit is None:
+                        config.take_profit = 0.04  # 4% TP
+                    logger.info(
+                        "[BuilderWorkflow] Optimize mode: no exit block found — "
+                        f"injecting SL={config.stop_loss*100:.1f}% TP={config.take_profit*100:.1f}% "
+                        "into backtest config (no structural block added)"
+                    )
+                    self._emit_agent_log(
+                        agent="system",
+                        role="planner",
+                        prompt="Auto-fix: missing exit conditions",
+                        response=(
+                            f"✅ Strategy has no exit block. Using SL={config.stop_loss*100:.1f}% / "
+                            f"TP={config.take_profit*100:.1f}% from backtest config so all iterations "
+                            "can run. Optimizer will tune indicator parameters."
+                        ),
+                        title="🔧 Auto-fix: SL/TP injected from config",
                     )
 
             # LLM block planning: only for new strategies when no blocks provided
@@ -611,10 +685,38 @@ class BuilderWorkflow:
                         response="0 trades generated. Optimizer sweep will be skipped until trades are detected.",
                         title="⚠️ 0 trades — checking connections",
                     )
+                elif _init_trades < 20 and "error" not in backtest:
+                    logger.warning(
+                        f"[BuilderWorkflow] Initial backtest: only {_init_trades} trades — "
+                        "signal conditions are too restrictive. Agents will receive sparse-signal warning."
+                    )
+                    self._emit_agent_log(
+                        agent="system",
+                        role="backtest",
+                        prompt="Initial backtest result",
+                        response=(
+                            f"⚠️ Sparse signals: only {_init_trades} trades in the full backtest period. "
+                            "For a 30m strategy you need 2+ trades/day minimum. "
+                            "The AND-gate logic is too restrictive — agents must widen entry conditions "
+                            "(e.g. use continuous SuperTrend signal instead of on-change-only, "
+                            "raise RSI cross level, or replace AND with OR)."
+                        ),
+                        title=f"⚠️ Sparse signals ({_init_trades} trades) — conditions too tight",
+                    )
 
             # Stage 8: Evaluate + Iterative optimization loop
             best_primary_score: float = float("-inf")
+            primary_score: float = float("-inf")  # set on first iteration; guard for post-loop code
             best_iteration_record: dict[str, Any] = {}
+            best_blocks_snapshot: list[dict[str, Any]] = []
+            best_backtest_result: dict[str, Any] = {}
+
+            # ── Hypothesis-testing state across iterations ────────────────────
+            # Carries optimizer findings from one iteration to the next so agents
+            # can narrow/shift ranges based on what was already explored.
+            _prev_opt_ranges: list[dict[str, Any]] | None = None
+            _prev_opt_best_params: dict[str, Any] | None = None
+            _prev_opt_score: float | None = None
 
             for iteration in range(1, config.max_iterations + 1):
                 self._set_stage(BuilderStage.EVALUATING)
@@ -653,6 +755,8 @@ class BuilderWorkflow:
                 if primary_score > best_primary_score:
                     best_primary_score = primary_score
                     best_iteration_record = iteration_record
+                    best_blocks_snapshot = copy.deepcopy(self._result.blocks_added)
+                    best_backtest_result = backtest if isinstance(backtest, dict) else {}
 
                 if iteration_record["acceptable"]:
                     logger.info(
@@ -669,70 +773,140 @@ class BuilderWorkflow:
                     f"{'✅' if metrics.get('net_profit', 0) > 0 else '❌'} — iterating"
                 )
 
-                if iteration >= config.max_iterations:
-                    logger.info("[BuilderWorkflow] Max iterations reached, accepting best result")
-                    break
-
                 # --- Iterative parameter adjustment ---
                 self._set_stage(BuilderStage.ITERATING)
 
+                # ── Shared context for _suggest_adjustments calls ──────────
+                _bt_warnings = (
+                    backtest.get("warnings", []) if isinstance(backtest, dict) else []
+                )
+                _iters_hist = list(self._result.iterations)  # snapshot before new iter added
+                _delib_plan = self._result.deliberation.get("decision", "") or None
+
                 if config.use_optimizer_mode:
-                    # ── Optimizer mode: agents suggest ranges → sweep ──────────
-                    # Skip optimizer sweep if no trades were detected — sweep can't
-                    # improve a strategy that generates no entries.  Fall back to
-                    # structural (single-value) suggestions instead.
-                    _current_trades = metrics.get("total_trades", 0)
-                    if _current_trades == 0:
+                    # ── Step 0: Topology intelligence — restructure graph if needed ─────
+                    # Agents first check for STRUCTURAL problems (wrong connections, dead
+                    # blocks, OR/AND gate issues) that parameter tuning cannot fix.
+                    # This runs BEFORE param optimization so the optimizer works on a
+                    # topologically correct graph, not a broken one.
+                    _live_connections = list(self._result.connections_made or [])
+                    topo_changes = await self._suggest_topology_changes(
+                        blocks=self._result.blocks_added,
+                        connections=_live_connections,
+                        metrics=metrics,
+                        iteration=iteration,
+                        iterations_history=_iters_hist,
+                    )
+                    if topo_changes:
+                        applied_topo = await self._apply_topology_changes(
+                            strategy_id=self._result.strategy_id,
+                            changes=topo_changes,
+                            current_connections=_live_connections,
+                            current_metrics=metrics,
+                        )
+                        if applied_topo:
+                            # Sync connections_made with what was actually changed
+                            self._result.connections_made = _live_connections
+                            logger.info(
+                                f"[BuilderWorkflow] 🏗️ Topology restructured: "
+                                f"{len(applied_topo)}/{len(topo_changes)} changes applied "
+                                f"— running quick backtest to get new baseline"
+                            )
+                            # Quick re-backtest after topology change so optimizer
+                            # sees the new graph, not the old broken one.
+                            _topo_sl = config.stop_loss if (config.stop_loss and config.stop_loss >= 0.001) else None
+                            _topo_tp = config.take_profit if (config.take_profit and config.take_profit >= 0.001) else None
+                            _topo_backtest = await builder_run_backtest(
+                                strategy_id=self._result.strategy_id,
+                                symbol=config.symbol,
+                                interval=config.timeframe,
+                                start_date=config.start_date,
+                                end_date=config.end_date,
+                                initial_capital=config.initial_capital,
+                                leverage=round(config.leverage),
+                                direction=config.direction,
+                                stop_loss=_topo_sl,
+                                take_profit=_topo_tp,
+                            )
+                            if isinstance(_topo_backtest, dict) and "error" not in _topo_backtest:
+                                backtest = _topo_backtest
+                                metrics = backtest.get("results", backtest.get("metrics", {}))
+                                _topo_sharpe = float(metrics.get("sharpe_ratio", 0) or 0)
+                                _topo_trades = int(metrics.get("total_trades", 0))
+                                logger.info(
+                                    f"[BuilderWorkflow] 🏗️ Post-topology baseline: "
+                                    f"Sharpe={_topo_sharpe:.3f}, Trades={_topo_trades}"
+                                )
+                                # Recalculate primary score for the new baseline
+                                primary_score, _ = config.evaluate_metrics(metrics)
+                                # Reset hypothesis state — topology changed everything
+                                _prev_opt_ranges = None
+                                _prev_opt_best_params = None
+                                _prev_opt_score = None
+                            else:
+                                logger.warning(
+                                    "[BuilderWorkflow] Post-topology backtest failed — "
+                                    "continuing with optimizer on new topology anyway"
+                                )
+
+                    # ── Hypothesis-testing mode: agents propose ranges → optimizer sweeps ──
+                    # Agents ALWAYS propose parameter RANGES (never fixed values).
+                    # Each iteration is a hypothesis test:
+                    #   1. Agents propose ranges (informed by previous iteration's findings)
+                    #   2. Optimizer sweeps those ranges (Optuna TPE/CMA-ES)
+                    #   3. Best found params are applied → next backtest
+                    #   4. Agents narrow/shift ranges based on what worked or failed
+                    # No fallback to fixed-value suggestions inside optimizer mode.
+                    agent_ranges = await self._suggest_param_ranges(
+                        blocks_added=self._result.blocks_added,
+                        iteration=iteration,
+                        metrics=metrics,
+                        connections=self._result.connections_made,
+                        backtest_warnings=_bt_warnings,
+                        iterations_history=_iters_hist,
+                        deliberation_plan=_delib_plan,
+                        previous_ranges=_prev_opt_ranges,
+                        previous_best_params=_prev_opt_best_params,
+                        previous_opt_score=_prev_opt_score,
+                        current_score=primary_score,
+                    )
+                    opt_result: dict[str, Any] | None = None
+                    if agent_ranges:
+                        opt_result = await self._run_optimizer_for_ranges(config, agent_ranges)
+
+                    if opt_result and opt_result.get("best_params"):
+                        _opt_score = opt_result.get("best_score", float("-inf"))
+                        # Apply optimizer params UNCONDITIONALLY — even when optimizer
+                        # score ≤ current score we still apply them, because the next
+                        # iteration's agents need to start from a known point in
+                        # parameter space, not a stale baseline.
+                        by_block: dict[str, dict[str, Any]] = {}
+                        for path, value in opt_result["best_params"].items():
+                            bid, _, param = path.partition(".")
+                            by_block.setdefault(bid, {})[param] = value
+                        adjustments = [{"block_id": bid, "params": params} for bid, params in by_block.items()]
+                        _improved = "↑ improved" if _opt_score > primary_score else "→ same region"
                         logger.info(
-                            f"[BuilderWorkflow] Optimizer mode skipped (0 trades, iteration {iteration}) "
-                            "— using structural adjustments instead"
+                            f"[BuilderWorkflow] 🔬 Hypothesis {iteration}: {_improved} — "
+                            f"{len(adjustments)} block(s), optimizer_score={_opt_score:.3f} "
+                            f"(baseline={primary_score:.3f})"
                         )
-                        adjustments = await self._suggest_adjustments(
-                            config.blocks,
-                            self._result.blocks_added,
-                            iteration,
-                            metrics,
-                            connections=self._result.connections_made,
-                        )
+                        # Store findings for next iteration's hypothesis refinement
+                        _prev_opt_ranges = agent_ranges
+                        _prev_opt_best_params = dict(opt_result["best_params"])
+                        _prev_opt_score = _opt_score
                     else:
-                        agent_ranges = await self._suggest_param_ranges(
-                            blocks_added=self._result.blocks_added,
-                            iteration=iteration,
-                            metrics=metrics,
-                            connections=self._result.connections_made,
+                        # Optimizer found no valid params (all trials NaN/pruned).
+                        # Record the failed ranges so next-iteration agents can
+                        # shift to unexplored territory.
+                        logger.info(
+                            f"[BuilderWorkflow] 🔬 Hypothesis {iteration}: optimizer found no valid "
+                            f"params — recording failed ranges for agents to avoid next cycle"
                         )
-                        opt_result: dict[str, Any] | None = None
-                        if agent_ranges:
-                            opt_result = await self._run_optimizer_for_ranges(config, agent_ranges)
-
-                        if opt_result and opt_result.get("best_params"):
-                            # best_params format: {"block_id.param": value}
-                            # Group by block_id and apply via builder_update_block_params
-                            by_block: dict[str, dict[str, Any]] = {}
-                            for path, value in opt_result["best_params"].items():
-                                bid, _, param = path.partition(".")
-                                by_block.setdefault(bid, {})[param] = value
-
-                            adjustments = [{"block_id": bid, "params": params} for bid, params in by_block.items()]
-                            logger.info(
-                                f"[BuilderWorkflow] 🎯 Optimizer gave best params for "
-                                f"{len(adjustments)} block(s) "
-                                f"(score={opt_result['best_score']:.3f})"
-                            )
-                        else:
-                            # Optimizer found nothing (all trials pruned) → fall
-                            # back to single-value structural suggestions
-                            logger.info(
-                                f"[BuilderWorkflow] Optimizer sweep produced no results "
-                                f"(iteration {iteration}) — falling back to structural adjustments"
-                            )
-                            adjustments = await self._suggest_adjustments(
-                                config.blocks,
-                                self._result.blocks_added,
-                                iteration,
-                                metrics,
-                                connections=self._result.connections_made,
-                            )
+                        _prev_opt_ranges = agent_ranges  # agents see what was already tried
+                        _prev_opt_best_params = None
+                        _prev_opt_score = None
+                        adjustments = []
                 else:
                     # ── Direct mode: agents suggest single values (original) ──
                     adjustments = await self._suggest_adjustments(
@@ -741,6 +915,9 @@ class BuilderWorkflow:
                         iteration,
                         metrics,
                         connections=self._result.connections_made,
+                        backtest_warnings=_bt_warnings,
+                        iterations_history=_iters_hist,
+                        deliberation_plan=_delib_plan,
                     )
 
                 if not adjustments:
@@ -785,8 +962,9 @@ class BuilderWorkflow:
                         builder_clone_strategy,
                     )
 
-                    base_name = config.name.split("_v")[0]
-                    version_name = f"{base_name}_v{iteration}"
+                    import re as _re
+                    base_name = _re.sub(r'[_ ]*AI-\d+$', '', config.name).rstrip('_- ')
+                    version_name = f"{base_name} AI-{iteration}"
                     clone = await builder_clone_strategy(
                         strategy_id=self._result.strategy_id,
                         new_name=version_name,
@@ -811,6 +989,9 @@ class BuilderWorkflow:
                 # Re-run backtest with adjusted parameters
                 self._set_stage(BuilderStage.BACKTESTING)
                 logger.info(f"[BuilderWorkflow] Re-running backtest (iteration {iteration + 1})...")
+                # Sanitize SL/TP: 0.0 fails BacktestConfig(ge=0.001) — treat as None
+                _iter_sl = config.stop_loss if (config.stop_loss and config.stop_loss >= 0.001) else None
+                _iter_tp = config.take_profit if (config.take_profit and config.take_profit >= 0.001) else None
                 backtest = await builder_run_backtest(
                     strategy_id=self._result.strategy_id,
                     symbol=config.symbol,
@@ -821,8 +1002,8 @@ class BuilderWorkflow:
                     leverage=round(config.leverage),
                     direction=config.direction,
                     commission=config.commission,
-                    stop_loss=config.stop_loss,
-                    take_profit=config.take_profit,
+                    stop_loss=_iter_sl,
+                    take_profit=_iter_tp,
                 )
                 self._result.backtest_results = backtest
 
@@ -846,8 +1027,89 @@ class BuilderWorkflow:
                     if _iter_trades == 0 and "error" not in backtest:
                         logger.warning(f"[BuilderWorkflow] Iteration {iteration + 1} backtest: 0 trades")
 
+                # Gate 2: last iteration — capture optimizer-adjusted backtest result then stop
+                if iteration >= config.max_iterations:
+                    if isinstance(backtest, dict) and "error" not in backtest:
+                        _final_m = backtest.get("results", backtest.get("metrics", {}))
+                        _final_sharpe = float(_final_m.get("sharpe_ratio", 0) or 0)
+                        _final_wr = _final_m.get("win_rate", 0)
+                        _final_wr_frac = _final_wr / 100.0 if _final_wr > 1 else _final_wr
+                        _final_score, _final_ok = config.evaluate_metrics(_final_m)
+                        _final_record: dict[str, Any] = {
+                            "iteration": iteration + 1,
+                            "primary_metric": primary_metric,
+                            "primary_score": _final_score,
+                            "sharpe_ratio": _final_sharpe,
+                            "win_rate": _final_wr_frac,
+                            "total_trades": _final_m.get("total_trades", 0),
+                            "net_profit": _final_m.get("net_profit", 0),
+                            "max_drawdown": _final_m.get("max_drawdown", _final_m.get("max_drawdown_pct", 0)),
+                            "acceptable": _final_ok,
+                            "_gate2_capture": True,  # not a real iteration; excluded from naming count
+                        }
+                        self._result.iterations.append(_final_record)
+                        if _final_score > best_primary_score:
+                            best_primary_score = _final_score
+                            best_iteration_record = _final_record
+                            best_blocks_snapshot = copy.deepcopy(self._result.blocks_added)
+                        logger.info(
+                            f"[BuilderWorkflow] Optimizer result captured: "
+                            f"{primary_metric}={_final_score:.3f}, Sharpe={_final_sharpe:.3f}, "
+                            f"Trades={_final_m.get('total_trades', 0)}"
+                        )
+                    logger.info("[BuilderWorkflow] Max iterations reached, accepting best result")
+                    break
+
             # ── Save best config to Semantic Memory (survives restarts) ───────
             await self._memory_store_best_config(config, best_iteration_record)
+
+            # ── Restore best-iteration params if last iteration was worse ──────
+            # The live strategy always ends up with the LAST iteration's params,
+            # but the BEST params may have been from an earlier iteration
+            # (e.g. optimizer swept to a worse region on the last pass, or
+            # the final LLM tweak degraded the result). Re-apply the best
+            # block params so the final clone captures the actual best result.
+            # Use the final Gate 2 score (last appended record), not the score
+            # from the START of the last iteration — they differ because the
+            # Bayesian sweep + LLM adjustments run AFTER primary_score is set.
+            _last_primary = (
+                self._result.iterations[-1].get("primary_score", primary_score)
+                if self._result.iterations
+                else primary_score
+            )
+            if best_blocks_snapshot and best_primary_score > _last_primary:
+                logger.info(
+                    f"[BuilderWorkflow] ↩️ Restoring best-iteration params "
+                    f"(best={best_primary_score:.3f} > last={_last_primary:.3f})"
+                )
+                from backend.agents.mcp.tools.strategy_builder import (
+                    builder_update_block_params as _ubp,
+                )
+                for _best_b in best_blocks_snapshot:
+                    _bid = _best_b.get("id", "")
+                    _best_params = _best_b.get("params") or {}
+                    _curr_b = next(
+                        (b for b in self._result.blocks_added if b.get("id") == _bid), None
+                    )
+                    _curr_params = (_curr_b.get("params") or {}) if _curr_b else {}
+                    _diff = {k: v for k, v in _best_params.items() if _curr_params.get(k) != v}
+                    if _diff:
+                        await _ubp(
+                            strategy_id=self._result.strategy_id,
+                            block_id=_bid,
+                            params=_diff,
+                        )
+                        if _curr_b:
+                            _curr_b.setdefault("params", {}).update(_diff)
+                self._result.blocks_added = copy.deepcopy(best_blocks_snapshot)
+                self._result.backtest_results = best_backtest_result
+                self._emit_agent_log(
+                    agent="system",
+                    role="optimizer",
+                    prompt="Restoring best iteration params",
+                    response=f"↩️ Params restored from best iteration (score={best_primary_score:.3f})",
+                    title="↩️ Best params restored",
+                )
 
             # ── Save FINAL version as a named clone ───────────────────────────
             # Always save a permanent "final" clone so the user has a clearly
@@ -860,12 +1122,13 @@ class BuilderWorkflow:
                     builder_clone_strategy,
                 )
 
-                _total_iters = len(self._result.iterations)
-                _base = config.name.split("_v")[0].split("_opt_")[0].split("_ai_")[0]
-                if config.existing_strategy_id:
-                    _final_name = f"{_base}_opt_v{_total_iters}"
-                else:
-                    _final_name = f"{_base}_ai_v{_total_iters}"
+                # Exclude the Gate 2 "final capture" record from the count
+                _total_iters = sum(
+                    1 for r in self._result.iterations if not r.get("_gate2_capture")
+                )
+                import re as _re
+                _base = _re.sub(r'[_ ]*AI-\d+$', '', config.name).rstrip('_- ')
+                _final_name = f"{_base} AI-{_total_iters}"
 
                 final_clone = await builder_clone_strategy(
                     strategy_id=self._result.strategy_id,
@@ -1788,6 +2051,132 @@ Recommended approach for positive profit (EMA + RSI combination):
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _build_block_catalog() -> str:
+        """Format ALL available block types from DEFAULT_PARAM_RANGES into a compact catalog.
+
+        This is injected into agent prompts so they know the FULL set of blocks they can
+        add or suggest — not just the blocks currently in the strategy.
+
+        Returns:
+            Multi-line human-readable catalog grouped by category.
+        """
+        from backend.optimization.builder_optimizer import DEFAULT_PARAM_RANGES
+
+        # Human-readable metadata per block type: category, description, output ports
+        _BLOCK_META: dict[str, dict[str, str]] = {
+            # Oscillators → entry signals
+            "rsi":              {"cat": "oscillator", "desc": "RSI momentum — cross level or range filter", "ports": "long, short"},
+            "macd":             {"cat": "oscillator", "desc": "MACD histogram cross zero/signal line", "ports": "long, short"},
+            "stochastic":       {"cat": "oscillator", "desc": "Stochastic %K/%D overbought/oversold", "ports": "long, short"},
+            "cci":              {"cat": "oscillator", "desc": "Commodity Channel Index momentum", "ports": "long, short"},
+            "williams_r":       {"cat": "oscillator", "desc": "Williams %R oscillator", "ports": "long, short"},
+            "qqe":              {"cat": "oscillator", "desc": "QQE — smoothed RSI with dynamic signal band", "ports": "long, short"},
+            "divergence":       {"cat": "oscillator", "desc": "Price/indicator divergence (RSI, MACD, Stoch, CMF, MFI)", "ports": "long, short"},
+            "aroon":            {"cat": "oscillator", "desc": "Aroon trend strength + direction crossover", "ports": "long, short"},
+            # Trend indicators
+            "supertrend":       {"cat": "trend", "desc": "SuperTrend ATR follower. ⚠️ connect to filter_long (not entry_long) to avoid over-trading every bar", "ports": "long, short"},
+            "ichimoku":         {"cat": "trend", "desc": "Ichimoku cloud multi-component (tenkan/kijun/senkou)", "ports": "long, short"},
+            "parabolic_sar":    {"cat": "trend", "desc": "Parabolic SAR trend reversal dots", "ports": "long, short"},
+            "adx":              {"cat": "trend", "desc": "ADX trend strength — best as filter: pass when ADX > threshold", "ports": "long, short (connect fromPort='long' to toPort='filter_long' on strategy)"},
+            # Moving averages
+            "ema":              {"cat": "trend_ma", "desc": "EMA — connect via two_mas for crossover signals", "ports": "value"},
+            "sma":              {"cat": "trend_ma", "desc": "SMA — connect via two_mas for crossover signals", "ports": "value"},
+            "two_mas":          {"cat": "trend_ma", "desc": "Dual MA crossover (fast MA × slow MA cross)", "ports": "long, short"},
+            # Volatility / breakout
+            "keltner_bollinger": {"cat": "volatility", "desc": "BB-inside-Keltner squeeze → breakout momentum signals", "ports": "long, short"},
+            "donchian":         {"cat": "volatility", "desc": "Donchian Channel N-bar high/low breakout", "ports": "long, short"},
+            "highest_lowest_bar": {"cat": "volatility", "desc": "N-bar high/low breakout with ATR confirmation", "ports": "long, short"},
+            "bollinger":        {"cat": "volatility", "desc": "Bollinger Bands — outputs price bands, NOT bool signals. Use keltner_bollinger for entry signals.", "ports": "upper, middle, lower, percentb"},
+            "keltner":          {"cat": "volatility", "desc": "Keltner Channel ATR bands", "ports": "upper, middle, lower"},
+            "atr":              {"cat": "volatility", "desc": "ATR value — pair with atr_volatility filter", "ports": "value"},
+            # Volume
+            "cmf":              {"cat": "volume", "desc": "Chaikin Money Flow volume momentum (positive=bullish)", "ports": "value"},
+            # Filters (AND-gate: connect fromPort='long' toPort='filter_long' on strategy)
+            # IMPORTANT: filter block OUTPUT ports are 'long' and 'short' — NOT 'filter_long'/'filter_short'
+            # 'filter_long'/'filter_short' are TARGET ports on the strategy node, not source ports
+            # ⚠️ RULE: ONLY use block types listed here — hallucinated types like atr_volatility,
+            #   volume_filter, macd_filter, stochastic_filter, two_ma_filter, qqe_filter, rsi_filter
+            #   do NOT exist and will be silently rejected. To filter with MACD/RSI/ADX: use the
+            #   base block type (macd/rsi/adx) connected fromPort="long" toPort="filter_long".
+            "supertrend_filter": {"cat": "filter", "desc": "SuperTrend AND-gate filter — enforce trend alignment (alias: supertrend). Use generate_on_trend_change=True.", "ports": "long, short"},
+            "rvi_filter":       {"cat": "filter", "desc": "Relative Vigor Index filter", "ports": "long, short"},
+            "mfi_filter":       {"cat": "filter", "desc": "Money Flow Index filter — volume-weighted momentum", "ports": "long, short"},
+            "cci_filter":       {"cat": "filter", "desc": "CCI range filter", "ports": "long, short"},
+            "momentum_filter":  {"cat": "filter", "desc": "Price momentum ROC filter", "ports": "long, short"},
+            "accumulation_areas": {"cat": "filter", "desc": "Accumulation zone detector — entries near support/resistance", "ports": "long, short"},
+            # Exit blocks
+            "static_sltp":        {"cat": "exit", "desc": "Static SL/TP % with optional breakeven. PRIMARY exit.", "ports": "sl_tp"},
+            "trailing_stop_exit": {"cat": "exit", "desc": "Trailing stop — activates at N%, trails by M%", "ports": "sl_tp"},
+            "atr_exit":           {"cat": "exit", "desc": "ATR-dynamic SL/TP — adapts to volatility", "ports": "sl_tp"},
+            "multi_tp_exit":      {"cat": "exit", "desc": "3-level TP with partial position close at each level", "ports": "sl_tp"},
+            "close_by_time":      {"cat": "exit", "desc": "Time-based exit: close after N bars (+ optional min_profit gate)", "ports": "sl_tp"},
+            "close_channel":      {"cat": "exit", "desc": "Close when price re-enters BB/Keltner channel (squeeze exit)", "ports": "sl_tp"},
+            "close_ma_cross":     {"cat": "exit", "desc": "Close on fast/slow MA crossover (+ optional min_profit gate)", "ports": "sl_tp"},
+            "close_rsi":          {"cat": "exit", "desc": "Close when RSI reaches overbought/oversold level", "ports": "sl_tp"},
+            "close_stochastic":   {"cat": "exit", "desc": "Close when Stochastic reaches overbought/oversold", "ports": "sl_tp"},
+            "close_psar":         {"cat": "exit", "desc": "Close on Parabolic SAR flip (trend reversal)", "ports": "sl_tp"},
+            "chandelier_exit":    {"cat": "exit", "desc": "Chandelier stop: ATR multiplier below highest high", "ports": "sl_tp"},
+            "break_even_exit":    {"cat": "exit", "desc": "Move SL to breakeven after price moves N% in profit", "ports": "sl_tp"},
+            # Entry refinement
+            "dca":                {"cat": "entry", "desc": "DCA grid — multiple entry orders below initial entry", "ports": "entry_long"},
+            # MA variants (use via two_mas for crossover)
+            "wma":      {"cat": "trend_ma", "desc": "Weighted MA — heavier weight on recent bars", "ports": "value"},
+            "dema":     {"cat": "trend_ma", "desc": "Double EMA — less lag than EMA", "ports": "value"},
+            "tema":     {"cat": "trend_ma", "desc": "Triple EMA — minimal lag trend follower", "ports": "value"},
+            "hull_ma":  {"cat": "trend_ma", "desc": "Hull MA — very smooth, minimal lag", "ports": "value"},
+            # Additional oscillators
+            "stoch_rsi": {"cat": "oscillator", "desc": "Stochastic RSI — RSI of RSI, highly sensitive", "ports": "long, short"},
+            "roc":       {"cat": "oscillator", "desc": "Rate of Change — % price change over N bars", "ports": "long, short"},
+            "cmo":       {"cat": "oscillator", "desc": "Chande Momentum Oscillator — bounded momentum", "ports": "long, short"},
+        }
+
+        cat_order = ["oscillator", "trend", "trend_ma", "volatility", "volume", "filter", "exit", "entry"]
+        cat_labels = {
+            "oscillator": "ENTRY SIGNALS — Oscillators (connect to entry_long / entry_short)",
+            "trend":      "ENTRY SIGNALS — Trend Indicators (entry or filter_long / filter_short)",
+            "trend_ma":   "ENTRY SIGNALS — Moving Averages (use via two_mas block for crossover)",
+            "volatility": "VOLATILITY & BREAKOUT (entry_long or filter_long)",
+            "volume":     "VOLUME INDICATORS",
+            "filter":     "FILTERS — AND-gate (connect to filter_long / filter_short)",
+            "exit":       "EXIT BLOCKS (connect to sl_tp port)",
+            "entry":      "ENTRY REFINEMENT",
+        }
+
+        # Group by category
+        by_cat: dict[str, list[str]] = {}
+        for block_type in DEFAULT_PARAM_RANGES:
+            meta = _BLOCK_META.get(block_type, {"cat": "other", "desc": "", "ports": "long, short"})
+            cat = meta["cat"]
+            by_cat.setdefault(cat, []).append(block_type)
+
+        lines = [
+            "## FULL BLOCK CATALOG — ALL available block types (use when proposing add_block)",
+            "Port semantics: entry_long/entry_short = OR-gate (any fires → trade). "
+            "filter_long/filter_short = AND-gate (ALL must pass). sl_tp = exit block port.\n",
+        ]
+        for cat in cat_order:
+            block_types = by_cat.get(cat, [])
+            if not block_types:
+                continue
+            lines.append(f"  [{cat_labels[cat]}]")
+            for bt in block_types:
+                meta = _BLOCK_META.get(bt, {"desc": "", "ports": "long, short"})
+                params = DEFAULT_PARAM_RANGES.get(bt, {})
+                key_params = [
+                    f"{pn}[{spec.get('low','?')}..{spec.get('high','?')}]"
+                    for pn, spec in list(params.items())[:5]
+                ]
+                if len(params) > 5:
+                    key_params.append(f"+{len(params)-5} more")
+                lines.append(
+                    f"    {bt}: {meta.get('desc','')} | ports→{meta.get('ports','?')} "
+                    f"| params: {', '.join(key_params)}"
+                )
+            lines.append("")
+
+        return "\n".join(lines)
+
     async def _suggest_adjustments(
         self,
         block_defs: list[dict[str, Any]],
@@ -1795,6 +2184,9 @@ Recommended approach for positive profit (EMA + RSI combination):
         iteration: int,
         metrics: dict[str, Any],
         connections: list[dict[str, Any]] | None = None,
+        backtest_warnings: list[str] | None = None,
+        iterations_history: list[dict[str, Any]] | None = None,
+        deliberation_plan: str | None = None,
     ) -> list[dict[str, Any]]:
         """Use a 3-agent parallel consensus to suggest parameter adjustments.
 
@@ -1818,6 +2210,108 @@ Recommended approach for positive profit (EMA + RSI combination):
         Returns:
             List of ``{"block_id": ..., "params": {...}}`` adjustments.
         """
+        # === AUTO-FIX: sparse-signal boolean params =====================================
+        # When trades are critically sparse, deterministically fix known culprits
+        # BEFORE calling LLMs. These are structural boolean params that the agent
+        # prompt cannot change (constraint says "numeric only").
+        #
+        # Strategy:
+        #   SuperTrend + RSI in AND gate → RSI stays as trigger, SuperTrend becomes filter.
+        #   SuperTrend alone          → disable on-change-only, make continuous filter.
+        #   RSI alone (no SuperTrend) → switch to range mode for continuous signals.
+        _adj_trades = int(metrics.get("total_trades", 0))
+        if _adj_trades < 15:
+            auto_fixes: list[dict[str, Any]] = []
+            # First pass: detect SuperTrend blocks with generate_on_trend_change=True.
+            # When such a block exists we must NOT also disable RSI use_cross_level —
+            # that combination (RSI range + SuperTrend continuous) creates the opposite
+            # problem: both conditions are nearly always true → floods entries with
+            # near-zero win rate. Instead keep RSI in trigger (cross) mode and let
+            # SuperTrend act as the continuous directional filter.
+            # Detect ANY SuperTrend block regardless of its current mode.
+            # Even when ST was already fixed to continuous mode (generate_on_trend_change=False)
+            # in a prior iteration, RSI must still stay as the discrete trigger —
+            # NOT switch to range mode. Using only "change mode=True" caused iteration 2
+            # to flood entries: ST already fixed → _has_st_change_mode=False → RSI flipped
+            # to range mode → both filters nearly always True → 200+ noisy entries.
+            _has_supertrend_block = any(
+                (_b.get("type") or "").lower() == "supertrend"
+                for _b in blocks_added
+            )
+            for _b in blocks_added:
+                _btype = (_b.get("type") or "").lower()
+                _bparams = _b.get("params") or {}
+                _bid = _b.get("id", "")
+                # SuperTrend: disable "on-change-only" → continuous trend filter.
+                if _btype == "supertrend" and _bparams.get("generate_on_trend_change", False):
+                    auto_fixes.append({"block_id": _bid, "params": {"generate_on_trend_change": False}})
+                    logger.info(
+                        f"[BuilderWorkflow] Auto-fix: block {_bid} (supertrend) "
+                        "generate_on_trend_change → False (sparse signals)"
+                    )
+                # RSI cross-level handling depends on whether a SuperTrend filter exists:
+                if _btype == "rsi" and _bparams.get("use_cross_level", False):
+                    if _has_supertrend_block:
+                        # SuperTrend is being fixed to continuous mode → RSI stays as
+                        # the discrete trigger (use_cross_level=True).
+                        # Just widen extreme cross levels so crossings happen 15–30× per period.
+                        rsi_level_fix: dict[str, Any] = {}
+                        _cross_l = float(_bparams.get("cross_long_level", 29))
+                        _cross_s = float(_bparams.get("cross_short_level", 55))
+                        if _cross_l < 35:
+                            rsi_level_fix["cross_long_level"] = 40.0
+                            # Config Conflict guard: cross_long_level must be >= long_rsi_more.
+                            # If long_rsi_more > new cross_long_level, RSI engine detects
+                            # conflict and switches to "cross-into-range" mode → very sparse
+                            # signals (cross through 42 from below is rare).
+                            _long_more = float(_bparams.get("long_rsi_more", 30))
+                            if _long_more > 40.0:
+                                rsi_level_fix["long_rsi_more"] = 35.0
+                                logger.info(
+                                    f"[BuilderWorkflow] Auto-fix: block {_bid} (rsi) "
+                                    f"long_rsi_more → 35 (was {_long_more}, would conflict with cross_long_level=40)"
+                                )
+                        if _cross_s > 65:
+                            rsi_level_fix["cross_short_level"] = 60.0
+                            # Symmetric guard for short side
+                            _short_less = float(_bparams.get("short_rsi_less", 70))
+                            if _short_less < 60.0:
+                                rsi_level_fix["short_rsi_less"] = 65.0
+                                logger.info(
+                                    f"[BuilderWorkflow] Auto-fix: block {_bid} (rsi) "
+                                    f"short_rsi_less → 65 (was {_short_less}, would conflict with cross_short_level=60)"
+                                )
+                        if rsi_level_fix:
+                            auto_fixes.append({"block_id": _bid, "params": rsi_level_fix})
+                            logger.info(
+                                f"[BuilderWorkflow] Auto-fix: block {_bid} (rsi) "
+                                f"widened cross levels → {rsi_level_fix} "
+                                "(SuperTrend present → RSI stays in cross-trigger mode)"
+                            )
+                    else:
+                        # No SuperTrend counterpart — switch RSI to range mode.
+                        auto_fixes.append({"block_id": _bid, "params": {"use_cross_level": False}})
+                        logger.info(
+                            f"[BuilderWorkflow] Auto-fix: block {_bid} (rsi) "
+                            "use_cross_level → False (no SuperTrend filter, switching to range mode)"
+                        )
+            if auto_fixes:
+                self._emit_agent_log(
+                    agent="system",
+                    role="optimizer",
+                    prompt="Sparse signal auto-fix",
+                    response=(
+                        f"🔧 Auto-fixed {len(auto_fixes)} sparse-signal boolean params "
+                        f"({_adj_trades} trades detected):\n"
+                        + "\n".join(
+                            f"  • {f['block_id']}: {f['params']}" for f in auto_fixes
+                        )
+                    ),
+                    title=f"🔧 Auto-fix: sparse signal params ({_adj_trades} trades)",
+                )
+                return auto_fixes
+        # =========================================================================
+
         # Include ALL blocks in the summary — never filter by params presence,
         # because logic gates / buy / sell blocks without params are still
         # important for the agent to understand the graph structure.
@@ -1841,8 +2335,53 @@ Recommended approach for positive profit (EMA + RSI combination):
         tunable_blocks = [b for b in blocks_summary if b.get("params")]
         tunable_json = json.dumps(tunable_blocks, indent=2)
 
-        prompt = f"""You are a quantitative strategy parameter optimizer.
+        # Build iteration history section for the prompt
+        _history_section = ""
+        if iterations_history:
+            _history_section = "\n══════════════════════════════════════════════════════════════\nITERATION HISTORY (avoid repeating failed configurations)\n══════════════════════════════════════════════════════════════\n"
+            for _rec in iterations_history:
+                _status = "✅ ACCEPTABLE" if _rec.get("acceptable") else "❌ not acceptable"
+                _history_section += (
+                    f"• Iter {_rec.get('iteration','?')}: "
+                    f"Sharpe={_rec.get('sharpe_ratio', 0):.3f}, "
+                    f"Trades={_rec.get('total_trades', 0)}, "
+                    f"WR={(_rec.get('win_rate', 0) * 100):.1f}%, "
+                    f"DD={abs(_rec.get('max_drawdown', 0)):.1f}%  {_status}\n"
+                )
 
+        # Build warnings section
+        _warnings_section = ""
+        if backtest_warnings:
+            _warnings_section = "\n══════════════════════════════════════════════════════════════\nBACKTEST WARNINGS (engine-detected issues — fix these!)\n══════════════════════════════════════════════════════════════\n"
+            for _w in backtest_warnings:
+                _warnings_section += f"⚠️  {_w}\n"
+            if any("DIRECTION_MISMATCH" in w for w in backtest_warnings):
+                _warnings_section += "→ DIRECTION_MISMATCH: strategy is configured for direction='both' but only one side has signals.\n   Check that entry_long AND entry_short connections both receive signals.\n"
+
+        # Build long/short breakdown
+        _long_trades = metrics.get("long_trades", metrics.get("total_trades", 0))
+        _short_trades = metrics.get("short_trades", 0)
+        _ls_section = ""
+        if _long_trades is not None or _short_trades is not None:
+            _ls_section = f"\n• Long Trades   : {_long_trades}  |  Short Trades: {_short_trades}"
+            if _short_trades == 0 and _long_trades > 0:
+                _ls_section += "  ← ⚠️ DIRECTION MISMATCH: zero short trades despite direction='both'. entry_short signals may be missing."
+
+        _delib_section = ""
+        if deliberation_plan:
+            _delib_section = (
+                f"\n══════════════════════════════════════════════════════════════\n"
+                f"PRE-RUN MULTI-AGENT CONSENSUS PLAN (agreed before iterations started)\n"
+                f"══════════════════════════════════════════════════════════════\n"
+                f"{deliberation_plan}\n"
+                f"→ Your parameter adjustments MUST be consistent with this plan.\n"
+                f"  If iterations have diverged from it, steer back toward it.\n"
+            )
+
+        prompt = f"""You are a quantitative strategy parameter optimizer and part of a MULTI-AGENT system.
+Other AI agents (DeepSeek, Qwen, Claude) are independently analyzing the same strategy.
+Your suggestions will be merged with theirs — propose well-reasoned, evidence-based changes.
+{_history_section}{_warnings_section}{_delib_section}
 ══════════════════════════════════════════════════════════════
 HOW THE VISUAL STRATEGY BUILDER WORKS
 ══════════════════════════════════════════════════════════════
@@ -1874,7 +2413,7 @@ LAST BACKTEST RESULTS (iteration {iteration})
 • Win Rate      : {win_rate:.1%}
 • Max Drawdown  : {abs(metrics.get("max_drawdown_pct", 0)):.1f}%
 • Net Profit    : {metrics.get("net_profit", 0):.2f} {"✅ profitable" if metrics.get("net_profit", 0) > 0 else "❌ LOSING MONEY — must fix"}
-• Total Trades  : {metrics.get("total_trades", 0)}{"  ← too many, reduce signal frequency" if metrics.get("total_trades", 0) > 300 else ""}
+• Total Trades  : {metrics.get("total_trades", 0)}{"  ← ⛔ CRITICAL: near-zero. Entry logic is broken — must widen conditions drastically" if metrics.get("total_trades", 0) < 5 else ("  ← ⚠️ TOO FEW: target ≥2/day. Loosen AND→OR, disable on-change-only signals, raise cross levels" if metrics.get("total_trades", 0) < 20 else ("  ← too many, reduce signal frequency" if metrics.get("total_trades", 0) > 300 else ""))}{_ls_section}
 
 ══════════════════════════════════════════════════════════════
 TUNABLE BLOCKS (only these have adjustable parameters)
@@ -1924,6 +2463,8 @@ Only include the specific parameters that should change."""
                 available_agents.append(AgentType.QWEN)
             if os.environ.get("PERPLEXITY_API_KEY"):
                 available_agents.append(AgentType.PERPLEXITY)
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                available_agents.append(AgentType.CLAUDE)
 
             if len(available_agents) >= 2:
                 logger.info(
@@ -2071,6 +2612,13 @@ Only include the specific parameters that should change."""
         iteration: int,
         metrics: dict[str, Any],
         connections: list[dict[str, Any]] | None = None,
+        backtest_warnings: list[str] | None = None,
+        iterations_history: list[dict[str, Any]] | None = None,
+        deliberation_plan: str | None = None,
+        previous_ranges: list[dict[str, Any]] | None = None,
+        previous_best_params: dict[str, Any] | None = None,
+        previous_opt_score: float | None = None,
+        current_score: float = 0.0,
     ) -> list[dict[str, Any]]:
         """Use agents to suggest parameter RANGES (min/max/step) for optimizer sweep.
 
@@ -2088,13 +2636,44 @@ Only include the specific parameters that should change."""
             connections=connections or self._result.connections_made or [],
         )
 
+        # Build set of connected block IDs — disconnected blocks don't affect backtest
+        _conns_for_filter = connections or self._result.connections_made or []
+        _connected_ids_for_ranges: set[str] = set()
+        for _c in _conns_for_filter:
+            _src = _c.get("source") or {}
+            _tgt = _c.get("target") or {}
+            _raw_sid = _src.get("blockId") if isinstance(_src, dict) else None
+            _raw_sid = _raw_sid or _c.get("source_block_id", "")
+            _raw_tid = _tgt.get("blockId") if isinstance(_tgt, dict) else None
+            _raw_tid = _raw_tid or _c.get("target_block_id", "")
+            # Guard: source_block_id may be a nested dict if frontend sends {blockId, portId}
+            _sid = _raw_sid.get("blockId", "") if isinstance(_raw_sid, dict) else (_raw_sid or "")
+            _tid = _raw_tid.get("blockId", "") if isinstance(_raw_tid, dict) else (_raw_tid or "")
+            if isinstance(_sid, str) and _sid:
+                _connected_ids_for_ranges.add(_sid)
+            if isinstance(_tid, str) and _tid:
+                _connected_ids_for_ranges.add(_tid)
+
         # Build per-block available-ranges hint for the prompt
+        # Only include CONNECTED blocks — disconnected blocks waste LLM tokens and
+        # Optuna trial budget on parameters that have zero effect on backtest results.
         available_ranges: dict[str, Any] = {}
         for block in blocks_added:
             bt = block.get("type", "").lower()
+            bid = block.get("id", bt)
+            if bt == "strategy":
+                continue  # strategy node has no optimizable params
+            # Skip disconnected blocks
+            if _connected_ids_for_ranges and bid not in _connected_ids_for_ranges:
+                logger.debug(
+                    f"[_suggest_param_ranges] Skipping disconnected block '{bid}' (type='{bt}') "
+                    "from available_ranges — not in any connection"
+                )
+                continue
             if bt in DEFAULT_PARAM_RANGES:
-                available_ranges[block.get("id", bt)] = {
+                available_ranges[bid] = {
                     "type": bt,
+                    "current_params": block.get("params", {}),
                     "optimizable": DEFAULT_PARAM_RANGES[bt],
                 }
 
@@ -2104,40 +2683,208 @@ Only include the specific parameters that should change."""
         sharpe = metrics.get("sharpe_ratio", 0)
         net_profit = metrics.get("net_profit", 0)
         max_dd = metrics.get("max_drawdown_pct", metrics.get("max_drawdown", 0))
+        total_trades = int(metrics.get("total_trades", 0))
 
-        prompt = f"""You are optimizing a trading strategy. Current backtest results:
+        # Build a clear trades warning — agents MUST know if signal frequency is broken
+        if total_trades < 5:
+            trades_note = (
+                f"{total_trades}  ⛔ CRITICAL: near-zero trades. "
+                "Parameter tuning CANNOT fix this. The entry signal conditions are completely broken. "
+                "Widen them drastically: remove AND gates, disable 'generate_on_trend_change', "
+                "use a simpler single-indicator entry."
+            )
+        elif total_trades < 20:
+            trades_note = (
+                f"{total_trades}  ⚠️ TOO FEW: target ≥ 2 trades/day for this timeframe. "
+                "Signal conditions are too restrictive — the priority is MORE trades, not better Sharpe. "
+                "Widen: raise RSI cross level, disable on-change-only SuperTrend, loosen AND to OR."
+            )
+        else:
+            trades_note = str(total_trades)
+
+        # Build iteration history so agents don't repeat what didn't work
+        _history_lines = ""
+        if self._result.iterations:
+            _history_lines = "\n## Previous iteration results (avoid repeating what failed)\n"
+            for _rec in self._result.iterations:
+                _status = "✅ acceptable" if _rec.get("acceptable") else "❌ not acceptable"
+                _history_lines += (
+                    f"- Iter {_rec['iteration']}: Sharpe={_rec.get('sharpe_ratio', 0):.3f}, "
+                    f"WR={_rec.get('win_rate', 0) * 100:.1f}%, "
+                    f"Trades={_rec.get('total_trades', 0)}, "
+                    f"DD={_rec.get('max_drawdown', 0):.1f}%, "
+                    f"Score={_rec.get('primary_score', 0):.3f} {_status}\n"
+                )
+            _history_lines += (
+                "Use this history to guide your range proposals: if a previous iteration "
+                "already explored a region with poor results, shift the ranges to unexplored territory.\n"
+            )
+
+        # Memory recall from previous successful runs (cross-session learning)
+        _memory_context_ranges = ""
+        try:
+            _mem = _get_workflow_memory()
+            _past = await _mem.recall(
+                query=f"{self._config_symbol if hasattr(self, '_config_symbol') else ''} "
+                      f"optimizer best params {total_trades} trades",
+                top_k=2,
+                min_importance=0.55,
+            )
+            if _past:
+                _memory_context_ranges = "\n## Past successful configurations (from memory)\n"
+                for _p in _past:
+                    _memory_context_ranges += f"- {_p.content}\n"
+        except Exception:
+            pass  # memory unavailable — continue without
+
+        # Long/short breakdown for direction mismatch awareness
+        _long_tr = metrics.get("long_trades", total_trades)
+        _short_tr = metrics.get("short_trades", 0)
+        _ls_note = f"\n- Long Trades: {_long_tr}  |  Short Trades: {_short_tr}"
+        if _short_tr == 0 and _long_tr > 0:
+            _ls_note += "  ← DIRECTION MISMATCH: zero short trades. entry_short port receives no signal."
+
+        # Deliberation plan section
+        _delib_ranges = ""
+        if deliberation_plan:
+            _delib_ranges = (
+                f"\n## Pre-run multi-agent consensus plan (follow this when proposing ranges)\n"
+                f"{deliberation_plan}\n"
+                f"→ Align your range proposals with the above plan. "
+                f"The plan was agreed before any iterations ran — steer toward it.\n"
+            )
+
+        # Backtest warnings section
+        _warn_ranges = ""
+        if backtest_warnings:
+            _warn_ranges = "\n## Backtest warnings\n"
+            for _w in backtest_warnings:
+                _warn_ranges += f"- {_w}\n"
+
+        # External iteration history override (if caller passes it)
+        if iterations_history:
+            _history_lines = "\n## Previous iteration results (avoid repeating what failed)\n"
+            for _rec in iterations_history:
+                _status = "✅ acceptable" if _rec.get("acceptable") else "❌ not acceptable"
+                _history_lines += (
+                    f"- Iter {_rec['iteration']}: Sharpe={_rec.get('sharpe_ratio', 0):.3f}, "
+                    f"WR={_rec.get('win_rate', 0) * 100:.1f}%, "
+                    f"Trades={_rec.get('total_trades', 0)}, "
+                    f"DD={_rec.get('max_drawdown', 0):.1f}%, "
+                    f"Score={_rec.get('primary_score', 0):.3f} {_status}\n"
+                )
+            _history_lines += (
+                "Use this history to guide your range proposals: if a previous iteration "
+                "already explored a region with poor results, shift the ranges to unexplored territory.\n"
+            )
+
+        # ── Hypothesis refinement context from previous iteration ────────────
+        # Agents receive: what ranges were swept last time, what params the
+        # optimizer found, and what score resulted.  They should use this to
+        # NARROW ranges around confirmed-good regions, SHIFT away from
+        # confirmed-bad regions, or WIDEN if the optimizer got stuck.
+        _hypothesis_section = ""
+        if previous_ranges is not None:
+            _prev_ranges_summary = json.dumps(
+                {item["block_id"]: item.get("ranges", {}) for item in (previous_ranges or [])},
+                indent=2,
+            )
+            _hypothesis_section = "\n## HYPOTHESIS REFINEMENT (previous iteration findings)\n"
+            _hypothesis_section += (
+                "The previous iteration ran an optimizer sweep over these ranges:\n"
+                f"```json\n{_prev_ranges_summary}\n```\n"
+            )
+            if previous_best_params:
+                _best_str = json.dumps(previous_best_params, indent=2)
+                _score_str = f"{previous_opt_score:.4f}" if previous_opt_score is not None else "N/A"
+                _hypothesis_section += (
+                    f"Optimizer found best params (score={_score_str}):\n"
+                    f"```json\n{_best_str}\n```\n"
+                )
+                if previous_opt_score is not None and previous_opt_score > current_score:
+                    _hypothesis_section += (
+                        "→ The optimizer IMPROVED the score. NARROW your ranges around the best params above "
+                        "(±20-30% of each value) to drill deeper into this region with finer steps.\n"
+                    )
+                else:
+                    _hypothesis_section += (
+                        "→ The optimizer did NOT improve vs baseline. SHIFT your ranges: "
+                        "try a DIFFERENT region (e.g. slower/faster indicator period, higher/lower threshold). "
+                        "Do NOT repeat the same ranges — they were already explored.\n"
+                    )
+            else:
+                _hypothesis_section += (
+                    "→ Optimizer found NO valid params in those ranges (all trials pruned/NaN). "
+                    "The proposed ranges are likely producing zero trades or invalid combinations. "
+                    "Propose COMPLETELY DIFFERENT ranges — especially widen signal thresholds "
+                    "(e.g. lower RSI cross_short_level, raise cross_long_level, disable AND gates).\n"
+                )
+            _hypothesis_section += "\n"
+
+        prompt = f"""You are part of a MULTI-AGENT system optimizing a visual block-based trading strategy.
+Other AI agents (DeepSeek, Qwen, Claude) propose ranges independently — yours will be MERGED with theirs.
+Propose WIDE, well-reasoned ranges focused on fixing the biggest problem first.
+The Bayesian optimizer (Optuna TPE) handles LARGE parameter spaces efficiently — use WIDE ranges and FINE steps.
+{_hypothesis_section}{_history_lines}{_memory_context_ranges}{_delib_ranges}{_warn_ranges}
+## Current backtest results
 - Sharpe Ratio: {sharpe:.3f}
 - Win Rate: {win_rate * 100:.1f}%
 - Net Profit: ${net_profit:.2f}
 - Max Drawdown: {max_dd:.2f}%
+- Total Trades: {trades_note}{_ls_note}
 - Iteration: {iteration}
 
-Strategy graph:
+## Strategy block graph (full topology)
 {graph_description}
 
-Available optimizable parameters per block:
+## Blocks currently in THIS strategy (optimizable, connected)
 {json.dumps(available_ranges, indent=2)}
 
-Analyze the current performance and suggest PARAMETER RANGES to sweep for optimization.
-Focus on 2-4 parameters that are most likely to improve Sharpe Ratio and Net Profit.
-Keep ranges narrow (max 15 values per param) to avoid combinatorial explosion.
+{self._build_block_catalog()}
+## Your task
+Return PARAMETER RANGES for the Bayesian optimizer to sweep.
+Focus on blocks already in the strategy above. If a block type above has no entry in the strategy yet,
+you may propose adding it via topology changes in a separate step — not here.
 
-IMPORTANT: Respond with ONLY a JSON array. No markdown, no explanation:
+**CRITICAL RULES:**
+1. **Include EVERY CONNECTED indicator and exit block** shown in the list above — do NOT skip them.
+   Each connected block must appear as a separate entry in the output JSON array.
+   Disconnected blocks are NOT shown above — do not invent block IDs not in the list.
+2. **Range width:** If HYPOTHESIS REFINEMENT section above is present, follow its instructions
+   (narrow/shift/widen) — they take priority. Otherwise use the FULL allowed range for first
+   iteration so the optimizer can discover the best region.
+3. **Use fine steps** (step=1 for integers, step=0.1–0.5 for floats) for high precision.
+4. **RSI period range: 7 to 100.** Slow RSI (period 50-100) often outperforms on 30m+ TFs.
+   The Bayesian optimizer explores efficiently — suggest the FULL range 7-100.
+5. **RSI cross_long_level: explore full range 15-85 (step=1).**
+   IMPORTANT: cross_long_level < long_rsi_more is VALID — the engine uses a conflict-resolution
+   path that fires an extended-cross signal when RSI enters the range from below. Do NOT avoid
+   this region — it is where many best configs live.
+6. **static_sltp block is the most powerful lever.** ALWAYS include it with wide ranges:
+   stop_loss_percent min=0.5 max=20.0 step=0.25, take_profit_percent min=0.5 max=20.0 step=0.25.
+   breakeven_activation_percent min=0.1 max=5.0 step=0.1.
+   Include both tight (1-2%) and wide (5-15%) SL/TP values to explore all risk/reward profiles.
+7. **close_by_time interaction (CRITICAL if close_by_time block is present):**
+   min_profit_percent MUST be >= take_profit_percent + 2.0. This ensures TP fires FIRST.
+   Use min_profit range: [TP_min + 2.0, 25.0] step=0.5 — do NOT start from 0.
+8. If strategy already meets targets (Sharpe >= 1.5, Net Profit > 0, Trades >= 30), return [].
+
+## Output format (JSON array only, no markdown, no explanation)
 [
   {{
-    "block_id": "the_block_id",
+    "block_id": "exact_block_id_from_list_above",
     "ranges": {{
-      "param_name": {{"min": 10, "max": 25, "step": 1, "type": "int"}},
-      "param_name2": {{"min": 0.5, "max": 3.0, "step": 0.5, "type": "float"}}
+      "param_name": {{"min": 10, "max": 50, "step": 1, "type": "int"}},
+      "param_name2": {{"min": 0.5, "max": 15.0, "step": 0.25, "type": "float"}}
+    }}
+  }},
+  {{
+    "block_id": "another_block_id",
+    "ranges": {{
+      "another_param": {{"min": 30, "max": 75, "step": 1, "type": "float"}}
     }}
   }}
 ]
-
-Rules:
-- Only suggest params that exist in the "Available optimizable parameters" list.
-- Keep (max - min) / step <= 15 values per param.
-- Do NOT suggest structural changes — ranges only.
-- If strategy is already good (Sharpe >= 1.5 and Net Profit > 0), return [].
 """
 
         # ── Try multi-agent consensus (A2A) ──────────────────────────────────
@@ -2154,6 +2901,8 @@ Rules:
                 available_agents.append(AgentType.QWEN)
             if os.environ.get("PERPLEXITY_API_KEY"):
                 available_agents.append(AgentType.PERPLEXITY)
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                available_agents.append(AgentType.CLAUDE)
 
             if len(available_agents) >= 2:
                 logger.info(
@@ -2265,7 +3014,9 @@ Rules:
                     if isinstance(rng, dict):
                         index[bid].setdefault(param, []).append(rng)
 
-        # Merge: tightest window per param
+        # Merge: WIDEST window per param (union, not intersection).
+        # Previous behavior (intersection) narrowed ranges when agents disagreed,
+        # defeating the purpose of wide-range Bayesian optimization.
         merged: list[dict[str, Any]] = []
         for bid, params in index.items():
             block_ranges: dict[str, Any] = {}
@@ -2273,22 +3024,537 @@ Rules:
                 if len(agent_ranges) == 1:
                     block_ranges[param] = agent_ranges[0]
                     continue
-                lo = max(r.get("min", 1) for r in agent_ranges)
-                hi = min(r.get("max", 100) for r in agent_ranges)
+                # Take the widest window across all agents + finest step
+                lo = min(r.get("min", 1) for r in agent_ranges)
+                hi = max(r.get("max", 100) for r in agent_ranges)
                 st = min(r.get("step", 1) for r in agent_ranges)
-                if lo >= hi:
-                    # Agents disagreed strongly — use widest window from first agent
-                    block_ranges[param] = agent_ranges[0]
-                else:
-                    block_ranges[param] = {
-                        "min": lo,
-                        "max": hi,
-                        "step": st,
-                        "type": agent_ranges[0].get("type", "int"),
-                    }
+                block_ranges[param] = {
+                    "min": lo,
+                    "max": hi,
+                    "step": st,
+                    "type": agent_ranges[0].get("type", "int"),
+                }
             if block_ranges:
                 merged.append({"block_id": bid, "ranges": block_ranges})
         return merged
+
+    # =========================================================================
+    # TOPOLOGY INTELLIGENCE — agents can restructure the graph, not just tune
+    # =========================================================================
+
+    async def _suggest_topology_changes(
+        self,
+        blocks: list[dict[str, Any]],
+        connections: list[dict[str, Any]],
+        metrics: dict[str, Any],
+        iteration: int,
+        iterations_history: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Ask agents to propose STRUCTURAL changes to the strategy graph.
+
+        Unlike ``_suggest_param_ranges`` which only tunes parameter values,
+        this method lets agents restructure the graph:
+
+        * **disconnect** — remove a wire (e.g. remove OR-gate noise source)
+        * **reconnect** — change a port (entry_long → filter_long)
+        * **add_block** — add a new indicator/filter block with connections
+        * **remove_block** — delete a block that is hurting performance
+
+        Returns:
+            List of topology change dicts, each with ``"action"`` key.
+            Empty list = no structural changes proposed.
+
+        Supported actions::
+
+            {"action": "disconnect",
+             "connection_id": "conn_abc123",
+             "reason": "Supertrend OR-gate fires every bar → 200+ trades"}
+
+            {"action": "reconnect",
+             "connection_id": "conn_abc123",
+             "new_target_port": "filter_long",
+             "reason": "Use Supertrend as AND-filter, not entry signal"}
+
+            {"action": "remove_block",
+             "block_id": "supertrend_1",
+             "reason": "Block is not connected — dead weight"}
+
+            {"action": "add_block",
+             "block_type": "adx",
+             "params": {"period": 14, "threshold": 25},
+             "connect_from_port": "long",
+             "connect_to_block_id": "strategy_node",
+             "connect_to_port": "filter_long",
+             "reason": "ADX filter reduces false entries in ranging market"}
+        """
+        # Build a human-readable graph description with connection IDs
+        graph_lines = ["## Current strategy graph (blocks + wires)\n"]
+        block_by_id: dict[str, dict[str, Any]] = {b.get("id", ""): b for b in blocks}
+        for b in blocks:
+            bt = b.get("type", "?")
+            bid = b.get("id", "?")
+            params = b.get("params", {})
+            graph_lines.append(f"  Block [{bid}] type={bt} params={json.dumps(params)}")
+
+        graph_lines.append("\n  Connections (connection_id → source_block:port → target_block:port):")
+        for c in connections:
+            cid = c.get("id", "?")
+            src = c.get("source", {})
+            tgt = c.get("target", {})
+            src_bid = src.get("blockId", c.get("source_block_id", "?"))
+            src_port = src.get("portId", c.get("source_port", "?"))
+            tgt_bid = tgt.get("blockId", c.get("target_block_id", "?"))
+            tgt_port = tgt.get("portId", c.get("target_port", "?"))
+            src_type = block_by_id.get(src_bid, {}).get("type", "?")
+            tgt_type = block_by_id.get(tgt_bid, {}).get("type", "?")
+            graph_lines.append(
+                f"    [{cid}] {src_type}({src_bid}):{src_port} → {tgt_type}({tgt_bid}):{tgt_port}"
+            )
+        graph_description = "\n".join(graph_lines)
+
+        win_rate = metrics.get("win_rate", 0)
+        if win_rate > 1:
+            win_rate /= 100.0
+        sharpe = metrics.get("sharpe_ratio", 0)
+        total_trades = int(metrics.get("total_trades", 0))
+        max_dd = metrics.get("max_drawdown_pct", metrics.get("max_drawdown", 0))
+        net_profit = metrics.get("net_profit", 0)
+
+        # Build iteration history
+        _hist = ""
+        if iterations_history:
+            _hist = "\n## Iteration history\n"
+            for rec in iterations_history:
+                _hist += (
+                    f"  Iter {rec['iteration']}: Sharpe={rec.get('sharpe_ratio',0):.3f}, "
+                    f"Trades={rec.get('total_trades',0)}, WR={rec.get('win_rate',0)*100:.1f}%, "
+                    f"DD={rec.get('max_drawdown',0):.1f}%\n"
+                )
+
+        # Detect known problematic patterns for the prompt
+        _diagnoses = []
+        if total_trades > 100 and win_rate < 0.40:
+            _diagnoses.append(
+                "⛔ OVER-TRADING: >100 trades with low WR. "
+                "Likely cause: an indicator in OR-gate fires EVERY BAR (e.g. Supertrend with "
+                "generate_on_trend_change=False connected to entry_long via OR). "
+                "Fix: disconnect that block from entry port OR reconnect it to filter_long port."
+            )
+        if 5 <= total_trades < 20:
+            _diagnoses.append(
+                "⛔ TOO FEW TRADES (5–19): Strategy is OVER-FILTERED — AND-gate blocks are "
+                "preventing entry signals. DO NOT add any more filter blocks. "
+                "Fix: disconnect one filter_long connection (move it to entry_long) or "
+                "remove a filter block entirely. Look for blocks connected to filter_long "
+                "and disconnect the most restrictive one."
+            )
+        if total_trades < 5:
+            _diagnoses.append(
+                "⛔ UNDER-TRADING: <5 trades. "
+                "Likely cause: AND-gate with conflicting conditions (e.g. RSI AND Supertrend never "
+                "fire simultaneously). Fix: disconnect one filter_long connection or remove a filter block."
+            )
+        if sharpe < -0.3 and total_trades > 50:
+            _diagnoses.append(
+                "⛔ NEGATIVE SHARPE with many trades. "
+                "Strategy is losing money consistently. "
+                "Consider: removing a noisy indicator, adding an ADX/trend filter, "
+                "or changing entry_long connections to filter_long."
+            )
+
+        # Detect declining-trades pattern across iterations (progressive over-filtering)
+        if iterations_history and len(iterations_history) >= 2:
+            prev_trades = iterations_history[-1].get("total_trades", 0)
+            prev2_trades = iterations_history[-2].get("total_trades", 0) if len(iterations_history) >= 2 else prev_trades
+            if total_trades < prev_trades < prev2_trades and total_trades < 30:
+                _diagnoses.append(
+                    "⛔ PROGRESSIVE OVER-FILTERING DETECTED: Trades are declining each iteration "
+                    f"({prev2_trades} → {prev_trades} → {total_trades}). "
+                    "Adding more filters is making the strategy worse! "
+                    "MANDATORY: return [] (no topology changes) — let the parameter optimizer work instead. "
+                    "Or remove/disconnect one existing filter_long block."
+                )
+
+        _diag_text = "\n".join(_diagnoses) if _diagnoses else "No obvious structural problems detected."
+
+        block_catalog = self._build_block_catalog()
+
+        prompt = f"""You are an expert trading strategy architect analyzing a visual block-based strategy graph.
+Your task: propose STRUCTURAL changes to fix fundamental problems that parameter tuning CANNOT solve.
+
+{block_catalog}
+{_hist}
+## Current backtest metrics (iteration {iteration})
+- Sharpe: {sharpe:.3f}
+- Win Rate: {win_rate*100:.1f}%
+- Total Trades: {total_trades}
+- Max Drawdown: {max_dd:.1f}%
+- Net Profit: ${net_profit:.2f}
+
+## Automated diagnosis
+{_diag_text}
+
+{graph_description}
+
+## Port semantics (CRITICAL — use exact port names)
+- entry_long / entry_short → fires a TRADE on this bar. OR-gate: ANY connected block fires → trade.
+- filter_long / filter_short → AND-gate: ALL connected filters must pass → trade.
+- sl_tp → stop-loss / take-profit exit block port.
+- Supertrend with generate_on_trend_change=False fires signal EVERY BAR while trend is active.
+  Connected to entry_long → creates hundreds of trades. Fix: reconnect to filter_long.
+
+## Available actions
+1. disconnect: remove a wire by connection_id
+2. reconnect: keep the wire but change its target port
+3. remove_block: delete a block (also removes its connections)
+4. add_block: add a new block with connections
+
+## Rules
+1. Only propose changes that fix the root cause shown in the diagnosis.
+2. If metrics are acceptable (Sharpe > 1.0, Trades ≥ 20, WR ≥ 40%), return [].
+3. Maximum 2 topology changes per iteration — don't restructure everything at once.
+4. Prefer reconnect over remove_block — keep blocks, just change how they wire.
+5. Never remove the strategy node or static_sltp exit block.
+6. Always provide a "reason" for each change — it will be logged.
+7. ⛔ CRITICAL: If Total Trades < 20, NEVER add filter blocks (add_block with connect_to_port="filter_long"). The strategy is already too restrictive. Adding more filters will kill remaining signals.
+8. ⛔ CRITICAL: If diagnosis says "PROGRESSIVE OVER-FILTERING", return [] immediately — no changes.
+
+## Output format (JSON array only, no markdown, no explanation)
+[
+  {{
+    "action": "disconnect",
+    "connection_id": "exact_conn_id_from_graph_above",
+    "reason": "one-line diagnosis"
+  }},
+  {{
+    "action": "reconnect",
+    "connection_id": "exact_conn_id_from_graph_above",
+    "new_source_block_id": "...",
+    "new_source_port": "...",
+    "new_target_block_id": "...",
+    "new_target_port": "filter_long",
+    "reason": "one-line diagnosis"
+  }},
+  {{
+    "action": "remove_block",
+    "block_id": "exact_block_id_from_graph_above",
+    "reason": "one-line diagnosis"
+  }},
+  {{
+    "action": "add_block",
+    "block_type": "adx",
+    "params": {{"period": 14, "threshold": 25}},
+    "connect_from_port": "long",
+    "connect_to_block_id": "strategy_node",
+    "connect_to_port": "filter_long",
+    "reason": "one-line diagnosis"
+  }}
+]
+"""
+        # Ask agents via parallel_consensus (same API as _suggest_param_ranges).
+        # DeepSeek + Qwen both see the full catalog and vote on topology changes.
+        # We pick the first non-empty JSON array from the individual responses.
+        try:
+            from backend.agents.agent_to_agent_communicator import AgentToAgentCommunicator
+            from backend.agents.models import AgentType
+
+            import os
+            a2a: AgentToAgentCommunicator = _get_a2a_communicator()
+            available_agents = []
+            if os.environ.get("DEEPSEEK_API_KEY"):
+                available_agents.append(AgentType.DEEPSEEK)
+            if os.environ.get("QWEN_API_KEY"):
+                available_agents.append(AgentType.QWEN)
+            if not available_agents:
+                logger.warning("[BuilderWorkflow] No API keys for topology agent — skipping")
+                return []
+
+            consensus = await asyncio.wait_for(
+                a2a.parallel_consensus(
+                    question=prompt,
+                    agents=available_agents,
+                    context={"task": "topology_analysis", "json_mode": True},
+                ),
+                timeout=90.0,
+            )
+            # Pick first individual response that contains a valid JSON array
+            raw_text = ""
+            for resp in consensus.get("individual_responses", []):
+                candidate = resp.get("content", "").strip()
+                if "[" in candidate and "]" in candidate:
+                    raw_text = candidate
+                    break
+            if not raw_text:
+                raw_text = consensus.get("consensus", "")
+        except asyncio.TimeoutError:
+            logger.warning("[BuilderWorkflow] Topology agent timed out (90s) — skipping")
+            return []
+        except Exception as e:
+            logger.warning(f"[BuilderWorkflow] Topology agent error: {e} — skipping")
+            return []
+
+        # Parse JSON array from response
+        try:
+            # Strip markdown fences if present
+            raw_text = re.sub(r"```(?:json)?\s*", "", raw_text).strip().strip("```").strip()
+            # Extract first JSON array
+            m = re.search(r"\[.*\]", raw_text, re.DOTALL)
+            if not m:
+                return []
+            changes: list[dict[str, Any]] = json.loads(m.group(0))
+            if not isinstance(changes, list):
+                return []
+            # Validate each change has action key
+            valid = [c for c in changes if isinstance(c, dict) and "action" in c]
+            logger.info(
+                f"[BuilderWorkflow] 🏗️ Topology agent proposed {len(valid)} change(s): "
+                f"{[c['action'] for c in valid]}"
+            )
+            return valid
+        except Exception as e:
+            logger.warning(f"[BuilderWorkflow] Could not parse topology response: {e}")
+            return []
+
+    async def _apply_topology_changes(
+        self,
+        strategy_id: str,
+        changes: list[dict[str, Any]],
+        current_connections: list[dict[str, Any]],
+        current_metrics: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Apply topology changes proposed by ``_suggest_topology_changes``.
+
+        Returns list of successfully applied changes (failed ones are skipped
+        with a warning — we never abort the whole iteration for a topology error).
+        """
+        applied: list[dict[str, Any]] = []
+
+        _ENTRY_PORTS = {"entry_long", "entry_short"}
+        # Guard: prevent adding filter blocks when strategy already has too few trades
+        _current_trades = int((current_metrics or {}).get("total_trades", 999))
+
+        def _sim_has_entry(conns: list[dict], remove_id: str | None = None, add_port: str | None = None) -> bool:
+            """Simulate whether connections still have ≥1 entry_long/short after a change."""
+            remaining = [
+                c for c in conns
+                if c.get("id") != remove_id
+            ]
+            if add_port and add_port in _ENTRY_PORTS:
+                return True  # adding a new entry connection — safe
+            for c in remaining:
+                tgt = c.get("target", {}) or {}
+                port = tgt.get("portId") or c.get("target_port", "")
+                if port in _ENTRY_PORTS:
+                    return True
+            return False
+
+        for change in changes:
+            action = change.get("action", "")
+            reason = change.get("reason", "")
+
+            try:
+                if action == "disconnect":
+                    conn_id = change.get("connection_id", "")
+                    if not conn_id:
+                        logger.warning("[BuilderWorkflow] disconnect: missing connection_id")
+                        continue
+                    # Safety: refuse if this would leave no entry_long/short connections
+                    if not _sim_has_entry(current_connections, remove_id=conn_id):
+                        logger.warning(
+                            f"[BuilderWorkflow] disconnect [{conn_id}] BLOCKED — would leave "
+                            f"strategy with no entry_long/entry_short connections"
+                        )
+                        continue
+                    result = await builder_disconnect_blocks(
+                        strategy_id=strategy_id,
+                        connection_id=conn_id,
+                    )
+                    if "error" in result:
+                        logger.warning(f"[BuilderWorkflow] disconnect {conn_id}: {result['error']}")
+                        continue
+                    logger.info(f"[BuilderWorkflow] 🏗️ Disconnected [{conn_id}] — {reason}")
+                    applied.append(change)
+                    # Update local connections snapshot
+                    current_connections[:] = [
+                        c for c in current_connections if c.get("id") != conn_id
+                    ]
+
+                elif action == "reconnect":
+                    conn_id = change.get("connection_id", "")
+                    new_src_bid = change.get("new_source_block_id")
+                    new_src_port = change.get("new_source_port")
+                    new_tgt_bid = change.get("new_target_block_id")
+                    new_tgt_port = change.get("new_target_port")
+                    # Safety: refuse if removing this connection would leave no entry_long/short
+                    # (the reconnect will add a new connection to new_tgt_port, which may not be entry)
+                    if conn_id and (new_tgt_port not in _ENTRY_PORTS):
+                        if not _sim_has_entry(current_connections, remove_id=conn_id, add_port=new_tgt_port):
+                            logger.warning(
+                                f"[BuilderWorkflow] reconnect [{conn_id}] BLOCKED — moving last "
+                                f"entry signal from entry_long to '{new_tgt_port}' would leave "
+                                f"strategy with no entry conditions"
+                            )
+                            continue
+
+                    # Step 1: remove old connection
+                    if conn_id:
+                        result = await builder_disconnect_blocks(
+                            strategy_id=strategy_id,
+                            connection_id=conn_id,
+                        )
+                        if "error" in result:
+                            logger.warning(f"[BuilderWorkflow] reconnect: disconnect {conn_id}: {result['error']}")
+                            continue
+                        current_connections[:] = [
+                            c for c in current_connections if c.get("id") != conn_id
+                        ]
+
+                    # Step 2: find source/target from the original connection if not overridden
+                    orig = next((c for c in self._result.connections_made or [] if c.get("id") == conn_id), {})
+                    src_bid = new_src_bid or orig.get("source", {}).get("blockId", orig.get("source_block_id", ""))
+                    src_port = new_src_port or orig.get("source", {}).get("portId", orig.get("source_port", "out"))
+                    tgt_bid = new_tgt_bid or orig.get("target", {}).get("blockId", orig.get("target_block_id", ""))
+                    tgt_port = new_tgt_port or orig.get("target", {}).get("portId", orig.get("target_port", "in"))
+
+                    if not (src_bid and tgt_bid):
+                        logger.warning(f"[BuilderWorkflow] reconnect: cannot resolve src/tgt blocks for {conn_id}")
+                        continue
+
+                    result = await builder_connect_blocks(
+                        strategy_id=strategy_id,
+                        source_block_id=src_bid,
+                        source_port=src_port,
+                        target_block_id=tgt_bid,
+                        target_port=tgt_port,
+                    )
+                    if "error" in result:
+                        logger.warning(f"[BuilderWorkflow] reconnect: connect error: {result['error']}")
+                        continue
+                    new_conn = result.get("connection", {})
+                    current_connections.append(new_conn)
+                    logger.info(
+                        f"[BuilderWorkflow] 🏗️ Reconnected [{conn_id}] "
+                        f"→ {src_bid}:{src_port} → {tgt_bid}:{tgt_port} — {reason}"
+                    )
+                    applied.append(change)
+
+                elif action == "remove_block":
+                    block_id = change.get("block_id", "")
+                    if not block_id:
+                        logger.warning("[BuilderWorkflow] remove_block: missing block_id")
+                        continue
+                    # Safety: never remove strategy node
+                    target_block = next(
+                        (b for b in self._result.blocks_added if b.get("id") == block_id), {}
+                    )
+                    if target_block.get("type") in ("strategy", "static_sltp"):
+                        logger.warning(
+                            f"[BuilderWorkflow] remove_block: refusing to remove protected block "
+                            f"'{block_id}' (type={target_block.get('type')})"
+                        )
+                        continue
+                    result = await builder_remove_block(
+                        strategy_id=strategy_id,
+                        block_id=block_id,
+                    )
+                    if "error" in result:
+                        logger.warning(f"[BuilderWorkflow] remove_block {block_id}: {result['error']}")
+                        continue
+                    # Update local state
+                    self._result.blocks_added = [
+                        b for b in self._result.blocks_added if b.get("id") != block_id
+                    ]
+                    current_connections[:] = [
+                        c for c in current_connections
+                        if c.get("source", {}).get("blockId") != block_id
+                        and c.get("target", {}).get("blockId") != block_id
+                    ]
+                    logger.info(f"[BuilderWorkflow] 🏗️ Removed block [{block_id}] — {reason}")
+                    applied.append(change)
+
+                elif action == "add_block":
+                    block_type = change.get("block_type", "")
+                    params = change.get("params", {})
+                    connect_from_port = change.get("connect_from_port", "long")
+                    connect_to_block_id = change.get("connect_to_block_id", "")
+                    connect_to_port = change.get("connect_to_port", "filter_long")
+
+                    if not block_type:
+                        logger.warning("[BuilderWorkflow] add_block: missing block_type")
+                        continue
+
+                    # Hard guard: never add filter blocks when trades are already low.
+                    # Topology agent may still suggest this despite the prompt rules.
+                    if connect_to_port in ("filter_long", "filter_short") and _current_trades < 20:
+                        logger.warning(
+                            f"[BuilderWorkflow] add_block BLOCKED: would add filter '{block_type}' "
+                            f"to '{connect_to_port}' but current trades={_current_trades} < 20. "
+                            f"Adding more filters will eliminate all trades. Skipping."
+                        )
+                        continue
+
+                    # Validate block_type against BLOCK_REGISTRY to prevent hallucinated types
+                    # (e.g. "supertrend_filter") from being added — unknown blocks produce no
+                    # signals and silently break the entire optimizer run.
+                    try:
+                        from backend.backtesting.indicators import BLOCK_REGISTRY as _BREG
+                        _SPECIAL_TYPES = {"strategy", "condition", "filter", "exit",
+                                          "static_sltp", "close_by_time", "tp_percent",
+                                          "sl_percent", "atr_exit", "close_channel",
+                                          "close_rsi", "channel", "price_action",
+                                          "divergence", "momentum", "pivot_points",
+                                          "highest_lowest_bar", "two_mas"}
+                        if block_type not in _BREG and block_type not in _SPECIAL_TYPES:
+                            logger.warning(
+                                f"[BuilderWorkflow] add_block BLOCKED: '{block_type}' not in "
+                                f"BLOCK_REGISTRY — topology agent hallucinated unknown type. "
+                                f"Skipping to prevent silent signal loss."
+                            )
+                            continue
+                    except Exception:
+                        pass  # If registry import fails, proceed and let the API handle it
+
+                    result = await builder_add_block(
+                        strategy_id=strategy_id,
+                        block_type=block_type,
+                        params=params,
+                    )
+                    if "error" in result:
+                        logger.warning(f"[BuilderWorkflow] add_block {block_type}: {result['error']}")
+                        continue
+
+                    new_block = result.get("block", {})
+                    new_block_id = new_block.get("id", "")
+                    if not new_block_id:
+                        logger.warning("[BuilderWorkflow] add_block: no block id in response")
+                        continue
+
+                    # Wire new block into the graph
+                    if connect_to_block_id:
+                        conn_result = await builder_connect_blocks(
+                            strategy_id=strategy_id,
+                            source_block_id=new_block_id,
+                            source_port=connect_from_port,
+                            target_block_id=connect_to_block_id,
+                            target_port=connect_to_port,
+                        )
+                        if "error" not in conn_result:
+                            current_connections.append(conn_result.get("connection", {}))
+
+                    self._result.blocks_added.append(new_block)
+                    logger.info(
+                        f"[BuilderWorkflow] 🏗️ Added block [{new_block_id}] type={block_type} "
+                        f"→ {connect_to_block_id}:{connect_to_port} — {reason}"
+                    )
+                    applied.append(change)
+
+                else:
+                    logger.warning(f"[BuilderWorkflow] Unknown topology action: {action!r}")
+
+            except Exception as e:
+                logger.error(f"[BuilderWorkflow] _apply_topology_changes [{action}] error: {e}")
+
+        return applied
 
     async def _run_optimizer_for_ranges(
         self,
@@ -2315,14 +3581,27 @@ Rules:
         from backend.backtesting.service import BacktestService
         from backend.optimization.builder_optimizer import (
             _merge_ranges,
+            clone_graph_with_params,
             extract_optimizable_params,
             generate_builder_param_combinations,
+            run_builder_backtest,
             run_builder_grid_search,
             run_builder_optuna_search,
         )
 
         # ── Convert agent ranges → custom_ranges format ──────────────────────
         # custom_ranges format: [{param_path, low, high, step, type, enabled}]
+        from backend.optimization.builder_optimizer import DEFAULT_PARAM_RANGES
+
+        # Pre-build block_id → block_type map (needed for constraint enforcement and
+        # DEFAULT_PARAM_RANGES expansion). Populated from loaded strategy blocks.
+        _block_type_map: dict[str, str] = {}
+        for _blk in (self._result.blocks_added or []):
+            _bid = _blk.get("id", _blk.get("block_id", ""))
+            _bt = _blk.get("type", "").lower()
+            if _bid:
+                _block_type_map[_bid] = _bt
+
         custom_ranges: list[dict[str, Any]] = []
         for item in agent_ranges:
             block_id = item.get("block_id", "")
@@ -2331,6 +3610,30 @@ Rules:
                 hi = rng.get("max", 100)
                 st = rng.get("step", 1)
                 ptype = rng.get("type", "int")
+                # ── Safety clamps to prevent degenerate RSI configs ───────────
+                # RSI period < 10 on 30m+ TF → 300+ daily crossings → commission bleed
+                if param == "period" and lo < 10:
+                    logger.warning(
+                        f"[BuilderWorkflow] Clamping {block_id}.period min {lo} → 10 (hard floor)"
+                    )
+                    lo = 10
+                # cross_long_level: allow values as low as 20.
+                # cross_long_level < long_rsi_more is VALID — oscillators.py conflict-resolution
+                # path fires an extended-cross signal at range entry (long_rsi_more). This region
+                # produces the current best config (cross=36, long_rsi_more=43 → 124 signals).
+                if param == "cross_long_level" and lo < 20:
+                    logger.warning(
+                        f"[BuilderWorkflow] Clamping {block_id}.cross_long_level min {lo} → 20"
+                    )
+                    lo = 20
+                # stop_loss_percent sanity floor: SL < 1% causes too many whipsaws on 30m.
+                # Note: now using FallbackV4 in optimizer so compounding parity gap is gone.
+                # Floor is just a sanity guard against extreme configs.
+                if param == "stop_loss_percent" and lo < 1.0:
+                    logger.warning(
+                        f"[BuilderWorkflow] Clamping {block_id}.stop_loss_percent min {lo} → 1.0"
+                    )
+                    lo = 1.0
                 if lo >= hi:
                     logger.debug(
                         f"[BuilderWorkflow] Skipping invalid range for {block_id}.{param}: min={lo} >= max={hi}"
@@ -2339,6 +3642,8 @@ Rules:
                 custom_ranges.append(
                     {
                         "param_path": f"{block_id}.{param}",
+                        "param_key": param,
+                        "block_type": _block_type_map.get(block_id, ""),
                         "low": lo,
                         "high": hi,
                         "step": st,
@@ -2347,20 +3652,56 @@ Rules:
                     }
                 )
 
+        # ── Expand narrow LLM ranges to at least DEFAULT_PARAM_RANGES width ──
+        # LLMs sometimes suggest narrow ranges (±20% around current value) even when
+        # instructed to use full range. This guard ensures the optimizer always has at
+        # least the default coverage for each parameter.
+        for _cr in custom_ranges:
+            _pp = _cr["param_path"]
+            _parts = _pp.split(".", 1)
+            if len(_parts) != 2:
+                continue
+            _bid, _pname = _parts
+            _btype = _block_type_map.get(_bid, "")
+            if not _btype or _btype not in DEFAULT_PARAM_RANGES:
+                continue
+            _def_range = DEFAULT_PARAM_RANGES[_btype].get(_pname)
+            if _def_range is None:
+                continue
+            _def_lo = _def_range.get("low", _cr["low"])
+            _def_hi = _def_range.get("high", _cr["high"])
+            # Only expand, never shrink — LLM might narrow for good reason (e.g. direction filter)
+            if _cr["low"] > _def_lo:
+                logger.info(
+                    f"[BuilderWorkflow] Expanding {_pp} low {_cr['low']} → {_def_lo} "
+                    f"(LLM narrowed below DEFAULT_PARAM_RANGES)"
+                )
+                _cr["low"] = _def_lo
+            if _cr["high"] < _def_hi:
+                logger.info(
+                    f"[BuilderWorkflow] Expanding {_pp} high {_cr['high']} → {_def_hi} "
+                    f"(LLM narrowed below DEFAULT_PARAM_RANGES)"
+                )
+                _cr["high"] = _def_hi
+
         if not custom_ranges:
             logger.warning("[BuilderWorkflow] No valid ranges from agents — skipping optimizer sweep")
             return None
 
-        # ── Fetch strategy graph from API ────────────────────────────────────
-        from backend.agents.mcp.tools.strategy_builder import builder_get_strategy
+        # ── Build strategy graph from in-memory state (no server required) ─────
+        # Prefer live in-memory blocks/connections over MCP fetch; fall back to
+        # API only when in-memory state is empty (should never happen in practice).
+        blocks = self._result.blocks_added or config.blocks or []
+        connections = self._result.connections_made or config.connections or []
+        if not blocks:
+            from backend.agents.mcp.tools.strategy_builder import builder_get_strategy
 
-        graph_resp = await builder_get_strategy(self._result.strategy_id)
-        if not graph_resp or "error" in graph_resp:
-            logger.warning(f"[BuilderWorkflow] Could not fetch strategy graph: {graph_resp}")
-            return None
-
-        blocks = graph_resp.get("blocks") or graph_resp.get("builder_blocks") or []
-        connections = graph_resp.get("connections") or graph_resp.get("builder_connections") or []
+            graph_resp = await builder_get_strategy(self._result.strategy_id)
+            if not graph_resp or "error" in graph_resp:
+                logger.warning(f"[BuilderWorkflow] Could not fetch strategy graph: {graph_resp}")
+                return None
+            blocks = graph_resp.get("blocks") or graph_resp.get("builder_blocks") or []
+            connections = graph_resp.get("connections") or graph_resp.get("builder_connections") or []
         strategy_graph: dict[str, Any] = {
             "name": config.name,
             "blocks": blocks,
@@ -2368,6 +3709,35 @@ Rules:
             "direction": config.direction,
             "interval": config.timeframe,
         }
+
+        # ── Filter custom_ranges to connected blocks only (belt-and-suspenders) ─
+        # _suggest_param_ranges already excludes disconnected blocks from the LLM prompt,
+        # but LLMs may still return block IDs not in the graph. Filter here to be safe.
+        _sweep_connected_ids: set[str] = set()
+        for _c in connections:
+            _src = _c.get("source") or {}
+            _tgt = _c.get("target") or {}
+            _raw_sid = _src.get("blockId") if isinstance(_src, dict) else None
+            _raw_sid = _raw_sid or _c.get("source_block_id", "")
+            _raw_tid = _tgt.get("blockId") if isinstance(_tgt, dict) else None
+            _raw_tid = _raw_tid or _c.get("target_block_id", "")
+            _sid = _raw_sid.get("blockId", "") if isinstance(_raw_sid, dict) else (_raw_sid or "")
+            _tid = _raw_tid.get("blockId", "") if isinstance(_raw_tid, dict) else (_raw_tid or "")
+            if isinstance(_sid, str) and _sid:
+                _sweep_connected_ids.add(_sid)
+            if isinstance(_tid, str) and _tid:
+                _sweep_connected_ids.add(_tid)
+        if _sweep_connected_ids:
+            _before = len(custom_ranges)
+            custom_ranges = [
+                cr for cr in custom_ranges
+                if cr["param_path"].split(".")[0] in _sweep_connected_ids
+            ]
+            _dropped = _before - len(custom_ranges)
+            if _dropped:
+                logger.info(
+                    f"[BuilderWorkflow] Filtered {_dropped} custom_range(s) for disconnected blocks"
+                )
 
         # ── Extract all optimizable params (needed by _merge_ranges) ─────────
         all_params = extract_optimizable_params(strategy_graph)
@@ -2407,15 +3777,25 @@ Rules:
             n = max(1, int((cr["high"] - cr["low"]) / cr["step"]) + 1)
             total_combos *= n
 
-        # ── Fetch OHLCV data ─────────────────────────────────────────────────
-        from datetime import datetime
+        # ── Fetch OHLCV data with warmup ────────────────────────────────────
+        # Load 45 extra days before start_date so Wilder RSI (and other EWM
+        # indicators) are fully converged before the optimization window starts.
+        # This matches the API router warmup window (45d × 48 bars/30m = 2160 bars)
+        # and eliminates the cold-start bias where optimizer signal counts differ
+        # from real backtest signal counts (observed: 107 cold vs 149 warm entries
+        # for period=40 on 30m BTCUSDT, causing optimizer Sharpe=0.792 → real=0.507).
+        from datetime import datetime, timedelta
+
+        _WARMUP_DAYS = 45
+        _opt_start = datetime.fromisoformat(config.start_date)
+        _warmup_start = _opt_start - timedelta(days=_WARMUP_DAYS)
 
         service = BacktestService()
         try:
             ohlcv = await service._fetch_historical_data(
                 symbol=config.symbol,
                 interval=config.timeframe,
-                start_date=datetime.fromisoformat(config.start_date),
+                start_date=_warmup_start,
                 end_date=datetime.fromisoformat(config.end_date),
                 market_type="linear",
             )
@@ -2427,6 +3807,19 @@ Rules:
             logger.warning("[BuilderWorkflow] No OHLCV data available — skipping optimizer sweep")
             return None
 
+        # Extract min_trades from Evaluation panel constraints (if set).
+        # This prevents the optimizer from selecting degenerate solutions
+        # with very few trades (which can have artificially high Sharpe).
+        _eval_constraints = config.evaluation_config.get("constraints") or []
+        _min_trades_constraint = max(
+            next(
+                (int(c.get("value", 0)) for c in _eval_constraints
+                 if c.get("metric") == "total_trades" and c.get("operator") in (">=", ">")),
+                0,
+            ),
+            15,  # floor: matches _MIN_TRADES_FOR_SWEEP; prevent degenerate 1-4 trade solutions
+        )
+
         config_params: dict[str, Any] = {
             "symbol": config.symbol,
             "interval": config.timeframe,
@@ -2436,23 +3829,31 @@ Rules:
             "direction": config.direction,
             "use_fixed_amount": False,
             "fixed_amount": 0.0,
-            "engine_type": "numba",
+            "engine_type": "numba",  # NumbaEngineV2 = 20-40x faster; top-5 re-verified by FallbackV4 below
             # Use primary_metric from Evaluation panel — single source of truth
             "optimize_metric": config.get_primary_metric(),
+            # Pass min_trades from evaluation panel so optimizer skips degenerate configs
+            "min_trades": _min_trades_constraint,
+            # Warmup cutoff: ohlcv includes _WARMUP_DAYS extra bars before start_date.
+            # run_builder_backtest will generate signals on the full warmup dataset
+            # (so RSI is converged), then slice to [warmup_cutoff:] before running
+            # the backtest engine — no trades in the warmup window.
+            "warmup_cutoff": config.start_date,
         }
 
         # ── Choose method based on realistic trial count ─────────────────────
         # Hard-cap trials to keep each sweep within a few minutes.
-        MAX_GRID_COMBOS = 200  # above this → Bayesian is more efficient
-        MAX_BAYESIAN_TRIALS = 50  # fast enough for mid-workflow use
-        MAX_SWEEP_SECONDS = 120  # 2-minute timeout per sweep
+        MAX_GRID_COMBOS = 200    # above this → Bayesian is more efficient
+        MAX_SWEEP_SECONDS = 300   # 5-minute budget per sweep (3 iters × 300s = 15 min total)
 
         if total_combos > MAX_GRID_COMBOS:
             method = "bayesian"
-            n_trials = MAX_BAYESIAN_TRIALS
+            # n_trials=None → Optuna runs until timeout, no artificial trial cap.
+            # Correct for spaces of 10^3–10^9+ combos: TPE samples intelligently.
+            n_trials = None
             logger.info(
-                f"[BuilderWorkflow] {total_combos} theoretical combos → "
-                f"Bayesian sweep (n_trials={n_trials}, timeout={MAX_SWEEP_SECONDS}s)"
+                f"[BuilderWorkflow] {total_combos:,} theoretical combos → "
+                f"Bayesian sweep (unlimited trials, timeout={MAX_SWEEP_SECONDS}s)"
             )
         else:
             method = "grid"
@@ -2462,7 +3863,7 @@ Rules:
         param_list_str = ", ".join(
             f"{cr['param_path']}: [{cr['low']}..{cr['high']} step {cr['step']}]" for cr in custom_ranges
         )
-        actual_label = f"{n_trials} trials" if method == "bayesian" else f"{total_combos} combos"
+        actual_label = f"∞ trials / {MAX_SWEEP_SECONDS}s budget" if method == "bayesian" else f"{total_combos} combos"
         self._emit_agent_log(
             agent="system",
             role="optimizer",
@@ -2506,12 +3907,96 @@ Rules:
 
             if result and result.get("best_params"):
                 best = result["best_params"]
+                _best_score = result.get("best_score", 0)
+                # If the optimizer fell back to unfiltered results (min_trades violated),
+                # reject the params — they're from degenerate low-trade solutions.
+                _top = (result.get("top_results") or [{}])[0]
+                if _top.get("_below_min_trades"):
+                    logger.warning(
+                        f"[BuilderWorkflow] Optimizer best params rejected — below min_trades "
+                        f"(required={_top.get('_min_trades_required', '?')}). "
+                        "Returning None so caller falls back to structural adjustments."
+                    )
+                    return None
+
+                # NOTE: cross_long_level < long_rsi_more is VALID (oscillators.py
+                # conflict-resolution path fires extended-cross at range boundary).
+                # The baseline strategy uses cross=36, long_rsi_more=43 → 124 signals.
+                # No clamping needed here.
+
+                # ── FallbackV4 cross-verification of top candidates ───────────────
+                # NumbaEngine uses equity-based compounding position sizing while
+                # FallbackV4 uses fixed sizing.  This parity gap can make NumbaEngine
+                # Sharpe misleading for certain SL/TP configurations.
+                # Solution: re-run the top-N candidates with FallbackV4 and pick the
+                # one with the best real-engine Sharpe.
+                _top_results = result.get("top_results", [])
+                if _top_results:
+                    _v4_config = {**config_params, "engine_type": "fallback"}
+                    _best_v4_score: float | None = None
+                    _best_v4_params: dict[str, Any] = best
+
+                    for _cand in _top_results[:5]:
+                        _cand_params = _cand.get("params", {})
+                        if not _cand_params:
+                            continue
+                        _cand_graph = clone_graph_with_params(strategy_graph, _cand_params)
+                        _v4_res = run_builder_backtest(_cand_graph, ohlcv, _v4_config)
+                        if _v4_res is None:
+                            continue
+                        _v4_score = float(_v4_res.get(optimize_metric, 0) or 0)
+                        logger.info(
+                            f"[BuilderWorkflow] FallbackV4 verify: "
+                            f"numba={_cand.get('score', 0):.3f} v4={_v4_score:.3f} "
+                            f"params={_cand_params}"
+                        )
+                        if _best_v4_score is None or _v4_score > _best_v4_score:
+                            _best_v4_score = _v4_score
+                            _best_v4_params = _cand_params
+
+                    if _best_v4_score is not None:
+                        logger.info(
+                            f"[BuilderWorkflow] ✅ FallbackV4 best: score={_best_v4_score:.3f} "
+                            f"(NumbaEngine best was {_best_score:.3f}) — using V4 result"
+                        )
+                        best = _best_v4_params
+                        _best_score = _best_v4_score
+
+                # ── Post-optimizer SL sanity floor ───────────────────────────────
+                # Enforce SL >= 1.0% — anything tighter is too noisy on 30m timeframe.
+                for _k in list(best.keys()):
+                    if _k.endswith(".stop_loss_percent"):
+                        _sl_val = float(best[_k])
+                        if _sl_val < 1.0:
+                            logger.warning(
+                                f"[BuilderWorkflow] Post-opt SL clamp: {_k} {_sl_val:.2f} → 1.0"
+                            )
+                            best[_k] = 1.0
+
+                # ── Post-optimizer close_by_time / TP cross-block constraint ─────
+                # When both static_sltp and close_by_time are present, ensure
+                # min_profit_percent >= take_profit_percent + 2.0 so TP fires first.
+                # If min_profit < TP, the time exit fires prematurely at the lower
+                # threshold, cutting off TP gains entirely.
+                _tp_key = next((k for k in best if k.endswith(".take_profit_percent")), None)
+                _mp_key = next((k for k in best if k.endswith(".min_profit_percent")), None)
+                if _tp_key and _mp_key:
+                    _tp_val = float(best[_tp_key])
+                    _mp_val = float(best[_mp_key])
+                    _mp_min = _tp_val + 2.0
+                    if _mp_val < _mp_min:
+                        logger.warning(
+                            f"[BuilderWorkflow] Cross-block constraint: {_mp_key} {_mp_val:.2f} "
+                            f"< take_profit({_tp_val:.2f}) + 2.0 → adjusted to {_mp_min:.2f}"
+                        )
+                        best[_mp_key] = _mp_min
+
                 logger.info(
-                    f"[BuilderWorkflow] ✅ Optimizer best: score={result.get('best_score', 0):.3f} params={best}"
+                    f"[BuilderWorkflow] ✅ Optimizer best: score={_best_score:.3f} params={best}"
                 )
                 return {
                     "best_params": best,
-                    "best_score": result.get("best_score", 0),
+                    "best_score": _best_score,
                     "best_metrics": result.get("best_metrics", {}),
                     "tested_combinations": result.get("tested_combinations", 0),
                 }
@@ -2673,7 +4158,7 @@ Rules:
             result = await deliberation.deliberate(
                 question=question,
                 agents=agents,
-                max_rounds=1,  # Single round to save costs
+                max_rounds=2,  # Round 1: initial opinions + cross-examine; Round 2: refined opinions (agents can change mind)
                 min_confidence=0.5,
             )
 

@@ -116,13 +116,13 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
 
 ## Input DataFrame Columns
 
-| Column    | Type     | Description   |
-| --------- | -------- | ------------- |
-| open      | float    | Open price    |
-| high      | float    | High price    |
-| low       | float    | Low price     |
-| close     | float    | Close price   |
-| volume    | float    | Volume        |
+| Column    | Type     | Description           |
+| --------- | -------- | --------------------- |
+| open      | float    | Open price            |
+| high      | float    | High price            |
+| low       | float    | Low price             |
+| close     | float    | Close price           |
+| volume    | float    | Volume                |
 | timestamp | datetime | Bar timestamp (index) |
 
 ## TradingView Parity (CRITICAL)

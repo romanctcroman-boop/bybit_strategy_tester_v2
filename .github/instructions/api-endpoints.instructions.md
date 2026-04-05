@@ -4,7 +4,6 @@ applyTo: "**/api/**/*.py"
 
 # FastAPI Endpoint Rules
 
-
 ## Router Structure
 
 ```python
@@ -27,39 +26,25 @@ router = APIRouter(
 ## Request/Response Models (Pydantic)
 
 ```python
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
 class BacktestRequest(BaseModel):
     """Request model for backtest endpoint"""
     symbol: str = Field(..., description="Trading pair (e.g., BTCUSDT)")
-    interval: str = Field(..., description="Timeframe (e.g., 15m, 1h)")
+    interval: str = Field(..., description="Timeframe (e.g., 15, 60, D)")
     start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
     initial_capital: float = Field(10000.0, ge=100, description="Starting capital")
     strategy_type: str = Field(..., description="Strategy to use")
     strategy_params: dict = Field(default_factory=dict)
 
-    @validator('symbol')
-    def validate_symbol(cls, v):
-        if not v.endswith('USDT'):
-            raise ValueError('Symbol must end with USDT')
-        return v.upper()
-
-    @validator('interval')
-    def validate_interval(cls, v):
-        # ✅ Correct: Bybit/internal format uses numeric strings, not '15m'
-        valid = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
-        if v not in valid:
-            raise ValueError(f'Invalid interval. Must be one of: {valid}')
-        return v
-
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "symbol": "BTCUSDT",
-                "interval": "15m",
+                "interval": "15",
                 "start_date": "2025-01-01",
                 "end_date": "2025-01-31",
                 "initial_capital": 10000,
@@ -67,6 +52,23 @@ class BacktestRequest(BaseModel):
                 "strategy_params": {"period": 14, "overbought": 70}
             }
         }
+    }
+
+    @field_validator('symbol')
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        if not v.endswith('USDT'):
+            raise ValueError('Symbol must end with USDT')
+        return v.upper()
+
+    @field_validator('interval')
+    @classmethod
+    def validate_interval(cls, v: str) -> str:
+        # ✅ Correct: Bybit/internal format uses numeric strings, not '15m'
+        valid = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
+        if v not in valid:
+            raise ValueError(f'Invalid interval. Must be one of: {valid}')
+        return v
 
 class BacktestResponse(BaseModel):
     """Response model for backtest endpoint"""

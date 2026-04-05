@@ -119,20 +119,22 @@ class TestRealLLMDeliberationInit:
 
     @patch("backend.agents.consensus.real_llm_deliberation._get_api_key")
     def test_init_all_three_clients(self, mock_key):
-        """All 3 clients initialized when keys present."""
+        """All 4 clients initialized when keys present (deepseek, qwen, perplexity, claude)."""
         mock_key.return_value = "test-key-xxx"
 
         with (
             patch("backend.agents.consensus.real_llm_deliberation.DeepSeekClient"),
             patch("backend.agents.consensus.real_llm_deliberation.QwenClient"),
             patch("backend.agents.consensus.real_llm_deliberation.PerplexityClient"),
+            patch("backend.agents.consensus.real_llm_deliberation.ClaudeClient"),
         ):
             delib = RealLLMDeliberation()
 
         assert "deepseek" in delib._clients
         assert "qwen" in delib._clients
         assert "perplexity" in delib._clients
-        assert len(delib._clients) == 3
+        assert "claude" in delib._clients
+        assert len(delib._clients) == 4
 
     @patch("backend.agents.consensus.real_llm_deliberation._get_api_key")
     def test_init_partial_clients(self, mock_key):

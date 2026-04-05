@@ -9,11 +9,20 @@ You are a **test-driven development specialist** for Bybit Strategy Tester v2.
 
 ```
 tests/
-├── ai_agents/          # AI agent behaviour tests (50+ divergence tests)
+├── conftest.py
 ├── backend/
-│   ├── api/            # API endpoint tests
-│   └── backtesting/    # Engine/metrics parity tests
-└── integration/        # End-to-end multi-component tests
+│   ├── backtesting/    # Engine, MTF, strategy builder parity
+│   ├── api/            # API router tests
+│   ├── agents/         # 40+ agent system tests
+│   ├── services/       # Service layer tests
+│   └── core/           # MetricsCalculator, indicators
+├── ai_agents/          # 56+ divergence + AI agent tests
+├── backtesting/        # GPU, market regime tests
+├── integration/        # Multi-component / DB / Redis tests
+├── e2e/                # End-to-end tests
+├── chaos/              # Chaos engineering tests
+├── frontend/           # Frontend smoke tests
+└── test_*.py           # Root-level tests
 ```
 
 ## Coverage Requirements
@@ -24,7 +33,7 @@ tests/
 | `backend/core/metrics_calculator.py` | 95% |
 | `backend/api/routers/`           | 95%     |
 | `backend/services/`              | 85%     |
-| `backend/backtesting/strategies/`| 85%     |
+| `backend/backtesting/strategies.py`| 85%    |
 | Everything else                  | 80%     |
 
 ## Naming Convention
@@ -60,12 +69,24 @@ def backtest_config() -> dict:
 
 ### Unit test
 ```python
+from backend.backtesting.strategies import RSIStrategy, SignalResult
+
 class TestRSIStrategy:
-    def test_generate_signals_returns_signal_column(self, sample_ohlcv):
+    def test_generate_signals_returns_signal_result(self, sample_ohlcv):
         strategy = RSIStrategy({'period': 14, 'overbought': 70, 'oversold': 30})
         result = strategy.generate_signals(sample_ohlcv)
-        assert 'signal' in result.columns
-        assert set(result['signal'].unique()).issubset({-1, 0, 1})
+        # ✅ SignalResult, NOT DataFrame
+        assert isinstance(result, SignalResult)
+        assert hasattr(result, 'entries')
+        assert hasattr(result, 'exits')
+        assert result.entries.dtype == bool
+        # ✅ len(result.entries), NOT len(result) — SignalResult has no __len__
+        assert len(result.entries) == len(sample_ohlcv)
+        assert not result.entries.isna().any()
+
+    # ❌ DO NOT use old DataFrame API:
+    # assert 'signal' in result.columns
+    # assert set(result['signal'].unique()).issubset({-1, 0, 1})
 ```
 
 ### Integration test (FastAPI)
@@ -80,7 +101,7 @@ async def test_backtest_api_success():
 
 ### Mock Bybit API (NEVER call real API)
 ```python
-with patch("backend.adapters.bybit.BybitClient.fetch_klines", new_callable=AsyncMock) as mock:
+with patch("backend.services.adapters.bybit.BybitAdapter.get_historical_klines", new_callable=AsyncMock) as mock:
     mock.return_value = {"retCode": 0, "result": {"list": [...]}}
     # test code
 ```

@@ -71,11 +71,13 @@ assert not data['close'].isna().any(), "NaN in close prices"
 # Check commission
 assert commission_rate == 0.0007, f"Wrong commission: {commission_rate}"
 
-# Check signal values
-assert set(signals['signal'].unique()).issubset({-1, 0, 1}), "Invalid signals"
+# Check SignalResult entries (generate_signals returns SignalResult, not DataFrame)
+assert isinstance(signals, SignalResult), "Expected SignalResult from generate_signals()"
+assert signals.entries.dtype == bool, "entries must be bool Series"
+assert not signals.entries.isna().any(), "NaN in entries"
 
 # Check data alignment
-assert len(prices) == len(signals), "Data length mismatch"
+assert len(prices) == len(signals.entries), "Data length mismatch"
 ```
 
 ### Step 4: Fix and Verify
@@ -112,9 +114,9 @@ valid_signals = signals[warmup_period:]
 logger.debug(f"RSI range: {data['rsi'].min():.2f} - {data['rsi'].max():.2f}")
 logger.debug(f"Overbought: {overbought}, Oversold: {oversold}")
 
-# Check signal counts
-logger.debug(f"Long signals: {(signals['signal'] == 1).sum()}")
-logger.debug(f"Short signals: {(signals['signal'] == -1).sum()}")
+# Check signal counts (signals is a SignalResult, not a DataFrame)
+logger.debug(f"Long entry signals: {signals.entries.sum()}")
+logger.debug(f"Short entry signals: {signals.short_entries.sum() if signals.short_entries is not None else 0}")
 ```
 
 ### Memory Issues

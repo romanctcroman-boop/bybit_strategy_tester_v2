@@ -261,6 +261,26 @@ async def create_backtest(request: BacktestCreateRequest):
                 "long_largest_loss": getattr(m, "long_largest_loss_value", 0),
                 "short_largest_win": getattr(m, "short_largest_win_value", 0),
                 "short_largest_loss": getattr(m, "short_largest_loss_value", 0),
+                # Long/Short avg trade pct
+                "long_avg_trade_pct": getattr(m, "long_avg_trade_pct", 0),
+                "short_avg_trade_pct": getattr(m, "short_avg_trade_pct", 0),
+                "long_avg_win_pct": getattr(m, "long_avg_win_pct", 0),
+                "long_avg_loss_pct": getattr(m, "long_avg_loss_pct", 0),
+                "short_avg_win_pct": getattr(m, "short_avg_win_pct", 0),
+                "short_avg_loss_pct": getattr(m, "short_avg_loss_pct", 0),
+                "long_largest_win_pct": getattr(m, "long_largest_win", 0),
+                "long_largest_loss_pct": getattr(m, "long_largest_loss", 0),
+                "short_largest_win_pct": getattr(m, "short_largest_win", 0),
+                "short_largest_loss_pct": getattr(m, "short_largest_loss", 0),
+                # Risk ratios per direction
+                "sharpe_long": getattr(m, "sharpe_long", 0),
+                "sortino_long": getattr(m, "sortino_long", 0),
+                "calmar_long": getattr(m, "calmar_long", 0),
+                "sharpe_short": getattr(m, "sharpe_short", 0),
+                "sortino_short": getattr(m, "sortino_short", 0),
+                "calmar_short": getattr(m, "calmar_short", 0),
+                # Stability R²
+                "stability": getattr(m, "stability", 0),
                 # Additional bar-based metrics
                 "avg_bars_in_winning": getattr(m, "avg_bars_in_winning", 0),
                 "avg_bars_in_losing": getattr(m, "avg_bars_in_losing", 0),
@@ -779,6 +799,45 @@ async def list_backtests(
                 open_pnl=_safe_float(opt_metrics.get("open_pnl", 0)),
                 open_pnl_pct=_safe_float(opt_metrics.get("open_pnl_pct", 0)),
                 open_trades=_safe_int(opt_metrics.get("open_trades", 0)),
+                # Stability R² from metrics_json
+                stability=_safe_float(opt_metrics.get("stability", 0)),
+                # Long/Short avg trade pct from metrics_json
+                long_avg_trade_pct=_safe_float(opt_metrics.get("long_avg_trade_pct", 0)),
+                short_avg_trade_pct=_safe_float(opt_metrics.get("short_avg_trade_pct", 0)),
+                long_avg_win_pct=_safe_float(opt_metrics.get("long_avg_win_pct", 0)),
+                long_avg_loss_pct=_safe_float(opt_metrics.get("long_avg_loss_pct", 0)),
+                short_avg_win_pct=_safe_float(opt_metrics.get("short_avg_win_pct", 0)),
+                short_avg_loss_pct=_safe_float(opt_metrics.get("short_avg_loss_pct", 0)),
+                long_largest_win=_safe_float(opt_metrics.get("long_largest_win", 0)),
+                long_largest_loss=_safe_float(opt_metrics.get("long_largest_loss", 0)),
+                short_largest_win=_safe_float(opt_metrics.get("short_largest_win", 0)),
+                short_largest_loss=_safe_float(opt_metrics.get("short_largest_loss", 0)),
+                long_largest_win_value=_safe_float(opt_metrics.get("long_largest_win_value", 0)),
+                long_largest_loss_value=_safe_float(opt_metrics.get("long_largest_loss_value", 0)),
+                short_largest_win_value=_safe_float(opt_metrics.get("short_largest_win_value", 0)),
+                short_largest_loss_value=_safe_float(opt_metrics.get("short_largest_loss_value", 0)),
+                # Sharpe/Sortino/Calmar per direction
+                sharpe_long=_safe_float(opt_metrics.get("sharpe_long", 0)),
+                sortino_long=_safe_float(opt_metrics.get("sortino_long", 0)),
+                calmar_long=_safe_float(opt_metrics.get("calmar_long", 0)),
+                sharpe_short=_safe_float(opt_metrics.get("sharpe_short", 0)),
+                sortino_short=_safe_float(opt_metrics.get("sortino_short", 0)),
+                calmar_short=_safe_float(opt_metrics.get("calmar_short", 0)),
+                # Risk/volatility metrics missing from list endpoint (N6 fix)
+                volatility=_safe_float(
+                    bt.volatility
+                    if hasattr(bt, "volatility") and bt.volatility is not None
+                    else opt_metrics.get("volatility", 0)
+                ),
+                ulcer_index=_safe_float(
+                    bt.ulcer_index
+                    if hasattr(bt, "ulcer_index") and bt.ulcer_index is not None
+                    else opt_metrics.get("ulcer_index", 0)
+                ),
+                sqn=_safe_float(opt_metrics.get("sqn", 0)),
+                kelly_percent=_safe_float(opt_metrics.get("kelly_percent", 0)),
+                kelly_percent_long=_safe_float(opt_metrics.get("kelly_percent_long", 0)),
+                kelly_percent_short=_safe_float(opt_metrics.get("kelly_percent_short", 0)),
             )
 
             # Get trades and equity curve from DB if available
@@ -819,13 +878,15 @@ async def list_backtests(
                 id=str(bt.id) if bt.id else "",
                 status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
                 created_at=_ensure_utc(bt.created_at) if bt.created_at else datetime.now(UTC),
+                completed_at=_ensure_utc(bt.completed_at) if bt.completed_at else None,
                 config=config,
                 metrics=metrics,
                 trades=cast(list[TradeRecord], list(trades_data)) if trades_data else [],
                 equity_curve=equity_curve_data,
                 final_equity=float(bt.final_capital) if bt.final_capital else None,
                 final_pnl=float(net_profit) if net_profit else None,
-                final_pnl_pct=float(bt.total_return) if bt.total_return else 0.0,
+                # total_return stored as 0-1 fraction; convert to % for API consistency
+                final_pnl_pct=float(bt.total_return) * 100 if bt.total_return else 0.0,
             )
             db_results.append(result)
         except Exception as e:
@@ -1159,6 +1220,26 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             long_largest_loss_pct=_safe_float(opt_metrics.get("long_largest_loss_pct", 0)),
             short_largest_win_pct=_safe_float(opt_metrics.get("short_largest_win_pct", 0)),
             short_largest_loss_pct=_safe_float(opt_metrics.get("short_largest_loss_pct", 0)),
+            # Stability R² from metrics_json
+            stability=_safe_float(opt_metrics.get("stability", 0)),
+            # Long/Short avg trade pct from metrics_json
+            long_avg_trade_pct=_safe_float(opt_metrics.get("long_avg_trade_pct", 0)),
+            short_avg_trade_pct=_safe_float(opt_metrics.get("short_avg_trade_pct", 0)),
+            long_avg_win_pct=_safe_float(opt_metrics.get("long_avg_win_pct", 0)),
+            long_avg_loss_pct=_safe_float(opt_metrics.get("long_avg_loss_pct", 0)),
+            short_avg_win_pct=_safe_float(opt_metrics.get("short_avg_win_pct", 0)),
+            short_avg_loss_pct=_safe_float(opt_metrics.get("short_avg_loss_pct", 0)),
+            long_largest_win_value=_safe_float(opt_metrics.get("long_largest_win_value", 0)),
+            long_largest_loss_value=_safe_float(opt_metrics.get("long_largest_loss_value", 0)),
+            short_largest_win_value=_safe_float(opt_metrics.get("short_largest_win_value", 0)),
+            short_largest_loss_value=_safe_float(opt_metrics.get("short_largest_loss_value", 0)),
+            # Sharpe/Sortino/Calmar per direction
+            sharpe_long=_safe_float(opt_metrics.get("sharpe_long", 0)),
+            sortino_long=_safe_float(opt_metrics.get("sortino_long", 0)),
+            calmar_long=_safe_float(opt_metrics.get("calmar_long", 0)),
+            sharpe_short=_safe_float(opt_metrics.get("sharpe_short", 0)),
+            sortino_short=_safe_float(opt_metrics.get("sortino_short", 0)),
+            calmar_short=_safe_float(opt_metrics.get("calmar_short", 0)),
         )
 
         # Get trades and equity curve from DB if available
@@ -1299,13 +1380,15 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             id=str(bt.id) if bt.id else "",
             status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
             created_at=_ensure_utc(bt.created_at) if bt.created_at else datetime.now(UTC),
+            completed_at=_ensure_utc(bt.completed_at) if bt.completed_at else None,
             config=config,
             metrics=metrics,
             trades=cast(list[TradeRecord], trades_data) if trades_data else [],
             equity_curve=equity_curve_data,
             final_equity=float(bt.final_capital) if bt.final_capital else None,
             final_pnl=float(net_profit) if net_profit else None,
-            final_pnl_pct=float(bt.total_return) if bt.total_return else 0.0,
+            # total_return stored as 0-1 fraction; convert to % for API consistency
+            final_pnl_pct=float(bt.total_return) * 100 if bt.total_return else 0.0,
         )
     except Exception as e:
         logger.warning(f"Failed to convert DB backtest {bt.id}: {e}")

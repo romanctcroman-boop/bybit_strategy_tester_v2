@@ -62,5 +62,5 @@ Common root causes in this project:
 - **Commission error**: Rate changed somewhere → grep all commission references
 - **Async bugs**: SQLite in async context without `asyncio.to_thread`
 - **Data gaps**: Missing data before DATA_START_DATE → check date filters
-- **Type mismatches**: Strategy returns wrong dtype → check signal column type
+- **Type mismatches**: Strategy returns wrong type → `generate_signals()` must return `SignalResult` with bool `entries`/`exits` Series, NOT a DataFrame with 'signal' column; check `result.entries.dtype == bool`
   </domain_patterns>

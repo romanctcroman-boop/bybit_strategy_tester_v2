@@ -33,7 +33,7 @@ Cross-phase integration verification. Ensures components work together.
 ### 3. Contract Compliance
 
 - API endpoints return documented response formats
-- Strategy `generate_signals()` returns proper DataFrame
+- Strategy `generate_signals()` returns `SignalResult` with bool `entries`/`exits` Series (NOT a DataFrame)
 - Engine accepts/returns expected types
 - MetricsCalculator receives correct trade data format
 

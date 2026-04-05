@@ -41,10 +41,18 @@ async def _api_get(path: str, params: dict | None = None) -> dict[str, Any]:
         return result  # type: ignore[return-value]
 
 
-async def _api_post(path: str, json_data: dict | None = None) -> dict[str, Any]:
+async def _api_post(
+    path: str,
+    json_data: dict | None = None,
+    params: dict | None = None,
+) -> dict[str, Any]:
     """Make POST request to strategy builder API."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.post(f"{_API_BASE}{path}", json=json_data or {})
+        resp = await client.post(
+            f"{_API_BASE}{path}",
+            json=json_data or {},
+            params=params,
+        )
         resp.raise_for_status()
         result: dict[str, Any] = resp.json()
         return result  # type: ignore[return-value]
@@ -498,7 +506,7 @@ async def builder_clone_strategy(
     try:
         return await _api_post(
             f"/strategies/{strategy_id}/clone",
-            json_data={"new_name": new_name},
+            params={"new_name": new_name},
         )
     except Exception as e:
         logger.error(f"builder_clone_strategy error: {e}")
@@ -901,6 +909,16 @@ async def builder_update_block_params(
 
         existing_params = target.get("params", {})
         existing_params.update(params)
+        # Coerce boolean-typed params: LLM agents sometimes return 0/1 or "true"/"false"
+        # instead of proper JSON booleans. Fix them before saving to prevent validator errors.
+        _BOOL_KEYS = {
+            "use_long_range", "use_short_range", "use_cross_level", "use_cross_memory",
+            "use_btc_source", "use_supertrend", "generate_on_trend_change",
+            "activate_breakeven", "close_only_in_profit", "enabled",
+        }
+        for _k, _v in existing_params.items():
+            if _k in _BOOL_KEYS and not isinstance(_v, bool):
+                existing_params[_k] = bool(_v) if isinstance(_v, int) else (str(_v).strip().lower() in ("true", "1"))
         target["params"] = existing_params
 
         # Save back

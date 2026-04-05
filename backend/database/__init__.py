@@ -16,7 +16,7 @@ import logging
 import os
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -57,6 +57,26 @@ if DATABASE_URL.startswith("sqlite"):
         )
     else:
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+        # Apply performance and safety PRAGMAs on every new SQLite connection.
+        # WAL:         concurrent readers don't block writers (critical for FastAPI async)
+        # NORMAL:      fsync only at checkpoints — safe + 3× faster writes than FULL
+        # busy_timeout: wait up to 5 s before raising "database is locked" (was 0 ms)
+        # cache_size:  32 MB page cache — reduces disk reads on 800+ MB database
+        # mmap_size:   memory-mapped I/O for sequential scans (OHLCV range queries)
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragmas(dbapi_conn, _connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.execute("PRAGMA cache_size=-32768")   # 32 MB (negative = KiB)
+            cursor.execute("PRAGMA mmap_size=268435456")  # 256 MB
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.close()
+
+        logger.info("SQLite engine: WAL, synchronous=NORMAL, busy_timeout=5s, cache=32MB")
+
 elif DATABASE_URL.startswith("postgresql"):
     # PostgreSQL with connection pooling best practices
     engine = create_engine(

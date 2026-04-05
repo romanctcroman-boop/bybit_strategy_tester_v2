@@ -5,7 +5,7 @@ Integrates BacktestEngine with Market Data sources (BybitAdapter, Cache, Local D
 """
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 from loguru import logger
@@ -20,6 +20,101 @@ from backend.backtesting.models import (
 from backend.database.repository.kline_repository import KlineRepository
 from backend.services.adapters.bybit import BybitAdapter
 from backend.utils.time import utc_now
+
+
+_INTERVAL_MS_SVC: dict[str, int] = {
+    "1": 60_000,
+    "3": 180_000,
+    "5": 300_000,
+    "15": 900_000,
+    "30": 1_800_000,
+    "60": 3_600_000,
+    "120": 7_200_000,
+    "240": 14_400_000,
+    "D": 86_400_000,
+    "W": 604_800_000,
+    "M": 2_592_000_000,
+}
+
+
+def _validate_data_completeness(
+    df: pd.DataFrame,
+    db_interval: str,
+    start_ts_ms: int,
+    end_ts_ms: int,
+) -> None:
+    """
+    Log a warning if the fetched candle count is significantly below the expected
+    count for the requested time range.
+
+    A completeness ratio below 70% suggests substantial data gaps that may
+    distort backtest results (e.g. indicator NaN regions, missed trades).
+
+    Args:
+        df: Fetched OHLCV DataFrame.
+        db_interval: Interval string ('1', '15', '60', 'D', etc.).
+        start_ts_ms: Requested start timestamp (ms).
+        end_ts_ms: Requested end timestamp (ms).
+    """
+    if df is None or len(df) < 2:
+        return
+
+    interval_ms = _INTERVAL_MS_SVC.get(db_interval, 60_000)
+    range_ms = max(end_ts_ms - start_ts_ms, 1)
+    expected = max(1, range_ms // interval_ms)
+    actual = len(df)
+    completeness = actual / expected
+
+    if completeness < 0.70:
+        logger.warning(
+            "[BacktestService] Data completeness warning: %d/%d candles (%.0f%%) "
+            "for interval=%s — backtest results may be unreliable due to gaps.",
+            actual,
+            expected,
+            completeness * 100,
+            db_interval,
+        )
+
+
+def _drop_incomplete_last_bar(df: pd.DataFrame, db_interval: str) -> pd.DataFrame:
+    """
+    Drop the last bar from the DataFrame if its candle period has not yet closed.
+
+    A candle is 'incomplete' when its open_time + interval_ms > now_utc_ms.
+    Without this guard, a backtest that includes today's date would include a
+    partially-formed candle, causing look-ahead bias (the future OHLCV of that
+    bar is not yet known, but the stored values reflect only part of the period).
+
+    Args:
+        df: OHLCV DataFrame with DatetimeIndex.
+        db_interval: Interval string ('1', '5', '15', '60', 'D', etc.).
+
+    Returns:
+        DataFrame with the last bar removed if still forming, otherwise unchanged.
+    """
+    if df is None or len(df) == 0:
+        return df
+
+    interval_ms = _INTERVAL_MS_SVC.get(db_interval, 60_000)
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+
+    last_ts = df.index[-1]
+    # Normalise to ms timestamp
+    if hasattr(last_ts, "timestamp"):
+        last_open_ms = int(last_ts.timestamp() * 1000)
+    else:
+        last_open_ms = int(last_ts)
+
+    if last_open_ms + interval_ms > now_ms:
+        logger.debug(
+            "[BacktestService] Dropping incomplete last bar at %s "
+            "(closes in ~%ds)",
+            last_ts,
+            (last_open_ms + interval_ms - now_ms) // 1000,
+        )
+        return df.iloc[:-1]
+
+    return df
 
 
 class BacktestService:
@@ -350,6 +445,8 @@ class BacktestService:
                                     f"Failed to fetch warmup gap from API: {_gap_err} — continuing without it"
                                 )
 
+                        df = _drop_incomplete_last_bar(df, db_interval)
+                        _validate_data_completeness(df, db_interval, start_ts, end_ts)
                         logger.info(f"Using {len(df)} candles from local database")
                         return df
                     else:
@@ -409,6 +506,8 @@ class BacktestService:
                 df = df.set_index("timestamp")
 
             df = df.sort_index()
+            df = _drop_incomplete_last_bar(df, db_interval)
+            _validate_data_completeness(df, db_interval, start_ts, end_ts)
 
             logger.info(f"Fetched {len(df)} candles from Bybit API")
             return df

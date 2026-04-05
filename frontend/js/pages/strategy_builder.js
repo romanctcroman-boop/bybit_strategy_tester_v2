@@ -40,7 +40,7 @@ import {
 // Import AiBuildModule — extracted during P0-1 refactoring
 import { createAiBuildModule } from '../components/AiBuildModule.js';
 import { createMyStrategiesModule } from '../components/MyStrategiesModule.js';
-import { createConnectionsModule } from '../components/ConnectionsModule.js';
+import { createConnectionsModule } from '../components/ConnectionsModule.js?v=20260330g';
 import { createUndoRedoModule } from '../components/UndoRedoModule.js';
 import { createValidateModule } from '../components/ValidateModule.js';
 import { createSaveLoadModule } from '../components/SaveLoadModule.js';
@@ -1253,6 +1253,9 @@ function setupEventListeners() {
     const leverageBlock = backtestLeverageRangeEl.closest('.properties-leverage-block');
     if (leverageBlock) {
       leverageBlock.addEventListener('wheel', (e) => {
+        // Only intercept wheel when cursor is directly over the range slider itself,
+        // not when the user is scrolling the properties panel past the leverage block.
+        if (e.target !== backtestLeverageRangeEl) return;
         e.preventDefault();
         const min = parseInt(backtestLeverageRangeEl.min, 10) || 1;
         const max = parseInt(backtestLeverageRangeEl.max, 10) || 50;
@@ -2873,8 +2876,8 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'use_atr_volatility', label: 'Use ATR1 <> ATR2 ?', type: 'checkbox' },
         { key: 'atr1_to_atr2', label: 'ATR1 to ATR2', type: 'select', options: ['ATR1 < ATR2', 'ATR1 > ATR2'], hasTooltip: true, tooltip: 'ATR1 < ATR2 — Volatility is Small in last bars. ATR1 > ATR2 — Volatility is High in last bars.' },
         { key: 'atr_diff_percent', label: 'How ATR1 > (<) ATR2. More than XX%', type: 'number', min: 0.1, max: 50, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Fast ATR1 is < Slow ATR2 for XX% or more.' },
-        { key: 'atr_length1', label: 'ATR length1 (20)(5)', type: 'number', min: 5, max: 20, step: 1, optimizable: true },
-        { key: 'atr_length2', label: 'ATR length2 (100)(20)', type: 'number', min: 20, max: 100, step: 1, optimizable: true },
+        { key: 'atr_length1', label: 'ATR length1 (20)(5)', type: 'number', min: 2, max: 200, step: 1, optimizable: true },
+        { key: 'atr_length2', label: 'ATR length2 (100)(20)', type: 'number', min: 5, max: 500, step: 1, optimizable: true },
         { key: 'atr_smoothing', label: 'ATR Smoothing', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] }
       ]
     },
@@ -2884,8 +2887,8 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'use_volume_filter', label: 'Use VOL1 <> VOL2 ?', type: 'checkbox' },
         { key: 'vol1_to_vol2', label: 'VOL1 to VOL2', type: 'select', options: ['VOL1 < VOL2', 'VOL1 > VOL2'], hasTooltip: true, tooltip: 'VOL1 < VOL2 — Volume is Small in last bars. VOL1 > VOL2 — Volume is High in last bars.' },
         { key: 'vol_diff_percent', label: 'How VOL1 > (<) VOL2. More than XX%', type: 'number', min: 0.1, max: 50, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Fast VOL1 is < Slow VOL2 for XX% or more.' },
-        { key: 'vol_length1', label: 'VOL length1 (20)(5)', type: 'number', min: 5, max: 20, step: 1, optimizable: true },
-        { key: 'vol_length2', label: 'VOL length2 (100)(20)', type: 'number', min: 20, max: 100, step: 1, optimizable: true },
+        { key: 'vol_length1', label: 'VOL length1 (20)(5)', type: 'number', min: 2, max: 200, step: 1, optimizable: true },
+        { key: 'vol_length2', label: 'VOL length2 (100)(20)', type: 'number', min: 5, max: 500, step: 1, optimizable: true },
         { key: 'vol_smoothing', label: 'VOL Smoothing', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] }
       ]
     },
@@ -3200,14 +3203,14 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'use_atr_sl', label: 'Use ATR Stop Loss ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close position if current Loss >= (Multiplier × ATR)' },
         { key: 'atr_sl_on_wicks', label: 'ATR SL work on Wicks ?', type: 'checkbox', hasTooltip: true, tooltip: 'If Disabled — ATR SL will be checked only after Close of current bar. Wicks are ignored. Use Static SL for protection.' },
         { key: 'atr_sl_smoothing', label: 'ATR SL Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'], optionLabels: ['WMA', 'RMA', 'SMA', 'EMA'], selectStyle: 'min-width: 120px;' },
-        { key: 'atr_sl_period', label: 'ATR SL Smoothing Period', type: 'number', min: 1, max: 150, optimizable: true },
-        { key: 'atr_sl_multiplier', label: 'Size of ATR SL (Multiplier×ATR)', type: 'number', min: 0.1, max: 4, step: 0.1, optimizable: true },
+        { key: 'atr_sl_period', label: 'ATR SL Smoothing Period', type: 'number', min: 1, max: 500, optimizable: true },
+        { key: 'atr_sl_multiplier', label: 'Size of ATR SL (Multiplier×ATR)', type: 'number', min: 0.1, max: 20, step: 0.1, optimizable: true },
         { type: 'separator', label: '======== ATR TAKE PROFIT ========' },
         { key: 'use_atr_tp', label: 'Use ATR Take Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close position if current Profit >= (Multiplier × ATR)' },
         { key: 'atr_tp_on_wicks', label: 'ATR TP work on Wicks ?', type: 'checkbox', hasTooltip: true, tooltip: 'If Disabled — ATR TP will be checked only after Close of current bar. Wicks are ignored.' },
         { key: 'atr_tp_smoothing', label: 'ATR TP Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'], optionLabels: ['WMA', 'RMA', 'SMA', 'EMA'], selectStyle: 'min-width: 120px;' },
-        { key: 'atr_tp_period', label: 'ATR TP Smoothing Period', type: 'number', min: 1, max: 150, optimizable: true },
-        { key: 'atr_tp_multiplier', label: 'Size of ATR TP (Multiplier×ATR)', type: 'number', min: 0.1, max: 4, step: 0.1, optimizable: true }
+        { key: 'atr_tp_period', label: 'ATR TP Smoothing Period', type: 'number', min: 1, max: 500, optimizable: true },
+        { key: 'atr_tp_multiplier', label: 'Size of ATR TP (Multiplier×ATR)', type: 'number', min: 0.1, max: 20, step: 0.1, optimizable: true }
       ]
     },
     multi_tp_exit: {
@@ -3927,6 +3930,29 @@ function getBlockPorts(blockId, _category) {
       ]
     },
 
+    // ── AI-generated filter aliases (LLM uses these names) ──
+    supertrend_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    two_ma_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    atr_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+
     // ── Close Condition blocks (config → Strategy SL/TP port) ──
     close_by_time: {
       inputs: [],
@@ -3965,6 +3991,8 @@ function getBlockPorts(blockId, _category) {
         { id: 'entry_short', label: 'Entry S', type: 'condition' },
         { id: 'exit_long', label: 'Exit L', type: 'condition' },
         { id: 'exit_short', label: 'Exit S', type: 'condition' },
+        { id: 'filter_long', label: 'Filter L', type: 'filter' },
+        { id: 'filter_short', label: 'Filter S', type: 'filter' },
         { id: 'sl_tp', label: 'SL/TP', type: 'config' },
         { id: 'close_cond', label: 'Close', type: 'config' },
         { id: 'dca_grid', label: 'DCA', type: 'config' }
@@ -4031,8 +4059,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Long — connect indicator Long signal or condition result"
-             style="top: 10%;"></div>
-        <span class="main-port-label entry-label" style="top: 10%; transform: translateY(-50%);"><i class="bi bi-arrow-up-circle"></i> Entry L</span>
+             style="top: 5%;"></div>
+        <span class="main-port-label entry-label" style="top: 5%; transform: translateY(-50%);"><i class="bi bi-arrow-up-circle"></i> Entry L</span>
 
         <!-- Entry Short port -->
         <div class="port condition-port main-port-left entry-port"
@@ -4041,8 +4069,28 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Short — connect indicator Short signal or condition result"
-             style="top: 23%;"></div>
-        <span class="main-port-label entry-label" style="top: 23%; transform: translateY(-50%);"><i class="bi bi-arrow-down-circle"></i> Entry S</span>
+             style="top: 16%;"></div>
+        <span class="main-port-label entry-label" style="top: 16%; transform: translateY(-50%);"><i class="bi bi-arrow-down-circle"></i> Entry S</span>
+
+        <!-- Filter Long port — amber -->
+        <div class="port filter-port main-port-left filter-input-port"
+             data-port-id="filter_long"
+             data-port-type="filter"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Filter Long — connect trend/volatility filter to gate long entries"
+             style="top: 27%;"></div>
+        <span class="main-port-label filter-label" style="top: 27%; transform: translateY(-50%);"><i class="bi bi-funnel"></i> Filter L</span>
+
+        <!-- Filter Short port — amber -->
+        <div class="port filter-port main-port-left filter-input-port"
+             data-port-id="filter_short"
+             data-port-type="filter"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Filter Short — connect trend/volatility filter to gate short entries"
+             style="top: 38%;"></div>
+        <span class="main-port-label filter-label" style="top: 38%; transform: translateY(-50%);"><i class="bi bi-funnel"></i> Filter S</span>
 
         <!-- Exit Long port -->
         <div class="port condition-port main-port-left exit-port"
@@ -4051,8 +4099,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Long — optional signal to close long positions"
-             style="top: 36%;"></div>
-        <span class="main-port-label exit-label" style="top: 36%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit L</span>
+             style="top: 49%;"></div>
+        <span class="main-port-label exit-label" style="top: 49%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit L</span>
 
         <!-- Exit Short port -->
         <div class="port condition-port main-port-left exit-port"
@@ -4061,8 +4109,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Short — optional signal to close short positions"
-             style="top: 49%;"></div>
-        <span class="main-port-label exit-label" style="top: 49%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit S</span>
+             style="top: 60%;"></div>
+        <span class="main-port-label exit-label" style="top: 60%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit S</span>
 
         <!-- SL/TP config port — cyan -->
         <div class="port config-port main-port-left config-input-port"
@@ -4071,8 +4119,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="SL/TP — connect Static SL/TP, Trailing Stop, ATR Exit, or Multi TP"
-             style="top: 63%;"></div>
-        <span class="main-port-label config-label-sltp" style="top: 63%; transform: translateY(-50%);"><i class="bi bi-shield-check"></i> SL/TP</span>
+             style="top: 71%;"></div>
+        <span class="main-port-label config-label-sltp" style="top: 71%; transform: translateY(-50%);"><i class="bi bi-shield-check"></i> SL/TP</span>
 
         <!-- Close Conditions config port — amber -->
         <div class="port config-port main-port-left config-input-port"
@@ -4081,8 +4129,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Close Conditions — connect Close by RSI, Stochastic, PSAR, Channel, MA, Time"
-             style="top: 77%;"></div>
-        <span class="main-port-label config-label-close" style="top: 77%; transform: translateY(-50%);"><i class="bi bi-door-open"></i> Close</span>
+             style="top: 82%;"></div>
+        <span class="main-port-label config-label-close" style="top: 82%; transform: translateY(-50%);"><i class="bi bi-door-open"></i> Close</span>
 
         <!-- DCA/Grid config port — purple -->
         <div class="port config-port main-port-left config-input-port"
@@ -4091,8 +4139,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="DCA/Grid — connect DCA or Manual Grid block"
-             style="top: 91%;"></div>
-        <span class="main-port-label config-label-dca" style="top: 91%; transform: translateY(-50%);"><i class="bi bi-layers"></i> DCA</span>
+             style="top: 93%;"></div>
+        <span class="main-port-label config-label-dca" style="top: 93%; transform: translateY(-50%);"><i class="bi bi-layers"></i> DCA</span>
 
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
@@ -5358,13 +5406,13 @@ const blockValidationRules = {
   // Universal Filters
   atr_volatility: {
     atr_diff_percent: { min: 0.1, max: 50, type: 'number', required: true },
-    atr_length1: { min: 5, max: 20, type: 'number', required: true },
-    atr_length2: { min: 20, max: 100, type: 'number', required: true }
+    atr_length1: { min: 2, max: 200, type: 'number', required: true },
+    atr_length2: { min: 5, max: 500, type: 'number', required: true }
   },
   volume_filter: {
     vol_diff_percent: { min: 0.1, max: 50, type: 'number', required: true },
-    vol_length1: { min: 5, max: 20, type: 'number', required: true },
-    vol_length2: { min: 20, max: 100, type: 'number', required: true }
+    vol_length1: { min: 2, max: 200, type: 'number', required: true },
+    vol_length2: { min: 5, max: 500, type: 'number', required: true }
   },
   highest_lowest_bar: {
     hl_lookback_bars: { min: 1, max: 100, type: 'number', required: true },
@@ -5463,10 +5511,10 @@ const blockValidationRules = {
 
   // Exit Blocks
   atr_exit: {
-    atr_sl_period: { min: 1, max: 150, type: 'number' },
-    atr_sl_multiplier: { min: 0.1, max: 4, type: 'number' },
-    atr_tp_period: { min: 1, max: 150, type: 'number' },
-    atr_tp_multiplier: { min: 0.1, max: 4, type: 'number' }
+    atr_sl_period: { min: 1, max: 500, type: 'number' },
+    atr_sl_multiplier: { min: 0.1, max: 20, type: 'number' },
+    atr_tp_period: { min: 1, max: 500, type: 'number' },
+    atr_tp_multiplier: { min: 0.1, max: 20, type: 'number' }
   },
   multi_tp_exit: {
     tp1: { min: 0.001, max: 1000, type: 'number' },
@@ -6551,7 +6599,52 @@ function showNotification(message, type = 'info') {
 // ZOOM FUNCTIONS
 // ============================================
 function fitToScreen() {
-  resetZoom();
+  const blocks = strategyBlocks;
+  if (!blocks || blocks.length === 0) { resetZoom(); return; }
+
+  // 1. Bounding box of all blocks (use DOM elements to get actual rendered size)
+  const container = document.getElementById('canvasContainer');
+  if (!container) { resetZoom(); return; }
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  blocks.forEach((b) => {
+    const el = document.getElementById(b.id);
+    const w = el ? el.offsetWidth : 180;
+    const h = el ? el.offsetHeight : 80;
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + w);
+    maxY = Math.max(maxY, b.y + h);
+  });
+
+  const PADDING = 40;
+  const contentW = maxX - minX + PADDING * 2;
+  const contentH = maxY - minY + PADDING * 2;
+
+  // 2. Available viewport: canvas-container minus any open floating panel
+  const canvasRect = container.getBoundingClientRect();
+  let availW = canvasRect.width;
+
+  // Check if a floating window is open (not collapsed)
+  const openPanel = document.querySelector('.floating-window:not(.floating-window-collapsed)');
+  if (openPanel) {
+    const panelW = openPanel.offsetWidth || 560;
+    availW = Math.max(availW - panelW, 200);
+  }
+  const availH = canvasRect.height;
+
+  // 3. Compute scale — clamp between 0.2 and 1.0
+  const scaleX = availW / contentW;
+  const scaleY = availH / contentH;
+  zoom = Math.max(0.2, Math.min(1.0, Math.min(scaleX, scaleY)));
+  setSBZoom(zoom);
+  updateZoom();
+
+  // 4. Scroll so top-left of content is at (PADDING, PADDING) after scaling
+  container.scrollLeft = Math.max(0, minX * zoom - PADDING);
+  container.scrollTop = Math.max(0, minY * zoom - PADDING);
+
+  renderConnections();
 }
 
 function zoomIn() {
@@ -6575,8 +6668,17 @@ function resetZoom() {
 function updateZoom() {
   document.getElementById('zoomLevel').textContent =
     `${Math.round(zoom * 100)}%`;
-  document.getElementById('blocksContainer').style.transform = `scale(${zoom})`;
-  document.getElementById('blocksContainer').style.transformOrigin = '0 0';
+  const t = `scale(${zoom})`;
+  const o = '0 0';
+  document.getElementById('blocksContainer').style.transform = t;
+  document.getElementById('blocksContainer').style.transformOrigin = o;
+  // SVG stays unscaled — it draws in native canvas pixels.
+  // renderConnections divides getBoundingClientRect() coords by zoom to convert
+  // screen-space → SVG-space.
+  const svg = document.getElementById('connectionsCanvas');
+  svg.style.transform = 'none';
+  svg.style.transformOrigin = '';
+  renderConnections();
 }
 
 
@@ -6705,7 +6807,8 @@ function _initConnectionsModule() {
     },
     pushUndo,
     showNotification,
-    renderBlocks
+    renderBlocks,
+    getZoom: () => zoom
   });
 }
 
@@ -6784,7 +6887,8 @@ function _initValidateModule() {
     getStrategyIdFromURL,
     saveStrategy: () => saveStrategy(),
     showNotification,
-    escapeHtml
+    escapeHtml,
+    renderConnections: () => renderConnections()
   });
 }
 function validateStrategyCompleteness() { return _validateModule ? _validateModule.validateStrategyCompleteness() : { valid: false, errors: [], warnings: [] }; }
@@ -6804,8 +6908,10 @@ function _initUndoRedoModule() {
     setConnections: (arr) => { connections.length = 0; connections.push(...arr); setSBConnections(connections); },
     getSelectedBlockId: () => getSBSelectedBlockId(),
     setSelectedBlockId: (id) => { selectedBlockId = id; setSBSelectedBlockId(id); },
+    getSelectedBlockIds: () => selectedBlockIds,
     renderBlocks,
     renderBlockProperties,
+    renderConnections,
     dispatchBlocksChanged,
     validateStrategy: () => validateStrategy(),
     showNotification,

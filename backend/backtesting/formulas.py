@@ -737,7 +737,7 @@ def _aggregate_monthly_returns(
     Вспомогательная функция: агрегировать доходности по месяцам.
 
     Группирует бары по (year, month) и считает:
-        monthly_return = (equity_end_of_month - equity_start_of_month) / initial_capital
+        monthly_return = (equity_end_of_month - equity_start_of_month) / equity_start_of_month
 
     Используется calc_sharpe_monthly_tv() и calc_sortino_monthly_tv().
 
@@ -796,7 +796,7 @@ def _aggregate_monthly_returns(
     for key in sorted(monthly_pnl):
         start_eq = monthly_start[key]
         end_eq = monthly_pnl[key]
-        monthly_returns.append((end_eq - start_eq) / initial_capital)
+        monthly_returns.append((end_eq - start_eq) / start_eq if start_eq != 0 else 0.0)
 
     return monthly_returns
 

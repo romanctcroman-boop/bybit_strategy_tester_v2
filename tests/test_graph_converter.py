@@ -4,7 +4,7 @@ Unit tests for StrategyDefToGraphConverter.
 Tests cover:
 - Category A signals (RSI, MACD, Stochastic, SuperTrend, EMA_Crossover, SMA_Crossover, EMA, SMA)
 - Category B signals (CCI, Williams_R, Bollinger, ADX, VWAP, OBV, ATR)
-- Filter blocks (Volatility, Volume, Trend, ADX, Time)
+- Filter blocks (Volatility, Volume, Trend, ADX, Time, SuperTrend)
 - Signal combining (AND/OR, 1/2/3/4+ signals)
 - Param renaming (Two MAs fast_period → ma1_length)
 - Mode activation flags
@@ -405,6 +405,40 @@ def test_time_filter_skipped_with_warning():
     graph, warnings = conv.convert(strat)
 
     assert any("Time" in w for w in warnings)
+
+
+def test_supertrend_filter_maps_to_supertrend_block():
+    """SuperTrend as a filter type should produce a supertrend block with generate_on_trend_change."""
+    conv = StrategyDefToGraphConverter()
+    strat = make_strategy(
+        signals=[Signal(id="s1", type="RSI", params={})],
+        filters=[Filter(id="f1", type="SuperTrend", params={"period": 14, "multiplier": 2.0})],
+    )
+    graph, warnings = conv.convert(strat)
+
+    # No unknown-filter warnings
+    assert not any("Unknown filter" in w for w in warnings), f"Got warnings: {warnings}"
+    # supertrend block present
+    st_blocks = _blocks_by_type(graph, "supertrend")
+    assert st_blocks, "Expected supertrend block from SuperTrend filter"
+    st = st_blocks[0]
+    # generate_on_trend_change must be True to prevent every-bar firing
+    assert st["params"].get("generate_on_trend_change") is True
+
+
+def test_supertrend_filter_aliases_resolve():
+    """LLM variants 'Supertrend', 'Super Trend', 'SuperTrend Filter' all map to supertrend block."""
+    for alias in ("Supertrend", "Super Trend", "SuperTrend Filter", "Supertrend Filter"):
+        conv = StrategyDefToGraphConverter()
+        strat = make_strategy(
+            signals=[Signal(id="s1", type="RSI", params={})],
+            filters=[Filter(id="f1", type=alias, params={})],
+        )
+        graph, warnings = conv.convert(strat)
+        assert not any("Unknown filter" in w for w in warnings), (
+            f"alias='{alias}' produced unknown-filter warning: {warnings}"
+        )
+        assert _blocks_by_type(graph, "supertrend"), f"alias='{alias}' did not produce supertrend block"
 
 
 # ---------------------------------------------------------------------------

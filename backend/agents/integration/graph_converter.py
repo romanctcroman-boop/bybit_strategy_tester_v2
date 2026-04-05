@@ -213,6 +213,15 @@ _SIGNAL_CAT_B: dict[str, dict[str, Any]] = {
     # OBV removed — threshold comparisons on cumulative OBV are unreliable; use Volume filter instead
 }
 
+# Divergence is handled separately: it's a Cat A block (outputs long/short bool directly)
+# without needing activation params. Added to _SIGNAL_CAT_A below.
+_SIGNAL_CAT_A["Divergence"] = {
+    "block_type": "divergence",
+    "activate": {},
+    "param_renames": {},
+    "default_params": {},
+}
+
 # Category A filter blocks: produce long/short directly when activated
 _FILTER_BLOCK_MAP: dict[str, dict[str, Any]] = {
     "Volatility": {
@@ -256,6 +265,22 @@ _FILTER_BLOCK_MAP: dict[str, dict[str, Any]] = {
         "condition_type": "greater_than",
         "threshold_default": 25.0,
     },
+    "SuperTrend": {
+        # SuperTrend trend-direction filter: long when price above ST, short when below.
+        # generate_on_trend_change=True prevents it from firing on every bar.
+        "block_type": "supertrend",
+        "activate": {},
+        "param_renames": {},
+        "default_params": {"period": 10, "multiplier": 3.0, "generate_on_trend_change": True},
+    },
+    "Highest/Lowest Bar": {
+        # Breakout filter: passes long when current bar is a new high over lookback,
+        # passes short when current bar is a new low.
+        "block_type": "highest_lowest_bar",
+        "activate": {"use_highest_lowest": True},
+        "param_renames": {"lookback": "hl_lookback_bars"},
+        "default_params": {"hl_lookback_bars": 10, "hl_price_percent": 0, "hl_atr_percent": 0},
+    },
     "Time": None,  # No equivalent block — skip with warning
 }
 
@@ -280,6 +305,25 @@ _FILTER_TYPE_ALIASES: dict[str, str] = {
     "ADX Filter": "ADX",
     "ADX Trend": "ADX",
     "Trend Strength": "ADX",
+    # SuperTrend filter variants
+    "Supertrend": "SuperTrend",
+    "Super Trend": "SuperTrend",
+    "SuperTrend Filter": "SuperTrend",
+    "Supertrend Filter": "SuperTrend",
+    "ST Filter": "SuperTrend",
+    # Highest/Lowest Bar variants
+    "Highest Lowest Bar": "Highest/Lowest Bar",
+    "HighestLowest": "Highest/Lowest Bar",
+    "Breakout Filter": "Highest/Lowest Bar",
+    "New High/Low": "Highest/Lowest Bar",
+    # Two MAs / MA Crossover used as a filter — treat as Trend filter
+    "Two MAs": "Trend",
+    "Two MA": "Trend",
+    "MA Crossover": "Trend",
+    "MA Cross Filter": "Trend",
+    "Moving Average Cross": "Trend",
+    "Dual MA": "Trend",
+    "Double MA": "Trend",
 }
 
 # Aliases for signal type names the LLM commonly produces
@@ -437,6 +481,19 @@ class StrategyDefToGraphConverter:
         _wire_direction(long_signal_ids, filter_long_ids, "long", "entry_long")
         _wire_direction(short_signal_ids, filter_short_ids, "short", "entry_short")
 
+        # ── Exit conditions → static_sltp block ─────────────────────────
+        self._build_exit_block(
+            strategy_def, strategy_node_id, blocks, connections, warnings
+        )
+
+        # ── Remove orphan blocks (not connected to strategy_node) ────────
+        n_before = len(blocks)
+        blocks, connections = self._remove_orphans(blocks, connections, strategy_node_id)
+        n_removed = n_before - len(blocks)
+        if n_removed:
+            warnings.append(f"Removed {n_removed} orphan block(s) not connected to strategy node")
+
+        self._assign_layout_positions(blocks)
         graph = {
             "name": strategy_def.strategy_name,
             "description": strategy_def.description,
@@ -451,6 +508,132 @@ class StrategyDefToGraphConverter:
             + (f", {len(warnings)} warnings" if warnings else "")
         )
         return graph, warnings
+
+    # ------------------------------------------------------------------
+    # Layout helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _assign_layout_positions(blocks: list[dict[str, Any]]) -> None:
+        """Assign x/y canvas positions so blocks don't pile up at (100,100).
+
+        Column layout:
+          Col 0 (x=80):   indicator blocks
+          Col 1 (x=380):  condition / filter blocks
+          Col 2 (x=650):  logic gate blocks (and / or / not)
+          Col 3 (x=920):  strategy node
+        """
+        _COL_X = {
+            "indicator": 80,
+            "condition": 380,
+            "filter": 380,
+            "logic": 650,
+            "strategy": 920,
+        }
+        _ROW_H = 110  # vertical spacing between blocks in the same column
+        _col_y: dict[str, int] = {k: 80 for k in _COL_X}
+
+        def _col_key(block: dict[str, Any]) -> str:
+            btype = block.get("type", "")
+            if btype == "strategy":
+                return "strategy"
+            if btype in ("condition", "filter", "atr_volatility", "volume_filter"):
+                return "condition"
+            if btype in ("and", "or", "not"):
+                return "logic"
+            return "indicator"
+
+        for block in blocks:
+            if block.get("x") and block.get("y"):
+                continue  # already positioned
+            col = _col_key(block)
+            block["x"] = _COL_X[col]
+            block["y"] = _col_y[col]
+            _col_y[col] += _ROW_H
+
+    # ------------------------------------------------------------------
+    # Exit condition helpers
+    # ------------------------------------------------------------------
+
+    def _build_exit_block(
+        self,
+        strategy_def: "StrategyDefinition",
+        strategy_node_id: str,
+        blocks: list[dict[str, Any]],
+        connections: list[dict[str, Any]],
+        warnings: list[str],
+    ) -> None:
+        """Create a static_sltp block from exit_conditions and wire to sl_tp port."""
+        # Skip if a static_sltp block already exists in the graph (LLM included one)
+        if any(b.get("type") == "static_sltp" for b in blocks):
+            logger.debug("[GraphConverter] static_sltp already present — skipping auto-add")
+            return
+
+        ec = getattr(strategy_def, "exit_conditions", None)
+        if not ec:
+            return  # engine SL/TP defaults apply — not a warning condition
+
+        tp_val = float(getattr(ec.take_profit, "value", 0.0) or 0.0) if ec.take_profit else 0.0
+        sl_val = float(getattr(ec.stop_loss, "value", 0.0) or 0.0) if ec.stop_loss else 0.0
+
+        # Clamp to sensible range: 0.3% – 20%
+        tp_pct = max(0.3, min(20.0, tp_val)) if tp_val > 0 else 2.0
+        sl_pct = max(0.3, min(20.0, sl_val)) if sl_val > 0 else 1.5
+
+        block_id = f"static_sltp_{next(self._id_counter)}"
+        blocks.append({
+            "id": block_id,
+            "type": "static_sltp",
+            "params": {
+                "take_profit_percent": round(tp_pct, 2),
+                "stop_loss_percent": round(sl_pct, 2),
+                "activate_breakeven": False,
+                "close_only_in_profit": False,
+            },
+        })
+        connections.append({
+            "from": block_id,
+            "fromPort": "exit",
+            "to": strategy_node_id,
+            "toPort": "sl_tp",
+        })
+        logger.debug(f"[GraphConverter] Added static_sltp: TP={tp_pct}% SL={sl_pct}%")
+
+    @staticmethod
+    def _remove_orphans(
+        blocks: list[dict[str, Any]],
+        connections: list[dict[str, Any]],
+        strategy_node_id: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Remove blocks that have no path to the strategy node.
+
+        Walks backwards from strategy_node through connections to find all
+        reachable block IDs. Blocks not in that set are orphans and are dropped.
+        """
+        # Build reverse map: target_id → set of source_ids
+        reverse: dict[str, set[str]] = {}
+        for conn in connections:
+            src = conn.get("from", "")
+            tgt = conn.get("to", "")
+            if src and tgt:
+                reverse.setdefault(tgt, set()).add(src)
+
+        # BFS backwards from strategy_node
+        reachable: set[str] = {strategy_node_id}
+        queue = [strategy_node_id]
+        while queue:
+            node = queue.pop()
+            for src in reverse.get(node, set()):
+                if src not in reachable:
+                    reachable.add(src)
+                    queue.append(src)
+
+        kept_blocks = [b for b in blocks if b.get("id") in reachable]
+        kept_conns = [
+            c for c in connections
+            if c.get("from") in reachable and c.get("to") in reachable
+        ]
+        return kept_blocks, kept_conns
 
     # ------------------------------------------------------------------
     # Signal builders
@@ -692,8 +875,9 @@ class StrategyDefToGraphConverter:
             for port, (src_id, src_port) in zip(ports, chunk, strict=False):
                 new_conns.append({"from": src_id, "fromPort": src_port, "to": gate_id, "toPort": port})
 
-            # The output of this gate becomes a new signal for the next round
-            current_signals = [(gate_id, "output"), *remaining]
+            # The output of this gate becomes a new signal for the next round.
+            # Use "result" (actual block output key) to avoid PortResolver fallback warnings.
+            current_signals = [(gate_id, "result"), *remaining]
 
         return current_signals[0], new_blocks, new_conns
 

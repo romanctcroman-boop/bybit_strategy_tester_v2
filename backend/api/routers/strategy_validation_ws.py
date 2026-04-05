@@ -419,8 +419,8 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
     # ==========================================================================
     "atr_volatility": {
         "atr_diff_percent": {"type": "number", "min": 0.1, "max": 50, "default": 10},
-        "atr_length1": {"type": "integer", "min": 5, "max": 20, "default": 20},
-        "atr_length2": {"type": "integer", "min": 20, "max": 100, "default": 100},
+        "atr_length1": {"type": "integer", "min": 2, "max": 200, "default": 20},
+        "atr_length2": {"type": "integer", "min": 5, "max": 500, "default": 100},
         "atr_smoothing": {
             "type": "select",
             "options": ["WMA", "RMA", "SMA", "EMA"],
@@ -429,8 +429,8 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
     },
     "volume_filter": {
         "vol_diff_percent": {"type": "number", "min": 0.1, "max": 50, "default": 10},
-        "vol_length1": {"type": "integer", "min": 5, "max": 20, "default": 20},
-        "vol_length2": {"type": "integer", "min": 20, "max": 100, "default": 100},
+        "vol_length1": {"type": "integer", "min": 2, "max": 200, "default": 20},
+        "vol_length2": {"type": "integer", "min": 5, "max": 500, "default": 100},
         "vol_smoothing": {
             "type": "select",
             "options": ["WMA", "RMA", "SMA", "EMA"],
@@ -827,6 +827,11 @@ def validate_param_value(
             )
 
     elif param_type == "boolean":
+        # Accept int (0/1) and string ("true"/"false") — LLM agents sometimes emit these.
+        if isinstance(param_value, int) and not isinstance(param_value, bool):
+            param_value = bool(param_value)
+        elif isinstance(param_value, str):
+            param_value = param_value.strip().lower() in ("true", "1", "yes")
         if not isinstance(param_value, bool):
             messages.append(
                 ValidationMessage(

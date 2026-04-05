@@ -71,7 +71,7 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     elif metric == "max_drawdown":
         return -max_drawdown_pct
     elif metric == "avg_drawdown":
-        return -(result.get("avg_drawdown", 0) or 0)
+        return -(abs(result.get("avg_drawdown", 0) or 0))
     elif metric == "avg_loss":
         return -(abs(result.get("avg_loss", 0) or 0))
     elif metric == "volatility":

@@ -121,6 +121,7 @@ class AgentToAgentCommunicator:
             AgentType.DEEPSEEK: self._handle_deepseek_message,
             AgentType.PERPLEXITY: self._handle_perplexity_message,
             AgentType.QWEN: self._handle_qwen_message,
+            AgentType.CLAUDE: self._handle_claude_message,
             AgentType.COPILOT: self._handle_copilot_message,
         }
         self.conversation_cache: dict[str, list[AgentMessage]] = {}
@@ -295,6 +296,64 @@ class AgentToAgentCommunicator:
             agent_type=AgentType.QWEN,
             agent_response=agent_response,
             success_confidence=0.85,
+        )
+
+    async def _handle_claude_message(self, message: AgentMessage) -> AgentMessage:
+        """Route a message to Claude (Anthropic) via ClaudeClient.
+
+        Claude uses the Anthropic Messages API which is NOT OpenAI-compatible,
+        so it bypasses unified_agent_interface and calls ClaudeClient directly.
+        Claude acts as a synthesis critic and strategic reasoner in consensus rounds.
+        """
+        import os
+
+        from backend.agents.llm.base_client import LLMClientFactory, LLMConfig, LLMProvider
+
+        logger.info("🔀 Claude routing via ClaudeClient (Anthropic Messages API)")
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return AgentMessage(
+                message_id=str(uuid.uuid4()),
+                from_agent=AgentType.CLAUDE,
+                to_agent=message.from_agent,
+                message_type=MessageType.RESPONSE,
+                content="ANTHROPIC_API_KEY not configured — Claude unavailable.",
+                context=message.context,
+                conversation_id=message.conversation_id,
+                iteration=message.iteration + 1,
+                confidence_score=0.0,
+                metadata={"status": "no_key"},
+            )
+
+        config = LLMConfig(
+            provider=LLMProvider.ANTHROPIC,
+            api_key=api_key,
+            model="claude-haiku-4-5-20251001",
+            temperature=0.7,
+            max_tokens=4096,
+        )
+        client = LLMClientFactory.create(config)
+        try:
+            response_text = await client.complete(message.content)
+            confidence = 0.90
+            metadata: dict[str, Any] = {"status": "ok", "model": "claude-haiku-4-5-20251001"}
+        except Exception as exc:
+            logger.warning(f"⚠️ Claude API error: {exc}")
+            response_text = f"Claude unavailable: {exc}"
+            confidence = 0.0
+            metadata = {"status": "error", "error": str(exc)}
+
+        return AgentMessage(
+            message_id=str(uuid.uuid4()),
+            from_agent=AgentType.CLAUDE,
+            to_agent=message.from_agent,
+            message_type=MessageType.RESPONSE,
+            content=response_text,
+            context=message.context,
+            conversation_id=message.conversation_id,
+            iteration=message.iteration + 1,
+            confidence_score=confidence,
+            metadata=metadata,
         )
 
     async def _handle_copilot_message(self, message: AgentMessage) -> AgentMessage:

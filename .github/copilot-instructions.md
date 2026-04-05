@@ -26,16 +26,16 @@ Frontend → Static HTML/JS/CSS at /frontend/
 
 ### Key Directories
 
-| Path                                            | Purpose                                          |
-| ----------------------------------------------- | ------------------------------------------------ |
-| `backend/backtesting/engines/fallback_engine_v4.py` | Gold standard engine (3204 lines)            |
-| `backend/backtesting/strategies.py`             | ALL strategies + BaseStrategy + SignalResult     |
-| `backend/core/metrics_calculator.py`            | 166 TV-parity metrics                            |
-| `backend/api/routers/`                          | 70+ API router files                             |
-| `backend/services/adapters/bybit.py`            | Bybit API integration (1710 lines)               |
-| `backend/config/constants.py`                   | COMMISSION_TV, ALL_TIMEFRAMES, DEFAULT_CAPITAL   |
-| `backend/config/database_policy.py`             | DATA_START_DATE=2025-01-01                       |
-| `frontend/js/pages/strategy_builder.js`         | Main UI logic (13378 lines)                      |
+| Path                                                | Purpose                                        |
+| --------------------------------------------------- | ---------------------------------------------- |
+| `backend/backtesting/engines/fallback_engine_v4.py` | Gold standard engine (3204 lines)              |
+| `backend/backtesting/strategies.py`                 | ALL strategies + BaseStrategy + SignalResult   |
+| `backend/core/metrics_calculator.py`                | 166 TV-parity metrics                          |
+| `backend/api/routers/`                              | 70+ API router files                           |
+| `backend/services/adapters/bybit.py`                | Bybit API integration (1710 lines)             |
+| `backend/config/constants.py`                       | COMMISSION_TV, ALL_TIMEFRAMES, DEFAULT_CAPITAL |
+| `backend/config/database_policy.py`                 | DATA_START_DATE=2025-01-01                     |
+| `frontend/js/pages/strategy_builder.js`             | Main UI logic (13378 lines)                    |
 
 ---
 

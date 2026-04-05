@@ -13,20 +13,27 @@ function makeDOM() {
     <div id="aiBuildModal" class="hidden" style="display:none">
       <div class="ai-build-modal-content">
         <div class="ai-build-header"><h3></h3></div>
-        <div class="ai-build-preset-heading"></div>
+        <div id="aiPresetSection"></div>
         <div id="aiBuildConfig"></div>
         <div id="aiBuildProgress" class="hidden"></div>
         <div id="aiBuildResults" class="hidden"></div>
         <div id="aiBuildResultContent"></div>
         <div id="aiBuildSummary"></div>
         <div id="agentMonitor" class="hidden">
-          <div id="agentColumns"></div>
-          <div id="agentFeed-deepseek"></div>
-          <div id="agentFeed-qwen"></div>
-          <div id="agentFeed-perplexity"></div>
-          <span id="agentBadge-deepseek">0</span>
-          <span id="agentBadge-qwen">0</span>
-          <span id="agentBadge-perplexity">0</span>
+          <div id="agentCols">
+            <div class="agent-col" data-agent="deepseek">
+              <div class="agent-col-header">DeepSeek <span id="agentBadge-deepseek">0</span></div>
+              <div class="agent-col-feed" id="agentFeed-deepseek"></div>
+            </div>
+            <div class="agent-col" data-agent="qwen">
+              <div class="agent-col-header">Qwen <span id="agentBadge-qwen">0</span></div>
+              <div class="agent-col-feed" id="agentFeed-qwen"></div>
+            </div>
+            <div class="agent-col" data-agent="perplexity">
+              <div class="agent-col-header">Perplexity <span id="agentBadge-perplexity">0</span></div>
+              <div class="agent-col-feed" id="agentFeed-perplexity"></div>
+            </div>
+          </div>
           <button id="btnToggleAgentMonitor"></button>
         </div>
         <div id="aiBuildStage"></div>
@@ -41,7 +48,7 @@ function makeDOM() {
     <input id="aiMinSharpe" value="0.5" />
     <input id="aiDeliberation" type="checkbox" />
     <input id="aiUseOptimizer" type="checkbox" />
-    <select id="aiExistingStrategy"><option value="">— Создать новую —</option></select>
+    <select id="aiExistingStrategy"><option value="">— Create New Strategy —</option></select>
     <div id="aiExistingStrategyHint" style="display:none"></div>
     <span id="aiNameHint"></span>
     <input id="strategyName" value="Test Strategy" />
@@ -219,9 +226,9 @@ describe('resetAiBuild', () => {
 describe('toggleAgentMonitor', () => {
     beforeEach(makeDOM);
 
-    it('toggles hidden class on agentColumns', () => {
+    it('toggles hidden class on agentCols', () => {
         const mod = createAiBuildModule(makeDeps());
-        const cols = document.getElementById('agentColumns');
+        const cols = document.getElementById('agentCols');
         expect(cols.classList.contains('hidden')).toBe(false);
         mod.toggleAgentMonitor();
         expect(cols.classList.contains('hidden')).toBe(true);
@@ -229,8 +236,8 @@ describe('toggleAgentMonitor', () => {
         expect(cols.classList.contains('hidden')).toBe(false);
     });
 
-    it('does not throw when agentColumns not found', () => {
-        document.getElementById('agentColumns').remove();
+    it('does not throw when agentCols not found', () => {
+        document.getElementById('agentCols').remove();
         const mod = createAiBuildModule(makeDeps());
         expect(() => mod.toggleAgentMonitor()).not.toThrow();
     });
@@ -270,25 +277,27 @@ describe('showAiBuildResults', () => {
         expect(document.getElementById('aiBuildResults').classList.contains('hidden')).toBe(false);
     });
 
-    it('renders success alert when data.success is true', async () => {
+    it('renders success status when data.success is true', async () => {
         const mod = createAiBuildModule(makeDeps());
         await mod.showAiBuildResults({
             success: true,
             workflow: { status: 'done', duration_seconds: 5, iterations: [], errors: [] }
         });
         const html = document.getElementById('aiBuildResultContent').innerHTML;
-        expect(html).toContain('alert-success');
+        expect(html).toContain('ai-result-status');
+        expect(html).toContain('is-ok');
         expect(html).toContain('Strategy Built');
     });
 
-    it('renders warning alert when data.success is false', async () => {
+    it('renders warning status when data.success is false', async () => {
         const mod = createAiBuildModule(makeDeps());
         await mod.showAiBuildResults({
             success: false,
             workflow: { status: 'below_target', duration_seconds: 3, iterations: [] }
         });
         const html = document.getElementById('aiBuildResultContent').innerHTML;
-        expect(html).toContain('alert-warning');
+        expect(html).toContain('ai-result-status');
+        expect(html).toContain('is-warn');
         expect(html).toContain('Below Target');
     });
 
@@ -320,7 +329,7 @@ describe('showAiBuildResults', () => {
             }
         });
         const html = document.getElementById('aiBuildResultContent').innerHTML;
-        expect(html).toContain('0 Trades Detected');
+        expect(html).toContain('0 Trades');
     });
 
     it('calls displayBacktestResults when backtestId present and fetch succeeds', async () => {

@@ -14,6 +14,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -54,9 +55,9 @@ class Trade(Base):
     # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # Foreign key to backtest
+    # Foreign key to backtest (String(36) matches Backtest.id UUID type)
     backtest_id = Column(
-        Integer,
+        String(36),
         ForeignKey("backtests.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -115,6 +116,11 @@ class Trade(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
         nullable=False,
+        index=True,
+    )
+
+    __table_args__ = (
+        Index("ix_trades_backtest_created", "backtest_id", "created_at"),
     )
 
     # Relationships

@@ -140,6 +140,7 @@ BLOCK_CATEGORY_MAP: dict[str, str] = {
     "close_stochastic": "close_conditions",
     "close_psar": "close_conditions",
     # Universal filters / indicators
+    "supertrend_filter": "indicator",   # alias for supertrend — LLM sometimes generates this name
     "atr_volatility": "indicator",
     "volume_filter": "indicator",
     "highest_lowest_bar": "indicator",

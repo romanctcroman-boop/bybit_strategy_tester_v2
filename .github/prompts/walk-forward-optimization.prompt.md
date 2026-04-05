@@ -8,7 +8,7 @@ Complete workflow for running walk-forward optimization on a strategy.
 
 - **Strategy:** [Name or ID]
 - **Symbol:** [e.g., BTCUSDT]
-- **Timeframe:** [e.g., 15m, 1h]
+- **Timeframe:** [e.g., 15, 60 — Bybit format: numeric string, NOT "15m"/"1h"]
 - **Date Range:** [Start and end dates]
 - **Parameters to Optimize:** [List with ranges]
 - **Optimization Metric:** [Sharpe, Sortino, PnL, etc.]
@@ -23,9 +23,9 @@ Complete workflow for running walk-forward optimization on a strategy.
 optimization_config = {
     'strategy': 'rsi',
     'symbol': 'BTCUSDT',
-    'timeframe': '15m',
-    'start_date': '2024-01-01',
-    'end_date': '2025-01-01',
+    'timeframe': '15',           # Bybit format: "1","5","15","30","60","240","D"
+    'start_date': '2025-01-01',  # DATA_START_DATE — no data before this
+    'end_date': '2025-07-01',
 
     # Walk-forward settings
     'train_days': 180,      # Training window
@@ -53,9 +53,9 @@ from backend.services.data_service import DataService
 service = DataService()
 data = await service.load_ohlcv(
     symbol='BTCUSDT',
-    interval='15m',
-    start_date='2024-01-01',
-    end_date='2025-01-01'
+    interval='15',              # Bybit format — NOT '15m'
+    start_date='2025-01-01',    # DATA_START_DATE minimum
+    end_date='2025-07-01'
 )
 
 print(f"Data points: {len(data)}")
@@ -79,9 +79,9 @@ curl -X POST "http://localhost:8000/api/v1/optimize/walk-forward" \
      -d '{
        "strategy_type": "rsi",
        "symbol": "BTCUSDT",
-       "interval": "15m",
-       "start_date": "2024-01-01",
-       "end_date": "2025-01-01",
+       "interval": "15",
+       "start_date": "2025-01-01",
+       "end_date": "2025-07-01",
        "train_days": 180,
        "test_days": 30,
        "param_ranges": {
@@ -97,7 +97,7 @@ curl -X POST "http://localhost:8000/api/v1/optimize/walk-forward" \
 
 ```python
 from backend.backtesting.walk_forward import WalkForwardOptimizer
-from backend.backtesting.strategies.rsi_strategy import RSIStrategy
+from backend.backtesting.strategies import RSIStrategy
 
 optimizer = WalkForwardOptimizer(
     strategy_class=RSIStrategy,
@@ -299,9 +299,9 @@ print(f"Max DD: {forward_result['max_drawdown']*100:.1f}%")
 python -m backend.backtesting.walk_forward \
     --strategy rsi \
     --symbol BTCUSDT \
-    --start 2024-01-01 \
-    --end 2025-01-01 \
-    --train-days 180 \
+    --start 2025-01-01 \
+    --end 2025-07-01 \
+    --train-days 90 \
     --test-days 30
 
 # View results

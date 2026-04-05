@@ -785,6 +785,11 @@ class StrategyBuilderAdapter(BaseStrategy):
                 close_conditions["close_min_profit"] = params.get("close_min_profit", 0.5)
                 close_conditions["close_max_bars"] = params.get("close_max_bars", 100)
             elif block_type == "close_by_time":
+                # extract_dca_config is a metadata query — report params regardless of connectivity.
+                # (Connectivity check is only relevant in generate_signals() to prevent orphan activation.)
+                _cbt_enabled = bool(params.get("enabled", True))
+                if not _cbt_enabled:
+                    continue
                 # Close by Time node: bars_since_entry, profit_only, min_profit_percent
                 bars = int(params.get("bars_since_entry", params.get("bars", 10)))
                 close_conditions["time_bars_close_enable"] = True

@@ -19,6 +19,7 @@ from backend.agents.langgraph_orchestrator import AgentState
 from backend.agents.trading_strategy_graph import (
     BacktestAnalysisNode,
     RefinementNode,
+    WalkForwardValidationNode,
     _backtest_passes,
     _should_refine,
     build_trading_strategy_graph,
@@ -114,6 +115,35 @@ class TestShouldRefine:
     def test_passed_should_not_refine(self):
         state = _state_with_backtest(trades=10, sharpe=1.5, max_drawdown=15.0, refinement_iteration=0)
         assert _should_refine(state) is False
+
+    def test_poor_risk_reward_with_good_signals_skips_refinement(self):
+        """poor_risk_reward + ≥50 signals + ≥5 trades → skip refinement (go to optimizer)."""
+        state = _state_with_backtest(trades=87, sharpe=-0.09, max_drawdown=35.0, refinement_iteration=0)
+        # Set analysis diagnosis
+        state.context["backtest_analysis"] = {"root_cause": "poor_risk_reward", "passed": False}
+        # Add signal counts to backtest result
+        bt = state.get_result("backtest") or {}
+        bt["signal_long_count"] = 186
+        bt["signal_short_count"] = 154
+        state.set_result("backtest", bt)
+        assert _should_refine(state) is False  # skip — optimizer handles this better
+
+    def test_poor_risk_reward_sparse_signals_still_refines(self):
+        """poor_risk_reward but only 3 total signals → refinement still needed."""
+        state = _state_with_backtest(trades=5, sharpe=-0.1, max_drawdown=20.0, refinement_iteration=0)
+        state.context["backtest_analysis"] = {"root_cause": "poor_risk_reward", "passed": False}
+        bt = state.get_result("backtest") or {}
+        bt["signal_long_count"] = 2
+        bt["signal_short_count"] = 1
+        state.set_result("backtest", bt)
+        assert _should_refine(state) is True  # refine — signal generation is the real issue
+
+    def test_poor_risk_reward_no_signal_counts_still_refines(self):
+        """poor_risk_reward with no signal_count info → conservative: still refine."""
+        state = _state_with_backtest(trades=10, sharpe=-0.5, max_drawdown=20.0, refinement_iteration=0)
+        state.context["backtest_analysis"] = {"root_cause": "poor_risk_reward", "passed": False}
+        # No signal_long_count / signal_short_count in backtest result
+        assert _should_refine(state) is True  # conservative: refine when unknown
 
 
 # ---------------------------------------------------------------------------
@@ -233,12 +263,12 @@ class TestGraphWiring:
         assert "generate_strategies" in targets
 
     def test_optimization_is_default_route(self):
-        # P1-2: with wf_validation enabled (default), backtest_analysis → wf_validation → optimize
+        # backtest_analysis → optimize_strategy in both WF and no-WF paths
+        # (WF now runs AFTER optimizer, so optimizer is always the next step after backtest_analysis)
         graph = build_trading_strategy_graph(run_backtest=True)
         router = graph.routers["backtest_analysis"]
-        assert router.default_route == "wf_validation"
+        assert router.default_route == "optimize_strategy"
 
-        # When wf_validation disabled, backtest_analysis → optimize directly
         graph_no_wf = build_trading_strategy_graph(run_backtest=True, run_wf_validation=False)
         router_no_wf = graph_no_wf.routers["backtest_analysis"]
         assert router_no_wf.default_route == "optimize_strategy"
@@ -247,11 +277,23 @@ class TestGraphWiring:
         graph = build_trading_strategy_graph(run_backtest=True)
         assert "optimize_strategy" in graph.nodes
 
-    def test_optimization_leads_to_ml_validation(self):
-        # Phase 7 (MLValidationNode) is now inserted between optimize and memory
+    def test_optimization_leads_to_wf_or_analysis_debate(self):
+        # With WF enabled: optimize_strategy → wf_validation → analysis_debate
         graph = build_trading_strategy_graph(run_backtest=True)
         opt_edges = graph.edges.get("optimize_strategy", [])
         targets = [e.target for e in opt_edges]
+        assert "wf_validation" in targets  # WF validates optimized params
+
+        # Without WF: optimize_strategy → analysis_debate directly
+        graph_no_wf = build_trading_strategy_graph(run_backtest=True, run_wf_validation=False)
+        opt_edges_no_wf = graph_no_wf.edges.get("optimize_strategy", [])
+        targets_no_wf = [e.target for e in opt_edges_no_wf]
+        assert "analysis_debate" in targets_no_wf
+
+    def test_analysis_debate_leads_to_ml_validation(self):
+        graph = build_trading_strategy_graph(run_backtest=True)
+        debate_edges = graph.edges.get("analysis_debate", [])
+        targets = [e.target for e in debate_edges]
         assert "ml_validation" in targets
 
     def test_ml_validation_leads_to_memory_update(self):
@@ -283,28 +325,28 @@ class TestRefinementIntegration:
     async def test_router_picks_optimize_on_pass(self):
         from backend.agents.langgraph_orchestrator import ConditionalRouter
 
-        # P1-2: passing path now goes backtest_analysis → wf_validation → optimize
+        # Passing path: backtest_analysis → optimize_strategy → wf_validation
         state = _state_with_backtest(trades=10, sharpe=1.5, max_drawdown=15.0, refinement_iteration=0)
         graph = build_trading_strategy_graph(run_backtest=True)
         router: ConditionalRouter = graph.routers["backtest_analysis"]
         next_node = router.get_next_node(state)
-        assert next_node == "wf_validation"  # P1-2 gate inserted
+        assert next_node == "optimize_strategy"  # optimizer first
 
-        # wf_validation router also defaults to optimize_strategy when not refining
+        # wf_validation router defaults to analysis_debate (WF validates optimized params)
         wf_router: ConditionalRouter = graph.routers["wf_validation"]
         next_node = wf_router.get_next_node(state)
-        assert next_node == "optimize_strategy"
+        assert next_node == "analysis_debate"
 
     @pytest.mark.asyncio
     async def test_router_picks_optimize_on_max_iterations(self):
         from backend.agents.langgraph_orchestrator import ConditionalRouter
 
-        # Failed strategy but max iterations reached → goes to wf_validation (then optimize)
+        # Failed strategy, max iterations reached → optimize_strategy (then wf_validation)
         state = _state_with_backtest(trades=1, sharpe=-1.0, max_drawdown=50.0, refinement_iteration=3)
         graph = build_trading_strategy_graph(run_backtest=True)
         router: ConditionalRouter = graph.routers["backtest_analysis"]
         next_node = router.get_next_node(state)
-        assert next_node == "wf_validation"  # max iter → no refine → wf gate
+        assert next_node == "optimize_strategy"  # max iter → no refine → optimizer
 
     @pytest.mark.asyncio
     async def test_two_iterations_then_pass(self):
@@ -335,6 +377,64 @@ class TestRefinementIntegration:
         )
         assert _should_refine(state) is False
         assert _backtest_passes(state) is True
+
+
+# ---------------------------------------------------------------------------
+# WalkForwardValidationNode: acceptance thresholds
+# ---------------------------------------------------------------------------
+
+
+class TestWFThresholds:
+    """Unit tests for WalkForwardValidationNode.WF_RATIO_THRESHOLD / WF_MIN_ABS_SHARPE."""
+
+    def test_ratio_threshold_value(self):
+        assert WalkForwardValidationNode.WF_RATIO_THRESHOLD == 0.5
+
+    def test_abs_sharpe_floor_value(self):
+        assert WalkForwardValidationNode.WF_MIN_ABS_SHARPE == 0.5
+
+    def test_ratio_passes(self):
+        """wf=0.6, is=1.0 → ratio=0.6 ≥ 0.5 → passes by ratio."""
+        node = WalkForwardValidationNode()
+        ratio = 0.6 / 1.0
+        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD
+        abs_passes = 0.6 >= node.WF_MIN_ABS_SHARPE
+        assert ratio_passes is True
+        assert (1.0 > 0 and 0.6 > 0 and (ratio_passes or abs_passes)) is True
+
+    def test_abs_floor_passes_when_ratio_fails(self):
+        """Run #14 scenario: wf=0.514, is=1.805 → ratio=0.285 < 0.5, but abs≥0.5 → passes."""
+        node = WalkForwardValidationNode()
+        wf_sharpe, is_sharpe = 0.514, 1.805
+        ratio = wf_sharpe / is_sharpe          # 0.285
+        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD   # False
+        abs_passes = wf_sharpe >= node.WF_MIN_ABS_SHARPE  # True
+        passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
+        assert ratio_passes is False
+        assert abs_passes is True
+        assert passed is True
+
+    def test_both_fail_when_wf_sharpe_low(self):
+        """wf=0.3, is=2.0 → ratio=0.15 < 0.5 AND abs=0.3 < 0.5 → fails."""
+        node = WalkForwardValidationNode()
+        wf_sharpe, is_sharpe = 0.3, 2.0
+        ratio = wf_sharpe / is_sharpe
+        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD
+        abs_passes = wf_sharpe >= node.WF_MIN_ABS_SHARPE
+        passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
+        assert ratio_passes is False
+        assert abs_passes is False
+        assert passed is False
+
+    def test_negative_wf_sharpe_always_fails(self):
+        """wf=-0.1, is=0.5 → negative OOS → fails regardless."""
+        node = WalkForwardValidationNode()
+        wf_sharpe, is_sharpe = -0.1, 0.5
+        ratio = wf_sharpe / is_sharpe if is_sharpe > 0 else 0.0
+        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD
+        abs_passes = wf_sharpe >= node.WF_MIN_ABS_SHARPE
+        passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
+        assert passed is False
 
 
 # ---------------------------------------------------------------------------

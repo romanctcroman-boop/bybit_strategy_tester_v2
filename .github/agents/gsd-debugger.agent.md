@@ -79,7 +79,7 @@ updated: YYYY-MM-DD
 
 - Verify indicator calculations (pandas_ta)
 - Check NaN propagation from lookback periods
-- Validate signal values: must be 1 (long), -1 (short), or 0 (no action)
+- Validate signal types: `generate_signals()` returns `SignalResult` with bool `entries`/`exits` Series (NOT a DataFrame with 'signal' column); check `result.entries.dtype == bool` and `not result.entries.isna().any()`
 - Test boundary conditions at start/end of data
 
 ## Rules

@@ -113,10 +113,10 @@ Create `.gsd/phases/XX-name/{phase}-VERIFICATION.md`:
 
 ### For Strategy Changes
 
-- [ ] `generate_signals()` returns DataFrame with 'signal' column
-- [ ] Signal values are only 1, -1, or 0
-- [ ] NaN handling present
-- [ ] Parameter validation in `__init__`
+- [ ] `generate_signals()` returns `SignalResult` (NOT DataFrame with 'signal' column)
+- [ ] `result.entries` and `result.exits` are `bool` pandas Series
+- [ ] `result.entries.isna().any()` is False (no NaN after `.fillna(False)`)
+- [ ] Parameter validation in `_validate_params()` raises `ValueError` on bad input
 
 ### For Database Changes
 

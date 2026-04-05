@@ -4,24 +4,24 @@ applyTo: "**/tests/**/*.py"
 
 # Testing Rules for Bybit Strategy Tester
 
-
 ## Structure
 
 ```
 tests/
-├── unit/              # Fast, isolated tests
-│   ├── test_strategies/
-│   ├── test_indicators/
-│   └── test_utils/
-├── integration/       # Multi-component tests
-│   ├── test_api/
-│   └── test_backtester/
-├── e2e/               # End-to-end tests
-│   └── test_full_backtest.py
-├── fixtures/          # Shared test data
-│   ├── sample_ohlcv.csv
-│   └── conftest.py
-└── conftest.py        # Root fixtures
+├── conftest.py              # Root fixtures
+├── backend/
+│   ├── backtesting/         # Engine, MTF, strategy builder parity
+│   ├── api/                 # API router tests
+│   ├── agents/              # 40+ agent system tests
+│   ├── services/            # Service layer tests
+│   └── core/                # MetricsCalculator, indicators
+├── ai_agents/               # 56+ divergence + AI agent tests
+├── backtesting/             # GPU, market regime tests
+├── integration/             # Multi-component / DB / Redis tests
+├── e2e/                     # End-to-end tests
+├── chaos/                   # Chaos engineering tests
+├── frontend/                # Frontend smoke tests
+└── test_*.py                # Root-level tests
 ```
 
 ## Naming Convention
@@ -93,7 +93,7 @@ def backtest_config() -> dict:
 | Module Category    | Minimum Coverage                                                                             |
 | ------------------ | -------------------------------------------------------------------------------------------- |
 | **Critical (95%)** | `backend/backtesting/engines/`, `backend/core/metrics_calculator.py`, `backend/api/routers/` |
-| **Medium (85%)**   | `backend/services/`, `backend/backtesting/strategies/`                                       |
+| **Medium (85%)**   | `backend/services/`, `backend/backtesting/strategies.py`                                     |
 | **Standard (80%)** | Everything else                                                                              |
 
 ## Test Patterns
@@ -152,7 +152,7 @@ class TestBacktestAPI:
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.post("/api/v1/backtests/", json={
                 "symbol": "BTCUSDT",
-                "interval": "15m",
+                "interval": "15",
                 "start_date": "2025-01-01",
                 "end_date": "2025-01-31",
                 "strategy_type": "rsi",
@@ -217,7 +217,7 @@ pytest tests/ -v
 pytest tests/ --cov=backend --cov-report=term-missing
 
 # Specific module
-pytest tests/unit/test_strategies/ -v
+pytest tests/backend/backtesting/ -v
 
 # Run only fast tests
 pytest tests/ -m "not slow"
@@ -232,7 +232,8 @@ pytest tests/ -n auto
 def test_tradingview_parity():
     """Verify indicator values match TradingView"""
     # Load reference data exported from TradingView
-    tv_data = pd.read_csv("tests/fixtures/tv_rsi_reference.csv")
+    # Note: create this file manually; tests/fixtures/ does not exist by default
+    tv_data = pd.read_csv("tv_rsi_reference.csv")  # adjust path as needed
 
     # Calculate using our implementation
     our_rsi = ta.rsi(tv_data['close'], length=14)

@@ -18,7 +18,7 @@ Implement a new feature from specification to deployment-ready code.
     - [ ] API routers (`backend/api/routers/`)
     - [ ] Services (`backend/services/`)
     - [ ] Backtesting engine (`backend/backtesting/`)
-    - [ ] Strategies (`backend/strategies/`)
+    - [ ] Strategies (`backend/backtesting/strategies.py`)
     - [ ] Frontend (`frontend/js/`)
     - [ ] Tests (`tests/`)
 3. **Map dependencies** — What existing code will be affected?

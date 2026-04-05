@@ -107,6 +107,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                     {
                         "symbol": symbol,
                         "interval": interval,
+                        "market_type": c.get("market_type", "linear"),
                         "open_time": open_time,
                         "open_time_dt": datetime.fromtimestamp(open_time / 1000, tz=UTC),
                         "open_price": float(c.get("open", 0)),
@@ -119,10 +120,10 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                     }
                 )
 
-            # SQLite UPSERT using ON CONFLICT
+            # SQLite UPSERT using ON CONFLICT — must match UniqueConstraint(symbol, interval, market_type, open_time)
             stmt = sqlite_insert(BybitKlineAudit).values(values)
             stmt = stmt.on_conflict_do_update(
-                index_elements=["symbol", "interval", "open_time"],
+                index_elements=["symbol", "interval", "market_type", "open_time"],
                 set_={
                     "open_price": stmt.excluded.open_price,
                     "high_price": stmt.excluded.high_price,

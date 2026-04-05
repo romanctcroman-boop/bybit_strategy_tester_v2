@@ -408,8 +408,9 @@ def execute_filter(
 
     # ========== Two MA Filter ==========
     elif filter_type == "two_ma_filter":
-        fast_period = _param(params, 9, "fast_period", "fastPeriod")
-        slow_period = _param(params, 21, "slow_period", "slowPeriod")
+        # Accept both legacy (fast_period/slow_period) and optimizer (ma1_length/ma2_length) keys
+        fast_period = _param(params, 9, "fast_period", "fastPeriod", "ma1_length")
+        slow_period = _param(params, 21, "slow_period", "slowPeriod", "ma2_length")
         ma_type = _param(params, "ema", "ma_type", "maType")
 
         if ma_type == "ema":
@@ -419,16 +420,32 @@ def execute_filter(
             fast = calculate_sma(close, fast_period)
             slow = calculate_sma(close, slow_period)
 
-        buy = crossover(fast, slow)
-        sell = crossunder(fast, slow)
-
+        # Use condition-style filter: allow entries while fast > slow (trend direction)
+        # crossover/crossunder would only fire on the crossing bar (~2-3 bars per year),
+        # making this filter block almost all entries when period gaps are large (e.g. 60 vs 110).
         mem_bars = int(params.get("ma_cross_memory_bars", 0))
         if mem_bars > 0:
-            buy, sell = extend_dual_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
+            # Crossover mode with memory: True on cross bar + N following bars
+            buy_evt = crossover(fast, slow)
+            sell_evt = crossunder(fast, slow)
+            buy_arr, sell_arr = extend_dual_signal_memory(
+                np.asarray(buy_evt, dtype=bool), np.asarray(sell_evt, dtype=bool), mem_bars
+            )
+            buy_s = pd.Series(buy_arr, index=ohlcv.index)
+            sell_s = pd.Series(sell_arr, index=ohlcv.index)
+        else:
+            # Condition mode: True all bars where fast MA > slow MA (intended semantic)
+            fast_arr = np.asarray(fast)
+            slow_arr = np.asarray(slow)
+            buy_s = pd.Series(fast_arr > slow_arr, index=ohlcv.index)
+            sell_s = pd.Series(fast_arr < slow_arr, index=ohlcv.index)
 
         return {
-            "buy": pd.Series(buy, index=ohlcv.index),
-            "sell": pd.Series(sell, index=ohlcv.index),
+            "buy": buy_s,
+            "sell": sell_s,
+            # Aliases so signal_router.py filter_long→long resolves correctly
+            "long": buy_s,
+            "short": sell_s,
             "fast": pd.Series(fast, index=ohlcv.index),
             "slow": pd.Series(slow, index=ohlcv.index),
         }

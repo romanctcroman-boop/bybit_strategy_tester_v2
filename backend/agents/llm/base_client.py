@@ -432,12 +432,14 @@ class LLMClientFactory:
     def create(config: LLMConfig) -> LLMClient:
         """Create client based on provider config."""
         # Import here to break circular dependency
+        from backend.agents.llm.clients.claude import ClaudeClient
         from backend.agents.llm.clients.deepseek import DeepSeekClient
         from backend.agents.llm.clients.ollama import OllamaClient
         from backend.agents.llm.clients.perplexity import PerplexityClient
         from backend.agents.llm.clients.qwen import QwenClient
 
         provider_map: dict[LLMProvider, type[LLMClient]] = {
+            LLMProvider.ANTHROPIC: ClaudeClient,
             LLMProvider.DEEPSEEK: DeepSeekClient,
             LLMProvider.PERPLEXITY: PerplexityClient,
             LLMProvider.QWEN: QwenClient,

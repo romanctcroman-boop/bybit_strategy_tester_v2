@@ -17,6 +17,7 @@ Endpoints:
 
 import asyncio
 import logging
+import math
 import os
 import time
 from datetime import UTC, datetime
@@ -51,6 +52,18 @@ from backend.services.strategy_builder import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_for_json(obj: Any) -> Any:
+    """Recursively replace non-JSON-compliant float values (inf/-inf/nan) with None."""
+    if isinstance(obj, float):
+        return None if not math.isfinite(obj) else obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
 
 router = APIRouter(prefix="/strategy-builder", tags=["Strategy Builder"])
 
@@ -657,6 +670,7 @@ async def list_strategies(
     strategies = (
         db.query(Strategy)
         .filter(Strategy.is_builder_strategy == True, Strategy.is_deleted == False)  # noqa: E712
+        .distinct(Strategy.id)
         .order_by(Strategy.updated_at.desc())
         .offset(offset)
         .limit(page_size)
@@ -1861,6 +1875,7 @@ async def optimize_strategy(
                 top_n=_internal_max_results,
                 timeout_seconds=request.timeout_seconds,
                 n_jobs=request.n_jobs,
+                strategy_id=strategy_id,
             )
         elif request.method == "walk_forward":
             # Walk-Forward Optimization
@@ -1958,6 +1973,9 @@ async def optimize_strategy(
                 result["best_metrics"] = {k: v for k, v in results_list[0].items() if k not in ("params", "score")}
                 result["best_params"] = results_list[0].get("params", result.get("best_params", {}))
                 result["best_score"] = results_list[0].get("score", result.get("best_score", 0))
+
+        # Sanitize non-finite floats (inf/-inf/nan) before JSON serialization
+        result = _sanitize_for_json(result)
 
         return {
             "strategy_id": strategy_id,
@@ -2901,7 +2919,14 @@ async def run_backtest_from_builder(
     has_exit_block = any(b.get("type") in exit_block_types for b in blocks)
     exit_ports = {"exit_long", "exit_short"}
     has_exit_signal = any(_get_target_port(c) in exit_ports for c in conns)
-    if not has_exit_block and not has_exit_signal:
+    # Also accept explicit stop_loss / take_profit from the request as exit conditions.
+    # This allows the AI optimizer to run on strategies without a structural exit block
+    # by injecting SL/TP at the config level instead.
+    has_exit_sl_tp = bool(
+        (request.stop_loss is not None and request.stop_loss > 0)
+        or (request.take_profit is not None and request.take_profit > 0)
+    )
+    if not has_exit_block and not has_exit_signal and not has_exit_sl_tp:
         validation_errors.append("No exit conditions: add SL/TP block or connect signals to Exit Long/Exit Short.")
 
     if validation_errors:
@@ -3150,6 +3175,14 @@ async def run_backtest_from_builder(
             elif block_type == "sl_percent" and block_stop_loss is None:
                 sl_val = block_params.get("stop_loss_percent", 1.5)
                 block_stop_loss = sl_val / 100
+
+        # Sanitize: 0.0 is not a valid SL/TP — treat as None (no SL/TP enforced by engine).
+        # This handles the case where AI optimizer sets stop_loss_percent=0 in a block,
+        # which would produce block_stop_loss=0.0 and fail BacktestConfig(ge=0.001).
+        if block_stop_loss is not None and block_stop_loss < 0.001:
+            block_stop_loss = None
+        if block_take_profit is not None and block_take_profit < 0.001:
+            block_take_profit = None
 
         no_trade_days_tuple = (
             tuple(request.no_trade_days) if request.no_trade_days is not None and len(request.no_trade_days) > 0 else ()

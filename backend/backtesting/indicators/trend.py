@@ -279,8 +279,12 @@ def _handle_supertrend(
     st_lower = np.where(st_direction == 1, st_line, np.nan)
 
     if not use_supertrend:
-        long_signal = pd.Series(True, index=ohlcv.index)
-        short_signal = pd.Series(True, index=ohlcv.index)
+        # Default behaviour: use trend direction (direction==1 = uptrend = long allowed)
+        # This makes SuperTrend behave as a trend-following filter even without
+        # explicit use_supertrend=True. Previously this returned pd.Series(True, …)
+        # which caused entry on every bar when wired to entry_long port.
+        long_signal = (direction == 1).fillna(False)
+        short_signal = (direction == -1).fillna(False)
     elif generate_on_trend_change:
         long_signal = (direction == 1) & (direction.shift(1) == -1)
         short_signal = (direction == -1) & (direction.shift(1) == 1)
@@ -524,6 +528,12 @@ BLOCK_REGISTRY: dict[str, dict[str, Any]] = {
         "param_aliases": {},
     },
     "supertrend": {
+        "handler": _handle_supertrend,
+        "outputs": ["supertrend", "direction", "upper", "lower", "long", "short"],
+        "param_aliases": {},
+    },
+    # Alias: LLM agents sometimes hallucinate "supertrend_filter" — map to same handler
+    "supertrend_filter": {
         "handler": _handle_supertrend,
         "outputs": ["supertrend", "direction", "upper", "lower", "long", "short"],
         "param_aliases": {},

@@ -33,19 +33,37 @@ ALL_TIMEFRAMES = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
 ### New Strategy
 
 ```python
-from backend.backtesting.strategies.base import BaseStrategy
+from backend.backtesting.strategies import BaseStrategy, SignalResult
+import pandas as pd
 import pandas_ta as ta
+from typing import Any
 
 class MyStrategy(BaseStrategy):
-    def __init__(self, params: dict):
-        super().__init__(params)
-        self.required_params = ['period', 'threshold']
-        self._validate_params()
+    name: str = "my_strategy"
+    description: str = "Brief description"
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
-        signals = data.copy()
-        signals['signal'] = 0   # 1=long, -1=short, 0=hold
-        return signals
+    def __init__(self, params: dict[str, Any] | None = None):
+        super().__init__(params)  # calls _validate_params() internally
+
+    def _validate_params(self) -> None:
+        if 'period' not in self.params:
+            raise ValueError("Missing required param: period")
+
+    def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
+        rsi = ta.rsi(ohlcv['close'], length=self.params['period'])
+        return SignalResult(
+            entries=(rsi < 30).fillna(False),
+            exits=(rsi > 70).fillna(False),
+            short_entries=(rsi > 70).fillna(False),
+            short_exits=(rsi < 30).fillna(False),
+        )
+
+    @classmethod
+    def get_default_params(cls) -> dict[str, Any]:
+        return {'period': 14}
+
+# Register in STRATEGY_REGISTRY (near end of strategies.py):
+# STRATEGY_REGISTRY["my_strategy"] = MyStrategy
 ```
 
 ### FastAPI Endpoint

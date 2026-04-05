@@ -31,6 +31,7 @@ class AgentType(str, Enum):
     DEEPSEEK = "deepseek"
     PERPLEXITY = "perplexity"
     QWEN = "qwen"
+    CLAUDE = "claude"
     COPILOT = "copilot"
     ORCHESTRATOR = "orchestrator"
 

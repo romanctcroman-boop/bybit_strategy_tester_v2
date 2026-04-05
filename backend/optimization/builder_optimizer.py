@@ -20,6 +20,7 @@ import contextlib
 import copy
 import json
 import logging
+import math
 import threading
 import time
 from itertools import product
@@ -162,55 +163,56 @@ def clear_optimization_progress(strategy_id: str) -> None:
 # Default optimization ranges per indicator block type
 DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
     "rsi": {
-        "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 14},
-        # Range filter bounds (long)
-        "long_rsi_more": {"type": "float", "low": 10, "high": 45, "step": 5, "default": 30},
-        "long_rsi_less": {"type": "float", "low": 55, "high": 90, "step": 5, "default": 70},
-        # Range filter bounds (short)
-        "short_rsi_less": {"type": "float", "low": 55, "high": 90, "step": 5, "default": 70},
-        "short_rsi_more": {"type": "float", "low": 10, "high": 45, "step": 5, "default": 30},
-        # Cross levels
-        "cross_long_level": {"type": "float", "low": 15, "high": 45, "step": 5, "default": 30},
-        "cross_short_level": {"type": "float", "low": 55, "high": 85, "step": 5, "default": 70},
+        # period: extended to 100 — slow RSI (period 50-100) can outperform on higher TFs
+        "period": {"type": "int", "low": 7, "high": 100, "step": 1, "default": 14},
+        # Range filter bounds (long) — step=2 for fine coverage
+        "long_rsi_more": {"type": "float", "low": 5, "high": 60, "step": 2, "default": 30},
+        "long_rsi_less": {"type": "float", "low": 50, "high": 95, "step": 2, "default": 70},
+        # Range filter bounds (short) — step=2 for fine coverage
+        "short_rsi_less": {"type": "float", "low": 50, "high": 95, "step": 2, "default": 70},
+        "short_rsi_more": {"type": "float", "low": 5, "high": 60, "step": 2, "default": 30},
+        # Cross levels: wide range, fine step=1 — Bayesian optimizer explores efficiently
+        "cross_long_level": {"type": "float", "low": 15, "high": 85, "step": 1, "default": 45},
+        "cross_short_level": {"type": "float", "low": 15, "high": 85, "step": 1, "default": 55},
         # Cross memory
         "cross_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
         # Legacy (backward compatibility — only used when no new mode is enabled)
-        "overbought": {"type": "int", "low": 60, "high": 85, "step": 5, "default": 70},
-        "oversold": {"type": "int", "low": 15, "high": 40, "step": 5, "default": 30},
+        "overbought": {"type": "int", "low": 55, "high": 90, "step": 1, "default": 70},
+        "oversold": {"type": "int", "low": 10, "high": 45, "step": 1, "default": 30},
     },
     "macd": {
-        "fast_period": {"type": "int", "low": 8, "high": 16, "step": 1, "default": 12},
-        "slow_period": {"type": "int", "low": 20, "high": 30, "step": 1, "default": 26},
-        "signal_period": {"type": "int", "low": 6, "high": 12, "step": 1, "default": 9},
+        "fast_period": {"type": "int", "low": 5, "high": 20, "step": 1, "default": 12},
+        "slow_period": {"type": "int", "low": 15, "high": 50, "step": 1, "default": 26},
+        "signal_period": {"type": "int", "low": 3, "high": 15, "step": 1, "default": 9},
         # Cross with Level (Zero Line)
-        "macd_cross_zero_level": {"type": "float", "low": -50.0, "high": 50.0, "step": 1.0, "default": 0},
+        "macd_cross_zero_level": {"type": "float", "low": -100.0, "high": 100.0, "step": 1.0, "default": 0},
         # Signal Memory
         "signal_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
     },
     "ema": {
-        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+        "period": {"type": "int", "low": 3, "high": 200, "step": 1, "default": 20},
     },
     "sma": {
-        "period": {"type": "int", "low": 5, "high": 100, "step": 5, "default": 50},
+        "period": {"type": "int", "low": 3, "high": 200, "step": 1, "default": 50},
     },
     "bollinger": {
-        "period": {"type": "int", "low": 10, "high": 30, "step": 1, "default": 20},
-        "std_dev": {"type": "float", "low": 1.5, "high": 3.0, "step": 0.25, "default": 2.0},
+        "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
+        "std_dev": {"type": "float", "low": 1.0, "high": 4.0, "step": 0.1, "default": 2.0},
     },
     "supertrend": {
-        "period": {"type": "int", "low": 5, "high": 20, "step": 1, "default": 10},
-        "multiplier": {"type": "float", "low": 1.0, "high": 5.0, "step": 0.5, "default": 3.0},
+        "period": {"type": "int", "low": 3, "high": 30, "step": 1, "default": 10},
+        "multiplier": {"type": "float", "low": 0.5, "high": 6.0, "step": 0.25, "default": 3.0},
     },
     "stochastic": {
-        "stoch_k_length": {"type": "int", "low": 5, "high": 21, "step": 1, "default": 14},
-        "stoch_k_smoothing": {"type": "int", "low": 1, "high": 5, "step": 1, "default": 3},
-        "stoch_d_smoothing": {"type": "int", "low": 1, "high": 5, "step": 1, "default": 3},
-        "long_stoch_d_more": {"type": "int", "low": 5, "high": 30, "step": 5, "default": 20},
-        "long_stoch_d_less": {"type": "int", "low": 30, "high": 50, "step": 5, "default": 40},
-        "short_stoch_d_less": {"type": "int", "low": 60, "high": 90, "step": 5, "default": 80},
-        "short_stoch_d_more": {"type": "int", "low": 50, "high": 80, "step": 5, "default": 60},
-        "stoch_cross_level_long": {"type": "int", "low": 10, "high": 30, "step": 5, "default": 20},
-        "stoch_cross_level_short": {"type": "int", "low": 70, "high": 90, "step": 5, "default": 80},
+        "stoch_k_length": {"type": "int", "low": 3, "high": 30, "step": 1, "default": 14},
+        "stoch_k_smoothing": {"type": "int", "low": 1, "high": 7, "step": 1, "default": 3},
+        "stoch_d_smoothing": {"type": "int", "low": 1, "high": 7, "step": 1, "default": 3},
+        "long_stoch_d_more": {"type": "int", "low": 1, "high": 40, "step": 1, "default": 20},
+        "long_stoch_d_less": {"type": "int", "low": 20, "high": 60, "step": 1, "default": 40},
+        "short_stoch_d_less": {"type": "int", "low": 50, "high": 99, "step": 1, "default": 80},
+        "short_stoch_d_more": {"type": "int", "low": 40, "high": 90, "step": 1, "default": 60},
+        "stoch_cross_level_long": {"type": "int", "low": 5, "high": 40, "step": 1, "default": 20},
+        "stoch_cross_level_short": {"type": "int", "low": 60, "high": 95, "step": 1, "default": 80},
         "stoch_cross_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
         "stoch_kd_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
     },
@@ -227,9 +229,9 @@ DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
         "period": {"type": "int", "low": 7, "high": 21, "step": 1, "default": 14},
     },
     "static_sltp": {
-        "stop_loss_percent": {"type": "float", "low": 0.5, "high": 5.0, "step": 0.5, "default": 1.5},
-        "take_profit_percent": {"type": "float", "low": 0.5, "high": 5.0, "step": 0.5, "default": 1.5},
-        "breakeven_activation_percent": {"type": "float", "low": 0.1, "high": 2.0, "step": 0.1, "default": 0.5},
+        "stop_loss_percent": {"type": "float", "low": 0.5, "high": 20.0, "step": 0.25, "default": 2.0},
+        "take_profit_percent": {"type": "float", "low": 0.5, "high": 20.0, "step": 0.25, "default": 2.0},
+        "breakeven_activation_percent": {"type": "float", "low": 0.1, "high": 5.0, "step": 0.1, "default": 0.5},
         "new_breakeven_sl_percent": {"type": "float", "low": 0.01, "high": 0.5, "step": 0.01, "default": 0.1},
     },
     "trailing_stop_exit": {
@@ -390,7 +392,9 @@ DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
     # --- Close-by-Indicator exit ranges ---
     "close_by_time": {
         "bars_since_entry": {"type": "int", "low": 3, "high": 50, "step": 1, "default": 10},
-        "min_profit_percent": {"type": "float", "low": 0, "high": 5, "step": 0.5, "default": 0},
+        # min_profit_percent extended to 25: must be >= take_profit_percent + 2 to avoid
+        # premature time-exit before TP fires. Wide range needed for large TP configs.
+        "min_profit_percent": {"type": "float", "low": 0, "high": 25, "step": 0.5, "default": 0},
     },
     "close_channel": {
         "keltner_length": {"type": "int", "low": 5, "high": 50, "step": 5, "default": 14},
@@ -501,11 +505,41 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
     blocks = graph.get("blocks", [])
     params = []
 
+    # Build set of block IDs that participate in at least one connection.
+    # Disconnected blocks have no effect on backtest results — optimizing their
+    # params wastes Optuna trial budget and introduces noise into the surrogate model.
+    connections = graph.get("connections", [])
+    _connected_block_ids: set[str] = set()
+    for _conn in connections:
+        _src = _conn.get("source") or {}
+        _tgt = _conn.get("target") or {}
+        _raw_sid = _src.get("blockId") if isinstance(_src, dict) else None
+        _raw_sid = _raw_sid or _conn.get("source_block_id", "")
+        _raw_tid = _tgt.get("blockId") if isinstance(_tgt, dict) else None
+        _raw_tid = _raw_tid or _conn.get("target_block_id", "")
+        # Guard: source/target_block_id may be a nested dict if frontend sends {blockId, portId}
+        _sid = _raw_sid.get("blockId", "") if isinstance(_raw_sid, dict) else (_raw_sid or "")
+        _tid = _raw_tid.get("blockId", "") if isinstance(_raw_tid, dict) else (_raw_tid or "")
+        if isinstance(_sid, str) and _sid:
+            _connected_block_ids.add(_sid)
+        if isinstance(_tid, str) and _tid:
+            _connected_block_ids.add(_tid)
+
     for block in blocks:
         block_id = block.get("id", "")
         block_type = block.get("type", "")
         block_name = block.get("name", block_type)
         block_params = block.get("params") or block.get("config") or {}
+
+        # Skip blocks that have no connections — their params don't affect backtest results.
+        # Exception: strategy node itself (type=="strategy") is the sink, not a source — always skip.
+        # Only skip disconnected non-strategy blocks (strategy type has no params to optimize anyway).
+        if block_type != "strategy" and _connected_block_ids and block_id not in _connected_block_ids:
+            logger.debug(
+                f"[OptExtract] Skipping disconnected block '{block_id}' (type='{block_type}') "
+                f"— not in any connection, params have no effect on backtest"
+            )
+            continue
 
         # User-provided optimization overrides from the UI (block.optimizationParams)
         user_opt_params: dict[str, dict[str, Any]] = block.get("optimizationParams") or {}
@@ -624,6 +658,15 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
             effective_high = user_override.get("high", range_spec["high"])
             effective_step = user_override.get("step", range_spec["step"])
             effective_type = user_override.get("type", range_spec["type"])
+
+            # Normalize step for int params: frontend may store float step (e.g. 0.1)
+            # which would produce step=0 after int() conversion → range() crash
+            if effective_type == "int" and float(effective_step) < 1:
+                logger.warning(
+                    f"[OptExtract] Block '{block_id}' param '{param_key}': "
+                    f"type=int but step={effective_step} < 1 — clamping to 1"
+                )
+                effective_step = 1
 
             params.append(
                 {
@@ -1199,6 +1242,37 @@ def run_builder_backtest(
         # ── Non-DCA path: use fast numba engine with BacktestInput ──────────
         signals = adapter.generate_signals(ohlcv)
 
+        # ── Warmup cutoff: slice to [start_date:] before backtest ────────────
+        # When ohlcv includes pre-period warmup bars (e.g. start_date - 45d) for
+        # indicator convergence, generate signals on the full warmup dataset so
+        # Wilder RSI is stable, then trim both ohlcv and signal Series to the actual
+        # backtest window.  Matches API router behaviour: signals computed on warmup
+        # data, backtest engine runs only on [start_date, end_date].
+        _warmup_cutoff_raw = config_params.get("warmup_cutoff")
+        if _warmup_cutoff_raw is not None:
+            import pandas as _pd_wm
+
+            _cutoff = _pd_wm.Timestamp(_warmup_cutoff_raw)
+            # Align timezone with ohlcv index
+            if ohlcv.index.tz is not None:
+                _cutoff = (
+                    _cutoff.tz_localize(ohlcv.index.tz)
+                    if _cutoff.tzinfo is None
+                    else _cutoff.tz_convert(ohlcv.index.tz)
+                )
+            elif _cutoff.tzinfo is not None:
+                _cutoff = _cutoff.tz_localize(None)
+            _wmask = ohlcv.index >= _cutoff
+            _n_warmup_dropped = int((~_wmask).sum())
+            if _n_warmup_dropped > 0:
+                ohlcv = ohlcv.loc[_wmask]
+                signals.entries = signals.entries.loc[_wmask]
+                signals.exits = signals.exits.loc[_wmask]
+                if signals.short_entries is not None:
+                    signals.short_entries = signals.short_entries.loc[_wmask]
+                if signals.short_exits is not None:
+                    signals.short_exits = signals.short_exits.loc[_wmask]
+
         # Convert SignalResult to numpy arrays
         long_entries = np.asarray(signals.entries.values, dtype=bool)
         long_exits = np.asarray(signals.exits.values, dtype=bool)
@@ -1586,6 +1660,39 @@ def _run_fast_rsi_threshold_optimization(
         if _fast_rsi_dca_close_cache is not None:
             _log_info("⚡ Fast RSI path: DCA close-condition indicator cache pre-computed")
 
+    # ── Warmup cutoff: trim all pre-computed series to [start_date:] ─────────
+    # RSI cache and filter masks were computed on the full warmup ohlcv so
+    # Wilder RSI converges before start_date. Now slice everything to the actual
+    # backtest window so the engine runs only on [start_date, end_date].
+    _warmup_cutoff_frp = config_params.get("warmup_cutoff")
+    if _warmup_cutoff_frp is not None:
+        import pandas as _pd_frp
+
+        _cutoff_frp = _pd_frp.Timestamp(_warmup_cutoff_frp)
+        if ohlcv.index.tz is not None:
+            _cutoff_frp = (
+                _cutoff_frp.tz_localize(ohlcv.index.tz)
+                if _cutoff_frp.tzinfo is None
+                else _cutoff_frp.tz_convert(ohlcv.index.tz)
+            )
+        elif _cutoff_frp.tzinfo is not None:
+            _cutoff_frp = _cutoff_frp.tz_localize(None)
+        _wmask_frp = ohlcv.index >= _cutoff_frp
+        _n_warmup_frp = int((~_wmask_frp).sum())
+        if _n_warmup_frp > 0:
+            ohlcv = ohlcv.loc[_wmask_frp]
+            # Slice RSI cache Series (same index as original ohlcv)
+            for _fp_key in list(_rsi_cache.keys()):
+                _fs, _fsp = _rsi_cache[_fp_key]
+                _rsi_cache[_fp_key] = (_fs.loc[_wmask_frp], _fsp.loc[_wmask_frp])
+            rsi, rsi_prev = _rsi_cache.get(_base_period, next(iter(_rsi_cache.values())))
+            # Slice numpy filter masks
+            if _ema_long_filter is not None:
+                _ema_long_filter = _ema_long_filter[_n_warmup_frp:]
+            if _ema_short_filter is not None:
+                _ema_short_filter = _ema_short_filter[_n_warmup_frp:]
+            _log_info(f"⚡ Fast RSI path: trimmed {_n_warmup_frp} warmup bars → {len(ohlcv)} bars for backtest")
+
     # ── Pre-init engine and imports outside the hot loop ─────────────────────
     # Importing inside the loop adds ~0.1-1ms per combo. Pre-init here.
     if not dca_enabled:
@@ -1723,8 +1830,8 @@ def _run_fast_rsi_threshold_optimization(
                 config_params=config_params,
                 final_dca_config=final_dca_config,
                 direction_str=direction_str,
-                block_stop_loss=block_stop_loss,
-                block_take_profit=block_take_profit,
+                block_stop_loss=_combo_sl,
+                block_take_profit=_combo_tp,
                 block_breakeven_enabled=block_breakeven_enabled,
                 block_breakeven_activation_pct=block_breakeven_activation_pct,
                 block_breakeven_offset=block_breakeven_offset,
@@ -1753,7 +1860,7 @@ def _run_fast_rsi_threshold_optimization(
                     position_size=config_params.get("position_size", 1.0),
                     use_fixed_amount=False,
                     fixed_amount=0.0,
-                    leverage=config_params.get("leverage", 1),
+                    leverage=config_params.get("leverage", 10),
                     stop_loss=_combo_sl if _combo_sl else 0.0,
                     take_profit=_combo_tp if _combo_tp else 0.0,
                     direction=_trade_direction,
@@ -2211,19 +2318,29 @@ def _run_dca_sltp_batch_numba(
             if nt == 0:
                 results.append(None)
                 continue
+            _np = float(batch["net_profit"][i])
+            _dd = float(batch["max_drawdown"][i])  # fraction 0-1
+            _wr = float(batch["win_rate"][i])  # fraction 0-1
+            _pf = float(batch["profit_factor"][i])
+            # calmar = total_return% / max_drawdown% (analytically derivable from batch)
+            _calmar = (_np / initial_capital * 100.0) / (_dd * 100.0) if _dd > 0 else 0.0
+            # payoff = avg_win / avg_loss = profit_factor * (1 - win_rate) / win_rate
+            _payoff = _pf * (1.0 - _wr) / _wr if _wr > 0 else 0.0
             results.append(
                 {
-                    "net_profit": float(batch["net_profit"][i]),
-                    "total_return": float(batch["net_profit"][i] / initial_capital * 100.0),
-                    "max_drawdown": float(batch["max_drawdown"][i] * 100.0),
-                    "win_rate": float(batch["win_rate"][i] * 100.0),
+                    "net_profit": _np,
+                    "total_return": _np / initial_capital * 100.0,
+                    "max_drawdown": _dd * 100.0,
+                    "win_rate": _wr * 100.0,
                     "sharpe_ratio": float(batch["sharpe"][i]),
-                    "profit_factor": float(batch["profit_factor"][i]),
+                    "profit_factor": _pf,
                     "total_trades": nt,
                     "n_trades": nt,
+                    # sortino_ratio requires downside deviation — not available from Numba batch
+                    # output; left as 0.0. Avoid using sortino as optimize_metric for DCA strategies.
                     "sortino_ratio": 0.0,
-                    "calmar_ratio": 0.0,
-                    "payoff_ratio": 0.0,
+                    "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
+                    "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
                 }
             )
         logger.info(f"⚡ Numba DCA batch: {n} combos done in parallel")
@@ -2429,18 +2546,24 @@ def _run_dca_mixed_batch_numba(
                 nt = int(batch["n_trades"][j])
                 if nt == 0:
                     continue
+                _np = float(batch["net_profit"][j])
+                _dd = float(batch["max_drawdown"][j])  # fraction 0-1
+                _wr = float(batch["win_rate"][j])  # fraction 0-1
+                _pf = float(batch["profit_factor"][j])
+                _calmar = (_np / capital * 100.0) / (_dd * 100.0) if _dd > 0 else 0.0
+                _payoff = _pf * (1.0 - _wr) / _wr if _wr > 0 else 0.0
                 results[idx] = {
-                    "net_profit": float(batch["net_profit"][j]),
-                    "total_return": float(batch["net_profit"][j] / capital * 100.0),
-                    "max_drawdown": float(batch["max_drawdown"][j] * 100.0),
-                    "win_rate": float(batch["win_rate"][j] * 100.0),
+                    "net_profit": _np,
+                    "total_return": _np / capital * 100.0,
+                    "max_drawdown": _dd * 100.0,
+                    "win_rate": _wr * 100.0,
                     "sharpe_ratio": float(batch["sharpe"][j]),
-                    "profit_factor": float(batch["profit_factor"][j]),
+                    "profit_factor": _pf,
                     "total_trades": nt,
                     "n_trades": nt,
                     "sortino_ratio": 0.0,
-                    "calmar_ratio": 0.0,
-                    "payoff_ratio": 0.0,
+                    "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
+                    "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
                 }
 
             # Update progress after each indicator group (called by caller via callback)
@@ -2644,8 +2767,12 @@ def build_infeasibility_checker(base_graph: dict[str, Any]):
             if use_cross and use_long_range:
                 cross_long = float(bp.get("cross_long_level", 29))
                 long_more = float(bp.get("long_rsi_more", 0))
-                if cross_long <= long_more:
-                    return True  # infeasible: cross at or below range floor → 0 signals
+                # NOTE: cross_long < long_more is NOT infeasible.
+                # oscillators.py has a conflict-resolution path that fires an "extended
+                # cross" signal when RSI enters the range from below (at long_rsi_more).
+                # Only prune the degenerate edge where cross level equals range floor
+                # and no bar movement could produce a signal.
+                # Nothing to prune here — both regions are explored by the optimizer.
 
             if use_cross and use_short_range:
                 cross_short = float(bp.get("cross_short_level", 55))
@@ -3300,11 +3427,12 @@ def run_builder_optuna_search(
     config_params: dict[str, Any],
     optimize_metric: str = "sharpe_ratio",
     weights: dict[str, float] | None = None,
-    n_trials: int = 100,
+    n_trials: int | None = None,
     sampler_type: str = "tpe",
     top_n: int = 10,
     timeout_seconds: int = 3600,
     n_jobs: int = 1,
+    strategy_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Run Optuna Bayesian optimization for a builder strategy.
@@ -3316,10 +3444,13 @@ def run_builder_optuna_search(
         config_params: Backtest config params.
         optimize_metric: Metric to maximize.
         weights: Metric weights for composite scoring.
-        n_trials: Number of Optuna trials.
+        n_trials: Max Optuna trials. ``None`` (default) = unlimited — stop only
+            when ``timeout_seconds`` is reached. This is the correct mode for
+            large parameter spaces (10^6–10^9 combos): Bayesian sampling explores
+            intelligently without enumerating.
         sampler_type: "tpe", "random", or "cmaes".
         top_n: Number of top results to re-run for full metrics.
-        timeout_seconds: Total timeout.
+        timeout_seconds: Wall-clock budget. Optimizer stops when this expires.
         n_jobs: Number of parallel workers (default 1). Values > 1 enable
             multi-threaded Optuna trials. Capped at os.cpu_count().
 
@@ -3364,13 +3495,27 @@ def run_builder_optuna_search(
         sampler = RandomSampler(seed=42)
     elif sampler_type == "cmaes":
         # CMA-ES requires n_startup_trials random before covariance builds up.
-        # With parallel workers each thread needs its own seed offset; use None for auto.
-        sampler = CmaEsSampler(seed=42, n_startup_trials=min(25, n_trials // 4))  # type: ignore[assignment]
+        # n_trials may be None (unlimited) — fall back to fixed startup count.
+        _cmaes_startup = min(25, n_trials // 4) if n_trials is not None else 25
+        sampler = CmaEsSampler(seed=42, n_startup_trials=_cmaes_startup)  # type: ignore[assignment]
     else:
-        sampler = TPESampler(seed=42, n_startup_trials=min(10, n_trials // 3))  # type: ignore[assignment]
+        # n_trials may be None (unlimited) — fall back to fixed startup count.
+        _tpe_startup = min(10, n_trials // 3) if n_trials is not None else 10
+        sampler = TPESampler(seed=42, n_startup_trials=_tpe_startup)  # type: ignore[assignment]
 
     # Suppress Optuna logging
     optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    # ── Suppress verbose DEBUG logging during optimizer runs ─────────────────
+    # The backtesting adapter and indicator handlers emit per-bar DEBUG lines for
+    # every trial (12+ lines/trial × 3000 trials = 36k+ lines). This slows I/O
+    # significantly. Use loguru.logger.disable() during the run, re-enable after.
+    # loguru.disable(name) suppresses all messages from modules whose __name__
+    # starts with `name`, so a single prefix disables the entire backtesting subtree.
+    from loguru import logger as _loguru_logger
+
+    _quiet_prefix = "backend.backtesting"
+    _loguru_logger.disable(_quiet_prefix)
 
     # Optuna's default in-memory storage is thread-safe for n_jobs > 1.
     # No external storage backend needed.
@@ -3387,7 +3532,8 @@ def run_builder_optuna_search(
         for spec in param_specs:
             path = spec["param_path"]
             if spec["type"] == "int":
-                val: int | float = trial.suggest_int(path, int(spec["low"]), int(spec["high"]), step=int(spec["step"]))
+                int_step = max(1, int(spec["step"]))  # guard: float step (e.g. 0.1) → 0 breaks range()
+                val: int | float = trial.suggest_int(path, int(spec["low"]), int(spec["high"]), step=int_step)
                 overrides[path] = val
             else:
                 val = trial.suggest_float(path, float(spec["low"]), float(spec["high"]), step=float(spec["step"]))
@@ -3404,6 +3550,58 @@ def run_builder_optuna_search(
                     if slow_val <= fast_val:
                         overrides[slow_path] = fast_val + 1
 
+        # ── Cross-block constraints ─────────────────────────────────────────────
+        # These prevent structurally dead configurations where one block can never
+        # fire because another block's exit condition pre-empts it.
+        #
+        # Find take_profit and close_by_time.min_profit paths by scanning param_specs.
+        _tp_path: str | None = None
+        _sl_path: str | None = None
+        _mp_path: str | None = None
+        _be_path: str | None = None
+        for _spec in param_specs:
+            _btype = _spec.get("block_type", "")
+            if _btype == "static_sltp":
+                if _spec.get("param_key") == "take_profit_percent":
+                    _tp_path = _spec["param_path"]
+                elif _spec.get("param_key") == "stop_loss_percent":
+                    _sl_path = _spec["param_path"]
+                elif _spec.get("param_key") == "breakeven_activation_percent":
+                    _be_path = _spec["param_path"]
+            elif _btype == "close_by_time" and _spec.get("param_key") == "min_profit_percent":
+                _mp_path = _spec["param_path"]
+
+        # Enforce TP >= SL * 1.5 (minimum risk/reward ratio 1:1.5).
+        # Without this constraint, the optimizer wastes trials on configurations
+        # where TP < SL — which are mathematically unprofitable at any win rate below ~60%.
+        if _tp_path and _sl_path and _tp_path in overrides and _sl_path in overrides:
+            _tp_val_rr = float(overrides[_tp_path])
+            _sl_val_rr = float(overrides[_sl_path])
+            _min_tp = round(_sl_val_rr * 1.5, 2)
+            if _tp_val_rr < _min_tp:
+                overrides[_tp_path] = _min_tp
+
+        if _tp_path and _tp_path in overrides:
+            _tp_val = float(overrides[_tp_path])
+            # close_by_time.min_profit_percent MUST be > take_profit_percent.
+            # If min_profit <= TP, the time-based exit fires BEFORE TP, cutting gains
+            # short and creating a "false" win at a lower level than intended.
+            # Correct behavior (matching the baseline Sharpe=0.620):
+            #   min_profit=5.0 > TP=2.5 → TP fires first, close_by_time is a no-op for winners.
+            # Rule: min_profit >= TP + 2.0% (TP fires first with meaningful buffer).
+            if _mp_path and _mp_path in overrides:
+                _mp_val = float(overrides[_mp_path])
+                _mp_min = _tp_val + 2.0
+                if _mp_val < _mp_min:
+                    overrides[_mp_path] = round(_mp_min, 2)
+            # breakeven_activation must be strictly less than TP, with meaningful headroom.
+            # If activation >= TP, breakeven kicks in at the same moment TP fires — useless.
+            # Clamp to 70% of TP.
+            if _be_path and _be_path in overrides:
+                _be_val = float(overrides[_be_path])
+                if _be_val >= _tp_val:
+                    overrides[_be_path] = round(_tp_val * 0.7, 2)
+
         # Clone graph and run backtest
         modified_graph = clone_graph_with_params(base_graph, overrides)
         result = run_builder_backtest(modified_graph, ohlcv, config_params)
@@ -3414,8 +3612,35 @@ def run_builder_optuna_search(
         # Always store result before applying min_trades filter (for fallback).
         # Lock protects the shared list when multiple threads write concurrently.
         score_raw = calculate_composite_score(result, optimize_metric, weights)
+
+        # Guard against pathological metric values (NaN/inf) that would corrupt
+        # Optuna's surrogate model (TPE/CMA-ES degrade on non-finite values).
+        if not math.isfinite(score_raw):
+            raise optuna.TrialPruned()
+        # Clamp to prevent extreme outliers from warping the surrogate model.
+        score_raw = max(-1e6, min(1e6, score_raw))
+
         with _results_lock:
             all_trial_results.append({"params": dict(overrides), "score": score_raw, **result})
+            _n_tested = len(all_trial_results)
+
+        # Update progress for frontend polling (every trial)
+        if strategy_id:
+            _best = max((r["score"] for r in all_trial_results), default=0.0)
+            _elapsed = time.time() - start_time
+            _speed = int(_n_tested / max(_elapsed, 1))
+            _remaining = (n_trials - _n_tested) if n_trials else 0
+            _eta = int(_remaining / max(_speed, 1)) if _speed > 0 else 0
+            update_optimization_progress(
+                strategy_id,
+                status="running",
+                tested=_n_tested,
+                total=n_trials or 0,
+                best_score=_best,
+                results_found=_n_tested,
+                speed=_speed,
+                eta_seconds=_eta,
+            )
 
         if not passes_filters(result, config_params):
             # Return a large penalty instead of pruning — pruned trials are excluded
@@ -3428,13 +3653,17 @@ def run_builder_optuna_search(
         return score_raw
 
     # Run optimization
-    study.optimize(
-        objective,
-        n_trials=n_trials,
-        timeout=timeout_seconds,
-        show_progress_bar=False,
-        n_jobs=effective_n_jobs,
-    )
+    try:
+        study.optimize(
+            objective,
+            n_trials=n_trials,
+            timeout=timeout_seconds,
+            show_progress_bar=False,
+            n_jobs=effective_n_jobs,
+        )
+    finally:
+        # Re-enable backend.backtesting logging after optimization
+        _loguru_logger.enable(_quiet_prefix)
 
     # Collect top-N trials — only those that passed filters (score > -1000 penalty threshold)
     PENALTY_THRESHOLD = -500.0  # scores below this were penalized (didn't pass filters)
@@ -3445,7 +3674,16 @@ def run_builder_optuna_search(
     ]
     passing_trials = [t for t in completed_trials if (t.value or 0.0) >= PENALTY_THRESHOLD]
     passing_trials.sort(key=lambda t: t.value if t.value is not None else 0.0, reverse=True)
-    top_trials = passing_trials[:top_n]
+    # Deduplicate by param combination — TPE may re-sample the same point multiple times,
+    # especially in small search spaces. Keep only the first (highest-score) occurrence.
+    _seen_param_keys: set[str] = set()
+    deduped_passing: list = []
+    for _t in passing_trials:
+        _key = str(sorted(_t.params.items()))
+        if _key not in _seen_param_keys:
+            _seen_param_keys.add(_key)
+            deduped_passing.append(_t)
+    top_trials = deduped_passing[:top_n]
 
     # Re-run top-N for full metrics
     top_results: list[dict[str, Any]] = []
@@ -3468,15 +3706,23 @@ def run_builder_optuna_search(
     # Sort by score
     top_results.sort(key=lambda r: r["score"], reverse=True)
 
-    # Fallback: if min_trades filter pruned all results, use all_trial_results instead
+    # Fallback: if min_trades filter pruned all results, use all_trial_results instead.
+    # Tag fallback results with a warning so callers (builder_workflow) know the
+    # constraint was violated and can decide whether to apply the params.
     fallback_used = False
+    _min_trades_req = config_params.get("min_trades", 0)
     if not top_results and all_trial_results:
         logger.warning(
-            f"⚠️ Optuna: all {len(completed_trials)} completed trials were re-run but produced no results "
-            f"(min_trades filter likely removed them). Falling back to {len(all_trial_results)} stored trial results."
+            f"⚠️ Optuna: all {len(completed_trials)} completed trials were filtered out "
+            f"(min_trades={_min_trades_req}). Strategy may be structurally unable to generate "
+            f"enough signals. Falling back to best {min(top_n, len(all_trial_results))} unfiltered results."
         )
         all_trial_results.sort(key=lambda r: r["score"], reverse=True)
         top_results = all_trial_results[:top_n]
+        # Tag each result so callers know the min_trades constraint was not met
+        for _r in top_results:
+            _r["_below_min_trades"] = True
+            _r["_min_trades_required"] = _min_trades_req
         fallback_used = True
 
     # Detect if best result is negative for the optimize metric
@@ -3487,6 +3733,20 @@ def run_builder_optuna_search(
             no_positive_results = True
 
     execution_time = time.time() - start_time
+
+    # Mark optimization as completed in progress store
+    if strategy_id:
+        _final_best = top_results[0]["score"] if top_results else 0.0
+        update_optimization_progress(
+            strategy_id,
+            status="completed",
+            tested=len(completed_trials),
+            total=n_trials or len(completed_trials),
+            best_score=_final_best,
+            results_found=len(top_results),
+            speed=0,
+            eta_seconds=0,
+        )
 
     return {
         "status": "completed",
@@ -3603,7 +3863,16 @@ def run_builder_walk_forward(
         oos_end = min(oos_start + test_size, total_bars)
 
         ohlcv_is = ohlcv.iloc[is_start:is_end].copy()
-        ohlcv_oos = ohlcv.iloc[oos_start:oos_end].copy()
+
+        # Prepend warmup bars to OOS slice so indicators (e.g. SMA-200, RSI-14)
+        # are properly initialised before the OOS period begins.  Without warmup
+        # the first ~max_period bars of OOS would have NaN indicators → no signals
+        # → artificially low OOS metrics (data leakage via missing indicator state).
+        # We take bars from the IS period (pre-gap), which are already "seen" by
+        # the optimised params — this does NOT leak future price data into IS fitting.
+        _WF_WARMUP_BARS = 200
+        oos_warmup_start = max(0, oos_start - _WF_WARMUP_BARS)
+        ohlcv_oos = ohlcv.iloc[oos_warmup_start:oos_end].copy()
 
         if len(ohlcv_is) < 20 or len(ohlcv_oos) < 10:
             logger_wf.warning(f"[WF] Window {split_idx + 1}: insufficient data, skipping")

@@ -459,9 +459,18 @@ def calculate_calmar(
     return float(np.clip(cagr / abs(max_drawdown_pct), -100, 100))
 
 
-def calculate_max_drawdown(equity: np.ndarray) -> tuple[float, float, int]:
+def calculate_max_drawdown(
+    equity: np.ndarray,
+    initial_capital: float | None = None,
+) -> tuple[float, float, int]:
     """
     Calculate Maximum Drawdown.
+
+    Args:
+        equity: Equity curve array.
+        initial_capital: When provided, uses TradingView formula:
+            dd = (peak - equity) / initial_capital.
+            When None (legacy), uses (peak - equity) / peak.
 
     Returns: (max_dd_pct, max_dd_value, max_dd_duration_bars)
     """
@@ -473,9 +482,14 @@ def calculate_max_drawdown(equity: np.ndarray) -> tuple[float, float, int]:
     # Running maximum
     peak = np.maximum.accumulate(equity)
 
-    # Drawdown at each point (as fraction)
-    # Protect against div by zero if peak is 0 (bankruptcy)
-    drawdown = (peak - equity) / np.where(peak > 0, peak, 1)
+    # Drawdown at each point.
+    # TradingView formula: divides by initial_capital (constant denominator).
+    # Standard formula: divides by running peak.
+    if initial_capital is not None and initial_capital > 0:
+        drawdown = (peak - equity) / initial_capital
+    else:
+        # Legacy path — keep backward compat for callers without initial_capital
+        drawdown = (peak - equity) / np.where(peak > 0, peak, 1)
 
     max_dd_fraction = np.max(drawdown)
     max_dd_pct = float(max_dd_fraction) * 100  # As percentage
@@ -527,7 +541,7 @@ def calculate_cagr(
             simple_return = (ratio - 1) * 100  # As percentage
             # Annualize using simple scaling (not compound)
             annualized = simple_return * (1 / years) if years > 0 else 0
-            return float(np.clip(annualized, -999, 999999))
+            return float(np.clip(annualized, -100, 999999))
 
         if ratio > 1e10:  # Overflow protection
             return 999999.0
@@ -880,9 +894,8 @@ class MetricsCalculator:
 
         metrics.net_profit = sum(pnl_list)
 
-        # Derived metrics (win rate excludes breakeven trades from denominator)
-        meaningful_trades = metrics.winning_trades + metrics.losing_trades
-        metrics.win_rate = calculate_win_rate(metrics.winning_trades, meaningful_trades)
+        # Derived metrics (win rate uses total_trades as denominator — TV standard includes breakeven)
+        metrics.win_rate = calculate_win_rate(metrics.winning_trades, metrics.total_trades)
         # Profit factor = gross_profit / gross_loss (both already net PnL sums, TV-compatible)
         metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
@@ -931,16 +944,15 @@ class MetricsCalculator:
         final_capital = equity[-1]
         total_return_pct = (final_capital - initial_capital) / initial_capital * 100
 
-        # Drawdown
+        # Drawdown — TV formula: знаменатель initial_capital (не running peak)
         (
             metrics.max_drawdown,
             metrics.max_drawdown_value,
             metrics.max_drawdown_duration_bars,
-        ) = calculate_max_drawdown(equity)
+        ) = calculate_max_drawdown(equity, initial_capital=initial_capital)
 
-        # Drawdown average
+        # Drawdown average (avg_drawdown остаётся с peak-denominator — это не TV-метрика)
         peak = np.maximum.accumulate(equity)
-        # Protect div zero
         with np.errstate(divide="ignore", invalid="ignore"):
             dd_series = (peak - equity) / np.where(peak > 0, peak, 1)
 
@@ -1031,7 +1043,8 @@ class MetricsCalculator:
         # Recovery factor
         if metrics.max_drawdown_value > 0:
             net_profit = final_capital - initial_capital
-            metrics.recovery_factor = net_profit / metrics.max_drawdown_value
+            # Cap at 999.0 to match the no-drawdown sentinel — avoids extreme outliers
+            metrics.recovery_factor = float(np.clip(net_profit / metrics.max_drawdown_value, -999.0, 999.0))
         else:
             net_profit = final_capital - initial_capital
             # No drawdown: recovery_factor is undefined; use 999.0 as "perfect" proxy.
@@ -1340,6 +1353,63 @@ class MetricsCalculator:
             expectancy, expectancy_ratio = 0.0, 0.0
             expectancy_pct, expectancy_pct_ratio = 0.0, 0.0
 
+        # ===== PER-DIRECTION SHARPE / SORTINO / CALMAR =====
+        # Build per-direction trade-returns and equity curves from PnL values.
+        # This gives accurate direction-specific risk-adjusted metrics instead
+        # of copying the global sharpe_ratio to both long and short.
+        def _direction_risk_metrics(
+            dir_trades: list,
+        ) -> tuple[float, float, float]:
+            """Return (sharpe, sortino, calmar) for a set of trades."""
+            if len(dir_trades) < 2:
+                return 0.0, 0.0, 0.0
+            pnls = []
+            for t in dir_trades:
+                p = t.get("pnl", 0) if isinstance(t, dict) else getattr(t, "pnl", 0)
+                pnls.append(float(p) if p else 0.0)
+            # Build cumulative equity curve starting from initial_capital
+            dir_equity = np.array(
+                [initial_capital] + [initial_capital + float(np.sum(pnls[: i + 1])) for i in range(len(pnls))]
+            )
+            if len(dir_equity) < 2:
+                return 0.0, 0.0, 0.0
+            with np.errstate(divide="ignore", invalid="ignore"):
+                dir_returns = np.diff(dir_equity) / dir_equity[:-1]
+            dir_returns = np.nan_to_num(dir_returns, nan=0.0, posinf=0.0, neginf=0.0)
+            s = calculate_sharpe(dir_returns, frequency)
+            so = calculate_sortino(dir_returns, frequency)
+            # Calmar: total return % and max drawdown %
+            dir_total_ret_pct = (dir_equity[-1] - initial_capital) / initial_capital * 100
+            (dir_max_dd, _, _) = calculate_max_drawdown(dir_equity)
+            dir_max_dd_pct = dir_max_dd * 100
+            c = calculate_calmar(dir_total_ret_pct, dir_max_dd_pct, years)
+            return s, so, c
+
+        # Separate trades by direction (same logic as calculate_long_short_metrics)
+        _long_dir_trades: list = []
+        _short_dir_trades: list = []
+        for _t in trades:
+            _side = _t.get("side", "") if isinstance(_t, dict) else getattr(_t, "side", "")
+            if not _side:
+                _side = _t.get("direction", "") if isinstance(_t, dict) else getattr(_t, "direction", "")
+            if hasattr(_side, "value"):
+                _side_str = str(_side.value).lower()
+            elif hasattr(_side, "name"):
+                _side_str = str(_side.name).lower()
+            else:
+                _side_str = str(_side).lower().strip()
+            if _side_str in ("buy", "long", "entry", "1", "tradeside.buy", "tradedirection.long"):
+                _long_dir_trades.append(_t)
+            elif _side_str in ("sell", "short", "exit", "-1", "tradeside.sell", "tradedirection.short"):
+                _short_dir_trades.append(_t)
+
+        sharpe_long_val, sortino_long_val, calmar_long_val = (
+            _direction_risk_metrics(_long_dir_trades) if _long_dir_trades else (0.0, 0.0, 0.0)
+        )
+        sharpe_short_val, sortino_short_val, calmar_short_val = (
+            _direction_risk_metrics(_short_dir_trades) if _short_dir_trades else (0.0, 0.0, 0.0)
+        )
+
         # Combine into dictionary
         result = {
             # Trade stats
@@ -1357,7 +1427,7 @@ class MetricsCalculator:
             "avg_win_pct": trade_m.avg_win_pct,  # Explicit alias — avg_win == avg_win_pct (percentage)
             "avg_loss": trade_m.avg_loss_pct,
             "avg_loss_pct": trade_m.avg_loss_pct,  # Explicit alias
-            "avg_trade": trade_m.avg_trade_pct,
+            "avg_trade": trade_m.avg_trade,
             "avg_trade_pct": trade_m.avg_trade_pct,  # Alias for frontend compatibility
             "largest_win": trade_m.largest_win_pct,
             "largest_loss": trade_m.largest_loss_pct,
@@ -1463,6 +1533,13 @@ class MetricsCalculator:
             "short_largest_win_pct": ls_m.short_largest_win_pct,
             "short_largest_loss_pct": ls_m.short_largest_loss_pct,
             "cagr_short": ls_m.short_cagr,
+            # Per-direction risk-adjusted ratios (computed from direction-specific equity curves)
+            "sharpe_long": sharpe_long_val,
+            "sharpe_short": sharpe_short_val,
+            "sortino_long": sortino_long_val,
+            "sortino_short": sortino_short_val,
+            "calmar_long": calmar_long_val,
+            "calmar_short": calmar_short_val,
         }
 
         # Store in cache (evict oldest if full)

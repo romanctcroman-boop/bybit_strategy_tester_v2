@@ -73,8 +73,9 @@ RSI UNIVERSAL NODE (Strategy Builder):
      Example: short_rsi_more=70, short_rsi_less=100 → short when RSI in 70..100 (overbought zone).
   2) CROSS level: use_cross_level=true → long when RSI crosses UP through cross_long_level,
      short when RSI crosses DOWN through cross_short_level.
-     opposite_signal=true swaps cross long/short. use_cross_memory=true + cross_memory_bars=N
-     keeps the cross signal active for N bars.
+     ⚠️ WARNING: produces only 1-5 signals/month — ALWAYS add use_cross_memory=true + cross_memory_bars=5
+     to keep each cross signal active for 5 bars (otherwise AND gates collapse to near-zero).
+     opposite_signal=true swaps cross long/short.
   3) LEGACY (auto-fallback): if no mode enabled but overbought/oversold params exist,
      uses classic RSI < oversold → long, RSI > overbought → short.
   If no mode is enabled and no legacy params → passthrough (always True, RSI acts as value source only).
@@ -85,10 +86,10 @@ RSI UNIVERSAL NODE (Strategy Builder):
   OPTIMIZATION RANGES (RSI): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    period: {{low: 5, high: 30, step: 1}}, long_rsi_more: {{low: 10, high: 45, step: 5}},
-    long_rsi_less: {{low: 55, high: 90, step: 5}}, short_rsi_less: {{low: 55, high: 90, step: 5}},
-    short_rsi_more: {{low: 10, high: 45, step: 5}}, cross_long_level: {{low: 15, high: 45, step: 5}},
-    cross_short_level: {{low: 55, high: 85, step: 5}}, cross_memory_bars: {{low: 1, high: 20, step: 1}}.
+    period: {{low: 7, high: 100, step: 1}}, long_rsi_more: {{low: 5, high: 60, step: 2}},
+    long_rsi_less: {{low: 50, high: 95, step: 2}}, short_rsi_less: {{low: 50, high: 95, step: 2}},
+    short_rsi_more: {{low: 5, high: 60, step: 2}}, cross_long_level: {{low: 15, high: 85, step: 1}},
+    cross_short_level: {{low: 15, high: 85, step: 1}}, cross_memory_bars: {{low: 1, high: 20, step: 1}}.
   Only enabled params with their mode active are included in optimization grid.
 
 MACD UNIVERSAL NODE (Strategy Builder):
@@ -114,8 +115,8 @@ MACD UNIVERSAL NODE (Strategy Builder):
   OPTIMIZATION RANGES (MACD): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    fast_period: {{low: 8, high: 16, step: 1}}, slow_period: {{low: 20, high: 30, step: 1}},
-    signal_period: {{low: 6, high: 12, step: 1}}, macd_cross_zero_level: {{low: -50, high: 50, step: 1}},
+    fast_period: {{low: 5, high: 20, step: 1}}, slow_period: {{low: 15, high: 50, step: 1}},
+    signal_period: {{low: 3, high: 15, step: 1}}, macd_cross_zero_level: {{low: -100.0, high: 100.0, step: 1.0}},
     signal_memory_bars: {{low: 1, high: 20, step: 1}}.
   Only params whose mode is enabled are included in optimization grid.
   IMPORTANT: fast_period must be < slow_period.
@@ -149,11 +150,11 @@ STOCHASTIC UNIVERSAL NODE (Strategy Builder):
   OPTIMIZATION RANGES (STOCHASTIC): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    stoch_k_length: {{low: 5, high: 21, step: 1}}, stoch_k_smoothing: {{low: 1, high: 5, step: 1}},
-    stoch_d_smoothing: {{low: 1, high: 5, step: 1}}, long_stoch_d_more: {{low: 5, high: 30, step: 5}},
-    long_stoch_d_less: {{low: 30, high: 50, step: 5}}, short_stoch_d_less: {{low: 60, high: 90, step: 5}},
-    short_stoch_d_more: {{low: 50, high: 80, step: 5}}, stoch_cross_level_long: {{low: 10, high: 30, step: 5}},
-    stoch_cross_level_short: {{low: 70, high: 90, step: 5}}, stoch_cross_memory_bars: {{low: 1, high: 20, step: 1}},
+    stoch_k_length: {{low: 3, high: 30, step: 1}}, stoch_k_smoothing: {{low: 1, high: 7, step: 1}},
+    stoch_d_smoothing: {{low: 1, high: 7, step: 1}}, long_stoch_d_more: {{low: 1, high: 40, step: 1}},
+    long_stoch_d_less: {{low: 20, high: 60, step: 1}}, short_stoch_d_less: {{low: 50, high: 99, step: 1}},
+    short_stoch_d_more: {{low: 40, high: 90, step: 1}}, stoch_cross_level_long: {{low: 5, high: 40, step: 1}},
+    stoch_cross_level_short: {{low: 60, high: 95, step: 1}}, stoch_cross_memory_bars: {{low: 1, high: 20, step: 1}},
     stoch_kd_memory_bars: {{low: 1, high: 20, step: 1}}.
   Only enabled params with their mode active are included in optimization grid.
 
@@ -175,7 +176,7 @@ SUPERTREND UNIVERSAL NODE (Strategy Builder):
   OPTIMIZATION RANGES (SUPERTREND): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    period: {{low: 5, high: 20, step: 1}}, multiplier: {{low: 1.0, high: 5.0, step: 0.5}}.
+    period: {{low: 3, high: 30, step: 1}}, multiplier: {{low: 0.5, high: 6.0, step: 0.25}}.
 
 QQE UNIVERSAL NODE (Strategy Builder):
   The QQE block uses RSI-MA / QQE-line cross signals with optional signal memory:
@@ -520,9 +521,9 @@ STATIC SL/TP NODE (Strategy Builder):
   OPTIMIZATION RANGES (STATIC SL/TP): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    take_profit_percent: {{low: 0.5, high: 5.0, step: 0.5}},
-    stop_loss_percent: {{low: 0.5, high: 5.0, step: 0.5}},
-    breakeven_activation_percent: {{low: 0.1, high: 2.0, step: 0.1}},
+    take_profit_percent: {{low: 0.5, high: 20.0, step: 0.25}},
+    stop_loss_percent: {{low: 0.5, high: 20.0, step: 0.25}},
+    breakeven_activation_percent: {{low: 0.1, high: 5.0, step: 0.1}},
     new_breakeven_sl_percent: {{low: 0.01, high: 0.5, step: 0.01}}.
 
 TRAILING STOP EXIT NODE (Strategy Builder):
@@ -796,9 +797,28 @@ STRATEGY REQUIREMENTS:
 1. Use {min_indicators}-{max_indicators} indicators for signal generation
 2. Add at least {min_filters} filter condition
 3. Clear entry/exit conditions
-4. Risk management (stop-loss, take-profit)
+4. Risk management (stop-loss, take-profit) — see HARD LIMITS below
 5. Account for commission ({commission}%) and slippage
 6. Be specific with parameter values - avoid generic/default values
+
+HARD LIMITS FOR INTRADAY (15m) STOP-LOSS / TAKE-PROFIT:
+- stop_loss value MUST be in range 0.5% – 5.0%  (NEVER > 5%: BTC 15m bars move ~0.3% avg; SL=20% means the position is held for MONTHS)
+- take_profit value MUST be in range 1.0% – 10.0% (NEVER > 10%)
+- take_profit MUST be >= stop_loss (positive R:R ratio)
+- Recommended defaults: stop_loss=1.5, take_profit=2.5 (R:R = 1.67)
+- Violation of these limits will cause trades=0 (price never reaches your SL/TP in the test period)
+
+SIGNAL DENSITY REQUIREMENT (CRITICAL — read before designing signals):
+- Each indicator MUST independently produce ≥ 50 signals over the 6-month test period (17,000 bars).
+  That is ~8 signals per month or ~2 per week. Too few signals → 0 trades even if logic is correct.
+- RSI CROSS LEVEL mode (use_cross_level=true) produces only 1-5 signals/month. AVOID in AND gates.
+  Instead use RSI RANGE mode: use_long_range=true + long_rsi_more=0 + long_rsi_less=30 (fires whenever RSI < 30).
+- AND gate rule: AND(A, B) produces at most min(count_A, count_B) signals.
+  If RSI_cross = 3 signals and Stochastic = 400 signals: AND(Stochastic, RSI_cross) = max 3.
+  Prefer OR gates to combine entry signals. Use AND gates ONLY for directional filters (e.g., trend direction).
+- Stochastic RANGE mode fires ~300-500 times in 6 months → good for entry signals.
+- Supertrend fires on every trend change (~100-200/period) → good filter.
+- If you must use CROSS LEVEL: add cross_memory_bars=5 to keep the signal active for 5 bars.
 
 RESPONSE FORMAT - Return ONLY valid JSON (no markdown, no explanation):
 {{
@@ -808,9 +828,9 @@ RESPONSE FORMAT - Return ONLY valid JSON (no markdown, no explanation):
     {{
       "id": "signal_1",
       "type": "RSI|MACD|EMA_Crossover|SMA_Crossover|Bollinger|SuperTrend|Stochastic|CCI",
-      "params": {{"period": 14, "use_cross_level": true, "cross_long_level": 30, "cross_short_level": 70}},
+      "params": {{"period": 14, "use_long_range": true, "long_rsi_more": 0, "long_rsi_less": 30, "use_short_range": true, "short_rsi_more": 70, "short_rsi_less": 100}},
       "weight": 0.5,
-      "condition": "RSI crosses up through 30 for long, crosses down through 70 for short"
+      "condition": "RSI in oversold zone (0-30) for long, overbought zone (70-100) for short — fires ~200x in 6 months"
     }}
   ],
   "filters": [
@@ -830,12 +850,12 @@ RESPONSE FORMAT - Return ONLY valid JSON (no markdown, no explanation):
     "take_profit": {{
       "type": "fixed_pct|trailing|atr_based",
       "value": 2.0,
-      "description": "Close at 2% profit"
+      "description": "Close at 2% profit (MUST be 1.0-10.0%)"
     }},
     "stop_loss": {{
       "type": "fixed_pct|atr_based",
       "value": 1.5,
-      "description": "Stop at 1.5% loss"
+      "description": "Stop at 1.5% loss (MUST be 0.5-5.0%)"
     }}
   }},
   "position_management": {{
@@ -1016,6 +1036,14 @@ AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
         "style": "adaptive",
         "preferred_indicators": ["SMA", "VWAP", "OBV", "Volume"],
         "preferred_timeframes": ["1h", "4h"],
+    },
+    "claude": {
+        "primary_role": "strategy_synthesizer",
+        "description": "Senior systematic trader specialising in multi-factor strategy design",
+        "strengths": ["structured_reasoning", "risk_reward_balance", "strategy_synthesis"],
+        "style": "systematic",
+        "preferred_indicators": ["EMA", "RSI", "ATR", "Supertrend", "ADX"],
+        "preferred_timeframes": ["1h", "4h", "1D"],
     },
 }
 

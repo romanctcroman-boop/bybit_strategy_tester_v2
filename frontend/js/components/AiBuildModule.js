@@ -116,7 +116,7 @@ export function createAiBuildModule(deps) {
     let _aiBuildExistingStrategyId = null;
 
     /** Counts for each agent column badge */
-    const _agentMsgCount = { deepseek: 0, qwen: 0, perplexity: 0 };
+    const _agentMsgCount = { deepseek: 0, qwen: 0, perplexity: 0, claude: 0 };
 
     // ── Helper: load strategies from DB into #aiExistingStrategy ─────────────
     async function _loadStrategiesList() {
@@ -128,7 +128,7 @@ export function createAiBuildModule(deps) {
             const data = await resp.json();
             const strategies = Array.isArray(data) ? data : (data.items || data.strategies || []);
             // keep first empty option
-            sel.innerHTML = '<option value="">— Создать новую стратегию —</option>';
+            sel.innerHTML = '<option value="">— Create New Strategy —</option>';
             strategies.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.id || s.strategy_id || '';
@@ -150,8 +150,7 @@ export function createAiBuildModule(deps) {
         const hint = document.getElementById('aiExistingStrategyHint');
         const nameHint = document.getElementById('aiNameHint');
         const aiNameEl = document.getElementById('aiName');
-        const presetHeading = document.querySelector('.ai-build-preset-heading');
-        const presetSelect = document.getElementById('aiPreset');
+        const presetSection = document.getElementById('aiPresetSection');
         const blocksPreview = document.getElementById('aiBlocksPreview');
         const btnRun = document.getElementById('btnRunAiBuild');
         const modal = document.getElementById('aiBuildModal');
@@ -168,15 +167,11 @@ export function createAiBuildModule(deps) {
             const stratName = selOption?.dataset?.stratName || selOption?.text || 'Strategy';
 
             if (hint) hint.style.display = 'block';
-            if (nameHint) nameHint.textContent = '(имя для сохранения результата оптимизации)';
+            if (nameHint) nameHint.textContent = '(name to save optimization result as)';
             if (aiNameEl) aiNameEl.value = `Opt_${stratName}`;
-            if (presetHeading) presetHeading.style.display = 'none';
-            if (presetSelect) presetSelect.style.display = 'none';
-            if (blocksPreview) {
-                blocksPreview.textContent = 'AI загрузит блоки из выбранной стратегии и оптимизирует параметры.';
-                blocksPreview.style.display = '';
-            }
-            if (descriptionEl) descriptionEl.placeholder = 'Опишите что улучшить (необязательно)';
+            if (presetSection) presetSection.style.display = 'none';
+            if (blocksPreview) blocksPreview.textContent = 'AI will load blocks from the selected strategy and optimize parameters.';
+            if (descriptionEl) descriptionEl.placeholder = 'Describe what to improve (optional)';
             if (btnRun) btnRun.innerHTML = '<i class="bi bi-stars"></i> Optimize & Backtest';
             if (titleEl) titleEl.innerHTML = '<i class="bi bi-stars"></i> AI Strategy Optimizer';
         } else {
@@ -185,11 +180,9 @@ export function createAiBuildModule(deps) {
             _aiBuildExistingStrategyId = null;
 
             if (hint) hint.style.display = 'none';
-            if (nameHint) nameHint.textContent = '(имя для новой стратегии)';
-            if (presetHeading) presetHeading.style.display = '';
-            if (presetSelect) presetSelect.style.display = '';
-            if (blocksPreview) blocksPreview.style.display = '';
-            if (descriptionEl) descriptionEl.placeholder = 'e.g. RSI mean-reversion with EMA trend filter, tight stop-loss 1.5%, take-profit 3%';
+            if (nameHint) nameHint.textContent = '(name for new strategy)';
+            if (presetSection) presetSection.style.display = '';
+            if (descriptionEl) descriptionEl.placeholder = 'e.g. RSI mean-reversion with EMA trend filter, SL 1.5%, TP 3%';
             if (btnRun) btnRun.innerHTML = '<i class="bi bi-play-fill"></i> Build & Backtest';
             if (titleEl) titleEl.innerHTML = '<i class="bi bi-robot"></i> AI Strategy Builder';
             applyAiPreset();
@@ -198,6 +191,11 @@ export function createAiBuildModule(deps) {
 
     // ── Public: openAiBuildModal ──────────────────────────────────────────────
     function openAiBuildModal() {
+        // Reset to config form only if a run is NOT currently in progress
+        const progressEl = document.getElementById('aiBuildProgress');
+        const isRunning = progressEl && !progressEl.classList.contains('hidden');
+        if (!isRunning) resetAiBuild();
+
         const modal = document.getElementById('aiBuildModal');
         modal.classList.remove('hidden');
         modal.style.display = 'flex';
@@ -246,7 +244,7 @@ export function createAiBuildModule(deps) {
         if (summaryEl) {
             let warning = '';
             if (!symbol) {
-                warning = '<div class="summary-warning"><i class="bi bi-exclamation-triangle"></i> Выберите тикер в панели Параметры</div>';
+                warning = '<div class="summary-warning"><i class="bi bi-exclamation-triangle"></i> Select a Symbol in the Parameters panel</div>';
             }
             summaryEl.innerHTML = `
         <div class="summary-row"><span class="summary-label">Symbol:</span><span class="summary-value">${symbol || '—'}</span></div>
@@ -286,6 +284,12 @@ export function createAiBuildModule(deps) {
         document.getElementById('aiBuildResults').classList.add('hidden');
         _aiBuildMode = 'build';
         _aiBuildExistingStrategyId = null;
+        // Hide inline header status
+        const headerStatus = document.getElementById('aiBuildHeaderStatus');
+        if (headerStatus) headerStatus.classList.add('hidden');
+        // Remove expanded-modal class left over from a previous run
+        const modalContent = document.querySelector('.ai-build-modal-content');
+        if (modalContent) modalContent.classList.remove('has-agents');
     }
 
     // ── Public: runAiBuild ────────────────────────────────────────────────────
@@ -299,7 +303,7 @@ export function createAiBuildModule(deps) {
         const leverage = parseFloat(document.getElementById('backtestLeverage')?.value || '10');
 
         if (!symbol) {
-            alert('Выберите тикер (Symbol) в панели Параметры');
+            alert('Please select a Symbol in the Parameters panel');
             return;
         }
 
@@ -346,10 +350,10 @@ export function createAiBuildModule(deps) {
             }));
             payload.connections = conns.map(c => ({
                 id: c.id,
-                source_block_id: c.sourceBlockId || c.source_block_id || c.source,
-                source_port: c.sourcePort || c.source_port || 'output',
-                target_block_id: c.targetBlockId || c.target_block_id || c.target,
-                target_port: c.targetPort || c.target_port || 'input'
+                source_block_id: c.sourceBlockId || c.source_block_id || (c.source?.blockId ?? (typeof c.source === 'string' ? c.source : '')) || '',
+                source_port: c.sourcePort || c.source_port || c.source?.portId || 'output',
+                target_block_id: c.targetBlockId || c.target_block_id || (c.target?.blockId ?? (typeof c.target === 'string' ? c.target : '')) || '',
+                target_port: c.targetPort || c.target_port || c.target?.portId || 'input'
             }));
         } else {
             const presetSelect = document.getElementById('aiPreset');
@@ -370,6 +374,10 @@ export function createAiBuildModule(deps) {
         if (_progressModal) _progressModal.classList.add('has-agents');
         _resetAgentMonitor();
 
+        // Show inline header status
+        const headerStatus = document.getElementById('aiBuildHeaderStatus');
+        if (headerStatus) headerStatus.classList.remove('hidden');
+
         const stageEl = document.getElementById('aiBuildStage');
         if (stageEl) {
             stageEl.textContent = _aiBuildMode === 'optimize'
@@ -377,13 +385,24 @@ export function createAiBuildModule(deps) {
                 : (description ? `Planning: "${description.substring(0, 60)}…"` : 'Building strategy with AI agent…');
         }
 
+        // Elapsed timer — static element in header
+        const timerEl = document.getElementById('aiBuildElapsed');
+        const _startTime = Date.now();
+        if (timerEl) timerEl.textContent = '0s elapsed';
+        const _timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - _startTime) / 1000);
+            if (timerEl) timerEl.textContent = `${elapsed}s elapsed`;
+        }, 1000);
+
         try {
             await _runAiBuildWithSSE(payload);
         } catch (err) {
             document.getElementById('aiBuildProgress').classList.add('hidden');
             document.getElementById('aiBuildResults').classList.remove('hidden');
             document.getElementById('aiBuildResultContent').innerHTML =
-                `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(err.message)}</div>`;
+                `<div class="ai-result-warn"><i class="bi bi-exclamation-triangle-fill"></i> ${escapeHtml(err.message)}</div>`;
+        } finally {
+            clearInterval(_timerInterval);
         }
     }
 
@@ -468,6 +487,14 @@ export function createAiBuildModule(deps) {
         }
     }
 
+    /** Meta per-agent: icon class + display name */
+    const _agentMeta = {
+        deepseek:   { icon: 'bi-stars',           name: 'DeepSeek' },
+        qwen:       { icon: 'bi-lightning-charge', name: 'Qwen' },
+        perplexity: { icon: 'bi-search',           name: 'Perplexity' },
+        claude:     { icon: 'bi-robot',            name: 'Claude' }
+    };
+
     function _appendAgentLog(log) {
         const agent = (log.agent || '').toLowerCase();
         const role = (log.role || 'unknown').toLowerCase();
@@ -476,35 +503,38 @@ export function createAiBuildModule(deps) {
         const response = log.response || '';
         const ts = log.ts ? new Date(log.ts).toLocaleTimeString() : '';
 
-        // 'system' and unknown agents go to the currently selected agent's column
+        // Unknown / system agents fall back to the selected single-agent
         const _selectedAgent = (document.getElementById('aiAgentSelect')?.value || 'deepseek').toLowerCase();
-        const col = ['deepseek', 'qwen', 'perplexity'].includes(agent) ? agent : _selectedAgent;
+        const col = _agentMeta[agent] ? agent : _selectedAgent;
 
         _ensureAgentMonitorVisible();
 
+        // Route to the per-agent column feed
         const feed = document.getElementById(`agentFeed-${col}`);
-        const badge = document.getElementById(`agentBadge-${col}`);
         if (!feed) return;
 
+        // Per-agent badge
         _agentMsgCount[col] = (_agentMsgCount[col] || 0) + 1;
+        const badge = document.getElementById(`agentBadge-${col}`);
         if (badge) badge.textContent = _agentMsgCount[col];
 
         const roleClass = `role-${role}`;
-        const roleLabel = {
-            planner: '🔍 Planner',
-            deliberation: '🤝 Deliberation',
-            optimizer: '⚙️ Optimizer'
-        }[role] || role;
+        const roleLabel = { planner: 'Planner', deliberation: 'Deliberation', optimizer: 'Optimizer' }[role] || role;
 
         const formattedResponse = escapeHtml(response)
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
+            .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+            .replace(/^#{1,3} (.+)$/gm, '<strong>$1</strong>')
+            .replace(/^[*\-] (.+)$/gm, '• $1')
             .replace(/\n/g, '<br>');
 
         const card = document.createElement('div');
         card.className = 'agent-message';
+        card.dataset.agent = col;
         card.innerHTML = `
-      <div class="agent-msg-role ${escapeHtml(roleClass)}">
-        <span class="agent-msg-role-label">${escapeHtml(roleLabel)}</span>
+      <div class="agent-msg-header">
+        ${role !== 'unknown' ? `<span class="agent-msg-role-badge ${escapeHtml(roleClass)}">${escapeHtml(roleLabel)}</span>` : ''}
         <span class="agent-msg-time">${escapeHtml(ts)}</span>
       </div>
       ${title ? `<div class="agent-msg-title">${escapeHtml(title)}</div>` : ''}
@@ -512,27 +542,31 @@ export function createAiBuildModule(deps) {
       ${promptExcerpt ? `<details class="agent-msg-context"><summary>Context</summary><div class="agent-msg-excerpt">${escapeHtml(promptExcerpt)}</div></details>` : ''}
     `;
 
+        // Smart auto-scroll: only scroll if user is already near the bottom
+        const isNearBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 20;
         feed.appendChild(card);
-        feed.scrollTop = feed.scrollHeight;
+        if (isNearBottom) feed.scrollTop = feed.scrollHeight;
     }
 
     function _resetAgentMonitor() {
-        ['deepseek', 'qwen', 'perplexity'].forEach(col => {
+        ['deepseek', 'qwen', 'perplexity', 'claude'].forEach(col => {
             _agentMsgCount[col] = 0;
-            const feed = document.getElementById(`agentFeed-${col}`);
             const badge = document.getElementById(`agentBadge-${col}`);
-            if (feed) feed.innerHTML = '';
             if (badge) badge.textContent = '0';
+            const feed = document.getElementById(`agentFeed-${col}`);
+            if (feed) feed.innerHTML = '';
         });
+
+        // Show the monitor immediately so users can see agent activity from the start
         const monitor = document.getElementById('agentMonitor');
         const modal = document.querySelector('.ai-build-modal-content');
-        if (monitor) monitor.classList.add('hidden');
-        if (modal) modal.classList.remove('has-agents');
+        if (monitor) monitor.classList.remove('hidden');
+        if (modal) modal.classList.add('has-agents');
     }
 
     // ── Public: toggleAgentMonitor ────────────────────────────────────────────
     function toggleAgentMonitor() {
-        const cols = document.getElementById('agentColumns');
+        const cols = document.getElementById('agentCols');
         const btn = document.getElementById('btnToggleAgentMonitor');
         if (!cols) return;
         const collapsed = cols.classList.toggle('hidden');
@@ -567,12 +601,22 @@ export function createAiBuildModule(deps) {
         });
 
         const sharpe = lastIter.sharpe_ratio ?? apiMetrics.sharpe_ratio ?? 0;
+        const sortino = lastIter.sortino_ratio ?? apiMetrics.sortino_ratio ?? 0;
         const winRate = lastIter.win_rate != null
             ? lastIter.win_rate
             : (apiMetrics.win_rate || 0) / 100;
         const netProfit = lastIter.net_profit ?? apiMetrics.net_profit ?? 0;
         const maxDd = lastIter.max_drawdown ?? apiMetrics.max_drawdown ?? 0;
         const totalTrades = lastIter.total_trades ?? apiMetrics.total_trades ?? 0;
+
+        // Composite quality score: same formula as backend composite_quality_score()
+        // score = Sharpe × Sortino × log(1+trades) / (1 + maxDD/100), capped at 1000
+        function calcCompositeScore(sh, so, tr, dd) {
+            if (sh <= 0 || so <= 0) return 0.0;
+            const raw = sh * so * Math.log1p(tr) / (1 + Math.abs(dd) / 100);
+            return Math.min(1000, Math.max(0, raw));
+        }
+        const compositeScore = calcCompositeScore(sharpe, sortino, totalTrades, maxDd);
 
         const wasOptimize = _aiBuildMode === 'optimize';
         const usedOptimizer = w.used_optimizer_mode || false;
@@ -588,148 +632,157 @@ export function createAiBuildModule(deps) {
         const profitClass = netProfit > 0 ? 'text-success fw-bold' : (netProfit === 0 ? 'text-secondary' : 'text-danger fw-bold');
         const ddClass = maxDd < 10 ? 'text-success' : (maxDd < 25 ? 'text-warning' : 'text-danger');
         const tradesClass = totalTrades >= 10 ? 'text-success' : (totalTrades > 0 ? 'text-warning' : 'text-danger fw-bold');
-        const zeroTradesWarning = totalTrades === 0
-            ? `<div class="alert alert-danger mt-2 py-2">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          <strong>0 Trades Detected!</strong>
-          Check that indicator blocks are connected to <em>Entry Long / Entry Short</em> ports on the Strategy node.
-          Review errors below.
-         </div>`
+        // ── Status header ─────────────────────────────────────────────────────
+        const statusIcon = ok ? (wasOptimize ? 'bi-stars' : 'bi-check-circle-fill') : 'bi-exclamation-triangle-fill';
+        const statusLabel = ok ? (wasOptimize ? 'Strategy Optimized' : 'Strategy Built') : 'Below Target';
+        const statusMod = ok ? 'is-ok' : 'is-warn';
+        const dur = (w.duration_seconds || 0).toFixed(1);
+
+        const savedName = w.final_version_name || '';
+        let html = `<div class="ai-result-status ${statusMod}">
+      <i class="bi ${statusIcon}"></i>
+      <span class="ai-result-status-label">${statusLabel}</span>
+      ${savedName ? `<span class="ai-result-saved-name" title="Saved as"><i class="bi bi-floppy"></i> ${escapeHtml(savedName)}</span>` : ''}
+      <span class="ai-result-status-meta">${w.status || ''} · ${dur}s${usedOptimizer ? ' · Optimizer' : ''}</span>
+    </div>`;
+
+        // ── Zero-trades warning ───────────────────────────────────────────────
+        if (totalTrades === 0) {
+            html += `<div class="ai-result-warn">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <strong>0 Trades</strong> — check that indicator blocks are wired to Entry Long / Entry Short ports on the Strategy node.
+    </div>`;
+        }
+
+        // ── Metrics grid ─────────────────────────────────────────────────────
+        html += `<div class="ai-metrics-grid">
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Sharpe Ratio</div>
+        <div class="ai-metric-value ${sharpeClass}">${sharpe.toFixed(3)}</div>
+      </div>
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Sortino</div>
+        <div class="ai-metric-value ${metricColor(sortino, [1.0, 0.3])}">${sortino.toFixed(3)}</div>
+      </div>
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Win Rate</div>
+        <div class="ai-metric-value ${winRateClass}">${(winRate * 100).toFixed(1)}%</div>
+      </div>
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Net Profit</div>
+        <div class="ai-metric-value ${profitClass}">$${netProfit.toFixed(2)}</div>
+      </div>
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Max Drawdown</div>
+        <div class="ai-metric-value ${ddClass}">${maxDd.toFixed(2)}%</div>
+      </div>
+      <div class="ai-metric-card">
+        <div class="ai-metric-label">Trades</div>
+        <div class="ai-metric-value ${tradesClass}">${totalTrades}</div>
+      </div>
+    </div>`;
+
+        // ── AI Score bar ──────────────────────────────────────────────────────
+        const scoreClass = compositeScore >= 1.0 ? 'is-good' : compositeScore > 0 ? 'is-mid' : 'is-bad';
+        const candidatesMeta = w.candidates_count > 1
+            ? `${w.candidates_count} candidates${w.agreement_score != null ? ` · ${(w.agreement_score * 100).toFixed(0)}% agreement` : ''}`
             : '';
+        html += `<div class="ai-score-bar">
+      <span class="ai-score-label">AI Score</span>
+      <span class="ai-score-value ${scoreClass}" title="Sharpe × Sortino × ln(1+trades) / (1 + DD%)">${compositeScore.toFixed(2)}</span>
+      ${candidatesMeta ? `<span class="ai-score-meta">${candidatesMeta}</span>` : ''}
+    </div>`;
 
-        let html = `
-      <div class="alert ${ok ? 'alert-success' : 'alert-warning'} py-2 mb-2">
-        <strong>${ok ? (wasOptimize ? '✅ Strategy Optimized!' : '✅ Strategy Built!') : '⚠️ Below Target'}</strong>
-        — ${w.status || 'unknown'} in ${(w.duration_seconds || 0).toFixed(1)}s
-        ${usedOptimizer ? '<span class="badge bg-primary ms-1">🎯 Optimizer</span>' : ''}
-      </div>
-      ${zeroTradesWarning}
-      <div class="row g-2 mb-3">
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Sharpe Ratio</div>
-            <div class="fs-5 ${sharpeClass}">${sharpe.toFixed(3)}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Win Rate</div>
-            <div class="fs-5 ${winRateClass}">${(winRate * 100).toFixed(1)}%</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Net Profit</div>
-            <div class="fs-5 ${profitClass}">$${netProfit.toFixed(2)}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Max Drawdown</div>
-            <div class="fs-5 ${ddClass}">${maxDd.toFixed(2)}%</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Total Trades</div>
-            <div class="fs-5 ${tradesClass}">${totalTrades}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card card-body p-2 text-center">
-            <div class="small text-muted">Blocks / Connections</div>
-            <div class="fs-5">${(w.blocks_added || []).length} / ${(w.connections_made || []).length}</div>
-          </div>
-        </div>
-      </div>
+        // ── Meta badges ───────────────────────────────────────────────────────
+        html += `<div class="ai-meta-bar">
+      <span class="ai-meta-chip" title="Strategy ID">${(w.strategy_id || '—').substring(0, 8)}…</span>
+      <span class="ai-meta-chip" title="Backtest ID">${(backtestId || '—').substring(0, 8)}…</span>
+      <span class="ai-meta-chip is-accent">${iters.length} iteration${iters.length !== 1 ? 's' : ''}</span>
+      ${w.final_version_name ? `<span class="ai-meta-chip is-saved" title="Saved as new version">💾 ${escapeHtml(w.final_version_name)}</span>` : ''}
+    </div>`;
 
-      <div class="d-flex gap-2 mb-2 flex-wrap">
-        <span class="badge bg-secondary">ID: ${(w.strategy_id || '—').substring(0, 8)}…</span>
-        <span class="badge bg-secondary">Backtest: ${(backtestId || '—').substring(0, 8)}…</span>
-        <span class="badge bg-info text-dark">${iters.length} iteration${iters.length !== 1 ? 's' : ''}</span>
-        ${w.final_version_name ? `<span class="badge bg-success" title="Saved as new strategy version">💾 ${escapeHtml(w.final_version_name)}</span>` : ''}
-      </div>
-      ${w.final_version_name && w.final_version_id ? `
-      <div class="alert alert-success py-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
-        <i class="bi bi-floppy2-fill"></i>
-        <span>Saved as <strong>${escapeHtml(w.final_version_name)}</strong></span>
-        <button class="btn btn-success btn-sm ms-auto"
-          onclick="window._loadAiFinalVersion('${escapeHtml(w.final_version_id)}', '${escapeHtml(w.final_version_name)}')">
-          📂 Load Final Version
-        </button>
-      </div>` : ''}`;
+        // ── Saved banner + load button ────────────────────────────────────────
+        if (w.final_version_name && w.final_version_id) {
+            html += `<div class="ai-saved-banner">
+      <i class="bi bi-floppy2-fill"></i>
+      <span>Saved as <strong>${escapeHtml(w.final_version_name)}</strong></span>
+      <button class="ai-action-btn is-primary" id="btnLoadAiFinalVersion"
+        data-version-id="${escapeHtml(w.final_version_id)}"
+        data-version-name="${escapeHtml(w.final_version_name)}">
+        <i class="bi bi-folder2-open"></i> Load onto Canvas
+      </button>
+    </div>`;
+        }
 
+        // ── Iterations table ──────────────────────────────────────────────────
         if (iters.length > 0) {
-            html += `
-      <details open class="mb-3">
-        <summary class="fw-semibold mb-1" style="cursor:pointer">📊 Iterations</summary>
-        <div class="table-responsive">
-        <table class="table table-sm table-hover table-bordered mb-0" style="font-size:0.82rem">
-          <thead class="table-dark">
-            <tr>
-              <th>#</th><th>Sharpe</th><th>Win Rate</th>
-              <th>Net Profit</th><th>Trades</th><th>Max DD</th><th>OK?</th>
-            </tr>
-          </thead>
-          <tbody>`;
+            html += `<details class="ai-detail-block" open>
+      <summary><i class="bi bi-bar-chart-steps"></i> Iterations <span class="ai-detail-count">${iters.length}</span></summary>
+      <div class="ai-iter-table-wrap">
+      <table class="ai-iter-table">
+        <thead><tr><th>#</th><th>Sharpe</th><th>Win Rate</th><th>Profit</th><th>Trades</th><th>DD</th><th></th></tr></thead>
+        <tbody>`;
             iters.forEach(function (it, idx) {
                 const isBest = idx === bestIterIdx && iters.length > 1;
-                const itSharpe = (it.sharpe_ratio || 0).toFixed(3);
-                const itWR = ((it.win_rate || 0) * 100).toFixed(1);
-                const itProfit = (it.net_profit || 0).toFixed(2);
-                const itDD = (it.max_drawdown || 0).toFixed(2);
-                const itTrades = it.total_trades || 0;
+                const profit = (it.net_profit || 0).toFixed(2);
+                const profitSign = parseFloat(profit) > 0 ? 'pos' : parseFloat(profit) < 0 ? 'neg' : '';
                 const itOk = it.acceptable;
-                const rowClass = isBest ? 'table-success' : (itOk ? 'table-info' : '');
-                html += `<tr class="${rowClass}">
+                html += `<tr class="${isBest ? 'is-best' : itOk ? 'is-ok' : ''}">
           <td>${it.iteration}${isBest ? ' ⭐' : ''}</td>
-          <td>${itSharpe}</td>
-          <td>${itWR}%</td>
-          <td class="${parseFloat(itProfit) > 0 ? 'text-success' : (parseFloat(itProfit) < 0 ? 'text-danger' : '')}">
-            $${itProfit}
-          </td>
-          <td class="${itTrades === 0 ? 'text-danger fw-bold' : ''}">${itTrades}</td>
-          <td>${itDD}%</td>
-          <td>${itOk ? '✅' : '❌'}</td>
+          <td>${(it.sharpe_ratio || 0).toFixed(3)}</td>
+          <td>${((it.win_rate || 0) * 100).toFixed(1)}%</td>
+          <td class="${profitSign}">$${profit}</td>
+          <td class="${(it.total_trades || 0) === 0 ? 'zero' : ''}">${it.total_trades || 0}</td>
+          <td>${(it.max_drawdown || 0).toFixed(2)}%</td>
+          <td>${itOk ? '✓' : '✗'}</td>
         </tr>`;
             });
             html += '</tbody></table></div></details>';
         }
 
+        // ── Deliberation ──────────────────────────────────────────────────────
         if (w.deliberation && w.deliberation.decision) {
-            html += `
-        <details class="mb-2">
-          <summary class="fw-semibold" style="cursor:pointer">🤖 AI Deliberation
-            (${(w.deliberation.confidence * 100).toFixed(0)}% confidence)
-          </summary>
-          <div class="alert alert-info mt-1 mb-0 py-2">
-            <small>${escapeHtml(w.deliberation.decision.substring(0, 500))}${w.deliberation.decision.length > 500 ? '…' : ''}</small>
-          </div>
-        </details>`;
+            const conf = (w.deliberation.confidence * 100).toFixed(0);
+            const decText = escapeHtml(w.deliberation.decision.substring(0, 600)) +
+                (w.deliberation.decision.length > 600 ? '…' : '');
+            html += `<details class="ai-detail-block" open>
+      <summary><i class="bi bi-cpu"></i> AI Deliberation <span class="ai-detail-count">${conf}% confidence</span></summary>
+      <div class="ai-deliberation-text">${decText}</div>
+    </details>`;
         }
 
+        // ── Errors ────────────────────────────────────────────────────────────
         if (w.errors && w.errors.length > 0) {
-            html += `
-      <details open class="mb-2">
-        <summary class="fw-semibold text-danger" style="cursor:pointer">
-          ❌ Errors (${w.errors.length})
-        </summary>
-        <ul class="list-unstyled mb-0 mt-1">`;
+            html += `<details class="ai-detail-block is-error" open>
+      <summary><i class="bi bi-x-circle-fill"></i> Errors <span class="ai-detail-count">${w.errors.length}</span></summary>
+      <ul class="ai-error-list">`;
             w.errors.forEach(function (e) {
-                html += `<li class="small text-danger border-start border-danger ps-2 mb-1">${escapeHtml(e)}</li>`;
+                html += `<li>${escapeHtml(e)}</li>`;
             });
             html += '</ul></details>';
         }
 
+        // ── Action buttons row ────────────────────────────────────────────────
         if (backtestId) {
-            html += `
-        <button class="btn btn-outline-primary btn-sm mt-2"
-                onclick="viewAiBacktestFullResults('${backtestId}')">
-          📊 View Full Results
-        </button>`;
+            html += `<div class="ai-result-actions">
+      <button class="ai-action-btn" id="btnViewAiFullResults" data-backtest-id="${escapeHtml(backtestId)}">
+        <i class="bi bi-bar-chart-line"></i> Full Results
+      </button>
+    </div>`;
         }
 
         document.getElementById('aiBuildResultContent').innerHTML = html;
+
+        // Wire result buttons via data attributes (avoids inline onclick)
+        const loadVersionBtn = document.getElementById('btnLoadAiFinalVersion');
+        if (loadVersionBtn) {
+            loadVersionBtn.addEventListener('click', () =>
+                _loadAiFinalVersion(loadVersionBtn.dataset.versionId, loadVersionBtn.dataset.versionName));
+        }
+        const viewFullBtn = document.getElementById('btnViewAiFullResults');
+        if (viewFullBtn) {
+            viewFullBtn.addEventListener('click', () => viewAiBacktestFullResults(viewFullBtn.dataset.backtestId));
+        }
 
         if (backtestId && typeof displayBacktestResults === 'function') {
             try {
@@ -747,15 +800,18 @@ export function createAiBuildModule(deps) {
             }
         }
 
-        console.log('[AI Build] Loading optimized strategy onto canvas:', w.strategy_id);
+        // Prefer the final named version (AI-N clone); fall back to working strategy
+        const loadId = w.final_version_id || w.strategy_id;
+        const loadName = w.final_version_name || '';
+        console.log('[AI Build] Loading strategy onto canvas:', loadId, loadName || '');
 
-        if (w.strategy_id && typeof loadStrategy === 'function') {
+        if (loadId && typeof loadStrategy === 'function') {
             try {
-                await loadStrategy(w.strategy_id);
-                console.log('[AI Build] Optimized strategy loaded onto canvas:', w.strategy_id);
+                await loadStrategy(loadId);
+                console.log('[AI Build] Strategy loaded onto canvas:', loadId, loadName);
 
                 const newUrl = new URL(window.location);
-                newUrl.searchParams.set('id', w.strategy_id);
+                newUrl.searchParams.set('id', loadId);
                 window.history.replaceState({}, '', newUrl);
             } catch (err) {
                 console.error('[AI Build] Failed to reload strategy onto canvas:', err);
@@ -783,11 +839,10 @@ export function createAiBuildModule(deps) {
             }
         } catch (err) {
             console.error('[AI Build] Failed to load final version:', err);
-            alert('Не удалось загрузить финальную версию: ' + err.message);
+            alert('Failed to load final version: ' + err.message);
         }
     }
-    // expose globally so onclick= attributes can call it
-    window._loadAiFinalVersion = _loadAiFinalVersion;
+    // (no global window exposure needed — called via data-attr + addEventListener)
 
     // ── Wire deliberation toggle → hide/show agent select ────────────────────
     (function _wireControls() {
@@ -833,6 +888,18 @@ export function createAiBuildModule(deps) {
                 refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
             });
         }
+
+        // Toggle agent monitor (no inline onclick in HTML)
+        const toggleBtn = document.getElementById('btnToggleAgentMonitor');
+        if (toggleBtn) toggleBtn.addEventListener('click', toggleAgentMonitor);
+
+        // Close button
+        const closeBtn = document.getElementById('btnCloseAiBuild');
+        if (closeBtn) closeBtn.addEventListener('click', closeAiBuildModal);
+
+        // Reset / Back button
+        const resetBtn = document.getElementById('btnResetAiBuild');
+        if (resetBtn) resetBtn.addEventListener('click', resetAiBuild);
     })();
 
     // ── Public API ────────────────────────────────────────────────────────────

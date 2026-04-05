@@ -445,6 +445,11 @@ class PyramidingManager:
         """
         Частично закрыть позицию (для Multi-level TP).
 
+        NOTE: Всегда использует пропорциональное закрытие (proportional close)
+        независимо от close_rule (ALL/FIFO/LIFO). Это намеренное TV-совместимое
+        поведение: при Multi-TP каждый уровень закрывает заданную долю всей позиции,
+        а не конкретные входы FIFO/LIFO. close_rule применяется только в close_position().
+
         Args:
             direction: "long" или "short"
             exit_price: Цена выхода
@@ -535,8 +540,18 @@ class PyramidingManager:
         # Save entry_count before closing (entries will be cleared)
         entry_count_before_close = pos.entry_count
 
-        # TP/SL всегда закрывает ВСЕ входы
-        if exit_reason in ("take_profit", "stop_loss", "end_of_data"):
+        # TP/SL и все защитные выходы всегда закрывают ВСЕ входы позиции.
+        # ВАЖНО: ATR_SL, ATR_TP, TRAILING_STOP, TIME_EXIT, SESSION_CLOSE,
+        # WEEKEND_CLOSE, BREAKEVEN_SL, MAX_DRAWDOWN должны здесь же — иначе
+        # при close_rule=FIFO/LIFO они закроют только один вход (баг).
+        _FORCE_CLOSE_ALL = frozenset((
+            "take_profit", "atr_tp",
+            "stop_loss",   "atr_sl", "breakeven_sl", "max_drawdown",
+            "trailing_stop",
+            "time_exit", "session_close", "weekend_close",
+            "end_of_data",
+        ))
+        if exit_reason in _FORCE_CLOSE_ALL:
             # Закрыть все сразу
             avg_price, total_size, total_allocated, first_bar, first_time = pos.close_all()
 

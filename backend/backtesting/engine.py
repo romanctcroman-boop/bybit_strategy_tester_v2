@@ -401,6 +401,25 @@ def _build_performance_metrics(
     except Exception:
         pass  # Fall back to MetricsCalculator Sharpe/Sortino
 
+    # ─── Stability R² override: use trade-exit equity for reliable R² ─────────────
+    # Per-bar equity often has flat segments (no position) that make ss_tot very
+    # small or cause negative R². Trade-exit equity gives meaningful stability.
+    _stability_tv = calc_metrics.get("stability", 0.0)
+    try:
+        from backend.core.metrics_calculator import calculate_stability_r2 as _calc_r2
+
+        _closed_for_stab = [t for t in trades if not getattr(t, "is_open", False)]
+        if len(_closed_for_stab) >= 3:
+            _cum_pnl_stab = 0.0
+            _stab_equity = [initial_capital]
+            for _t in _closed_for_stab:
+                _cum_pnl_stab += float(getattr(_t, "pnl", 0.0))
+                _stab_equity.append(initial_capital + _cum_pnl_stab)
+            _stab_arr = np.array(_stab_equity, dtype=np.float64)
+            _stability_tv = _calc_r2(_stab_arr)
+    except Exception:
+        pass  # Fall back to per-bar MetricsCalculator stability
+
     # Buy & Hold calculations (not in MetricsCalculator as it's context-specific)
     # TV uses first bar of the TRADING RANGE (first trade entry bar), not first bar of loaded data.
     # last_price = close of last bar of trading range (last trade exit bar or last bar with data).
@@ -1065,6 +1084,8 @@ def _build_performance_metrics(
         pnl_distribution=pnl_distribution or [],
         avg_profit_pct=np.mean([t.pnl_pct for t in winning_trades_list]) if winning_trades_list else 0.0,
         avg_loss_pct=abs(np.mean([t.pnl_pct for t in losing_trades_list])) if losing_trades_list else 0.0,
+        # Stability (R²) of equity curve — uses trade-exit equity for reliability
+        stability=_stability_tv,
         # ===== NEW: Additional calculated metrics =====
         closed_trades=closed_trades,
         account_size_required=account_size_required,
@@ -1156,14 +1177,13 @@ def _build_performance_metrics(
         short_breakeven_trades=calc_metrics["short_breakeven_trades"],
         cagr_short=calc_metrics["cagr_short"],
         # ===== NEW: LONG/SHORT ADVANCED METRICS (TradingView) =====
-        # Sharpe/Sortino per direction (using overall values as baseline -
-        # true per-direction calculation would require separate equity curves)
-        sharpe_long=calc_metrics["sharpe_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
-        sharpe_short=calc_metrics["sharpe_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
-        sortino_long=calc_metrics["sortino_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
-        sortino_short=calc_metrics["sortino_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
-        calmar_long=calc_metrics["calmar_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
-        calmar_short=calc_metrics["calmar_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
+        # Sharpe/Sortino per direction (computed from direction-specific equity curves in metrics_calculator)
+        sharpe_long=calc_metrics.get("sharpe_long", 0.0) if calc_metrics["long_trades"] > 0 else 0.0,
+        sharpe_short=calc_metrics.get("sharpe_short", 0.0) if calc_metrics["short_trades"] > 0 else 0.0,
+        sortino_long=calc_metrics.get("sortino_long", 0.0) if calc_metrics["long_trades"] > 0 else 0.0,
+        sortino_short=calc_metrics.get("sortino_short", 0.0) if calc_metrics["short_trades"] > 0 else 0.0,
+        calmar_long=calc_metrics.get("calmar_long", 0.0) if calc_metrics["long_trades"] > 0 else 0.0,
+        calmar_short=calc_metrics.get("calmar_short", 0.0) if calc_metrics["short_trades"] > 0 else 0.0,
         # Expectancy per direction
         long_expectancy=(
             calc_metrics["long_win_rate"] / 100 * calc_metrics["long_avg_win"]
@@ -2876,7 +2896,7 @@ class BacktestEngine:
             equity_curve=equity_curve,
             final_equity=equity[-1],
             final_pnl=equity[-1] - config.initial_capital,
-            final_pnl_pct=total_return,
+            final_pnl_pct=total_return * 100,  # convert to percentage for API consistency
         )
 
     def _run_vectorbt(
@@ -3021,7 +3041,7 @@ class BacktestEngine:
             equity_curve=equity_curve,
             final_equity=final_equity,
             final_pnl=final_equity - config.initial_capital,
-            final_pnl_pct=(final_equity - config.initial_capital) / config.initial_capital,
+            final_pnl_pct=(final_equity - config.initial_capital) / config.initial_capital * 100,  # percentage
         )
 
     def get_result(self, backtest_id: str) -> BacktestResult | None:

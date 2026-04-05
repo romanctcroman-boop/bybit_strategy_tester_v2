@@ -670,6 +670,8 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
         """Collect refined opinions after critique phase (parallel if enabled — P3-1)."""
         import asyncio
 
+        _AGENT_CALL_TIMEOUT = 40.0  # max seconds per individual LLM call
+
         async def refine_one(opinion: AgentVote) -> AgentVote:
             agent_type = opinion.agent_type
             agent_critiques = [c for c in critiques if c.target_agent == opinion.agent_id]
@@ -686,7 +688,18 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
                 original_position=opinion.position,
                 critiques=critiques_text or "No critiques received.",
             )
-            response = await self._ask_agent(agent_type, prompt)
+            try:
+                response = await asyncio.wait_for(
+                    self._ask_agent(agent_type, prompt),
+                    timeout=_AGENT_CALL_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "[Deliberation] refine_one timeout (%.0fs) for agent=%s — keeping original position",
+                    _AGENT_CALL_TIMEOUT,
+                    agent_type,
+                )
+                return opinion  # keep the previous vote unchanged
             vote = self._parse_opinion(agent_type, response)
             vote.agent_id = opinion.agent_id
             return vote

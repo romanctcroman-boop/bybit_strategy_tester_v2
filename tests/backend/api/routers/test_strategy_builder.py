@@ -380,6 +380,7 @@ class TestListStrategies:
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
+        mock_query.distinct.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.offset.return_value = mock_query
         mock_query.limit.return_value = mock_query

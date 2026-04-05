@@ -9,5 +9,12 @@
       "Bash(py:*)",
       "WebSearch"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "context7",
+    "playwright",
+    "sequential-thinking",
+    "fetch",
+    "github"
+  ]
 }

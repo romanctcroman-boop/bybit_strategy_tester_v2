@@ -52,10 +52,10 @@ For each connection in must_haves:
 
 ## Strategy Verification
 
-- [ ] generate_signals() returns DataFrame with 'signal' column
-- [ ] Signal values: 1 (long), -1 (short), 0 (no action)
-- [ ] No NaN in signal column after warmup period
-- [ ] BaseStrategy properly subclassed
+- [ ] `generate_signals()` returns `SignalResult` — NOT a DataFrame with 'signal' column
+- [ ] `result.entries` / `result.exits` are `bool` Series (`.dtype == bool`)
+- [ ] No NaN in entries/exits after `.fillna(False)` (`result.entries.isna().any()` is False)
+- [ ] BaseStrategy properly subclassed with `_validate_params()` raising ValueError
 
 ## Engine Verification
 

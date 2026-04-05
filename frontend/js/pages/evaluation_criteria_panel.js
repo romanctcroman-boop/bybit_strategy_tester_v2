@@ -68,17 +68,17 @@ class EvaluationCriteriaPanel {
         this.state = {
             // Ranking mode: 'single' | 'balanced' | 'weighted'
             rankingMode: 'single',
-            primaryMetric: 'sharpe_ratio',
+            primaryMetric: 'profit_factor',
             // balanced mode: metrics to rank by average rank
             balancedMetrics: ['net_profit', 'max_drawdown'],
             // weighted mode: same as secondary + weights
             secondaryMetrics: ['win_rate', 'max_drawdown', 'profit_factor'],
             constraints: [
-                { id: crypto.randomUUID(), metric: 'max_drawdown', operator: '<=', value: 15, unit: '%', enabled: true },
-                { id: crypto.randomUUID(), metric: 'total_trades', operator: '>=', value: 50, unit: '', enabled: true }
+                { id: crypto.randomUUID(), metric: 'max_drawdown', operator: '<=', value: 10, unit: '%', enabled: true },
+                { id: crypto.randomUUID(), metric: 'total_trades', operator: '>=', value: 85, unit: '', enabled: true }
             ],
             sortOrder: [
-                { id: crypto.randomUUID(), metric: 'sharpe_ratio', direction: 'desc' }
+                { id: crypto.randomUUID(), metric: 'profit_factor', direction: 'desc' }
             ],
             weights: {
                 sharpe_ratio: 1.0,
@@ -898,17 +898,25 @@ class EvaluationCriteriaPanel {
      * Save state to localStorage
      */
     saveState() {
-        localStorage.setItem('evaluationCriteriaState', JSON.stringify(this.state));
+        localStorage.setItem('evaluationCriteriaState', JSON.stringify({ ...this.state, _version: 2 }));
     }
 
     /**
-     * Load saved state — migrates legacy useCompositeScore to rankingMode
+     * Load saved state — migrates legacy useCompositeScore to rankingMode.
+     * Version 2: default changed to profit_factor + stricter constraints.
+     * Old saved states (version < 2) are discarded so users get the new defaults.
      */
     loadSavedState() {
+        const CURRENT_VERSION = 2;
         const saved = localStorage.getItem('evaluationCriteriaState');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
+                // Discard states saved before version 2 so new defaults apply
+                if (!parsed._version || parsed._version < CURRENT_VERSION) {
+                    localStorage.removeItem('evaluationCriteriaState');
+                    return;
+                }
                 // Migration: old state had useCompositeScore but no rankingMode
                 if (!parsed.rankingMode) {
                     parsed.rankingMode = parsed.useCompositeScore ? 'weighted' : 'single';

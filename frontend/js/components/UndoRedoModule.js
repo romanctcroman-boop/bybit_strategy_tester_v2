@@ -37,8 +37,10 @@ export function createUndoRedoModule({
     setConnections,
     getSelectedBlockId,
     setSelectedBlockId,
+    getSelectedBlockIds,
     renderBlocks,
     renderBlockProperties,
+    renderConnections,
     dispatchBlocksChanged,
     validateStrategy,
     showNotification,
@@ -78,8 +80,10 @@ export function createUndoRedoModule({
         conns.length = 0;
         conns.push(...(snapshot.connections || []));
 
-        setBlocks(blocks);
-        setConnections(conns);
+        // Pass copies so the setters' own .length=0 / .push(...arr) round-trip
+        // doesn't accidentally clear the array we just populated (self-reference bug).
+        setBlocks([...blocks]);
+        setConnections([...conns]);
 
         const selId = getSelectedBlockId();
         if (selId && !blocks.some((b) => b.id === selId)) {
@@ -241,7 +245,42 @@ export function createUndoRedoModule({
      * @param {string} direction
      */
     function alignBlocks(direction) {
-        console.log(`[UndoRedoModule] alignBlocks: ${direction}`);
+        const ids = getSelectedBlockIds ? getSelectedBlockIds() : [];
+        if (ids.length < 2) {
+            return; // nothing to align
+        }
+
+        const blocks = getBlocks();
+        const selected = blocks.filter((b) => ids.includes(b.id));
+
+        // Get DOM widths for center/right alignment
+        const widthOf = (b) => {
+            const el = document.getElementById(b.id);
+            return el ? el.offsetWidth : 200;
+        };
+
+        const minX = Math.min(...selected.map((b) => b.x));
+        const maxRight = Math.max(...selected.map((b) => b.x + widthOf(b)));
+        const centerX = (minX + maxRight) / 2;
+
+        pushUndo();
+
+        selected.forEach((block) => {
+            if (direction === 'left') {
+                block.x = minX;
+            } else if (direction === 'center') {
+                block.x = Math.round(centerX - widthOf(block) / 2);
+            } else if (direction === 'right') {
+                block.x = Math.round(maxRight - widthOf(block));
+            }
+            // Sync position to DOM immediately
+            const el = document.getElementById(block.id);
+            if (el) el.style.left = block.x + 'px';
+        });
+
+        setBlocks(blocks);
+        if (renderConnections) renderConnections();
+        dispatchBlocksChanged();
     }
 
     /**

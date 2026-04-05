@@ -302,7 +302,7 @@ class TestLLMClientFactory:
 
     def test_create_unsupported_raises(self):
         """Unsupported provider raises ValueError."""
-        config = LLMConfig(provider=LLMProvider.ANTHROPIC, api_key="test")
+        config = LLMConfig(provider=LLMProvider.OPENAI, api_key="test")
         with pytest.raises(ValueError, match="Unsupported provider"):
             LLMClientFactory.create(config)
 

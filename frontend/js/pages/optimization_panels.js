@@ -794,7 +794,7 @@ class OptimizationPanels {
         const strategyId = urlParams.get('id');
 
         if (!strategyId) {
-            this.showNotification('Save strategy first before running backtest', 'warning');
+            this.showNotification('Сначала сохраните стратегию перед запуском бэктеста', 'warning');
             return;
         }
 
@@ -876,7 +876,7 @@ class OptimizationPanels {
         const strategyId = urlParams.get('id');
 
         if (!strategyId) {
-            this.showNotification('Save strategy first before optimization', 'warning');
+            this.showNotification('Сначала сохраните стратегию перед оптимизацией', 'warning');
             return;
         }
 
@@ -1767,116 +1767,397 @@ class OptimizationPanels {
         if (!summary) return;
 
         console.log('[OptPanels] displayQuickResults called. results keys:', Object.keys(results || {}));
-        console.log('[OptPanels] results.best:', results?.best);
         console.log('[OptPanels] results.top_results length:', results?.top_results?.length);
-        console.log('[OptPanels] results.best_metrics:', results?.best_metrics);
 
-        // Handle both API formats: results.best.metrics OR results.top_results[0] OR results.best_metrics
-        let metrics = {};
-        if (results?.best?.metrics && Object.keys(results.best.metrics).length > 0) {
-            metrics = results.best.metrics;
-            console.log('[OptPanels] Using results.best.metrics, keys:', Object.keys(metrics).length);
-        } else if (results?.best_metrics && Object.keys(results.best_metrics).length > 0) {
-            metrics = results.best_metrics;
-            console.log('[OptPanels] Using results.best_metrics, keys:', Object.keys(metrics).length);
-        } else if (results?.top_results?.[0] && Object.keys(results.top_results[0]).length > 0) {
-            metrics = results.top_results[0];
-            console.log('[OptPanels] Using results.top_results[0], keys:', Object.keys(metrics).length);
-        }
-
-        console.log('[OptPanels] Final metrics object keys:', Object.keys(metrics));
-
-        if (!metrics || Object.keys(metrics).length === 0) {
-            summary.innerHTML = `
-                <p class="text-muted text-sm text-center">
-                    <i class="bi bi-exclamation-circle"></i>
-                    No results available
-                </p>
-            `;
-            return;
-        }
-
-        const totalTrials = results.total_trials || results.tested_combinations || results.total_combinations || 0;
-        const sharpe = metrics.sharpe_ratio ?? 0;
-        const totalReturn = metrics.total_return ?? 0;
-        const maxDD = metrics.max_drawdown ?? 0;
-        const winRate = metrics.win_rate ?? 0;
-        const netProfit = metrics.net_profit ?? null;
+        const topResults = results?.top_results || [];
 
         // Determine the optimization criterion used
         const optimizeMetric = results.optimize_metric
             || this.state.lastOptimizeMetric
             || this.state.primaryMetric
             || 'sharpe_ratio';
+
         const metricLabelMap = {
-            'sharpe_ratio': 'Sharpe Ratio',
-            'total_return': 'Total Return',
-            'total_return_pct': 'Total Return %',
-            'max_drawdown': 'Max Drawdown',
+            'sharpe_ratio': 'Sharpe',
+            'total_return': 'Return %',
+            'total_return_pct': 'Return %',
+            'max_drawdown': 'Max DD',
             'win_rate': 'Win Rate',
-            'profit_factor': 'Profit Factor',
-            'calmar_ratio': 'Calmar Ratio',
-            'sortino_ratio': 'Sortino Ratio',
+            'profit_factor': 'PF',
+            'calmar_ratio': 'Calmar',
+            'sortino_ratio': 'Sortino',
             'expectancy': 'Expectancy',
             'net_profit': 'Net Profit',
             'cagr': 'CAGR',
-            'recovery_factor': 'Recovery Factor'
+            'recovery_factor': 'Recovery',
+            'total_trades': 'Trades'
         };
-        const metricLabel = metricLabelMap[optimizeMetric] || optimizeMetric;
 
-        // Best score value from the optimization metric
-        const _bestScore = metrics[optimizeMetric] ?? results.best_score ?? null;
-        const isLosing = (optimizeMetric === 'net_profit' && netProfit !== null && netProfit < 0)
-            || (optimizeMetric === 'total_return' && totalReturn < 0)
-            || (optimizeMetric === 'sharpe_ratio' && sharpe < 0);
-        const noPositiveResult = results.no_positive_results === true
-            || (isLosing && (results.fallback_used === true || results.all_filtered === true));
+        // --- Build column list ---
+        // 1. Always: rank, optimize_metric
+        // 2. Constraint metrics from EvaluationCriteriaPanel (Evaluation Min Requirements)
+        // 3. Always: total_trades, Параметры блоков
+        const evalCriteria = window.evaluationCriteriaPanel?.getCriteria() || {};
+        const constraintMetrics = (evalCriteria.constraints || [])
+            .filter(c => c.metric && c.metric !== 'min_trades' && c.metric !== 'total_trades')
+            .map(c => c.metric);
 
-        const warningHtml = noPositiveResult
-            ? '<div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.4);border-radius:6px;padding:5px 10px;margin-bottom:6px;font-size:11px;color:#fca5a5;text-align:center;"><i class="bi bi-exclamation-triangle"></i> Прибыльных конфигураций не найдено. Показан наименее убыточный вариант.</div>'
-            : (isLosing ? '<div style="background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.4);border-radius:6px;padding:5px 10px;margin-bottom:6px;font-size:11px;color:#fdba74;text-align:center;"><i class="bi bi-exclamation-triangle"></i> Лучший найденный результат убыточен. Попробуйте другой период или параметры.</div>' : '');
+        // De-duplicate metric columns
+        // Fixed order: optimize_metric first, then constraint metrics,
+        // then always-visible metrics, then total_trades
+        const alwaysShow = ['max_drawdown', 'sharpe_ratio', 'win_rate'];
+        const metricCols = [optimizeMetric];
+        constraintMetrics.forEach(m => { if (!metricCols.includes(m)) metricCols.push(m); });
+        alwaysShow.forEach(m => { if (!metricCols.includes(m)) metricCols.push(m); });
+        if (!metricCols.includes('total_trades')) metricCols.push('total_trades');
+
+        // Collect parameter column keys from top_results (keys starting with block format "blockId.paramKey")
+        const paramCols = [];
+        if (topResults.length > 0) {
+            const row0 = topResults[0];
+            Object.keys(row0).forEach(k => {
+                // parameter keys have a dot: e.g. "rsi.cross_long_level"
+                if (k.includes('.') && !metricCols.includes(k)) {
+                    paramCols.push(k);
+                }
+            });
+        }
+
+        // --- Fallback: no top_results — try to show single best result as before ---
+        if (topResults.length === 0) {
+            let metrics = {};
+            if (results?.best?.metrics && Object.keys(results.best.metrics).length > 0) {
+                metrics = results.best.metrics;
+            } else if (results?.best_metrics && Object.keys(results.best_metrics).length > 0) {
+                metrics = results.best_metrics;
+            }
+            if (!metrics || Object.keys(metrics).length === 0) {
+                summary.innerHTML = '<p class="text-muted text-sm text-center"><i class="bi bi-exclamation-circle"></i> No results available</p>';
+                return;
+            }
+            // Push single entry as top_results for unified rendering below
+            topResults.push({ ...metrics, ...(results.best_params || {}) });
+        }
+
+        const totalTrials = results.total_trials || results.tested_combinations || results.total_combinations || 0;
+        const fallbackUsed = results.fallback_used === true || results.all_filtered === true;
+
+        // Check if best result is losing
+        const best = topResults[0] || {};
+        const bestOptVal = best[optimizeMetric] ?? null;
+        const isLosing = bestOptVal !== null && bestOptVal < 0;
+        const noPositive = results.no_positive_results === true || (isLosing && fallbackUsed);
+
+        // --- Warning banner ---
+        let warningHtml = '';
+        if (noPositive) {
+            warningHtml = '<div class="opt-results-warning opt-results-warning--error"><i class="bi bi-exclamation-triangle"></i> Прибыльных конфигураций не найдено. Показан наименее убыточный.</div>';
+        } else if (isLosing) {
+            warningHtml = '<div class="opt-results-warning opt-results-warning--warn"><i class="bi bi-exclamation-triangle"></i> Лучший результат убыточен. Попробуйте другой период.</div>';
+        } else if (fallbackUsed) {
+            warningHtml = '<div class="opt-results-warning opt-results-warning--warn"><i class="bi bi-exclamation-triangle"></i> Фильтры сняты — нет результатов прошедших Min Requirements.</div>';
+        }
+
+        // --- Header info ---
+        const optLabel = metricLabelMap[optimizeMetric] || optimizeMetric;
+        const constraintBadges = (evalCriteria.constraints || []).map(c => {
+            const lbl = metricLabelMap[c.metric] || c.metric;
+            const unit = c.metric.includes('drawdown') || c.metric.includes('return') || c.metric.includes('rate') ? '%' : '';
+            return `<span class="opt-constraint-badge">${lbl} ${c.operator} ${c.value}${unit}</span>`;
+        }).join('');
+
+        // --- Format helpers ---
+        const fmt = (val, key) => {
+            if (val === null || val === undefined) return '<span style="color:#666">—</span>';
+            const n = Number(val);
+            if (isNaN(n)) return String(val);
+            // Integer-like keys
+            if (key === 'total_trades' || key.endsWith('period') || key.endsWith('length')) {
+                return n.toFixed(0);
+            }
+            // Percent keys
+            if (key.includes('return') || key.includes('drawdown') || key.includes('win_rate') || key.includes('cagr')) {
+                const cls = n >= 0 ? 'opt-cell-pos' : 'opt-cell-neg';
+                return `<span class="${cls}">${n >= 0 && key !== 'max_drawdown' ? '+' : ''}${n.toFixed(1)}%</span>`;
+            }
+            // Net profit
+            if (key === 'net_profit') {
+                const cls = n >= 0 ? 'opt-cell-pos' : 'opt-cell-neg';
+                return `<span class="${cls}">${n >= 0 ? '+' : ''}${n.toFixed(2)}</span>`;
+            }
+            // Param cols (blockId.paramKey) — show plain value
+            if (key.includes('.')) {
+                return typeof val === 'number' && !Number.isInteger(val) ? n.toFixed(2) : String(val);
+            }
+            return n.toFixed(2);
+        };
+
+        // Two-line header labels: first line short name, second line unit/detail
+        const colLabelTwoLine = key => {
+            const twoLineMap = {
+                'net_profit': ['Net', 'Profit'],
+                'total_trades': ['Trades', ''],
+                'max_drawdown': ['Max', 'DD'],
+                'sharpe_ratio': ['Sharpe', ''],
+                'win_rate': ['Win', 'Rate'],
+                'profit_factor': ['Profit', 'Factor'],
+                'total_return': ['Return', '%'],
+                'total_return_pct': ['Return', '%'],
+                'calmar_ratio': ['Calmar', ''],
+                'sortino_ratio': ['Sortino', ''],
+                'expectancy': ['Exp', ''],
+                'cagr': ['CAGR', ''],
+                'recovery_factor': ['Recov', '']
+            };
+            if (key.includes('.')) {
+                const [blockId, paramKey] = key.split('.');
+                const bLabel = blockId.toUpperCase();
+                const pLabel = paramKey.replace(/_percent$/, '%').replace(/_/g, ' ');
+                return `<span class="th-line1">${bLabel}</span><span class="th-line2">${pLabel}</span>`;
+            }
+            const pair = twoLineMap[key];
+            if (pair) {
+                const [l1, l2] = pair;
+                return l2
+                    ? `<span class="th-line1">${l1}</span><span class="th-line2">${l2}</span>`
+                    : `<span class="th-line1">${l1}</span>`;
+            }
+            const plain = (metricLabelMap[key] || key.replace(/_/g, ' ')).split(' ');
+            return plain.length >= 2
+                ? `<span class="th-line1">${plain[0]}</span><span class="th-line2">${plain.slice(1).join(' ')}</span>`
+                : `<span class="th-line1">${plain[0]}</span>`;
+        };
+
+        // Constraint operator + threshold map for cell highlighting
+        const constraintMap = {};
+        (evalCriteria.constraints || []).forEach(c => {
+            constraintMap[c.metric === 'min_trades' ? 'total_trades' : c.metric] = c;
+        });
+
+        const cellClass = (key, val) => {
+            const c = constraintMap[key];
+            if (!c) return '';
+            const n = Number(val);
+            if (isNaN(n)) return '';
+            const threshold = Number(c.value);
+            let passes = true;
+            if (c.operator === '<=' && n > threshold) passes = false;
+            if (c.operator === '>=' && n < threshold) passes = false;
+            if (c.operator === '<' && n >= threshold) passes = false;
+            if (c.operator === '>' && n <= threshold) passes = false;
+            return passes ? 'opt-cell-pass' : 'opt-cell-fail';
+        };
+
+        // --- Build table ---
+        const allCols = [...metricCols, ...paramCols];
+
+        const headerCells = allCols.map(k =>
+            `<th title="${k}">${colLabelTwoLine(k)}</th>`
+        ).join('');
+
+        const rows = topResults.map((row, idx) => {
+            const isBest = idx === 0;
+            const belowFilter = row._below_min_trades === true;
+            const flagHtml = belowFilter
+                ? '<span class="opt-flag-below" title="Не прошёл Min Requirements">⚠</span>'
+                : (isBest ? '<span class="opt-flag-best" title="Лучший результат">★</span>' : '');
+
+            const cells = allCols.map(k => {
+                const rawVal = row[k];
+                const extra = cellClass(k, rawVal);
+                return `<td class="${extra}">${fmt(rawVal, k)}</td>`;
+            }).join('');
+
+            return `<tr class="opt-result-row ${isBest ? 'opt-row-best' : ''} ${belowFilter ? 'opt-row-below' : ''}"
+                data-idx="${idx}"
+                title="Один клик — открыть копию стратегии&#10;Двойной клик — запустить полный бэктест">
+                <td class="opt-rank-cell">${flagHtml}${idx + 1}</td>
+                ${cells}
+            </tr>`;
+        }).join('');
 
         summary.innerHTML = `
-            ${warningHtml}
-            <div class="opt-criterion-badge" style="
-                background: rgba(99,102,241,0.12);
-                border: 1px solid rgba(99,102,241,0.3);
-                border-radius: 6px;
-                padding: 5px 10px;
-                margin-bottom: 8px;
-                font-size: 11px;
-                text-align: center;
-                color: #a5b4fc;
-            ">
-                <i class="bi bi-bullseye"></i>
-                Критерий оптимизации: <strong style="color:#c7d2fe">${metricLabel}</strong>
+            <div class="opt-results-header">
+                <span class="opt-results-title">Results</span>
+                <div class="opt-results-meta">
+                    ${warningHtml ? `<span class="opt-results-warning-inline">${warningHtml.replace(/<\/?div[^>]*>/g, '')}</span>` : `<span class="opt-metric-badge"><i class="bi bi-bullseye"></i> ${optLabel}</span>${constraintBadges}`}
+                </div>
+                <span class="opt-results-count">${topResults.length} / ${totalTrials.toLocaleString()} trials</span>
             </div>
-            <div class="results-metric-grid">
-                <div class="result-metric-card">
-                    <span class="result-metric-label">Sharpe</span>
-                    <span class="result-metric-value ${sharpe >= 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}">${sharpe.toFixed(2)}</span>
-                </div>
-                <div class="result-metric-card">
-                    <span class="result-metric-label">Return</span>
-                    <span class="result-metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">${totalReturn.toFixed(2)}%</span>
-                </div>
-                <div class="result-metric-card">
-                    <span class="result-metric-label">Max DD</span>
-                    <span class="result-metric-value negative">${maxDD.toFixed(1)}%</span>
-                </div>
-                <div class="result-metric-card">
-                    <span class="result-metric-label">Win Rate</span>
-                    <span class="result-metric-value">${winRate.toFixed(1)}%</span>
-                </div>
-                ${netProfit !== null ? `<div class="result-metric-card" style="grid-column: 1 / -1;">
-                    <span class="result-metric-label">Net Profit</span>
-                    <span class="result-metric-value ${netProfit >= 0 ? 'positive' : 'negative'}">${netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)} USD</span>
-                </div>` : ''}
+            <div class="opt-hint-row">
+                <i class="bi bi-hand-index"></i> клик — открыть копию &nbsp;·&nbsp;
+                <i class="bi bi-mouse2"></i> двойной — полный бэктест
             </div>
-            <p class="text-muted text-sm mt-2 text-center">
-                <i class="bi bi-trophy"></i> Best of ${totalTrials} trials
-            </p>
+            <div class="opt-results-table-wrap">
+                <table class="opt-results-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            ${headerCells}
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
         `;
+
+        // --- Row click handlers ---
+        const strategyId = new URLSearchParams(window.location.search).get('id');
+
+        summary.querySelectorAll('.opt-result-row').forEach(tr => {
+            let clickTimer = null;
+
+            tr.addEventListener('click', (_e) => {
+                const idx = parseInt(tr.dataset.idx, 10);
+                const row = topResults[idx];
+                if (!row) return;
+
+                // Debounce: wait 250ms to distinguish single vs double click
+                if (clickTimer) return; // double-click already handled
+                clickTimer = setTimeout(async () => {
+                    clickTimer = null;
+
+                    if (!strategyId) {
+                        this.showNotification('Стратегия не сохранена — невозможно создать копию', 'warning');
+                        return;
+                    }
+
+                    // Visual feedback
+                    summary.querySelectorAll('.opt-result-row').forEach((r, i) => {
+                        r.classList.toggle('opt-row-selected', i === idx);
+                    });
+                    tr.classList.add('opt-row-loading');
+
+                    try {
+                        // Extract param cols (keys with dot) for this row
+                        const rowParams = {};
+                        Object.keys(row).forEach(k => { if (k.includes('.')) rowParams[k] = row[k]; });
+
+                        // 1. Clone the strategy
+                        const rankLabel = idx === 0 ? ' ★' : ` #${idx + 1}`;
+                        const cloneRes = await fetch(
+                            `/api/v1/strategy-builder/strategies/${strategyId}/clone?new_name=${encodeURIComponent((document.title || 'Strategy') + rankLabel)}`,
+                            { method: 'POST' }
+                        );
+                        if (!cloneRes.ok) throw new Error(`Clone failed: ${cloneRes.status}`);
+                        const cloneData = await cloneRes.json();
+                        const cloneId = cloneData.id;
+
+                        // 2. Apply optimized params to the clone via PUT
+                        if (Object.keys(rowParams).length > 0) {
+                            // Fetch current clone blocks, patch params, then save
+                            const getRes = await fetch(`/api/v1/strategy-builder/strategies/${cloneId}`);
+                            if (getRes.ok) {
+                                const cloneStrategy = await getRes.json();
+                                const blocks = cloneStrategy.builder_blocks || [];
+                                // Apply param values into blocks
+                                Object.entries(rowParams).forEach(([key, value]) => {
+                                    const dotIdx = key.indexOf('.');
+                                    if (dotIdx === -1) return;
+                                    const blockId = key.substring(0, dotIdx);
+                                    const paramKey = key.substring(dotIdx + 1);
+                                    const block = blocks.find(b => b.id === blockId);
+                                    if (block) {
+                                        if (!block.params) block.params = {};
+                                        block.params[paramKey] = value;
+                                        // Disable optimization flag for this param
+                                        if (block.optimizationParams && block.optimizationParams[paramKey]) {
+                                            block.optimizationParams[paramKey].enabled = false;
+                                        }
+                                    }
+                                });
+                                // Save updated blocks back to clone
+                                await fetch(`/api/v1/strategy-builder/strategies/${cloneId}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ ...cloneStrategy, builder_blocks: blocks })
+                                });
+                            }
+                        }
+
+                        // 3. Open clone in new tab
+                        window.open(`/frontend/strategy-builder.html?id=${cloneId}`, '_blank');
+
+                    } catch (err) {
+                        this.showNotification(`Ошибка: ${err.message}`, 'error');
+                    } finally {
+                        tr.classList.remove('opt-row-loading');
+                    }
+                }, 250);
+            });
+
+            tr.addEventListener('dblclick', async (_e) => {
+                // Cancel pending single-click
+                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+
+                const idx = parseInt(tr.dataset.idx, 10);
+                const row = topResults[idx];
+                if (!row) return;
+
+                if (!strategyId) {
+                    this.showNotification('Стратегия не сохранена', 'warning');
+                    return;
+                }
+
+                tr.classList.add('opt-row-loading');
+                summary.querySelectorAll('.opt-result-row').forEach((r, i) => {
+                    r.classList.toggle('opt-row-selected', i === idx);
+                });
+
+                try {
+                    // Extract param cols for this row
+                    const rowParams = {};
+                    Object.keys(row).forEach(k => { if (k.includes('.')) rowParams[k] = row[k]; });
+
+                    // Build backtest request with optimized params
+                    const props = this.getPropertiesPanelValues();
+                    const { startDate: sd, endDate: ed } = this.getBacktestDates();
+
+                    // Merge optimized params into strategy_params
+                    const strategyParams = {};
+                    Object.entries(rowParams).forEach(([key, value]) => {
+                        const paramKey = key.substring(key.indexOf('.') + 1);
+                        strategyParams[paramKey] = value;
+                    });
+
+                    const payload = {
+                        strategy_id: strategyId,
+                        symbol: props.symbol,
+                        interval: props.interval,
+                        start_date: sd,
+                        end_date: ed,
+                        market_type: props.market_type || 'linear',
+                        initial_capital: props.initial_capital,
+                        leverage: props.leverage,
+                        commission: props.commission,
+                        direction: props.direction,
+                        strategy_params: strategyParams
+                    };
+
+                    const btRes = await fetch(
+                        `/api/v1/strategy-builder/strategies/${strategyId}/backtest`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        }
+                    );
+                    if (!btRes.ok) throw new Error(`Backtest failed: ${btRes.status}`);
+                    const btData = await btRes.json();
+                    const backtestId = btData.backtest_id || btData.id;
+                    if (backtestId) {
+                        window.open(`/frontend/backtest-results.html?backtest_id=${backtestId}`, '_blank');
+                    } else {
+                        this.showNotification('Бэктест завершён, но backtest_id не получен', 'warning');
+                    }
+
+                } catch (err) {
+                    this.showNotification(`Ошибка бэктеста: ${err.message}`, 'error');
+                } finally {
+                    tr.classList.remove('opt-row-loading');
+                }
+            });
+        });
     }
 
     /**

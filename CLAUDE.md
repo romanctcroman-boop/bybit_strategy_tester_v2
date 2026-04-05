@@ -23,6 +23,9 @@
 -   13. Test Infrastructure
 -   14. Recent Major Changes
 -   15. Refactor Checklist for AI Agents
+-   16. Changes After 2026-02-21
+-   17. Memory Bank & Session Infrastructure
+-   18. Subsystem Architectures Quick Reference
 
 ## 1. Overview
 
@@ -78,6 +81,10 @@ FastAPI router                                          → JSON response + warn
 | Optimization             | `backend/optimization/`                           | Optuna (TPE/CMA-ES), Ray, grid                            |
 | `OrderExecutor`          | `backend/trading/order_executor.py`               | Live trading order execution                              |
 | `PositionManager`        | `backend/trading/position_manager.py`             | Live trading position management                          |
+| `StrategyRunner`         | `backend/services/live_trading/strategy_runner.py`| Live trading orchestrator (WS → signal → order)           |
+| `RiskEngine`             | `backend/services/risk_management/risk_engine.py` | Unified risk management (exposure, sizing, SL)            |
+| `HierarchicalMemory`     | `backend/agents/memory/hierarchical_memory.py`    | 4-tier agent memory (WORKING/EPISODIC/SEMANTIC/PROCEDURAL)|
+| `ConsensusEngine`        | `backend/agents/consensus/consensus_engine.py`    | Agent consensus (weighted_voting/bayesian/best_of)        |
 
 ### API entry points
 
@@ -186,7 +193,7 @@ The `warnings[]` field in backtest responses may contain:
 | `[DIRECTION_MISMATCH]`      | Direction filter dropped all signals (e.g., `direction="long"` but only short entries exist) |
 | `[NO_TRADES]`               | Strategy generated signals but no trades were executed (SL/TP/filters eliminated all)        |
 | `[INVALID_OHLC]`            | Bars with invalid OHLC data were removed before backtest                                     |
-| `[UNIVERSAL_BAR_MAGNIFIER]` | Bar magnifier initialization failed; falling back to standard mode                           |
+| `[UNIVERSAL_BAR_MAGNIFIER]` | Bar magnifier initialization failed; falling back to standard mode. **STUB**: `_bar_magnifier_index` is built (`engine:3101–3144`) but never subscripted — intrabar SL/TP loop does not exist. `use_bar_magnifier=True` silently has no effect; SL/TP are still checked at bar close only. |
 
 ### `market_type`: spot vs linear
 
@@ -375,14 +382,14 @@ d:/bybit_strategy_tester_v2/
 
 ## 5. Critical Constants — NEVER CHANGE WITHOUT EXPLICIT APPROVAL
 
-| Constant              | Value                                        | Location                            | Reason                                                      |
-| --------------------- | -------------------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
-| `commission_value`    | **0.0007** (0.07%)                           | `BacktestConfig.commission_value`   | TradingView parity — 10+ files depend on this               |
-| Engine                | **FallbackEngineV4**                         | `backend/backtesting/engine.py`     | Gold standard; V2 kept for parity tests only, V3 deprecated |
-| `DATA_START_DATE`     | **2025-01-01**                               | `backend/config/database_policy.py` | Never hardcode — always import                              |
-| Timeframes            | `["1","5","15","30","60","240","D","W","M"]` | adapter + validator                 | Legacy mapping on load: 3→5, 120→60, 360→240, 720→D         |
-| `initial_capital`     | **10000.0** (default)                        | `BacktestConfig.initial_capital`    | User-configurable; referenced in engine, metrics, UI        |
-| Max backtest duration | **730 days** (2 years)                       | `BacktestConfig.validate_dates()`   | Pydantic validator; raises `ValueError` if exceeded         |
+| Constant              | Value                                        | Location                                                       | Reason                                                      |
+| --------------------- | -------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| `COMMISSION_TV`       | **0.0007** (0.07%)                           | `backend/config/constants.py` → `BacktestConfig.commission_value` | TradingView parity — 12+ files depend on this           |
+| Engine                | **FallbackEngineV4**                         | `backend/backtesting/engine.py`                                | Gold standard; V2 kept for parity tests only, V3 deprecated |
+| `DATA_START_DATE`     | **2025-01-01**                               | `backend/config/database_policy.py`                            | Never hardcode — always import                              |
+| `DEFAULT_CAPITAL`     | **10000.0**                                  | `backend/config/constants.py` → `BacktestConfig.initial_capital` | Engine, metrics, optimization, frontend tests             |
+| Timeframes            | `["1","5","15","30","60","240","D","W","M"]` | `backend/config/constants.py` → adapter + validator            | Legacy mapping on load: 3→5, 120→60, 360→240, 720→D         |
+| Max backtest duration | **730 days** (2 years)                       | `BacktestConfig.validate_dates()`                              | Pydantic validator; raises `ValueError` if exceeded         |
 
 ## High-Risk Variables (grep before any refactor)
 
@@ -626,6 +633,46 @@ and `"bullish"`/`"bearish"` (backward compat). The `"signal"` key = `long | shor
 All engines (Fallback, Numba, GPU, fast_optimizer) MUST use `MetricsCalculator.calculate_all()`.
 Do NOT reimplement metric formulas elsewhere — sync issues have caused bugs before.
 
+### Engine Execution Invariants (TradingView parity)
+
+- **Entry always on open of the NEXT bar after signal** — never on the signal bar itself
+- **Commission formula:** `commission = trade_value × 0.0007` where `trade_value = initial_capital × position_size` — NOT `leveraged_value × 0.0007`
+- **Commission on margin** (`commission_on_margin=True`): Bybit/TV style — applied before leverage multiplier
+
+### Middleware Pipeline Order (FIXED — do NOT reorder)
+
+`backend/api/middleware_setup.py` — 10 middleware applied outer→inner:
+1. `RequestIDMiddleware` — X-Request-ID tracing
+2. `TimingMiddleware` — request timing
+3. `GZipMiddleware(min_size=500)`
+4. `TrustedHostMiddleware`
+5. `HTTPSRedirectMiddleware` (prod only)
+6. `CORSMiddleware`
+7. `RateLimitMiddleware` (120 req/min per IP)
+8. `CSRFMiddleware` (POST/PUT/DELETE)
+9. `SecurityHeadersMiddleware`
+10. `ErrorHandlerMiddleware` — global exception → JSON
+
+### Live Trading Pitfalls
+
+- **Paper trading** (`backend/trading/paper_trading.py`) does NOT send real orders — verify mode before deploy
+- **position_size units:** engine/optimization = fraction (0.0–1.0); live trading = absolute quantity
+- **GracefulShutdown:** SIGTERM → closes all open positions before exit
+- `TradingConfig.commission_rate` = 0.0007 — keep in sync with engine
+
+### Agent Memory Pitfalls
+
+- `agent_namespace = "shared"` — accessible to ALL agents; use agent name for isolation
+- `embedding = None` when ChromaDB/sentence-transformers unavailable — fallback to BM25-only
+- SQLite timestamp format: `"%Y-%m-%d %H:%M:%S"` (space separator, NOT 'T') — breaks queries if wrong
+- Retrieval: BM25 (keyword) + VectorStore (semantic) → hybrid score → Top-K
+
+### Optimization Filter Unit Mismatch
+
+`passes_filters()` in `backend/optimization/filters.py`:
+- `max_drawdown_limit` in **request** = fraction (0.0–1.0)
+- `max_drawdown` in **result** = percentage (0–100)
+
 ---
 
 ## 9. How to Work with Claude Code
@@ -643,6 +690,25 @@ frontend/js/pages/backtest_results.js
 CLAUDE.md                           # This file
 ```
 
+### Directories to read when needed
+
+```
+backend/backtesting/engines/fallback_engine_v4.py  # When changing engine (3204 lines)
+backend/backtesting/indicator_handlers.py          # When adding indicator (2217 lines)
+backend/backtesting/strategy_builder/adapter.py    # When changing Builder (1399 lines)
+backend/services/adapters/bybit.py                 # When changing Bybit API (1710 lines)
+frontend/js/pages/strategy_builder.js              # When changing UI (13378 lines)
+backend/services/live_trading/strategy_runner.py   # When changing live trading (821 lines)
+backend/services/risk_management/risk_engine.py    # When changing risk management
+backend/agents/memory/hierarchical_memory.py       # When changing agent memory
+backend/agents/consensus/consensus_engine.py       # When changing agent consensus
+backend/agents/self_improvement/feedback_loop.py   # When changing self-improvement
+backend/agents/security/security_orchestrator.py   # When changing agent security
+backend/optimization/advanced_engine.py            # When changing optimization pipeline
+backend/ml/regime_detection.py                     # When changing ML/regime detection
+frontend/js/core/StateManager.js                   # When changing frontend state
+```
+
 ### Directories to usually ignore
 
 ```
@@ -652,6 +718,9 @@ data/archive/                   # Logs and result dumps
 backend/backtesting/universal_engine/  # Experimental, not in main flow
 backend/ml/                     # ML optional, not core to backtest
 deployment/                     # DevOps, not code
+backend/research/               # Research stubs (XAI, federated, blockchain) — not integrated
+backend/social/                 # Copy trading PoC — in-memory, not production
+backend/experimental/           # L2 LOB — experimental WebSocket collector
 ```
 
 ### Commands
@@ -989,13 +1058,17 @@ Persistent context files loaded via hooks at session start and after compaction:
 
 ### Hooks (`.claude/hooks/`)
 
-Three hooks are configured in `.claude/settings.json`:
+Seven hooks are configured in `.claude/settings.json`:
 
 | Hook | Event | Trigger | Action |
 |------|-------|---------|--------|
+| `protect_files.py` | PreToolUse Edit\|Write | Before any edit | Blocks .env, alembic/versions/, .git/, *.lock |
+| `ruff_format.py` | PostToolUse Edit\|Write | After Python edit | Auto-format with ruff |
 | `post_edit_tests.py` | PostToolUse Edit\|Write | Python backend file edited | Auto-run targeted pytest |
+| `post_tool_failure.py` | PostToolUseFailure | Any tool failure | Context-aware error hints |
 | `post_compact_context.py` | PostCompact | Mid-session compaction | Re-inject critical constants + Memory Bank |
-| `session_start_context.py` | SessionStart compact\|startup | Session start | Load Memory Bank into context |
+| `session_start_context.py` | SessionStart compact\|startup\|resume | Session start | Load Memory Bank into context |
+| `stop_reminder.py` | Stop | Session end | Remind to update activeContext.md |
 
 **Hook test mapping** (`post_edit_tests.py`): maps edited file paths to targeted test directories (not full suite). Edit `backend/backtesting/engine.py` → runs `tests/backend/backtesting/test_engine.py`.
 
@@ -1004,6 +1077,52 @@ Three hooks are configured in `.claude/settings.json`:
 Context files exist in key modules and load on-demand when Claude reads files in those directories:
 - `backend/backtesting/CLAUDE.md` — engine hierarchy, adapter details, SignalResult contract
 - `backend/api/CLAUDE.md` — router patterns, direction trap, async rules
+- `backend/optimization/CLAUDE.md` — optimizer details, scoring, known issues
 - `frontend/CLAUDE.md` — no-build rule, commission conversion, direction mismatch CSS
+- `backend/agents/CLAUDE.md` — LangGraph pipeline, memory, consensus, self-improvement, security *(added 2026-03-28)*
+- `backend/services/CLAUDE.md` — live trading, risk management, kline cache, Monte Carlo *(added 2026-03-28)*
+- `backend/ml/CLAUDE.md` — regime detection, RL agents, Gymnasium env *(added 2026-03-28)*
 
 **Known limitation:** Sub-directory CLAUDE.md files load only when Claude uses `Read()` on files in that directory (Claude Code bug #2571, NOT_PLANNED). They do NOT load at session start. This is acceptable — we always read files before editing them.
+
+---
+
+## 18. Subsystem Index (added 2026-03-28)
+
+> Sub-directory CLAUDE.md files load automatically when you read files from that directory.
+> Full detail in `CLAUDE_CODE.md` §19-§31.
+
+| Subsystem | Key entry point | Sub-dir CLAUDE.md | Critical trap |
+|-----------|----------------|-------------------|---------------|
+| **Backtesting engine** | `engine.py` | `backend/backtesting/CLAUDE.md` ✅ | Entry on NEXT bar open; commission on margin |
+| **Strategy Builder** | `strategy_builder/adapter.py` | `backend/backtesting/CLAUDE.md` ✅ | Port aliases silent drop; `"Chart"` TF resolution |
+| **API / Routers** | `api/app.py` | `backend/api/CLAUDE.md` ✅ | Direction default: API="long", engine="both" |
+| **Live Trading** | `services/live_trading/strategy_runner.py` | `backend/services/CLAUDE.md` ✅ | `paper_trading.py` ≠ real orders; pos_size units differ |
+| **Risk Management** | `services/risk_management/risk_engine.py` | `backend/services/CLAUDE.md` ✅ | 6 sizing methods, 7 SL types, 18 rejection reasons |
+| **Data / Cache** | `services/kline_manager.py` | `backend/services/CLAUDE.md` ✅ | 4-tier cache; `kline_db_service.py` FROZEN |
+| **AI Pipeline** | `agents/trading_strategy_graph.py` | `backend/agents/CLAUDE.md` ✅ | WF after optimizer; sig counts ≠ trade counts |
+| **Agent Memory** | `agents/memory/hierarchical_memory.py` | `backend/agents/CLAUDE.md` ✅ | Timestamp format `"%Y-%m-%d %H:%M:%S"` (space, not T) |
+| **Consensus/Debate** | `agents/consensus/consensus_engine.py` | `backend/agents/CLAUDE.md` ✅ | `.decision` field (NOT `.consensus_answer`) |
+| **Optimization** | `optimization/optuna_optimizer.py` | `backend/optimization/CLAUDE.md` ✅ | `max_drawdown_limit` fraction vs result percentage |
+| **Frontend** | `js/pages/strategy_builder.js` | `frontend/CLAUDE.md` ✅ | No build step; commission UI% → backend decimal |
+| **ML / RL** | `ml/regime_detection.py` | `backend/ml/CLAUDE.md` ✅ | All dependencies optional; `commission_rate=0.0007` in TradingConfig |
+
+### Data storage quick reference
+
+**SQLite databases:** `data.sqlite3` (main ORM), `bybit_klines_15m.db` (candles), `data/agent_memory.db` (agents)
+
+**ORM relationships:** `Strategy 1→N Backtest 1→N Trade` · `Strategy 1→N Optimization`
+
+**4-tier kline cache:** L1 in-process dict → L2 Redis (5min/1h TTL) → L3 SQLite → L4 Bybit REST (120 req/min)
+
+### Auxiliary modules status
+
+| Module | Status |
+|--------|--------|
+| `backend/celery_app.py` + `backend/tasks/` | Active — async tasks; `CELERY_EAGER=1` for tests |
+| `backend/reports/` | Active — HTML/PDF/Email (ReportLab + SMTP) |
+| `backend/social/` | PoC — copy trading in-memory, not production |
+| `backend/research/` | Research stubs — XAI, federated, blockchain, ABM — not in main flow |
+| `backend/experimental/l2_lob/` | Experimental — L2 WebSocket + CGAN |
+| `backend/benchmarking/` | Active — latency + load testing + regression detection |
+| `backend/unified_api/` | Interface layer — `SimulatedExecutor` works, `LiveExecutor` stub |

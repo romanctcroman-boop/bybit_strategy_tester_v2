@@ -20,6 +20,7 @@ import pandas as pd
 
 from backend.backtesting.atr_calculator import calculate_atr_fast
 from backend.backtesting.formulas import (
+    calc_calmar,
     calc_expectancy,
     calc_payoff_ratio,
     calc_profit_factor,
@@ -1336,18 +1337,16 @@ class FallbackEngineV4(BaseBacktestEngine):
                 regime_detector.update(close_price, volume_val, atr_val)
 
             # === ADAPTIVE ATR MULTIPLIER ===
-            # Обновляем историю ATR и получаем адаптивные множители
-            # _local variables will replace the globals once ATR-TP/SL is wired up
+            # Обновляем историю ATR и получаем адаптивные множители.
+            # Когда adaptive_atr_enabled=True, множители масштабируются по режиму
+            # волатильности (LOW×1.5 / NORMAL×1.0 / HIGH×0.7).
             if adaptive_atr is not None and atr_values is not None:
                 adaptive_atr.update(atr_values[i])
-                # Локально переопределяем множители для этого бара
                 _atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)
                 _atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)
             else:
                 _atr_tp_multiplier_local = atr_tp_multiplier
                 _atr_sl_multiplier_local = atr_sl_multiplier
-            # Suppress F841 until adaptive multipliers are consumed downstream
-            _ = _atr_tp_multiplier_local, _atr_sl_multiplier_local
 
             # === MFE/MAE TRACKING ===
             # Аккумулируем MFE/MAE для открытых позиций на каждом баре
@@ -1744,6 +1743,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                         # Сработал TP уровень - частичное закрытие
                         portion = long_tp_state.mark_hit(next_tp)
 
+                        # Снимаем размер ДО close_partial — после он уже уменьшится
+                        pos_before = pyramid_mgr.get_total_size("long")
+
                         partial_result = pyramid_mgr.close_partial(
                             direction="long",
                             exit_price=tp_price,
@@ -1757,9 +1759,6 @@ class FallbackEngineV4(BaseBacktestEngine):
                         if partial_result is not None:
                             cash += partial_result["allocated"] + partial_result["pnl"]
 
-                            # For partial close, scale MFE/MAE proportionally to the closed portion
-                            # Get the position size before partial close to calculate the proportion
-                            pos_before = pyramid_mgr.get_total_size("long")
                             partial_size = partial_result["size"]
 
                             # Scale MFE/MAE: only the portion that was closed
@@ -1825,6 +1824,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                     if low_price <= tp_price > 0:
                         portion = short_tp_state.mark_hit(next_tp)
 
+                        # Снимаем размер ДО close_partial — после он уже уменьшится
+                        pos_before = pyramid_mgr.get_total_size("short")
+
                         short_partial = pyramid_mgr.close_partial(
                             direction="short",
                             exit_price=tp_price,
@@ -1838,9 +1840,6 @@ class FallbackEngineV4(BaseBacktestEngine):
                         if short_partial is not None:
                             cash += short_partial["allocated"] + short_partial["pnl"]
 
-                            # For partial close, scale MFE/MAE proportionally to the closed portion
-                            # Get the position size before partial close to calculate the proportion
-                            pos_before = pyramid_mgr.get_total_size("short")
                             partial_size = short_partial["size"]
 
                             # Scale MFE/MAE: only the portion that was closed
@@ -1921,7 +1920,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 if pyramid_mgr.has_position("long") and not pending_long_exit and not long_breakeven.enabled:
                     # Определяем SL по режиму
                     if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
-                        sl_price = pyramid_mgr.get_atr_sl_price("long", current_atr, atr_sl_multiplier)
+                        sl_price = pyramid_mgr.get_atr_sl_price("long", current_atr, _atr_sl_multiplier_local)
                         if sl_max_limit and stop_loss > 0:
                             fixed_sl = pyramid_mgr.get_sl_price("long", stop_loss)
                             if fixed_sl and sl_price < fixed_sl:
@@ -1939,7 +1938,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # SHORT SL check
                 if pyramid_mgr.has_position("short") and not pending_short_exit and not short_breakeven.enabled:
                     if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
-                        sl_price = pyramid_mgr.get_atr_sl_price("short", current_atr, atr_sl_multiplier)
+                        sl_price = pyramid_mgr.get_atr_sl_price("short", current_atr, _atr_sl_multiplier_local)
                         if sl_max_limit and stop_loss > 0:
                             fixed_sl = pyramid_mgr.get_sl_price("short", stop_loss)
                             if fixed_sl and sl_price > fixed_sl:
@@ -1980,14 +1979,14 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # === ОПРЕДЕЛЕНИЕ TP ЦЕНЫ (по режиму) ===
                 tp_price_long: float | None = None
                 if tp_mode == TpMode.ATR and atr_values is not None and current_atr > 0:
-                    tp_price_long = pyramid_mgr.get_atr_tp_price("long", current_atr, atr_tp_multiplier)
+                    tp_price_long = pyramid_mgr.get_atr_tp_price("long", current_atr, _atr_tp_multiplier_local)
                 elif tp_mode == TpMode.FIXED and take_profit > 0:
                     tp_price_long = pyramid_mgr.get_tp_price("long", take_profit)
 
                 # === ОПРЕДЕЛЕНИЕ SL ЦЕНЫ (по режиму) ===
                 sl_price_long: float | None = None
                 if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
-                    sl_price_long = pyramid_mgr.get_atr_sl_price("long", current_atr, atr_sl_multiplier)
+                    sl_price_long = pyramid_mgr.get_atr_sl_price("long", current_atr, _atr_sl_multiplier_local)
                     # MAX limit: не выходить за пределы fixed SL
                     if sl_max_limit and stop_loss > 0:
                         fixed_sl = pyramid_mgr.get_sl_price("long", stop_loss)
@@ -2019,14 +2018,14 @@ class FallbackEngineV4(BaseBacktestEngine):
                 # === ОПРЕДЕЛЕНИЕ TP ЦЕНЫ (по режиму) ===
                 tp_price_short: float | None = None
                 if tp_mode == TpMode.ATR and atr_values is not None and current_atr > 0:
-                    tp_price_short = pyramid_mgr.get_atr_tp_price("short", current_atr, atr_tp_multiplier)
+                    tp_price_short = pyramid_mgr.get_atr_tp_price("short", current_atr, _atr_tp_multiplier_local)
                 elif tp_mode == TpMode.FIXED and take_profit > 0:
                     tp_price_short = pyramid_mgr.get_tp_price("short", take_profit)
 
                 # === ОПРЕДЕЛЕНИЕ SL ЦЕНЫ (по режиму) ===
                 sl_price_short: float | None = None
                 if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
-                    sl_price_short = pyramid_mgr.get_atr_sl_price("short", current_atr, atr_sl_multiplier)
+                    sl_price_short = pyramid_mgr.get_atr_sl_price("short", current_atr, _atr_sl_multiplier_local)
                     # MAX limit: не выходить за пределы fixed SL
                     if sl_max_limit and stop_loss > 0:
                         fixed_sl = pyramid_mgr.get_sl_price("short", stop_loss)
@@ -2073,7 +2072,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                     if dca_direction == "long":
                         so_price = base_price * (1 - deviation)
                         if low_price <= so_price and pyramid_mgr.can_add_entry("long"):
-                            so_capital = cash * volume
+                            # Клэмп по доступному cash — volume может быть > 1 (dca_volume_scale),
+                            # что без клэмпа уводило бы cash в минус.
+                            so_capital = min(cash * volume, cash)
                             if so_capital > 0:
                                 so_size = (so_capital * leverage) / so_price
                                 pyramid_mgr.add_entry(
@@ -2103,7 +2104,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     elif dca_direction == "short":
                         so_price = base_price * (1 + deviation)
                         if high_price >= so_price and pyramid_mgr.can_add_entry("short"):
-                            so_capital = cash * volume
+                            so_capital = min(cash * volume, cash)
                             if so_capital > 0:
                                 so_size = (so_capital * leverage) / so_price
                                 pyramid_mgr.add_entry(
@@ -2584,6 +2585,19 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                             # Инициализировать DCA состояние
                             if dca_enabled and dca_safety_orders > 0:
+                                # Предупреждение: каждый SO занимает слот pyramiding.
+                                # При pyramiding < dca_safety_orders + 1 часть SO не исполнится.
+                                _max_so = pyramiding - pyramid_mgr.get_position("long").entry_count
+                                if dca_safety_orders > _max_so:
+                                    import logging as _log
+                                    _log.getLogger(__name__).warning(
+                                        "DCA safety_orders=%d превышает доступные слоты pyramiding=%d "
+                                        "(занято=%d). Исполнится только %d SO. "
+                                        "Увеличьте pyramiding до %d для полного DCA.",
+                                        dca_safety_orders, pyramiding,
+                                        pyramid_mgr.get_position("long").entry_count,
+                                        _max_so, dca_safety_orders + 1,
+                                    )
                                 dca_state = {
                                     "direction": "long",
                                     "base_price": entry_price,
@@ -2735,6 +2749,17 @@ class FallbackEngineV4(BaseBacktestEngine):
                                 cash -= order_capital
 
                             if dca_enabled and dca_safety_orders > 0:
+                                _max_so_s = pyramiding - pyramid_mgr.get_position("short").entry_count
+                                if dca_safety_orders > _max_so_s:
+                                    import logging as _log
+                                    _log.getLogger(__name__).warning(
+                                        "DCA safety_orders=%d превышает доступные слоты pyramiding=%d "
+                                        "(занято=%d). Исполнится только %d SO. "
+                                        "Увеличьте pyramiding до %d для полного DCA.",
+                                        dca_safety_orders, pyramiding,
+                                        pyramid_mgr.get_position("short").entry_count,
+                                        _max_so_s, dca_safety_orders + 1,
+                                    )
                                 dca_state = {
                                     "direction": "short",
                                     "base_price": entry_price,
@@ -2813,6 +2838,38 @@ class FallbackEngineV4(BaseBacktestEngine):
                             pending_short_exit_reason = ExitReason.TAKE_PROFIT
                             pending_short_exit_price = tp_price_check
 
+                # === SAME-BAR SL CHECK ===
+                # TV-parity: если SL тоже достигнут на баре входа — проверяем так же как TP.
+                # SL имеет приоритет над TP когда оба достигнуты (worst-case для трейдера).
+                # LONG SL check
+                if pyramid_mgr.has_position("long") and not pending_long_exit and tp_mode != TpMode.MULTI:
+                    long_pos = pyramid_mgr.get_position("long")
+                    if long_pos is not None and long_pos.first_entry_bar == i:
+                        sl_price_check: float | None = None
+                        if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
+                            sl_price_check = pyramid_mgr.get_atr_sl_price("long", current_atr, _atr_sl_multiplier_local)
+                        elif sl_mode == SlMode.FIXED and stop_loss > 0:
+                            sl_price_check = pyramid_mgr.get_sl_price("long", stop_loss)
+                        if sl_price_check and low_price <= sl_price_check:
+                            # SL overrides TP set above (worst-case principle)
+                            pending_long_exit = True
+                            pending_long_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            pending_long_exit_price = sl_price_check
+
+                # SHORT SL check
+                if pyramid_mgr.has_position("short") and not pending_short_exit and tp_mode != TpMode.MULTI:
+                    short_pos = pyramid_mgr.get_position("short")
+                    if short_pos is not None and short_pos.first_entry_bar == i:
+                        sl_price_check = None
+                        if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
+                            sl_price_check = pyramid_mgr.get_atr_sl_price("short", current_atr, _atr_sl_multiplier_local)
+                        elif sl_mode == SlMode.FIXED and stop_loss > 0:
+                            sl_price_check = pyramid_mgr.get_sl_price("short", stop_loss)
+                        if sl_price_check and high_price >= sl_price_check:
+                            pending_short_exit = True
+                            pending_short_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            pending_short_exit_price = sl_price_check
+
             # === FUNDING FEE CALCULATION ===
             if include_funding and funding_interval_hours > 0:
                 # Determine if this bar crosses a funding interval
@@ -2868,10 +2925,73 @@ class FallbackEngineV4(BaseBacktestEngine):
             )
             equity_curve.append(equity)
 
-        # === ЗАКРЫТИЕ ОСТАВШИХСЯ ПОЗИЦИЙ ===
+        # === ИСПОЛНЕНИЕ PENDING EXITS С ПОСЛЕДНЕГО БАРА ===
+        # Если SL/TP сработал на последнем баре данных (n-1), pending флаг был выставлен,
+        # но следующей итерации цикла нет — выход никогда не исполнялся.
+        # Исполняем здесь по сохранённой цене до force-close.
         final_time = timestamps[-1]
         final_price = close_prices[-1]
 
+        for _dir, _pending, _reason, _price, _mfe, _mae in [
+            (
+                "long",
+                pending_long_exit,
+                pending_long_exit_reason,
+                pending_long_exit_price,
+                long_accumulated_mfe,
+                long_accumulated_mae,
+            ),
+            (
+                "short",
+                pending_short_exit,
+                pending_short_exit_reason,
+                pending_short_exit_price,
+                short_accumulated_mfe,
+                short_accumulated_mae,
+            ),
+        ]:
+            if _pending and pyramid_mgr.has_position(_dir):
+                _exit_price = _price if _price is not None else final_price
+                closed = pyramid_mgr.close_position(
+                    direction=_dir,
+                    exit_price=_exit_price,
+                    exit_bar_idx=n - 1,
+                    exit_time=final_time,
+                    exit_reason=_reason.value if hasattr(_reason, "value") else str(_reason),
+                    taker_fee=taker_fee,
+                )
+                for trade_data in closed:
+                    cash += trade_data["allocated"] + trade_data["pnl"]
+                    entry_value = trade_data["entry_price"] * trade_data["size"]
+                    mfe_pct = (_mfe / entry_value * 100) if entry_value > 0 else 0.0
+                    mae_pct = (_mae / entry_value * 100) if entry_value > 0 else 0.0
+                    trades.append(
+                        TradeRecord(
+                            entry_time=trade_data["entry_time"],
+                            exit_time=trade_data["exit_time"],
+                            direction=_dir,
+                            entry_price=trade_data["entry_price"],
+                            exit_price=trade_data["exit_price"],
+                            size=trade_data["size"],
+                            pnl=trade_data["pnl"],
+                            pnl_pct=trade_data["pnl_pct"],
+                            fees=trade_data["fees"],
+                            exit_reason=_reason if isinstance(_reason, ExitReason) else ExitReason.UNKNOWN,
+                            duration_bars=trade_data["duration_bars"],
+                            mfe=_mfe,
+                            mae=_mae,
+                            mfe_pct=mfe_pct,
+                            mae_pct=mae_pct,
+                        )
+                    )
+                if _dir == "long":
+                    long_accumulated_mfe = 0.0
+                    long_accumulated_mae = 0.0
+                else:
+                    short_accumulated_mfe = 0.0
+                    short_accumulated_mae = 0.0
+
+        # === ЗАКРЫТИЕ ОСТАВШИХСЯ ПОЗИЦИЙ ===
         for dir_str in ["long", "short"]:
             if pyramid_mgr.has_position(dir_str):
                 closed = pyramid_mgr.close_position(
@@ -3189,6 +3309,8 @@ class FallbackEngineV4(BaseBacktestEngine):
             metrics.short_profit_factor = short_m["profit_factor"]
             metrics.short_avg_win = short_m["avg_win"]
             metrics.short_avg_loss = short_m["avg_loss"]
+
+        metrics.calmar_ratio = calc_calmar(metrics.total_return, metrics.max_drawdown)
 
         return metrics
 

@@ -43,7 +43,13 @@ export function createMyStrategiesModule(deps) {
             });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
-            _strategiesCache = data.strategies || [];
+            // Deduplicate by id in case backend returns duplicates (defensive guard)
+            const seen = new Set();
+            _strategiesCache = (data.strategies || []).filter(s => {
+                if (seen.has(s.id)) return false;
+                seen.add(s.id);
+                return true;
+            });
             return _strategiesCache;
         } catch (err) {
             console.error('[My Strategies] Failed to fetch strategies:', err);

@@ -1319,8 +1319,8 @@ class TestIterativeOptimization:
             wf = BuilderWorkflow()
             result = await wf.run(config)
 
-            # Should have 2 iterations since Sharpe never reaches 100
-            assert len(result.iterations) == 2
+            # 2 eval iterations + 1 Gate-2 final record = 3 total
+            assert len(result.iterations) == 3
             assert result.status.value in ("completed", "failed")
 
     def test_config_enable_deliberation_default(self):

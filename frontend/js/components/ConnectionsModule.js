@@ -66,13 +66,15 @@ export function createConnectionsModule(deps) {
         removeConnection,
         pushUndo,
         showNotification,
-        renderBlocks
+        renderBlocks,
+        getZoom = () => 1
     } = deps;
 
     // ── Module state ──────────────────────────────────────────────────────────
     let _isConnecting = false;
     let _connectionStart = null;
     let _tempLine = null;
+    let _diagDone = false; // reset each renderConnections call for zoom diag
 
     // ── Getters (used by strategy_builder.js shim) ────────────────────────────
     function getIsConnecting() { return _isConnecting; }
@@ -143,10 +145,9 @@ export function createConnectionsModule(deps) {
     // ── startConnection ───────────────────────────────────────────────────────
     function startConnection(portElement, _event) {
         _isConnecting = true;
+        const zoom = getZoom();
         const rect = portElement.getBoundingClientRect();
-        const containerRect = document
-            .getElementById('canvasContainer')
-            .getBoundingClientRect();
+        const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
 
         _connectionStart = {
             element: portElement,
@@ -154,8 +155,8 @@ export function createConnectionsModule(deps) {
             portId: portElement.dataset.portId,
             portType: portElement.dataset.portType,
             direction: portElement.dataset.direction,
-            x: rect.left + rect.width / 2 - containerRect.left,
-            y: rect.top + rect.height / 2 - containerRect.top
+            x: (rect.left + rect.width / 2 - containerRect.left) / zoom,
+            y: (rect.top + rect.height / 2 - containerRect.top) / zoom
         };
 
         const svg = document.getElementById('connectionsCanvas');
@@ -214,11 +215,10 @@ export function createConnectionsModule(deps) {
     // ── updateTempConnection ──────────────────────────────────────────────────
     function updateTempConnection(event) {
         if (!_tempLine || !_connectionStart) return;
-        const containerRect = document
-            .getElementById('canvasContainer')
-            .getBoundingClientRect();
-        const endX = event.clientX - containerRect.left;
-        const endY = event.clientY - containerRect.top;
+        const zoom = getZoom();
+        const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
+        const endX = (event.clientX - containerRect.left) / zoom;
+        const endY = (event.clientY - containerRect.top) / zoom;
         const path = createBezierPath(
             _connectionStart.x, _connectionStart.y, endX, endY,
             _connectionStart.direction === 'output'
@@ -312,12 +312,13 @@ export function createConnectionsModule(deps) {
                 type: conn.type || 'data'
             };
         }
-        // Format: { from, to } — legacy
+        // Format: { from, fromPort, to, toPort } — used by GraphConverter (AI pipeline)
+        // or { from, to } — legacy minimal format
         if (conn.from && conn.to) {
             return {
                 id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                source: { blockId: conn.from, portId: 'out' },
-                target: { blockId: conn.to, portId: 'in' },
+                source: { blockId: conn.from, portId: conn.fromPort || 'out' },
+                target: { blockId: conn.to, portId: conn.toPort || 'in' },
                 type: conn.type || 'data'
             };
         }
@@ -338,11 +339,17 @@ export function createConnectionsModule(deps) {
         }
     }
 
+    // ── _getPortCentre* ───────────────────────────────────────────────────────
+    // Walk the offsetParent chain from a port element up to (but not including)
     // ── renderConnections ─────────────────────────────────────────────────────
     function renderConnections() {
         const svg = document.getElementById('connectionsCanvas');
         if (!svg) return;
-        svg.querySelectorAll('.connection-line:not(.temp)').forEach(el => el.remove());
+
+        _diagDone = false; // reset so first wire of THIS render is logged
+
+        // Remove all non-temp wires AND their pulse overlays
+        svg.querySelectorAll('.connection-line:not(.temp), .wire-pulse').forEach(el => el.remove());
 
         const connections = getConnections();
         connections.forEach(conn => {
@@ -357,17 +364,44 @@ export function createConnectionsModule(deps) {
                 return;
             }
 
-            const sourcePort = sourceBlock.querySelector(
-                `[data-port-id="${conn.source.portId}"][data-direction="output"]`
-            );
-            const targetPort = targetBlock.querySelector(
-                `[data-port-id="${conn.target.portId}"][data-direction="input"]`
-            );
+            // Port name aliases: AI pipeline generates names like "filter_long" but
+            // blocks render ports as "long". Fall back to the base signal name.
+            const PORT_FALLBACKS = {
+                'filter_long': ['long', 'bullish', 'buy', 'value', 'out'],
+                'filter_short': ['short', 'bearish', 'sell', 'value', 'out'],
+                'entry_long': ['long', 'bullish', 'buy', 'out'],
+                'entry_short': ['short', 'bearish', 'sell', 'out'],
+                // AI pipeline uses "sl_tp" as source port name on config blocks,
+                // but those blocks render a generic "config" output port.
+                'sl_tp': ['config', 'out', 'value'],
+                'close_cond': ['config', 'out', 'value'],
+                'dca_grid': ['config', 'out', 'value'],
+                // When source port is "long" but block only has band ports (donchian, bollinger, etc.)
+                'long': ['out', 'upper', 'value', 'signal'],
+                'short': ['out', 'lower', 'value', 'signal']
+            };
+
+            function findPort(block, portId, direction) {
+                let el = block.querySelector(
+                    `[data-port-id="${portId}"][data-direction="${direction}"]`
+                );
+                if (el) return el;
+                const fallbacks = PORT_FALLBACKS[portId] || [];
+                for (const alias of fallbacks) {
+                    el = block.querySelector(
+                        `[data-port-id="${alias}"][data-direction="${direction}"]`
+                    );
+                    if (el) return el;
+                }
+                return null;
+            }
+
+            const sourcePort = findPort(sourceBlock, conn.source.portId, 'output');
+            const targetPort = findPort(targetBlock, conn.target.portId, 'input');
 
             if (!sourcePort || !targetPort) {
-                console.warn('[renderConnections] Port not found:', {
-                    sourceBlockId: conn.source.blockId, sourcePortId: conn.source.portId,
-                    targetBlockId: conn.target.blockId, targetPortId: conn.target.portId,
+                console.error('[renderConnections] ❌ Invisible connection — port missing in DOM:', {
+                    connection: `${conn.source.blockId}.${conn.source.portId} → ${conn.target.blockId}.${conn.target.portId}`,
                     sourcePortFound: !!sourcePort, targetPortFound: !!targetPort,
                     availableSourcePorts: Array.from(
                         sourceBlock.querySelectorAll('[data-direction="output"]')
@@ -376,18 +410,39 @@ export function createConnectionsModule(deps) {
                         targetBlock.querySelectorAll('[data-direction="input"]')
                     ).map(p => p.dataset.portId)
                 });
+                // Mark block visually so user knows there's an invisible connection
+                const badBlock = !sourcePort ? sourceBlock : targetBlock;
+                badBlock.classList.add('has-invisible-connection');
                 return;
             }
 
+            // SVG is NOT scaled — it draws in native canvasContainer pixels.
+            // getBoundingClientRect() returns screen-space (CSS-scaled) coords.
+            // Dividing by zoom converts them to SVG logical coordinates.
+            const zoom = getZoom();
             const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
             const sourceRect = sourcePort.getBoundingClientRect();
             const targetRect = targetPort.getBoundingClientRect();
 
-            const startX = sourceRect.left + sourceRect.width / 2 - containerRect.left;
-            const startY = sourceRect.top + sourceRect.height / 2 - containerRect.top;
-            const endX = targetRect.left + targetRect.width / 2 - containerRect.left;
-            const endY = targetRect.top + targetRect.height / 2 - containerRect.top;
+            const startX = (sourceRect.left + sourceRect.width / 2 - containerRect.left) / zoom;
+            const startY = (sourceRect.top + sourceRect.height / 2 - containerRect.top) / zoom;
+            const endX = (targetRect.left + targetRect.width / 2 - containerRect.left) / zoom;
+            const endY = (targetRect.top + targetRect.height / 2 - containerRect.top) / zoom;
 
+            // ── Diagnostic (first wire of every render) ──────────────────────
+            if (!_diagDone) {
+                _diagDone = true;
+                console.log('[ConnDiag] zoom:', zoom,
+                    '\n  containerRect:', Math.round(containerRect.left), Math.round(containerRect.top), Math.round(containerRect.width), 'x', Math.round(containerRect.height),
+                    '\n  sourcePort screen left/top:', Math.round(sourceRect.left), Math.round(sourceRect.top),
+                    '\n  raw offset (before /zoom):', Math.round(sourceRect.left - containerRect.left), Math.round(sourceRect.top - containerRect.top),
+                    '\n  SVG startX/startY:', Math.round(startX), Math.round(startY),
+                    '\n  SVG endX/endY:', Math.round(endX), Math.round(endY));
+            }
+
+            const bezierD = createBezierPath(startX, startY, endX, endY, true);
+
+            // ── Base (dim) wire ──────────────────────────────────────────────
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.classList.add('connection-line', conn.type);
 
@@ -397,6 +452,7 @@ export function createConnectionsModule(deps) {
                 if (tPortId === 'sl_tp') path.classList.add('config-sltp');
                 else if (tPortId === 'close_cond') path.classList.add('config-close');
                 else if (tPortId === 'dca_grid') path.classList.add('config-dca');
+
             }
 
             // Direction-mismatch detection
@@ -427,13 +483,88 @@ export function createConnectionsModule(deps) {
                 path.appendChild(titleEl);
             }
 
-            path.setAttribute('d', createBezierPath(startX, startY, endX, endY, true));
+            // ── Validation-error wire (red) when source or target block is invalid ──
+            if (!isMismatch) {
+                const sourceInvalid = sourceBlock.classList.contains('block-invalid');
+                const targetInvalid = targetBlock.classList.contains('block-invalid');
+                if (sourceInvalid || targetInvalid) {
+                    path.classList.add('validation-error-wire');
+                    const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    const badName = sourceInvalid
+                        ? (sourceBlock.querySelector('.block-title')?.textContent || conn.source.blockId)
+                        : (targetBlock.querySelector('.block-title')?.textContent || conn.target.blockId);
+                    titleEl.textContent = `⚠ Блок "${badName}" содержит ошибку валидации`;
+                    path.appendChild(titleEl);
+                }
+            }
+
+            path.setAttribute('d', bezierD);
             path.dataset.connectionId = conn.id;
             svg.appendChild(path);
 
             sourcePort.classList.add('connected');
             targetPort.classList.add('connected');
+
+            // ── Signal-pulse overlay (skip for mismatch — it has its own anim) ──
+            if (!isMismatch) {
+                _appendWirePulse(svg, bezierD, path.classList);
+            }
         });
+    }
+
+    /**
+     * Appends a glowing pulse <path> that travels along the same bezier curve.
+     * Uses getTotalLength() so the pulse always follows the exact wire shape
+     * regardless of length or curvature, and the animation never freezes.
+     *
+     * @param {SVGSVGElement} svg
+     * @param {string}        bezierD   - SVG "d" attribute string
+     * @param {DOMTokenList}  baseClasses - classList of the base wire (to copy type)
+     */
+    function _appendWirePulse(svg, bezierD, baseClasses) {
+        const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pulse.classList.add('wire-pulse');
+
+        // Copy type/colour classes from the base wire
+        const typeClasses = ['data', 'flow', 'condition', 'config',
+            'config-sltp', 'config-close', 'config-dca'];
+        typeClasses.forEach(cls => {
+            if (baseClasses.contains(cls)) pulse.classList.add(cls);
+        });
+
+        pulse.setAttribute('d', bezierD);
+
+        // Add to DOM first so getTotalLength() returns a real value
+        svg.appendChild(pulse);
+
+        const totalLen = pulse.getTotalLength();
+        if (totalLen < 1) { pulse.remove(); return; }
+
+        // Pulse segment = ~8% of wire length, clamped to 12–40px (thin needle)
+        const pulseLen = Math.min(40, Math.max(12, totalLen * 0.08));
+        // gap fills the rest so only one needle is visible per loop
+        const gap = totalLen - pulseLen;
+
+        // Set dasharray once — one thin bright needle + long invisible gap
+        pulse.style.strokeDasharray = `${pulseLen} ${gap}`;
+
+        // Speed: constant ~60 px/s → very slow, smooth signal crawl
+        const durationMs = Math.max(2000, (totalLen / 60) * 1000);
+
+        // Web Animations API — from: segment is just past the end (off-screen right)
+        //                       to:   segment has travelled past the start (off-screen left)
+        // dashoffset positive = shift segment toward start, negative = toward end
+        pulse.animate(
+            [
+                { strokeDashoffset: totalLen },           // start: pulse is off the far end
+                { strokeDashoffset: -(totalLen - pulseLen + 4) }  // end: pulse exits the near end
+            ],
+            {
+                duration: durationMs,
+                iterations: Infinity,
+                easing: 'linear'
+            }
+        );
     }
 
     // ── createBezierPath ──────────────────────────────────────────────────────

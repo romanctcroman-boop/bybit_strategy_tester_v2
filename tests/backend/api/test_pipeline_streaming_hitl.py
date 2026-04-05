@@ -248,7 +248,7 @@ class TestGetHITLStatus:
         pid = "hitl_status_test_001"
         _pipeline_jobs[pid] = {
             "status": "hitl_pending",
-            "created_at": "2026-03-25T12:00:00+00:00",
+            "created_at": datetime.now(UTC).isoformat(),
             "hitl_pending": True,
             "hitl_payload": {"strategy_name": "TestRSI"},
         }
@@ -264,7 +264,7 @@ class TestGetHITLStatus:
         pid = "hitl_status_test_002"
         _pipeline_jobs[pid] = {
             "status": "completed",
-            "created_at": "2026-03-25T12:00:00+00:00",
+            "created_at": datetime.now(UTC).isoformat(),
             "hitl_pending": False,
         }
         with TestClient(app) as client:
@@ -289,7 +289,7 @@ class TestApproveHITL:
         pid = "hitl_approve_test_001"
         _pipeline_jobs[pid] = {
             "status": "completed",
-            "created_at": "2026-03-25T12:00:00+00:00",
+            "created_at": datetime.now(UTC).isoformat(),
             "hitl_pending": False,
         }
         with TestClient(app) as client:
@@ -303,7 +303,7 @@ class TestApproveHITL:
         pid = "hitl_approve_test_002"
         _pipeline_jobs[pid] = {
             "status": "hitl_pending",
-            "created_at": "2026-03-25T12:00:00+00:00",
+            "created_at": datetime.now(UTC).isoformat(),
             "hitl_pending": True,
             "hitl_request": {
                 "symbol": "BTCUSDT", "timeframe": "15",
@@ -331,7 +331,7 @@ class TestApproveHITL:
         pid = "hitl_approve_test_003"
         _pipeline_jobs[pid] = {
             "status": "hitl_pending",
-            "created_at": "2026-03-25T12:00:00+00:00",
+            "created_at": datetime.now(UTC).isoformat(),
             "hitl_pending": True,
             "hitl_request": {
                 "symbol": "BTCUSDT", "timeframe": "15",

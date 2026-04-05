@@ -677,6 +677,24 @@ class BybitAdapter:
                 logger.exception(f"Failed to fetch historical klines: {e}")
                 raise
 
+        else:
+            # Loop exhausted max_iterations without reaching start_time — trailing data may be lost
+            if start_time and all_candles:
+                oldest_fetched = min(c.get("open_time", 0) for c in all_candles)
+                if oldest_fetched > start_time:
+                    logger.warning(
+                        "[BybitAdapter] Pagination loop exhausted (%d iterations) for %s/%s "
+                        "before reaching start_time=%d. Oldest fetched: %d. "
+                        "Candles in range [%d, %d] are MISSING from the result.",
+                        max_iterations,
+                        symbol_upper,
+                        interval_norm,
+                        start_time,
+                        oldest_fetched,
+                        start_time,
+                        oldest_fetched,
+                    )
+
         # Sort by time ascending and remove duplicates
         all_candles.sort(key=lambda x: x.get("open_time", 0))
         seen = set()

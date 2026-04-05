@@ -52,7 +52,7 @@ document.getElementById("container").addEventListener("click", (e) => {
 3. **ALWAYS** validate user input before sending to API
 4. **Commission rate display**: Always show as `0.07%` (matching backend 0.0007)
 5. **Timeframes**: Only show the 9 valid timeframes in dropdowns
-6. **strategy_builder.js** is ~3000 lines — be careful with edits, use grep to find sections
+6. **strategy_builder.js** is ~13 400 lines — be careful with edits, use grep to find sections
 
 ## Testing
 

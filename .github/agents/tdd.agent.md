@@ -66,13 +66,18 @@ def test_rsi_strategy_with_oversold_signal_returns_long():
 ```python
 import pytest
 import pandas as pd
-from backend.backtesting.strategies.rsi import RSIStrategy
+from backend.backtesting.strategies import RSIStrategy, SignalResult
 
-def test_rsi_generate_signals_adds_signal_column(sample_ohlcv):
+def test_rsi_generate_signals_returns_signal_result(sample_ohlcv):
     strategy = RSIStrategy({"period": 14, "overbought": 70, "oversold": 30})
     result = strategy.generate_signals(sample_ohlcv)
-    assert "signal" in result.columns
-    assert set(result["signal"].unique()).issubset({-1, 0, 1})
+    assert isinstance(result, SignalResult)
+    assert hasattr(result, "entries")
+    assert hasattr(result, "exits")
+    assert result.entries.dtype == bool
+    assert result.exits.dtype == bool
+    assert not result.entries.isna().any()
+    assert len(result.entries) == len(sample_ohlcv)  # len(result.entries), NOT len(result)
 ```
 
 ### API Endpoint Test
@@ -104,7 +109,7 @@ def test_fallback_v4_commission_rate_is_0007():
 
 ```powershell
 # Run specific test file
-pytest tests/backtesting/test_rsi.py -v
+pytest tests/backend/backtesting/ -v
 
 # Run with coverage
 pytest tests/ --cov=backend --cov-report=term-missing

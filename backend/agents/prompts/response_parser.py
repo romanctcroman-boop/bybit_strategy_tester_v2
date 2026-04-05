@@ -33,7 +33,7 @@ class Signal(BaseModel):
             "Indicator type — MUST be one of: "
             "RSI, MACD, EMA_Crossover, SMA_Crossover, EMA, SMA, "
             "Bollinger, SuperTrend, Stochastic, CCI, ADX, "
-            "Williams_R, VWAP. "
+            "Williams_R, VWAP, Divergence. "
             "Do NOT use ATR or OBV as signals (use Volatility filter for ATR). "
             "Use MULTIPLE signals (2-4) for robust entry logic. "
             "Avoid SuperTrend alone in ranging markets — combine with RSI or CCI. "
@@ -62,7 +62,22 @@ class Signal(BaseModel):
             "EMA",
             "SMA",
             "VWAP",
+            "Divergence",
         }
+        # Explicit multi-word aliases that normalization won't catch
+        _explicit_aliases = {
+            "keltner/bollinger channel": "Bollinger",
+            "keltner_bollinger_channel": "Bollinger",
+            "bollinger bands": "Bollinger",
+            "bollinger_bands": "Bollinger",
+            "ema crossover": "EMA_Crossover",
+            "sma crossover": "SMA_Crossover",
+            "supertrend": "SuperTrend",
+            "divergence": "Divergence",
+            "rsi divergence": "Divergence",
+        }
+        if v.lower() in _explicit_aliases:
+            return _explicit_aliases[v.lower()]
         # Normalize common variations
         normalized = v.replace(" ", "_").replace("-", "_")
         # Case-insensitive match

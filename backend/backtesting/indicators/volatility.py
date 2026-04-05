@@ -129,10 +129,20 @@ def _handle_donchian(
         ohlcv["low"].values,
         period,
     )
+    upper = pd.Series(dc_upper, index=ohlcv.index)
+    middle = pd.Series(dc_mid, index=ohlcv.index)
+    lower = pd.Series(dc_lower, index=ohlcv.index)
+    # Boolean breakout signals for entry port connections
+    long_signal = pd.Series(ohlcv["close"].values > dc_upper, index=ohlcv.index)
+    short_signal = pd.Series(ohlcv["close"].values < dc_lower, index=ohlcv.index)
     return {
-        "upper": pd.Series(dc_upper, index=ohlcv.index),
-        "middle": pd.Series(dc_mid, index=ohlcv.index),
-        "lower": pd.Series(dc_lower, index=ohlcv.index),
+        "upper": upper,
+        "middle": middle,
+        "lower": lower,
+        "long": long_signal,
+        "short": short_signal,
+        "bullish": long_signal,
+        "bearish": short_signal,
     }
 
 

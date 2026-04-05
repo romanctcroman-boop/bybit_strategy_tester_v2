@@ -75,6 +75,7 @@ from backend.agents.llm import (
     PerplexityClient,
     QwenClient,
 )
+from backend.agents.llm.clients.claude import ClaudeClient
 
 
 class RealLLMDeliberation(MultiAgentDeliberation):
@@ -168,6 +169,16 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             "SEMANTIC (365d TTL, market patterns/rules), PROCEDURAL (permanent, analytical workflows). "
             "Follow the exact format specified in the prompt."
         ),
+        "claude": (
+            "You are a critical strategy evaluator participating in a multi-agent deliberation. "
+            "Your expertise: logical consistency, risk-reward analysis, identifying flawed assumptions, "
+            "and synthesising diverse viewpoints into a single coherent conclusion. "
+            "Your role is to challenge weak reasoning, spot contradictions between agents, "
+            "and produce the most robust final verdict — even if it differs from the majority. "
+            "You prioritise capital preservation over returns. "
+            "Commission is 0.07% per trade — always factor this into profitability estimates. "
+            "Follow the exact format specified in the prompt."
+        ),
     }
 
     # Default system prompt for unknown agents
@@ -258,6 +269,22 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             logger.info("✅ Qwen client ready (via KeyManager)")
         else:
             logger.warning("⚠️ QWEN_API_KEY not found in KeyManager or environment")
+
+        # Claude Sonnet — critical evaluator / debate participant
+        # Uses Sonnet (not Haiku) for complex multi-step reasoning in debate rounds
+        claude_key = _get_api_key("ANTHROPIC_API_KEY")
+        if claude_key:
+            config = LLMConfig(
+                provider=LLMProvider.ANTHROPIC,
+                api_key=claude_key,
+                model="claude-sonnet-4-6",
+                temperature=0.3,  # lower = more consistent critical reasoning
+                max_tokens=2048,
+            )
+            self._clients["claude"] = ClaudeClient(config)
+            logger.info("✅ Claude Sonnet client ready (via KeyManager)")
+        else:
+            logger.warning("⚠️ ANTHROPIC_API_KEY not found — Claude debate participant unavailable")
 
     async def _real_ask(self, agent_type: str, prompt: str) -> str:
         """

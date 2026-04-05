@@ -15,7 +15,7 @@ Step-by-step guide for adding a new FastAPI endpoint.
 Path: `backend/api/schemas/[feature].py`
 
 ```python
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -26,19 +26,21 @@ class FeatureRequest(BaseModel):
     field1: str = Field(..., description="Required field")
     field2: Optional[int] = Field(None, ge=0, description="Optional field")
 
-    @validator('field1')
-    def validate_field1(cls, v):
-        if not v:
-            raise ValueError('field1 cannot be empty')
-        return v
-
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "field1": "value",
                 "field2": 42
             }
         }
+    }
+
+    @field_validator('field1')
+    @classmethod
+    def validate_field1(cls, v: str) -> str:
+        if not v:
+            raise ValueError('field1 cannot be empty')
+        return v
 
 
 class FeatureResponse(BaseModel):
@@ -55,6 +57,7 @@ Path: `backend/api/routers/[feature].py`
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
+from datetime import timezone
 from loguru import logger
 
 from backend.api.schemas.feature import FeatureRequest, FeatureResponse
@@ -86,7 +89,7 @@ async def create_feature(
         return FeatureResponse(
             success=True,
             data=result,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
     except ValueError as e:
         logger.warning(f"Validation error: {e}")
@@ -153,7 +156,7 @@ def get_feature_service(db: Session = Depends(get_db)) -> FeatureService:
 
 ### 6. Create Tests
 
-Path: `tests/integration/test_api/test_feature.py`
+Path: `tests/backend/api/test_feature.py`
 
 ```python
 import pytest
@@ -195,7 +198,7 @@ curl -X POST http://localhost:8000/api/v1/feature/ \
   -d '{"field1": "test"}'
 
 # Run tests
-pytest tests/integration/test_api/test_feature.py -v
+pytest tests/backend/api/test_feature.py -v
 
 # Check OpenAPI docs
 # Visit: http://localhost:8000/docs

@@ -39,8 +39,9 @@ plot(ema_val, title="EMA")
 import pandas as pd
 import numpy as np
 
-# Load TradingView export
-tv_data = pd.read_csv('tests/fixtures/tv_reference.csv')
+# Load TradingView export (create this file manually by exporting from TradingView)
+# Note: tests/fixtures/ does not exist by default — create it or use a local path
+tv_data = pd.read_csv('tv_reference.csv')  # adjust path as needed
 
 # Verify columns
 print(tv_data.columns)

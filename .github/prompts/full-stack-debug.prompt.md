@@ -44,7 +44,7 @@ Frontend (JS fetch) → API Router → Service Layer → Engine/DB → Response 
 - `commission_rate` — Must be `0.0007`
 - `DATA_START_DATE` — Must be `2025-01-01`
 - `ALL_TIMEFRAMES` — Only 9 valid values
-- Signal column — Must be `1`, `-1`, or `0`
+- `generate_signals()` — Must return `SignalResult` (NOT DataFrame); `entries`/`exits` are bool Series
 
 ### Output Format
 

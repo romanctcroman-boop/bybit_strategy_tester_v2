@@ -9,107 +9,342 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **fix(docs): infrastructure audit round 5 — deep re-audit with individual file reads (2026-04-05)**
+
+        Re-audit triggered by "Слишком оптимистично" — every file read individually, not just grep-matched.
+
+        **Files fixed:**
+        - `.github/prompts/walk-forward-optimization.prompt.md` line 11 — Input section showed
+          `[e.g., 15m, 1h]` as timeframe example, contradicting line 56 which says `# NOT '15m'`.
+          Fixed to: `[e.g., 15, 60 — Bybit format: numeric string, NOT "15m"/"1h"]`
+
+        **Files verified CLEAN (individually read):**
+        - All `.claude/hooks/`: `stop_reminder.py`, `post_tool_failure.py`, `ruff_format.py`,
+          `notification.py`, `user_prompt_submit.py`, `session_end.py` — pure infrastructure
+        - All `.github/prompts/` (GSD suite + walk-forward): clean after round 5 fix
+        - All `.github/instructions/`: `backtester.instructions.md`, `api-endpoints.instructions.md`
+        - All `.github/agents/`: `gsd-verifier.agent.md`, `gsd-integration-checker.agent.md`,
+          `backtester.agent.md`, `reviewer.agent.md`
+        - All `.github/skills/strategy-development/SKILL.md`
+        - All `.claude/commands/` (9 files), `.claude/agents/` (7 files)
+
+- **fix(docs): infrastructure audit round 4 — complete audit of all remaining .github/ and .claude/ files (2026-04-05)**
+
+        Final audit pass — all 57 .github/*.md and .claude/*.md files verified and cleaned.
+
+        **Files fixed:**
+        - `.github/agents/tdd.agent.md` — wrong import (`strategies.rsi → strategies`), old DataFrame test template
+          (`"signal" in result.columns`) → SignalResult API, wrong test path (`tests/backtesting/ → tests/backend/backtesting/`)
+        - `.github/agents/gsd-debugger.agent.md` — "signal values must be 1/-1/0" →
+          "generate_signals() returns SignalResult with bool entries/exits Series"
+        - `.github/skills/gsd-diagnose-issues/SKILL.md` — "check signal column type" → SignalResult type check
+        - `.github/skills/backtest-execution/SKILL.md` — non-existent strategy file paths (macd.py, bollinger.py etc.)
+          replaced with correct strategy type keys and reference to strategies.py
+        - `.github/instructions/api-connectors.instructions.md` — Pydantic v1 `@validator` → v2 `@field_validator` + `@classmethod`
+        - `.github/prompts/tradingview-parity-check.prompt.md` — `tests/fixtures/` non-existent path → note + adjusted path
+        - `.github/prompts/add-strategy.prompt.md` — `tests/fixtures/` path + parity test updated to use SignalResult API
+        - `.github/instructions/tests.instructions.md` — `tests/fixtures/` path clarified with note
+        - `.github/prompts/implement-feature.prompt.md` — `backend/strategies/` → `backend/backtesting/strategies.py`
+
+- **fix(docs): infrastructure audit round 2 — fix stale SignalResult API in .github/agents/ and skills (2026-04-05)**
+
+        Deep audit pass: found and fixed 7 more files using old DataFrame signal API.
+
+        **Files fixed:**
+        - `.github/agents/implementer.agent.md` — full strategy template rewrite: old
+          `from backend.backtesting.strategies.base import BaseStrategy`, `generate_signals() → pd.DataFrame`,
+          `signals['signal'] = 0` replaced with correct `SignalResult` + `STRATEGY_REGISTRY` pattern
+        - `.github/agents/gsd-verifier.agent.md` — checklist updated: "returns DataFrame with 'signal' column"
+          → `SignalResult` with `bool` Series checks
+        - `.github/agents/gsd-integration-checker.agent.md` — "returns proper DataFrame"
+          → "returns `SignalResult` with bool entries/exits Series"
+        - `.github/instructions/gsd-verification-patterns.instructions.md` — strategy verification
+          checklist updated from old signal column API to SignalResult
+        - `.github/skills/strategy-development/SKILL.md` — `len(result)` → `len(result.entries)`;
+          `STRATEGY_MAP` → `STRATEGY_REGISTRY`
+        - `.github/prompts/add-strategy.prompt.md` — test/lint paths fixed
+          (`tests/test_strategies/` → `tests/backend/backtesting/`,
+          `strategies/new_strategy.py` → `strategies.py`);
+          `registered in __init__.py` → `STRATEGY_REGISTRY in strategies.py`
+        - `.claude/agents/tdd.md` — coverage table: `strategies/` (directory) → `strategies.py` (file)
+
+- **fix(docs): infrastructure audit — fix stale API patterns across all agent/copilot files (2026-04-05)**
+
+        Full audit of all `.github/prompts/`, `.github/instructions/`, `.claude/commands/`,
+        `.claude/agents/`, `.claude/hooks/`, and sub-directory `CLAUDE.md` files.
+
+        **Files fixed:**
+        - `.github/prompts/add-api-endpoint.prompt.md` — Pydantic v1→v2 patterns
+          (`@field_validator` + `@classmethod`, `model_config = {}`), `datetime.now(timezone.utc)`,
+          test path `tests/integration/test_api/` → `tests/backend/api/`
+        - `.github/prompts/walk-forward-optimization.prompt.md` — import path fixed
+          (`from backend.backtesting.strategies import RSIStrategy`), dates moved to
+          post-DATA_START_DATE (`2025-01-01`), timeframe `'15m'` → `'15'` (Bybit format)
+        - `.github/prompts/debug-session.prompt.md` — DataFrame signal API replaced with
+          `SignalResult` checks (`isinstance(signals, SignalResult)`, `signals.entries.dtype`)
+        - `.github/prompts/full-stack-debug.prompt.md` — stale `signal` column reference
+          → `generate_signals()` returns `SignalResult` (NOT DataFrame)
+        - `.claude/commands/new-strategy.md` — complete rewrite (3 critical errors):
+          wrong file path (separate vs. single file), wrong import path, entirely wrong API
+          (DataFrame → SignalResult), missing STRATEGY_REGISTRY registration
+        - `frontend/CLAUDE.md` — line count updated: `~7154` → `~13378` for `strategy_builder.js`
+        - `.github/instructions/tests.instructions.md` — timeframe `"15m"` → `"15"` in
+          integration test, `tests/unit/test_strategies/` → `tests/backend/backtesting/`,
+          `strategies/` (directory) → `strategies.py` (single file) in coverage table
+
+        **Files audited and confirmed clean (no changes needed):**
+        `.github/copilot-instructions.md`, all sub-dir `CLAUDE.md` files (backtesting, api,
+        agents, services, ml, optimization, frontend), all `.claude/agents/`, all
+        `.claude/commands/` except new-strategy, all `.claude/hooks/`,
+        `.github/instructions/api-endpoints.instructions.md`,
+        `.github/instructions/strategies.instructions.md`
+
+- **fix: BUG-1/2/3 — calmar_ratio, filter port mismatch, two_ma_filter, MCP fetch (2026-04-03)**
+
+    Four critical bugs found during AI Build Round 4 analysis:
+
+    **BUG-1 — `FallbackEngineV4.calmar_ratio = 0.000` (CRITICAL)**
+    - `engines/fallback_engine_v4.py` `_calculate_metrics()` never set `metrics.calmar_ratio` — defaulted to 0.0.
+    - All FallbackV4 verify candidates scored 0.000 → optimizer pick was effectively random.
+    - Fix: added `calc_calmar` import + `metrics.calmar_ratio = calc_calmar(metrics.total_return, metrics.max_drawdown)`.
+
+    **BUG-2 — Filter block port mismatch (HIGH)**
+    - Block library in `builder_workflow.py` described filter blocks with `"ports": "filter_long, filter_short"`.
+    - LLM topology agent used "filter_long" as `fromPort` but filter blocks output `['long', 'short']` → adapter warning + signal dropped → all filter blocks silently non-functional.
+    - Fix (A): added `"filter_long": ["long", "bullish"]` + `"filter_short": ["short", "bearish"]` aliases to `SIGNAL_PORT_ALIASES` in `strategy_builder/signal_router.py`.
+    - Fix (B): corrected block library descriptions to `"ports": "long, short"` in `builder_workflow.py`.
+
+    **BUG-2b — `two_ma_filter` output keys + param names (HIGH)**
+    - `two_ma_filter` in `block_executor.py` returned `{buy, sell, fast, slow}` — no `long/short` keys → still dropped after BUG-2(A) fix.
+    - Also read `fast_period/slow_period` but optimizer sends `ma1_length/ma2_length` → params ignored, used defaults (9/21) instead of optimized values.
+    - Fix: added `ma1_length`/`ma2_length` as fallback keys in `_param()` calls; added `"long": buy_s, "short": sell_s` to return dict.
+
+    **BUG-3 — Optimizer fetches strategy graph via MCP (MEDIUM)**
+    - `_run_optimizer_for_ranges()` in `builder_workflow.py` called `builder_get_strategy()` via MCP HTTP request.
+    - When server is not running → "All connection attempts failed" → optimizer returns None → "No adjustments possible".
+    - Fix: use `self._result.blocks_added or config.blocks` directly (already in memory); MCP fetch only as fallback when in-memory state is empty.
+
+    Files: `engines/fallback_engine_v4.py`, `strategy_builder/signal_router.py`, `strategy_builder/block_executor.py`, `agents/workflows/builder_workflow.py`.
+
+- **fix: AI Build `primary_score` NameError on iteration ≥ 2 (2026-04-02)**
+
+    `_suggest_param_ranges()` in `builder_workflow.py` referenced `primary_score` — a local variable from `run()` — causing `NameError` on iteration ≥ 2 (first iteration set it, but `_suggest_param_ranges` is a method, not a closure).
+    - Fix (1): safe init `primary_score = float("-inf")` before loop in `run()`.
+    - Fix (2): added `current_score: float = 0.0` param to `_suggest_param_ranges`.
+    - Fix (3): pass `current_score=primary_score` at call site.
+    - Fix (4): line 2796 uses `current_score` not `primary_score`.
+
+    File: `backend/agents/workflows/builder_workflow.py`.
+
+- **fix: multi-agent audit round 2 — 4 bugs (2026-04-01)**
+
+    **(A) OPT-HIGH-3: Numba DCA batch calmar/payoff hardcoded 0.0**
+    - `builder_optimizer.py` DCA batch methods returned `calmar_ratio=0.0` and `payoff_ratio=0.0` always.
+    - Fix: `calmar = net_profit / (capital * max_dd)`, `payoff = profit_factor * (1-wr) / wr`.
+
+    **(B) OPT-MEDIUM-1: fast RSI path leverage default 1→10**
+    - Fast RSI optimization path used leverage=1 instead of the standard optimization default of 10.
+
+    **(C) DebateNode + AnalysisDebateNode: inner timeout**
+    - Added `asyncio.wait_for(deliberate_with_llm(...), timeout=140.0)` in both debate nodes (LangGraph node-level timeout is not guaranteed at sub-call level).
+
+    **(D) `deliberation.py` `_collect_refined_opinions`: per-agent timeout**
+    - Added `asyncio.wait_for(_ask_agent(...), timeout=40.0)` in `refine_one()` with graceful fallback (keeps previous vote) on timeout.
+
+    Files: `builder_optimizer.py`, `trading_strategy_graph.py`, `deliberation.py`.
+
+- **fix: multi-system audit — 5 bugs across metrics/optimizer/data (2026-04-01)**
+
+    **(1) Win rate denominator**
+    - `MetricsCalculator`: win rate denominator changed to `total_trades` (TradingView standard).
+
+    **(2) Monthly returns formula**
+    - `formulas.py`: monthly returns → relative `(end-start)/start_equity` (was absolute difference).
+
+    **(3) HITL tests TTL eviction**
+    - `test_pipeline_streaming_hitl.py`: hardcoded `created_at` dates evicted by 1h TTL in `_evict_stale_jobs()` → replaced with `datetime.now(UTC).isoformat()`.
+
+    **(4) `kline_repository.py` ON CONFLICT missing `market_type`**
+    - Added `market_type` column to `ON CONFLICT` clause; `MIN_GAP_CANDLES` 2→1.
+
+    **(5) Optuna NaN/inf guard + OOS warmup + fast RSI DCA path**
+    - `builder_optimizer.py`: `math.isfinite(score_raw)` → `TrialPruned()`, clamped ±1e6.
+    - WF OOS data leakage: prepend 200 warmup bars (`oos_warmup_start = max(0, oos_start - 200)`).
+    - Fast RSI DCA path used `block_stop_loss/take_profit` instead of per-combo `_combo_sl/_combo_tp` — fixed.
+
+    Files: `metrics_calculator.py`, `formulas.py`, `test_pipeline_streaming_hitl.py`, `kline_repository.py`, `builder_optimizer.py`.
+
+- **fix: data service — incomplete bar detection + data completeness validation (2026-04-01)**
+
+    `backtesting/service.py`:
+    - `_drop_incomplete_last_bar()`: drops last candle if `open_time + interval_ms > now` (prevents look-ahead bias from partial candles).
+    - `_validate_data_completeness()`: logs WARNING when actual candles < 70% of expected range (catches data gaps).
+    - Both called from `_fetch_historical_data()` at DB and API paths.
+
+    File: `backend/backtesting/service.py`.
+
+- **fix: close_by_time orphan block activates regardless of connectivity (2026-04-01)**
+
+    `adapter.py` activated `close_by_time` block if block type was present in the graph, regardless of whether it was connected.
+    - Without fix: WR=84% / Sharpe=-0.948 on disconnected close_by_time (closes every trade at fixed bars regardless of strategy signals).
+    - Fix: added `_cbt_connected` check — block only activates if it has ≥ 1 connection in `self.connections`.
+
+    File: `backend/backtesting/strategy_builder/adapter.py`.
+
+- **fix: agent system audit — 6 fixes to builder_workflow.py (2026-04-01)**
+
+    Full audit pass of `builder_workflow.py` optimizer loop:
+    1. `engine_type="numba"` for 20-40× speedup (was default "auto").
+    2. Multi-agent identity header in `_suggest_adjustments` prompt.
+    3. `iterations_history` param — LLM sees all prior iteration results (not just current).
+    4. `backtest_warnings` param — DIRECTION_MISMATCH flows to LLM with long/short signal breakdown.
+    5. Multi-agent identity + memory recall in `_suggest_param_ranges`.
+    6. `max_rounds=2` in `_run_deliberation` — agents can revise opinions after cross-examination.
+
+    File: `backend/agents/workflows/builder_workflow.py`.
+
+- **fix: optimization ranges divergence — templates.py vs DEFAULT_PARAM_RANGES (2026-04-01)**
+
+    `templates.py` ranges were stale vs `DEFAULT_PARAM_RANGES` in `builder_optimizer.py`.
+    Fixed all 5 blocks: RSI, MACD, Stochastic, Supertrend (period 5→3/20→30, multiplier 1.0→0.5/5.0→6.0), static_sltp (TP/SL high 5→20).
+
+    Files: `backend/agents/prompts/templates.py`, `backend/optimization/builder_optimizer.py`.
+
+- **feat(agents): Claude as 4th MoA agent + synthesis critic (2026-03-30)**
+
+        New `ClaudeClient` (Anthropic native Messages API) + wired into AI pipeline.
+
+        **New files:**
+        - `backend/agents/llm/clients/claude.py` — `ClaudeClient` (Anthropic Messages API,
+          NOT OpenAI-compatible). Handles `x-api-key` header, top-level `system` field,
+          `content[0].text` response parsing, `input_tokens`/`output_tokens` usage counts.
+          Default model: `claude-haiku-4-5-20251001`. json_mode handled via prompt
+          engineering (no `response_format` field needed — Claude follows JSON instructions).
+        - `tests/backend/agents/test_claude_client.py` — 18 tests (payload, parse,
+          retry, json_mode isolation, _synthesis_critic Claude→QWEN→None fallback chain).
+
+        **Modified files:**
+        - `backend/agents/llm/clients/__init__.py` — exports `ClaudeClient`
+        - `backend/agents/llm/base_client.py` — `LLMClientFactory.create()` registers
+          `LLMProvider.ANTHROPIC → ClaudeClient`
+        - `backend/agents/prompts/templates.py` — `AGENT_SPECIALIZATIONS["claude"]` added
+          (role: strategy_synthesizer, style: systematic)
+        - `backend/agents/trading_strategy_graph.py`:
+          - `_call_llm()` provider_map: `"claude"` → haiku model, `ANTHROPIC_API_KEY`
+          - New `_synthesis_critic()`: tries Claude first, falls back to QWEN, then None.
+            Previously `_qwen_critic()` was called directly; now a smarter wrapper.
+          - DebateNode agent filter: added `"claude"` (opt-in via `agents=["deepseek","claude"]`)
+          - AnalysisDebateNode agent filter: added `"claude"`
+        - `.env.example` — `ANTHROPIC_API_KEY` section added
+
+        **Architecture:** Claude used as CRITIC (always active when DeepSeek MoA runs),
+        not as primary generator — avoids 10-50× cost increase while gaining structured-
+        output quality improvement exactly where it matters (synthesis of 3 variants).
+        Claude as generator is opt-in via `agents=["deepseek", "claude"]`.
+
+        **Tests:** 245/245 passing (no regressions).
+
 - **fix: Strategy Builder UI — 6 bugs fixed (2026-03-29)**
 
-    Full bug-fix pass across Strategy Builder frontend components.
+        Full bug-fix pass across Strategy Builder frontend components.
 
-    **Bug #8 — Undo/Redo loses connections on Redo (CRITICAL)**
-    - `frontend/js/components/UndoRedoModule.js` `restoreStateSnapshot()`: fixed
-      self-reference array-clearing bug. `setBlocks(blocks)` / `setConnections(conns)`
-      setters do `arr.length = 0; arr.push(...passed)` — when `passed === arr` (same
-      reference) the first `length=0` cleared what was just populated. Fixed by passing
-      `[...blocks]` / `[...conns]` shallow copies so the setter's round-trip is safe.
+        **Bug #8 — Undo/Redo loses connections on Redo (CRITICAL)**
+        - `frontend/js/components/UndoRedoModule.js` `restoreStateSnapshot()`: fixed
+          self-reference array-clearing bug. `setBlocks(blocks)` / `setConnections(conns)`
+          setters do `arr.length = 0; arr.push(...passed)` — when `passed === arr` (same
+          reference) the first `length=0` cleared what was just populated. Fixed by passing
+          `[...blocks]` / `[...conns]` shallow copies so the setter's round-trip is safe.
 
-    **Bug #12 — Database panel 503/timeout on first open**
-    - `frontend/js/strategy_builder/SymbolSyncModule.js` `loadAndRender()`: renamed to
-      `loadAndRender(attempt = 1)` and added one automatic retry with 2 s delay on
-      `AbortError` or non-OK response. Shows "Повторная попытка подключения..." while
-      waiting. Manual Refresh button still works for subsequent failures.
+        **Bug #12 — Database panel 503/timeout on first open**
+        - `frontend/js/strategy_builder/SymbolSyncModule.js` `loadAndRender()`: renamed to
+          `loadAndRender(attempt = 1)` and added one automatic retry with 2 s delay on
+          `AbortError` or non-OK response. Shows "Повторная попытка подключения..." while
+          waiting. Manual Refresh button still works for subsequent failures.
 
-    **Bug #6 — Fit to Screen ignores open floating panels**
-    - `frontend/js/pages/strategy_builder.js` `fitToScreen()`: replaced stub
-      `resetZoom()` call with proper implementation that (a) measures the bounding box
-      of all rendered blocks, (b) deducts 560 px for any open floating panel, (c) computes
-      `zoom = clamp(min(availW/contentW, availH/contentH), 0.2, 1.0)`, then scrolls
-      canvas so content is centred with 40 px padding.
+        **Bug #6 — Fit to Screen ignores open floating panels**
+        - `frontend/js/pages/strategy_builder.js` `fitToScreen()`: replaced stub
+          `resetZoom()` call with proper implementation that (a) measures the bounding box
+          of all rendered blocks, (b) deducts 560 px for any open floating panel, (c) computes
+          `zoom = clamp(min(availW/contentW, availH/contentH), 0.2, 1.0)`, then scrolls
+          canvas so content is centred with 40 px padding.
 
-    **Bug #2 — Navbar buttons inaccessible on narrow screens**
-    - `frontend/css/strategy_builder.css`: added three `@media` breakpoints.
-        - `≤ 1100 px`: action buttons show icon-only (text `font-size:0`).
-        - `≤ 860 px`: navbar wraps to two rows; `.navbar-actions` becomes horizontally
-          scrollable so all buttons remain reachable.
-        - `≤ 600 px`: strategy-name input shrinks to 120 px.
+        **Bug #2 — Navbar buttons inaccessible on narrow screens**
+        - `frontend/css/strategy_builder.css`: added three `@media` breakpoints.
+            - `≤ 1100 px`: action buttons show icon-only (text `font-size:0`).
+            - `≤ 860 px`: navbar wraps to two rows; `.navbar-actions` becomes horizontally
+              scrollable so all buttons remain reachable.
+            - `≤ 600 px`: strategy-name input shrinks to 120 px.
 
-    **Bug #1 — Scroll wheel changes leverage unexpectedly (FIXED in prior step)**
-    - `frontend/js/pages/strategy_builder.js` line ~1255: `leverageBlock` wheel listener
-      now guards `if (e.target !== backtestLeverageRangeEl) return` — only intercepts
-      scroll when cursor is directly over the range input.
+        **Bug #1 — Scroll wheel changes leverage unexpectedly (FIXED in prior step)**
+        - `frontend/js/pages/strategy_builder.js` line ~1255: `leverageBlock` wheel listener
+          now guards `if (e.target !== backtestLeverageRangeEl) return` — only intercepts
+          scroll when cursor is directly over the range input.
 
-    **Bug #3 — No Russian notification for "Run Backtest / Optimize" without saved strategy**
-    - `frontend/js/pages/optimization_panels.js` lines 797, 879: translated English
-      "Save strategy first…" warning messages to Russian.
+        **Bug #3 — No Russian notification for "Run Backtest / Optimize" without saved strategy**
+        - `frontend/js/pages/optimization_panels.js` lines 797, 879: translated English
+          "Save strategy first…" warning messages to Russian.
 
-    **Bug #5 — Duplicate strategies in "My Strategies" modal**
-    - Root: some strategies appeared twice, likely due to duplicate DB rows or join artifacts.
-    - `backend/api/routers/strategy_builder/router.py` `list_strategies()`: added
-      `.distinct(Strategy.id)` to the SQLAlchemy query so the backend never emits
-      duplicate rows regardless of underlying joins.
-    - `frontend/js/components/MyStrategiesModule.js` `fetchStrategiesList()`: added
-      frontend deduplication by `id` as a defensive second layer.
+        **Bug #5 — Duplicate strategies in "My Strategies" modal**
+        - Root: some strategies appeared twice, likely due to duplicate DB rows or join artifacts.
+        - `backend/api/routers/strategy_builder/router.py` `list_strategies()`: added
+          `.distinct(Strategy.id)` to the SQLAlchemy query so the backend never emits
+          duplicate rows regardless of underlying joins.
+        - `frontend/js/components/MyStrategiesModule.js` `fetchStrategiesList()`: added
+          frontend deduplication by `id` as a defensive second layer.
 
-    **Bug #11 — No block library toggle button (FALSE ALARM)**
-    - `frontend/js/sidebar-toggle.js` already wires `#toggleLeftSidebarBtn` with full
-      collapse/expand logic and CSS (`sidebar-left.collapsed`). Toggle works correctly.
+        **Bug #11 — No block library toggle button (FALSE ALARM)**
+        - `frontend/js/sidebar-toggle.js` already wires `#toggleLeftSidebarBtn` with full
+          collapse/expand logic and CSS (`sidebar-left.collapsed`). Toggle works correctly.
 
-    Implemented RuFlo-inspired parallel agent execution and quality improvements across
-    the LangGraph pipeline. All changes verified: 211 tests passing.
+        Implemented RuFlo-inspired parallel agent execution and quality improvements across
+        the LangGraph pipeline. All changes verified: 211 tests passing.
 
-    **P3-1a — `debate ∥ memory_recall` parallel execution**
-    - `trading_strategy_graph.py` `build_trading_strategy_graph()`: replaced sequential
-      `regime_classifier → debate → memory_recall` chain with `EdgeType.PARALLEL` edge
-      so `debate` and `memory_recall` run concurrently after `regime_classifier`.
-    - `langgraph_orchestrator.py` `_execute_parallel()` / `EdgeType.PARALLEL` already
-      supported this pattern via `asyncio.gather`.
-    - Saves ~10-15s per pipeline run (memory_recall overlaps with debate's 90s LLM calls).
+        **P3-1a — `debate ∥ memory_recall` parallel execution**
+        - `trading_strategy_graph.py` `build_trading_strategy_graph()`: replaced sequential
+          `regime_classifier → debate → memory_recall` chain with `EdgeType.PARALLEL` edge
+          so `debate` and `memory_recall` run concurrently after `regime_classifier`.
+        - `langgraph_orchestrator.py` `_execute_parallel()` / `EdgeType.PARALLEL` already
+          supported this pattern via `asyncio.gather`.
+        - Saves ~10-15s per pipeline run (memory_recall overlaps with debate's 90s LLM calls).
 
-    **P3-1b — `_collect_refined_opinions` parallel (deliberation.py)**
-    - `backend/agents/consensus/deliberation.py`: converted sequential `for opinion in
-previous_opinions` loop to `asyncio.gather` pattern, matching how
-      `_collect_initial_opinions` and `_cross_examine` already work.
-    - Saves ~10-20s per debate refinement round (2 agent calls overlap instead of serial).
+        **P3-1b — `_collect_refined_opinions` parallel (deliberation.py)**
+        - `backend/agents/consensus/deliberation.py`: converted sequential `for opinion in
 
-    **P3-2 — `MLValidationNode` 3 sub-checks parallel**
-    - `trading_strategy_graph.py` `MLValidationNode.execute()`: replaced 3 sequential
-      `await asyncio.to_thread(...)` calls (overfitting / regime / stability) with a single
-      `await asyncio.gather(..., return_exceptions=True)`.
-    - All 3 sub-checks are independent (same inputs, different slices/logic).
-    - Saves ~7-18s per run (dominant check ~12s, now runs in parallel with the others).
+    previous_opinions`loop to`asyncio.gather`pattern, matching how
+     `\_collect_initial_opinions`and`\_cross_examine` already work. - Saves ~10-20s per debate refinement round (2 agent calls overlap instead of serial).
 
-    **P3-3 — Optuna `n_jobs=2`, `N_TRIALS` 50→100**
-    - `OptimizationNode.N_TRIALS`: 50 → 100 (with `n_jobs=2` the 120s budget supports ~100 trials).
-    - `run_builder_optuna_search(n_jobs=2)`: 2 parallel Optuna workers, ~2× trial throughput.
+        **P3-2 — `MLValidationNode` 3 sub-checks parallel**
+        - `trading_strategy_graph.py` `MLValidationNode.execute()`: replaced 3 sequential
+          `await asyncio.to_thread(...)` calls (overfitting / regime / stability) with a single
+          `await asyncio.gather(..., return_exceptions=True)`.
+        - All 3 sub-checks are independent (same inputs, different slices/logic).
+        - Saves ~7-18s per run (dominant check ~12s, now runs in parallel with the others).
 
-    **SELF-RAG — skip memory recall when DB is empty**
-    - `MemoryRecallNode.execute()`: added early-exit when `loaded_count == 0` (new session,
-      no memories yet), skipping all 3 `recall()` queries and their BM25+embedding overhead.
+        **P3-3 — Optuna `n_jobs=2`, `N_TRIALS` 50→100**
+        - `OptimizationNode.N_TRIALS`: 50 → 100 (with `n_jobs=2` the 120s budget supports ~100 trials).
+        - `run_builder_optuna_search(n_jobs=2)`: 2 parallel Optuna workers, ~2× trial throughput.
 
-    **Memory deduplication across 3 recall queries**
-    - `MemoryRecallNode.execute()`: added `_dedup()` helper that removes items already seen
-      in a previous list (by `item.id`). The same high-importance memory can score in wins,
-      failures, and regime_memories simultaneously, inflating the LLM context block.
+        **SELF-RAG — skip memory recall when DB is empty**
+        - `MemoryRecallNode.execute()`: added early-exit when `loaded_count == 0` (new session,
+          no memories yet), skipping all 3 `recall()` queries and their BM25+embedding overhead.
 
-    **JSON mode for DeepSeek MoA + QWEN critic**
-    - `base_client.py` `_build_payload()`: added `json_mode` parameter; when `True`, injects
-      `response_format={"type":"json_object"}` for OpenAI-compatible providers (DeepSeek, Qwen).
-    - `GenerateStrategiesNode._call_llm()`: new `json_mode: bool = False` parameter, gated
-      to deepseek/qwen only (Perplexity sonar-pro does not support `response_format`).
-    - Enabled `json_mode=True` for all 3 DeepSeek MoA calls and the QWEN critic call.
-    - Eliminates ~90% of `ResponseParser._extract_json()` regex failures on malformed output.
+        **Memory deduplication across 3 recall queries**
+        - `MemoryRecallNode.execute()`: added `_dedup()` helper that removes items already seen
+          in a previous list (by `item.id`). The same high-importance memory can score in wins,
+          failures, and regime_memories simultaneously, inflating the LLM context block.
 
-    **Total estimated savings: ~30-55s per full pipeline run.**
-    Files: `trading_strategy_graph.py`, `deliberation.py`, `base_client.py`,
-    `tests/test_memory_recall_and_analysis_nodes.py`, `tests/backend/agents/test_p1_features.py`,
-    `tests/backend/agents/test_p2_features.py`.
+        **JSON mode for DeepSeek MoA + QWEN critic**
+        - `base_client.py` `_build_payload()`: added `json_mode` parameter; when `True`, injects
+          `response_format={"type":"json_object"}` for OpenAI-compatible providers (DeepSeek, Qwen).
+        - `GenerateStrategiesNode._call_llm()`: new `json_mode: bool = False` parameter, gated
+          to deepseek/qwen only (Perplexity sonar-pro does not support `response_format`).
+        - Enabled `json_mode=True` for all 3 DeepSeek MoA calls and the QWEN critic call.
+        - Eliminates ~90% of `ResponseParser._extract_json()` regex failures on malformed output.
+
+        **Total estimated savings: ~30-55s per full pipeline run.**
+        Files: `trading_strategy_graph.py`, `deliberation.py`, `base_client.py`,
+        `tests/test_memory_recall_and_analysis_nodes.py`, `tests/backend/agents/test_p1_features.py`,
+        `tests/backend/agents/test_p2_features.py`.
 
 - **fix: backtest metrics UI bugs N1-N7 (2026-03-29)**
 
@@ -1033,19 +1268,19 @@ previous_opinions` loop to `asyncio.gather` pattern, matching how
 
 - **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
 
-                    All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
-                    changes that were not reflected in the tests.
+                      All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+                      changes that were not reflected in the tests.
 
-                    **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
-                    - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
-                      now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
-                    - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
-                    - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
-                    - `renderPagination` tests updated: pagination is always removed, no elements created.
-                    - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+                      **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+                      - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+                        now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+                      - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+                      - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+                      - `renderPagination` tests updated: pagination is always removed, no elements created.
+                      - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
 
-                    **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
-                    - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
+                      **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+                      - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
 
     selected'`) but `setDom()`helper did not create the`#strategyTimeframe`element.
     - Added`strategyTimeframe = '15'`parameter to`setDom()` and creates the element.
@@ -2396,7 +2631,7 @@ function calculateADX(data, period = 14) {
     TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
     (bars_in_trade now uses inclusive counting to match TV).
 
-                                            **File:** `scripts/_tv_calibration_check.py`
+                                              **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

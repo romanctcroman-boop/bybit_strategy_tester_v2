@@ -9,39 +9,39 @@
 
 ## 📑 Навигация
 
-| Раздел                                   | Содержание                                          |
-| ---------------------------------------- | --------------------------------------------------- |
-| [§1](#1-окружение)                       | Окружение, запуск, команды                          |
-| [§2](#2-архитектура-слои)                | 6-слойная архитектура                               |
-| [§3](#3-полная-библиотека-переменных)    | Все переменные, типы, диапазоны, файлы              |
-| [§4](#4-граф-зависимостей-переменных)    | Логические связи, глубина проникновения             |
-| [§5](#5-кросс-системные-переменные)      | 7 high-risk параметров, 12+ файлов каждый           |
-| [§6](#6-блоки-strategy-builder)          | 40+ блоков, порты, расширения                       |
-| [§7](#7-роутинг-данных)                  | 70+ роутеров, маршрутизация запросов                |
-| [§8](#8-хранение-данных)                 | SQLite, Redis, кэши, ORM модели                     |
-| [§9](#9-чтение-данных)                   | KlineDataManager, DataService, adapters             |
-| [§10](#10-преобразование-данных)         | Pipeline: raw OHLCV → signals → trades → metrics    |
-| [§11](#11-потоковая-обработка)           | WebSocket, SSE, Redis pub/sub                       |
-| [§12](#12-middleware-pipeline)           | 10 middleware в фиксированном порядке               |
-| [§13](#13-движки-бэктестинга)            | V4, Numba, DCA — выбор и паритет                    |
-| [§14](#14-метрики)                       | MetricsCalculator — 166 метрик, TV-parity           |
-| [§15](#15-ai-agent-system)               | LangGraph pipeline, LLM providers, memory           |
-| [§16](#16-инфраструктура-claude-code)    | Hooks, slash commands, memory-bank                  |
-| [§17](#17-критические-инварианты)        | НИКОГДА не нарушай                                  |
-| [§18](#18-рефакторинг-чеклист)           | Pre-flight → Post-flight                            |
-| [§19](#19-live-trading-subsystem)        | Live trading, WebSocket, order execution            |
-| [§20](#20-risk-management)               | RiskEngine, position sizing, stop loss, exposure    |
-| [§21](#21-agent-memory-system)           | 4-tier memory, vector store, BM25, SQLite backend   |
-| [§22](#22-agent-consensus--debate)       | ConsensusEngine, deliberation, RiskVetoGuard        |
-| [§23](#23-agent-self-improvement)        | FeedbackLoop, evolution, RLHF, pattern extraction   |
-| [§24](#24-security-layer)                | Prompt guards, AES-256-GCM, Shamir, HSM             |
-| [§25](#25-mlrl-subsystem)                | Regime detection, RL agents, Gymnasium env          |
-| [§26](#26-monte-carlo--walk-forward)     | Monte Carlo simulation, walk-forward validation     |
-| [§27](#27-monitoring--observability)     | Prometheus, health checks, cost tracking, alerts    |
-| [§28](#28-optimization-system-deep-dive) | Ray optimizer, advanced engine, filters             |
-| [§29](#29-frontend-architecture)         | StateManager, EventBus, 25 components, core modules |
-| [§30](#30-services-layer-deep-dive)      | 60+ services, LLM clients, event bus, reliability   |
-| [§31](#31-auxiliary--experimental-modules)| Celery, reports, social, research, L2 LOB, benchmark |
+| Раздел                                     | Содержание                                           |
+| ------------------------------------------ | ---------------------------------------------------- |
+| [§1](#1-окружение)                         | Окружение, запуск, команды                           |
+| [§2](#2-архитектура-слои)                  | 6-слойная архитектура                                |
+| [§3](#3-полная-библиотека-переменных)      | Все переменные, типы, диапазоны, файлы               |
+| [§4](#4-граф-зависимостей-переменных)      | Логические связи, глубина проникновения              |
+| [§5](#5-кросс-системные-переменные)        | 7 high-risk параметров, 12+ файлов каждый            |
+| [§6](#6-блоки-strategy-builder)            | 40+ блоков, порты, расширения                        |
+| [§7](#7-роутинг-данных)                    | 70+ роутеров, маршрутизация запросов                 |
+| [§8](#8-хранение-данных)                   | SQLite, Redis, кэши, ORM модели                      |
+| [§9](#9-чтение-данных)                     | KlineDataManager, DataService, adapters              |
+| [§10](#10-преобразование-данных)           | Pipeline: raw OHLCV → signals → trades → metrics     |
+| [§11](#11-потоковая-обработка)             | WebSocket, SSE, Redis pub/sub                        |
+| [§12](#12-middleware-pipeline)             | 10 middleware в фиксированном порядке                |
+| [§13](#13-движки-бэктестинга)              | V4, Numba, DCA — выбор и паритет                     |
+| [§14](#14-метрики)                         | MetricsCalculator — 166 метрик, TV-parity            |
+| [§15](#15-ai-agent-system)                 | LangGraph pipeline, LLM providers, memory            |
+| [§16](#16-инфраструктура-claude-code)      | Hooks, slash commands, memory-bank                   |
+| [§17](#17-критические-инварианты)          | НИКОГДА не нарушай                                   |
+| [§18](#18-рефакторинг-чеклист)             | Pre-flight → Post-flight                             |
+| [§19](#19-live-trading-subsystem)          | Live trading, WebSocket, order execution             |
+| [§20](#20-risk-management)                 | RiskEngine, position sizing, stop loss, exposure     |
+| [§21](#21-agent-memory-system)             | 4-tier memory, vector store, BM25, SQLite backend    |
+| [§22](#22-agent-consensus--debate)         | ConsensusEngine, deliberation, RiskVetoGuard         |
+| [§23](#23-agent-self-improvement)          | FeedbackLoop, evolution, RLHF, pattern extraction    |
+| [§24](#24-security-layer)                  | Prompt guards, AES-256-GCM, Shamir, HSM              |
+| [§25](#25-mlrl-subsystem)                  | Regime detection, RL agents, Gymnasium env           |
+| [§26](#26-monte-carlo--walk-forward)       | Monte Carlo simulation, walk-forward validation      |
+| [§27](#27-monitoring--observability)       | Prometheus, health checks, cost tracking, alerts     |
+| [§28](#28-optimization-system-deep-dive)   | Ray optimizer, advanced engine, filters              |
+| [§29](#29-frontend-architecture)           | StateManager, EventBus, 25 components, core modules  |
+| [§30](#30-services-layer-deep-dive)        | 60+ services, LLM clients, event bus, reliability    |
+| [§31](#31-auxiliary--experimental-modules) | Celery, reports, social, research, L2 LOB, benchmark |
 
 ---
 
@@ -2035,13 +2035,13 @@ task_reject_on_worker_lost = True  # Reject при потере worker
 
 **Задачи:**
 
-| Task                           | Queue                | Retries | Описание                          |
-| ------------------------------ | -------------------- | ------- | --------------------------------- |
-| `run_backtest_task`            | `backtests`          | 3       | Одиночный бэктест с atomic claim  |
-| `bulk_backtest_task`           | `backtests`          | 0       | Celery `group()` для параллельных |
-| `grid_search_task`             | `optimizations.grid` | 2       | Grid search + progress tracking   |
-| `walk_forward_task`            | `optimizations.walk` | 2       | IS/OOS rolling window             |
-| `bayesian_optimization_task`   | `optimizations.bayes`| 2       | Optuna-based Bayesian             |
+| Task                         | Queue                 | Retries | Описание                          |
+| ---------------------------- | --------------------- | ------- | --------------------------------- |
+| `run_backtest_task`          | `backtests`           | 3       | Одиночный бэктест с atomic claim  |
+| `bulk_backtest_task`         | `backtests`           | 0       | Celery `group()` для параллельных |
+| `grid_search_task`           | `optimizations.grid`  | 2       | Grid search + progress tracking   |
+| `walk_forward_task`          | `optimizations.walk`  | 2       | IS/OOS rolling window             |
+| `bayesian_optimization_task` | `optimizations.bayes` | 2       | Optuna-based Bayesian             |
 
 **⚠️ Зависимости:** Требует Redis-брокер. `CELERY_EAGER=1` — синхронный режим для тестов.
 
@@ -2133,14 +2133,14 @@ backend/research/
 └── __init__.py
 ```
 
-| Модуль                     | Класс              | Описание                                                            |
-| -------------------------- | ------------------- | ------------------------------------------------------------------ |
-| `explainable_ai`           | `SHAPExplainer`     | Simplified SHAP for ML signal interpretation (no real SHAP lib)    |
-|                            | `LIMEExplainer`     | LIME-style local linear explanations                               |
-| `blockchain_verification`  | `BacktestVerifier`  | SHA-256 hashes → cryptographic proof of backtest integrity         |
-| `federated_learning`       | `FederatedLearning` | FedAvg aggregation, N клиентов, global/local weights               |
-| `multi_agent_simulation`   | `MarketSimulator`   | ABM: momentum/mean_reversion/market_maker/random/RL agents         |
-| `parameter_adaptation`     | `ParameterAdapter`  | Regime-based param tuning (trending/ranging/volatile/calm presets) |
+| Модуль                    | Класс               | Описание                                                           |
+| ------------------------- | ------------------- | ------------------------------------------------------------------ |
+| `explainable_ai`          | `SHAPExplainer`     | Simplified SHAP for ML signal interpretation (no real SHAP lib)    |
+|                           | `LIMEExplainer`     | LIME-style local linear explanations                               |
+| `blockchain_verification` | `BacktestVerifier`  | SHA-256 hashes → cryptographic proof of backtest integrity         |
+| `federated_learning`      | `FederatedLearning` | FedAvg aggregation, N клиентов, global/local weights               |
+| `multi_agent_simulation`  | `MarketSimulator`   | ABM: momentum/mean_reversion/market_maker/random/RL agents         |
+| `parameter_adaptation`    | `ParameterAdapter`  | Regime-based param tuning (trending/ranging/volatile/calm presets) |
 
 **⚠️ Статус:** Research stubs. Используют simplified алгоритмы (не production SHAP/LIME). Не интегрированы в основной пайплайн.
 
@@ -2159,6 +2159,7 @@ backend/experimental/l2_lob/
 ```
 
 **Функционал:**
+
 - **Сбор:** Bybit REST + WebSocket → L2 snapshots (NDJSON)
 - **Replay:** `load_snapshots_ndjson()` → `OrderBookSimulator` для бэктеста с L2
 - **Generative:** CGAN research для синтеза реалистичного стакана

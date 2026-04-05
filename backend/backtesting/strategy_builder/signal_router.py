@@ -45,4 +45,8 @@ SIGNAL_PORT_ALIASES: dict[str, list[str]] = {
     # Close-condition blocks expose "config" as their single output port on the frontend.
     # Resolve it to the actual signal keys present in the cached output.
     "config": ["exit_long", "exit_short", "exit", "signal"],
+    # LLM topology agents sometimes use the TARGET port name ("filter_long") as the SOURCE
+    # port in connections for filter blocks. Filter blocks actually output "long"/"short".
+    "filter_long": ["long", "bullish"],
+    "filter_short": ["short", "bearish"],
 }

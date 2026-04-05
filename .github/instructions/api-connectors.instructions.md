@@ -149,15 +149,16 @@ class BybitWebSocket:
 ## Response Validation
 
 ```python
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 class BybitKlineResponse(BaseModel):
     retCode: int
     retMsg: str
     result: dict
 
-    @validator('retCode')
-    def check_success(cls, v):
+    @field_validator('retCode')
+    @classmethod
+    def check_success(cls, v: int) -> int:
         if v != 0:
             raise ValueError(f"API error code: {v}")
         return v

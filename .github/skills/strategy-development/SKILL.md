@@ -101,12 +101,8 @@ Add new strategies to `backend/backtesting/strategies.py` directly (no sub-packa
 class MyStrategy(BaseStrategy):
     ...
 
-# Then register in the STRATEGY_MAP dict (if one exists in the router/engine):
-# backend/api/routers/strategy_builder/router.py or similar
-STRATEGY_MAP = {
-    # ... existing strategies ...
-    'my_strategy': MyStrategy,
-}
+# Then register in STRATEGY_REGISTRY (near end of same file):
+STRATEGY_REGISTRY["my_strategy"] = MyStrategy
 ```
 
 ## Testing Requirements
@@ -131,7 +127,7 @@ def test_my_strategy_with_missing_params():
 def test_my_strategy_preserves_data_length(sample_ohlcv):
     strategy = MyStrategy({"period": 14, "threshold": 30})
     result = strategy.generate_signals(sample_ohlcv)
-    assert len(result) == len(sample_ohlcv)
+    assert len(result.entries) == len(sample_ohlcv)  # len(result.entries), NOT len(result)
 ```
 
 ## pandas_ta Indicators

@@ -669,8 +669,8 @@ class TestCalculateTradeMetrics:
 
     def test_win_rate(self, deterministic_trades):
         m = MetricsCalculator.calculate_trade_metrics(deterministic_trades)
-        # Win rate = winning / (winning + losing) = 2/4 = 50% (breakeven excluded)
-        assert abs(m.win_rate - 50.0) < 0.01
+        # Win rate = winning / total_trades = 2/5 = 40% (TV standard: breakeven included in denominator)
+        assert abs(m.win_rate - 40.0) < 0.01
 
     def test_avg_win(self, deterministic_trades):
         m = MetricsCalculator.calculate_trade_metrics(deterministic_trades)
@@ -868,8 +868,8 @@ class TestCalculateLongShortMetrics:
 
     def test_short_win_rate(self, deterministic_trades):
         m = MetricsCalculator.calculate_long_short_metrics(deterministic_trades, 10000.0)
-        # Short trades: +150, 0 → 1 win, 0 losses, 1 breakeven → 1/(1+0) = 100%
-        assert abs(m.short_win_rate - 100.0) < 0.01
+        # Short trades: +150, 0 → 1 win, 0 losses, 1 breakeven → 1/2 = 50% (TV: total_trades denominator)
+        assert abs(m.short_win_rate - 50.0) < 0.01
 
     def test_long_net_profit(self, deterministic_trades):
         m = MetricsCalculator.calculate_long_short_metrics(deterministic_trades, 10000.0)

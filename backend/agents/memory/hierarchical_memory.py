@@ -131,6 +131,10 @@ class MemoryItem:
             created_at = datetime.fromtimestamp(created_at, tz=UTC)
         elif isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
+            # SQLite stores timestamps without timezone (e.g. "2026-03-27 20:15:00").
+            # Assume UTC when tzinfo is missing to avoid naive/aware subtraction errors.
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=UTC)
         else:
             created_at = datetime.now(UTC)
 
@@ -138,6 +142,8 @@ class MemoryItem:
             accessed_at = datetime.fromtimestamp(accessed_at, tz=UTC)
         elif isinstance(accessed_at, str):
             accessed_at = datetime.fromisoformat(accessed_at)
+            if accessed_at.tzinfo is None:
+                accessed_at = accessed_at.replace(tzinfo=UTC)
         else:
             accessed_at = datetime.now(UTC)
 

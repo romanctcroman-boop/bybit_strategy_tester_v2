@@ -43,7 +43,8 @@ export function createValidateModule({
     saveStrategy,
     showNotification,
     // eslint-disable-next-line no-unused-vars
-    escapeHtml
+    escapeHtml,
+    renderConnections
 }) {
 
     // -----------------------------------------------
@@ -318,15 +319,18 @@ export function createValidateModule({
                 if (!hasSLTP) {
                     result.warnings.push('🔴 Exit: No SL/TP block — trades have no stop-loss protection');
                 }
-                // Duplicate static_sltp blocks — only first one is used by engine
-                const sltpCount = exitBlocks.filter((b) => b.type === 'static_sltp').length;
-                if (sltpCount > 1) {
-                    result.warnings.push(`🔴 Exit: ${sltpCount} Static SL/TP blocks detected — only the first will be used`);
-                }
-                const atrExitCount = exitBlocks.filter((b) => b.type === 'atr_exit').length;
-                if (atrExitCount > 1) {
-                    result.warnings.push(`🔴 Exit: ${atrExitCount} ATR Exit blocks detected — only the first will be used`);
-                }
+                // Duplicate exit blocks — auto-remove extras, keep first
+                const removeDuplicateExitType = (type) => {
+                    const dupes = exitBlocks.filter((b) => b.type === type);
+                    if (dupes.length > 1) {
+                        dupes.slice(1).forEach((b) => {
+                            if (window.deleteBlock) window.deleteBlock(b.id);
+                        });
+                        result.warnings.push(`ℹ️ ${dupes.length - 1} duplicate ${type} block(s) removed automatically`);
+                    }
+                };
+                removeDuplicateExitType('static_sltp');
+                removeDuplicateExitType('atr_exit');
             }
 
             // ── DISCONNECTED BLOCKS ──
@@ -344,6 +348,7 @@ export function createValidateModule({
 
             // ── BLOCK PARAMETER VALIDATION ──
             let blocksWithInvalidParams = 0;
+            result.blockErrors = []; // structured: [{blockId, blockName, error}]
             blocks.forEach((block) => {
                 if (block.isMain) return;
                 const paramValidation = validateBlockParams(block);
@@ -351,19 +356,26 @@ export function createValidateModule({
                 if (!paramValidation.valid) {
                     blocksWithInvalidParams++;
                     if (paramValidation.errors.length > 0) {
-                        result.errors.push(`Block "${block.name}": ${paramValidation.errors[0]}`);
+                        result.blockErrors.push({
+                            blockId: block.id,
+                            blockName: block.name || block.type,
+                            error: paramValidation.errors[0]
+                        });
+                        result.errors.push(`Block "${block.name || block.type}": ${paramValidation.errors[0]}`);
                     }
                 }
             });
             if (blocksWithInvalidParams > 0) {
                 result.valid = false;
                 if (blocksWithInvalidParams > 1) {
-                    result.warnings.push(`${blocksWithInvalidParams} blocks have invalid parameters (hover for details)`);
+                    result.warnings.push(`${blocksWithInvalidParams} block(s) have validation errors`);
                 }
             }
 
             console.log('[ValidateModule] Validation result:', result);
             updateValidationPanel(result);
+            // Re-render wires so invalid-block connections turn red
+            if (renderConnections) renderConnections();
         } catch (error) {
             console.error('[ValidateModule] Validation error:', error);
             showNotification(`Ошибка валидации: ${error.message}`, 'error');
@@ -384,6 +396,29 @@ export function createValidateModule({
      *
      * @param {{ valid: boolean, errors: string[], warnings: string[] }} result
      */
+    /**
+     * Scroll canvas to block and flash it red to draw attention.
+     * @param {string} blockId
+     */
+    function focusBlockOnCanvas(blockId) {
+        const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
+        if (!blockEl) return;
+
+        // Scroll canvas container to center on the block
+        const canvas = document.getElementById('strategyCanvas') || blockEl.closest('.canvas-area, .canvas-container, #canvasWrapper');
+        if (canvas) {
+            const blockRect = blockEl.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            canvas.scrollLeft += blockRect.left - canvasRect.left - canvasRect.width / 2 + blockRect.width / 2;
+            canvas.scrollTop += blockRect.top - canvasRect.top - canvasRect.height / 2 + blockRect.height / 2;
+        }
+        blockEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
+        // Flash animation: pulse red 3 times
+        blockEl.classList.add('block-validation-flash');
+        setTimeout(() => blockEl.classList.remove('block-validation-flash'), 1800);
+    }
+
     function updateValidationPanel(result) {
         console.log('[ValidateModule] updateValidationPanel called');
         const status = document.getElementById('validationStatus');
@@ -410,9 +445,24 @@ export function createValidateModule({
             status.style.color = '#dc3545';
         }
 
+        // Build lookup: "Block 'name'" → blockId from structured errors
+        const blockErrorLookup = {};
+        (result.blockErrors || []).forEach(({ blockId, blockName }) => {
+            blockErrorLookup[blockName] = blockId;
+        });
+
         let html = '';
         result.errors.forEach((err) => {
-            html += `<div class="validation-item error"><i class="bi bi-x-circle"></i><span>${err}</span></div>`;
+            // Try to extract block name from format: Block "name": ...
+            const match = err.match(/^Block "([^"]+)":/);
+            const blockId = match ? blockErrorLookup[match[1]] : null;
+            if (blockId) {
+                html += `<div class="validation-item error clickable-error" data-block-id="${blockId}" style="cursor:pointer" title="Click to highlight block on canvas">` +
+                    `<i class="bi bi-x-circle"></i><span>${err}</span>` +
+                    `<i class="bi bi-crosshair" style="margin-left:auto;opacity:0.6;font-size:10px"></i></div>`;
+            } else {
+                html += `<div class="validation-item error"><i class="bi bi-x-circle"></i><span>${err}</span></div>`;
+            }
         });
         result.warnings.forEach((warn) => {
             html += `<div class="validation-item warning"><i class="bi bi-exclamation-triangle"></i><span>${warn}</span></div>`;
@@ -425,8 +475,17 @@ export function createValidateModule({
         list.style.display = 'block';
         list.style.visibility = 'visible';
 
+        // Attach click handlers to clickable error items
+        list.querySelectorAll('.clickable-error[data-block-id]').forEach((el) => {
+            el.addEventListener('click', () => focusBlockOnCanvas(el.dataset.blockId));
+        });
+
         if (result.errors.length > 0) {
-            showNotification(`Валидация не пройдена: ${result.errors[0]}`, 'error');
+            const errCount = result.errors.length;
+            const summary = errCount === 1
+                ? result.errors[0]
+                : `${errCount} ошибок — кликните на ошибку в панели чтобы найти блок`;
+            showNotification(`Валидация не пройдена: ${summary}`, 'error');
         } else if (result.warnings.length > 0) {
             showNotification(`Предупреждения: ${result.warnings[0]}`, 'warning');
         } else {

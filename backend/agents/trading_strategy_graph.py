@@ -266,15 +266,20 @@ class DebateNode(AgentNode):
         try:
             from backend.agents.consensus.real_llm_deliberation import deliberate_with_llm
 
-            debate_result = await deliberate_with_llm(
-                question=question,
-                agents=[a for a in agents if a in ("deepseek", "qwen", "perplexity")],
-                max_rounds=self._MAX_ROUNDS,
-                min_confidence=0.65,
-                symbol=symbol,
-                strategy_type="debate",
-                enrich_with_perplexity="perplexity" in agents,
-                use_memory=True,
+            # Inner timeout guards against LangGraph runner not honouring the node-level
+            # timeout=150s. The 140s budget gives 10s for cleanup before node cancellation.
+            debate_result = await asyncio.wait_for(
+                deliberate_with_llm(
+                    question=question,
+                    agents=[a for a in agents if a in ("deepseek", "qwen", "perplexity", "claude")],
+                    max_rounds=self._MAX_ROUNDS,
+                    min_confidence=0.65,
+                    symbol=symbol,
+                    strategy_type="debate",
+                    enrich_with_perplexity="perplexity" in agents,
+                    use_memory=True,
+                ),
+                timeout=140.0,
             )
 
             # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
@@ -372,15 +377,18 @@ class AnalysisDebateNode(AgentNode):
         try:
             from backend.agents.consensus.real_llm_deliberation import deliberate_with_llm
 
-            debate_result = await deliberate_with_llm(
-                question=question,
-                agents=[a for a in agents if a in ("deepseek", "qwen")],
-                max_rounds=2,  # shorter — optimizer data is structured, less ambiguity
-                min_confidence=0.60,
-                symbol=symbol,
-                strategy_type="optimizer_analysis",
-                enrich_with_perplexity=False,
-                use_memory=True,
+            debate_result = await asyncio.wait_for(
+                deliberate_with_llm(
+                    question=question,
+                    agents=[a for a in agents if a in ("deepseek", "qwen", "claude")],
+                    max_rounds=2,  # shorter — optimizer data is structured, less ambiguity
+                    min_confidence=0.60,
+                    symbol=symbol,
+                    strategy_type="optimizer_analysis",
+                    enrich_with_perplexity=False,
+                    use_memory=True,
+                ),
+                timeout=140.0,
             )
 
             # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
@@ -765,11 +773,11 @@ class GenerateStrategiesNode(AgentNode):
             logger.info(f"🔀 Self-MoA: {len(moa_texts)}/{len(self._MOA_TEMPERATURES)} DeepSeek variants succeeded")
 
             if moa_texts:
-                # QWEN critic: synthesise the best strategy from all variants
-                critic_output = await self._qwen_critic(moa_texts, market_context)
+                # Synthesis critic: Claude (preferred) → QWEN fallback → raw T=0.7
+                critic_output = await self._synthesis_critic(moa_texts, market_context)
                 if critic_output:
                     responses.append({"agent": "deepseek", "response": critic_output})
-                    logger.info("✅ QWEN critic produced synthesised DeepSeek strategy")
+                    logger.info("✅ Synthesis critic produced synthesised DeepSeek strategy")
                 else:
                     # Fallback: use the middle-temperature (T=0.7) output directly
                     mid = moa_texts[len(moa_texts) // 2]
@@ -850,6 +858,63 @@ class GenerateStrategiesNode(AgentNode):
             logger.debug(f"QWEN critic call failed: {e}")
             return None
 
+    async def _synthesis_critic(self, moa_texts: list[str], market_context: Any) -> str | None:
+        """
+        Strategy synthesis critic for Self-MoA.
+
+        Tries Claude Haiku first (superior instruction-following for structured JSON
+        synthesis), falls back to QWEN if Claude is unavailable or fails.
+        Returns None only when both providers fail — caller uses T=0.7 variant.
+        """
+        variants_block = "\n\n".join(
+            f"--- VARIANT {i + 1} (T={self._MOA_TEMPERATURES[i]:.1f}) ---\n{text}"
+            for i, text in enumerate(moa_texts)
+        )
+        critic_prompt = (
+            "You are a quantitative trading strategy critic.\n\n"
+            "Below are multiple strategy proposals for the same market context, "
+            "generated at different creativity levels.\n\n"
+            f"{variants_block}\n\n"
+            "Your task:\n"
+            "1. Identify the strongest elements from each variant\n"
+            "2. Synthesise ONE final strategy that combines the best ideas\n"
+            "3. Ensure the strategy is concrete, implementable, and risk-controlled\n"
+            "4. Output in the SAME structured JSON format as the variants\n\n"
+            "Output only the synthesised strategy JSON, no explanation."
+        )
+        system_msg = "You are a precision strategy synthesiser. Output valid JSON only."
+
+        # Claude first — better at following complex structured-output instructions
+        try:
+            result = await self._call_llm(
+                "claude",
+                critic_prompt,
+                system_msg,
+                temperature=0.3,
+            )
+            if result:
+                logger.debug("🟣 Claude synthesis critic succeeded")
+                return result
+        except Exception as e:
+            logger.debug(f"Claude synthesis critic failed, trying QWEN: {e}")
+
+        # QWEN fallback
+        try:
+            result = await self._call_llm(
+                "qwen",
+                critic_prompt,
+                system_msg,
+                temperature=0.3,
+                json_mode=True,
+            )
+            if result:
+                logger.debug("🟢 QWEN synthesis critic (fallback) succeeded")
+                return result
+        except Exception as e:
+            logger.debug(f"QWEN synthesis critic also failed: {e}")
+
+        return None
+
     async def _call_llm(
         self,
         agent_name: str,
@@ -884,6 +949,10 @@ class GenerateStrategiesNode(AgentNode):
             "deepseek": (LLMProvider.DEEPSEEK, "DEEPSEEK_API_KEY", "deepseek-chat", 0.7),
             "qwen": (LLMProvider.QWEN, "QWEN_API_KEY", "qwen-plus", 0.4),
             "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "sonar-pro", 0.7),
+            # Claude: uses Anthropic Messages API (NOT OpenAI-compatible).
+            # json_mode is handled via prompt engineering inside ClaudeClient —
+            # no response_format field is sent, so _supports_json_mode stays False.
+            "claude": (LLMProvider.ANTHROPIC, "ANTHROPIC_API_KEY", "claude-haiku-4-5-20251001", 0.7),
         }
 
         if agent_name not in provider_map:
@@ -903,7 +972,8 @@ class GenerateStrategiesNode(AgentNode):
             max_tokens=4096,
         )
         client = LLMClientFactory.create(config)
-        # json_mode is only supported by OpenAI-compatible providers
+        # json_mode is only supported by OpenAI-compatible providers.
+        # ClaudeClient silently drops json_mode (handled via prompt), so exclude here.
         _supports_json_mode = agent_name in ("deepseek", "qwen")
         try:
             messages = [
