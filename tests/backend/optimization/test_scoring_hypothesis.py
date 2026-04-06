@@ -17,6 +17,7 @@ from hypothesis import strategies as st
 
 from backend.optimization.scoring import (
     apply_custom_sort_order,
+    apply_pareto_scores,
     calculate_composite_score,
     rank_by_multi_criteria,
 )
@@ -302,3 +303,189 @@ class TestCustomSortProperties:
         """Empty sort order should return results unmodified."""
         results = [{"net_profit": 100}, {"net_profit": 200}]
         assert apply_custom_sort_order(results, []) == results
+
+
+# =============================================================================
+# Tests for apply_pareto_scores
+# =============================================================================
+
+
+class TestParetoScores:
+    """Tests for apply_pareto_scores — normalised NP / DD ranking."""
+
+    # ------------------------------------------------------------------
+    # Structural invariants
+    # ------------------------------------------------------------------
+
+    def test_empty_list_returns_empty(self):
+        """Empty input must return empty list without errors."""
+        assert apply_pareto_scores([]) == []
+
+    def test_preserves_length(self):
+        """apply_pareto_scores must not add or remove results."""
+        results = [
+            {"total_return": 10.0, "max_drawdown": 5.0, "total_trades": 20},
+            {"total_return": 50.0, "max_drawdown": 20.0, "total_trades": 60},
+            {"total_return": 5.0, "max_drawdown": 1.0, "total_trades": 10},
+        ]
+        out = apply_pareto_scores(results)
+        assert len(out) == 3
+
+    def test_adds_pareto_score_field(self):
+        """Every result must get a pareto_score field after processing."""
+        results = [
+            {"total_return": 20.0, "max_drawdown": 10.0, "total_trades": 30},
+            {"total_return": 40.0, "max_drawdown": 5.0, "total_trades": 50},
+        ]
+        apply_pareto_scores(results)
+        for r in results:
+            assert "pareto_score" in r
+            assert "score" in r
+
+    def test_score_equals_pareto_score(self):
+        """result['score'] must equal result['pareto_score'] after processing."""
+        results = [
+            {"total_return": 20.0, "max_drawdown": 10.0, "total_trades": 30},
+            {"total_return": 40.0, "max_drawdown": 5.0, "total_trades": 50},
+        ]
+        apply_pareto_scores(results)
+        for r in results:
+            assert r["score"] == r["pareto_score"]
+
+    def test_scores_are_finite(self):
+        """All pareto_scores must be finite (no NaN / inf)."""
+        import math
+
+        results = [
+            {"total_return": 0.0, "max_drawdown": 0.0, "total_trades": 0},
+            {"total_return": 100.0, "max_drawdown": 50.0, "total_trades": 100},
+            {"total_return": -5.0, "max_drawdown": 2.0, "total_trades": 5},
+        ]
+        apply_pareto_scores(results)
+        for r in results:
+            assert math.isfinite(r["pareto_score"]), f"Non-finite score: {r['pareto_score']}"
+
+    def test_sorted_best_first(self):
+        """Output list must be sorted by pareto_score descending."""
+        results = [
+            {"total_return": 10.0, "max_drawdown": 50.0, "total_trades": 30},  # bad ratio
+            {"total_return": 80.0, "max_drawdown": 8.0, "total_trades": 50},  # best ratio
+            {"total_return": 5.0, "max_drawdown": 2.0, "total_trades": 20},
+            {"total_return": 40.0, "max_drawdown": 15.0, "total_trades": 100},
+        ]
+        apply_pareto_scores(results)
+        scores = [r["pareto_score"] for r in results]
+        assert scores == sorted(scores, reverse=True)
+
+    # ------------------------------------------------------------------
+    # Domain correctness
+    # ------------------------------------------------------------------
+
+    def test_best_ratio_wins(self):
+        """High NP / low DD must beat high NP / high DD."""
+        results = [
+            {"total_return": 80.0, "max_drawdown": 8.0, "total_trades": 50},  # best ratio
+            {"total_return": 80.0, "max_drawdown": 50.0, "total_trades": 50},  # same NP, huge DD
+        ]
+        apply_pareto_scores(results)
+        # First result must be the high-ratio one (low DD)
+        assert results[0]["max_drawdown"] == 8.0
+
+    def test_single_result_gets_zero_score(self):
+        """Single-element list: range is 0, min-max norm = 0/1.0 → score = 0."""
+        results = [{"total_return": 50.0, "max_drawdown": 10.0, "total_trades": 40}]
+        apply_pareto_scores(results)
+        # np_norm = (50-50)/(1) = 0 → pareto = 0 * ... = 0
+        assert results[0]["pareto_score"] == 0.0
+
+    def test_none_values_treated_as_zero(self):
+        """None / missing fields must not raise exceptions."""
+        results = [
+            {"total_return": None, "max_drawdown": None, "total_trades": None},
+            {"total_return": 30.0, "max_drawdown": 10.0, "total_trades": 20},
+        ]
+        # Should not raise
+        apply_pareto_scores(results)
+        for r in results:
+            assert "pareto_score" in r
+
+    def test_deterministic(self):
+        """Same input must always produce the same scores."""
+        import copy
+
+        results1 = [
+            {"total_return": 20.0, "max_drawdown": 5.0, "total_trades": 30},
+            {"total_return": 60.0, "max_drawdown": 15.0, "total_trades": 80},
+            {"total_return": 10.0, "max_drawdown": 3.0, "total_trades": 15},
+        ]
+        results2 = copy.deepcopy(results1)
+        apply_pareto_scores(results1)
+        apply_pareto_scores(results2)
+        scores1 = [r["pareto_score"] for r in results1]
+        scores2 = [r["pareto_score"] for r in results2]
+        assert scores1 == scores2
+
+    @given(
+        results=st.lists(
+            st.fixed_dictionaries(
+                {
+                    "total_return": st.floats(min_value=0, max_value=1000, allow_nan=False, allow_infinity=False),
+                    "max_drawdown": st.floats(min_value=0, max_value=100, allow_nan=False, allow_infinity=False),
+                    "total_trades": st.integers(min_value=0, max_value=500),
+                }
+            ),
+            min_size=2,
+            max_size=30,
+        )
+    )
+    @settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
+    def test_property_sorted_and_finite(self, results):
+        """Property: output is always sorted best-first and all scores finite."""
+        import math
+
+        apply_pareto_scores(results)
+        scores = [r["pareto_score"] for r in results]
+        # All finite
+        for s in scores:
+            assert math.isfinite(s), f"Non-finite pareto_score: {s}"
+        # Sorted descending
+        assert scores == sorted(scores, reverse=True)
+
+    # ------------------------------------------------------------------
+    # pareto_balance in calculate_composite_score (per-result proxy)
+    # ------------------------------------------------------------------
+
+    def test_per_result_pareto_balance_is_finite(self):
+        """calculate_composite_score with 'pareto_balance' must return finite value."""
+        import math
+
+        result = {"total_return": 50.0, "max_drawdown": 10.0, "total_trades": 30}
+        score = calculate_composite_score(result, "pareto_balance")
+        assert math.isfinite(score)
+        assert score >= 0
+
+    def test_per_result_pareto_balance_zero_dd(self):
+        """Zero max_drawdown uses floor 0.1% — must not raise ZeroDivisionError."""
+        result = {"total_return": 20.0, "max_drawdown": 0.0, "total_trades": 10}
+        score = calculate_composite_score(result, "pareto_balance")
+        assert score >= 0
+
+    def test_per_result_pareto_balance_higher_np_wins(self):
+        """Higher NP with same DD must score higher per-result proxy."""
+        low = calculate_composite_score(
+            {"total_return": 10.0, "max_drawdown": 5.0, "total_trades": 20}, "pareto_balance"
+        )
+        high = calculate_composite_score(
+            {"total_return": 80.0, "max_drawdown": 5.0, "total_trades": 20}, "pareto_balance"
+        )
+        assert high > low
+
+    def test_per_result_pareto_balance_lower_dd_wins(self):
+        """Same NP with lower DD must score higher per-result proxy."""
+        high_dd = calculate_composite_score(
+            {"total_return": 50.0, "max_drawdown": 40.0, "total_trades": 30}, "pareto_balance"
+        )
+        low_dd = calculate_composite_score(
+            {"total_return": 50.0, "max_drawdown": 5.0, "total_trades": 30}, "pareto_balance"
+        )
+        assert low_dd > high_dd

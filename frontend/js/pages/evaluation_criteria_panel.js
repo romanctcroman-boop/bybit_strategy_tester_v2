@@ -270,6 +270,7 @@ class EvaluationCriteriaPanel {
                     <label class="property-label" style="cursor:pointer">
                         <i class="bi bi-sort-down"></i> Advanced: Tiebreaker Order
                         <span class="sort-count">(${this.state.sortOrder.length} levels)</span>
+                        ${this.state.sortOrder.length > 0 ? `<span class="sort-active-badge" title="Tiebreaker active — click to view">↕ ${this.state.sortOrder.length}</span>` : ''}
                     </label>
                     <button class="eval-collapse-btn" type="button">
                         <i class="bi bi-chevron-down"></i>
@@ -504,7 +505,12 @@ class EvaluationCriteriaPanel {
 
         // --- Primary metric (weighted mode) ---
         this.container.querySelector('#evalPrimaryMetricW')?.addEventListener('change', (e) => {
+            const prev = this.state.primaryMetric;
             this.state.primaryMetric = e.target.value;
+            // Remove orphaned weight for old primary if it's no longer in secondaryMetrics
+            if (prev !== this.state.primaryMetric && !this.state.secondaryMetrics.includes(prev)) {
+                delete this.state.weights[prev];
+            }
             this.updateWeightsUI();
             this.saveState();
             this.emitChange();
@@ -533,9 +539,17 @@ class EvaluationCriteriaPanel {
                 if (e.target.checked) {
                     if (!this.state.secondaryMetrics.includes(metric)) {
                         this.state.secondaryMetrics.push(metric);
+                        // Initialise weight to 1.0 if not already set
+                        if (this.state.weights[metric] === undefined) {
+                            this.state.weights[metric] = 1.0;
+                        }
                     }
                 } else {
                     this.state.secondaryMetrics = this.state.secondaryMetrics.filter(m => m !== metric);
+                    // Remove orphaned weight key — metric is no longer in the list
+                    if (metric !== this.state.primaryMetric) {
+                        delete this.state.weights[metric];
+                    }
                 }
                 this.updateWeightsUI();
                 this.saveState();
@@ -944,7 +958,7 @@ class EvaluationCriteriaPanel {
                 constraints: [],  // no hard limits — the scoring handles the trade-off
                 sortOrder: [
                     { metric: 'pareto_balance', direction: 'desc' },
-                    { metric: 'net_profit',     direction: 'desc' }   // tiebreaker: higher NP wins
+                    { metric: 'net_profit', direction: 'desc' }   // tiebreaker: higher NP wins
                 ]
             }
         };

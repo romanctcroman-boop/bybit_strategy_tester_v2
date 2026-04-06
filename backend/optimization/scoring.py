@@ -209,6 +209,8 @@ def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -
         "sortino_ratio": True,
         "calmar_ratio": True,
         "risk_adjusted_return": True,
+        "pareto_balance": True,  # normalised NP/DD ratio — higher = better
+        "pareto_score": True,  # same as pareto_balance after apply_pareto_scores()
         # Risk (lower = better)
         "max_drawdown": False,
         "avg_drawdown": False,
