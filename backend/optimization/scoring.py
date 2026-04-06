@@ -94,12 +94,92 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
         drawdown_factor = 1 + max_drawdown
         return total_return / drawdown_factor
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # pareto_balance: per-result proxy score for the Pareto-optimal NP↑ / DD↓
+    # trade-off.  Uses a robust ratio: total_return% / (max_drawdown% + ε)
+    # amplified by a log-trade bonus so thin 1-2 trade back-tests don't win.
+    #
+    # The *true* Pareto normalisation (across all candidates) is performed by
+    # apply_pareto_scores() which is called by the optimizer after the full
+    # grid is evaluated.  This per-result value is used only for early sorting
+    # and streaming progress during the sweep.
+    # ──────────────────────────────────────────────────────────────────────────
+    elif metric == "pareto_balance":
+        import math
+
+        trades = int(result.get("total_trades", 0) or 0)
+        dd_safe = max(max_drawdown_pct, 0.1)  # floor at 0.1% to avoid /0
+        trade_bonus = math.log1p(max(trades, 1))
+        raw = (total_return / dd_safe) * trade_bonus
+        return min(raw, 1e6)  # cap at 1 M
+
     # P2-5: composite quality score (AI agent strategy selection)
     elif metric == "composite_quality":
         return composite_quality_score(result)
 
     # Default — net_profit
     return net_profit
+
+
+def apply_pareto_scores(results: list[dict]) -> list[dict]:
+    """
+    Post-processing: assign a normalised Pareto-balance score to every result.
+
+    Separates the Pareto trade-off between **Net Profit** (higher = better)
+    and **Max Drawdown** (lower = better) without arbitrary hard thresholds.
+
+    Algorithm
+    ---------
+    1. Collect ``total_return`` and ``max_drawdown`` across all candidates.
+    2. Min–max normalise each to [0, 1].
+    3. ``pareto_score = np_norm / (dd_norm + ε)`` — rewards high return
+       relative to drawdown across the *entire candidate set*, not in
+       absolute terms.
+    4. Apply a log-trade bonus ``log(1 + trades)`` to penalise thin samples.
+    5. Write the result back to ``result["score"]`` and
+       ``result["pareto_score"]`` for display.
+
+    The function mutates the list in-place and returns it.
+
+    Args:
+        results: List of result dicts (already contain ``total_return``,
+                 ``max_drawdown``, ``total_trades``).
+
+    Returns:
+        Same list with ``score`` and ``pareto_score`` updated.
+    """
+    import math
+
+    if not results:
+        return results
+
+    returns = [abs(float(r.get("total_return", 0) or 0)) for r in results]
+    drawdowns = [abs(float(r.get("max_drawdown", 0) or 0)) for r in results]
+
+    min_ret, max_ret = min(returns), max(returns)
+    min_dd, max_dd = min(drawdowns), max(drawdowns)
+
+    ret_range = max_ret - min_ret if max_ret > min_ret else 1.0
+    dd_range = max_dd - min_dd if max_dd > min_dd else 1.0
+
+    EPS = 1e-6
+
+    for i, r in enumerate(results):
+        np_norm = (returns[i] - min_ret) / ret_range  # 0..1, higher=better
+        # dd_norm: 0..1, higher means WORSE drawdown → invert
+        dd_raw_norm = (drawdowns[i] - min_dd) / dd_range  # 0=best DD, 1=worst DD
+        dd_penalty = dd_raw_norm + EPS  # avoid /0
+
+        trades = int(r.get("total_trades", 0) or 0)
+        trade_bonus = math.log1p(max(trades, 1))
+
+        pareto = (np_norm / dd_penalty) * trade_bonus
+        r["pareto_score"] = round(float(pareto), 6)
+        r["score"] = r["pareto_score"]
+
+    # Sort best first (modifies list order)
+    results.sort(key=lambda x: x.get("pareto_score", 0), reverse=True)
+    return results
 
 
 def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -> list[dict]:

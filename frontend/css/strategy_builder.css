@@ -5135,6 +5135,19 @@ body.floating-window-open .zoom-controls {
     color: var(--text-primary);
 }
 
+/* Pareto Balance preset — highlighted with teal accent */
+.criteria-preset-btn-sm--highlight {
+    border-color: rgba(32, 201, 151, 0.5);
+    color: rgb(32, 201, 151);
+    font-weight: 600;
+}
+
+.criteria-preset-btn-sm--highlight:hover {
+    background: rgba(32, 201, 151, 0.15);
+    border-color: rgb(32, 201, 151);
+    color: rgb(32, 201, 151);
+}
+
 /* ── Ranking Mode Buttons ── */
 .eval-mode-buttons {
     display: flex;

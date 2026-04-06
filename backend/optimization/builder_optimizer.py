@@ -35,7 +35,7 @@ import pandas as pd
 
 from backend.config.constants import COMMISSION_TV
 from backend.optimization.filters import passes_filters
-from backend.optimization.scoring import calculate_composite_score
+from backend.optimization.scoring import apply_pareto_scores, calculate_composite_score
 
 logger = logging.getLogger(__name__)
 
@@ -1950,6 +1950,11 @@ def _run_fast_rsi_threshold_optimization(
             logger.info(f"⏹️ Fast RSI early stopping at combo {i}/{total}")
             break
 
+    # Pareto post-processing: re-score all candidates by NP/DD balance before final sort
+    if optimize_metric == "pareto_balance":
+        apply_pareto_scores(all_results)
+        apply_pareto_scores(results)
+
     results.sort(key=lambda r: r["score"], reverse=True)
     top_results = results[:max_results]
 
@@ -3398,6 +3403,11 @@ def run_builder_grid_search(
         if early_stopping and no_improvement_count >= early_stopping_patience:
             logger.info(f"⏹️ Builder early stopping at combo {i}/{total} (patience={early_stopping_patience})")
             break
+
+    # Pareto post-processing: re-score all candidates by NP/DD balance before final sort
+    if optimize_metric == "pareto_balance":
+        apply_pareto_scores(all_results)
+        apply_pareto_scores(results)
 
     # Sort results
     results.sort(key=lambda r: r["score"], reverse=True)

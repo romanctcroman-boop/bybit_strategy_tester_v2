@@ -41,7 +41,8 @@ class EvaluationCriteriaPanel {
                     cagr: { label: 'CAGR', unit: '%', direction: 'maximize' },
                     sharpe_ratio: { label: 'Sharpe Ratio', unit: '', direction: 'maximize' },
                     sortino_ratio: { label: 'Sortino Ratio', unit: '', direction: 'maximize' },
-                    calmar_ratio: { label: 'Calmar Ratio', unit: '', direction: 'maximize' }
+                    calmar_ratio: { label: 'Calmar Ratio', unit: '', direction: 'maximize' },
+                    pareto_balance: { label: '⚖️ NP/DD Balance', unit: '', direction: 'maximize', hint: 'Finds the best trade-off between Net Profit and Drawdown. No hard thresholds — optimises the ratio across all candidates.' }
                 }
             },
             risk: {
@@ -154,6 +155,9 @@ class EvaluationCriteriaPanel {
                     </button>
                     <button class="criteria-preset-btn-sm" data-preset="frequency" title="Many trades, consistent">
                         📊 Frequency
+                    </button>
+                    <button class="criteria-preset-btn-sm criteria-preset-btn-sm--highlight" data-preset="pareto" title="Automatically finds best Net Profit / Drawdown trade-off — no hard limits needed">
+                        ⚖️ NP/DD Balance
                     </button>
                 </div>
             </div>
@@ -904,6 +908,23 @@ class EvaluationCriteriaPanel {
                 sortOrder: [
                     { metric: 'profit_factor', direction: 'desc' },
                     { metric: 'total_trades', direction: 'desc' }
+                ]
+            },
+            // ──────────────────────────────────────────────────────────────────
+            // Pareto Balance: finds the best Net Profit / Drawdown trade-off
+            // without hard thresholds. Backend normalises both metrics across
+            // all candidates and ranks by the ratio. Use this when you want
+            // "maximum profit for minimum drawdown" without knowing the exact
+            // acceptable values.
+            // ──────────────────────────────────────────────────────────────────
+            pareto: {
+                rankingMode: 'single',
+                primaryMetric: 'pareto_balance',
+                balancedMetrics: ['pareto_balance', 'net_profit', 'max_drawdown'],
+                secondaryMetrics: ['net_profit', 'max_drawdown', 'total_trades'],
+                constraints: [],  // no hard limits — the scoring handles the trade-off
+                sortOrder: [
+                    { metric: 'pareto_balance', direction: 'desc' }
                 ]
             }
         };

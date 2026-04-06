@@ -1810,7 +1810,9 @@ class OptimizationPanels {
             'net_profit': 'Net Profit',
             'cagr': 'CAGR',
             'recovery_factor': 'Recovery',
-            'total_trades': 'Trades'
+            'total_trades': 'Trades',
+            'pareto_balance': '⚖️ NP/DD',
+            'pareto_score': '⚖️ NP/DD'
         };
 
         // --- Build column list ---
@@ -1901,6 +1903,10 @@ class OptimizationPanels {
             if (key === 'total_trades' || key.endsWith('period') || key.endsWith('length')) {
                 return n.toFixed(0);
             }
+            // Pareto balance score — dimensionless, show with teal colour
+            if (key === 'pareto_balance' || key === 'pareto_score') {
+                return `<span style="color:rgb(32,201,151);font-weight:600">${n.toFixed(3)}</span>`;
+            }
             // Percent keys
             if (key.includes('return') || key.includes('drawdown') || key.includes('win_rate') || key.includes('cagr')) {
                 const cls = n >= 0 ? 'opt-cell-pos' : 'opt-cell-neg';
@@ -1933,7 +1939,9 @@ class OptimizationPanels {
                 'sortino_ratio': ['Sortino', ''],
                 'expectancy': ['Exp', ''],
                 'cagr': ['CAGR', ''],
-                'recovery_factor': ['Recov', '']
+                'recovery_factor': ['Recov', ''],
+                'pareto_balance': ['⚖️ NP/DD', 'Balance'],
+                'pareto_score': ['⚖️ NP/DD', 'Score']
             };
             if (key.includes('.')) {
                 const [blockId, paramKey] = key.split('.');
