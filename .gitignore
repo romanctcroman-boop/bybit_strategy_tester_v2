@@ -327,6 +327,14 @@ complete_*.py
 collaborative_*.py
 deep_*.py
 
+# Root-level underscore-prefixed diagnostic/temp scripts (_check_*.py, _bt_stats.py …)
+_*.py
+_*.ps1
+_*.bat
+_*.txt
+_*.json
+_*.md
+
 # Investigation/debug one-off scripts in scripts/ (underscore-prefixed)
 scripts/_investigate_*.py
 scripts/_debug_*.py
