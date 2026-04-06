@@ -1,4 +1,4 @@
-{
+﻿{
   "statusLine": {
     "type": "command",
     "command": "bash /c/Users/roman/.claude/statusline-command.sh"
@@ -54,12 +54,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_files.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/protect_files.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/commission_guard.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/commission_guard.py",
             "timeout": 5
           }
         ]
@@ -71,12 +71,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/ruff_format.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/ruff_format.py",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_edit_tests.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/post_edit_tests.py",
             "timeout": 120
           }
         ]
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_failure.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/post_tool_failure.py",
             "timeout": 5
           }
         ]
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_compact_context.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/post_compact_context.py",
             "timeout": 30
           }
         ]
@@ -112,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_context.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/session_start_context.py",
             "timeout": 15
           }
         ]
@@ -124,7 +124,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_reminder.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/stop_reminder.py",
             "timeout": 5
           }
         ]
@@ -136,7 +136,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_end.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/session_end.py",
             "timeout": 5
           }
         ]
@@ -148,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/user_prompt_submit.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/user_prompt_submit.py",
             "timeout": 5
           }
         ]
@@ -160,7 +160,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/notification.py\"",
+            "command": "/c/Users/roman/AppData/Local/Programs/Python/Python314/python.exe D:/bybit_strategy_tester_v2/.claude/hooks/notification.py",
             "timeout": 10,
             "async": true
           }
@@ -169,3 +169,5 @@
     ]
   }
 }
+
+

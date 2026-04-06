@@ -58,3 +58,56 @@ pyramiding = request_params.get("pyramiding", 1)  # читается из params
 pytest tests/test_builder_optimizer.py -v
 pytest tests/backend/ -v -k "optim"
 ```
+
+---
+
+## Key optimization metrics (scoring targets)
+
+The optimizer (`scoring.py`) supports 20 metrics as objective functions. Most commonly used:
+
+| Metric            | Direction | Notes                                                                |
+| ----------------- | --------- | -------------------------------------------------------------------- |
+| `net_profit`      | higher ↑  | Absolute profit in capital currency                                  |
+| `total_return`    | higher ↑  | Return as percentage                                                 |
+| `sharpe_ratio`    | higher ↑  | Risk-adjusted return (uses `risk_free_rate`)                         |
+| `sortino_ratio`   | higher ↑  | Like Sharpe but penalizes only downside volatility                   |
+| `calmar_ratio`    | higher ↑  | `total_return / max_drawdown` — computed in scorer                   |
+| `max_drawdown`    | lower ↓   | Reported in **percent** (17.29 = 17.29%); scorer negates for sorting |
+| `win_rate`        | higher ↑  | Winning trades / total trades × 100                                  |
+| `profit_factor`   | higher ↑  | Gross profit / gross loss                                            |
+| `expectancy`      | higher ↑  | Average expected profit per trade                                    |
+| `recovery_factor` | higher ↑  | Net profit / max drawdown                                            |
+
+> `rank_by_multi_criteria()` ranks results across multiple criteria simultaneously using average-rank method.
+
+## MM parameter dependencies
+
+```
+initial_capital × position_size          → trade_value (capital per entry)
+trade_value × leverage                   → leveraged_position_value
+leveraged_position_value × commission_value  → commission (if commission_on_margin=False)
+trade_value × commission_value           → commission (TradingView style, commission_on_margin=True)
+
+stop_loss (decimal) → closes long at entry_price × (1 - stop_loss)
+take_profit (decimal)→ closes long at entry_price × (1 + take_profit)
+sl_type = 'average_price' → SL from avg entry (DCA standard)
+sl_type = 'last_order'    → SL from last DCA order price
+
+trailing_stop_activation → trailing starts when PnL > activation%
+trailing_stop_offset     → SL set at peak_price × (1 - offset%)
+
+pyramiding ≥ 2
+    → allows multiple concurrent entries
+    → close_rule = ALL/FIFO/LIFO determines close order
+
+dca_martingale_coef × position_size per level → size of each DCA order
+dca_drawdown_threshold → triggers safety close when account_drawdown > threshold%
+```
+
+## Optimization Filter Unit Mismatch (важно!)
+
+`passes_filters()` в `backend/optimization/filters.py`:
+- `max_drawdown_limit` в **request** = fraction (0.0–1.0)
+- `max_drawdown` в **result** = percentage (0–100)
+
+Не путать единицы измерения при передаче фильтров!
