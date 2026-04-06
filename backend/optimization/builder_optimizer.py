@@ -2819,14 +2819,13 @@ def build_infeasibility_checker(base_graph: dict[str, Any]):
                 return True  # infeasible
 
             if use_cross and use_long_range:
-                cross_long = float(bp.get("cross_long_level", 29))
-                long_more = float(bp.get("long_rsi_more", 0))
-                # NOTE: cross_long < long_more is NOT infeasible.
+                # NOTE: cross_long_level < long_rsi_more is NOT infeasible.
                 # oscillators.py has a conflict-resolution path that fires an "extended
                 # cross" signal when RSI enters the range from below (at long_rsi_more).
                 # Only prune the degenerate edge where cross level equals range floor
                 # and no bar movement could produce a signal.
                 # Nothing to prune here — both regions are explored by the optimizer.
+                pass
 
             if use_cross and use_short_range:
                 cross_short = float(bp.get("cross_short_level", 55))
