@@ -916,15 +916,35 @@ class EvaluationCriteriaPanel {
             // all candidates and ranks by the ratio. Use this when you want
             // "maximum profit for minimum drawdown" without knowing the exact
             // acceptable values.
+            //
+            // Secondary metrics give the full picture alongside the balance score:
+            //   net_profit      — absolute dollar return
+            //   max_drawdown    — peak-to-trough loss (the "cost" metric)
+            //   total_return    — % return (same as NP but scale-independent)
+            //   sharpe_ratio    — risk-adjusted return quality
+            //   profit_factor   — gross profit / gross loss efficiency
+            //   win_rate        — trade reliability
+            //   calmar_ratio    — CAGR / MaxDD (classic NP-DD ratio, complement)
+            //   total_trades    — statistical significance of the sample
             // ──────────────────────────────────────────────────────────────────
             pareto: {
                 rankingMode: 'single',
                 primaryMetric: 'pareto_balance',
                 balancedMetrics: ['pareto_balance', 'net_profit', 'max_drawdown'],
-                secondaryMetrics: ['net_profit', 'max_drawdown', 'total_trades'],
+                secondaryMetrics: [
+                    'net_profit',       // absolute $-return
+                    'max_drawdown',     // DD — the cost of the strategy
+                    'total_return',     // %-return (scale-independent view of NP)
+                    'sharpe_ratio',     // risk-adjusted return quality
+                    'profit_factor',    // gross profit / gross loss
+                    'win_rate',         // trade reliability
+                    'calmar_ratio',     // CAGR/MaxDD — classic complement to pareto_balance
+                    'total_trades'      // sample size for statistical confidence
+                ],
                 constraints: [],  // no hard limits — the scoring handles the trade-off
                 sortOrder: [
-                    { metric: 'pareto_balance', direction: 'desc' }
+                    { metric: 'pareto_balance', direction: 'desc' },
+                    { metric: 'net_profit',     direction: 'desc' }   // tiebreaker: higher NP wins
                 ]
             }
         };
