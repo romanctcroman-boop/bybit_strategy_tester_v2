@@ -1428,9 +1428,22 @@ class OptimizationPanels {
         const passingCount = data.results_passing_filters ?? data.results_found ?? 0;
         const fallbackUsed = data.fallback_used === true;
 
+        // Build human-readable constraint summary for fallback notification
+        const _buildConstraintSummary = () => {
+            const evalCriteria = window.evaluationCriteriaPanel?.getCriteria();
+            const constraints = evalCriteria?.constraints || [];
+            if (constraints.length === 0) return '';
+            return ' Ограничения: ' + constraints.map(c => {
+                const label = c.metric.replace(/_/g, ' ');
+                return `${label} ${c.operator} ${c.value}`;
+            }).join(', ') + '.';
+        };
+
         // Show diagnostic summary so user knows what optimizer found
         const profitStr = bestProfit !== null ? ` net_profit=${bestProfit.toFixed(2)}` : '';
-        const fallbackNote = fallbackUsed ? ' ⚠️ фильтры обнулили всё — показан лучший без фильтра' : '';
+        const fallbackNote = fallbackUsed
+            ? ` ⚠️ Ни одна комбинация не прошла фильтры.${_buildConstraintSummary()} Показан лучший без фильтра.`
+            : '';
         // Show best params concisely (e.g. "sl=2.0% tp=1.5% period=14")
         const paramStr = Object.entries(bestParams).length > 0
             ? ' | ' + Object.entries(bestParams).map(([k, v]) => {
@@ -1446,7 +1459,14 @@ class OptimizationPanels {
             fallbackUsed ? 'warning' : 'info'
         );
 
-        if (Object.keys(bestParams).length > 0) {
+        if (fallbackUsed) {
+            // Don't auto-apply params that violate constraints — user must decide
+            this.showNotification(
+                '⚠️ 0 комбинаций прошло ограничения. Параметры НЕ применены автоматически. ' +
+                'Смягчи ограничения или просмотри результаты таблицы чтобы выбрать вручную.',
+                'warning'
+            );
+        } else if (Object.keys(bestParams).length > 0) {
             this.applyBestParamsToBlocks(bestParams);
         } else if ((data.tested_combinations || 0) > 0) {
             // Optimization ran but returned 0 results — explain why
@@ -1855,7 +1875,13 @@ class OptimizationPanels {
         } else if (isLosing) {
             warningHtml = '<div class="opt-results-warning opt-results-warning--warn"><i class="bi bi-exclamation-triangle"></i> Лучший результат убыточен. Попробуйте другой период.</div>';
         } else if (fallbackUsed) {
-            warningHtml = '<div class="opt-results-warning opt-results-warning--warn"><i class="bi bi-exclamation-triangle"></i> Фильтры сняты — нет результатов прошедших Min Requirements.</div>';
+            const constraintList = (evalCriteria.constraints || []).map(c => {
+                const lbl = metricLabelMap[c.metric] || c.metric;
+                return `${lbl} ${c.operator} ${c.value}`;
+            }).join(', ');
+            const constraintStr = constraintList ? ` (${constraintList})` : '';
+            warningHtml = '<div class="opt-results-warning opt-results-warning--warn"><i class="bi bi-exclamation-triangle"></i> ' +
+                `Ни одна комбинация не прошла фильтры${constraintStr}. Показаны лучшие без фильтрации. Параметры НЕ применены.</div>`;
         }
 
         // --- Header info ---

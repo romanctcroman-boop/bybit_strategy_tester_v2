@@ -15,16 +15,28 @@
  */
 
 class EvaluationCriteriaPanel {
-    constructor(containerId = 'evaluationCriteriaSection') {
+    constructor(containerId = 'evaluationCriteriaSection', strategyId = null) {
         this.containerId = containerId;
         this.container = null;
+        // Per-strategy localStorage key so each strategy keeps its own Evaluation settings
+        const sid = strategyId || new URLSearchParams(window.location.search).get('id') || 'default';
+        this._storageKey = `evaluationCriteriaState_${sid}`;
 
         // All available metrics with categories
+        // Metrics that support unit toggle ($ ↔ %)
+        // Only metrics whose native unit is '$' need a toggle — they can be expressed as '%'.
+        // net_profit ($) ↔ total_return (%)
+        // expectancy ($) ↔ expectancy_pct (%)
+        this.unitToggleMap = {
+            net_profit: { altMetric: 'total_return', altUnit: '%' },
+            expectancy: { altMetric: 'expectancy_pct', altUnit: '%' }
+        };
+
         this.availableMetrics = {
             performance: {
                 label: 'Performance',
                 metrics: {
-                    net_profit: { label: 'Net Profit', unit: '$', direction: 'maximize' },
+                    net_profit: { label: 'Net Profit', unit: '$', direction: 'maximize', unitToggle: true },
                     total_return: { label: 'Total Return', unit: '%', direction: 'maximize' },
                     cagr: { label: 'CAGR', unit: '%', direction: 'maximize' },
                     sharpe_ratio: { label: 'Sharpe Ratio', unit: '', direction: 'maximize' },
@@ -49,7 +61,7 @@ class EvaluationCriteriaPanel {
                     profit_factor: { label: 'Profit Factor', unit: '', direction: 'maximize' },
                     avg_win: { label: 'Avg Win', unit: '%', direction: 'maximize' },
                     avg_loss: { label: 'Avg Loss', unit: '%', direction: 'minimize' },
-                    expectancy: { label: 'Expectancy', unit: '$', direction: 'maximize' },
+                    expectancy: { label: 'Expectancy', unit: '$', direction: 'maximize', unitToggle: true },
                     payoff_ratio: { label: 'Payoff Ratio', unit: '', direction: 'maximize' }
                 }
             },
@@ -73,13 +85,8 @@ class EvaluationCriteriaPanel {
             balancedMetrics: ['net_profit', 'max_drawdown'],
             // weighted mode: same as secondary + weights
             secondaryMetrics: ['win_rate', 'max_drawdown', 'profit_factor'],
-            constraints: [
-                { id: crypto.randomUUID(), metric: 'max_drawdown', operator: '<=', value: 10, unit: '%', enabled: true },
-                { id: crypto.randomUUID(), metric: 'total_trades', operator: '>=', value: 85, unit: '', enabled: true }
-            ],
-            sortOrder: [
-                { id: crypto.randomUUID(), metric: 'profit_factor', direction: 'desc' }
-            ],
+            constraints: [],
+            sortOrder: [],
             weights: {
                 sharpe_ratio: 1.0,
                 win_rate: 0.8,
@@ -371,14 +378,33 @@ class EvaluationCriteriaPanel {
 
         return this.state.constraints.map(constraint => {
             const metric = this.getMetricInfo(constraint.metric);
+            const hasToggle = metric.unitToggle === true;
+            // displayUnit stored on constraint; fallback to metric's native unit
+            const displayUnit = constraint.displayUnit || metric.unit;
+            const isAltUnit = hasToggle && displayUnit !== metric.unit;
+
+            // Direction arrow badge: ↑ for maximize, ↓ for minimize, nothing for neutral
+            const dirIcon = metric.direction === 'maximize'
+                ? '<span class="constraint-dir-badge up" title="Higher is better">↑</span>'
+                : metric.direction === 'minimize'
+                    ? '<span class="constraint-dir-badge down" title="Lower is better">↓</span>'
+                    : '';
+
+            const unitHtml = hasToggle
+                ? `<button type="button" class="constraint-unit-toggle ${isAltUnit ? 'active' : ''}" title="Switch unit: ${metric.unit} ↔ %">${displayUnit || '$'}</button>`
+                : (metric.unit ? `<span class="constraint-unit">${metric.unit}</span>` : '');
+
             return `
                 <div class="constraint-item ${constraint.enabled ? '' : 'disabled'}" data-id="${constraint.id}">
                     <label class="constraint-toggle" title="Enable/disable">
                         <input type="checkbox" class="constraint-enabled" ${constraint.enabled ? 'checked' : ''}>
                     </label>
-                    <select class="constraint-metric" title="Metric">
-                        ${this.renderConstraintMetricOptions(constraint.metric)}
-                    </select>
+                    <div class="constraint-metric-wrap">
+                        ${dirIcon}
+                        <select class="constraint-metric" title="Metric">
+                            ${this.renderConstraintMetricOptions(constraint.metric)}
+                        </select>
+                    </div>
                     <select class="constraint-operator" title="Operator">
                         <option value="<=" ${constraint.operator === '<=' ? 'selected' : ''}>≤</option>
                         <option value=">=" ${constraint.operator === '>=' ? 'selected' : ''}>≥</option>
@@ -388,8 +414,8 @@ class EvaluationCriteriaPanel {
                         <option value="!=" ${constraint.operator === '!=' ? 'selected' : ''}>≠</option>
                     </select>
                     <input type="number" class="constraint-value" value="${constraint.value}" step="any" title="Value">
-                    <span class="constraint-unit">${metric.unit}</span>
-                    <button class="constraint-remove" title="Remove">
+                    ${unitHtml}
+                    <button type="button" class="constraint-remove" title="Remove">
                         <i class="bi bi-x"></i>
                     </button>
                 </div>
@@ -539,6 +565,7 @@ class EvaluationCriteriaPanel {
             if (!item) return;
             if (e.target.closest('.constraint-remove')) {
                 this.removeConstraint(item.dataset.id);
+                return;
             }
         });
 
@@ -549,6 +576,9 @@ class EvaluationCriteriaPanel {
             this.saveState();
             this.emitChange();
         });
+
+        // Bind unit-toggle buttons directly (more reliable than delegation for buttons)
+        this._bindToggleButtons();
 
         // --- Add sort level ---
         this.container.querySelector('#btnAddEvalSort')?.addEventListener('click', () => {
@@ -627,17 +657,71 @@ class EvaluationCriteriaPanel {
         const constraint = this.state.constraints.find(c => c.id === id);
         if (!constraint) return;
 
+        const prevMetric = constraint.metric;
         constraint.enabled = item.querySelector('.constraint-enabled')?.checked ?? true;
         constraint.metric = item.querySelector('.constraint-metric')?.value || constraint.metric;
         constraint.operator = item.querySelector('.constraint-operator')?.value || constraint.operator;
         constraint.value = parseFloat(item.querySelector('.constraint-value')?.value) || 0;
 
+        // Reset displayUnit when metric changes and update direction badge
+        if (constraint.metric !== prevMetric) {
+            delete constraint.displayUnit;
+            // Re-render this row to update direction badge + toggle button presence
+            this.renderConstraintsList();
+            return;
+        }
+
         // Update unit based on metric
         const metricInfo = this.getMetricInfo(constraint.metric);
         constraint.unit = metricInfo.unit;
-        item.querySelector('.constraint-unit').textContent = metricInfo.unit;
+
+        // Update the unit toggle button or static span
+        const toggleBtn = item.querySelector('.constraint-unit-toggle');
+        const unitSpan = item.querySelector('.constraint-unit');
+        if (toggleBtn) {
+            const displayUnit = constraint.displayUnit || metricInfo.unit;
+            toggleBtn.textContent = displayUnit || '$';
+            toggleBtn.classList.toggle('active', displayUnit !== metricInfo.unit);
+        } else if (unitSpan) {
+            unitSpan.textContent = metricInfo.unit;
+        }
 
         item.classList.toggle('disabled', !constraint.enabled);
+    }
+
+    /**
+     * Toggle constraint unit between native ($) and alternative (%) for metrics
+     * that support unitToggle (net_profit, expectancy).
+     * Stores displayUnit on the constraint; getCriteria() maps it to the correct API metric.
+     */
+    _toggleConstraintUnit(item) {
+        const id = item.dataset.id;
+        const constraint = this.state.constraints.find(c => c.id === id);
+        if (!constraint) return;
+
+        const metricInfo = this.getMetricInfo(constraint.metric);
+        if (!metricInfo.unitToggle) return;
+
+        const nativeUnit = metricInfo.unit;        // e.g. '$'
+        const toggleEntry = this.unitToggleMap[constraint.metric];
+        if (!toggleEntry) return;
+
+        const altUnit = toggleEntry.altUnit;       // e.g. '%'
+        const currentDisplay = constraint.displayUnit || nativeUnit;
+
+        // Flip the unit
+        const newDisplayUnit = (currentDisplay === nativeUnit) ? altUnit : nativeUnit;
+        constraint.displayUnit = newDisplayUnit;
+
+        // Update the button text and active class immediately (no full re-render needed)
+        const btn = item.querySelector('.constraint-unit-toggle');
+        if (btn) {
+            btn.textContent = newDisplayUnit;
+            btn.classList.toggle('active', newDisplayUnit !== nativeUnit);
+        }
+
+        this.saveState();
+        this.emitChange();
     }
 
     /**
@@ -853,11 +937,43 @@ class EvaluationCriteriaPanel {
     }
 
     /**
-     * Re-render just the constraints list
+     * Bind unit-toggle buttons directly on every rendered button.
+     * Called after render() and after every renderConstraintsList().
+     * Direct binding is more reliable than event delegation for these buttons.
+     */
+    _bindToggleButtons() {
+        const list = this.container.querySelector('#evalConstraintsList');
+        if (!list) return;
+        list.querySelectorAll('.constraint-unit-toggle').forEach(btn => {
+            // Remove any previously attached listener to avoid duplicates
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const item = newBtn.closest('.constraint-item');
+                if (item) this._toggleConstraintUnit(item);
+            });
+        });
+    }
+
+    /**
+     * Re-render just the constraints list and rebind toggle buttons directly.
+     * Direct binding avoids any delegation issues (pointer-events, event bubbling).
      */
     renderConstraintsList() {
         const list = this.container.querySelector('#evalConstraintsList');
-        if (list) list.innerHTML = this.renderConstraints();
+        if (!list) return;
+        list.innerHTML = this.renderConstraints();
+        // Bind toggle buttons directly on each button element — most reliable approach
+        list.querySelectorAll('.constraint-unit-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const item = btn.closest('.constraint-item');
+                if (item) this._toggleConstraintUnit(item);
+            });
+        });
     }
 
     /**
@@ -898,7 +1014,7 @@ class EvaluationCriteriaPanel {
      * Save state to localStorage
      */
     saveState() {
-        localStorage.setItem('evaluationCriteriaState', JSON.stringify({ ...this.state, _version: 2 }));
+        localStorage.setItem(this._storageKey, JSON.stringify({ ...this.state, _version: 2 }));
     }
 
     /**
@@ -908,13 +1024,13 @@ class EvaluationCriteriaPanel {
      */
     loadSavedState() {
         const CURRENT_VERSION = 2;
-        const saved = localStorage.getItem('evaluationCriteriaState');
+        const saved = localStorage.getItem(this._storageKey);
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
                 // Discard states saved before version 2 so new defaults apply
                 if (!parsed._version || parsed._version < CURRENT_VERSION) {
-                    localStorage.removeItem('evaluationCriteriaState');
+                    localStorage.removeItem(this._storageKey);
                     return;
                 }
                 // Migration: old state had useCompositeScore but no rankingMode
@@ -966,11 +1082,18 @@ class EvaluationCriteriaPanel {
             primary_metric: this.state.primaryMetric,
             secondary_metrics: secondaryMetrics,
             ranking_mode: mode,
-            constraints: this.state.constraints.filter(c => c.enabled).map(c => ({
-                metric: c.metric,
-                operator: c.operator,
-                value: c.value
-            })),
+            constraints: this.state.constraints.filter(c => c.enabled).map(c => {
+                // If user switched a $ metric to % display, send the % variant metric name to API
+                // e.g. net_profit + displayUnit='%' → total_return
+                const metricInfo = this.getMetricInfo(c.metric);
+                const toggleEntry = metricInfo.unitToggle ? this.unitToggleMap[c.metric] : null;
+                const useAlt = toggleEntry && c.displayUnit && c.displayUnit !== metricInfo.unit;
+                return {
+                    metric: useAlt ? toggleEntry.altMetric : c.metric,
+                    operator: c.operator,
+                    value: c.value
+                };
+            }),
             sort_order: this.state.sortOrder.map(s => ({
                 metric: s.metric,
                 direction: s.direction

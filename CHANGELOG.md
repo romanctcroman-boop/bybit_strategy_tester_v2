@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **docs: CLAUDE.md refactor — reduce root file from 74.5k to ~35k characters (2026-04-06)**
+
+        Root CLAUDE.md was too large (74.5k) to fit in context efficiently. Content moved to
+        sub-directory CLAUDE.md files and new dedicated docs files. No information was deleted.
+
+        **New files created:**
+        - `tests/CLAUDE.md` — full test infrastructure docs (214 files, conftest layout,
+          test directories table, key fixtures, pytest commands, hook mapping)
+        - `docs/REFACTOR_CHECKLIST.md` — complete refactor checklist for AI agents
+          (pre-flight, high-risk params, engine/strategy/API/frontend changes, post-flight)
+
+        **Sub-directory CLAUDE.md files augmented (appended, not replaced):**
+        - `backend/backtesting/CLAUDE.md` — added: Strategy Builder graph format (JSON example),
+          full block types list, SignalResult full dataclass, built-in strategy param tables,
+          Strategy Builder block param tables, port alias mapping (_PORT_ALIASES, _SIGNAL_PORT_ALIASES),
+          timeframe key list
+        - `backend/api/CLAUDE.md` — added: warning codes table ([DIRECTION_MISMATCH], [NO_TRADES],
+          [INVALID_OHLC], [UNIVERSAL_BAR_MAGNIFIER]), direction default table (API vs engine vs builder),
+          market_type table (spot vs linear), cross-cutting parameters dependency table (7 params),
+          known inconsistencies (commission/position_size/leverage/pyramiding)
+        - `backend/optimization/CLAUDE.md` — added: key optimization metrics table (10 metrics
+          with direction), MM parameter dependencies formula block, filter unit mismatch note
+
+        **Root CLAUDE.md: replaced with single-line references:**
+        - §3 graph format + SignalResult → `backend/backtesting/CLAUDE.md`
+        - §3 direction defaults + warning codes + market_type → `backend/api/CLAUDE.md`
+        - §6 strategy params (all tables + port aliases) → `backend/backtesting/CLAUDE.md`
+        - §7 MM dependencies + optimization metrics + cross-cutting params → sub-dir files
+        - §13 test infrastructure → `tests/CLAUDE.md`
+        - §14 recent changes — kept headlines only, details → `CHANGELOG.md`
+        - §15 refactor checklist → `docs/REFACTOR_CHECKLIST.md`
+        - §16 post-2026-02-21 changes — one-liner summary
+
 - **fix(docs): infrastructure audit round 5 — deep re-audit with individual file reads (2026-04-05)**
 
         Re-audit triggered by "Слишком оптимистично" — every file read individually, not just grep-matched.

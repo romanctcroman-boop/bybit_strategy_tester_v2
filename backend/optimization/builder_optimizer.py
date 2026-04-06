@@ -1237,10 +1237,14 @@ def run_builder_backtest(
                 "gross_loss": _safe(getattr(metrics, "gross_loss", 0)),
                 "avg_win": _safe(getattr(metrics, "avg_win", 0)),
                 "avg_loss": _safe(getattr(metrics, "avg_loss", 0)),
+                # % aliases for unit-toggle constraints
+                "avg_win_pct": _safe(getattr(metrics, "avg_win", 0)),
+                "avg_loss_pct": _safe(getattr(metrics, "avg_loss", 0)),
                 "largest_win": _safe(getattr(metrics, "largest_win", 0)),
                 "largest_loss": _safe(getattr(metrics, "largest_loss", 0)),
                 "recovery_factor": _safe(getattr(metrics, "recovery_factor", 0)),
                 "expectancy": _safe(getattr(metrics, "expectancy", 0)),
+                "expectancy_pct": _safe(getattr(metrics, "expectancy_pct", 0)),
                 "sortino_ratio": _safe(getattr(metrics, "sortino_ratio", 0)),
                 "calmar_ratio": _safe(getattr(metrics, "calmar_ratio", 0)),
                 "max_drawdown_value": 0.0,
@@ -1949,10 +1953,23 @@ def _run_fast_rsi_threshold_optimization(
     results.sort(key=lambda r: r["score"], reverse=True)
     top_results = results[:max_results]
 
+    # Fallback: all results were filtered out — return best unfiltered with a warning flag
+    fallback_used = False
     if not top_results and all_results:
-        logger.warning(f"⚠️ All {len(all_results)} results filtered out. Returning best unfiltered.")
-        all_results.sort(key=lambda r: r["score"], reverse=True)
-        top_results = all_results[:max_results]
+        _min_trades_fb = config_params.get("min_trades") or 1
+        _constraints_fb = config_params.get("constraints") or []
+        logger.warning(
+            f"⚠️ Fast RSI: all {len(all_results)} results filtered out "
+            f"(min_trades={_min_trades_fb}, constraints={len(_constraints_fb)}). "
+            "Returning best unfiltered results."
+        )
+        # Apply a soft min-trades guard to avoid showing garbage 1-2 trade combos
+        _fb_candidates = [r for r in all_results if r.get("total_trades", 0) >= max(_min_trades_fb, 3)]
+        if not _fb_candidates:
+            _fb_candidates = all_results
+        _fb_candidates.sort(key=lambda r: r["score"], reverse=True)
+        top_results = _fb_candidates[:max_results]
+        fallback_used = True
 
     execution_time = time.time() - start_time
     speed = int(tested / max(execution_time, 0.001))
@@ -1993,6 +2010,9 @@ def _run_fast_rsi_threshold_optimization(
         "execution_time_seconds": round(execution_time, 2),
         "speed_combinations_per_sec": speed,
         "early_stopped": early_stopping and no_improvement_count >= early_stopping_patience,
+        "fallback_used": fallback_used,
+        "no_positive_results": bool(top_results and top_results[0].get("score", 0) < 0),
+        "optimize_metric": optimize_metric,
     }
 
 
@@ -2338,6 +2358,7 @@ def _run_dca_sltp_batch_numba(
             results.append(
                 {
                     "net_profit": _np,
+                    "net_profit_pct": _np / initial_capital * 100.0,
                     "total_return": _np / initial_capital * 100.0,
                     "max_drawdown": _dd * 100.0,
                     "win_rate": _wr * 100.0,
@@ -2350,6 +2371,13 @@ def _run_dca_sltp_batch_numba(
                     "sortino_ratio": 0.0,
                     "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
                     "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
+                    # expectancy / avg_win / avg_loss not available from Numba batch
+                    "expectancy": 0.0,
+                    "expectancy_pct": 0.0,
+                    "avg_win": 0.0,
+                    "avg_win_pct": 0.0,
+                    "avg_loss": 0.0,
+                    "avg_loss_pct": 0.0,
                 }
             )
         logger.info(f"⚡ Numba DCA batch: {n} combos done in parallel")
@@ -2563,6 +2591,7 @@ def _run_dca_mixed_batch_numba(
                 _payoff = _pf * (1.0 - _wr) / _wr if _wr > 0 else 0.0
                 results[idx] = {
                     "net_profit": _np,
+                    "net_profit_pct": _np / capital * 100.0,
                     "total_return": _np / capital * 100.0,
                     "max_drawdown": _dd * 100.0,
                     "win_rate": _wr * 100.0,
@@ -2573,6 +2602,12 @@ def _run_dca_mixed_batch_numba(
                     "sortino_ratio": 0.0,
                     "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
                     "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
+                    "expectancy": 0.0,
+                    "expectancy_pct": 0.0,
+                    "avg_win": 0.0,
+                    "avg_win_pct": 0.0,
+                    "avg_loss": 0.0,
+                    "avg_loss_pct": 0.0,
                 }
 
             # Update progress after each indicator group (called by caller via callback)
@@ -2716,10 +2751,15 @@ def _run_dca_with_signals(
             "winning_trades": int(getattr(metrics, "winning_trades", 0) or 0),
             "losing_trades": int(getattr(metrics, "losing_trades", 0) or 0),
             "net_profit": _safe(getattr(metrics, "net_profit", 0)),
+            "net_profit_pct": _safe(getattr(metrics, "total_return", 0)),
             "avg_trade": _safe(getattr(metrics, "avg_trade", 0)),
             "avg_win": _safe(getattr(metrics, "avg_win", 0)),
             "avg_loss": _safe(getattr(metrics, "avg_loss", 0)),
+            # % aliases for unit-toggle constraints
+            "avg_win_pct": _safe(getattr(metrics, "avg_win", 0)),
+            "avg_loss_pct": _safe(getattr(metrics, "avg_loss", 0)),
             "expectancy": _safe(getattr(metrics, "expectancy", 0)),
+            "expectancy_pct": _safe(getattr(metrics, "expectancy_pct", 0)),
             "sortino_ratio": _safe(getattr(metrics, "sortino_ratio", 0)),
             "calmar_ratio": _safe(getattr(metrics, "calmar_ratio", 0)),
             "payoff_ratio": _safe(getattr(metrics, "payoff_ratio", 0)),
@@ -3364,15 +3404,22 @@ def run_builder_grid_search(
     top_results = results[:max_results]
 
     # Fallback: if all results were filtered out, return top N unfiltered results
-    # This happens when strategy generates too few trades for min_trades filter
+    # This happens when constraints, min_trades, or other filters reject all combos
     fallback_used = False
     if not top_results and all_results:
+        _min_trades_gs = config_params.get("min_trades") or 1
+        _constraints_gs = config_params.get("constraints") or []
         logger.warning(
-            f"⚠️ All {len(all_results)} results filtered out (min_trades={config_params.get('min_trades')}). "
+            f"⚠️ All {len(all_results)} results filtered out "
+            f"(min_trades={_min_trades_gs}, constraints={len(_constraints_gs)}). "
             "Returning best unfiltered results."
         )
-        all_results.sort(key=lambda r: r["score"], reverse=True)
-        top_results = all_results[:max_results]
+        # Soft min-trades guard: avoid garbage 1-2 trade combos in fallback
+        _fb_candidates_gs = [r for r in all_results if r.get("total_trades", 0) >= max(_min_trades_gs, 3)]
+        if not _fb_candidates_gs:
+            _fb_candidates_gs = all_results
+        _fb_candidates_gs.sort(key=lambda r: r["score"], reverse=True)
+        top_results = _fb_candidates_gs[:max_results]
         fallback_used = True
 
     # Detect if best result has negative score for the optimize metric

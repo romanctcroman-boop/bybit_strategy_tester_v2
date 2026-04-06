@@ -5518,6 +5518,73 @@ body.floating-window-open .zoom-controls {
     min-width: 16px;
 }
 
+/* Wrapper for direction badge + metric select */
+.constraint-metric-wrap {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.constraint-metric-wrap .constraint-metric {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Direction badge: ↑ maximize (green), ↓ minimize (red/orange) */
+.constraint-dir-badge {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.constraint-dir-badge.up {
+    color: #3fb950; /* green — higher is better */
+}
+
+.constraint-dir-badge.down {
+    color: #f85149; /* red — lower is better */
+}
+
+/* Clickable unit toggle button for $ ↔ % metrics (net_profit, expectancy) */
+.constraint-unit-toggle {
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 24px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #444);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.constraint-unit-toggle:hover {
+    background: rgba(99, 163, 255, 0.12);
+    border-color: #63a3ff;
+    color: #63a3ff;
+}
+
+.constraint-unit-toggle.active {
+    background: rgba(99, 163, 255, 0.18);
+    border-color: #63a3ff;
+    color: #63a3ff;
+}
+
 .constraint-remove {
     background: transparent;
     border: none;

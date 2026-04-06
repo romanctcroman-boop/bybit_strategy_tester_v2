@@ -347,7 +347,9 @@ export function createSaveLoadModule({
                     if (window.evaluationCriteriaPanel?.state) {
                         return window.evaluationCriteriaPanel.state;
                     }
-                    const raw = localStorage.getItem('evaluationCriteriaState');
+                    // Fallback: read from per-strategy key
+                    const sid = getStrategyIdFromURL() || 'default';
+                    const raw = localStorage.getItem(`evaluationCriteriaState_${sid}`);
                     return raw ? JSON.parse(raw) : null;
                 } catch { return null; }
             })(),
@@ -672,11 +674,23 @@ export function createSaveLoadModule({
             }
 
             // Restore EvaluationCriteriaPanel state (primaryMetric, constraints, weights, sort order)
+            // evaluationCriteriaConfig is stored inside builder_graph on the server;
+            // top-level key may also be present for backward compat.
+            const evalConfig = strategy.evaluationCriteriaConfig
+                || strategy.builder_graph?.evaluationCriteriaConfig
+                || null;
+            if (evalConfig) { strategy.evaluationCriteriaConfig = evalConfig; }
             if (strategy.evaluationCriteriaConfig) {
                 try {
-                    localStorage.setItem('evaluationCriteriaState', JSON.stringify(strategy.evaluationCriteriaConfig));
-                    if (window.evaluationCriteriaPanel?.loadSavedState) {
-                        window.evaluationCriteriaPanel.loadSavedState();
+                    if (window.evaluationCriteriaPanel) {
+                        // Merge saved config into live panel state and re-render
+                        window.evaluationCriteriaPanel.state = {
+                            ...window.evaluationCriteriaPanel.state,
+                            ...strategy.evaluationCriteriaConfig
+                        };
+                        window.evaluationCriteriaPanel.render();
+                        window.evaluationCriteriaPanel.bindEvents();
+                        window.evaluationCriteriaPanel.saveState(); // persists under per-strategy key
                     }
                 } catch (e) {
                     console.warn('[SaveLoadModule] Could not restore evaluationCriteriaConfig:', e);

@@ -146,6 +146,7 @@ class CreateStrategyRequest(BaseModel):
     blocks: list[dict[str, Any]] = Field(default_factory=list)
     connections: list[dict[str, Any]] = Field(default_factory=list)
     main_strategy: dict[str, Any] | None = Field(default=None, description="Main strategy node with entry/exit signals")
+    evaluationCriteriaConfig: dict[str, Any] | None = Field(default=None, description="Evaluation criteria panel state")
 
 
 class AddBlockRequest(BaseModel):
@@ -523,6 +524,9 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
         if request.main_strategy:
             builder_graph_data["main_strategy"] = request.main_strategy  # type: ignore[assignment]
             logger.info("CREATE STRATEGY: Added main_strategy to builder_graph_data")
+        # Persist evaluation criteria panel state
+        if request.evaluationCriteriaConfig:
+            builder_graph_data["evaluationCriteriaConfig"] = request.evaluationCriteriaConfig  # type: ignore[assignment]
 
         db_strategy = Strategy(
             name=request.name,
@@ -769,12 +773,24 @@ async def update_strategy(
             _blocks_to_save = list(existing_blocks)
             _connections_to_save = db_strategy.builder_connections or []
 
-        db_strategy.builder_graph = {  # type: ignore[assignment]
+        new_builder_graph: dict[str, Any] = {
             "blocks": _blocks_to_save,
             "connections": _connections_to_save,
             "market_type": request.market_type,
             "direction": request.direction,
         }
+        # Preserve main_strategy from existing builder_graph if not in request
+        existing_graph = db_strategy.builder_graph or {}
+        if request.main_strategy:
+            new_builder_graph["main_strategy"] = request.main_strategy
+        elif existing_graph.get("main_strategy"):
+            new_builder_graph["main_strategy"] = existing_graph["main_strategy"]
+        # Persist evaluation criteria panel state (prefer request value, fallback to existing)
+        if request.evaluationCriteriaConfig is not None:
+            new_builder_graph["evaluationCriteriaConfig"] = request.evaluationCriteriaConfig
+        elif existing_graph.get("evaluationCriteriaConfig"):
+            new_builder_graph["evaluationCriteriaConfig"] = existing_graph["evaluationCriteriaConfig"]
+        db_strategy.builder_graph = new_builder_graph  # type: ignore[assignment]
         db_strategy.builder_blocks = _blocks_to_save  # type: ignore[assignment]
         db_strategy.builder_connections = _connections_to_save  # type: ignore[assignment]
 
