@@ -8,7 +8,8 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-Command",
         "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' start -AppModule backend.api.app:app -BindHost 0.0.0.0 -Port 8000 -Workers 4"
       ],
@@ -29,7 +30,8 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-Command",
         "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' stop"
       ],
@@ -41,7 +43,8 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-Command",
         "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' status"
       ],
@@ -53,7 +56,8 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-Command",
         "& '${workspaceFolder}\\scripts\\start_uvicorn.ps1' tail"
       ],
@@ -65,7 +69,9 @@
       "label": "Start Redis Server",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\start_redis.ps1",
-      "args": ["start"],
+      "args": [
+        "start"
+      ],
       "isBackground": true,
       "problemMatcher": [],
       "presentation": {
@@ -81,7 +87,9 @@
       "label": "Start Kline DB Service",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\start_kline_db_service.ps1",
-      "args": ["start"],
+      "args": [
+        "start"
+      ],
       "isBackground": true,
       "problemMatcher": [],
       "presentation": {
@@ -97,7 +105,9 @@
       "label": "Start DB Maintenance Server",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-      "args": ["start"],
+      "args": [
+        "start"
+      ],
       "isBackground": true,
       "problemMatcher": [],
       "presentation": {
@@ -113,14 +123,18 @@
       "label": "Stop DB Maintenance Server",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-      "args": ["stop"],
+      "args": [
+        "stop"
+      ],
       "problemMatcher": []
     },
     {
       "label": "DB Maintenance Status",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\start_db_maintenance.ps1",
-      "args": ["status"],
+      "args": [
+        "status"
+      ],
       "problemMatcher": []
     },
     {
@@ -164,9 +178,10 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", "${workspaceFolder}\\start_all.ps1",
-        "-NoBrowser"
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\start_all.ps1"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -218,7 +233,10 @@
       "label": "Run Database Migrations",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["${workspaceFolder}\\main.py", "migrate"],
+      "args": [
+        "${workspaceFolder}\\main.py",
+        "migrate"
+      ],
       "problemMatcher": []
     },
     {
@@ -233,7 +251,10 @@
       "label": "System Health Check",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["${workspaceFolder}\\main.py", "health"],
+      "args": [
+        "${workspaceFolder}\\main.py",
+        "health"
+      ],
       "problemMatcher": []
     },
     {
@@ -248,7 +269,8 @@
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-Command",
         "$pids = (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue).OwningProcess | Sort-Object -Unique; foreach ($p in $pids) { taskkill /F /PID $p 2>&1 }; Write-Host 'Done'"
       ],
@@ -277,7 +299,13 @@
       "label": "Run All Tests",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "pytest", "tests/", "-x", "-q"],
+      "args": [
+        "-m",
+        "pytest",
+        "tests/",
+        "-x",
+        "-q"
+      ],
       "group": {
         "kind": "test",
         "isDefault": true
@@ -288,7 +316,15 @@
       "label": "Run Tests (fast — skip slow)",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "pytest", "tests/", "-x", "-q", "-m", "not slow"],
+      "args": [
+        "-m",
+        "pytest",
+        "tests/",
+        "-x",
+        "-q",
+        "-m",
+        "not slow"
+      ],
       "group": "test",
       "problemMatcher": []
     },
@@ -296,7 +332,12 @@
       "label": "Run Engine Tests",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "pytest", "tests/backend/backtesting/test_engine.py", "-v"],
+      "args": [
+        "-m",
+        "pytest",
+        "tests/backend/backtesting/test_engine.py",
+        "-v"
+      ],
       "group": "test",
       "problemMatcher": []
     },
@@ -305,14 +346,25 @@
       "label": "Ruff Check + Fix",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "ruff", "check", ".", "--fix"],
+      "args": [
+        "-m",
+        "ruff",
+        "check",
+        ".",
+        "--fix"
+      ],
       "problemMatcher": []
     },
     {
       "label": "Ruff Format",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "ruff", "format", "."],
+      "args": [
+        "-m",
+        "ruff",
+        "format",
+        "."
+      ],
       "problemMatcher": []
     }
   ]

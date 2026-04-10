@@ -331,7 +331,7 @@ class BuilderOptimizationRequest(BaseModel):
     # Optimization method
     method: str = Field(
         default="grid_search",
-        pattern="^(grid_search|random_search|bayesian|walk_forward)$",
+        pattern="^(grid_search|random_search|bayesian|walk_forward|multi_objective)$",
         description="Optimization method",
     )
 
@@ -345,7 +345,7 @@ class BuilderOptimizationRequest(BaseModel):
     # Optimization limits
     max_iterations: int = Field(default=0, ge=0, description="Max iterations (0 = all for grid)")
     n_trials: int = Field(default=100, ge=10, le=50000, description="Optuna/random trials")
-    sampler_type: str = Field(default="tpe", description="Optuna sampler: tpe/random/cmaes")
+    sampler_type: str = Field(default="tpe", description="Optuna sampler: tpe/random/cmaes/gp/auto")
     n_jobs: int = Field(default=1, ge=1, le=32, description="Parallel Optuna workers (1=sequential)")
     timeout_seconds: int = Field(default=3600, ge=60, le=86400, description="Timeout")
     max_results: int = Field(default=20, ge=1, le=100, description="Max results to return")
@@ -369,6 +369,25 @@ class BuilderOptimizationRequest(BaseModel):
     # Filters
     constraints: list[dict] | None = Field(default=None, description="Metric constraints")
     min_trades: int | None = Field(default=None, description="Min trades filter")
+
+    # P0-2: OOS Validation (opt-in, default off)
+    run_oos_validation: bool = Field(default=False, description="Enable Out-of-Sample validation split")
+    oos_ratio: float = Field(
+        default=0.2,
+        ge=0.1,
+        le=0.4,
+        description="OOS fraction (0.1-0.4). Default 0.2 = last 20% of data.",
+    )
+
+    # P1-1: GT-Score (opt-in)
+    run_gt_score: bool = Field(default=False, description="Enable GT-Score robustness evaluation")
+    gt_score_top_n: int = Field(default=5, ge=1, le=20, description="Number of top results for GT-Score")
+    gt_score_neighbors: int = Field(default=20, ge=5, le=100, description="Number of neighbors for GT-Score")
+    gt_score_epsilon: float = Field(default=0.05, ge=0.01, le=0.2, description="Perturbation fraction for GT-Score")
+
+    # P2-1: CSCV (opt-in)
+    run_cscv: bool = Field(default=False, description="Enable CSCV overfitting validation")
+    cscv_n_splits: int = Field(default=16, ge=4, le=32, description="Number of CSCV chronological splits")
 
     @field_validator("interval")
     @classmethod
@@ -1794,13 +1813,28 @@ async def optimize_strategy(
     )
 
     # Fetch OHLCV data (cached to avoid repeated Bybit API calls within a session)
+    # Use 45-day warmup to match full backtest indicator convergence behavior.
+    # Without warmup, cold-start indicators (e.g. Supertrend) produce different signals
+    # vs the full backtest path, causing large P&L discrepancies.
+    import datetime as _dt_opt
+
     from backend.backtesting.service import BacktestService
 
-    _cache_key = (request.symbol, request.interval, request.start_date, request.end_date, request.market_type)
+    _OPT_WARMUP_DAYS = 45
+    _opt_start_date = datetime.fromisoformat(request.start_date)
+    _opt_warmup_start = _opt_start_date - _dt_opt.timedelta(days=_OPT_WARMUP_DAYS)
+
+    _cache_key = (
+        request.symbol,
+        request.interval,
+        str(_opt_warmup_start.date()),
+        request.end_date,
+        request.market_type,
+    )
     ohlcv = _get_cached_ohlcv(_cache_key)
     if ohlcv is not None:
         logger.info(
-            f"OHLCV cache hit: {request.symbol} {request.interval} {request.start_date}→{request.end_date} ({len(ohlcv)} bars)"
+            f"OHLCV cache hit: {request.symbol} {request.interval} {_opt_warmup_start.date()}→{request.end_date} ({len(ohlcv)} bars)"
         )
     else:
         service = BacktestService()
@@ -1809,7 +1843,7 @@ async def optimize_strategy(
                 service._fetch_historical_data(
                     symbol=request.symbol,
                     interval=request.interval,
-                    start_date=datetime.fromisoformat(request.start_date),
+                    start_date=_opt_warmup_start,
                     end_date=datetime.fromisoformat(request.end_date),
                     market_type=request.market_type,
                 ),
@@ -1859,6 +1893,15 @@ async def optimize_strategy(
         "weights": request.weights,
         "constraints": request.constraints,
         "min_trades": request.min_trades,
+        "warmup_cutoff": request.start_date,  # slice signals/ohlcv to start_date after warm-start compute
+        # P1-1: GT-Score config (opt-in)
+        "run_gt_score": request.run_gt_score,
+        "gt_score_top_n": request.gt_score_top_n,
+        "gt_score_neighbors": request.gt_score_neighbors,
+        "gt_score_epsilon": request.gt_score_epsilon,
+        # P2-1: CSCV config (opt-in)
+        "run_cscv": request.run_cscv,
+        "cscv_n_splits": request.cscv_n_splits,
     }
 
     # For balanced/weighted modes, collect a much larger candidate pool before
@@ -1874,14 +1917,29 @@ async def optimize_strategy(
             # Optuna Bayesian search
             custom_ranges = request.parameter_ranges or None
             # Merge to get active specs
-            from backend.optimization.builder_optimizer import _merge_ranges
+            from backend.optimization.builder_optimizer import _merge_ranges, split_ohlcv_is_oos
 
             active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            # P0-2: OOS split (opt-in via request.run_oos_validation)
+            _oos_ohlcv = None
+            _oos_split_info: dict = {}
+            if request.run_oos_validation:
+                ohlcv_for_opt, _oos_ohlcv, _oos_split_info = split_ohlcv_is_oos(
+                    ohlcv,
+                    oos_ratio=request.oos_ratio,
+                    oos_min_bars=200,
+                )
+                if _oos_split_info.get("oos_skipped"):
+                    logger.warning(f"OOS skipped: {_oos_split_info['reason']}")
+                    ohlcv_for_opt = ohlcv
+            else:
+                ohlcv_for_opt = ohlcv
 
             result = await asyncio.to_thread(
                 run_builder_optuna_search,
                 base_graph=strategy_graph,
-                ohlcv=ohlcv,
+                ohlcv=ohlcv_for_opt,
                 param_specs=active_specs,
                 config_params=config_params,
                 optimize_metric=request.optimize_metric,
@@ -1893,6 +1951,63 @@ async def optimize_strategy(
                 n_jobs=request.n_jobs,
                 strategy_id=strategy_id,
             )
+
+            # P0-2: OOS validation — re-run top results on OOS data
+            if _oos_ohlcv is not None and isinstance(result, dict) and result.get("top_results"):
+                from backend.optimization.builder_optimizer import run_oos_validation
+
+                result["top_results"] = run_oos_validation(
+                    top_results=result["top_results"],
+                    base_graph=strategy_graph,
+                    oos_ohlcv=_oos_ohlcv,
+                    config_params=config_params,
+                    oos_cutoff_ts=_oos_split_info["oos_cutoff_ts"],
+                    n_top=5,
+                )
+                result["oos_split_info"] = _oos_split_info
+
+        elif request.method == "multi_objective":
+            # P2-2: Multi-objective optimization (requires OOS split)
+            if not request.run_oos_validation:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="multi_objective method requires run_oos_validation=True (OOS split needed)",
+                )
+            from backend.optimization.builder_optimizer import (
+                _merge_ranges,
+                run_builder_optuna_multi_objective,
+                split_ohlcv_is_oos,
+            )
+
+            custom_ranges = request.parameter_ranges or None
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            is_ohlcv, oos_ohlcv, split_info = split_ohlcv_is_oos(
+                ohlcv,
+                oos_ratio=request.oos_ratio,
+            )
+            if oos_ohlcv is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Not enough data for OOS split: {split_info.get('reason', 'unknown')}",
+                )
+
+            result = await asyncio.to_thread(
+                run_builder_optuna_multi_objective,
+                base_graph=strategy_graph,
+                is_ohlcv=is_ohlcv,
+                oos_ohlcv=oos_ohlcv,
+                oos_cutoff_ts=split_info["oos_cutoff_ts"],
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_trials=request.n_trials,
+                top_n=_internal_max_results,
+                timeout_seconds=request.timeout_seconds,
+                strategy_id=strategy_id,
+            )
+            result["oos_split_info"] = split_info
         elif request.method == "walk_forward":
             # Walk-Forward Optimization
             custom_ranges = request.parameter_ranges or None
@@ -2648,6 +2763,11 @@ class BacktestRequest(BaseModel):
         description="Weekdays to block (0=Mon … 6=Sun). Unchecked in UI = trade that day.",
     )
 
+    parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Block parameter overrides in 'blockId.paramKey' format. Used to reproduce optimization results.",
+    )
+
     @field_validator("interval")
     @classmethod
     def validate_interval(cls, v: str) -> str:
@@ -2874,6 +2994,7 @@ async def run_backtest_from_builder(
         request.pyramiding,
         request.engine,
     )
+    logger.info("[BacktestRequest] parameters=%s", request.parameters)
 
     # =============================================
     # 3-PART VALIDATION: Parameters, Entry, Exit
@@ -2970,6 +3091,8 @@ async def run_backtest_from_builder(
         # Build strategy graph from DB data.
         # Fallback: if builder_blocks is NULL (strategy imported via builder_graph only),
         # use builder_graph["blocks"] and builder_graph["connections"] instead.
+        import copy as _copy
+
         _blocks = db_strategy.builder_blocks
         _connections = db_strategy.builder_connections
         if not _blocks and db_strategy.builder_graph:
@@ -2981,6 +3104,53 @@ async def run_backtest_from_builder(
                 len(_blocks or []),
                 len(_connections or []),
             )
+
+        # Apply block parameter overrides (from optimization results double-click).
+        # Format: {"blockId.paramKey": value, ...}
+        # Mirrors clone_graph_with_params() in builder_optimizer.py:
+        #   1. Writes to the same key ("params" or "config") the block already uses
+        #   2. Auto-enables RSI/MACD mode flags gated by the overridden param
+        if request.parameters:
+            _blocks = _copy.deepcopy(list(_blocks or []))
+            _applied = []
+            for param_path, value in request.parameters.items():
+                if "." in param_path:
+                    block_id, param_key = param_path.split(".", 1)
+                    _found = False
+                    for block in _blocks:
+                        if block.get("id") == block_id:
+                            # Use the same key the block already has ("params" or "config")
+                            _params_key = "params" if "params" in block else "config"
+                            if _params_key not in block or block[_params_key] is None:
+                                block[_params_key] = {}
+                            block[_params_key][param_key] = value
+                            # Auto-enable RSI mode flags (mirrors clone_graph_with_params logic)
+                            if block.get("type") == "rsi":
+                                _rp = block[_params_key]
+                                if param_key in ("cross_long_level", "cross_short_level"):
+                                    _rp["use_cross_level"] = True
+                                elif param_key == "cross_memory_bars":
+                                    _rp["use_cross_memory"] = True
+                                elif param_key in ("long_rsi_more", "long_rsi_less"):
+                                    _rp["use_long_range"] = True
+                                elif param_key in ("short_rsi_more", "short_rsi_less"):
+                                    _rp["use_short_range"] = True
+                            # Auto-enable MACD mode flags
+                            elif block.get("type") == "macd":
+                                if param_key == "macd_cross_zero_level":
+                                    block[_params_key]["use_macd_cross_zero"] = True
+                                elif param_key == "signal_memory_bars":
+                                    block[_params_key]["disable_signal_memory"] = False
+                            _applied.append(f"{block_id}.{param_key}={value}")
+                            _found = True
+                            break
+                    if not _found:
+                        logger.warning(
+                            "[BlockOverride] block_id '%s' NOT FOUND in _blocks (ids: %s)",
+                            block_id,
+                            [b.get("id") for b in _blocks],
+                        )
+            logger.info("[BlockOverride] applied %d/%d overrides: %s", len(_applied), len(request.parameters), _applied)
 
         strategy_graph: dict[str, Any] = {
             "name": db_strategy.name,
@@ -3069,7 +3239,7 @@ async def run_backtest_from_builder(
                 engine_type = "dca"
             else:
                 # Check for features that require FallbackEngineV4
-                blocks_list: list[dict[str, Any]] = db_strategy.builder_blocks or []  # type: ignore[assignment]
+                blocks_list: list[dict[str, Any]] = list(_blocks or [])  # type: ignore[assignment]
                 has_multi_tp = any(
                     block.get("type") == "take_profit" and block.get("params", {}).get("multi_levels")
                     for block in blocks_list
@@ -3151,7 +3321,7 @@ async def run_backtest_from_builder(
         # close_by_time block → max_bars_in_trade (0 = disabled)
         block_max_bars_in_trade: int = 0
 
-        for block in db_strategy.builder_blocks or []:  # type: ignore[union-attr]
+        for block in _blocks or []:  # type: ignore[union-attr]
             block_type = block.get("type", "")
             block_params = block.get("params") or block.get("config") or {}
             if block_type == "close_by_time":

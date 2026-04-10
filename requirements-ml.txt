@@ -11,6 +11,9 @@ scikit-learn>=1.4.2          # Grid/Bayes search wrappers
 
 # Bayesian optimization
 optuna>=3.6.1                # Hyperparameter optimization framework
+optunahub>=0.1.0             # OptunaHub samplers (BIPOP CMA-ES restart)
+cmaes>=0.10.0                # Required by optunahub RestartCmaEsSampler
+optuna-fast-fanova>=0.0.1    # Fast fANOVA parameter importance (Python ≤3.12 only)
 
 # Data processing
 pandas>=2.2.2

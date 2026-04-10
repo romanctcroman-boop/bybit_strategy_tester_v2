@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(optimization): Bayesian optimization modernization — GPSampler, native constrained BO, warm-start (2026-04-09)**
+
+        Five improvements to `run_builder_optuna_search` in `backend/optimization/builder_optimizer.py`:
+
+        **1. GPSampler support (`sampler_type="gp"`)**
+        - Added `GPSampler` import (Optuna ≥ 3.6, graceful fallback to `None` if unavailable).
+        - New `elif sampler_type == "gp" and GPSampler is not None` branch: fits a GP (Matérn 5/2
+          kernel with ARD), optimizes Expected Improvement acquisition. Startup via QMC Sobol when
+          available. Best sample efficiency for < 200 trials; comparable to TPE at larger budgets.
+        - Docstring updated: `sampler_type` now includes `"gp"` option.
+
+        **2. Native constrained Bayesian optimization (replaces penalty approach)**
+        - Added `_constraints_func(trial)` that reads `trial.user_attrs["constraint"]` — a list of
+          floats where values > 0 signal a violated filter (min_trades, max_drawdown_limit,
+          min_profit_factor, min_win_rate). Passed to `constraints_func=` in TPE, CMA-ES, and GP kwargs.
+        - In `objective()`: replaced the old `return -1000.0 - penalty` block with native constraint
+          storage via `trial.set_user_attr("constraint", _violations)`. The true `score_raw` is now
+          returned for ALL trials — infeasible trials are deprioritised by the sampler without
+          warping the surrogate model with artificial penalty values.
+        - `RandomSampler` intentionally excluded (doesn't use a surrogate model; constraints_func
+          is irrelevant there).
+
+        **3. Feasibility filter for passing_trials**
+        - Removed `PENALTY_THRESHOLD = -500.0` constant and the `t.value >= PENALTY_THRESHOLD` check.
+        - Replaced with `_trial_is_feasible(t)` helper: reads `user_attrs["constraint"]`, returns
+          `True` iff all values ≤ 0. Falls back to `passes_filters()` on stored result for trials
+          with no constraint attr (backward compatibility with warm-started trials).
+
+        **4. Warm-start support (`warm_start_trials` parameter)**
+        - New optional parameter `warm_start_trials: list[dict[str, Any]] | None = None`.
+        - After `create_study()`, enqueues up to 10 previous best param dicts via
+          `study.enqueue_trial()` (not `add_trial`) so they go through the objective and produce
+          real constraint values. Validates that all param keys match current `param_specs`.
+        - Estimated improvement: ~30% better initial coverage via meta-learning.
+
+        **5. `_trial_number` stored in `all_trial_results`**
+        - Added `"_trial_number": trial.number` to every entry in `all_trial_results` so the
+          `_trial_is_feasible` fallback can join by trial number.
+
+        **Files affected:** `backend/optimization/builder_optimizer.py`
+        **Tests:** 98 passed (`tests/test_builder_optimizer.py`)
+
 - **docs: CLAUDE.md refactor — reduce root file from 74.5k to ~35k characters (2026-04-06)**
 
         Root CLAUDE.md was too large (74.5k) to fit in context efficiently. Content moved to

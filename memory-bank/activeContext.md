@@ -1,11 +1,92 @@
 # Active Context — Текущая работа
 
-> Обновлено: 2026-04-05 (сессия 12)
+> Обновлено: 2026-04-10 (сессия 15)
 
 ## Текущий фокус
 
-**ИНФРАСТРУКТУРНЫЙ АУДИТ ПОЛНОСТЬЮ ЗАВЕРШЁН (Round 5 — глубокий повторный аудит).**
-Все файлы `.github/` и `.claude/` прочитаны индивидуально. Найдено и исправлено 1 противоречие.
+**Optimization system audit + bugfixes — завершён. Все баги исправлены.**
+
+## Что сделано (2026-04-10 сессия 15) — Optimization system bugfixes
+
+### Баг #1 — Scale mismatch IS/OOS (`builder_optimizer.py`)
+- Проблема: IS score хранился log-сжатым (`_compress_score`), OOS считался raw → деградация бессмысленна
+- Фикс: Модульный хелпер `_compress_score()` теперь применяется и к OOS score в `run_oos_validation` и в `objective()`
+
+### Баг #2 — NaN propagation (`scoring.py`)
+- Проблема: `float('nan') or 0` возвращает `nan` (NaN truthy в Python)
+- Фикс: Хелпер `_safe()` — корректно обрабатывает NaN/None/inf → 0.0
+
+### Баг #3 — 2-часовое зависание loguru (`builder_optimizer.py`)
+- Причина: `run_oos_validation`, IS top-N re-run, GT-Score не подавляли loguru
+- FallbackEngineV4 с `close_by_time profit_only=True` → тысячи DEBUG-строк → 21MB файл
+- Фикс: `_loguru_logger.disable("backend.backtesting") + disable("backend.core")` в `try/finally` во всех трёх фазах
+
+### Тест на RSI_ST_ETHUSDT_01
+- 20 trials BIPOP CMA-ES, 11 параметров, IS=35692 bars, OOS=8922+200 warmup
+- Завершился за **380 секунд** без зависания (было 2+ часа)
+- Файл лога: 50KB (было 21MB в 4 строки)
+- IS scores = 0 (ожидаемо: 20 trials на 11 params не покрывают пространство)
+- OOS validation отработал корректно
+
+## Следующие шаги
+- Запустить полный тест с 200+ trials если нужна реальная оптимизация
+- `_run_optimization.py` оставлен с `run_gt_score=False, run_cscv=False` для быстрых тестов
+
+## Что сделано (2026-04-10 сессия 13) — Multi-agent tech debt cleanup (5 items)
+
+### 1. `consensus_engine.py` — Configurable thresholds
+Параметры `_SIGNAL_INCLUSION_THRESHOLD`, `_MAX_CONSENSUS_SIGNALS`, `_MAX_CONSENSUS_FILTERS` теперь
+передаются в конструктор (с дефолтами от модульных констант).
+- `_merge_filters` переведён из `@staticmethod` в instance method (для доступа к `self._max_consensus_filters`)
+- Все 4 внутренних использования констант → `self._*` атрибуты
+
+### 2. `hierarchical_memory.py` — DEBUG log для shared namespace
+В `store()` добавлен `logger.debug(...)` при `agent_namespace == "shared"`:
+предупреждает о потенциальном загрязнении памяти всех агентов.
+
+### 3. `templates.py` + `prompt_engineer.py` — Selective indicator injection
+- `REGIME_INDICATOR_SECTIONS` — маппинг 5 режимов → релевантные секции индикаторов
+- `_ALWAYS_INCLUDE_SECTIONS` — секции выходов/фильтров/DCA всегда включаются
+- `filter_prompt_indicators(formatted_prompt, regime)` — постпроцессинг промпта,
+  оставляет только нужные секции (~8K → ~2-3K токенов)
+- `prompt_engineer.py`: вызов `filter_prompt_indicators()` после форматирования промпта
+
+### 4. `ai_pipeline.py` — SQLite persistence для pipeline jobs
+- `_PIPELINE_DB_PATH = "data/pipeline_jobs.db"`, WAL mode, схема `pipeline_jobs`
+- `_create_job()` / `_update_job()` — синхронизируют in-memory dict + SQLite
+- `_load_jobs_from_db()` при запуске сервера (running → "lost")
+- `_evict_stale_jobs()` вызывает `_delete_job_from_db()`
+
+### 5. Тесты
+Запущены: `tests/backend/agents/test_p1_features.py`, `test_p2_features.py`,
+`tests/backend/api/test_pipeline_streaming_hitl.py`, `tests/backend/agents/`
+Результат: exit_code=0 (все тесты прошли)
+
+## Что сделано (2026-04-10 сессия 14) — Load tests + optimizer improvements
+
+### DeepSeek prefix caching (кеш токенов)
+- `LLMResponse` — добавлены поля `prompt_cache_hit_tokens`, `prompt_cache_miss_tokens`
+- `estimated_cost` — кеш-хиты считаются по 10% цены input
+- `deepseek.py` — `_parse_response()` override, парсит `usage.prompt_cache_hit_tokens/miss`
+- 8 новых тестов в `test_llm_clients.py` (44 passed total)
+
+### Optuna MedianPruner (builder_optimizer.py)
+- Single-objective: `pruner=MedianPruner(n_startup_trials=10)` + `trial.report()` / `trial.should_prune()`
+- Multi-objective OOS: IS gate (`is_score < -1.0` → `(-inf, -inf)`) пропускает дорогой OOS при плохом IS
+
+### Load tests 100+ параллельных запросов (tests/load/test_concurrent_requests.py)
+Добавлены 4 новых класса (+14 тестов):
+- `TestConcurrentBacktestsPOST` — POST `/api/v1/backtests/` при 5/20/50 конкуренции
+- `TestConnectionPoolBehavior` — 200+ одновременных соединений, нет pool exhaustion
+- `TestSustainedLoad` — 5 волн × 50 запросов, нет деградации латентности
+- `TestRaceConditions` — одновременные read+write, нет race conditions
+- `slow_client` fixture (120 s timeout) для тестов с CPU-тяжёлыми POST запросами
+
+## Следующие задачи
+
+Отложенные (деферред) задачи:
+- `test_workflow_with_iterations` — 1 pre-existing failure (ожидает 2 итерации, получает 3)
+- Load testing под реальной нагрузкой (100+ параллельных запросов с живым сервером)
 
 ## Что сделано (2026-04-05 сессия 12) — Infrastructure Audit Round 5 (deep re-audit)
 

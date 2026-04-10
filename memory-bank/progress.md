@@ -132,6 +132,22 @@
   - `set_result` не сохранял `"rounds"` → debug script всегда показывал `Rounds: 0`
   - Fix: добавлен `"rounds": len(rounds_list)` в оба branch set_result
 
+- **Multi-agent tech debt cleanup** ✅ (2026-04-10 сессия 13)
+  - **consensus_engine.py**: `_SIGNAL_INCLUSION_THRESHOLD`, `_MAX_CONSENSUS_SIGNALS`, `_MAX_CONSENSUS_FILTERS` теперь конфигурируемы через конструктор; `_merge_filters` переведён в instance method
+  - **hierarchical_memory.py**: DEBUG log при `agent_namespace="shared"` — предупреждает о cross-agent contamination
+  - **templates.py**: `REGIME_INDICATOR_SECTIONS` + `_ALWAYS_INCLUDE_SECTIONS` + `filter_prompt_indicators()` — selective injection (~8K → ~2-3K токенов)
+  - **prompt_engineer.py**: вызов `filter_prompt_indicators()` после форматирования промпта
+  - **ai_pipeline.py**: SQLite persistence (`data/pipeline_jobs.db`, WAL) для pipeline jobs; `_create_job()`/`_update_job()` helpers; running jobs → "lost" при рестарте сервера
+  - **Тесты**: exit_code=0 (p1_features, p2_features, pipeline_streaming_hitl, agents suite)
+
+- **DeepSeek prefix caching + Optuna MedianPruner** ✅ (2026-04-10 сессия 14)
+  - **`LLMResponse`**: поля `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens` (DeepSeek KV cache)
+  - **`estimated_cost`**: cache-aware ценообразование (hit=10% от нормальной цены → -90% экономии)
+  - **`DeepSeekClient._parse_response()`**: извлекает cache метрики из `usage` + DEBUG лог экономии
+  - **`builder_optimizer.py`**: `MedianPruner(n_startup_trials=10)` в single-objective `create_study()`; `trial.report()` + `trial.should_prune()` в objective; IS gate для OOS (skip OOS если `is_score < -1.0`)
+  - **`test_prompt_ranges_match_optimizer_ranges`**: 27 passed (были уже зелёными из предыдущих сессий)
+  - 9 новых тестов в `test_llm_clients.py`
+
 ## ⚠️ Известные проблемы / Технический долг
 
 - RSI Wilder smoothing: 4-trade divergence vs TradingView (warmup limit 500 баров) — ACCEPTABLE
@@ -153,11 +169,11 @@
 ## 🚧 В процессе / Запланировано
 
 - Deferred: real API integration tests (требует live keys + data), load tests (100+ requests)
-- Deferred: fix `test_prompt_ranges_match_optimizer_ranges` (5 pre-existing) — промпт↔optimizer range sync
+- ~~Deferred: fix `test_prompt_ranges_match_optimizer_ranges`~~ — VERIFIED PASSING 27/27 (2026-04-10)
 - Deferred: fix `test_workflow_with_iterations` (1 pre-existing) — ожидает 2 итерации, получает 3
 - Deferred: multi-symbol validation (BTC+ETH+SOL параллельно)
-- Deferred: DeepSeek prefix caching (-90% токенов)
-- Deferred: Optuna MedianPruner
+- ~~Deferred: DeepSeek prefix caching~~ — DONE (2026-04-10)
+- ~~Deferred: Optuna MedianPruner~~ — DONE (2026-04-10)
 
 ## 📊 Метрики кодовой базы
 

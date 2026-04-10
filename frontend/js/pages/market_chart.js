@@ -2455,7 +2455,7 @@ function toggleCompareMode() {
 
         // Show main price scale, hide percent scale
         chart.priceScale('right').applyOptions({ visible: true });
-        try { chart.priceScale('percent').applyOptions({ visible: false }); } catch (e) { }
+        try { chart.priceScale('percent').applyOptions({ visible: false }); } catch (e) { /* cleanup - error expected */ }
 
         // Remove baseline
         removeCompareBaseline();
@@ -2485,7 +2485,7 @@ function addCompareBaseline() {
 
 function removeCompareBaseline() {
     if (compareBaseline) {
-        try { chart.removeSeries(compareBaseline); } catch (e) { }
+        try { chart.removeSeries(compareBaseline); } catch (e) { /* cleanup - error expected */ }
         compareBaseline = null;
     }
 }
@@ -2546,7 +2546,7 @@ function removeFromCompare(symbol) {
 
 function clearCompare() {
     compareSymbols.forEach(c => {
-        try { chart.removeSeries(c.series); } catch (e) { }
+        try { chart.removeSeries(c.series); } catch (e) { /* cleanup - error expected */ }
     });
     compareSymbols = [];
     removeCompareBaseline();
@@ -3726,7 +3726,7 @@ function applyVolumeIndicators() {
                     // Keep UI toggle on, but avoid crashing chart internals.
                     try {
                         chart.removeSeries(vwapSeries);
-                    } catch (_) { }
+                    } catch (_) { /* cleanup - error expected */ }
                     vwapSeries = null;
                 }
             }
@@ -3734,7 +3734,7 @@ function applyVolumeIndicators() {
     } else if (vwapSeries) {
         try {
             chart.removeSeries(vwapSeries);
-        } catch (_) { }
+        } catch (_) { /* cleanup - error expected */ }
         vwapSeries = null;
     }
 
@@ -3817,7 +3817,7 @@ function updateVolumeIndicators() {
         safeSetData(volumeSmaSeries, smaData, 'volumeSmaSeries(updateVolumeIndicators)');
     } else {
         volumeSmaSeries.applyOptions({ visible: false });
-        try { volumeSmaSeries.setData([]); } catch (_) { }
+        try { volumeSmaSeries.setData([]); } catch (_) { /* cleanup - error expected */ }
     }
 
     applyVolumeOpacity();
@@ -4333,11 +4333,11 @@ function updateHighLowLinesSync() {
     try {
         // Always remove existing lines first
         if (highPriceLine) {
-            try { candleSeries.removePriceLine(highPriceLine); } catch (e) { }
+            try { candleSeries.removePriceLine(highPriceLine); } catch (e) { /* cleanup - error expected */ }
             highPriceLine = null;
         }
         if (lowPriceLine) {
-            try { candleSeries.removePriceLine(lowPriceLine); } catch (e) { }
+            try { candleSeries.removePriceLine(lowPriceLine); } catch (e) { /* cleanup - error expected */ }
             lowPriceLine = null;
         }
 
@@ -4376,11 +4376,11 @@ async function updateHighLowLines(show) {
     try {
         // Always remove existing lines first
         if (highPriceLine) {
-            try { candleSeries.removePriceLine(highPriceLine); } catch (e) { }
+            try { candleSeries.removePriceLine(highPriceLine); } catch (e) { /* cleanup - error expected */ }
             highPriceLine = null;
         }
         if (lowPriceLine) {
-            try { candleSeries.removePriceLine(lowPriceLine); } catch (e) { }
+            try { candleSeries.removePriceLine(lowPriceLine); } catch (e) { /* cleanup - error expected */ }
             lowPriceLine = null;
         }
 
@@ -4429,7 +4429,7 @@ async function updateOpenPriceLine(show) {
 
     try {
         if (openPriceLine) {
-            try { candleSeries.removePriceLine(openPriceLine); } catch (e) { }
+            try { candleSeries.removePriceLine(openPriceLine); } catch (e) { /* cleanup - error expected */ }
             openPriceLine = null;
         }
 
@@ -4466,7 +4466,7 @@ function updateSupportResistance(show) {
     try {
         // Remove existing S/R lines
         supportResistanceLines.forEach(line => {
-            try { candleSeries.removePriceLine(line); } catch (e) { }
+            try { candleSeries.removePriceLine(line); } catch (e) { /* cleanup - error expected */ }
         });
         supportResistanceLines = [];
 
@@ -4828,11 +4828,11 @@ function showToast(message, type) {
             try {
                 el.remove();
                 if (container && container.childElementCount === 0) container.remove();
-            } catch (_) { }
+            } catch (_) { /* cleanup - error expected */ }
         }, 2500);
     } catch (e) {
         // Last resort: do not crash UI.
-        try { console.log('[Toast]', message, type); } catch (_) { }
+        try { console.log('[Toast]', message, type); } catch (_) { /* cleanup - error expected */ }
     }
 }
 
@@ -5089,7 +5089,7 @@ function triggerAlert(alert) {
     try {
         const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleAgAOIZodJaCckAVPYuoyuFGRggAUzxhfJSJe1kkL3iYsdDcX04MADdNZ4ORgnleMjZwkKvDzGBQDQArS2WAj4l9ZkQ2a4ifrsC7Wk8QACdNaIONhnhdQDZsiKO5yLNYThAAKU5ngIuIfGZDNWuJo7jLt1lPEAApT2d/ioZ7YUA1a4misci4Wk8QAClPZ3+KhXpfQDVriaGxybdaTxAAKU9nf4qFel9ANWuJobHJt1pPEAA=');
         audio.play();
-    } catch (e) { }
+    } catch (e) { /* cleanup - error expected */ }
 
     // Update badge
     updateAlertBadge();

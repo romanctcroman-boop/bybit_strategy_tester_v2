@@ -742,7 +742,7 @@ function showBackendConnectionBanner(message) {
   banner.id = 'strategy-builder-backend-banner';
   banner.setAttribute('role', 'alert');
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc3545;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-  banner.innerHTML = `<span>${escapeHtml(message)}</span><a href="http://localhost:8000/frontend/strategy-builder.html" style="color:#fff;text-decoration:underline;white-space:nowrap;">Открыть с сервера</a><button type="button" aria-label="Закрыть" style="background:transparent;border:none;color:#fff;cursor:pointer;padding:4px;font-size:18px;">&times;</button>`;
+  banner.innerHTML = `<span>${escapeHtml(message)}</span><a href="/frontend/strategy-builder.html" style="color:#fff;text-decoration:underline;white-space:nowrap;">Открыть с сервера</a><button type="button" aria-label="Закрыть" style="background:transparent;border:none;color:#fff;cursor:pointer;padding:4px;font-size:18px;">&times;</button>`;
   banner.querySelector('button').addEventListener('click', () => banner.remove());
   document.body.prepend(banner);
 }

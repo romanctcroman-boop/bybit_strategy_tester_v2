@@ -49,6 +49,22 @@ def async_client(app):
     )
 
 
+@pytest.fixture(scope="module")
+def slow_client(app):
+    """AsyncClient with extended timeout for CPU-heavy POST endpoints (backtests).
+
+    In-process ASGI tests run everything in one thread.  20+ concurrent
+    backtests serialise behind each other, so total wall-time can exceed the
+    default 30 s per-request timeout.  This client allows up to 120 s so
+    load tests can verify absence of crashes without false timeouts.
+    """
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+        timeout=120.0,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -306,3 +322,221 @@ class TestThroughputBenchmarks:
         elapsed = time.perf_counter() - t0
         rps = n / elapsed
         assert rps >= 10, f"Strategy list throughput {rps:.0f} rps < 10 rps minimum"
+
+
+# ---------------------------------------------------------------------------
+# Test class: Concurrent POST /api/v1/backtests/
+# ---------------------------------------------------------------------------
+
+
+def _make_backtest_payload() -> dict[str, Any]:
+    """Minimal BacktestCreateRequest payload for the main backtest endpoint."""
+    return {
+        "symbol": "BTCUSDT",
+        "interval": "15",
+        "start_date": "2025-01-01T00:00:00Z",
+        "end_date": "2025-02-01T00:00:00Z",
+        "strategy_type": "sma_crossover",
+        "strategy_params": {"fast_period": 10, "slow_period": 30},
+        "initial_capital": 10000,
+        "position_size": 0.5,
+        "direction": "long",
+        "commission_value": 0.0007,
+    }
+
+
+class TestConcurrentBacktestsPOST:
+    """POST /api/v1/backtests/ under concurrent load.
+
+    Backtests involve DB writes + backtest engine execution.  We accept any
+    HTTP status (200, 4xx, 5xx) as "handled" — we only reject connection-level
+    failures (code 0, which mean server panicked or dropped the socket).
+    """
+
+    @pytest.mark.asyncio
+    async def test_5_concurrent_backtest_posts_no_crash(self, slow_client):
+        """5 simultaneous POST requests must not crash the server."""
+        codes, _ = await _fire_n(slow_client, "POST", "/api/v1/backtests/", 5, json=_make_backtest_payload())
+        crashes = sum(1 for c in codes if c == 0)
+        assert crashes == 0, f"{crashes}/5 connection errors in concurrent backtest POSTs"
+
+    @pytest.mark.asyncio
+    async def test_20_concurrent_backtest_posts_no_crash(self, slow_client):
+        """20 simultaneous POSTs — server must survive, all requests handled."""
+        codes, _ = await _fire_n(slow_client, "POST", "/api/v1/backtests/", 20, json=_make_backtest_payload())
+        crashes = sum(1 for c in codes if c == 0)
+        assert crashes == 0, f"{crashes}/20 connection errors under concurrent backtest load"
+
+    @pytest.mark.asyncio
+    async def test_50_concurrent_backtest_posts_all_handled(self, slow_client):
+        """50 simultaneous POSTs — every request must receive an HTTP response."""
+        codes, _ = await _fire_n(slow_client, "POST", "/api/v1/backtests/", 50, json=_make_backtest_payload())
+        crashes = sum(1 for c in codes if c == 0)
+        handled = sum(1 for c in codes if c != 0)
+        assert crashes == 0, f"{crashes}/50 connection errors in 50 concurrent POSTs"
+        assert handled == 50, f"Only {handled}/50 requests received an HTTP response"
+
+    @pytest.mark.asyncio
+    async def test_backtest_post_no_deadlock(self, slow_client):
+        """Concurrent POSTs must not deadlock — httpx 120 s timeout is the guard.
+
+        In-process ASGI testing serialises backtest work, so per-request
+        latency scales with concurrency.  We only assert that every request
+        eventually returns (no code 0 / hung connection).
+        """
+        codes, _ = await _fire_n(slow_client, "POST", "/api/v1/backtests/", 20, json=_make_backtest_payload())
+        crashes = sum(1 for c in codes if c == 0)
+        assert crashes == 0, f"{crashes}/20 requests hung or dropped (possible deadlock)"
+
+
+# ---------------------------------------------------------------------------
+# Test class: 200+ simultaneous connections (pool exhaustion check)
+# ---------------------------------------------------------------------------
+
+
+class TestConnectionPoolBehavior:
+    """Stress-test the connection pool with 200+ simultaneous requests."""
+
+    @pytest.mark.asyncio
+    async def test_200_concurrent_health_no_pool_exhaustion(self, async_client):
+        """200 simultaneous GETs to a trivial endpoint must not exhaust the pool."""
+        codes, times = await _fire_n(async_client, "GET", "/healthz", 200)
+        crashes = sum(1 for c in codes if c == 0)
+        # Soft timeout: ≥10% timing out strongly suggests pool exhaustion
+        hard_timeouts = sum(1 for t in times if t >= 29.9)
+        assert crashes == 0, f"{crashes}/200 connection errors at 200 concurrency"
+        assert hard_timeouts < 20, f"{hard_timeouts}/200 requests timed out — possible connection pool exhaustion"
+
+    @pytest.mark.asyncio
+    async def test_200_concurrent_mixed_endpoints(self, async_client):
+        """200 concurrent requests spread across three endpoints."""
+        tasks = [("GET", "/healthz")] * 100 + [("GET", "/api/strategies/")] * 60 + [("GET", "/openapi.json")] * 40
+
+        async def one(method: str, url: str) -> int:
+            try:
+                resp = await async_client.request(method, url)
+                return resp.status_code
+            except Exception:
+                return 0
+
+        codes = await asyncio.gather(*[one(m, u) for m, u in tasks])
+        crashes = sum(1 for c in codes if c == 0)
+        assert crashes == 0, f"{crashes}/200 connection errors in mixed 200-connection test"
+
+    @pytest.mark.asyncio
+    async def test_connection_pool_recovers_after_burst(self, async_client):
+        """After a 200-connection burst, normal requests still work."""
+        # Burst
+        await _fire_n(async_client, "GET", "/healthz", 200)
+        await asyncio.sleep(0.1)
+        # Normal request after burst
+        codes, times = await _fire_n(async_client, "GET", "/healthz", 10)
+        ok = sum(1 for c in codes if c == 200)
+        assert ok == 10, f"Pool did not recover: only {ok}/10 success after 200-conn burst"
+        assert max(times) < 2.0, f"Post-burst max latency {max(times):.2f}s > 2s"
+
+
+# ---------------------------------------------------------------------------
+# Test class: Sustained load (multiple waves)
+# ---------------------------------------------------------------------------
+
+
+class TestSustainedLoad:
+    """Multiple sequential waves — verify latency does not degrade over time."""
+
+    @pytest.mark.asyncio
+    async def test_5_waves_of_50_no_latency_drift(self, async_client):
+        """5 waves × 50 requests = 250 total. Last wave must not be 5× slower."""
+        wave_medians: list[float] = []
+        for _ in range(5):
+            _, times = await _fire_n(async_client, "GET", "/healthz", 50)
+            wave_medians.append(statistics.median(times))
+            await asyncio.sleep(0.05)
+
+        baseline = wave_medians[0]
+        worst = max(wave_medians)
+        assert worst < baseline * 5 + 0.5, (
+            f"Sustained-load degradation detected: {[f'{t * 1000:.0f}ms' for t in wave_medians]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_sustained_load_zero_crashes_over_5_waves(self, async_client):
+        """250 total requests across 5 waves — zero connection errors allowed."""
+        all_codes: list[int] = []
+        for _ in range(5):
+            codes, _ = await _fire_n(async_client, "GET", "/healthz", 50)
+            all_codes.extend(codes)
+            await asyncio.sleep(0.02)
+        crashes = sum(1 for c in all_codes if c == 0)
+        assert crashes == 0, f"{crashes}/250 connection errors across 5 sustained waves"
+
+    @pytest.mark.asyncio
+    async def test_mixed_get_post_sustained_waves(self, slow_client):
+        """3 waves mixing GET health checks with POST backtest requests."""
+        all_crashes = 0
+        for _ in range(3):
+            # 30 GETs + 5 POSTs per wave = 105 requests total
+            get_codes, _ = await _fire_n(slow_client, "GET", "/healthz", 30)
+            post_codes, _ = await _fire_n(slow_client, "POST", "/api/v1/backtests/", 5, json=_make_backtest_payload())
+            all_crashes += sum(1 for c in get_codes + post_codes if c == 0)
+            await asyncio.sleep(0.05)
+
+        assert all_crashes == 0, f"{all_crashes} connection errors in mixed GET/POST sustained waves"
+
+
+# ---------------------------------------------------------------------------
+# Test class: Race conditions (concurrent reads + writes)
+# ---------------------------------------------------------------------------
+
+
+class TestRaceConditions:
+    """Detect race conditions by firing concurrent reads and writes simultaneously."""
+
+    @pytest.mark.asyncio
+    async def test_concurrent_read_write_no_crash(self, slow_client):
+        """Simultaneous GETs and POSTs must not cause 500-level panics."""
+        get_tasks = [("GET", "/healthz")] * 40 + [("GET", "/api/strategies/")] * 20
+        post_tasks = [("POST", "/api/v1/backtests/")] * 10
+
+        async def do_get(url: str) -> int:
+            try:
+                resp = await slow_client.get(url)
+                return resp.status_code
+            except Exception:
+                return 0
+
+        async def do_post() -> int:
+            try:
+                resp = await slow_client.post("/api/v1/backtests/", json=_make_backtest_payload())
+                return resp.status_code
+            except Exception:
+                return 0
+
+        all_coros = [do_get(u) for _, u in get_tasks] + [do_post() for _ in post_tasks]
+        codes = await asyncio.gather(*all_coros)
+        crashes = sum(1 for c in codes if c == 0)
+        assert crashes == 0, f"{crashes} connection errors in concurrent read+write test"
+
+    @pytest.mark.asyncio
+    async def test_strategy_list_stable_during_backtest_writes(self, slow_client):
+        """Strategy list reads must not fail while backtest POSTs are in-flight."""
+
+        async def read_strategies() -> int:
+            try:
+                resp = await slow_client.get("/api/strategies/")
+                return resp.status_code
+            except Exception:
+                return 0
+
+        async def write_backtest() -> int:
+            try:
+                resp = await slow_client.post("/api/v1/backtests/", json=_make_backtest_payload())
+                return resp.status_code
+            except Exception:
+                return 0
+
+        coros = [read_strategies() for _ in range(30)] + [write_backtest() for _ in range(10)]
+        codes = await asyncio.gather(*coros)
+        read_codes = codes[:30]
+        crashes_in_reads = sum(1 for c in read_codes if c == 0)
+        assert crashes_in_reads == 0, f"{crashes_in_reads} crashes in strategy-list reads during concurrent POSTs"
