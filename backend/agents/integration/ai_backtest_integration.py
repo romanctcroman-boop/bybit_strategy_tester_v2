@@ -264,24 +264,7 @@ Return ONLY this JSON:
 }}"""
 
     def __init__(self):
-        self._deliberation = None
-        logger.info("📊 AIBacktestAnalyzer initialized")
-
-    def _get_deliberation(self):
-        """Lazy load deliberation"""
-        if self._deliberation is None:
-            try:
-                from backend.agents.consensus.real_llm_deliberation import (
-                    get_real_deliberation,
-                )
-
-                self._deliberation = get_real_deliberation()
-            except Exception as e:
-                logger.warning(f"Could not load RealLLMDeliberation: {e}")
-                from backend.agents.consensus.deliberation import MultiAgentDeliberation
-
-                self._deliberation = MultiAgentDeliberation()
-        return self._deliberation
+        logger.info("AIBacktestAnalyzer initialized")
 
     async def analyze_backtest(
         self,
@@ -394,16 +377,12 @@ Return ONLY this JSON:
         )
 
     async def _call_llm(self, agent_type: str, prompt: str) -> str:
-        """Call LLM directly for raw response"""
+        """Call LLM directly for raw response via unified agent interface."""
         try:
-            from backend.agents.consensus.real_llm_deliberation import (
-                get_real_deliberation,
-            )
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
-            delib = get_real_deliberation()
-
-            # Use the real_ask function to call LLM directly
-            return await delib._real_ask(agent_type, prompt)
+            interface = UnifiedAgentInterface()
+            return await interface.ask(agent_type, prompt)
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             return ""
@@ -642,23 +621,7 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
 """
 
     def __init__(self):
-        self._deliberation = None
-        logger.info("🔧 AIOptimizationAnalyzer initialized")
-
-    def _get_deliberation(self):
-        """Lazy load deliberation"""
-        if self._deliberation is None:
-            try:
-                from backend.agents.consensus.real_llm_deliberation import (
-                    get_real_deliberation,
-                )
-
-                self._deliberation = get_real_deliberation()
-            except Exception:
-                from backend.agents.consensus.deliberation import MultiAgentDeliberation
-
-                self._deliberation = MultiAgentDeliberation()
-        return self._deliberation
+        logger.info("AIOptimizationAnalyzer initialized")
 
     async def analyze_optimization(
         self,
@@ -720,14 +683,12 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
         )
 
     async def _call_llm(self, agent_type: str, prompt: str) -> str:
-        """Call LLM directly for raw response"""
+        """Call LLM directly for raw response via unified agent interface."""
         try:
-            from backend.agents.consensus.real_llm_deliberation import (
-                get_real_deliberation,
-            )
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
-            delib = get_real_deliberation()
-            return await delib._real_ask(agent_type, prompt)
+            interface = UnifiedAgentInterface()
+            return await interface.ask(agent_type, prompt)
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             return ""

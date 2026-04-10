@@ -325,39 +325,5 @@ class TestGenerateStrategiesNodeWithClaude:
 
 
 # ============================================================================
-# D. DebateNode / AnalysisDebateNode agent filters
+# D. (removed) Debate agent filters — debate system removed
 # ============================================================================
-
-
-class TestDebateAgentFilter:
-    """
-    Claude must pass through the agent filter in both debate nodes.
-    The filter is embedded in DebateNode.execute() and AnalysisDebateNode.execute():
-        agents=[a for a in agents if a in ("deepseek", "qwen", "perplexity", "claude")]
-        agents=[a for a in agents if a in ("deepseek", "qwen", "claude")]
-    """
-
-    # Replicate the exact filter expressions from trading_strategy_graph.py
-    _DEBATE_ALLOWED = frozenset(("deepseek", "qwen", "perplexity", "claude"))
-    _ANALYSIS_ALLOWED = frozenset(("deepseek", "qwen", "claude"))
-
-    def test_claude_passes_debate_node_filter(self):
-        raw = ["deepseek", "claude", "unknown"]
-        filtered = [a for a in raw if a in self._DEBATE_ALLOWED]
-        assert "claude" in filtered
-
-    def test_claude_passes_analysis_debate_filter(self):
-        raw = ["deepseek", "claude", "unknown"]
-        filtered = [a for a in raw if a in self._ANALYSIS_ALLOWED]
-        assert "claude" in filtered
-
-    def test_unknown_agent_excluded_from_debate(self):
-        raw = ["unknown_provider"]
-        filtered = [a for a in raw if a in self._DEBATE_ALLOWED]
-        assert filtered == []
-
-    def test_claude_only_in_both_filters(self):
-        """claude-only agent list is non-empty after both filter expressions."""
-        raw = ["claude"]
-        assert [a for a in raw if a in self._DEBATE_ALLOWED]
-        assert [a for a in raw if a in self._ANALYSIS_ALLOWED]

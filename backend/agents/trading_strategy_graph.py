@@ -3,29 +3,27 @@ Trading Strategy LangGraph Pipeline.
 
 Builds an AgentGraph that implements the full AI strategy generation cycle:
 
-    analyze_market ──► regime_classifier ──► [debate] ──► memory_recall ──► generate_strategies ──► parse_responses
-                                                                                                               │
-                                                                                                         select_best
-                                                                                                               │
-                                                                                                         build_graph
-                                                                                                               │
-                                                                                                          backtest
-                                                                                                               │
-                                                                                               backtest_analysis ──► refine_strategy ──┐
-                                                                                                               │                       │
-                                                                                               (passes/max iter)            (back to generate)
-                                                                                                               │
-                                                                                                     optimize_strategy
-                                                                                                               │
-                                                                                                   [wf_validation]  (optional, run_wf_validation=True)
-                                                                                                               │
-                                                                                                    analysis_debate
-                                                                                                               │
-                                                                                                     ml_validation
-                                                                                                               │
-                                                                                               [hitl]  (optional, hitl_enabled=True)
-                                                                                                               │
-                                                                                                     memory_update ──► reflection ──► report ──► END
+    analyze_market ──► regime_classifier ──► memory_recall ──► generate_strategies ──► parse_responses
+                                                                                                  │
+                                                                                            select_best
+                                                                                                  │
+                                                                                            build_graph
+                                                                                                  │
+                                                                                             backtest
+                                                                                                  │
+                                                                                  backtest_analysis ──► refine_strategy ──┐
+                                                                                                  │                       │
+                                                                                  (passes/max iter)            (back to generate)
+                                                                                                  │
+                                                                                        optimize_strategy
+                                                                                                  │
+                                                                                      [wf_validation]  (optional, run_wf_validation=True)
+                                                                                                  │
+                                                                                         ml_validation
+                                                                                                  │
+                                                                                    [hitl]  (optional, hitl_enabled=True)
+                                                                                                  │
+                                                                                        memory_update ──► reflection ──► report ──► END
 
 Uses StrategyController components but in a graph-based execution model
 for better observability, retry logic, and conditional routing.
@@ -47,7 +45,6 @@ from backend.agents.langgraph_orchestrator import (
     AgentState,
     BudgetExceededError,
     ConditionalRouter,
-    EdgeType,
     FunctionAgent,
     make_sqlite_checkpointer,
     register_graph,
@@ -194,287 +191,6 @@ class RegimeClassifierNode(AgentNode):
         state.set_result(self.name, classification)
         logger.info(f"[RegimeClassifier] {regime} (adx≈{adx_proxy:.0f}, atr={atr_pct:.2f}%, conf={confidence:.0%})")
         return state
-
-
-class DebateNode(AgentNode):
-    """
-    Node 1.5 (optional): Multi-Agent Debate on market regime before strategy generation.
-
-    MAD pattern (Du et al., MIT/CMU 2023):
-    - Agents debate the market regime and best strategy direction
-    - Adaptive stopping: KS-test detects when positions have converged (p > 0.05)
-    - Max 3 rounds to avoid over-deliberation
-    - Debate consensus enriches the market context for GenerateStrategiesNode
-    - P2-2: S²-MAD cosine-similarity early stop (similarity > 0.9 → converged)
-
-    Falls back gracefully if deliberation APIs are unavailable.
-    """
-
-    _MAX_ROUNDS = 3
-    _KS_STABILITY_THRESHOLD = 0.05  # p-value above which debate is considered stable
-    _SIMILARITY_THRESHOLD = 0.90  # P2-2: cosine sim above this → responses converged
-
-    def __init__(self) -> None:
-        super().__init__(
-            name="debate",
-            description="Multi-Agent Debate with KS-test adaptive stopping + S²-MAD cosine similarity",
-            timeout=150.0,  # raised from 90s — eval runs show debate takes 84–102s
-        )
-
-    @staticmethod
-    def _cosine_similarity(a: str, b: str) -> float:
-        """
-        Bag-of-words cosine similarity between two text responses (P2-2).
-        Used to detect when debate participants have converged without LLM cost.
-        Returns 0.0–1.0; values above _SIMILARITY_THRESHOLD indicate convergence.
-        """
-        import re
-        from collections import Counter
-        from math import sqrt
-
-        tokens_a = Counter(re.findall(r"\w+", a.lower()))
-        tokens_b = Counter(re.findall(r"\w+", b.lower()))
-        all_tokens = set(tokens_a) | set(tokens_b)
-        dot = sum(tokens_a[t] * tokens_b[t] for t in all_tokens)
-        norm_a = sqrt(sum(v * v for v in tokens_a.values()))
-        norm_b = sqrt(sum(v * v for v in tokens_b.values()))
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        return dot / (norm_a * norm_b)
-
-    async def execute(self, state: AgentState) -> AgentState:
-        market_result = state.get_result("analyze_market")
-        if not market_result:
-            logger.warning("[DebateNode] No market analysis — skipping debate")
-            return state
-
-        market_context = market_result["market_context"]
-        symbol = state.context.get("symbol", "BTCUSDT")
-        agents = state.context.get("agents", ["claude"])
-
-        # P2-2: S²-MAD — check if previous debate results already converged
-        prior_debate = state.context.get("debate_consensus")
-        if prior_debate:
-            prior_texts = prior_debate.get("_participant_texts", [])
-            if len(prior_texts) >= 2:
-                sim = self._cosine_similarity(prior_texts[0], prior_texts[1])
-                if sim >= self._SIMILARITY_THRESHOLD:
-                    logger.info(
-                        f"🔁 [DebateNode] S²-MAD early stop: cosine_sim={sim:.3f} ≥ {self._SIMILARITY_THRESHOLD} — skipping re-debate"
-                    )
-                    return state
-
-        # Build debate question from market context
-        regime = getattr(market_context, "market_regime", "unknown")
-        question = (
-            f"Given current market context for {symbol} (regime: {regime}), "
-            f"what is the optimal strategy direction and risk posture? "
-            f"Should we trade long/short/both, and what risk level is appropriate?"
-        )
-
-        try:
-            from backend.agents.consensus.real_llm_deliberation import deliberate_with_llm
-
-            # Inner timeout guards against LangGraph runner not honouring the node-level
-            # timeout=150s. The 140s budget gives 10s for cleanup before node cancellation.
-            debate_result = await asyncio.wait_for(
-                deliberate_with_llm(
-                    question=question,
-                    agents=[a for a in agents if a in ("deepseek", "qwen", "perplexity", "claude")],
-                    max_rounds=self._MAX_ROUNDS,
-                    min_confidence=0.65,
-                    symbol=symbol,
-                    strategy_type="debate",
-                    enrich_with_perplexity="perplexity" in agents,
-                    use_memory=True,
-                ),
-                timeout=140.0,
-            )
-
-            # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
-            confidence = getattr(debate_result, "confidence", 0.0)
-            consensus = getattr(debate_result, "decision", "")
-
-            # P2-2: store participant texts for S²-MAD similarity check on future rounds
-            # Extract from first round opinions (DeliberationRound.opinions → AgentVote.reasoning)
-            rounds_list = getattr(debate_result, "rounds", [])
-            if rounds_list:
-                participant_texts = [v.reasoning for v in rounds_list[0].opinions if getattr(v, "reasoning", "")]
-            else:
-                participant_texts = []
-            if len(participant_texts) >= 2:
-                sim = self._cosine_similarity(participant_texts[0], participant_texts[1])
-                logger.info(f"🔁 [DebateNode] S²-MAD cosine_sim={sim:.3f} (threshold={self._SIMILARITY_THRESHOLD})")
-
-            logger.info(f"🗣️ Debate complete: confidence={confidence:.2f}, rounds={len(rounds_list)}")
-
-            # Enrich state with debate consensus for GenerateStrategiesNode
-            state.context["debate_consensus"] = {
-                "question": question,
-                "consensus": consensus,
-                "confidence": confidence,
-                "participating_agents": agents,
-                "_participant_texts": participant_texts,  # P2-2: stored for S²-MAD check
-            }
-            state.set_result(self.name, {"consensus": consensus, "confidence": confidence, "rounds": len(rounds_list)})
-            state.add_message(
-                "system",
-                f"Debate consensus (confidence={confidence:.0%}): {consensus[:200]}",
-                self.name,
-            )
-
-        except Exception as e:
-            logger.warning(f"[DebateNode] Deliberation failed (non-fatal, continuing): {e}")
-            state.set_result(self.name, {"consensus": None, "confidence": 0.0, "rounds": 0, "error": str(e)})
-
-        return state
-
-
-class AnalysisDebateNode(AgentNode):
-    """
-    Post-optimization debate node (between optimize_strategy and ml_validation).
-
-    Agents analyze the full optimizer trial array — not just the single best result —
-    to surface statistical patterns:
-    - Which parameter regions consistently produce positive Sharpe?
-    - Which params have the highest sensitivity (Spearman ρ with Sharpe)?
-    - Is the strategy structurally viable or does performance rely on lucky param choices?
-    - What concrete design changes would improve robustness?
-
-    Consensus stored in:
-    - state.context["optimizer_analysis"]  → fed into next GenerateStrategiesNode call
-    - state.results["analysis_debate"]     → surfaced in pipeline report
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            name="analysis_debate",
-            description="Agents debate optimizer trial patterns for strategy improvement",
-            timeout=150.0,  # raised from 90s — eval runs show debate takes 84–102s
-        )
-
-    async def execute(self, state: AgentState) -> AgentState:
-        opt_result = state.get_result("optimize_strategy")
-        if not opt_result:
-            logger.debug("[AnalysisDebateNode] No optimization result — skipping")
-            return state
-
-        top_trials: list[dict] = opt_result.get("top_trials", [])
-        if not top_trials:
-            logger.debug("[AnalysisDebateNode] Empty top_trials — skipping")
-            return state
-
-        param_sensitivity: dict = opt_result.get("param_sensitivity", {})
-        n_positive: int = opt_result.get("n_positive_sharpe", 0)
-        tested: int = opt_result.get("tested_combinations", 0)
-        best_sharpe: float = float(opt_result.get("best_sharpe", 0.0))
-        symbol: str = state.context.get("symbol", "BTCUSDT")
-        agents: list[str] = state.context.get("agents", ["claude"])
-
-        question = self._format_question(
-            top_trials=top_trials,
-            param_sensitivity=param_sensitivity,
-            n_positive=n_positive,
-            tested=tested,
-            best_sharpe=best_sharpe,
-            symbol=symbol,
-        )
-
-        try:
-            from backend.agents.consensus.real_llm_deliberation import deliberate_with_llm
-
-            debate_result = await asyncio.wait_for(
-                deliberate_with_llm(
-                    question=question,
-                    agents=[a for a in agents if a in ("deepseek", "qwen", "claude")],
-                    max_rounds=2,  # shorter — optimizer data is structured, less ambiguity
-                    min_confidence=0.60,
-                    symbol=symbol,
-                    strategy_type="optimizer_analysis",
-                    enrich_with_perplexity=False,
-                    use_memory=True,
-                ),
-                timeout=140.0,
-            )
-
-            # DeliberationResult uses .decision + .confidence (not .consensus_answer / .confidence_score)
-            consensus: str = getattr(debate_result, "decision", "")
-            confidence: float = getattr(debate_result, "confidence", 0.0)
-            rounds_done = len(getattr(debate_result, "rounds", []))
-
-            logger.info(
-                f"📊 [AnalysisDebateNode] Done: confidence={confidence:.2f}, rounds={rounds_done}, "
-                f"best_sharpe={best_sharpe:.2f}, n_positive={n_positive}/{len(top_trials)}"
-            )
-
-            # Store for GenerateStrategiesNode (Phase 4: close the feedback loop)
-            state.context["optimizer_analysis"] = {
-                "consensus": consensus,
-                "confidence": confidence,
-                "n_positive_sharpe": n_positive,
-                "n_trials": len(top_trials),
-                "best_sharpe": best_sharpe,
-                "top_params": top_trials[0].get("params", {}) if top_trials else {},
-                "param_sensitivity": param_sensitivity,
-            }
-            state.set_result(
-                self.name,
-                {"consensus": consensus, "confidence": confidence, "n_positive_sharpe": n_positive},
-            )
-            state.add_message(
-                "system",
-                f"Optimizer analysis (confidence={confidence:.0%}): {consensus[:200]}",
-                self.name,
-            )
-
-        except Exception as exc:
-            logger.warning(f"[AnalysisDebateNode] Analysis failed (non-fatal): {exc}")
-
-        return state
-
-    @staticmethod
-    def _format_question(
-        top_trials: list[dict],
-        param_sensitivity: dict[str, float],
-        n_positive: int,
-        tested: int,
-        best_sharpe: float,
-        symbol: str,
-    ) -> str:
-        """Format a structured debate question from the optimizer trial array."""
-        trial_lines = []
-        for i, t in enumerate(top_trials[:10]):
-            params_str = ", ".join(f"{k}={v}" for k, v in sorted(t.get("params", {}).items()))
-            trial_lines.append(
-                f"  #{i + 1}: {params_str} → sharpe={t['sharpe']:.3f}, "
-                f"trades={t['trades']}, dd={t['drawdown']:.1f}%, pf={t['profit_factor']:.2f}"
-            )
-        trial_block = "\n".join(trial_lines) if trial_lines else "  (no trial data)"
-
-        if param_sensitivity:
-            sorted_sens = sorted(param_sensitivity.items(), key=lambda x: abs(x[1]), reverse=True)
-            sens_str = ", ".join(f"{k}={v:+.3f}" for k, v in sorted_sens[:6])
-        else:
-            sens_str = "insufficient data (< 3 trials)"
-
-        pct_pos = round(n_positive / len(top_trials) * 100) if top_trials else 0
-
-        return (
-            f"Optimizer ran {tested} trials on {symbol} strategy. "
-            f"{n_positive}/{len(top_trials)} top re-run trials have positive Sharpe ({pct_pos}%). "
-            f"Best Sharpe={best_sharpe:.3f}.\n\n"
-            f"TOP 10 TRIAL RESULTS (sorted by composite score: Sharpe×50%+Sortino×30%+PF×20%):\n"
-            f"{trial_block}\n\n"
-            f"PARAM SENSITIVITY (Spearman ρ with Sharpe, range [-1,+1]):\n"
-            f"  {sens_str}\n\n"
-            f"Questions for debate:\n"
-            f"1. Which parameter values and ranges produce consistent positive Sharpe?\n"
-            f"2. Which params have the highest impact on performance (per sensitivity)?\n"
-            f"3. Is this strategy structurally viable or does it rely on lucky param choices?\n"
-            f"4. What specific design changes (new indicators, different logic, param ranges) "
-            f"would improve robustness?\n"
-            f"Provide concrete, data-backed recommendations for the next strategy generation."
-        )
 
 
 class MemoryRecallNode(AgentNode):
@@ -3416,18 +3132,17 @@ def _report_node(state: AgentState) -> AgentState:
 
 def build_trading_strategy_graph(
     run_backtest: bool = True,
-    run_debate: bool = True,
     run_wf_validation: bool = True,
     checkpoint_enabled: bool = False,
     hitl_enabled: bool = False,
     event_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    **_kwargs: Any,
 ) -> AgentGraph:
     """
     Build the full Trading Strategy generation graph.
 
     Args:
         run_backtest:       If True, includes backtest + memory_update nodes
-        run_debate:         If True, includes the MAD debate node before generation
         run_wf_validation:  If True (default), adds WalkForwardValidationNode as an
                             overfitting gate between backtest_analysis and optimize.
                             P1-2: wf_sharpe/is_sharpe < 0.5 → re-triggers refinement.
@@ -3445,28 +3160,25 @@ def build_trading_strategy_graph(
         AgentGraph ready for execution
 
     Graph structure (full):
-        analyze_market → regime_classifier → [debate ∥ memory_recall]  (P3-1: parallel)
-                                                              → generate_strategies → parse_responses
-                                                                    ↑                       │
-                                                                    │               select_best (Consensus)
-                                                                    │                       │
-                                                           refine_strategy ←           build_graph
-                                                           (iter < 3, fails)                │
-                                                                                        backtest
-                                                                                            │
-                                                                                   backtest_analysis
-                                                                                            ├── fails → refine (loop)
-                                                                                            └── passes → optimize_strategy → [wf_validation →] analysis_debate
-                                                                                                                                      ↕ refine if fails
-                                                                                                       analysis_debate  ← (AnalysisDebateNode: agents debate optimizer array)
-                                                                                                               │         ↓ optimizer_analysis → next GenerateStrategiesNode call
-                                                                                                        ml_validation
-                                                                                                               │
-                                                                                              [hitl_check →] memory_update → reflection → report → END
+        analyze_market → regime_classifier → memory_recall → grounding → generate_strategies → parse_responses
+                                                                                ↑                       │
+                                                                                │               select_best (Consensus)
+                                                                                │                       │
+                                                                       refine_strategy ←           build_graph
+                                                                       (iter < 3, fails)                │
+                                                                                                    backtest
+                                                                                                        │
+                                                                                               backtest_analysis
+                                                                                                        ├── fails → refine (loop)
+                                                                                                        └── passes → optimize_strategy → [wf_validation →] ml_validation
+                                                                                                                                                  ↕ refine if fails
+                                                                                                                  ml_validation
+                                                                                                                        │
+                                                                                                      [hitl_check →] memory_update → reflection → report → END
     """
     graph = AgentGraph(
         name="trading_strategy_pipeline",
-        description="AI-powered trading strategy generation with Self-MoA + MAD + ConsensusEngine",
+        description="AI-powered trading strategy generation with Self-MoA + ConsensusEngine",
         checkpoint_fn=make_sqlite_checkpointer() if checkpoint_enabled else None,
         event_fn=event_fn,
     )
@@ -3479,22 +3191,11 @@ def build_trading_strategy_graph(
     graph.add_node(ConsensusNode())
     graph.add_node(FunctionAgent(name="report", func=_report_node, description="Final report"))
 
-    # Chain: analyze → regime_classifier → [debate ∥ memory_recall] → generate → parse → select
-    # P3-1: debate and memory_recall are independent (both only read analyze_market results)
-    # — run them in parallel to save ~10-15 s per pipeline run.
+    # Chain: analyze → regime_classifier → memory_recall → grounding → generate → parse → select
     graph.add_edge("analyze_market", "regime_classifier")
     graph.add_node(MemoryRecallNode())
     graph.add_node(GroundingNode())
-    if run_debate:
-        graph.add_node(DebateNode())
-        graph.add_edge(
-            "regime_classifier",
-            ["debate", "memory_recall"],
-            edge_type=EdgeType.PARALLEL,
-        )
-        graph.add_edge("debate", "grounding")
-    else:
-        graph.add_edge("regime_classifier", "memory_recall")
+    graph.add_edge("regime_classifier", "memory_recall")
     graph.add_edge("memory_recall", "grounding")
     graph.add_edge("grounding", "generate_strategies")
 
@@ -3513,12 +3214,16 @@ def build_trading_strategy_graph(
         graph.add_edge("build_graph", "backtest")
         graph.add_edge("backtest", "backtest_analysis")
 
-        # backtest_analysis → [refine | optimize_strategy] (both WF and no-WF paths go to optimizer first)
+        # backtest_analysis → [refine | optimize_strategy]
         backtest_router = ConditionalRouter(name="backtest_router")
         backtest_router.add_route(_should_refine, "refine_strategy")
         backtest_router.set_default("optimize_strategy")
         graph.add_conditional_edges("backtest_analysis", backtest_router)
 
+        # After refinement, loop back to regenerate strategies
+        graph.add_edge("refine_strategy", "generate_strategies")
+
+        graph.add_node(MLValidationNode())
         if run_wf_validation:
             # P1-2: walk-forward gate AFTER optimization — WF validates optimized params,
             # not raw IS params.  OptimizationNode stores best_params in state.context
@@ -3526,20 +3231,11 @@ def build_trading_strategy_graph(
             graph.add_node(WalkForwardValidationNode())
             wf_router = ConditionalRouter(name="wf_router")
             wf_router.add_route(_should_refine, "refine_strategy")
-            wf_router.set_default("analysis_debate")
+            wf_router.set_default("ml_validation")
             graph.add_conditional_edges("wf_validation", wf_router)
-
-        # After refinement, loop back to regenerate strategies
-        graph.add_edge("refine_strategy", "generate_strategies")
-
-        # Optimization → [wf_validation if enabled, else analysis_debate] → ML validation
-        graph.add_node(AnalysisDebateNode())
-        graph.add_node(MLValidationNode())
-        if run_wf_validation:
             graph.add_edge("optimize_strategy", "wf_validation")  # WF validates optimized params
         else:
-            graph.add_edge("optimize_strategy", "analysis_debate")
-        graph.add_edge("analysis_debate", "ml_validation")
+            graph.add_edge("optimize_strategy", "ml_validation")
 
         if hitl_enabled:
             # P2-3: HITL checkpoint before memory_update
@@ -3574,7 +3270,6 @@ async def run_strategy_pipeline(
     df: pd.DataFrame,
     agents: list[str] | None = None,
     run_backtest: bool = False,
-    run_debate: bool = True,
     run_wf_validation: bool = True,
     initial_capital: float = INITIAL_CAPITAL,
     leverage: int = 1,
@@ -3585,6 +3280,7 @@ async def run_strategy_pipeline(
     hitl_approved: bool = False,
     event_fn: Callable[[str, dict[str, Any]], None] | None = None,
     seed_graph: dict[str, Any] | None = None,
+    **_kwargs: Any,
 ) -> AgentState:
     """
     Convenience function to run the full strategy generation pipeline.
@@ -3593,9 +3289,8 @@ async def run_strategy_pipeline(
         symbol: Trading pair (e.g. "BTCUSDT")
         timeframe: Candle interval (e.g. "15")
         df: OHLCV DataFrame
-        agents: LLM agents to use (default: ["deepseek"])
+        agents: LLM agents to use (default: ["claude"])
         run_backtest: Whether to backtest the generated strategy
-        run_debate: Whether to run MAD debate before generation (default: True)
         run_wf_validation: Whether to run walk-forward overfitting gate (P1-2, default True)
         initial_capital: Starting capital
         leverage: Trading leverage
@@ -3619,15 +3314,14 @@ async def run_strategy_pipeline(
         seed_graph: Existing Strategy Builder graph dict (blocks + connections).
             When provided, skips LLM generation and runs the pipeline in
             "analysis mode": analyze_market → regime → backtest the existing
-            graph → analyze → debate/refine/optimize → report.
-            Useful for: "I have a strategy — let agents analyse, debate and improve it."
+            graph → analyze → refine/optimize → report.
+            Useful for: "I have a strategy — let agents analyse and improve it."
 
     Returns:
         AgentState with all results in state.results
     """
     graph = build_trading_strategy_graph(
         run_backtest=run_backtest,
-        run_debate=run_debate,
         run_wf_validation=run_wf_validation,
         checkpoint_enabled=checkpoint_enabled,
         hitl_enabled=hitl_enabled,

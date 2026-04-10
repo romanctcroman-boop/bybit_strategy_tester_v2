@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
+import sqlite3
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -26,7 +29,8 @@ from pydantic import BaseModel, Field
 
 from backend.services.distributed_lock import get_distributed_lock
 
-# In-memory pipeline job store (lightweight — no DB needed)
+# In-memory pipeline job store — primary access path (fast).
+# Backed by SQLite for durability across server restarts.
 # Eviction: max 200 entries, stale jobs removed after 1 hour.
 _pipeline_jobs: dict[str, dict[str, Any]] = {}
 _PIPELINE_JOBS_MAX = 200
@@ -36,16 +40,119 @@ _PIPELINE_JOB_TTL_SECONDS = 3600  # 1 hour
 # Populated by POST /generate-stream; consumed by WS /stream/{pipeline_id}
 _pipeline_queues: dict[str, asyncio.Queue] = {}
 
+# SQLite persistence for pipeline job metadata
+_PIPELINE_DB_PATH = "data/pipeline_jobs.db"
+
+
+def _db_connect() -> sqlite3.Connection:
+    """Open WAL-mode SQLite connection to the pipeline jobs DB."""
+    Path(_PIPELINE_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(_PIPELINE_DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pipeline_jobs (
+            pipeline_id TEXT PRIMARY KEY,
+            status      TEXT NOT NULL,
+            data        TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    return conn
+
+
+def _persist_job(pipeline_id: str, job: dict) -> None:
+    """Upsert a job record to SQLite (fire-and-forget; errors are logged, not raised)."""
+    try:
+        with _db_connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO pipeline_jobs (pipeline_id, status, data, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(pipeline_id) DO UPDATE SET
+                    status     = excluded.status,
+                    data       = excluded.data,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    pipeline_id,
+                    job.get("status", "unknown"),
+                    json.dumps(job, default=str),
+                    job.get("created_at", datetime.now(UTC).isoformat()),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+    except Exception as exc:
+        logger.warning(f"[PipelineJobs] Failed to persist job {pipeline_id}: {exc}")
+
+
+def _delete_job_from_db(pipeline_id: str) -> None:
+    """Remove a job record from SQLite."""
+    try:
+        with _db_connect() as conn:
+            conn.execute("DELETE FROM pipeline_jobs WHERE pipeline_id = ?", (pipeline_id,))
+    except Exception as exc:
+        logger.warning(f"[PipelineJobs] Failed to delete job {pipeline_id} from DB: {exc}")
+
+
+def _create_job(pipeline_id: str, job: dict) -> None:
+    """Set a new job in the in-memory store and persist to SQLite."""
+    _pipeline_jobs[pipeline_id] = job
+    _persist_job(pipeline_id, job)
+
+
+def _update_job(pipeline_id: str, updates: dict) -> None:
+    """Update an existing job in-memory and persist the change to SQLite."""
+    _pipeline_jobs[pipeline_id].update(updates)
+    _persist_job(pipeline_id, _pipeline_jobs[pipeline_id])
+
+
+def _load_jobs_from_db() -> None:
+    """
+    Load persisted pipeline jobs from SQLite into the in-memory store on startup.
+
+    Jobs that were "running" when the server shut down are marked "lost" since
+    the async tasks no longer exist — callers can check for this status.
+    """
+    try:
+        with _db_connect() as conn:
+            rows = conn.execute("SELECT pipeline_id, data FROM pipeline_jobs").fetchall()
+        loaded = 0
+        for pipeline_id, data_json in rows:
+            try:
+                job = json.loads(data_json)
+                if job.get("status") == "running":
+                    job["status"] = "lost"
+                    job["error"] = "Server restarted while job was running"
+                _pipeline_jobs[pipeline_id] = job
+                loaded += 1
+            except Exception:
+                pass
+        if loaded:
+            logger.info(f"[PipelineJobs] Loaded {loaded} persisted job(s) from {_PIPELINE_DB_PATH}")
+    except Exception as exc:
+        logger.warning(f"[PipelineJobs] Could not load persisted jobs: {exc}")
+
+
+# Load persisted jobs on module import (server startup)
+_load_jobs_from_db()
+
 
 def _evict_stale_jobs() -> None:
     """Remove jobs older than TTL and enforce max size.
 
     Also cleans up any orphaned WebSocket queues whose job has been evicted
     (e.g. /generate-stream was called but no WS client ever connected).
+
+    Uses list() snapshots to avoid RuntimeError from dict mutation during iteration
+    in edge cases where re-entrant calls occur.
     """
     now = datetime.now(UTC)
     stale_ids = []
-    for jid, job in _pipeline_jobs.items():
+    for jid, job in list(_pipeline_jobs.items()):  # snapshot — safe against re-entrant mutation
         created_raw = job.get("created_at")
         if created_raw is None:
             continue
@@ -58,16 +165,18 @@ def _evict_stale_jobs() -> None:
     for jid in stale_ids:
         _pipeline_jobs.pop(jid, None)
         _pipeline_queues.pop(jid, None)  # clean up orphaned WS queue if any
+        _delete_job_from_db(jid)
 
     # If still over limit, remove oldest first
     if len(_pipeline_jobs) > _PIPELINE_JOBS_MAX:
         sorted_ids = sorted(
-            _pipeline_jobs,
+            list(_pipeline_jobs),  # snapshot before sort
             key=lambda k: _pipeline_jobs[k].get("created_at", "0"),
         )
         for jid in sorted_ids[: len(_pipeline_jobs) - _PIPELINE_JOBS_MAX]:
             _pipeline_jobs.pop(jid, None)
             _pipeline_queues.pop(jid, None)  # clean up orphaned WS queue if any
+            _delete_job_from_db(jid)
 
 
 router = APIRouter(
@@ -100,7 +209,10 @@ class GenerateRequest(BaseModel):
     initial_capital: float = Field(10000, ge=100, le=100_000_000, description="Starting capital")
     leverage: int = Field(1, ge=1, le=125, description="Trading leverage")
     start_date: str = Field("2025-01-01", description="Data start date (YYYY-MM-DD)")
-    end_date: str = Field("2025-06-01", description="Data end date (YYYY-MM-DD)")
+    end_date: str = Field(
+        default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"),
+        description="Data end date (YYYY-MM-DD), defaults to today",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -161,7 +273,10 @@ class AnalyzeMarketRequest(BaseModel):
     symbol: str = Field("BTCUSDT", description="Trading pair")
     timeframe: str = Field("15", description="Candle interval")
     start_date: str = Field("2025-01-01", description="Data start date (YYYY-MM-DD)")
-    end_date: str = Field("2025-06-01", description="Data end date (YYYY-MM-DD)")
+    end_date: str = Field(
+        default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"),
+        description="Data end date (YYYY-MM-DD), defaults to today",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -198,7 +313,10 @@ class ImproveStrategyRequest(BaseModel):
     strategy_type: str = Field(..., description="Engine strategy type (rsi, macd, ema_crossover, etc.)")
     strategy_params: dict[str, Any] = Field(default_factory=dict, description="Current strategy parameters")
     start_date: str = Field("2025-01-01", description="Data start date (YYYY-MM-DD)")
-    end_date: str = Field("2025-06-01", description="Data end date (YYYY-MM-DD)")
+    end_date: str = Field(
+        default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"),
+        description="Data end date (YYYY-MM-DD), defaults to today",
+    )
     initial_capital: float = Field(10000, ge=100, description="Starting capital")
     direction: str = Field("both", description="Trade direction: long, short, both")
     wf_splits: int = Field(5, ge=2, le=20, description="Walk-forward splits")
@@ -314,11 +432,14 @@ async def _execute_pipeline(request: GenerateRequest) -> PipelineResponse:
     # Create pipeline job (evict stale entries first)
     _evict_stale_jobs()
     pipeline_id = str(uuid.uuid4())[:12]
-    _pipeline_jobs[pipeline_id] = {
-        "status": "running",
-        "created_at": datetime.now(UTC).isoformat(),
-        "current_stage": "context_analysis",
-    }
+    _create_job(
+        pipeline_id,
+        {
+            "status": "running",
+            "created_at": datetime.now(UTC).isoformat(),
+            "current_stage": "context_analysis",
+        },
+    )
 
     controller = StrategyController()
     result = await controller.generate_strategy(
@@ -369,13 +490,16 @@ async def _execute_pipeline(request: GenerateRequest) -> PipelineResponse:
     )
 
     # Store result for later retrieval
-    _pipeline_jobs[pipeline_id] = {
-        "status": "completed" if result.success else "failed",
-        "created_at": _pipeline_jobs[pipeline_id]["created_at"],
-        "completed_at": datetime.now(UTC).isoformat(),
-        "current_stage": result.final_stage.value,
-        "result": pipeline_response.model_dump(),
-    }
+    _create_job(
+        pipeline_id,
+        {
+            "status": "completed" if result.success else "failed",
+            "created_at": _pipeline_jobs[pipeline_id]["created_at"],
+            "completed_at": datetime.now(UTC).isoformat(),
+            "current_stage": result.final_stage.value,
+            "result": pipeline_response.model_dump(),
+        },
+    )
 
     return pipeline_response
 
@@ -631,7 +755,7 @@ class StreamGenerateRequest(BaseModel):
     initial_capital: float = Field(10000, ge=100)
     leverage: int = Field(1, ge=1, le=125)
     start_date: str = Field("2025-01-01")
-    end_date: str = Field("2025-06-01")
+    end_date: str = Field(default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"))
     pipeline_timeout: float = Field(300.0, ge=10.0, le=600.0)
 
 
@@ -670,12 +794,15 @@ async def generate_strategy_stream(request: StreamGenerateRequest) -> StreamJobR
     queue, event_fn = make_pipeline_event_queue()
     _pipeline_queues[pipeline_id] = queue
 
-    _pipeline_jobs[pipeline_id] = {
-        "status": "running",
-        "created_at": datetime.now(UTC).isoformat(),
-        "current_stage": "starting",
-        "stream_request": request.model_dump(),
-    }
+    _create_job(
+        pipeline_id,
+        {
+            "status": "running",
+            "created_at": datetime.now(UTC).isoformat(),
+            "current_stage": "starting",
+            "stream_request": request.model_dump(),
+        },
+    )
 
     async def _run_pipeline_bg() -> None:
         """Background coroutine: runs pipeline, feeds events into queue."""
@@ -703,13 +830,14 @@ async def generate_strategy_stream(request: StreamGenerateRequest) -> StreamJobR
             )
 
             report = state.get_result("report") or {}
-            _pipeline_jobs[pipeline_id].update(
+            _update_job(
+                pipeline_id,
                 {
                     "status": "completed",
                     "completed_at": datetime.now(UTC).isoformat(),
                     "current_stage": "report",
                     "result": report,
-                }
+                },
             )
             await queue.put(
                 {
@@ -724,8 +852,9 @@ async def generate_strategy_stream(request: StreamGenerateRequest) -> StreamJobR
             )
         except Exception as exc:
             logger.error(f"[StreamPipeline] {pipeline_id} failed: {exc}")
-            _pipeline_jobs[pipeline_id].update(
-                {"status": "failed", "error": str(exc), "completed_at": datetime.now(UTC).isoformat()}
+            _update_job(
+                pipeline_id,
+                {"status": "failed", "error": str(exc), "completed_at": datetime.now(UTC).isoformat()},
             )
             await queue.put({"status": "done", "success": False, "error": str(exc), "pipeline_id": pipeline_id})
 
@@ -774,7 +903,7 @@ async def stream_pipeline_events(websocket: WebSocket, pipeline_id: str) -> None
             try:
                 # Wait up to 30s for next event to avoid holding connection forever
                 event = await asyncio.wait_for(queue.get(), timeout=30.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send keepalive ping
                 await websocket.send_json({"status": "heartbeat", "pipeline_id": pipeline_id})
                 continue
@@ -815,7 +944,7 @@ class HITLGenerateRequest(BaseModel):
     initial_capital: float = Field(10000, ge=100)
     leverage: int = Field(1, ge=1, le=125)
     start_date: str = Field("2025-01-01")
-    end_date: str = Field("2025-06-01")
+    end_date: str = Field(default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"))
     pipeline_timeout: float = Field(300.0, ge=10.0)
 
 
@@ -855,11 +984,14 @@ async def generate_strategy_hitl(request: HITLGenerateRequest) -> HITLStatusResp
     """
     _evict_stale_jobs()
     pipeline_id = str(uuid.uuid4())[:12]
-    _pipeline_jobs[pipeline_id] = {
-        "status": "running",
-        "created_at": datetime.now(UTC).isoformat(),
-        "hitl_request": request.model_dump(),
-    }
+    _create_job(
+        pipeline_id,
+        {
+            "status": "running",
+            "created_at": datetime.now(UTC).isoformat(),
+            "hitl_request": request.model_dump(),
+        },
+    )
 
     try:
         from backend.agents.trading_strategy_graph import run_strategy_pipeline
@@ -887,7 +1019,8 @@ async def generate_strategy_hitl(request: HITLGenerateRequest) -> HITLStatusResp
         hitl_pending = bool(state.context.get("hitl_pending", False))
         hitl_payload = state.context.get("hitl_payload", {})
 
-        _pipeline_jobs[pipeline_id].update(
+        _update_job(
+            pipeline_id,
             {
                 "status": "hitl_pending" if hitl_pending else "completed",
                 "hitl_pending": hitl_pending,
@@ -896,7 +1029,7 @@ async def generate_strategy_hitl(request: HITLGenerateRequest) -> HITLStatusResp
                 "_partial_state_session_id": state.session_id,
                 "_partial_results_keys": list(state.results.keys()),
                 "completed_at": datetime.now(UTC).isoformat() if not hitl_pending else None,
-            }
+            },
         )
 
         return HITLStatusResponse(
@@ -904,15 +1037,14 @@ async def generate_strategy_hitl(request: HITLGenerateRequest) -> HITLStatusResp
             hitl_pending=hitl_pending,
             hitl_payload=hitl_payload,
             message=(
-                f"Pipeline paused for human review. "
-                f"POST /ai-pipeline/pipeline/{pipeline_id}/hitl/approve to continue."
+                f"Pipeline paused for human review. POST /ai-pipeline/pipeline/{pipeline_id}/hitl/approve to continue."
                 if hitl_pending
                 else "Pipeline completed without HITL pause."
             ),
         )
 
     except Exception as exc:
-        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        _update_job(pipeline_id, {"status": "failed", "error": str(exc)})
         logger.error(f"[HITL generate] {pipeline_id} failed: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -1000,13 +1132,14 @@ async def approve_hitl_pipeline(pipeline_id: str) -> HITLApproveResponse:
         )
 
         report = state.get_result("report") or {}
-        _pipeline_jobs[pipeline_id].update(
+        _update_job(
+            pipeline_id,
             {
                 "status": "completed",
                 "hitl_pending": False,
                 "completed_at": datetime.now(UTC).isoformat(),
                 "result": report,
-            }
+            },
         )
 
         logger.info(f"[HITL approve] Pipeline {pipeline_id} resumed and completed")
@@ -1018,7 +1151,7 @@ async def approve_hitl_pipeline(pipeline_id: str) -> HITLApproveResponse:
         )
 
     except Exception as exc:
-        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        _update_job(pipeline_id, {"status": "failed", "error": str(exc)})
         logger.error(f"[HITL approve] {pipeline_id} failed: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -1040,7 +1173,7 @@ class AnalyzeStrategyRequest(BaseModel):
     initial_capital: float = Field(10000, ge=100)
     leverage: int = Field(1, ge=1, le=125)
     start_date: str = Field("2025-01-01")
-    end_date: str = Field("2025-06-01")
+    end_date: str = Field(default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"))
     pipeline_timeout: float = Field(300.0, ge=10.0, le=600.0)
 
     model_config = {
@@ -1142,11 +1275,14 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
     # --- run pipeline in seed_graph mode ---
     _evict_stale_jobs()
     pipeline_id = str(uuid.uuid4())[:12]
-    _pipeline_jobs[pipeline_id] = {
-        "status": "running",
-        "created_at": datetime.now(UTC).isoformat(),
-        "seed_strategy": strategy_name,
-    }
+    _create_job(
+        pipeline_id,
+        {
+            "status": "running",
+            "created_at": datetime.now(UTC).isoformat(),
+            "seed_strategy": strategy_name,
+        },
+    )
 
     try:
         from backend.agents.trading_strategy_graph import run_strategy_pipeline
@@ -1163,7 +1299,7 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
             timeframe=request.timeframe,
             df=df,
             agents=request.agents,
-            run_backtest=True,          # always backtest in analysis mode
+            run_backtest=True,  # always backtest in analysis mode
             run_debate=request.run_debate,
             initial_capital=request.initial_capital,
             leverage=request.leverage,
@@ -1179,12 +1315,13 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
 
         refinement_applied = state.context.get("refinement_iteration", 0) > 0
 
-        _pipeline_jobs[pipeline_id].update(
+        _update_job(
+            pipeline_id,
             {
                 "status": "completed",
                 "completed_at": datetime.now(UTC).isoformat(),
                 "result": report,
-            }
+            },
         )
 
         return AnalyzeStrategyResponse(
@@ -1202,7 +1339,7 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
     except HTTPException:
         raise
     except Exception as exc:
-        _pipeline_jobs[pipeline_id].update({"status": "failed", "error": str(exc)})
+        _update_job(pipeline_id, {"status": "failed", "error": str(exc)})
         logger.error(f"[analyze-strategy] {pipeline_id} failed: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 

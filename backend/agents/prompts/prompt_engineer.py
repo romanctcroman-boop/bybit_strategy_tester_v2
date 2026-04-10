@@ -78,7 +78,7 @@ class PromptEngineer:
         Returns:
             Complete prompt string ready for LLM API call
         """
-        spec = AGENT_SPECIALIZATIONS.get(agent_name, AGENT_SPECIALIZATIONS["deepseek"])
+        spec = AGENT_SPECIALIZATIONS.get(agent_name, AGENT_SPECIALIZATIONS["claude"])
 
         # Merge context with platform config
         prompt_vars = context.to_prompt_vars()
@@ -299,7 +299,7 @@ class PromptEngineer:
         Returns:
             System message string
         """
-        spec = AGENT_SPECIALIZATIONS.get(agent_name, AGENT_SPECIALIZATIONS["deepseek"])
+        spec = AGENT_SPECIALIZATIONS.get(agent_name, AGENT_SPECIALIZATIONS["claude"])
         strengths = ", ".join(spec.get("strengths", []))
 
         return (

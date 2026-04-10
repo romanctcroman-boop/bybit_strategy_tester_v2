@@ -139,9 +139,108 @@ class ConsensusEngine:
         print(result.agreement_score)
     """
 
-    def __init__(self) -> None:
+    # SQLite DB shared with the pipeline memory (survives restarts)
+    _PERF_DB: str = "data/pipeline_strategy_memory.db"
+
+    def __init__(
+        self,
+        signal_inclusion_threshold: float = _SIGNAL_INCLUSION_THRESHOLD,
+        max_consensus_signals: int = _MAX_CONSENSUS_SIGNALS,
+        max_consensus_filters: int = _MAX_CONSENSUS_FILTERS,
+    ) -> None:
+        self._signal_inclusion_threshold = signal_inclusion_threshold
+        self._max_consensus_signals = max_consensus_signals
+        self._max_consensus_filters = max_consensus_filters
         self._performance: dict[str, AgentPerformance] = {}
         self._history: list[ConsensusResult] = []
+        self._load_performance()
+
+    # ─────────────────────────────────────────────────────────────────
+    # PERFORMANCE PERSISTENCE (SQLite)
+    # ─────────────────────────────────────────────────────────────────
+
+    def _db_connect(self) -> sqlite3.Connection:
+        """Open WAL-mode SQLite connection to the pipeline memory DB."""
+        Path(self._PERF_DB).parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self._PERF_DB)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_performance (
+                agent_name       TEXT PRIMARY KEY,
+                total_strategies INTEGER NOT NULL DEFAULT 0,
+                successful_backtests INTEGER NOT NULL DEFAULT 0,
+                avg_sharpe       REAL NOT NULL DEFAULT 0.0,
+                avg_profit_factor REAL NOT NULL DEFAULT 0.0,
+                avg_win_rate     REAL NOT NULL DEFAULT 0.0,
+                cumulative_score REAL NOT NULL DEFAULT 0.0,
+                updated_at       TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        return conn
+
+    def _load_performance(self) -> None:
+        """Load agent performance history from SQLite on startup."""
+        try:
+            with self._db_connect() as conn:
+                rows = conn.execute(
+                    "SELECT agent_name, total_strategies, successful_backtests, "
+                    "avg_sharpe, avg_profit_factor, avg_win_rate, cumulative_score "
+                    "FROM agent_performance"
+                ).fetchall()
+            for row in rows:
+                perf = AgentPerformance(
+                    agent_name=row[0],
+                    total_strategies=row[1],
+                    successful_backtests=row[2],
+                    avg_sharpe=row[3],
+                    avg_profit_factor=row[4],
+                    avg_win_rate=row[5],
+                    cumulative_score=row[6],
+                )
+                self._performance[row[0]] = perf
+            if rows:
+                logger.debug(f"[ConsensusEngine] Loaded performance for {len(rows)} agent(s) from DB")
+        except Exception as e:
+            logger.warning(f"[ConsensusEngine] Could not load performance from DB: {e}")
+
+    def _save_performance(self, agent_name: str) -> None:
+        """Persist a single agent's performance record to SQLite."""
+        perf = self._performance.get(agent_name)
+        if perf is None:
+            return
+        try:
+            with self._db_connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO agent_performance
+                        (agent_name, total_strategies, successful_backtests,
+                         avg_sharpe, avg_profit_factor, avg_win_rate, cumulative_score, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(agent_name) DO UPDATE SET
+                        total_strategies     = excluded.total_strategies,
+                        successful_backtests = excluded.successful_backtests,
+                        avg_sharpe           = excluded.avg_sharpe,
+                        avg_profit_factor    = excluded.avg_profit_factor,
+                        avg_win_rate         = excluded.avg_win_rate,
+                        cumulative_score     = excluded.cumulative_score,
+                        updated_at           = excluded.updated_at
+                    """,
+                    (
+                        perf.agent_name,
+                        perf.total_strategies,
+                        perf.successful_backtests,
+                        perf.avg_sharpe,
+                        perf.avg_profit_factor,
+                        perf.avg_win_rate,
+                        perf.cumulative_score,
+                        datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                    ),
+                )
+        except Exception as e:
+            logger.warning(f"[ConsensusEngine] Could not save performance for '{agent_name}': {e}")
 
     # ─────────────────────────────────────────────────────────────────
     # PUBLIC API
@@ -274,6 +373,7 @@ class ConsensusEngine:
             f"avg_sharpe={perf.avg_sharpe:.2f}, "
             f"score={perf.cumulative_score:.2f}"
         )
+        self._save_performance(agent_name)
 
     def get_performance(self, agent_name: str) -> AgentPerformance | None:
         """Get an agent's performance record."""
@@ -494,9 +594,9 @@ class ConsensusEngine:
         )
 
         consensus_signals: list[Signal] = []
-        for signal_key, info in sorted_signals[:_MAX_CONSENSUS_SIGNALS]:
+        for signal_key, info in sorted_signals[: self._max_consensus_signals]:
             normalized_weight = info["total_weight"] / max(sum(agent_weights.values()), 1e-9)
-            if normalized_weight < _SIGNAL_INCLUSION_THRESHOLD:
+            if normalized_weight < self._signal_inclusion_threshold:
                 continue
 
             # Merge parameters via median
@@ -620,9 +720,9 @@ class ConsensusEngine:
         )
 
         consensus_signals: list[Signal] = []
-        for signal_key, info in sorted_signals[:_MAX_CONSENSUS_SIGNALS]:
+        for signal_key, info in sorted_signals[: self._max_consensus_signals]:
             normalized = info["posterior_sum"] / total_posterior
-            if normalized < _SIGNAL_INCLUSION_THRESHOLD / 2:  # lower threshold for Bayesian
+            if normalized < self._signal_inclusion_threshold / 2:  # lower threshold for Bayesian
                 continue
 
             merged_params = self._merge_params(info["params_list"])
@@ -737,8 +837,8 @@ class ConsensusEngine:
 
         return merged
 
-    @staticmethod
     def _merge_filters(
+        self,
         strategies: dict[str, StrategyDefinition],
         agent_weights: dict[str, float],
     ) -> list[Filter]:
@@ -753,7 +853,7 @@ class ConsensusEngine:
                     seen_types[f.type] = (weight, f)
 
         filters = [f for _, f in sorted(seen_types.values(), key=lambda x: x[0], reverse=True)]
-        return filters[:_MAX_CONSENSUS_FILTERS]
+        return filters[: self._max_consensus_filters]
 
     @staticmethod
     def _merge_exit_conditions(

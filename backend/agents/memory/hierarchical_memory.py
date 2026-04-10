@@ -338,6 +338,12 @@ class HierarchicalMemory:
         Returns:
             Created MemoryItem
         """
+        if agent_namespace == "shared":
+            logger.debug(
+                "[HierarchicalMemory] store() called with agent_namespace='shared' (default). "
+                "Memory will be visible to ALL agents — pass an explicit namespace for isolation."
+            )
+
         # Generate ID based on content hash
         content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
         item_id = f"{memory_type.value}_{content_hash}_{int(time.time())}"
