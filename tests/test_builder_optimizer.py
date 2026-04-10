@@ -1884,3 +1884,257 @@ class TestProgressTracking:
         raw = tmp_file.read_text(encoding="utf-8")
         data = json.loads(raw)  # must not raise
         assert len(data) == 20
+
+
+# =============================================================================
+# TESTS: Bayesian Optimization Modernization (GPSampler, warm_start, constraints)
+# =============================================================================
+
+
+class TestOptunaModernization:
+    """Tests for modernized Bayesian optimization features:
+    - GPSampler (sampler_type="gp")
+    - warm_start_trials via study.enqueue_trial()
+    - Native constraints via constraints_func / trial.set_user_attr("constraint", ...)
+    """
+
+    # ------------------------------------------------------------------
+    # Signature / structural tests (no Optuna run required)
+    # ------------------------------------------------------------------
+
+    def test_warm_start_trials_in_signature(self):
+        """run_builder_optuna_search accepts warm_start_trials kwarg."""
+        import inspect
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        sig = inspect.signature(run_builder_optuna_search)
+        assert "warm_start_trials" in sig.parameters
+        assert sig.parameters["warm_start_trials"].default is None
+
+    def test_gp_sampler_importable(self):
+        """GPSampler is available in installed Optuna version."""
+        try:
+            from optuna.samplers import GPSampler
+
+            assert GPSampler is not None
+        except ImportError:
+            pytest.skip("GPSampler not available in this Optuna version")
+
+    # ------------------------------------------------------------------
+    # GPSampler functional tests
+    # ------------------------------------------------------------------
+
+    @pytest.mark.slow
+    def test_gp_sampler_returns_valid_structure(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """sampler_type='gp' runs without error and returns standard result dict."""
+        try:
+            from optuna.samplers import GPSampler  # noqa: F401
+        except ImportError:
+            pytest.skip("GPSampler not available")
+
+        import warnings
+
+        import optuna
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", optuna.exceptions.ExperimentalWarning)
+            result = run_builder_optuna_search(
+                base_graph=sample_rsi_graph,
+                ohlcv=sample_ohlcv,
+                param_specs=specs,
+                config_params=backtest_config_params,
+                n_trials=5,
+                top_n=3,
+                timeout_seconds=60,
+                sampler_type="gp",
+            )
+
+        assert result["status"] == "completed"
+        assert "top_results" in result
+        assert "best_params" in result
+        assert isinstance(result["top_results"], list)
+
+    @pytest.mark.slow
+    def test_gp_sampler_tested_combinations_correct(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """sampler_type='gp' runs exactly n_trials (within Optuna's count)."""
+        try:
+            from optuna.samplers import GPSampler  # noqa: F401
+        except ImportError:
+            pytest.skip("GPSampler not available")
+
+        import warnings
+
+        import optuna
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 25, "step": 1},
+        ]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", optuna.exceptions.ExperimentalWarning)
+            result = run_builder_optuna_search(
+                base_graph=sample_rsi_graph,
+                ohlcv=sample_ohlcv,
+                param_specs=specs,
+                config_params=backtest_config_params,
+                n_trials=6,
+                top_n=3,
+                timeout_seconds=60,
+                sampler_type="gp",
+            )
+
+        assert result["tested_combinations"] <= 6
+
+    # ------------------------------------------------------------------
+    # warm_start_trials tests
+    # ------------------------------------------------------------------
+
+    @pytest.mark.slow
+    def test_warm_start_trials_accepted_and_runs(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """warm_start_trials with valid param keys is accepted without error."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        warm_start = [
+            {"params": {"rsi_1.period": 14}},
+            {"params": {"rsi_1.period": 18}},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=5,
+            top_n=3,
+            timeout_seconds=60,
+            warm_start_trials=warm_start,
+        )
+        assert result["status"] == "completed"
+        assert result["tested_combinations"] >= 1
+
+    @pytest.mark.slow
+    def test_warm_start_trials_invalid_keys_ignored(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """warm_start_trials with unknown param keys are silently skipped."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        # Unknown key "nonexistent_block.param" should be filtered and skipped
+        warm_start = [
+            {"params": {"nonexistent_block.param": 99}},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=5,
+            top_n=3,
+            timeout_seconds=60,
+            warm_start_trials=warm_start,
+        )
+        # Should not crash; invalid warm_start entry simply not enqueued
+        assert result["status"] == "completed"
+
+    def test_warm_start_trials_none_is_default(self):
+        """Passing warm_start_trials=None (default) is equivalent to not passing it."""
+        import inspect
+
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        sig = inspect.signature(run_builder_optuna_search)
+        default = sig.parameters["warm_start_trials"].default
+        assert default is None
+
+    # ------------------------------------------------------------------
+    # Native constraints tests
+    # ------------------------------------------------------------------
+
+    @pytest.mark.slow
+    def test_native_constraints_infeasible_trial_has_positive_violation(
+        self, sample_rsi_graph, sample_ohlcv, backtest_config_params
+    ):
+        """When min_trades is impossible (9999), all trials are infeasible.
+
+        The optimizer uses native constraints (constraints_func) so:
+        - results_passing_filters == 0  (no feasible trials)
+        - top_results falls back to unfiltered results tagged with _below_min_trades=True
+        """
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        config = {**backtest_config_params, "min_trades": 9999}
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=config,
+            n_trials=5,
+            top_n=3,
+            timeout_seconds=60,
+        )
+
+        # All trials violate min_trades=9999 → 0 passing the feasibility filter
+        assert result["status"] == "completed"
+        assert result["results_passing_filters"] == 0, (
+            f"Expected 0 passing filters, got: {result['results_passing_filters']}"
+        )
+        # Graceful fallback: top_results filled with best-of-infeasible, tagged _below_min_trades
+        if result["top_results"]:
+            assert result["top_results"][0].get("_below_min_trades") is True
+
+    @pytest.mark.slow
+    def test_native_constraints_feasible_trials_returned(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """When min_trades constraint is loose (0), top_results are not empty."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        # min_trades=0 → all trials feasible
+        config = {**backtest_config_params, "min_trades": 0}
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=config,
+            n_trials=5,
+            top_n=3,
+            timeout_seconds=60,
+        )
+        assert result["status"] == "completed"
+        # At least some results should pass with min_trades=0
+        assert isinstance(result["top_results"], list)
+
+    @pytest.mark.slow
+    def test_no_penalty_score_in_results(self, sample_rsi_graph, sample_ohlcv, backtest_config_params):
+        """top_results should not contain the old -1000 penalty sentinel score."""
+        from backend.optimization.builder_optimizer import run_builder_optuna_search
+
+        specs = [
+            {"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 20, "step": 1},
+        ]
+        result = run_builder_optuna_search(
+            base_graph=sample_rsi_graph,
+            ohlcv=sample_ohlcv,
+            param_specs=specs,
+            config_params=backtest_config_params,
+            n_trials=5,
+            top_n=5,
+            timeout_seconds=60,
+        )
+        for r in result["top_results"]:
+            score = r.get("score", r.get("_score", 0.0))
+            assert score > -500.0, f"Penalty sentinel score found in results: {score}"

@@ -41,6 +41,7 @@ class OptimizationPanels {
             progress: 0,
             currentJobId: null,
             lastResults: null,
+            lastOptContext: null, // { symbol, interval, start_date, end_date, ... } used for dblclick backtest
 
             // Run mode (auto-detected)
             runMode: 'single' // 'single' or 'optimization'
@@ -192,6 +193,8 @@ class OptimizationPanels {
         const leverageEl = document.getElementById('backtestLeverageRange') || document.getElementById('backtestLeverage');
         const commissionEl = document.getElementById('backtestCommission');
         const marketTypeEl = document.getElementById('builderMarketType');
+        const positionSizeEl = document.getElementById('backtestPositionSize');
+        const positionSizeTypeEl = document.getElementById('backtestPositionSizeType');
 
         // Keep Bybit timeframe codes as-is — the backend BuilderOptimizationRequest
         // validates only Bybit codes: 1/5/15/30/60/240/D/W/M.
@@ -220,6 +223,11 @@ class OptimizationPanels {
             }
         }
 
+        // position_size: UI shows percent (10), backend expects fraction (0.10)
+        const positionSizePct = parseFloat(positionSizeEl?.value) || 10;
+        const positionSizeType = positionSizeTypeEl?.value || 'percent';
+        const position_size = positionSizeType === 'percent' ? positionSizePct / 100 : positionSizePct;
+
         return {
             symbol: (symbolEl?.value || 'BTCUSDT').trim().toUpperCase(),
             interval,
@@ -228,7 +236,8 @@ class OptimizationPanels {
             leverage: parseInt(leverageEl?.value, 10) || 10,
             commission,
             strategy_type: strategyType,
-            market_type: marketTypeEl?.value || 'linear'
+            market_type: marketTypeEl?.value || 'linear',
+            position_size
         };
     }
 
@@ -952,6 +961,7 @@ class OptimizationPanels {
                 end_date: ed,
                 market_type: props.market_type || 'linear',
                 initial_capital: props.initial_capital,
+                position_size: props.position_size,
                 leverage: props.leverage,
                 commission: props.commission,
                 direction: props.direction,
@@ -983,8 +993,21 @@ class OptimizationPanels {
                 ...(wfConfig ? { walk_forward: wfConfig } : {})
             };
 
-            // Remember the metric used so displayQuickResults can show it
+            // Remember the metric and context used so double-click re-runs with EXACT same params
             this.state.lastOptimizeMetric = payload.optimize_metric;
+            this.state.lastOptContext = {
+                strategy_id: strategyId,
+                symbol: payload.symbol,
+                interval: payload.interval,
+                start_date: sd,
+                end_date: ed,
+                market_type: payload.market_type,
+                initial_capital: payload.initial_capital,
+                position_size: payload.position_size,
+                leverage: payload.leverage,
+                commission: payload.commission,
+                direction: payload.direction,
+            };
 
             const endpoint = `/api/v1/strategy-builder/strategies/${strategyId}/optimize`;
             console.log(`[OptPanels] Builder optimization → ${endpoint}`, payload);
@@ -1374,8 +1397,17 @@ class OptimizationPanels {
         console.log('[OptPanels] data.best_metrics keys:', Object.keys(bestMetrics));
         console.log('[OptPanels] data.top_results count:', data.top_results?.length, 'first:', data.top_results?.[0] ? Object.keys(data.top_results[0]).slice(0, 5) : 'none');
 
+        const optimMetric = data.optimize_metric || this.state.lastOptimizeMetric || this.state.primaryMetric || 'sharpe_ratio';
+        // Map `score` field → actual metric name so column lookup works (e.g. pareto_balance)
+        const mappedTopResults = (data.top_results || []).map(r => {
+            if (r.score !== undefined && r[optimMetric] === undefined) {
+                return { ...r, [optimMetric]: r.score };
+            }
+            return r;
+        });
+
         const results = {
-            top_results: data.top_results || [],
+            top_results: mappedTopResults,
             best_params: data.best_params || {},
             best_score: data.best_score || 0,
             total_combinations: data.total_combinations || 0,
@@ -1455,7 +1487,7 @@ class OptimizationPanels {
             : ' | нет изменений';
         this.showNotification(
             `📊 Оптимизация: проверено ${testedCount} комбо, прошли фильтр ${passingCount}. ` +
-            `Лучший: trades=${bestTrades}${profitStr}${paramStr}${fallbackNote}`,
+            `Лучший: trades=${bestTrades}${profitStr}${paramStr}${fallbackNote} — кликни строку в таблице чтобы создать копию стратегии`,
             fallbackUsed ? 'warning' : 'info'
         );
 
@@ -1466,9 +1498,7 @@ class OptimizationPanels {
                 'Смягчи ограничения или просмотри результаты таблицы чтобы выбрать вручную.',
                 'warning'
             );
-        } else if (Object.keys(bestParams).length > 0) {
-            this.applyBestParamsToBlocks(bestParams);
-        } else if ((data.tested_combinations || 0) > 0) {
+        } else if ((data.tested_combinations || 0) > 0 && Object.keys(bestParams).length === 0) {
             // Optimization ran but returned 0 results — explain why
             this.showNotification(
                 '⚠️ Оптимизация завершена, но 0 результатов. ' +
@@ -1488,7 +1518,61 @@ class OptimizationPanels {
         const btn = document.getElementById('btnViewFullResults');
         if (btn) btn.style.display = 'block';
 
+        // Pre-save top-5 backtests in background so double-click is instant
+        this._presaveTopBacktests(results.top_results || []);
+
         console.log('[OptPanels] Optimization complete:', results);
+    }
+
+    /**
+     * Pre-run and save backtests for ALL top results after optimization completes.
+     * Runs all in parallel (Promise.all) so the whole batch finishes quickly.
+     * Stores backtest_id into each row so double-click opens instantly.
+     */
+    async _presaveTopBacktests(topResults) {
+        const ctx = this.state.lastOptContext;
+        if (!ctx || !ctx.strategy_id) return;
+        const toSave = topResults.filter(row => !row.backtest_id);
+        if (toSave.length === 0) return;
+
+        const runOne = async (row) => {
+            const rowParams = { ...(row.params || {}) };
+            Object.keys(row).forEach(k => { if (k.includes('.')) rowParams[k] = row[k]; });
+            try {
+                const res = await fetch(
+                    `/api/v1/strategy-builder/strategies/${ctx.strategy_id}/backtest`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            symbol: ctx.symbol,
+                            interval: ctx.interval,
+                            start_date: ctx.start_date + (ctx.start_date.includes('T') ? '' : 'T00:00:00'),
+                            end_date: ctx.end_date + (ctx.end_date.includes('T') ? '' : 'T00:00:00'),
+                            market_type: ctx.market_type,
+                            initial_capital: ctx.initial_capital,
+                            position_size: ctx.position_size,
+                            leverage: ctx.leverage,
+                            commission: ctx.commission,
+                            direction: ctx.direction,
+                            parameters: rowParams,
+                        })
+                    }
+                );
+                if (res.ok) {
+                    const d = await res.json();
+                    if (d.backtest_id || d.id) row.backtest_id = d.backtest_id || d.id;
+                }
+            } catch (_e) {
+                // silent — double-click will run fresh if id missing
+            }
+        };
+
+        // Run all in parallel, re-render when done
+        await Promise.all(toSave.map(row => runOne(row)));
+        if (this.state.lastResults) {
+            this.displayQuickResults(this.state.lastResults);
+        }
     }
 
     /**
@@ -1797,6 +1881,15 @@ class OptimizationPanels {
             || this.state.primaryMetric
             || 'sharpe_ratio';
 
+        // Sort topResults by optimizeMetric so topResults[0] is truly the best.
+        // Lower-is-better metrics sort ascending; all others descending.
+        const lowerIsBetter = ['max_drawdown', 'avg_drawdown', 'volatility', 'var_95'].includes(optimizeMetric);
+        topResults.sort((a, b) => {
+            const av = a[optimizeMetric] ?? (lowerIsBetter ? Infinity : -Infinity);
+            const bv = b[optimizeMetric] ?? (lowerIsBetter ? Infinity : -Infinity);
+            return lowerIsBetter ? av - bv : bv - av;
+        });
+
         const metricLabelMap = {
             'sharpe_ratio': 'Sharpe',
             'total_return': 'Return %',
@@ -1827,7 +1920,7 @@ class OptimizationPanels {
         // De-duplicate metric columns
         // Fixed order: optimize_metric first, then constraint metrics,
         // then always-visible metrics, then total_trades
-        const alwaysShow = ['max_drawdown', 'sharpe_ratio', 'win_rate'];
+        const alwaysShow = ['net_profit', 'max_drawdown', 'sharpe_ratio', 'win_rate'];
         const metricCols = [optimizeMetric];
         constraintMetrics.forEach(m => { if (!metricCols.includes(m)) metricCols.push(m); });
         alwaysShow.forEach(m => { if (!metricCols.includes(m)) metricCols.push(m); });
@@ -1895,7 +1988,7 @@ class OptimizationPanels {
         }).join('');
 
         // --- Format helpers ---
-        const fmt = (val, key) => {
+        const fmt = (val, key, row = null) => {
             if (val === null || val === undefined) return '<span style="color:#666">—</span>';
             const n = Number(val);
             if (isNaN(n)) return String(val);
@@ -1912,10 +2005,16 @@ class OptimizationPanels {
                 const cls = n >= 0 ? 'opt-cell-pos' : 'opt-cell-neg';
                 return `<span class="${cls}">${n >= 0 && key !== 'max_drawdown' ? '+' : ''}${n.toFixed(1)}%</span>`;
             }
-            // Net profit
+            // Net profit — show $amount / %return
             if (key === 'net_profit') {
                 const cls = n >= 0 ? 'opt-cell-pos' : 'opt-cell-neg';
-                return `<span class="${cls}">${n >= 0 ? '+' : ''}${n.toFixed(2)}</span>`;
+                const sign = n >= 0 ? '+' : '';
+                const pct = row?.net_profit_pct ?? row?.total_return;
+                if (pct != null) {
+                    const pSign = pct >= 0 ? '+' : '';
+                    return `<span class="${cls}">${sign}$${Math.round(n)} / ${pSign}${pct.toFixed(1)}%</span>`;
+                }
+                return `<span class="${cls}">${sign}$${n.toFixed(2)}</span>`;
             }
             // Param cols (blockId.paramKey) — show plain value
             if (key.includes('.')) {
@@ -1927,7 +2026,7 @@ class OptimizationPanels {
         // Two-line header labels: first line short name, second line unit/detail
         const colLabelTwoLine = key => {
             const twoLineMap = {
-                'net_profit': ['Net', 'Profit'],
+                'net_profit': ['Net', 'Profit $/%'],
                 'total_trades': ['Trades', ''],
                 'max_drawdown': ['Max', 'DD'],
                 'sharpe_ratio': ['Sharpe', ''],
@@ -1992,20 +2091,24 @@ class OptimizationPanels {
         const rows = topResults.map((row, idx) => {
             const isBest = idx === 0;
             const belowFilter = row._below_min_trades === true;
+            const hasBacktest = !!row.backtest_id;
             const flagHtml = belowFilter
                 ? '<span class="opt-flag-below" title="Не прошёл Min Requirements">⚠</span>'
                 : (isBest ? '<span class="opt-flag-best" title="Лучший результат">★</span>' : '');
+            const readyIcon = hasBacktest
+                ? '<span class="opt-flag-ready" title="Бэктест сохранён — откроется мгновенно">⚡</span>'
+                : '';
 
             const cells = allCols.map(k => {
                 const rawVal = row[k];
                 const extra = cellClass(k, rawVal);
-                return `<td class="${extra}">${fmt(rawVal, k)}</td>`;
+                return `<td class="${extra}">${fmt(rawVal, k, row)}</td>`;
             }).join('');
 
             return `<tr class="opt-result-row ${isBest ? 'opt-row-best' : ''} ${belowFilter ? 'opt-row-below' : ''}"
                 data-idx="${idx}"
-                title="Один клик — открыть копию стратегии&#10;Двойной клик — запустить полный бэктест">
-                <td class="opt-rank-cell">${flagHtml}${idx + 1}</td>
+                title="Один клик — открыть копию стратегии&#10;Двойной клик — полный бэктест${hasBacktest ? ' (сохранён ⚡)' : ''}">
+                <td class="opt-rank-cell">${flagHtml}${readyIcon}${idx + 1}</td>
                 ${cells}
             </tr>`;
         }).join('');
@@ -2063,21 +2166,30 @@ class OptimizationPanels {
                     tr.classList.add('opt-row-loading');
 
                     try {
-                        // Extract param cols (keys with dot) for this row
-                        const rowParams = {};
+                        // Extract params: row.params is the primary source (blockId.paramKey format)
+                        // Also pick up any flat dot-keys on the row itself (legacy)
+                        const rowParams = { ...(row.params || {}) };
                         Object.keys(row).forEach(k => { if (k.includes('.')) rowParams[k] = row[k]; });
 
-                        // 1. Clone the strategy
-                        const rankLabel = idx === 0 ? ' ★' : ` #${idx + 1}`;
+                        // 1. Get original strategy name to build a meaningful clone name
+                        const origRes = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}`);
+                        const origData = origRes.ok ? await origRes.json() : {};
+                        const baseName = origData.name || strategyId;
+
+                        // Build index suffix: _01 for ★1, _02 for #2, etc.
+                        const rankIndex = String(idx + 1).padStart(2, '0');
+                        const cloneName = `${baseName}_${rankIndex}`;
+
+                        // 2. Clone the strategy with the indexed name
                         const cloneRes = await fetch(
-                            `/api/v1/strategy-builder/strategies/${strategyId}/clone?new_name=${encodeURIComponent((document.title || 'Strategy') + rankLabel)}`,
+                            `/api/v1/strategy-builder/strategies/${strategyId}/clone?new_name=${encodeURIComponent(cloneName)}`,
                             { method: 'POST' }
                         );
                         if (!cloneRes.ok) throw new Error(`Clone failed: ${cloneRes.status}`);
                         const cloneData = await cloneRes.json();
                         const cloneId = cloneData.id;
 
-                        // 2. Apply optimized params to the clone via PUT
+                        // 3. Apply optimized params to the clone via PUT
                         if (Object.keys(rowParams).length > 0) {
                             // Fetch current clone blocks, patch params, then save
                             const getRes = await fetch(`/api/v1/strategy-builder/strategies/${cloneId}`);
@@ -2109,7 +2221,8 @@ class OptimizationPanels {
                             }
                         }
 
-                        // 3. Open clone in new tab
+                        // 4. Open clone in new tab
+                        this.showNotification(`Создана копия: ${cloneName}`, 'success');
                         window.open(`/frontend/strategy-builder.html?id=${cloneId}`, '_blank');
 
                     } catch (err) {
@@ -2139,33 +2252,35 @@ class OptimizationPanels {
                 });
 
                 try {
-                    // Extract param cols for this row
-                    const rowParams = {};
+                    // Fast path: backtest was pre-saved after optimization
+                    if (row.backtest_id) {
+                        window.open(`/frontend/backtest-results.html?backtest_id=${row.backtest_id}`, '_blank');
+                        return;
+                    }
+
+                    // Extract optimized params
+                    const rowParams = { ...(row.params || {}) };
                     Object.keys(row).forEach(k => { if (k.includes('.')) rowParams[k] = row[k]; });
 
-                    // Build backtest request with optimized params
-                    const props = this.getPropertiesPanelValues();
-                    const { startDate: sd, endDate: ed } = this.getBacktestDates();
-
-                    // Merge optimized params into strategy_params
-                    const strategyParams = {};
-                    Object.entries(rowParams).forEach(([key, value]) => {
-                        const paramKey = key.substring(key.indexOf('.') + 1);
-                        strategyParams[paramKey] = value;
-                    });
+                    // Use EXACT context from when optimization ran, not current UI values.
+                    // This ensures the backtest matches optimizer results (same dates, commission, etc.)
+                    const ctx = this.state.lastOptContext;
+                    const props = ctx || this.getPropertiesPanelValues();
+                    const sd = ctx ? ctx.start_date : this.getBacktestDates().startDate;
+                    const ed = ctx ? ctx.end_date : this.getBacktestDates().endDate;
 
                     const payload = {
-                        strategy_id: strategyId,
                         symbol: props.symbol,
                         interval: props.interval,
-                        start_date: sd,
-                        end_date: ed,
+                        start_date: sd + (sd.includes('T') ? '' : 'T00:00:00'),
+                        end_date: ed + (ed.includes('T') ? '' : 'T00:00:00'),
                         market_type: props.market_type || 'linear',
                         initial_capital: props.initial_capital,
+                        position_size: props.position_size,
                         leverage: props.leverage,
                         commission: props.commission,
                         direction: props.direction,
-                        strategy_params: strategyParams
+                        parameters: rowParams,
                     };
 
                     const btRes = await fetch(
@@ -2180,6 +2295,7 @@ class OptimizationPanels {
                     const btData = await btRes.json();
                     const backtestId = btData.backtest_id || btData.id;
                     if (backtestId) {
+                        row.backtest_id = backtestId; // cache for next click
                         window.open(`/frontend/backtest-results.html?backtest_id=${backtestId}`, '_blank');
                     } else {
                         this.showNotification('Бэктест завершён, но backtest_id не получен', 'warning');

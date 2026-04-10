@@ -6149,6 +6149,13 @@ body.floating-window-open .zoom-controls {
     font-size: 11px;
 }
 
+.opt-flag-ready {
+    color: #60a5fa;
+    margin-right: 2px;
+    font-size: 10px;
+    opacity: 0.8;
+}
+
 /* Cell value colors */
 .opt-cell-pos {
     color: #3fb950;
@@ -7521,8 +7528,7 @@ body.floating-window-open .zoom-controls {
 
 /* Parameter Range Container */
 .param-ranges-container {
-    max-height: 200px;
-    overflow-y: auto;
+    overflow-y: visible;
 }
 
 .param-range-item {

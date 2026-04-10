@@ -36,6 +36,7 @@ def build_backtest_input(
     trade_direction: TradeDirection,
     stop_loss_pct: float = 0.0,
     take_profit_pct: float = 0.0,
+    max_bars_in_trade: int = 0,
 ) -> BacktestInput:
     """
     Build BacktestInput from request params — single source of truth.
@@ -49,6 +50,7 @@ def build_backtest_input(
         trade_direction: TradeDirection enum.
         stop_loss_pct: Stop loss percent (e.g. 10.0 = 10%).
         take_profit_pct: Take profit percent (e.g. 1.5 = 1.5%).
+        max_bars_in_trade: Force-close after N bars (0 = disabled, from close_by_time block).
 
     Returns:
         Configured BacktestInput instance.
@@ -82,6 +84,7 @@ def build_backtest_input(
         use_bar_magnifier=False,
         max_drawdown_limit=0.0,
         pyramiding=request_params.get("pyramiding", 1),
+        max_bars_in_trade=max_bars_in_trade,
         market_regime_enabled=request_params.get("market_regime_enabled", False),
         market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
         market_regime_lookback=request_params.get("market_regime_lookback", 50),

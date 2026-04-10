@@ -1,11 +1,29 @@
 """
 Optimization Scoring Functions.
 
-Composite score calculation and multi-criteria ranking.
+Composite score calculation, multi-criteria ranking, GT-Score,
+and Deflated Sharpe Ratio.
 Extracted from optimizations.py for testability and reuse.
 """
 
 from __future__ import annotations
+
+import math
+
+
+def _safe(v: object, default: float = 0.0) -> float:
+    """Return default if v is None, NaN, or non-finite.
+
+    Replaces the ``x or 0`` pattern which fails for NaN: float('nan') is
+    truthy, so ``nan or 0`` returns nan instead of 0.
+    """
+    if v is None:
+        return default
+    try:
+        f = float(v)  # type: ignore[arg-type]
+        return f if math.isfinite(f) else default
+    except (TypeError, ValueError):
+        return default
 
 
 def calculate_composite_score(result: dict, metric: str, weights: dict | None = None) -> float:
@@ -29,13 +47,13 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     Note:
         max_drawdown comes in PERCENT (17.29 = 17.29%).
     """
-    total_return = result.get("total_return", 0) or 0
-    sharpe_ratio = result.get("sharpe_ratio", 0) or 0
-    net_profit = result.get("net_profit", 0) or 0
-    max_drawdown_pct = abs(result.get("max_drawdown", 0) or 0)
+    total_return = _safe(result.get("total_return"))
+    sharpe_ratio = _safe(result.get("sharpe_ratio"))
+    net_profit = _safe(result.get("net_profit"))
+    max_drawdown_pct = abs(_safe(result.get("max_drawdown")))
     max_drawdown = max_drawdown_pct / 100.0
-    win_rate_pct = result.get("win_rate", 0) or 0
-    profit_factor = result.get("profit_factor", 0) or 0  # 0 for losers, not 1
+    win_rate_pct = _safe(result.get("win_rate"))
+    profit_factor = _safe(result.get("profit_factor"))  # 0 for losers, not 1
     profit_factor = min(profit_factor, 999.0)  # cap to avoid runaway scores from tiny loss baselines
 
     # Simple metrics (higher = better)
@@ -44,46 +62,46 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     elif metric == "sharpe_ratio":
         return sharpe_ratio
     elif metric == "sortino_ratio":
-        return result.get("sortino_ratio", 0) or 0
+        return _safe(result.get("sortino_ratio"))
     elif metric == "total_return":
         return total_return
     elif metric == "cagr":
-        return result.get("cagr", 0) or 0
+        return _safe(result.get("cagr"))
     elif metric == "win_rate":
         return win_rate_pct
     elif metric == "profit_factor":
         return profit_factor
     elif metric == "expectancy":
-        return result.get("expectancy", 0) or 0
+        return _safe(result.get("expectancy"))
     elif metric == "recovery_factor":
-        rf = result.get("recovery_factor", 0) or 0
+        rf = _safe(result.get("recovery_factor"))
         return min(rf, 999.0) if rf != float("inf") else 999.0
     elif metric == "avg_win":
-        return result.get("avg_win", 0) or 0
+        return _safe(result.get("avg_win"))
     elif metric == "payoff_ratio":
-        return result.get("payoff_ratio", 0) or 0
+        return _safe(result.get("payoff_ratio"))
     elif metric == "total_trades":
-        return result.get("total_trades", 0) or 0
+        return _safe(result.get("total_trades"))
     elif metric == "trades_per_month":
-        return result.get("trades_per_month", 0) or 0
+        return _safe(result.get("trades_per_month"))
 
     # Inverted metrics (lower = better, return negative for sorting)
     elif metric == "max_drawdown":
         return -max_drawdown_pct
     elif metric == "avg_drawdown":
-        return -(abs(result.get("avg_drawdown", 0) or 0))
+        return -(abs(_safe(result.get("avg_drawdown"))))
     elif metric == "avg_loss":
-        return -(abs(result.get("avg_loss", 0) or 0))
+        return -(abs(_safe(result.get("avg_loss"))))
     elif metric == "volatility":
-        return -(abs(result.get("volatility", 0) or 0))
+        return -(abs(_safe(result.get("volatility"))))
     elif metric == "var_95":
-        return -(abs(result.get("var_95", 0) or 0))
+        return -(abs(_safe(result.get("var_95"))))
 
     # Activity metrics (neutral - return raw value)
     elif metric == "avg_trade_duration":
-        return result.get("avg_trade_duration", 0) or result.get("avg_bars_in_trade", 0) or 0
+        return _safe(result.get("avg_trade_duration")) or _safe(result.get("avg_bars_in_trade"))
     elif metric == "avg_bars_in_trade":
-        return result.get("avg_bars_in_trade", 0) or 0
+        return _safe(result.get("avg_bars_in_trade"))
 
     # Computed composite metrics
     elif metric == "calmar_ratio":
@@ -105,8 +123,6 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     # and streaming progress during the sweep.
     # ──────────────────────────────────────────────────────────────────────────
     elif metric == "pareto_balance":
-        import math
-
         trades = int(result.get("total_trades", 0) or 0)
         dd_safe = max(max_drawdown_pct, 0.1)  # floor at 0.1% to avoid /0
         trade_bonus = math.log1p(max(trades, 1))
@@ -148,15 +164,19 @@ def apply_pareto_scores(results: list[dict]) -> list[dict]:
     Returns:
         Same list with ``score`` and ``pareto_score`` updated.
     """
-    import math
 
     if not results:
         return results
 
-    returns = [abs(float(r.get("total_return", 0) or 0)) for r in results]
+    # Use actual total_return (not abs) so negative-return strategies always rank below
+    # positive-return ones. Clamp negative returns to 0 for normalization purposes.
+    raw_returns = [float(r.get("total_return", 0) or 0) for r in results]
     drawdowns = [abs(float(r.get("max_drawdown", 0) or 0)) for r in results]
 
-    min_ret, max_ret = min(returns), max(returns)
+    # For normalization, floor returns at 0 so losers never compete with winners
+    norm_returns = [max(ret, 0.0) for ret in raw_returns]
+
+    min_ret, max_ret = min(norm_returns), max(norm_returns)
     min_dd, max_dd = min(drawdowns), max(drawdowns)
 
     ret_range = max_ret - min_ret if max_ret > min_ret else 1.0
@@ -165,7 +185,7 @@ def apply_pareto_scores(results: list[dict]) -> list[dict]:
     EPS = 1e-6
 
     for i, r in enumerate(results):
-        np_norm = (returns[i] - min_ret) / ret_range  # 0..1, higher=better
+        np_norm = (norm_returns[i] - min_ret) / ret_range  # 0..1, higher=better
         # dd_norm: 0..1, higher means WORSE drawdown → invert
         dd_raw_norm = (drawdowns[i] - min_dd) / dd_range  # 0=best DD, 1=worst DD
         dd_penalty = dd_raw_norm + EPS  # avoid /0
@@ -174,6 +194,9 @@ def apply_pareto_scores(results: list[dict]) -> list[dict]:
         trade_bonus = math.log1p(max(trades, 1))
 
         pareto = (np_norm / dd_penalty) * trade_bonus
+        # Penalise losing strategies: negative total_return → always score 0 or below
+        if raw_returns[i] < 0:
+            pareto = -abs(pareto) - 1.0
         r["pareto_score"] = round(float(pareto), 6)
         r["score"] = r["pareto_score"]
 
@@ -320,7 +343,6 @@ def composite_quality_score(result: dict) -> float:
         ...                          "total_trades": 50, "max_drawdown": 15.0})
         # ≈ 1.2 × 1.8 × log(51) / 1.15 ≈ 6.84
     """
-    import math
 
     sharpe = result.get("sharpe_ratio", 0.0) or 0.0
     sortino = result.get("sortino_ratio", 0.0) or 0.0
@@ -365,3 +387,151 @@ def apply_custom_sort_order(results: list[dict], sort_order: list[dict]) -> list
         return tuple(keys)
 
     return sorted(results, key=sort_key)
+
+
+# =============================================================================
+# P1-1: GT-Score (Generalization-Testing Score)
+# =============================================================================
+
+
+def calculate_gt_score(
+    base_params: dict,
+    param_specs: list[dict],
+    run_backtest_fn,
+    n_neighbors: int = 20,
+    epsilon: float = 0.05,
+    seed: int = 42,
+) -> dict:
+    """
+    Calculate GT-Score (Generalization-Testing Score) for a parameter set.
+
+    Measures robustness of the found optimum by evaluating N perturbed
+    parameter combinations in the ±epsilon neighborhood.
+
+    High GT-Score = strategy sits on a plateau (robust, generalizable).
+    Low GT-Score  = strategy is a sharp peak (overfitted, fragile).
+
+    Args:
+        base_params: Optimal parameter dict {"param_path": value, ...}.
+        param_specs: Parameter specs with type/low/high/step info.
+        run_backtest_fn: Callable(params_dict) -> score_float | None.
+        n_neighbors: Number of perturbed neighbors to evaluate (default 20).
+        epsilon: Perturbation fraction of param range (default 0.05 = ±5%).
+        seed: RNG seed for reproducibility.
+
+    Returns:
+        Dict with:
+            gt_score: float — mean/std ratio (higher = more robust)
+            gt_mean: float — mean neighbor score
+            gt_std: float — std of neighbor scores
+            gt_n_valid: int — number of neighbors with valid results
+    """
+    import random
+
+    import numpy as np
+
+    rng = random.Random(seed)
+
+    # Build spec lookup by param_path
+    spec_map = {s["param_path"]: s for s in param_specs}
+
+    neighbor_scores: list[float] = []
+
+    for _ in range(n_neighbors):
+        perturbed = {}
+        for path, val in base_params.items():
+            spec = spec_map.get(path)
+            if spec is None:
+                perturbed[path] = val
+                continue
+
+            param_range = spec["high"] - spec["low"]
+            delta = param_range * epsilon
+
+            if spec["type"] == "int":
+                max_step = max(1, int(delta))
+                offset = rng.randint(-max_step, max_step)
+                new_val = int(val) + offset
+                new_val = max(spec["low"], min(spec["high"], new_val))
+                perturbed[path] = int(new_val)
+            else:
+                offset = rng.uniform(-delta, delta)
+                new_val = float(val) + offset
+                new_val = max(spec["low"], min(spec["high"], new_val))
+                step = spec.get("step", 0.01)
+                n_decimals = max(0, -math.floor(math.log10(step)) if step < 1 else 0)
+                perturbed[path] = round(new_val, n_decimals)
+
+        score = run_backtest_fn(perturbed)
+        if score is not None:
+            neighbor_scores.append(score)
+
+    if len(neighbor_scores) < 2:
+        return {"gt_score": 0.0, "gt_mean": 0.0, "gt_std": 0.0, "gt_n_valid": len(neighbor_scores)}
+
+    gt_mean = float(np.mean(neighbor_scores))
+    gt_std = float(np.std(neighbor_scores))
+    gt_score = gt_mean / (gt_std + 1e-8)
+
+    return {
+        "gt_score": round(gt_score, 4),
+        "gt_mean": round(gt_mean, 6),
+        "gt_std": round(gt_std, 6),
+        "gt_n_valid": len(neighbor_scores),
+    }
+
+
+# =============================================================================
+# P2-3: Deflated Sharpe Ratio (DSR) — Bailey & López de Prado (2014)
+# =============================================================================
+
+
+def deflated_sharpe_ratio(
+    sharpe_ratio: float,
+    n_trials: int,
+    n_observations: int,
+    skewness: float = 0.0,
+    kurtosis: float = 3.0,
+) -> float:
+    """
+    Calculate Deflated Sharpe Ratio (DSR) — Bailey & López de Prado (2014).
+
+    Corrects the best observed Sharpe Ratio for selection bias from
+    evaluating multiple parameter combinations. DSR < 0 means the
+    strategy has no statistical edge after accounting for trial count.
+
+    Args:
+        sharpe_ratio: Best observed Sharpe Ratio from optimization.
+        n_trials: Number of parameter combinations evaluated (strategies tested).
+        n_observations: Number of bars (time periods) in the backtest.
+        skewness: Skewness of returns (default 0 = normal).
+        kurtosis: Kurtosis of returns (default 3 = normal).
+
+    Returns:
+        DSR: float in [0, 1] (probability). DSR > 0.5 → statistically significant edge.
+    """
+    from scipy import stats as _stats
+
+    if n_observations < 10 or n_trials < 1:
+        return float("nan")
+
+    gamma_em = 0.5772156649  # Euler-Mascheroni constant
+
+    # Expected maximum Sharpe from N independent trials (Extreme Value Theory)
+    z1 = _stats.norm.ppf(1 - 1.0 / max(n_trials, 2))
+    z2 = _stats.norm.ppf(1 - 1.0 / max(n_trials * math.e, 2))
+    expected_max = (1 - gamma_em) * z1 + gamma_em * z2
+
+    # Standard deviation of SR estimator
+    sr_std = math.sqrt(
+        (1 - skewness * sharpe_ratio + (kurtosis - 1) / 4.0 * sharpe_ratio**2) / max(n_observations - 1, 1)
+    )
+
+    if sr_std < 1e-12:
+        return float("nan")
+
+    # DSR: probability that SR > expected maximum from random search
+    dsr_z = (sharpe_ratio - expected_max) / sr_std
+    dsr = float(_stats.norm.cdf(dsr_z))
+
+    return round(dsr, 4)
