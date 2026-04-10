@@ -543,6 +543,7 @@ class BuilderWorkflow:
                                     "connections": config.connections,
                                 }
                                 from backend.agents.mcp.tools.strategy_builder import _api_put
+
                                 await _api_put(
                                     f"/strategies/{config.existing_strategy_id}",
                                     json_data=sync_payload,
@@ -553,9 +554,7 @@ class BuilderWorkflow:
                                     f"{len(raw_connections) - len(config.connections)} filtered connections)"
                                 )
                             except Exception as _sync_err:
-                                logger.warning(
-                                    f"[BuilderWorkflow] Could not sync connections to DB: {_sync_err}"
-                                )
+                                logger.warning(f"[BuilderWorkflow] Could not sync connections to DB: {_sync_err}")
                     else:
                         logger.warning(
                             f"[BuilderWorkflow] Could not load existing strategy details: "
@@ -573,11 +572,26 @@ class BuilderWorkflow:
             # The backtest endpoint is also patched to accept these as valid exit conditions.
             if config.existing_strategy_id and config.blocks:
                 _exit_types = {
-                    "static_sltp", "exit", "trailing_stop", "atr_exit", "multi_tp",
-                    "trailing_stop_exit", "time_exit", "session_exit", "break_even_exit",
-                    "chandelier_exit", "partial_close", "multi_tp_exit", "tp_percent",
-                    "sl_percent", "rsi_close", "stoch_close", "channel_close", "ma_close",
-                    "psar_close", "time_bars_close",
+                    "static_sltp",
+                    "exit",
+                    "trailing_stop",
+                    "atr_exit",
+                    "multi_tp",
+                    "trailing_stop_exit",
+                    "time_exit",
+                    "session_exit",
+                    "break_even_exit",
+                    "chandelier_exit",
+                    "partial_close",
+                    "multi_tp_exit",
+                    "tp_percent",
+                    "sl_percent",
+                    "rsi_close",
+                    "stoch_close",
+                    "channel_close",
+                    "ma_close",
+                    "psar_close",
+                    "time_bars_close",
                 }
                 if not any(b.get("type") in _exit_types for b in config.blocks):
                     if config.stop_loss is None:
@@ -586,7 +600,7 @@ class BuilderWorkflow:
                         config.take_profit = 0.04  # 4% TP
                     logger.info(
                         "[BuilderWorkflow] Optimize mode: no exit block found — "
-                        f"injecting SL={config.stop_loss*100:.1f}% TP={config.take_profit*100:.1f}% "
+                        f"injecting SL={config.stop_loss * 100:.1f}% TP={config.take_profit * 100:.1f}% "
                         "into backtest config (no structural block added)"
                     )
                     self._emit_agent_log(
@@ -594,8 +608,8 @@ class BuilderWorkflow:
                         role="planner",
                         prompt="Auto-fix: missing exit conditions",
                         response=(
-                            f"✅ Strategy has no exit block. Using SL={config.stop_loss*100:.1f}% / "
-                            f"TP={config.take_profit*100:.1f}% from backtest config so all iterations "
+                            f"✅ Strategy has no exit block. Using SL={config.stop_loss * 100:.1f}% / "
+                            f"TP={config.take_profit * 100:.1f}% from backtest config so all iterations "
                             "can run. Optimizer will tune indicator parameters."
                         ),
                         title="🔧 Auto-fix: SL/TP injected from config",
@@ -777,9 +791,7 @@ class BuilderWorkflow:
                 self._set_stage(BuilderStage.ITERATING)
 
                 # ── Shared context for _suggest_adjustments calls ──────────
-                _bt_warnings = (
-                    backtest.get("warnings", []) if isinstance(backtest, dict) else []
-                )
+                _bt_warnings = backtest.get("warnings", []) if isinstance(backtest, dict) else []
                 _iters_hist = list(self._result.iterations)  # snapshot before new iter added
                 _delib_plan = self._result.deliberation.get("decision", "") or None
 
@@ -815,7 +827,9 @@ class BuilderWorkflow:
                             # Quick re-backtest after topology change so optimizer
                             # sees the new graph, not the old broken one.
                             _topo_sl = config.stop_loss if (config.stop_loss and config.stop_loss >= 0.001) else None
-                            _topo_tp = config.take_profit if (config.take_profit and config.take_profit >= 0.001) else None
+                            _topo_tp = (
+                                config.take_profit if (config.take_profit and config.take_profit >= 0.001) else None
+                            )
                             _topo_backtest = await builder_run_backtest(
                                 strategy_id=self._result.strategy_id,
                                 symbol=config.symbol,
@@ -958,12 +972,13 @@ class BuilderWorkflow:
 
                 # Save a version snapshot to DB after each successful adjustment
                 try:
+                    import re as _re
+
                     from backend.agents.mcp.tools.strategy_builder import (
                         builder_clone_strategy,
                     )
 
-                    import re as _re
-                    base_name = _re.sub(r'[_ ]*AI-\d+$', '', config.name).rstrip('_- ')
+                    base_name = _re.sub(r"[_ ]*AI-\d+$", "", config.name).rstrip("_- ")
                     version_name = f"{base_name} AI-{iteration}"
                     clone = await builder_clone_strategy(
                         strategy_id=self._result.strategy_id,
@@ -1085,12 +1100,11 @@ class BuilderWorkflow:
                 from backend.agents.mcp.tools.strategy_builder import (
                     builder_update_block_params as _ubp,
                 )
+
                 for _best_b in best_blocks_snapshot:
                     _bid = _best_b.get("id", "")
                     _best_params = _best_b.get("params") or {}
-                    _curr_b = next(
-                        (b for b in self._result.blocks_added if b.get("id") == _bid), None
-                    )
+                    _curr_b = next((b for b in self._result.blocks_added if b.get("id") == _bid), None)
                     _curr_params = (_curr_b.get("params") or {}) if _curr_b else {}
                     _diff = {k: v for k, v in _best_params.items() if _curr_params.get(k) != v}
                     if _diff:
@@ -1123,11 +1137,10 @@ class BuilderWorkflow:
                 )
 
                 # Exclude the Gate 2 "final capture" record from the count
-                _total_iters = sum(
-                    1 for r in self._result.iterations if not r.get("_gate2_capture")
-                )
+                _total_iters = sum(1 for r in self._result.iterations if not r.get("_gate2_capture"))
                 import re as _re
-                _base = _re.sub(r'[_ ]*AI-\d+$', '', config.name).rstrip('_- ')
+
+                _base = _re.sub(r"[_ ]*AI-\d+$", "", config.name).rstrip("_- ")
                 _final_name = f"{_base} AI-{_total_iters}"
 
                 final_clone = await builder_clone_strategy(
@@ -1311,11 +1324,11 @@ Recommended approach for positive profit (EMA + RSI combination):
 }}"""
 
         try:
-            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
             _agent_name = config.agent if config.agent in {"qwen", "deepseek", "perplexity"} else "qwen"
-            delib = get_real_deliberation()
-            raw_text: str = await delib._real_ask(_agent_name, prompt) or ""
+            _interface = UnifiedAgentInterface()
+            raw_text: str = await _interface.ask(_agent_name, prompt) or ""
             logger.debug(f"[BuilderWorkflow] LLM plan raw response from {_agent_name} ({len(raw_text)} chars)")
 
             # Emit agent log so the SSE panel can show what the planner said
@@ -2066,32 +2079,72 @@ Recommended approach for positive profit (EMA + RSI combination):
         # Human-readable metadata per block type: category, description, output ports
         _BLOCK_META: dict[str, dict[str, str]] = {
             # Oscillators → entry signals
-            "rsi":              {"cat": "oscillator", "desc": "RSI momentum — cross level or range filter", "ports": "long, short"},
-            "macd":             {"cat": "oscillator", "desc": "MACD histogram cross zero/signal line", "ports": "long, short"},
-            "stochastic":       {"cat": "oscillator", "desc": "Stochastic %K/%D overbought/oversold", "ports": "long, short"},
-            "cci":              {"cat": "oscillator", "desc": "Commodity Channel Index momentum", "ports": "long, short"},
-            "williams_r":       {"cat": "oscillator", "desc": "Williams %R oscillator", "ports": "long, short"},
-            "qqe":              {"cat": "oscillator", "desc": "QQE — smoothed RSI with dynamic signal band", "ports": "long, short"},
-            "divergence":       {"cat": "oscillator", "desc": "Price/indicator divergence (RSI, MACD, Stoch, CMF, MFI)", "ports": "long, short"},
-            "aroon":            {"cat": "oscillator", "desc": "Aroon trend strength + direction crossover", "ports": "long, short"},
+            "rsi": {"cat": "oscillator", "desc": "RSI momentum — cross level or range filter", "ports": "long, short"},
+            "macd": {"cat": "oscillator", "desc": "MACD histogram cross zero/signal line", "ports": "long, short"},
+            "stochastic": {"cat": "oscillator", "desc": "Stochastic %K/%D overbought/oversold", "ports": "long, short"},
+            "cci": {"cat": "oscillator", "desc": "Commodity Channel Index momentum", "ports": "long, short"},
+            "williams_r": {"cat": "oscillator", "desc": "Williams %R oscillator", "ports": "long, short"},
+            "qqe": {"cat": "oscillator", "desc": "QQE — smoothed RSI with dynamic signal band", "ports": "long, short"},
+            "divergence": {
+                "cat": "oscillator",
+                "desc": "Price/indicator divergence (RSI, MACD, Stoch, CMF, MFI)",
+                "ports": "long, short",
+            },
+            "aroon": {
+                "cat": "oscillator",
+                "desc": "Aroon trend strength + direction crossover",
+                "ports": "long, short",
+            },
             # Trend indicators
-            "supertrend":       {"cat": "trend", "desc": "SuperTrend ATR follower. ⚠️ connect to filter_long (not entry_long) to avoid over-trading every bar", "ports": "long, short"},
-            "ichimoku":         {"cat": "trend", "desc": "Ichimoku cloud multi-component (tenkan/kijun/senkou)", "ports": "long, short"},
-            "parabolic_sar":    {"cat": "trend", "desc": "Parabolic SAR trend reversal dots", "ports": "long, short"},
-            "adx":              {"cat": "trend", "desc": "ADX trend strength — best as filter: pass when ADX > threshold", "ports": "long, short (connect fromPort='long' to toPort='filter_long' on strategy)"},
+            "supertrend": {
+                "cat": "trend",
+                "desc": "SuperTrend ATR follower. ⚠️ connect to filter_long (not entry_long) to avoid over-trading every bar",
+                "ports": "long, short",
+            },
+            "ichimoku": {
+                "cat": "trend",
+                "desc": "Ichimoku cloud multi-component (tenkan/kijun/senkou)",
+                "ports": "long, short",
+            },
+            "parabolic_sar": {"cat": "trend", "desc": "Parabolic SAR trend reversal dots", "ports": "long, short"},
+            "adx": {
+                "cat": "trend",
+                "desc": "ADX trend strength — best as filter: pass when ADX > threshold",
+                "ports": "long, short (connect fromPort='long' to toPort='filter_long' on strategy)",
+            },
             # Moving averages
-            "ema":              {"cat": "trend_ma", "desc": "EMA — connect via two_mas for crossover signals", "ports": "value"},
-            "sma":              {"cat": "trend_ma", "desc": "SMA — connect via two_mas for crossover signals", "ports": "value"},
-            "two_mas":          {"cat": "trend_ma", "desc": "Dual MA crossover (fast MA × slow MA cross)", "ports": "long, short"},
+            "ema": {"cat": "trend_ma", "desc": "EMA — connect via two_mas for crossover signals", "ports": "value"},
+            "sma": {"cat": "trend_ma", "desc": "SMA — connect via two_mas for crossover signals", "ports": "value"},
+            "two_mas": {
+                "cat": "trend_ma",
+                "desc": "Dual MA crossover (fast MA × slow MA cross)",
+                "ports": "long, short",
+            },
             # Volatility / breakout
-            "keltner_bollinger": {"cat": "volatility", "desc": "BB-inside-Keltner squeeze → breakout momentum signals", "ports": "long, short"},
-            "donchian":         {"cat": "volatility", "desc": "Donchian Channel N-bar high/low breakout", "ports": "long, short"},
-            "highest_lowest_bar": {"cat": "volatility", "desc": "N-bar high/low breakout with ATR confirmation", "ports": "long, short"},
-            "bollinger":        {"cat": "volatility", "desc": "Bollinger Bands — outputs price bands, NOT bool signals. Use keltner_bollinger for entry signals.", "ports": "upper, middle, lower, percentb"},
-            "keltner":          {"cat": "volatility", "desc": "Keltner Channel ATR bands", "ports": "upper, middle, lower"},
-            "atr":              {"cat": "volatility", "desc": "ATR value — pair with atr_volatility filter", "ports": "value"},
+            "keltner_bollinger": {
+                "cat": "volatility",
+                "desc": "BB-inside-Keltner squeeze → breakout momentum signals",
+                "ports": "long, short",
+            },
+            "donchian": {
+                "cat": "volatility",
+                "desc": "Donchian Channel N-bar high/low breakout",
+                "ports": "long, short",
+            },
+            "highest_lowest_bar": {
+                "cat": "volatility",
+                "desc": "N-bar high/low breakout with ATR confirmation",
+                "ports": "long, short",
+            },
+            "bollinger": {
+                "cat": "volatility",
+                "desc": "Bollinger Bands — outputs price bands, NOT bool signals. Use keltner_bollinger for entry signals.",
+                "ports": "upper, middle, lower, percentb",
+            },
+            "keltner": {"cat": "volatility", "desc": "Keltner Channel ATR bands", "ports": "upper, middle, lower"},
+            "atr": {"cat": "volatility", "desc": "ATR value — pair with atr_volatility filter", "ports": "value"},
             # Volume
-            "cmf":              {"cat": "volume", "desc": "Chaikin Money Flow volume momentum (positive=bullish)", "ports": "value"},
+            "cmf": {"cat": "volume", "desc": "Chaikin Money Flow volume momentum (positive=bullish)", "ports": "value"},
             # Filters (AND-gate: connect fromPort='long' toPort='filter_long' on strategy)
             # IMPORTANT: filter block OUTPUT ports are 'long' and 'short' — NOT 'filter_long'/'filter_short'
             # 'filter_long'/'filter_short' are TARGET ports on the strategy node, not source ports
@@ -2099,48 +2152,108 @@ Recommended approach for positive profit (EMA + RSI combination):
             #   volume_filter, macd_filter, stochastic_filter, two_ma_filter, qqe_filter, rsi_filter
             #   do NOT exist and will be silently rejected. To filter with MACD/RSI/ADX: use the
             #   base block type (macd/rsi/adx) connected fromPort="long" toPort="filter_long".
-            "supertrend_filter": {"cat": "filter", "desc": "SuperTrend AND-gate filter — enforce trend alignment (alias: supertrend). Use generate_on_trend_change=True.", "ports": "long, short"},
-            "rvi_filter":       {"cat": "filter", "desc": "Relative Vigor Index filter", "ports": "long, short"},
-            "mfi_filter":       {"cat": "filter", "desc": "Money Flow Index filter — volume-weighted momentum", "ports": "long, short"},
-            "cci_filter":       {"cat": "filter", "desc": "CCI range filter", "ports": "long, short"},
-            "momentum_filter":  {"cat": "filter", "desc": "Price momentum ROC filter", "ports": "long, short"},
-            "accumulation_areas": {"cat": "filter", "desc": "Accumulation zone detector — entries near support/resistance", "ports": "long, short"},
+            "supertrend_filter": {
+                "cat": "filter",
+                "desc": "SuperTrend AND-gate filter — enforce trend alignment (alias: supertrend). Use generate_on_trend_change=True.",
+                "ports": "long, short",
+            },
+            "rvi_filter": {"cat": "filter", "desc": "Relative Vigor Index filter", "ports": "long, short"},
+            "mfi_filter": {
+                "cat": "filter",
+                "desc": "Money Flow Index filter — volume-weighted momentum",
+                "ports": "long, short",
+            },
+            "cci_filter": {"cat": "filter", "desc": "CCI range filter", "ports": "long, short"},
+            "momentum_filter": {"cat": "filter", "desc": "Price momentum ROC filter", "ports": "long, short"},
+            "accumulation_areas": {
+                "cat": "filter",
+                "desc": "Accumulation zone detector — entries near support/resistance",
+                "ports": "long, short",
+            },
             # Exit blocks
-            "static_sltp":        {"cat": "exit", "desc": "Static SL/TP % with optional breakeven. PRIMARY exit.", "ports": "sl_tp"},
-            "trailing_stop_exit": {"cat": "exit", "desc": "Trailing stop — activates at N%, trails by M%", "ports": "sl_tp"},
-            "atr_exit":           {"cat": "exit", "desc": "ATR-dynamic SL/TP — adapts to volatility", "ports": "sl_tp"},
-            "multi_tp_exit":      {"cat": "exit", "desc": "3-level TP with partial position close at each level", "ports": "sl_tp"},
-            "close_by_time":      {"cat": "exit", "desc": "Time-based exit: close after N bars (+ optional min_profit gate)", "ports": "sl_tp"},
-            "close_channel":      {"cat": "exit", "desc": "Close when price re-enters BB/Keltner channel (squeeze exit)", "ports": "sl_tp"},
-            "close_ma_cross":     {"cat": "exit", "desc": "Close on fast/slow MA crossover (+ optional min_profit gate)", "ports": "sl_tp"},
-            "close_rsi":          {"cat": "exit", "desc": "Close when RSI reaches overbought/oversold level", "ports": "sl_tp"},
-            "close_stochastic":   {"cat": "exit", "desc": "Close when Stochastic reaches overbought/oversold", "ports": "sl_tp"},
-            "close_psar":         {"cat": "exit", "desc": "Close on Parabolic SAR flip (trend reversal)", "ports": "sl_tp"},
-            "chandelier_exit":    {"cat": "exit", "desc": "Chandelier stop: ATR multiplier below highest high", "ports": "sl_tp"},
-            "break_even_exit":    {"cat": "exit", "desc": "Move SL to breakeven after price moves N% in profit", "ports": "sl_tp"},
+            "static_sltp": {
+                "cat": "exit",
+                "desc": "Static SL/TP % with optional breakeven. PRIMARY exit.",
+                "ports": "sl_tp",
+            },
+            "trailing_stop_exit": {
+                "cat": "exit",
+                "desc": "Trailing stop — activates at N%, trails by M%",
+                "ports": "sl_tp",
+            },
+            "atr_exit": {"cat": "exit", "desc": "ATR-dynamic SL/TP — adapts to volatility", "ports": "sl_tp"},
+            "multi_tp_exit": {
+                "cat": "exit",
+                "desc": "3-level TP with partial position close at each level",
+                "ports": "sl_tp",
+            },
+            "close_by_time": {
+                "cat": "exit",
+                "desc": "Time-based exit: close after N bars (+ optional min_profit gate)",
+                "ports": "sl_tp",
+            },
+            "close_channel": {
+                "cat": "exit",
+                "desc": "Close when price re-enters BB/Keltner channel (squeeze exit)",
+                "ports": "sl_tp",
+            },
+            "close_ma_cross": {
+                "cat": "exit",
+                "desc": "Close on fast/slow MA crossover (+ optional min_profit gate)",
+                "ports": "sl_tp",
+            },
+            "close_rsi": {"cat": "exit", "desc": "Close when RSI reaches overbought/oversold level", "ports": "sl_tp"},
+            "close_stochastic": {
+                "cat": "exit",
+                "desc": "Close when Stochastic reaches overbought/oversold",
+                "ports": "sl_tp",
+            },
+            "close_psar": {"cat": "exit", "desc": "Close on Parabolic SAR flip (trend reversal)", "ports": "sl_tp"},
+            "chandelier_exit": {
+                "cat": "exit",
+                "desc": "Chandelier stop: ATR multiplier below highest high",
+                "ports": "sl_tp",
+            },
+            "break_even_exit": {
+                "cat": "exit",
+                "desc": "Move SL to breakeven after price moves N% in profit",
+                "ports": "sl_tp",
+            },
             # Entry refinement
-            "dca":                {"cat": "entry", "desc": "DCA grid — multiple entry orders below initial entry", "ports": "entry_long"},
+            "dca": {
+                "cat": "entry",
+                "desc": "DCA grid — multiple entry orders below initial entry",
+                "ports": "entry_long",
+            },
             # MA variants (use via two_mas for crossover)
-            "wma":      {"cat": "trend_ma", "desc": "Weighted MA — heavier weight on recent bars", "ports": "value"},
-            "dema":     {"cat": "trend_ma", "desc": "Double EMA — less lag than EMA", "ports": "value"},
-            "tema":     {"cat": "trend_ma", "desc": "Triple EMA — minimal lag trend follower", "ports": "value"},
-            "hull_ma":  {"cat": "trend_ma", "desc": "Hull MA — very smooth, minimal lag", "ports": "value"},
+            "wma": {"cat": "trend_ma", "desc": "Weighted MA — heavier weight on recent bars", "ports": "value"},
+            "dema": {"cat": "trend_ma", "desc": "Double EMA — less lag than EMA", "ports": "value"},
+            "tema": {"cat": "trend_ma", "desc": "Triple EMA — minimal lag trend follower", "ports": "value"},
+            "hull_ma": {"cat": "trend_ma", "desc": "Hull MA — very smooth, minimal lag", "ports": "value"},
             # Additional oscillators
-            "stoch_rsi": {"cat": "oscillator", "desc": "Stochastic RSI — RSI of RSI, highly sensitive", "ports": "long, short"},
-            "roc":       {"cat": "oscillator", "desc": "Rate of Change — % price change over N bars", "ports": "long, short"},
-            "cmo":       {"cat": "oscillator", "desc": "Chande Momentum Oscillator — bounded momentum", "ports": "long, short"},
+            "stoch_rsi": {
+                "cat": "oscillator",
+                "desc": "Stochastic RSI — RSI of RSI, highly sensitive",
+                "ports": "long, short",
+            },
+            "roc": {"cat": "oscillator", "desc": "Rate of Change — % price change over N bars", "ports": "long, short"},
+            "cmo": {
+                "cat": "oscillator",
+                "desc": "Chande Momentum Oscillator — bounded momentum",
+                "ports": "long, short",
+            },
         }
 
         cat_order = ["oscillator", "trend", "trend_ma", "volatility", "volume", "filter", "exit", "entry"]
         cat_labels = {
             "oscillator": "ENTRY SIGNALS — Oscillators (connect to entry_long / entry_short)",
-            "trend":      "ENTRY SIGNALS — Trend Indicators (entry or filter_long / filter_short)",
-            "trend_ma":   "ENTRY SIGNALS — Moving Averages (use via two_mas block for crossover)",
+            "trend": "ENTRY SIGNALS — Trend Indicators (entry or filter_long / filter_short)",
+            "trend_ma": "ENTRY SIGNALS — Moving Averages (use via two_mas block for crossover)",
             "volatility": "VOLATILITY & BREAKOUT (entry_long or filter_long)",
-            "volume":     "VOLUME INDICATORS",
-            "filter":     "FILTERS — AND-gate (connect to filter_long / filter_short)",
-            "exit":       "EXIT BLOCKS (connect to sl_tp port)",
-            "entry":      "ENTRY REFINEMENT",
+            "volume": "VOLUME INDICATORS",
+            "filter": "FILTERS — AND-gate (connect to filter_long / filter_short)",
+            "exit": "EXIT BLOCKS (connect to sl_tp port)",
+            "entry": "ENTRY REFINEMENT",
         }
 
         # Group by category
@@ -2164,13 +2277,12 @@ Recommended approach for positive profit (EMA + RSI combination):
                 meta = _BLOCK_META.get(bt, {"desc": "", "ports": "long, short"})
                 params = DEFAULT_PARAM_RANGES.get(bt, {})
                 key_params = [
-                    f"{pn}[{spec.get('low','?')}..{spec.get('high','?')}]"
-                    for pn, spec in list(params.items())[:5]
+                    f"{pn}[{spec.get('low', '?')}..{spec.get('high', '?')}]" for pn, spec in list(params.items())[:5]
                 ]
                 if len(params) > 5:
-                    key_params.append(f"+{len(params)-5} more")
+                    key_params.append(f"+{len(params) - 5} more")
                 lines.append(
-                    f"    {bt}: {meta.get('desc','')} | ports→{meta.get('ports','?')} "
+                    f"    {bt}: {meta.get('desc', '')} | ports→{meta.get('ports', '?')} "
                     f"| params: {', '.join(key_params)}"
                 )
             lines.append("")
@@ -2234,10 +2346,7 @@ Recommended approach for positive profit (EMA + RSI combination):
             # NOT switch to range mode. Using only "change mode=True" caused iteration 2
             # to flood entries: ST already fixed → _has_st_change_mode=False → RSI flipped
             # to range mode → both filters nearly always True → 200+ noisy entries.
-            _has_supertrend_block = any(
-                (_b.get("type") or "").lower() == "supertrend"
-                for _b in blocks_added
-            )
+            _has_supertrend_block = any((_b.get("type") or "").lower() == "supertrend" for _b in blocks_added)
             for _b in blocks_added:
                 _btype = (_b.get("type") or "").lower()
                 _bparams = _b.get("params") or {}
@@ -2303,9 +2412,7 @@ Recommended approach for positive profit (EMA + RSI combination):
                     response=(
                         f"🔧 Auto-fixed {len(auto_fixes)} sparse-signal boolean params "
                         f"({_adj_trades} trades detected):\n"
-                        + "\n".join(
-                            f"  • {f['block_id']}: {f['params']}" for f in auto_fixes
-                        )
+                        + "\n".join(f"  • {f['block_id']}: {f['params']}" for f in auto_fixes)
                     ),
                     title=f"🔧 Auto-fix: sparse signal params ({_adj_trades} trades)",
                 )
@@ -2342,7 +2449,7 @@ Recommended approach for positive profit (EMA + RSI combination):
             for _rec in iterations_history:
                 _status = "✅ ACCEPTABLE" if _rec.get("acceptable") else "❌ not acceptable"
                 _history_section += (
-                    f"• Iter {_rec.get('iteration','?')}: "
+                    f"• Iter {_rec.get('iteration', '?')}: "
                     f"Sharpe={_rec.get('sharpe_ratio', 0):.3f}, "
                     f"Trades={_rec.get('total_trades', 0)}, "
                     f"WR={(_rec.get('win_rate', 0) * 100):.1f}%, "
@@ -2521,11 +2628,11 @@ Only include the specific parameters that should change."""
 
         # ── Single-agent fallback (uses config.agent set at run() start) ──────
         try:
-            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
             _agent_name = getattr(self, "_primary_agent", "qwen")
-            delib = get_real_deliberation()
-            raw_text_fallback: str = await delib._real_ask(_agent_name, prompt) or ""
+            _interface = UnifiedAgentInterface()
+            raw_text_fallback: str = await _interface.ask(_agent_name, prompt) or ""
 
             # Emit agent log for the single-agent fallback
             self._emit_agent_log(
@@ -2726,7 +2833,7 @@ Only include the specific parameters that should change."""
             _mem = _get_workflow_memory()
             _past = await _mem.recall(
                 query=f"{self._config_symbol if hasattr(self, '_config_symbol') else ''} "
-                      f"optimizer best params {total_trades} trades",
+                f"optimizer best params {total_trades} trades",
                 top_k=2,
                 min_importance=0.55,
             )
@@ -2797,10 +2904,7 @@ Only include the specific parameters that should change."""
             if previous_best_params:
                 _best_str = json.dumps(previous_best_params, indent=2)
                 _score_str = f"{previous_opt_score:.4f}" if previous_opt_score is not None else "N/A"
-                _hypothesis_section += (
-                    f"Optimizer found best params (score={_score_str}):\n"
-                    f"```json\n{_best_str}\n```\n"
-                )
+                _hypothesis_section += f"Optimizer found best params (score={_score_str}):\n```json\n{_best_str}\n```\n"
                 if previous_opt_score is not None and previous_opt_score > current_score:
                     _hypothesis_section += (
                         "→ The optimizer IMPROVED the score. NARROW your ranges around the best params above "
@@ -2943,11 +3047,11 @@ you may propose adding it via topology changes in a separate step — not here.
 
         # ── Single-agent fallback (uses config.agent set at run() start) ──────
         try:
-            from backend.agents.consensus.real_llm_deliberation import get_real_deliberation
+            from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
             _agent_name = getattr(self, "_primary_agent", "qwen")
-            delib = get_real_deliberation()
-            raw_text: str = await delib._real_ask(_agent_name, prompt) or ""
+            _interface = UnifiedAgentInterface()
+            raw_text: str = await _interface.ask(_agent_name, prompt) or ""
             self._emit_agent_log(
                 agent=_agent_name,
                 role="optimizer",
@@ -3107,9 +3211,7 @@ you may propose adding it via topology changes in a separate step — not here.
             tgt_port = tgt.get("portId", c.get("target_port", "?"))
             src_type = block_by_id.get(src_bid, {}).get("type", "?")
             tgt_type = block_by_id.get(tgt_bid, {}).get("type", "?")
-            graph_lines.append(
-                f"    [{cid}] {src_type}({src_bid}):{src_port} → {tgt_type}({tgt_bid}):{tgt_port}"
-            )
+            graph_lines.append(f"    [{cid}] {src_type}({src_bid}):{src_port} → {tgt_type}({tgt_bid}):{tgt_port}")
         graph_description = "\n".join(graph_lines)
 
         win_rate = metrics.get("win_rate", 0)
@@ -3126,9 +3228,9 @@ you may propose adding it via topology changes in a separate step — not here.
             _hist = "\n## Iteration history\n"
             for rec in iterations_history:
                 _hist += (
-                    f"  Iter {rec['iteration']}: Sharpe={rec.get('sharpe_ratio',0):.3f}, "
-                    f"Trades={rec.get('total_trades',0)}, WR={rec.get('win_rate',0)*100:.1f}%, "
-                    f"DD={rec.get('max_drawdown',0):.1f}%\n"
+                    f"  Iter {rec['iteration']}: Sharpe={rec.get('sharpe_ratio', 0):.3f}, "
+                    f"Trades={rec.get('total_trades', 0)}, WR={rec.get('win_rate', 0) * 100:.1f}%, "
+                    f"DD={rec.get('max_drawdown', 0):.1f}%\n"
                 )
 
         # Detect known problematic patterns for the prompt
@@ -3165,7 +3267,9 @@ you may propose adding it via topology changes in a separate step — not here.
         # Detect declining-trades pattern across iterations (progressive over-filtering)
         if iterations_history and len(iterations_history) >= 2:
             prev_trades = iterations_history[-1].get("total_trades", 0)
-            prev2_trades = iterations_history[-2].get("total_trades", 0) if len(iterations_history) >= 2 else prev_trades
+            prev2_trades = (
+                iterations_history[-2].get("total_trades", 0) if len(iterations_history) >= 2 else prev_trades
+            )
             if total_trades < prev_trades < prev2_trades and total_trades < 30:
                 _diagnoses.append(
                     "⛔ PROGRESSIVE OVER-FILTERING DETECTED: Trades are declining each iteration "
@@ -3186,7 +3290,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
 {_hist}
 ## Current backtest metrics (iteration {iteration})
 - Sharpe: {sharpe:.3f}
-- Win Rate: {win_rate*100:.1f}%
+- Win Rate: {win_rate * 100:.1f}%
 - Total Trades: {total_trades}
 - Max Drawdown: {max_dd:.1f}%
 - Net Profit: ${net_profit:.2f}
@@ -3255,10 +3359,11 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
         # DeepSeek + Qwen both see the full catalog and vote on topology changes.
         # We pick the first non-empty JSON array from the individual responses.
         try:
+            import os
+
             from backend.agents.agent_to_agent_communicator import AgentToAgentCommunicator
             from backend.agents.models import AgentType
 
-            import os
             a2a: AgentToAgentCommunicator = _get_a2a_communicator()
             available_agents = []
             if os.environ.get("DEEPSEEK_API_KEY"):
@@ -3286,7 +3391,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                     break
             if not raw_text:
                 raw_text = consensus.get("consensus", "")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[BuilderWorkflow] Topology agent timed out (90s) — skipping")
             return []
         except Exception as e:
@@ -3307,8 +3412,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
             # Validate each change has action key
             valid = [c for c in changes if isinstance(c, dict) and "action" in c]
             logger.info(
-                f"[BuilderWorkflow] 🏗️ Topology agent proposed {len(valid)} change(s): "
-                f"{[c['action'] for c in valid]}"
+                f"[BuilderWorkflow] 🏗️ Topology agent proposed {len(valid)} change(s): {[c['action'] for c in valid]}"
             )
             return valid
         except Exception as e:
@@ -3335,10 +3439,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
 
         def _sim_has_entry(conns: list[dict], remove_id: str | None = None, add_port: str | None = None) -> bool:
             """Simulate whether connections still have ≥1 entry_long/short after a change."""
-            remaining = [
-                c for c in conns
-                if c.get("id") != remove_id
-            ]
+            remaining = [c for c in conns if c.get("id") != remove_id]
             if add_port and add_port in _ENTRY_PORTS:
                 return True  # adding a new entry connection — safe
             for c in remaining:
@@ -3375,9 +3476,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                     logger.info(f"[BuilderWorkflow] 🏗️ Disconnected [{conn_id}] — {reason}")
                     applied.append(change)
                     # Update local connections snapshot
-                    current_connections[:] = [
-                        c for c in current_connections if c.get("id") != conn_id
-                    ]
+                    current_connections[:] = [c for c in current_connections if c.get("id") != conn_id]
 
                 elif action == "reconnect":
                     conn_id = change.get("connection_id", "")
@@ -3405,9 +3504,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                         if "error" in result:
                             logger.warning(f"[BuilderWorkflow] reconnect: disconnect {conn_id}: {result['error']}")
                             continue
-                        current_connections[:] = [
-                            c for c in current_connections if c.get("id") != conn_id
-                        ]
+                        current_connections[:] = [c for c in current_connections if c.get("id") != conn_id]
 
                     # Step 2: find source/target from the original connection if not overridden
                     orig = next((c for c in self._result.connections_made or [] if c.get("id") == conn_id), {})
@@ -3444,9 +3541,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                         logger.warning("[BuilderWorkflow] remove_block: missing block_id")
                         continue
                     # Safety: never remove strategy node
-                    target_block = next(
-                        (b for b in self._result.blocks_added if b.get("id") == block_id), {}
-                    )
+                    target_block = next((b for b in self._result.blocks_added if b.get("id") == block_id), {})
                     if target_block.get("type") in ("strategy", "static_sltp"):
                         logger.warning(
                             f"[BuilderWorkflow] remove_block: refusing to remove protected block "
@@ -3461,11 +3556,10 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                         logger.warning(f"[BuilderWorkflow] remove_block {block_id}: {result['error']}")
                         continue
                     # Update local state
-                    self._result.blocks_added = [
-                        b for b in self._result.blocks_added if b.get("id") != block_id
-                    ]
+                    self._result.blocks_added = [b for b in self._result.blocks_added if b.get("id") != block_id]
                     current_connections[:] = [
-                        c for c in current_connections
+                        c
+                        for c in current_connections
                         if c.get("source", {}).get("blockId") != block_id
                         and c.get("target", {}).get("blockId") != block_id
                     ]
@@ -3498,12 +3592,27 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                     # signals and silently break the entire optimizer run.
                     try:
                         from backend.backtesting.indicators import BLOCK_REGISTRY as _BREG
-                        _SPECIAL_TYPES = {"strategy", "condition", "filter", "exit",
-                                          "static_sltp", "close_by_time", "tp_percent",
-                                          "sl_percent", "atr_exit", "close_channel",
-                                          "close_rsi", "channel", "price_action",
-                                          "divergence", "momentum", "pivot_points",
-                                          "highest_lowest_bar", "two_mas"}
+
+                        _SPECIAL_TYPES = {
+                            "strategy",
+                            "condition",
+                            "filter",
+                            "exit",
+                            "static_sltp",
+                            "close_by_time",
+                            "tp_percent",
+                            "sl_percent",
+                            "atr_exit",
+                            "close_channel",
+                            "close_rsi",
+                            "channel",
+                            "price_action",
+                            "divergence",
+                            "momentum",
+                            "pivot_points",
+                            "highest_lowest_bar",
+                            "two_mas",
+                        }
                         if block_type not in _BREG and block_type not in _SPECIAL_TYPES:
                             logger.warning(
                                 f"[BuilderWorkflow] add_block BLOCKED: '{block_type}' not in "
@@ -3579,7 +3688,11 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
             ``tested_combinations`` on success; ``None`` on failure.
         """
         from backend.backtesting.service import BacktestService
+
+        # ── Convert agent ranges → custom_ranges format ──────────────────────
+        # custom_ranges format: [{param_path, low, high, step, type, enabled}]
         from backend.optimization.builder_optimizer import (
+            DEFAULT_PARAM_RANGES,
             _merge_ranges,
             clone_graph_with_params,
             extract_optimizable_params,
@@ -3589,14 +3702,10 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
             run_builder_optuna_search,
         )
 
-        # ── Convert agent ranges → custom_ranges format ──────────────────────
-        # custom_ranges format: [{param_path, low, high, step, type, enabled}]
-        from backend.optimization.builder_optimizer import DEFAULT_PARAM_RANGES
-
         # Pre-build block_id → block_type map (needed for constraint enforcement and
         # DEFAULT_PARAM_RANGES expansion). Populated from loaded strategy blocks.
         _block_type_map: dict[str, str] = {}
-        for _blk in (self._result.blocks_added or []):
+        for _blk in self._result.blocks_added or []:
             _bid = _blk.get("id", _blk.get("block_id", ""))
             _bt = _blk.get("type", "").lower()
             if _bid:
@@ -3613,26 +3722,20 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                 # ── Safety clamps to prevent degenerate RSI configs ───────────
                 # RSI period < 10 on 30m+ TF → 300+ daily crossings → commission bleed
                 if param == "period" and lo < 10:
-                    logger.warning(
-                        f"[BuilderWorkflow] Clamping {block_id}.period min {lo} → 10 (hard floor)"
-                    )
+                    logger.warning(f"[BuilderWorkflow] Clamping {block_id}.period min {lo} → 10 (hard floor)")
                     lo = 10
                 # cross_long_level: allow values as low as 20.
                 # cross_long_level < long_rsi_more is VALID — oscillators.py conflict-resolution
                 # path fires an extended-cross signal at range entry (long_rsi_more). This region
                 # produces the current best config (cross=36, long_rsi_more=43 → 124 signals).
                 if param == "cross_long_level" and lo < 20:
-                    logger.warning(
-                        f"[BuilderWorkflow] Clamping {block_id}.cross_long_level min {lo} → 20"
-                    )
+                    logger.warning(f"[BuilderWorkflow] Clamping {block_id}.cross_long_level min {lo} → 20")
                     lo = 20
                 # stop_loss_percent sanity floor: SL < 1% causes too many whipsaws on 30m.
                 # Note: now using FallbackV4 in optimizer so compounding parity gap is gone.
                 # Floor is just a sanity guard against extreme configs.
                 if param == "stop_loss_percent" and lo < 1.0:
-                    logger.warning(
-                        f"[BuilderWorkflow] Clamping {block_id}.stop_loss_percent min {lo} → 1.0"
-                    )
+                    logger.warning(f"[BuilderWorkflow] Clamping {block_id}.stop_loss_percent min {lo} → 1.0")
                     lo = 1.0
                 if lo >= hi:
                     logger.debug(
@@ -3729,15 +3832,10 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                 _sweep_connected_ids.add(_tid)
         if _sweep_connected_ids:
             _before = len(custom_ranges)
-            custom_ranges = [
-                cr for cr in custom_ranges
-                if cr["param_path"].split(".")[0] in _sweep_connected_ids
-            ]
+            custom_ranges = [cr for cr in custom_ranges if cr["param_path"].split(".")[0] in _sweep_connected_ids]
             _dropped = _before - len(custom_ranges)
             if _dropped:
-                logger.info(
-                    f"[BuilderWorkflow] Filtered {_dropped} custom_range(s) for disconnected blocks"
-                )
+                logger.info(f"[BuilderWorkflow] Filtered {_dropped} custom_range(s) for disconnected blocks")
 
         # ── Extract all optimizable params (needed by _merge_ranges) ─────────
         all_params = extract_optimizable_params(strategy_graph)
@@ -3813,8 +3911,11 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
         _eval_constraints = config.evaluation_config.get("constraints") or []
         _min_trades_constraint = max(
             next(
-                (int(c.get("value", 0)) for c in _eval_constraints
-                 if c.get("metric") == "total_trades" and c.get("operator") in (">=", ">")),
+                (
+                    int(c.get("value", 0))
+                    for c in _eval_constraints
+                    if c.get("metric") == "total_trades" and c.get("operator") in (">=", ">")
+                ),
                 0,
             ),
             15,  # floor: matches _MIN_TRADES_FOR_SWEEP; prevent degenerate 1-4 trade solutions
@@ -3843,8 +3944,8 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
 
         # ── Choose method based on realistic trial count ─────────────────────
         # Hard-cap trials to keep each sweep within a few minutes.
-        MAX_GRID_COMBOS = 200    # above this → Bayesian is more efficient
-        MAX_SWEEP_SECONDS = 300   # 5-minute budget per sweep (3 iters × 300s = 15 min total)
+        MAX_GRID_COMBOS = 200  # above this → Bayesian is more efficient
+        MAX_SWEEP_SECONDS = 300  # 5-minute budget per sweep (3 iters × 300s = 15 min total)
 
         if total_combos > MAX_GRID_COMBOS:
             method = "bayesian"
@@ -3968,9 +4069,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                     if _k.endswith(".stop_loss_percent"):
                         _sl_val = float(best[_k])
                         if _sl_val < 1.0:
-                            logger.warning(
-                                f"[BuilderWorkflow] Post-opt SL clamp: {_k} {_sl_val:.2f} → 1.0"
-                            )
+                            logger.warning(f"[BuilderWorkflow] Post-opt SL clamp: {_k} {_sl_val:.2f} → 1.0")
                             best[_k] = 1.0
 
                 # ── Post-optimizer close_by_time / TP cross-block constraint ─────
@@ -3991,9 +4090,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                         )
                         best[_mp_key] = _mp_min
 
-                logger.info(
-                    f"[BuilderWorkflow] ✅ Optimizer best: score={_best_score:.3f} params={best}"
-                )
+                logger.info(f"[BuilderWorkflow] ✅ Optimizer best: score={_best_score:.3f} params={best}")
                 return {
                     "best_params": best,
                     "best_score": _best_score,
@@ -4096,160 +4193,6 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
         return adjustments
 
     async def _run_deliberation(self, config: BuilderWorkflowConfig) -> None:
-        """Run AI deliberation and apply the resulting block plan to ``config``.
-
-        Uses RealLLMDeliberation with DeepSeek + Perplexity + Qwen agents to
-        analyse the planned blocks and suggest improvements before building.
-
-        If the deliberation response contains a JSON object with ``blocks``
-        and ``connections`` arrays those values **replace** ``config.blocks``
-        and ``config.connections`` so that the build stages use the LLM-
-        recommended design.
-
-        Results are stored in ``self._result.deliberation`` and logged.
-        """
-        try:
-            from backend.agents.consensus.real_llm_deliberation import (
-                RealLLMDeliberation,
-            )
-
-            logger.info("[BuilderWorkflow] 🤖 Starting AI Deliberation for planning...")
-
-            deliberation = RealLLMDeliberation(enable_perplexity_enrichment=True)
-
-            # Build the question from config
-            block_names = [b.get("type", "?") for b in config.blocks]
-            question = (
-                f"I'm building a trading strategy for {config.symbol} on {config.timeframe}m timeframe. "
-                f"Direction: {config.direction}. Planned blocks: {', '.join(block_names) or 'none yet'}. "
-                f"Parameters: {json.dumps(config.blocks)}. "
-                f"Capital: ${config.initial_capital}, Leverage: {config.leverage}x, "
-                f"Commission: {config.commission} (0.07%). "
-                f"Should I use these blocks and parameters, or suggest improvements? "
-                f"Focus on Sharpe ratio optimization and win rate above {config.min_acceptable_win_rate:.0%}. "
-                f"If you recommend changes, include a JSON object at the END of your reply with "
-                f'keys "blocks" and "connections" (same schema as the builder API) '
-                f"so the changes can be applied automatically."
-            )
-
-            # Enrich with market context first
-            await deliberation.enrich_for_deliberation(
-                question=question,
-                symbol=config.symbol,
-                strategy_type="builder",
-            )
-
-            # Use all available agents — check env keys at runtime
-            import os
-
-            agents: list[str] = []
-            if os.environ.get("DEEPSEEK_API_KEY"):
-                agents.append("deepseek")
-            if os.environ.get("QWEN_API_KEY"):
-                agents.append("qwen")
-            if os.environ.get("PERPLEXITY_API_KEY"):
-                agents.append("perplexity")
-
-            if not agents:
-                logger.warning("[BuilderWorkflow] No LLM API keys found — skipping deliberation")
-                self._result.deliberation = {"skipped": True, "reason": "no_api_keys"}
-                return
-
-            result = await deliberation.deliberate(
-                question=question,
-                agents=agents,
-                max_rounds=2,  # Round 1: initial opinions + cross-examine; Round 2: refined opinions (agents can change mind)
-                min_confidence=0.5,
-            )
-
-            decision_text: str = result.decision or ""
-
-            # Build per-agent vote lookup from final_votes (position + reasoning)
-            vote_by_agent: dict[str, str] = {}
-            for vote in getattr(result, "final_votes", []) or []:
-                aid = getattr(vote, "agent_id", "")
-                position = getattr(vote, "position", "")
-                reasoning = getattr(vote, "reasoning", "")
-                confidence = getattr(vote, "confidence", None)
-                parts = []
-                if position:
-                    parts.append(f"**Position:** {position}")
-                if reasoning:
-                    parts.append(f"**Reasoning:** {reasoning}")
-                if confidence is not None:
-                    parts.append(f"**Confidence:** {confidence:.0%}")
-                if aid:
-                    vote_by_agent[aid] = "\n".join(parts) if parts else position or reasoning
-
-            # Also check rounds for individual agent responses
-            for rnd in getattr(result, "rounds", []) or []:
-                for vote in getattr(rnd, "votes", []) or []:
-                    aid = getattr(vote, "agent_id", "")
-                    if aid and aid not in vote_by_agent:
-                        position = getattr(vote, "position", "")
-                        reasoning = getattr(vote, "reasoning", "")
-                        confidence = getattr(vote, "confidence", None)
-                        parts = []
-                        if position:
-                            parts.append(f"**Position:** {position}")
-                        if reasoning:
-                            parts.append(f"**Reasoning:** {reasoning}")
-                        if confidence is not None:
-                            parts.append(f"**Confidence:** {confidence:.0%}")
-                        vote_by_agent[aid] = "\n".join(parts) if parts else position or reasoning
-
-            # Emit per-agent logs so the SSE panel shows each agent's unique position
-            conf_label = f"{result.confidence:.0%}" if result.confidence else ""
-            for agent_name in agents:
-                individual_response = vote_by_agent.get(agent_name, "")
-                if not individual_response:
-                    # Fallback: show consensus decision with agent-role framing
-                    individual_response = f"[Consensus reached] {decision_text[:600]}"
-                self._emit_agent_log(
-                    agent=agent_name,
-                    role="deliberation",
-                    prompt=question,
-                    response=individual_response,
-                    title=f"🤝 Deliberation — consensus {conf_label}",
-                )
-
-            self._result.deliberation = {
-                "decision": decision_text,
-                "confidence": result.confidence,
-                "agent_count": len(agents),
-                "agents_used": agents,
-            }
-
-            # ── Apply deliberation output to config if JSON plan found ──
-            json_match = re.search(r"\{.*\}", decision_text, re.DOTALL)
-            if json_match:
-                try:
-                    plan = json.loads(json_match.group())
-                    new_blocks = plan.get("blocks")
-                    new_conns = plan.get("connections")
-                    if new_blocks and isinstance(new_blocks, list):
-                        has_buy = any(b.get("type") in ("buy", "buy_market") for b in new_blocks)
-                        has_sell = any(b.get("type") in ("sell", "sell_market") for b in new_blocks)
-                        if has_buy and has_sell:
-                            config.blocks = new_blocks
-                            config.connections = new_conns or []
-                            self._result.deliberation["applied_to_config"] = True
-                            logger.info(
-                                f"[BuilderWorkflow] ✅ Deliberation plan applied: "
-                                f"{len(new_blocks)} blocks, {len(new_conns or [])} connections"
-                            )
-                        else:
-                            logger.warning(
-                                "[BuilderWorkflow] Deliberation JSON found but missing buy/sell — not applied"
-                            )
-                except Exception as parse_err:
-                    logger.warning(f"[BuilderWorkflow] Could not parse deliberation JSON: {parse_err}")
-
-            logger.info(
-                f"[BuilderWorkflow] 🤖 Deliberation result: "
-                f"confidence={result.confidence:.2f}, decision={decision_text[:100]}..."
-            )
-
-        except Exception as e:
-            logger.warning(f"[BuilderWorkflow] AI Deliberation failed (non-fatal): {e}")
-            self._result.deliberation = {"error": str(e), "skipped": True}
+        """Debate system removed — no-op stub."""
+        logger.info("[BuilderWorkflow] Debate system removed — skipping deliberation")
+        self._result.deliberation = {"skipped": True, "reason": "debate_system_removed"}

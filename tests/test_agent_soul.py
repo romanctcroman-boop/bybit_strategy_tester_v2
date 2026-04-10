@@ -520,7 +520,9 @@ class TestSelfMoADiversity:
         ]
         call_count = [0]
 
-        async def fake_call_llm(self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
+        async def fake_call_llm(
+            self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False
+        ):
             idx = min(call_count[0], len(moa_responses) - 1)
             call_count[0] += 1
             if agent_name == "qwen":
@@ -576,7 +578,9 @@ class TestSelfMoADiversity:
 
         moa_texts = [_DEEPSEEK_STRATEGY_JSON, _QWEN_STRATEGY_JSON, _DEEPSEEK_HIGH_TEMP_JSON]
 
-        async def fake_critic_call(self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
+        async def fake_critic_call(
+            self_node, agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False
+        ):
             # QWEN возвращает синтез (берём DeepSeek консерватора как базу)
             assert agent_name == "qwen", f"Критик должен быть qwen, получено {agent_name}"
             assert temperature == 0.3, f"Критик должен использовать T=0.3, получено {temperature}"
@@ -636,6 +640,7 @@ class TestSelfMoADiversity:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestDeliberationDynamics:
     """
     Тест 3: Multi-Agent Debate (MAD) паттерн.

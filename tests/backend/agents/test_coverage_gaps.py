@@ -421,6 +421,7 @@ class TestLangGraphOrchestratorCoverage:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestDeliberationCoverage:
     """Cover untested branches in deliberation module."""
 

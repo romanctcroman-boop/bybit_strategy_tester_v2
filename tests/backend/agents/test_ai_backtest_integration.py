@@ -488,6 +488,7 @@ class TestGlobalSingletons:
 # ═══════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestAIBacktestAnalyzerLLMCall:
     """Tests for _call_llm method fallback"""
 
@@ -522,6 +523,7 @@ class TestAIBacktestAnalyzerLLMCall:
 # ═══════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestAIBacktestAnalyzerDeliberation:
     """Tests for lazy deliberation initialization"""
 

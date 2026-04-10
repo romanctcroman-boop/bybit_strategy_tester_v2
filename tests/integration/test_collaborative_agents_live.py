@@ -35,14 +35,11 @@ import pytest
 from dotenv import load_dotenv
 from loguru import logger
 
+pytestmark = pytest.mark.skip(reason="Debate system removed")
+
 load_dotenv()
 
 from backend.agents.consensus.consensus_engine import ConsensusEngine, ConsensusResult
-from backend.agents.consensus.deliberation import (
-    DeliberationResult,
-    MultiAgentDeliberation,
-    VotingStrategy,
-)
 from backend.agents.consensus.domain_agents import (
     AnalysisResult,
     RiskManagementAgent,

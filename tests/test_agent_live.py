@@ -363,6 +363,7 @@ async def test_self_moa_temperature_diversity_live():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skip(reason="Debate system removed")
 @pytest.mark.asyncio
 async def test_mad_debate_deepseek_vs_qwen_live():
     """

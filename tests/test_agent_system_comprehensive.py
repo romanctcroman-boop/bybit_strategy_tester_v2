@@ -354,6 +354,7 @@ class TestPerformanceEvaluator:
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestMultiAgentDeliberation:
     """Tests for MultiAgentDeliberation"""
 
@@ -956,6 +957,7 @@ class TestIntegration:
         return True
 
     @staticmethod
+    @pytest.mark.skip(reason="Debate system removed")
     async def test_consensus_with_tracing():
         """Test consensus with distributed tracing"""
         from backend.agents.consensus.deliberation import MultiAgentDeliberation
@@ -981,6 +983,7 @@ class TestIntegration:
         return True
 
     @staticmethod
+    @pytest.mark.skip(reason="Debate system removed")
     async def test_end_to_end_agent_flow():
         """Test complete agent flow: request -> consensus -> evaluation"""
         from backend.agents.consensus.deliberation import MultiAgentDeliberation

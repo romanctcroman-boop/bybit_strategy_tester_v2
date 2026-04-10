@@ -226,6 +226,7 @@ class TestPromptsAlertingCacheFix:
 # ─────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="Self-MoA (DeepSeek x3 + Qwen) removed — replaced by single Claude call")
 class TestGenerateStrategiesNodeMoA:
     def _make_state(self, agents=None):
         try:
@@ -519,6 +520,7 @@ class TestMemoryUpdateNode:
 # ─────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="Debate system removed")
 class TestDebateNode:
     def _make_state(self, regime="bullish"):
         try:

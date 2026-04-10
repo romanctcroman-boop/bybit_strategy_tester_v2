@@ -430,19 +430,16 @@ class TestGraphWiringWithNewNodes:
 
     def test_memory_recall_wired_before_generate(self):
         g = build_trading_strategy_graph(run_backtest=False, run_debate=False)
-        # P2-1: analyze_market → regime_classifier → memory_recall → generate_strategies
+        # analyze_market → regime_classifier → memory_recall → grounding → generate_strategies
         edges = _edge_pairs(g)
         assert ("regime_classifier", "memory_recall") in edges
-        assert ("memory_recall", "generate_strategies") in edges
+        assert ("memory_recall", "grounding") in edges
+        assert ("grounding", "generate_strategies") in edges
 
+    @pytest.mark.skip(reason="Debate node removed from pipeline")
     def test_debate_and_memory_recall_run_in_parallel(self):
-        # P3-1: debate and memory_recall run in parallel after regime_classifier
-        g = build_trading_strategy_graph(run_backtest=False, run_debate=True)
-        edges = _edge_pairs(g)
-        assert ("regime_classifier", "debate") in edges
-        assert ("regime_classifier", "memory_recall") in edges
-        assert ("debate", "generate_strategies") in edges
-        assert ("memory_recall", "generate_strategies") in edges
+        # P3-1: debate and memory_recall ran in parallel after regime_classifier (debate removed)
+        pass
 
     def test_backtest_analysis_node_in_graph(self):
         g = build_trading_strategy_graph(run_backtest=True, run_debate=False)
@@ -461,10 +458,9 @@ class TestGraphWiringWithNewNodes:
         assert "backtest" not in g.routers
 
     def test_all_nodes_present(self):
-        g = build_trading_strategy_graph(run_backtest=True, run_debate=True)
+        g = build_trading_strategy_graph(run_backtest=True)
         expected = {
             "analyze_market",
-            "debate",
             "memory_recall",
             "generate_strategies",
             "parse_responses",

@@ -1,15 +1,17 @@
 """
 Tests for P2 agent improvements:
 - P2-1: RegimeClassifierNode (deterministic ADX+ATR regime)
-- P2-2: S²-MAD cosine similarity early stop in DebateNode
 - P2-3: HITLCheckNode (human-in-the-loop checkpoint)
 - P2-4: make_pipeline_event_queue (streaming events)
 - P2-5: composite_quality_score in scoring.py
+
+Note: P2-2 (DebateNode S²-MAD) removed — debate system was removed.
 """
+
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -20,11 +22,9 @@ from backend.agents.langgraph_orchestrator import (
     make_pipeline_event_queue,
 )
 from backend.agents.trading_strategy_graph import (
-    DebateNode,
     HITLCheckNode,
     RegimeClassifierNode,
     build_trading_strategy_graph,
-    run_strategy_pipeline,
 )
 from backend.optimization.scoring import composite_quality_score
 
@@ -61,9 +61,9 @@ class TestRegimeClassifierNode:
     def test_trending_bull_classification(self):
         node = RegimeClassifierNode()
         state = AgentState()
-        state.set_result("analyze_market", _make_market_result(
-            trend_direction="bullish", trend_strength="strong", atr_pct=1.0
-        ))
+        state.set_result(
+            "analyze_market", _make_market_result(trend_direction="bullish", trend_strength="strong", atr_pct=1.0)
+        )
         result = _run(node.execute(state))
         clf = result.context["regime_classification"]
         assert clf["regime"] == "trending_bull"
@@ -72,9 +72,9 @@ class TestRegimeClassifierNode:
     def test_trending_bear_classification(self):
         node = RegimeClassifierNode()
         state = AgentState()
-        state.set_result("analyze_market", _make_market_result(
-            trend_direction="bearish", trend_strength="strong", atr_pct=1.0
-        ))
+        state.set_result(
+            "analyze_market", _make_market_result(trend_direction="bearish", trend_strength="strong", atr_pct=1.0)
+        )
         result = _run(node.execute(state))
         clf = result.context["regime_classification"]
         assert clf["regime"] == "trending_bear"
@@ -83,9 +83,9 @@ class TestRegimeClassifierNode:
         """Bearish + very high ATR (>3.5%) → crypto_risk_off."""
         node = RegimeClassifierNode()
         state = AgentState()
-        state.set_result("analyze_market", _make_market_result(
-            trend_direction="bearish", trend_strength="weak", atr_pct=4.0
-        ))
+        state.set_result(
+            "analyze_market", _make_market_result(trend_direction="bearish", trend_strength="weak", atr_pct=4.0)
+        )
         result = _run(node.execute(state))
         clf = result.context["regime_classification"]
         assert clf["regime"] == "crypto_risk_off"
@@ -94,9 +94,9 @@ class TestRegimeClassifierNode:
         """High ATR but low trend strength → volatile_ranging."""
         node = RegimeClassifierNode()
         state = AgentState()
-        state.set_result("analyze_market", _make_market_result(
-            trend_direction="neutral", trend_strength="weak", atr_pct=3.0
-        ))
+        state.set_result(
+            "analyze_market", _make_market_result(trend_direction="neutral", trend_strength="weak", atr_pct=3.0)
+        )
         result = _run(node.execute(state))
         clf = result.context["regime_classification"]
         assert clf["regime"] == "volatile_ranging"
@@ -105,9 +105,9 @@ class TestRegimeClassifierNode:
         """Low ATR, low trend strength → ranging."""
         node = RegimeClassifierNode()
         state = AgentState()
-        state.set_result("analyze_market", _make_market_result(
-            trend_direction="neutral", trend_strength="weak", atr_pct=0.5
-        ))
+        state.set_result(
+            "analyze_market", _make_market_result(trend_direction="neutral", trend_strength="weak", atr_pct=0.5)
+        )
         result = _run(node.execute(state))
         clf = result.context["regime_classification"]
         assert clf["regime"] == "ranging"
@@ -139,80 +139,10 @@ class TestRegimeClassifierNode:
         node = RegimeClassifierNode()
         for strength in ("strong", "moderate", "weak"):
             state = AgentState()
-            state.set_result("analyze_market", _make_market_result(
-                trend_direction="bullish", trend_strength=strength
-            ))
+            state.set_result("analyze_market", _make_market_result(trend_direction="bullish", trend_strength=strength))
             result = _run(node.execute(state))
             conf = result.context["regime_classification"]["confidence"]
             assert 0.0 <= conf <= 1.0, f"Confidence {conf} out of range for {strength}"
-
-
-# =============================================================================
-# P2-2: S²-MAD cosine similarity in DebateNode
-# =============================================================================
-
-
-class TestDebateNodeS2MAD:
-    def test_cosine_similarity_identical_texts(self):
-        """Identical texts → similarity = 1.0."""
-        text = "The trend is bullish with strong momentum indicators RSI MACD"
-        sim = DebateNode._cosine_similarity(text, text)
-        assert abs(sim - 1.0) < 1e-6
-
-    def test_cosine_similarity_orthogonal_texts(self):
-        """Completely different vocabulary → similarity ≈ 0."""
-        a = "alpha beta gamma delta epsilon"
-        b = "omega sigma theta lambda kappa"
-        sim = DebateNode._cosine_similarity(a, b)
-        assert sim == 0.0
-
-    def test_cosine_similarity_empty_returns_zero(self):
-        assert DebateNode._cosine_similarity("", "some text") == 0.0
-        assert DebateNode._cosine_similarity("text", "") == 0.0
-
-    def test_cosine_similarity_partial_overlap(self):
-        a = "bullish trend momentum RSI strong"
-        b = "bullish market trend strong volatile"
-        sim = DebateNode._cosine_similarity(a, b)
-        assert 0.3 < sim < 1.0
-
-    def test_debate_skips_if_prior_texts_similar(self):
-        """If prior debate texts have sim >= 0.9, DebateNode skips re-debate."""
-        node = DebateNode()
-        text = "The market is trending bullish with strong RSI and MACD signals momentum"
-        state = AgentState()
-        state.set_result("analyze_market", _make_market_result())
-        # Pre-populate with converged debate (nearly identical texts)
-        state.context["debate_consensus"] = {
-            "consensus": "trade long",
-            "confidence": 0.8,
-            "_participant_texts": [text, text + " additional words identical"],
-        }
-        # Should return without calling deliberate_with_llm
-        with patch("backend.agents.trading_strategy_graph.DebateNode._cosine_similarity",
-                   return_value=0.95) as mock_sim:
-            result = _run(node.execute(state))
-        # Debate consensus should be unchanged (not updated)
-        assert result.context["debate_consensus"]["confidence"] == 0.8
-
-    def test_debate_proceeds_if_prior_texts_dissimilar(self):
-        """If prior debate texts have sim < 0.9, DebateNode attempts re-debate."""
-        node = DebateNode()
-        state = AgentState()
-        state.set_result("analyze_market", _make_market_result())
-        state.context["debate_consensus"] = {
-            "consensus": "old",
-            "_participant_texts": ["completely different", "orthogonal vocabulary"],
-        }
-        # deliberate_with_llm should be called (will fail, non-fatal)
-        with patch("backend.agents.trading_strategy_graph.DebateNode._cosine_similarity",
-                   return_value=0.2):
-            with patch("backend.agents.consensus.real_llm_deliberation.deliberate_with_llm",
-                       side_effect=Exception("no api")):
-                result = _run(node.execute(state))
-        # Error is stored but pipeline doesn't crash
-        debate_result = result.get_result("debate")
-        assert debate_result is not None
 
 
 # =============================================================================
@@ -351,6 +281,7 @@ class TestPipelineEventQueue:
 class TestCompositeQualityScore:
     def test_positive_sharpe_and_sortino_with_trades(self):
         import math
+
         result = {
             "sharpe_ratio": 1.2,
             "sortino_ratio": 1.8,
@@ -396,6 +327,7 @@ class TestCompositeQualityScore:
 
     def test_calculate_composite_score_accepts_composite_quality_metric(self):
         from backend.optimization.scoring import calculate_composite_score
+
         result = {"sharpe_ratio": 1.5, "sortino_ratio": 2.0, "total_trades": 40, "max_drawdown": 12.0}
         score = calculate_composite_score(result, "composite_quality")
         assert score > 0.0
@@ -422,14 +354,9 @@ class TestBuildGraphP2:
         edges = [e.target for e in graph.edges.get("regime_classifier", [])]
         assert "memory_recall" in edges
 
+    @pytest.mark.skip(reason="Debate node removed from pipeline")
     def test_regime_classifier_connects_to_debate_when_enabled(self):
-        # P3-1: parallel edge — target is a list ["debate", "memory_recall"]
-        graph = build_trading_strategy_graph(run_backtest=False, run_debate=True)
-        all_targets: list[str] = []
-        for e in graph.edges.get("regime_classifier", []):
-            t = e.target
-            all_targets.extend(t if isinstance(t, list) else [t])
-        assert "debate" in all_targets
+        pass
 
     def test_hitl_node_added_when_enabled(self):
         graph = build_trading_strategy_graph(run_backtest=True, hitl_enabled=True)

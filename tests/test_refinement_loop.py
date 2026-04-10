@@ -277,24 +277,22 @@ class TestGraphWiring:
         graph = build_trading_strategy_graph(run_backtest=True)
         assert "optimize_strategy" in graph.nodes
 
-    def test_optimization_leads_to_wf_or_analysis_debate(self):
-        # With WF enabled: optimize_strategy → wf_validation → analysis_debate
+    def test_optimization_leads_to_wf_or_ml_validation(self):
+        # With WF enabled: optimize_strategy → wf_validation → ml_validation
         graph = build_trading_strategy_graph(run_backtest=True)
         opt_edges = graph.edges.get("optimize_strategy", [])
         targets = [e.target for e in opt_edges]
         assert "wf_validation" in targets  # WF validates optimized params
 
-        # Without WF: optimize_strategy → analysis_debate directly
+        # Without WF: optimize_strategy → ml_validation directly
         graph_no_wf = build_trading_strategy_graph(run_backtest=True, run_wf_validation=False)
         opt_edges_no_wf = graph_no_wf.edges.get("optimize_strategy", [])
         targets_no_wf = [e.target for e in opt_edges_no_wf]
-        assert "analysis_debate" in targets_no_wf
+        assert "ml_validation" in targets_no_wf
 
+    @pytest.mark.skip(reason="analysis_debate node removed from pipeline")
     def test_analysis_debate_leads_to_ml_validation(self):
-        graph = build_trading_strategy_graph(run_backtest=True)
-        debate_edges = graph.edges.get("analysis_debate", [])
-        targets = [e.target for e in debate_edges]
-        assert "ml_validation" in targets
+        pass
 
     def test_ml_validation_leads_to_memory_update(self):
         graph = build_trading_strategy_graph(run_backtest=True)
@@ -332,10 +330,10 @@ class TestRefinementIntegration:
         next_node = router.get_next_node(state)
         assert next_node == "optimize_strategy"  # optimizer first
 
-        # wf_validation router defaults to analysis_debate (WF validates optimized params)
+        # wf_validation router defaults to ml_validation (debate node removed)
         wf_router: ConditionalRouter = graph.routers["wf_validation"]
         next_node = wf_router.get_next_node(state)
-        assert next_node == "analysis_debate"
+        assert next_node == "ml_validation"
 
     @pytest.mark.asyncio
     async def test_router_picks_optimize_on_max_iterations(self):
@@ -398,7 +396,7 @@ class TestWFThresholds:
         node = WalkForwardValidationNode()
         ratio = 0.6 / 1.0
         ratio_passes = ratio >= node.WF_RATIO_THRESHOLD
-        abs_passes = 0.6 >= node.WF_MIN_ABS_SHARPE
+        abs_passes = node.WF_MIN_ABS_SHARPE <= 0.6
         assert ratio_passes is True
         assert (1.0 > 0 and 0.6 > 0 and (ratio_passes or abs_passes)) is True
 
@@ -406,8 +404,8 @@ class TestWFThresholds:
         """Run #14 scenario: wf=0.514, is=1.805 → ratio=0.285 < 0.5, but abs≥0.5 → passes."""
         node = WalkForwardValidationNode()
         wf_sharpe, is_sharpe = 0.514, 1.805
-        ratio = wf_sharpe / is_sharpe          # 0.285
-        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD   # False
+        ratio = wf_sharpe / is_sharpe  # 0.285
+        ratio_passes = ratio >= node.WF_RATIO_THRESHOLD  # False
         abs_passes = wf_sharpe >= node.WF_MIN_ABS_SHARPE  # True
         passed = is_sharpe > 0 and wf_sharpe > 0 and (ratio_passes or abs_passes)
         assert ratio_passes is False

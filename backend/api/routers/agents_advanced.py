@@ -127,94 +127,30 @@ class ToolCallRequest(BaseModel):
 @router.post("/deliberate", response_model=DeliberationResponse)
 async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
     """
-    Run multi-agent deliberation on a question
+    Multi-agent deliberation endpoint — debate system has been removed.
 
-    Multiple AI agents debate and reach consensus on a decision.
-    Uses structured voting and evidence gathering.
-
-    **Now uses REAL LLM APIs (DeepSeek, Perplexity)!**
+    Returns a neutral placeholder response.
     """
-    try:
-        from backend.agents.consensus.real_llm_deliberation import (
-            VotingStrategy,
-            get_real_deliberation,
-        )
-
-        deliberation = get_real_deliberation()
-
-        # Map string to enum
-        strategy_map = {
-            "majority": VotingStrategy.MAJORITY,
-            "weighted": VotingStrategy.WEIGHTED,
-            "unanimous": VotingStrategy.UNANIMOUS,
-            "ranked_choice": VotingStrategy.RANKED_CHOICE,
-        }
-        voting_strategy = strategy_map.get(request.voting_strategy, VotingStrategy.WEIGHTED)
-
-        result = await deliberation.deliberate(
-            question=request.question,
-            agents=request.agents,
-            max_rounds=request.max_rounds,
-            min_confidence=request.min_confidence,
-            voting_strategy=voting_strategy,
-        )
-
-        # Extract votes from final_votes
-        votes = {}
-        for vote in result.final_votes:
-            votes[vote.agent_id] = vote.confidence
-
-        # Extract dissenting views
-        dissenting_views = [
-            f"{vote.agent_id}: {vote.reasoning or vote.position}" for vote in result.dissenting_opinions
-        ]
-
-        # Extract evidence chain as strings
-        evidence_chain = [e.get("evidence", str(e)) if isinstance(e, dict) else str(e) for e in result.evidence_chain]
-
-        return DeliberationResponse(
-            decision=result.decision,
-            confidence=result.confidence,
-            rounds_used=len(result.rounds),
-            votes=votes,
-            evidence_chain=evidence_chain,
-            dissenting_views=dissenting_views,
-        )
-
-    except Exception as e:
-        logger.error(f"Deliberation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info("Debate system removed — skipping deliberation")
+    return DeliberationResponse(
+        decision="Debate system removed.",
+        confidence=0.0,
+        rounds_used=0,
+        votes={},
+        evidence_chain=[],
+        dissenting_views=[],
+    )
 
 
 @router.get("/domain-agents")
 async def list_domain_agents():
     """
-    List available domain-specific agents
+    Domain agents endpoint — debate system has been removed.
 
-    Returns all registered domain agents with their capabilities.
+    Returns an empty agent list.
     """
-    try:
-        from backend.agents.consensus.domain_agents import DomainAgentRegistry
-
-        registry = DomainAgentRegistry()
-        agent_names = registry.list_agents()
-
-        return {
-            "agents": [
-                {
-                    "id": name,
-                    "type": "domain",
-                    "specialty": name,
-                    "capabilities": [],
-                }
-                for name in agent_names
-            ],
-            "total": len(agent_names),
-        }
-
-    except Exception as e:
-        logger.error(f"Error listing domain agents: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    logger.info("Debate system removed — domain agents not available")
+    return {"agents": [], "total": 0}
 
 
 # ============================================================================
@@ -827,99 +763,20 @@ async def get_key_pool_metrics():
 
 @router.get("/deliberation/accuracy")
 async def get_agent_accuracy():
-    """
-    Get adaptive accuracy weights for all agents.
-
-    Shows historical accuracy and current voting weight per agent.
-    Weights are used in weighted deliberation voting.
-    """
-    try:
-        from backend.agents.consensus.real_llm_deliberation import (
-            get_real_deliberation,
-        )
-
-        deliberation = get_real_deliberation()
-        report = deliberation.get_agent_accuracy_report()
-        stats = deliberation.get_stats()
-
-        return {
-            "success": True,
-            "accuracy": report,
-            "deliberation_stats": stats,
-        }
-
-    except Exception as e:
-        logger.error(f"Agent accuracy error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "accuracy": {}, "deliberation_stats": {}, "note": "Debate system removed"}
 
 
 @router.get("/deliberation/audit-log")
 async def get_deliberation_audit_log(last_n: int = 50):
-    """
-    Get decision chain audit log from deliberation system.
-
-    Provides full traceability of intermediate deliberation steps:
-    start, round completions, voting details, outcome recordings.
-    """
-    try:
-        from backend.agents.consensus.real_llm_deliberation import (
-            get_real_deliberation,
-        )
-
-        deliberation = get_real_deliberation()
-        log = deliberation.get_audit_log(last_n=last_n)
-
-        return {
-            "success": True,
-            "entries": log,
-            "total": len(deliberation.audit_log),
-            "returned": len(log),
-        }
-
-    except Exception as e:
-        logger.error(f"Audit log error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "entries": [], "total": 0, "returned": 0, "note": "Debate system removed"}
 
 
 @router.get("/deliberation/history")
 async def get_deliberation_history(limit: int = 20):
-    """
-    Get recent deliberation results.
-
-    Returns decision, confidence, agents involved, and duration
-    for each recent deliberation.
-    """
-    try:
-        from backend.agents.consensus.real_llm_deliberation import (
-            get_real_deliberation,
-        )
-
-        deliberation = get_real_deliberation()
-        history = deliberation.deliberation_history[-limit:]
-
-        return {
-            "success": True,
-            "deliberations": [
-                {
-                    "id": d.id,
-                    "question": d.question[:200],
-                    "decision": d.decision[:200],
-                    "confidence": d.confidence,
-                    "voting_strategy": d.voting_strategy.value,
-                    "rounds": len(d.rounds),
-                    "agents": d.metadata.get("agents", []),
-                    "duration_seconds": round(d.duration_seconds, 2),
-                    "timestamp": d.timestamp.isoformat(),
-                    "dissenting_count": len(d.dissenting_opinions),
-                }
-                for d in reversed(history)
-            ],
-            "total": len(deliberation.deliberation_history),
-        }
-
-    except Exception as e:
-        logger.error(f"Deliberation history error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "deliberations": [], "total": 0, "note": "Debate system removed"}
 
 
 # ============================================================================

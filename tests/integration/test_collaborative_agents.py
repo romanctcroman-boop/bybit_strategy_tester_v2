@@ -26,12 +26,9 @@ from typing import Any
 
 import pytest
 
+pytestmark = pytest.mark.skip(reason="Debate system removed")
+
 from backend.agents.consensus.consensus_engine import ConsensusEngine, ConsensusResult
-from backend.agents.consensus.deliberation import (
-    DeliberationResult,
-    MultiAgentDeliberation,
-    VotingStrategy,
-)
 from backend.agents.consensus.domain_agents import (
     AgentExpertise,
     AnalysisResult,
