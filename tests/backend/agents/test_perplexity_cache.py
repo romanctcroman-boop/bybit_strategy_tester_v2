@@ -18,9 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.agents.consensus.perplexity_integration import (
-    PerplexityIntegration,
-)
+pytestmark = pytest.mark.skip(reason="PerplexityIntegration removed from consensus module")
 
 # =============================================================================
 # FIXTURES
