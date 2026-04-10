@@ -494,7 +494,7 @@ class TestFewShotInjection:
             return '{"strategy_name": "TestRSI", "blocks": []}'
 
         with patch.object(node, "_call_llm", side_effect=fake_call_llm):
-            with patch.object(node, "_qwen_critic", return_value=None):
+            with patch.object(node, "_synthesis_critic", return_value=None):
                 _run(node.execute(state))
 
         assert len(prompts_captured) > 0

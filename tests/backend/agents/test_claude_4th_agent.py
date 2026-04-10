@@ -19,7 +19,6 @@ import pytest
 
 from backend.agents.langgraph_orchestrator import AgentState
 
-
 # ============================================================================
 # A. Specialization in templates.py
 # ============================================================================
@@ -30,6 +29,7 @@ class TestClaudeAgentSpecialization:
 
     def _spec(self):
         from backend.agents.prompts.templates import AGENT_SPECIALIZATIONS
+
         return AGENT_SPECIALIZATIONS["claude"]
 
     def test_specialization_exists_with_required_fields(self):
@@ -42,11 +42,13 @@ class TestClaudeAgentSpecialization:
 
     def test_get_system_message_claude_nonempty(self):
         from backend.agents.prompts.prompt_engineer import PromptEngineer
+
         msg = PromptEngineer().get_system_message("claude")
         assert isinstance(msg, str) and len(msg) > 20
 
     def test_get_system_message_claude_contains_specialization_text(self):
         from backend.agents.prompts.prompt_engineer import PromptEngineer
+
         msg = PromptEngineer().get_system_message("claude")
         # Should reference the description from AGENT_SPECIALIZATIONS["claude"]
         assert "systematic trader" in msg.lower() or "synthesiz" in msg.lower()
@@ -72,6 +74,7 @@ class TestCallLlmClaudeRouting:
 
     def _make_node(self):
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
+
         return GenerateStrategiesNode()
 
     def _mock_km(self, key: str | None = "sk-ant-test"):
@@ -82,21 +85,23 @@ class TestCallLlmClaudeRouting:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_anthropic_key(self):
         node = self._make_node()
-        with patch("backend.security.key_manager.get_key_manager",
-                   return_value=self._mock_km(None)):
+        with patch("backend.security.key_manager.get_key_manager", return_value=self._mock_km(None)):
             result = await node._call_llm("claude", "prompt", "sys")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_creates_claude_client_with_anthropic_provider(self):
         from backend.agents.llm.base_client import LLMProvider
+
         node = self._make_node()
 
         mock_client = AsyncMock()
-        mock_client.chat = AsyncMock(return_value=MagicMock(
-            content="strategy json",
-            estimated_cost=0.001,
-        ))
+        mock_client.chat = AsyncMock(
+            return_value=MagicMock(
+                content="strategy json",
+                estimated_cost=0.001,
+            )
+        )
         mock_client.close = AsyncMock()
 
         created_configs: list = []
@@ -105,10 +110,8 @@ class TestCallLlmClaudeRouting:
             created_configs.append(config)
             return mock_client
 
-        with patch("backend.security.key_manager.get_key_manager",
-                   return_value=self._mock_km("sk-ant-test")):
-            with patch("backend.agents.llm.base_client.LLMClientFactory.create",
-                       side_effect=capture_create):
+        with patch("backend.security.key_manager.get_key_manager", return_value=self._mock_km("sk-ant-test")):
+            with patch("backend.agents.llm.base_client.LLMClientFactory.create", side_effect=capture_create):
                 await node._call_llm("claude", "prompt", "sys")
 
         assert len(created_configs) == 1
@@ -129,11 +132,11 @@ class TestCallLlmClaudeRouting:
         mock_client.chat = capture_chat
         mock_client.close = AsyncMock()
 
-        with patch("backend.security.key_manager.get_key_manager",
-                   return_value=self._mock_km()):
-            with patch("backend.agents.llm.base_client.LLMClientFactory.create",
-                       return_value=mock_client):
-                await node._call_llm("claude", "p", "s", json_mode=True)
+        with (
+            patch("backend.security.key_manager.get_key_manager", return_value=self._mock_km()),
+            patch("backend.agents.llm.base_client.LLMClientFactory.create", return_value=mock_client),
+        ):
+            await node._call_llm("claude", "p", "s", json_mode=True)
 
         assert chat_kwargs, "client.chat was never called"
         assert chat_kwargs[0].get("json_mode") is False
@@ -144,16 +147,19 @@ class TestCallLlmClaudeRouting:
         state = AgentState()
 
         mock_client = AsyncMock()
-        mock_client.chat = AsyncMock(return_value=MagicMock(
-            content="ok", estimated_cost=0.0042,
-        ))
+        mock_client.chat = AsyncMock(
+            return_value=MagicMock(
+                content="ok",
+                estimated_cost=0.0042,
+            )
+        )
         mock_client.close = AsyncMock()
 
-        with patch("backend.security.key_manager.get_key_manager",
-                   return_value=self._mock_km()):
-            with patch("backend.agents.llm.base_client.LLMClientFactory.create",
-                       return_value=mock_client):
-                await node._call_llm("claude", "p", "s", state=state)
+        with (
+            patch("backend.security.key_manager.get_key_manager", return_value=self._mock_km()),
+            patch("backend.agents.llm.base_client.LLMClientFactory.create", return_value=mock_client),
+        ):
+            await node._call_llm("claude", "p", "s", state=state)
 
         assert state.llm_call_count == 1
         assert abs(state.total_cost_usd - 0.0042) < 1e-9
@@ -162,16 +168,19 @@ class TestCallLlmClaudeRouting:
     async def test_returns_content_on_success(self):
         node = self._make_node()
         mock_client = AsyncMock()
-        mock_client.chat = AsyncMock(return_value=MagicMock(
-            content='{"strategy_name":"test"}', estimated_cost=0.0,
-        ))
+        mock_client.chat = AsyncMock(
+            return_value=MagicMock(
+                content='{"strategy_name":"test"}',
+                estimated_cost=0.0,
+            )
+        )
         mock_client.close = AsyncMock()
 
-        with patch("backend.security.key_manager.get_key_manager",
-                   return_value=self._mock_km()):
-            with patch("backend.agents.llm.base_client.LLMClientFactory.create",
-                       return_value=mock_client):
-                result = await node._call_llm("claude", "p", "s")
+        with (
+            patch("backend.security.key_manager.get_key_manager", return_value=self._mock_km()),
+            patch("backend.agents.llm.base_client.LLMClientFactory.create", return_value=mock_client),
+        ):
+            result = await node._call_llm("claude", "p", "s")
 
         assert result == '{"strategy_name":"test"}'
 
@@ -204,11 +213,11 @@ def _patch_prompt_engineer(node: object) -> None:
 
 
 class TestGenerateStrategiesNodeWithClaude:
-    """Claude goes through the generic for-loop (not DeepSeek MoA) as 4th generator."""
+    """Claude goes through the single-call path (not DeepSeek MoA) as primary generator."""
 
     @pytest.mark.asyncio
     async def test_claude_only_calls_claude_via_for_loop(self):
-        """agents=['claude'] → _call_llm('claude') called once via for-loop."""
+        """agents=['claude'] → _call_llm called once with a Claude tier name."""
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
 
         node = GenerateStrategiesNode()
@@ -223,7 +232,8 @@ class TestGenerateStrategiesNodeWithClaude:
 
         node._call_llm = fake_call_llm
         await node.execute(state)
-        assert called_agents == ["claude"]
+        assert len(called_agents) == 1
+        assert called_agents[0].startswith("claude")
 
     @pytest.mark.asyncio
     async def test_claude_only_response_stored_in_results(self):
@@ -246,8 +256,8 @@ class TestGenerateStrategiesNodeWithClaude:
         assert responses[0]["agent"] == "claude"
 
     @pytest.mark.asyncio
-    async def test_deepseek_and_claude_produce_two_responses(self):
-        """agents=['deepseek','claude'] → 2 responses: 1 from DeepSeek MoA + 1 from Claude generator."""
+    async def test_deepseek_and_claude_produce_one_response(self):
+        """agents=['deepseek','claude'] → 1 response: all agent names route to Claude Sonnet."""
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
 
         node = GenerateStrategiesNode()
@@ -257,8 +267,7 @@ class TestGenerateStrategiesNodeWithClaude:
         async def fake_call_llm(agent_name, *args, **kwargs):
             return f'{{"strategy_name":"{agent_name} strategy"}}'
 
-        # _synthesis_critic returns None → falls back to T=0.7 raw variant
-        async def fake_critic(moa_texts, market_context):
+        async def fake_critic(moa_texts, market_context, **kwargs):
             return None
 
         node._call_llm = fake_call_llm
@@ -268,11 +277,9 @@ class TestGenerateStrategiesNodeWithClaude:
 
         result = state.get_result("generate_strategies") or {}
         responses = result.get("responses", [])
-        # One from DeepSeek (via MoA fallback) + one from Claude (via for-loop)
-        assert len(responses) == 2
-        agent_names = {r["agent"] for r in responses}
-        assert "deepseek" in agent_names
-        assert "claude" in agent_names
+        # New architecture: single Claude call regardless of agents list
+        assert len(responses) == 1
+        assert responses[0]["agent"] == "claude"
 
     @pytest.mark.asyncio
     async def test_claude_failure_handled_gracefully(self):
@@ -331,8 +338,8 @@ class TestDebateAgentFilter:
     """
 
     # Replicate the exact filter expressions from trading_strategy_graph.py
-    _DEBATE_ALLOWED    = frozenset(("deepseek", "qwen", "perplexity", "claude"))
-    _ANALYSIS_ALLOWED  = frozenset(("deepseek", "qwen", "claude"))
+    _DEBATE_ALLOWED = frozenset(("deepseek", "qwen", "perplexity", "claude"))
+    _ANALYSIS_ALLOWED = frozenset(("deepseek", "qwen", "claude"))
 
     def test_claude_passes_debate_node_filter(self):
         raw = ["deepseek", "claude", "unknown"]

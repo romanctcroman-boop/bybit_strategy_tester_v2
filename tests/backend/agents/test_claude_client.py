@@ -13,7 +13,6 @@ Coverage:
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,10 +20,10 @@ import pytest
 from backend.agents.llm.base_client import LLMConfig, LLMMessage, LLMProvider
 from backend.agents.llm.clients.claude import ClaudeClient
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(**kwargs) -> LLMConfig:
     return LLMConfig(
@@ -52,6 +51,7 @@ def _anthropic_response(text: str = "hello") -> dict:
 # ---------------------------------------------------------------------------
 # ClaudeClient unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestClaudeBuildPayload:
     def setup_method(self):
@@ -198,24 +198,31 @@ class TestClaudeChatRetry:
 # _synthesis_critic tests
 # ---------------------------------------------------------------------------
 
+
 class TestSynthesisCritic:
-    """Tests for GenerateStrategiesNode._synthesis_critic."""
+    """Tests for GenerateStrategiesNode._synthesis_critic.
+
+    _synthesis_critic now uses Claude Haiku as sole critic (no QWEN fallback).
+    It is a legacy helper kept for backward compatibility — the primary generation
+    path is a single Claude Sonnet/Opus call in execute().
+    """
 
     def _make_node(self):
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
+
         node = GenerateStrategiesNode.__new__(GenerateStrategiesNode)
         node._MOA_TEMPERATURES = [0.3, 0.7, 1.1]
         return node
 
     @pytest.mark.asyncio
-    async def test_returns_claude_result_when_available(self):
-        """Claude succeeds → result returned immediately, QWEN not called."""
+    async def test_returns_claude_haiku_result_when_available(self):
+        """Claude Haiku succeeds → result returned."""
         node = self._make_node()
         call_log: list[str] = []
 
         async def fake_call_llm(agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
             call_log.append(agent_name)
-            if agent_name == "claude":
+            if agent_name == "claude-haiku":
                 return '{"strategy_name": "Claude strategy"}'
             return None
 
@@ -223,43 +230,39 @@ class TestSynthesisCritic:
         result = await node._synthesis_critic(["variant1", "variant2", "variant3"], market_context=None)
 
         assert result == '{"strategy_name": "Claude strategy"}'
-        assert call_log == ["claude"]  # QWEN never called
+        assert call_log == ["claude-haiku"]
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_qwen_when_claude_fails(self):
-        """Claude raises → QWEN fallback invoked."""
+    async def test_returns_none_when_claude_haiku_fails(self):
+        """Claude Haiku raises → None returned (no QWEN fallback in new architecture)."""
         node = self._make_node()
         call_log: list[str] = []
 
         async def fake_call_llm(agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
             call_log.append(agent_name)
-            if agent_name == "claude":
-                raise RuntimeError("Claude unavailable")
-            return '{"strategy_name": "QWEN strategy"}'
+            raise RuntimeError("Claude unavailable")
 
         node._call_llm = fake_call_llm
         result = await node._synthesis_critic(["v1", "v2"], market_context=None)
 
-        assert result == '{"strategy_name": "QWEN strategy"}'
-        assert call_log == ["claude", "qwen"]
+        assert result is None
+        assert call_log == ["claude-haiku"]
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_qwen_when_claude_returns_none(self):
-        """Claude returns None (key missing) → QWEN fallback."""
+    async def test_returns_none_when_claude_haiku_returns_none(self):
+        """Claude Haiku returns None (key missing) → None."""
         node = self._make_node()
 
         async def fake_call_llm(agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
-            if agent_name == "claude":
-                return None
-            return '{"strategy_name": "QWEN"}'
+            return None
 
         node._call_llm = fake_call_llm
         result = await node._synthesis_critic(["v1"], market_context=None)
-        assert result == '{"strategy_name": "QWEN"}'
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_returns_none_when_both_fail(self):
-        """Both Claude and QWEN fail → None (caller uses T=0.7 raw variant)."""
+    async def test_returns_none_when_all_fail(self):
+        """Claude Haiku fails → None."""
         node = self._make_node()
 
         async def fake_call_llm(agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
@@ -271,13 +274,13 @@ class TestSynthesisCritic:
 
     @pytest.mark.asyncio
     async def test_critic_uses_deterministic_temperature(self):
-        """Critic must call with temperature=0.3 regardless of agent."""
+        """Critic must call with temperature=0.3."""
         node = self._make_node()
         temps_seen: list[float] = []
 
         async def fake_call_llm(agent_name, prompt, system_msg, temperature=None, state=None, json_mode=False):
             temps_seen.append(temperature)
-            if agent_name == "claude":
+            if agent_name == "claude-haiku":
                 return '{"ok": true}'
             return None
 
@@ -289,6 +292,7 @@ class TestSynthesisCritic:
 # ---------------------------------------------------------------------------
 # LLMClientFactory registration
 # ---------------------------------------------------------------------------
+
 
 class TestClaudeClientFactory:
     def test_factory_creates_claude_client(self):

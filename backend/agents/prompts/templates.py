@@ -219,8 +219,8 @@ ATR VOLATILITY NODE (Strategy Builder):
   OPTIMIZATION RANGES (ATR VOLATILITY): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    atr_length1: {{low: 10, high: 50, step: 5}}, atr_length2: {{low: 50, high: 200, step: 10}},
-    atr_diff_percent: {{low: 5, high: 30, step: 5}}.
+    atr_length1: {{low: 5, high: 50, step: 5}}, atr_length2: {{low: 50, high: 200, step: 10}},
+    atr_diff_percent: {{low: 0, high: 50, step: 5}}.
 
 VOLUME FILTER NODE (Strategy Builder):
   Compares two Volume MAs of different lengths to detect volume expansion/contraction.
@@ -237,8 +237,8 @@ VOLUME FILTER NODE (Strategy Builder):
   OPTIMIZATION RANGES (VOLUME FILTER): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    vol_length1: {{low: 10, high: 50, step: 5}}, vol_length2: {{low: 50, high: 200, step: 10}},
-    vol_diff_percent: {{low: 5, high: 30, step: 5}}.
+    vol_length1: {{low: 5, high: 50, step: 5}}, vol_length2: {{low: 50, high: 200, step: 10}},
+    vol_diff_percent: {{low: 0, high: 50, step: 5}}.
 
 HIGHEST/LOWEST BAR NODE (Strategy Builder):
   Detects price near recent highs/lows with optional ATR-based offset and "Block if Worse Than" filter.
@@ -256,8 +256,8 @@ HIGHEST/LOWEST BAR NODE (Strategy Builder):
   OPTIMIZATION RANGES (HIGHEST/LOWEST BAR): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    hl_lookback_bars: {{low: 5, high: 30, step: 5}}, hl_price_percent: {{low: 0, high: 5, step: 0.5}},
-    hl_atr_percent: {{low: 0, high: 5, step: 0.5}}, atr_hl_length: {{low: 20, high: 100, step: 10}}.
+    hl_lookback_bars: {{low: 5, high: 50, step: 5}}, hl_price_percent: {{low: 0, high: 5, step: 0.5}},
+    hl_atr_percent: {{low: 0, high: 10, step: 1}}, atr_hl_length: {{low: 10, high: 100, step: 10}}.
 
 TWO MAs NODE (Strategy Builder):
   Two configurable moving averages with MA Cross signal and MA1 Filter modes.
@@ -380,7 +380,7 @@ CCI (Commodity Channel Index) NODE (Strategy Builder):
   OPTIMIZATION RANGES (CCI): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    cci_length: {{low: 7, high: 30, step: 1}}, cci_long_more: {{low: -400, high: -50, step: 25}},
+    cci_length: {{low: 10, high: 30, step: 1}}, cci_long_more: {{low: -400, high: -50, step: 25}},
     cci_long_less: {{low: -50, high: 200, step: 25}}, cci_short_less: {{low: 50, high: 400, step: 25}},
     cci_short_more: {{low: -100, high: 200, step: 25}}.
 
@@ -539,7 +539,7 @@ TRAILING STOP EXIT NODE (Strategy Builder):
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
     activation_percent: {{low: 0.5, high: 3.0, step: 0.25}},
-    trailing_percent: {{low: 0.2, high: 2.0, step: 0.1}}.
+    trailing_percent: {{low: 0.25, high: 2.0, step: 0.25}}.
 
 ATR EXIT NODE (Strategy Builder):
   Volatility-adaptive stop-loss and take-profit based on ATR.
@@ -596,7 +596,7 @@ CLOSE BY TIME NODE (Strategy Builder):
   OPTIMIZATION RANGES (CLOSE BY TIME): Each optimizable param can have a range for grid search.
   Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
   Default ranges from optimizer:
-    bars_since_entry: {{low: 3, high: 50, step: 1}}, min_profit_percent: {{low: 0, high: 5, step: 0.5}}.
+    bars_since_entry: {{low: 3, high: 50, step: 1}}, min_profit_percent: {{low: 0, high: 25, step: 0.5}}.
 
 CHANNEL CLOSE NODE (Strategy Builder):
   Close position when price reaches opposite channel boundary (Keltner/Bollinger).
@@ -706,6 +706,154 @@ CLOSE BY PARABOLIC SAR NODE (Strategy Builder):
   Default ranges from optimizer:
     psar_start: {{low: 0.01, high: 0.05, step: 0.005}}, psar_increment: {{low: 0.01, high: 0.05, step: 0.005}},
     psar_maximum: {{low: 0.1, high: 0.4, step: 0.05}}, psar_close_nth_bar: {{low: 1, high: 10, step: 1}}.
+
+RSI FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when RSI is in a specified zone.
+  Params: use_rsi_filter(false) — enable the filter,
+  rsi_filter_period(14, 1-200) — RSI calculation period,
+  rsi_filter_timeframe('Chart') — calculation timeframe,
+  rsi_long_zone_more(0), rsi_long_zone_less(100) — long allowed when RSI in [more, less],
+  rsi_short_zone_more(0), rsi_short_zone_less(100) — short allowed when RSI in [more, less].
+  Use case: Avoid entries when RSI is in extreme zones (overbought/oversold) or require trend confirmation.
+  Optimizable params: rsi_period(14).
+  OPTIMIZATION RANGES (RSI FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    rsi_period: {{low: 5, high: 30, step: 1}}.
+
+SUPERTREND FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when price is above/below SuperTrend line (trend direction filter).
+  Params: use_supertrend_filter(false) — enable the filter,
+  atr_period(10, 1-200) — ATR period for SuperTrend calculation,
+  atr_multiplier(3.0, 0.1-20) — multiplier for ATR band width,
+  supertrend_filter_timeframe('Chart') — calculation timeframe,
+  long_above(true) — long only when price > SuperTrend (uptrend), short_below(true) — short only in downtrend.
+  Use case: Trend-following filter — only trade in the direction of the dominant SuperTrend.
+  Optimizable params: atr_period(10), atr_multiplier(3.0).
+  OPTIMIZATION RANGES (SUPERTREND FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    atr_period: {{low: 5, high: 20, step: 1}}, atr_multiplier: {{low: 1.0, high: 5.0, step: 0.5}}.
+
+MACD FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when MACD histogram is positive (long) or negative (short).
+  Params: use_macd_filter(false) — enable the filter,
+  macd_fast_length(12, 1-200), macd_slow_length(26, 1-200), macd_signal_smoothing(9, 1-50),
+  macd_filter_timeframe('Chart') — calculation timeframe.
+  Logic: Long signal passes when MACD histogram > 0 (bullish momentum). Short passes when histogram < 0.
+  Use case: Momentum confirmation — trade only when MACD agrees with signal direction.
+  Optimizable params: macd_fast_length(12), macd_slow_length(26), macd_signal_smoothing(9).
+  OPTIMIZATION RANGES (MACD FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    macd_fast_length: {{low: 8, high: 16, step: 1}}, macd_slow_length: {{low: 20, high: 30, step: 1}},
+    macd_signal_smoothing: {{low: 6, high: 12, step: 1}}.
+
+STOCHASTIC FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when Stochastic %K is not in overbought/oversold zone.
+  Params: use_stochastic_filter(false) — enable the filter,
+  stoch_k_length(14, 1-200), stoch_k_smoothing(3, 1-50), stoch_d_smoothing(3, 1-50),
+  stochastic_filter_timeframe('Chart') — calculation timeframe.
+  Logic: Long passes when %K not overbought, Short passes when %K not oversold.
+  Use case: Avoid buying when already overbought or selling when already oversold.
+  Optimizable params: stoch_k_length(14), stoch_k_smoothing(3), stoch_d_smoothing(3).
+  OPTIMIZATION RANGES (STOCHASTIC FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    stoch_k_length: {{low: 5, high: 21, step: 1}}, stoch_k_smoothing: {{low: 1, high: 5, step: 1}},
+    stoch_d_smoothing: {{low: 1, high: 5, step: 1}}.
+
+TWO MA FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when price is above both MAs (long) or below both MAs (short).
+  Params: use_two_ma_filter(false) — enable the filter,
+  ma1_length(50, 1-500) — fast MA period, ma2_length(100, 1-500) — slow MA period,
+  ma_type('EMA', options: SMA/EMA/WMA) — MA calculation type,
+  two_ma_filter_timeframe('Chart') — calculation timeframe.
+  Use case: Dual moving average trend filter — trade only in direction of both MAs.
+  Optimizable params: ma1_length(50), ma2_length(100).
+  OPTIMIZATION RANGES (TWO MA FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    ma1_length: {{low: 10, high: 100, step: 5}}, ma2_length: {{low: 50, high: 200, step: 10}}.
+
+QQE FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when QQE trend direction agrees with signal direction.
+  Params: use_qqe_filter(false) — enable the filter,
+  qqe_rsi_length(14, 1-200) — RSI period for QQE calculation,
+  qqe_rsi_smoothing(5, 1-50) — RSI smoothing period,
+  qqe_delta_multiplier(5.1, 0.1-20) — QQE delta multiplier (controls ATR band width),
+  qqe_filter_timeframe('Chart') — calculation timeframe.
+  NOTE: The param key is qqe_delta_multiplier (NOT qqe_factor — that is for the standalone QQE signal block).
+  Logic: Long passes when QQE trend = bullish. Short passes when QQE trend = bearish.
+  Use case: Trend confirmation with QQE adaptive indicator.
+  Optimizable params: qqe_rsi_length(14), qqe_rsi_smoothing(5), qqe_delta_multiplier(5.1).
+  OPTIMIZATION RANGES (QQE FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    qqe_rsi_length: {{low: 5, high: 25, step: 1}}, qqe_rsi_smoothing: {{low: 3, high: 10, step: 1}},
+    qqe_delta_multiplier: {{low: 2.0, high: 8.0, step: 0.5}}.
+
+CCI FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when CCI is within a specified range.
+  Params: use_cci_filter(false) — enable the filter,
+  cci_length(14, 1-200) — CCI calculation period,
+  cci_filter_timeframe('Chart') — calculation timeframe,
+  cci_long_more(-400), cci_long_less(400) — long allowed when CCI in [more, less],
+  cci_short_less(400), cci_short_more(10) — short allowed when CCI in [more, less].
+  Use case: Filter trades to only CCI zones indicating trend or mean-reversion setups.
+  Optimizable params: cci_length(14), cci_long_more(-400), cci_long_less(400), cci_short_less(400), cci_short_more(10).
+  OPTIMIZATION RANGES (CCI FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    cci_length: {{low: 5, high: 30, step: 1}}, cci_long_more: {{low: -400, high: 0, step: 50}},
+    cci_long_less: {{low: 0, high: 400, step: 50}}, cci_short_less: {{low: 0, high: 400, step: 50}},
+    cci_short_more: {{low: -400, high: 200, step: 50}}.
+
+MOMENTUM FILTER NODE (Strategy Builder):
+  Filter block — passes signal only when Momentum indicator is within a specified range.
+  Params: use_momentum_filter(false) — enable the filter,
+  momentum_length(14, 1-200) — Momentum calculation period (current_close / close_N_bars_ago × 100 - 100),
+  momentum_filter_timeframe('Chart') — calculation timeframe,
+  momentum_long_more(-100), momentum_long_less(10) — long allowed when momentum in [more, less],
+  momentum_short_less(95), momentum_short_more(-30) — short allowed when momentum in [more, less].
+  Use case: Filter trades based on price rate-of-change direction and magnitude.
+  Optimizable params: momentum_length(14), momentum_long_more(-100), momentum_long_less(10), momentum_short_less(95), momentum_short_more(-30).
+  OPTIMIZATION RANGES (MOMENTUM FILTER): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    momentum_length: {{low: 5, high: 30, step: 1}}, momentum_long_more: {{low: -200, high: 0, step: 10}},
+    momentum_long_less: {{low: 0, high: 100, step: 10}}, momentum_short_less: {{low: 0, high: 200, step: 10}},
+    momentum_short_more: {{low: -100, high: 50, step: 10}}.
+
+CHANDELIER EXIT NODE (Strategy Builder):
+  Exit block — closes position when price violates the Chandelier Stop level.
+  Params: enabled(false) — activate Chandelier Exit,
+  atr_period(22, 1-200) — ATR calculation period,
+  atr_multiplier(3.0, 0.1-20) — multiplier for ATR-based stop distance,
+  use_close_for_high_low(false) — use close instead of high/low for chandelier calculation.
+  Logic: Long exit: chandelier_stop = highest_high(N) - atr_multiplier × ATR(N). Close long when price < stop.
+  Short exit: chandelier_stop = lowest_low(N) + atr_multiplier × ATR(N). Close short when price > stop.
+  Use case: Volatility-adaptive trailing stop — wider in volatile markets, tighter in calm markets.
+  Optimizable params: atr_period(22), atr_multiplier(3.0).
+  OPTIMIZATION RANGES (CHANDELIER EXIT): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    atr_period: {{low: 10, high: 30, step: 1}}, atr_multiplier: {{low: 1.5, high: 5.0, step: 0.5}}.
+
+KELTNER CHANNEL NODE (Strategy Builder):
+  Computes Keltner Channel (EMA ± ATR×multiplier) as a data source / trend indicator.
+  Params: ema_period(20, 1-200) — EMA period for channel midline,
+  atr_period(10, 1-200) — ATR period for band width,
+  multiplier(2.0, 0.1-10) — ATR multiplier for band distance.
+  Outputs: upper, middle, lower band values (float). Does NOT output boolean signals directly.
+  NOTE: This is a data-source block. For entry signals based on channel breakouts/rebounds use the
+  KELTNER/BOLLINGER CHANNEL entry block instead (block type: keltner_bollinger).
+  Optimizable params: ema_period(20), atr_period(10), multiplier(2.0).
+  OPTIMIZATION RANGES (KELTNER CHANNEL): Each optimizable param can have a range for grid search.
+  Format per param: {{"enabled": true/false, "min": <low>, "max": <high>, "step": <step>}}
+  Default ranges from optimizer:
+    ema_period: {{low: 10, high: 40, step: 5}}, atr_period: {{low: 5, high: 20, step: 1}},
+    multiplier: {{low: 1.0, high: 4.0, step: 0.5}}.
 
 === OPTIMIZATION WORKFLOW ===
 
@@ -877,6 +1025,156 @@ IMPORTANT: Be specific with parameter values. Return ONLY the JSON object."""
 
 
 # =============================================================================
+# SELECTIVE INDICATOR INJECTION — regime-aware token reduction
+# =============================================================================
+
+# Maps market regime → indicator section header prefixes to include.
+# All exit/SL/TP/filter/condition nodes are always included (small, critical).
+# Covers the 5 regime categories from RegimeClassifierNode.
+REGIME_INDICATOR_SECTIONS: dict[str, list[str]] = {
+    "trending_up": [
+        "MACD UNIVERSAL NODE",
+        "SUPERTREND UNIVERSAL NODE",
+        "TWO MAs NODE",
+        "QQE UNIVERSAL NODE",
+        "ATR VOLATILITY NODE",
+        "VOLUME FILTER NODE",
+        "HIGHEST/LOWEST BAR NODE",
+        "ACCUMULATION AREAS NODE",
+    ],
+    "trending_down": [
+        "MACD UNIVERSAL NODE",
+        "SUPERTREND UNIVERSAL NODE",
+        "TWO MAs NODE",
+        "QQE UNIVERSAL NODE",
+        "ATR VOLATILITY NODE",
+        "VOLUME FILTER NODE",
+        "HIGHEST/LOWEST BAR NODE",
+        "ACCUMULATION AREAS NODE",
+    ],
+    "ranging": [
+        "RSI UNIVERSAL NODE",
+        "STOCHASTIC UNIVERSAL NODE",
+        "RVI (Relative Vigor Index) NODE",
+        "MFI (Money Flow Index) NODE",
+        "CCI (Commodity Channel Index) NODE",
+        "KELTNER/BOLLINGER CHANNEL NODE",
+        "ATR VOLATILITY NODE",
+        "VOLUME FILTER NODE",
+        "DIVERGENCE NODE",
+    ],
+    "consolidating": [
+        "RSI UNIVERSAL NODE",
+        "STOCHASTIC UNIVERSAL NODE",
+        "ACCUMULATION AREAS NODE",
+        "KELTNER/BOLLINGER CHANNEL NODE",
+        "ATR VOLATILITY NODE",
+        "VOLUME FILTER NODE",
+        "DIVERGENCE NODE",
+    ],
+    "volatile": [
+        "RSI UNIVERSAL NODE",
+        "STOCHASTIC UNIVERSAL NODE",
+        "QQE UNIVERSAL NODE",
+        "SUPERTREND UNIVERSAL NODE",
+        "ATR VOLATILITY NODE",
+        "VOLUME FILTER NODE",
+        "KELTNER/BOLLINGER CHANNEL NODE",
+        "DIVERGENCE NODE",
+        "HIGHEST/LOWEST BAR NODE",
+    ],
+}
+
+# Section headers that are always included regardless of regime (exit/condition nodes)
+_ALWAYS_INCLUDE_SECTIONS: list[str] = [
+    "CROSSOVER NODE",
+    "CROSSUNDER NODE",
+    "GREATER THAN NODE",
+    "LESS THAN NODE",
+    "EQUALS NODE",
+    "BETWEEN NODE",
+    "DCA (Dollar-Cost Averaging) NODE",
+    "MANUAL GRID NODE",
+    "STATIC SL/TP NODE",
+    "TRAILING STOP EXIT NODE",
+    "ATR EXIT NODE",
+    "MULTI TP LEVELS NODE",
+    "CLOSE BY TIME NODE",
+    "CHANNEL CLOSE NODE",
+    "TWO MAs CLOSE NODE",
+    "CLOSE BY RSI NODE",
+    "CLOSE BY STOCHASTIC NODE",
+    "CLOSE BY PARABOLIC SAR NODE",
+    "RSI FILTER NODE",
+    "SUPERTREND FILTER NODE",
+    "MACD FILTER NODE",
+    "STOCHASTIC FILTER NODE",
+    "TWO MA FILTER NODE",
+    "QQE FILTER NODE",
+    "CCI FILTER NODE",
+    "MOMENTUM FILTER NODE",
+    "CHANDELIER EXIT NODE",
+    "KELTNER CHANNEL NODE",
+]
+
+# Marker strings that delimit the indicator docs block inside the template/formatted prompt
+_INDICATOR_BLOCK_START = "RSI UNIVERSAL NODE (Strategy Builder):"
+_INDICATOR_BLOCK_END = "=== OPTIMIZATION WORKFLOW ==="
+
+
+def filter_prompt_indicators(formatted_prompt: str, regime: str) -> str:
+    """
+    Replace the full indicator docs block in an already-formatted prompt with
+    a regime-filtered subset, reducing token usage (~8K → ~2-3K tokens).
+
+    Args:
+        formatted_prompt: Result of STRATEGY_GENERATION_TEMPLATE.format(**vars)
+        regime: Market regime string (e.g. "trending_up", "ranging", "volatile")
+
+    Returns:
+        Prompt with indicator docs filtered to the regime-relevant subset.
+        Falls back to the original prompt if markers are not found or regime unknown.
+    """
+    start_idx = formatted_prompt.find(_INDICATOR_BLOCK_START)
+    end_idx = formatted_prompt.find(_INDICATOR_BLOCK_END)
+    if start_idx == -1 or end_idx == -1:
+        return formatted_prompt  # markers not found — return as-is
+
+    indicator_block = formatted_prompt[start_idx:end_idx]
+
+    wanted_headers = REGIME_INDICATOR_SECTIONS.get(regime)
+    if wanted_headers is None:
+        return formatted_prompt  # unknown regime — use full docs
+
+    all_wanted = list(wanted_headers) + _ALWAYS_INCLUDE_SECTIONS
+
+    # Split the block into sections by NODE header lines
+    # Each section starts with "HEADER (Strategy Builder):" or similar header patterns
+    import re
+
+    section_pattern = re.compile(
+        r"(?=(?:[A-Z][A-Z /()%-]+(?:UNIVERSAL )?NODE|CROSSOVER NODE|CROSSUNDER NODE"
+        r"|GREATER THAN NODE|LESS THAN NODE|EQUALS NODE|BETWEEN NODE"
+        r"|=== OPTIMIZATION WORKFLOW ===))"
+    )
+    raw_sections = section_pattern.split(indicator_block)
+
+    kept: list[str] = []
+    for section in raw_sections:
+        if not section.strip():
+            continue
+        section_header = section.split("\n")[0].strip()
+        if any(section_header.startswith(wanted) for wanted in all_wanted):
+            kept.append(section)
+
+    if not kept:
+        return formatted_prompt  # nothing matched — keep original
+
+    filtered_block = "".join(kept)
+    return formatted_prompt[:start_idx] + filtered_block + formatted_prompt[end_idx:]
+
+
+# =============================================================================
 # MARKET ANALYSIS PROMPT
 # =============================================================================
 
@@ -1044,6 +1342,30 @@ AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
         "style": "systematic",
         "preferred_indicators": ["EMA", "RSI", "ATR", "Supertrend", "ADX"],
         "preferred_timeframes": ["1h", "4h", "1D"],
+    },
+    "claude-haiku": {
+        "primary_role": "strategy_validator",
+        "description": "Fast and precise validator for format, memory, and routine synthesis tasks",
+        "strengths": ["format_validation", "memory_summarization", "cost_efficiency"],
+        "style": "concise",
+        "preferred_indicators": ["EMA", "RSI"],
+        "preferred_timeframes": ["15m", "1h"],
+    },
+    "claude-sonnet": {
+        "primary_role": "strategy_synthesizer",
+        "description": "Senior systematic trader specialising in multi-factor strategy design",
+        "strengths": ["structured_reasoning", "risk_reward_balance", "strategy_synthesis"],
+        "style": "systematic",
+        "preferred_indicators": ["EMA", "RSI", "ATR", "Supertrend", "ADX"],
+        "preferred_timeframes": ["1h", "4h", "1D"],
+    },
+    "claude-opus": {
+        "primary_role": "strategy_architect",
+        "description": "World-class quant strategist for novel regimes and complex market structures",
+        "strengths": ["deep_reasoning", "novel_regime_handling", "complex_synthesis", "edge_cases"],
+        "style": "rigorous",
+        "preferred_indicators": ["EMA", "RSI", "ATR", "ADX", "MACD", "Bollinger"],
+        "preferred_timeframes": ["4h", "1D"],
     },
 }
 

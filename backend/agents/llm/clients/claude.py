@@ -67,7 +67,7 @@ class ClaudeClient(LLMClient):
     DEFAULT_MODEL = "claude-haiku-4-5-20251001"
     PROVIDER = LLMProvider.ANTHROPIC
     BREAKER_NAME = "claude_llm_client"
-    EMOJI = "🟣"
+    EMOJI = "🟠"  # Anthropic orange; 🟣 is reserved for Perplexity
 
     def __init__(self, config: LLMConfig) -> None:
         self.config = config
@@ -128,9 +128,7 @@ class ClaudeClient(LLMClient):
     def _parse_response(self, data: dict[str, Any], latency: float) -> LLMResponse:
         """Parse Anthropic Messages API response."""
         content_blocks = data.get("content", [])
-        text = "".join(
-            b.get("text", "") for b in content_blocks if b.get("type") == "text"
-        )
+        text = "".join(b.get("text", "") for b in content_blocks if b.get("type") == "text")
         usage = data.get("usage", {})
         prompt_tokens = usage.get("input_tokens", 0)
         completion_tokens = usage.get("output_tokens", 0)

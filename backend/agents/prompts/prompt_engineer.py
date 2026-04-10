@@ -39,6 +39,7 @@ from backend.agents.prompts.templates import (
     STRATEGY_EXAMPLE_SUPERTREND_FOLLOW,
     STRATEGY_GENERATION_TEMPLATE,
     STRATEGY_VALIDATION_TEMPLATE,
+    filter_prompt_indicators,
 )
 
 
@@ -107,6 +108,10 @@ class PromptEngineer:
         )
 
         prompt = STRATEGY_GENERATION_TEMPLATE.format(**prompt_vars)
+
+        # Selective indicator injection: filter to regime-relevant docs (~8K → ~2-3K tokens)
+        if context.market_regime:
+            prompt = filter_prompt_indicators(prompt, context.market_regime)
 
         if include_examples:
             prompt += "\n\nEXAMPLE STRATEGIES FOR REFERENCE:\n"

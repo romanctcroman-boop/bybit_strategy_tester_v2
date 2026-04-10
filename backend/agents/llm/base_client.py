@@ -87,6 +87,9 @@ class LLMResponse:
     latency_ms: float = 0.0
     raw_response: dict[str, Any] | None = None
     reasoning_content: str | None = None  # CoT reasoning (Qwen3, DeepSeek-R1)
+    prompt_cache_hit_tokens: int = 0  # DeepSeek: tokens served from KV cache (10% cost)
+    prompt_cache_miss_tokens: int = 0  # DeepSeek: tokens not in cache (100% cost)
+    citations: list[str] | None = None  # Perplexity sonar-pro: source URLs
 
     @property
     def estimated_cost(self) -> float:
@@ -106,8 +109,15 @@ class LLMResponse:
             LLMProvider.OLLAMA: {"input": 0.0, "output": 0.0},
         }
         rates = costs.get(self.provider, {"input": 0.0, "output": 0.0})
-        input_cost = (self.prompt_tokens / 1_000_000) * rates["input"]
         output_cost = (self.completion_tokens / 1_000_000) * rates["output"]
+
+        # Cache-aware input cost: cache hits are 10% of normal price (DeepSeek KV cache)
+        if self.provider == LLMProvider.DEEPSEEK and (self.prompt_cache_hit_tokens or self.prompt_cache_miss_tokens):
+            hit_cost = (self.prompt_cache_hit_tokens / 1_000_000) * rates["input"] * 0.1
+            miss_cost = (self.prompt_cache_miss_tokens / 1_000_000) * rates["input"]
+            return hit_cost + miss_cost + output_cost
+
+        input_cost = (self.prompt_tokens / 1_000_000) * rates["input"]
         return input_cost + output_cost
 
 
@@ -414,6 +424,7 @@ class LLMClientFactory:
 
     # Lazy import map to avoid circular imports at module level
     _CLIENT_CLASSES: dict[LLMProvider, str] = {
+        LLMProvider.ANTHROPIC: "ClaudeClient",
         LLMProvider.DEEPSEEK: "DeepSeekClient",
         LLMProvider.PERPLEXITY: "PerplexityClient",
         LLMProvider.QWEN: "QwenClient",

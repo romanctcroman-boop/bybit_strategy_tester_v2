@@ -115,6 +115,119 @@ class TestLLMResponse:
         )
         assert resp.reasoning_content == "Step 1: ..."
 
+    def test_estimated_cost_deepseek_cache_hit(self):
+        """Cache hits cost 10% of normal input price."""
+        resp = LLMResponse(
+            content="test",
+            model="deepseek-chat",
+            provider=LLMProvider.DEEPSEEK,
+            prompt_tokens=1_000_000,
+            completion_tokens=0,
+            prompt_cache_hit_tokens=1_000_000,
+            prompt_cache_miss_tokens=0,
+        )
+        # hit: 1M * $0.14 * 0.1 = $0.014
+        assert abs(resp.estimated_cost - 0.014) < 0.0001
+
+    def test_estimated_cost_deepseek_cache_miss(self):
+        """Cache misses use full input price."""
+        resp = LLMResponse(
+            content="test",
+            model="deepseek-chat",
+            provider=LLMProvider.DEEPSEEK,
+            prompt_tokens=1_000_000,
+            completion_tokens=0,
+            prompt_cache_hit_tokens=0,
+            prompt_cache_miss_tokens=1_000_000,
+        )
+        # miss: 1M * $0.14 = $0.14
+        assert abs(resp.estimated_cost - 0.14) < 0.0001
+
+    def test_estimated_cost_deepseek_mixed_cache(self):
+        """Mixed hit/miss: 800K hit + 200K miss + 100K completion."""
+        resp = LLMResponse(
+            content="test",
+            model="deepseek-chat",
+            provider=LLMProvider.DEEPSEEK,
+            prompt_tokens=1_000_000,
+            completion_tokens=100_000,
+            prompt_cache_hit_tokens=800_000,
+            prompt_cache_miss_tokens=200_000,
+        )
+        # hit: 800K * 0.14 * 0.1 = 0.01120
+        # miss: 200K * 0.14       = 0.02800
+        # out:  100K * 0.28       = 0.02800
+        expected = 0.01120 + 0.02800 + 0.02800
+        assert abs(resp.estimated_cost - expected) < 0.0001
+
+    def test_estimated_cost_deepseek_no_cache_fields_unchanged(self):
+        """Without cache fields, falls back to normal prompt_tokens pricing."""
+        resp = LLMResponse(
+            content="test",
+            model="deepseek-chat",
+            provider=LLMProvider.DEEPSEEK,
+            prompt_tokens=1_000_000,
+            completion_tokens=1_000_000,
+        )
+        # Normal: 0.14 + 0.28 = 0.42
+        assert abs(resp.estimated_cost - 0.42) < 0.01
+
+
+class TestDeepSeekClientCacheParsing:
+    """Test DeepSeekClient._parse_response() cache token extraction."""
+
+    def _make_api_response(
+        self,
+        cache_hit: int = 0,
+        cache_miss: int = 0,
+        prompt_tokens: int = 1000,
+        completion_tokens: int = 100,
+    ) -> dict:
+        return {
+            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+            "model": "deepseek-chat",
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+                "prompt_cache_hit_tokens": cache_hit,
+                "prompt_cache_miss_tokens": cache_miss,
+            },
+        }
+
+    def _make_client(self) -> "DeepSeekClient":
+        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
+        return DeepSeekClient(config)
+
+    def test_cache_hit_tokens_extracted(self):
+        """prompt_cache_hit_tokens is parsed from API response."""
+        client = self._make_client()
+        data = self._make_api_response(cache_hit=800, cache_miss=200)
+        resp = client._parse_response(data, latency=50.0)
+        assert resp.prompt_cache_hit_tokens == 800
+        assert resp.prompt_cache_miss_tokens == 200
+
+    def test_no_cache_fields_defaults_to_zero(self):
+        """Missing cache fields default to 0 (older API responses)."""
+        client = self._make_client()
+        data = {
+            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+            "model": "deepseek-chat",
+            "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+        }
+        resp = client._parse_response(data, latency=50.0)
+        assert resp.prompt_cache_hit_tokens == 0
+        assert resp.prompt_cache_miss_tokens == 0
+
+    def test_cost_saving_with_full_cache_hit(self):
+        """Full cache hit: cost is ~10x cheaper than no cache."""
+        client = self._make_client()
+        data_cached = self._make_api_response(cache_hit=1_000_000, cache_miss=0, completion_tokens=0)
+        data_uncached = self._make_api_response(cache_hit=0, cache_miss=0, prompt_tokens=1_000_000, completion_tokens=0)
+        resp_cached = client._parse_response(data_cached, latency=0)
+        resp_uncached = client._parse_response(data_uncached, latency=0)
+        assert resp_cached.estimated_cost < resp_uncached.estimated_cost * 0.15  # at least 85% cheaper
+
 
 class TestLLMConfig:
     """Test LLMConfig defaults."""

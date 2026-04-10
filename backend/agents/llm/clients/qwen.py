@@ -64,6 +64,8 @@ class QwenClient(OpenAICompatibleClient):
         "qwen3-14b",
         "qwen3-8b",
         "qwen3-4b",
+        "qwq-plus",
+        "qwq-plus-latest",
     }
 
     def _build_payload(self, messages: list[LLMMessage], **kwargs: Any) -> dict[str, Any]:
@@ -81,22 +83,15 @@ class QwenClient(OpenAICompatibleClient):
         return payload
 
     def _parse_response(self, data: dict[str, Any], latency: float) -> LLMResponse:
-        """Parse response with reasoning_content extraction."""
-        message = data["choices"][0]["message"]
-        reasoning = message.get("reasoning_content")
+        """Parse response with reasoning_content extraction.
 
-        return LLMResponse(
-            content=message["content"],
-            model=data.get("model", self.model),
-            provider=self.PROVIDER,
-            finish_reason=data["choices"][0].get("finish_reason"),
-            prompt_tokens=data.get("usage", {}).get("prompt_tokens", 0),
-            completion_tokens=data.get("usage", {}).get("completion_tokens", 0),
-            total_tokens=data.get("usage", {}).get("total_tokens", 0),
-            latency_ms=latency,
-            raw_response=data,
-            reasoning_content=reasoning,
-        )
+        Calls super() to preserve all base fields (including prompt_cache_hit/miss_tokens)
+        then overwrites reasoning_content from Qwen-specific message field.
+        """
+        resp = super()._parse_response(data, latency)
+        reasoning = data["choices"][0]["message"].get("reasoning_content")
+        resp.reasoning_content = reasoning
+        return resp
 
 
 __all__ = ["QwenClient"]

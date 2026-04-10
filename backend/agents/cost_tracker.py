@@ -68,6 +68,18 @@ COST_TABLE: dict[str, dict[str, tuple[float, float]]] = {
         "sonar-reasoning-pro": (0.20, 0.60),
         "sonar-deep-research": (0.20, 0.60),
     },
+    # Anthropic Claude — keyed by both "anthropic" (LLMProvider.value) and "claude"
+    # (agent_name used in trading_strategy_graph.py provider_map)
+    "anthropic": {
+        "claude-haiku-4-5-20251001": (0.25, 1.25),
+        "claude-sonnet-4-6": (3.00, 15.00),
+        "claude-opus-4-6": (15.00, 75.00),
+    },
+    "claude": {
+        "claude-haiku-4-5-20251001": (0.25, 1.25),
+        "claude-sonnet-4-6": (3.00, 15.00),
+        "claude-opus-4-6": (15.00, 75.00),
+    },
 }
 
 
@@ -292,7 +304,9 @@ class CostTracker:
                         "requests": len(day_records),
                         "tokens": sum(r.total_tokens for r in day_records),
                         "deepseek": sum(r.cost_usd for r in day_records if r.agent == "deepseek"),
+                        "qwen": sum(r.cost_usd for r in day_records if r.agent == "qwen"),
                         "perplexity": sum(r.cost_usd for r in day_records if r.agent == "perplexity"),
+                        "claude": sum(r.cost_usd for r in day_records if r.agent in ("claude", "anthropic")),
                     }
                 )
 

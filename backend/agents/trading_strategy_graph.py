@@ -3,23 +3,29 @@ Trading Strategy LangGraph Pipeline.
 
 Builds an AgentGraph that implements the full AI strategy generation cycle:
 
-    analyze_market ──► [debate] ──► memory_recall ──► generate_strategies ──► parse_responses
-                                                                                    │
-                                                                              select_best
-                                                                                    │
-                                                                              build_graph
-                                                                                    │
-                                                                               backtest
-                                                                                    │
-                                                                        backtest_analysis ──► refine_strategy ──┐
-                                                                                    │                          │
-                                                                        (passes/max iter)            (back to generate)
-                                                                                    │
-                                                                          optimize_strategy
-                                                                                    │
-                                                                           ml_validation
-                                                                                    │
-                                                                           memory_update ──► report ──► END
+    analyze_market ──► regime_classifier ──► [debate] ──► memory_recall ──► generate_strategies ──► parse_responses
+                                                                                                               │
+                                                                                                         select_best
+                                                                                                               │
+                                                                                                         build_graph
+                                                                                                               │
+                                                                                                          backtest
+                                                                                                               │
+                                                                                               backtest_analysis ──► refine_strategy ──┐
+                                                                                                               │                       │
+                                                                                               (passes/max iter)            (back to generate)
+                                                                                                               │
+                                                                                                     optimize_strategy
+                                                                                                               │
+                                                                                                   [wf_validation]  (optional, run_wf_validation=True)
+                                                                                                               │
+                                                                                                    analysis_debate
+                                                                                                               │
+                                                                                                     ml_validation
+                                                                                                               │
+                                                                                               [hitl]  (optional, hitl_enabled=True)
+                                                                                                               │
+                                                                                                     memory_update ──► reflection ──► report ──► END
 
 Uses StrategyController components but in a graph-based execution model
 for better observability, retry logic, and conditional routing.
@@ -155,7 +161,10 @@ class RegimeClassifierNode(AgentNode):
 
         # Approximate ADX proxy from trend_strength string
         strength_map = {"strong": 30.0, "moderate": 20.0, "weak": 10.0}
-        adx_proxy = strength_map.get(trend_strength, 10.0)
+        adx_proxy = strength_map.get(trend_strength)
+        if adx_proxy is None:
+            logger.warning(f"[RegimeClassifier] Unknown trend_strength '{trend_strength}' — defaulting to weak (10.0)")
+            adx_proxy = 10.0
 
         # --- Classify ---
         if atr_pct >= self._ATR_RISK_OFF_THRESHOLD and trend_dir == "bearish":
@@ -241,7 +250,7 @@ class DebateNode(AgentNode):
 
         market_context = market_result["market_context"]
         symbol = state.context.get("symbol", "BTCUSDT")
-        agents = state.context.get("agents", ["deepseek", "qwen"])
+        agents = state.context.get("agents", ["claude"])
 
         # P2-2: S²-MAD — check if previous debate results already converged
         prior_debate = state.context.get("debate_consensus")
@@ -297,10 +306,7 @@ class DebateNode(AgentNode):
                 sim = self._cosine_similarity(participant_texts[0], participant_texts[1])
                 logger.info(f"🔁 [DebateNode] S²-MAD cosine_sim={sim:.3f} (threshold={self._SIMILARITY_THRESHOLD})")
 
-            logger.info(
-                f"🗣️ Debate complete: confidence={confidence:.2f}, "
-                f"rounds={len(rounds_list)}"
-            )
+            logger.info(f"🗣️ Debate complete: confidence={confidence:.2f}, rounds={len(rounds_list)}")
 
             # Enrich state with debate consensus for GenerateStrategiesNode
             state.context["debate_consensus"] = {
@@ -363,7 +369,7 @@ class AnalysisDebateNode(AgentNode):
         tested: int = opt_result.get("tested_combinations", 0)
         best_sharpe: float = float(opt_result.get("best_sharpe", 0.0))
         symbol: str = state.context.get("symbol", "BTCUSDT")
-        agents: list[str] = state.context.get("agents", ["deepseek", "qwen"])
+        agents: list[str] = state.context.get("agents", ["claude"])
 
         question = self._format_question(
             top_trials=top_trials,
@@ -515,9 +521,7 @@ class MemoryRecallNode(AgentNode):
             from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory
 
-            memory = HierarchicalMemory(
-                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
-            )
+            memory = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
             # Event loop is already running inside execute() → must async_load explicitly
             loaded_count = await memory.async_load()
             logger.debug(f"[MemoryRecallNode] async_load loaded {loaded_count} memories from SQLite")
@@ -653,18 +657,120 @@ class MemoryRecallNode(AgentNode):
         return state
 
 
+class GroundingNode(AgentNode):
+    """
+    Grounding Node: Perplexity sonar-pro provides real-time market context.
+
+    Fetches current price levels, recent news, sentiment and key technical levels
+    for the target symbol. This grounds strategy generation in current reality,
+    not just historical patterns — reducing hallucinated price levels.
+
+    Runs after MemoryRecallNode, before GenerateStrategiesNode.
+    Skips gracefully if PERPLEXITY_API_KEY is not configured.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="grounding",
+            description="Fetch real-time market context via Perplexity sonar-pro",
+            timeout=20.0,
+            retry_count=1,
+            retry_delay=2.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        from backend.security.key_manager import get_key_manager
+
+        symbol = state.context.get("symbol", "BTCUSDT")
+        timeframe = state.context.get("timeframe", "15")
+        regime = state.context.get("regime", "unknown")
+
+        km = get_key_manager()
+        api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
+        if not api_key:
+            logger.info("[Grounding] PERPLEXITY_API_KEY not set — skipping grounding")
+            state.set_result(self.name, {"grounding_context": "", "skipped": True})
+            return state
+
+        query = (
+            f"{symbol} cryptocurrency current price, key support and resistance levels, "
+            f"recent significant news or events, market sentiment, {timeframe}min timeframe. "
+            f"Current detected regime: {regime}. "
+            f"Provide specific price levels and actionable context for a trading strategy."
+        )
+
+        try:
+            grounding_text = await self._call_llm(
+                "perplexity",
+                query,
+                system_msg="Provide concise factual market data with specific price levels and sources.",
+                state=state,
+            )
+
+            grounding_context = f"## Real-Time Market Grounding ({symbol})\n{grounding_text or ''}\n"
+            state.set_result(self.name, {"grounding_context": grounding_context, "skipped": False})
+            # Inject into state context so GenerateStrategiesNode can read it
+            state.context["grounding_context"] = grounding_context
+            logger.info(f"[Grounding] {symbol} real-time context fetched ({len(grounding_context)} chars)")
+        except Exception as e:
+            logger.warning(f"[Grounding] Perplexity call failed: {e} — continuing without grounding")
+            state.set_result(self.name, {"grounding_context": "", "error": str(e)})
+
+        return state
+
+    async def _call_llm(
+        self,
+        agent_name: str,
+        query: str,
+        system_msg: str,
+        state: AgentState | None = None,
+        **kwargs: Any,
+    ) -> str | None:
+        """Minimal _call_llm for GroundingNode — Perplexity only."""
+        from backend.agents.llm.base_client import (
+            LLMClientFactory,
+            LLMConfig,
+            LLMMessage,
+            LLMProvider,
+        )
+        from backend.security.key_manager import get_key_manager
+
+        km = get_key_manager()
+        api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
+        if not api_key:
+            return None
+
+        config = LLMConfig(
+            provider=LLMProvider.PERPLEXITY,
+            api_key=api_key,
+            model="sonar-pro",
+            temperature=0.3,
+            max_tokens=1024,
+        )
+        client = LLMClientFactory.create(config)
+        try:
+            messages = [
+                LLMMessage(role="system", content=system_msg),
+                LLMMessage(role="user", content=query),
+            ]
+            response = await client.chat(messages)
+            if state is not None:
+                state.record_llm_cost(response.estimated_cost)
+            return response.content
+        finally:
+            await client.close()
+
+
 class GenerateStrategiesNode(AgentNode):
     """
     Node 2: Generate strategy proposals from LLM agents.
 
-    Self-MoA pattern (ICLR 2025):
-    - DeepSeek called 3× in parallel at T=0.3/0.7/1.1 → diverse proposals
-    - QWEN acts as critic: reviews all 3 DeepSeek outputs and synthesises
-      the strongest strategy from them (temperature diversity → +6.6% quality)
-    - Other agents (Perplexity) called normally for market context
+    Claude Sonnet is used for standard strategy generation; Opus is escalated
+    for novel/unknown regimes or when force_escalate is set in context.
+    Perplexity real-time grounding context is injected by GroundingNode upstream.
     """
 
-    # Self-MoA temperatures for DeepSeek — conservative / balanced / creative
+    # Kept for backward compatibility with existing tests that reference this attribute
     _MOA_TEMPERATURES = [0.3, 0.7, 1.1]
 
     def __init__(self) -> None:
@@ -690,7 +796,10 @@ class GenerateStrategiesNode(AgentNode):
             return state
 
         market_context = market_result["market_context"]
-        agents: list[str] = state.context.get("agents", ["deepseek"])
+        agents: list[str] = state.context.get("agents", ["claude"])
+        if not agents:
+            state.add_error(self.name, ValueError("agents list is empty — cannot generate strategies"))
+            return state
         platform_config = state.context.get(
             "platform_config",
             {"exchange": "Bybit", "commission": COMMISSION_TV, "max_leverage": 100},
@@ -745,71 +854,49 @@ class GenerateStrategiesNode(AgentNode):
         responses: list[dict[str, Any]] = []
         failed_agents: list[str] = []
 
-        # --- Self-MoA: 3× DeepSeek in parallel if DeepSeek is in the agent list ---
-        if "deepseek" in agents:
-            prompt = self._prompt_engineer.create_strategy_prompt(
-                context=market_context,
-                platform_config=platform_config,
-                agent_name="deepseek",
-                include_examples=True,
-            )
-            if few_shot_block:
-                prompt = f"{few_shot_block}\n\n{prompt}"
-            if memory_context:
-                prompt = f"{memory_context}\n\n{prompt}"
-            if optimizer_insights_block:
-                prompt = f"{prompt}\n\n{optimizer_insights_block}"
-            if refinement_feedback:
-                prompt = f"{prompt}\n\n{refinement_feedback}"
-            system_msg = self._prompt_engineer.get_system_message("deepseek")
+        # --- Strategy generation: single Claude Sonnet call (or Opus for escalation) ---
+        # Determine if this is an escalation run (novel/unknown regime)
+        regime = state.context.get("regime", "unknown")
+        is_novel_regime = regime in ("unknown", "extreme_volatile") or state.context.get("force_escalate")
+        agent_name = "claude-opus" if is_novel_regime else "claude-sonnet"
 
-            moa_tasks = [
-                self._call_llm("deepseek", prompt, system_msg, temperature=t, state=state, json_mode=True)
-                for t in self._MOA_TEMPERATURES
-            ]
-            moa_results = await asyncio.gather(*moa_tasks, return_exceptions=True)
-            moa_texts = [r for r in moa_results if isinstance(r, str) and r]
+        # Read grounding context injected by GroundingNode (if present)
+        grounding_context = state.context.get("grounding_context", "")
+        if grounding_context:
+            market_context_text = getattr(market_context, "summary", str(market_context))
+            state.context["_enriched_market_context"] = f"{grounding_context}\n\n{market_context_text}"
 
-            logger.info(f"🔀 Self-MoA: {len(moa_texts)}/{len(self._MOA_TEMPERATURES)} DeepSeek variants succeeded")
+        prompt = self._prompt_engineer.create_strategy_prompt(
+            context=market_context,
+            platform_config=platform_config,
+            agent_name="claude",
+            include_examples=True,
+        )
+        if grounding_context:
+            prompt = f"{grounding_context}\n\n{prompt}"
+        if few_shot_block:
+            prompt = f"{few_shot_block}\n\n{prompt}"
+        if memory_context:
+            prompt = f"{memory_context}\n\n{prompt}"
+        if optimizer_insights_block:
+            prompt = f"{prompt}\n\n{optimizer_insights_block}"
+        if refinement_feedback:
+            prompt = f"{prompt}\n\n{refinement_feedback}"
+        system_msg = self._prompt_engineer.get_system_message("claude")
 
-            if moa_texts:
-                # Synthesis critic: Claude (preferred) → QWEN fallback → raw T=0.7
-                critic_output = await self._synthesis_critic(moa_texts, market_context)
-                if critic_output:
-                    responses.append({"agent": "deepseek", "response": critic_output})
-                    logger.info("✅ Synthesis critic produced synthesised DeepSeek strategy")
-                else:
-                    # Fallback: use the middle-temperature (T=0.7) output directly
-                    mid = moa_texts[len(moa_texts) // 2]
-                    responses.append({"agent": "deepseek", "response": mid})
-                    logger.info("⚠️ QWEN critic unavailable — using T=0.7 DeepSeek variant")
+        if is_novel_regime:
+            logger.info(f"[GenerateStrategy] Escalating to Opus (regime={regime})")
+        else:
+            logger.info(f"[GenerateStrategy] Using Claude Sonnet (regime={regime})")
 
-        # --- Other agents (Perplexity for market context, QWEN standalone) ---
-        for agent_name in agents:
-            if agent_name == "deepseek":
-                continue  # handled by Self-MoA above
-            prompt = self._prompt_engineer.create_strategy_prompt(
-                context=market_context,
-                platform_config=platform_config,
-                agent_name=agent_name,
-                include_examples=True,
-            )
-            if few_shot_block:
-                prompt = f"{few_shot_block}\n\n{prompt}"
-            if memory_context:
-                prompt = f"{memory_context}\n\n{prompt}"
-            if optimizer_insights_block:
-                prompt = f"{prompt}\n\n{optimizer_insights_block}"
-            if refinement_feedback:
-                prompt = f"{prompt}\n\n{refinement_feedback}"
-            system_msg = self._prompt_engineer.get_system_message(agent_name)
-            try:
-                response_text = await self._call_llm(agent_name, prompt, system_msg, state=state)
-                if response_text:
-                    responses.append({"agent": agent_name, "response": response_text})
-            except Exception as e:
-                logger.warning(f"[Graph] LLM call failed for {agent_name}: {e}")
-                failed_agents.append(agent_name)
+        try:
+            response_text = await self._call_llm(agent_name, prompt, system_msg, state=state)
+            if response_text:
+                responses.append({"agent": "claude", "response": response_text})
+                logger.info("Claude strategy generation succeeded")
+        except Exception as e:
+            logger.error(f"Claude strategy generation failed: {e}")
+            failed_agents.append("claude")
 
         if failed_agents:
             state.context["partial_generation"] = True
@@ -819,61 +906,19 @@ class GenerateStrategiesNode(AgentNode):
         state.set_result(self.name, {"responses": responses})
         state.add_message(
             "system",
-            f"Generated {len(responses)} responses (Self-MoA active for DeepSeek)",
+            f"Generated {len(responses)} responses (Claude Sonnet/Opus)",
             self.name,
         )
         return state
 
-    async def _qwen_critic(self, moa_texts: list[str], market_context: Any) -> str | None:
-        """
-        QWEN critic node for Self-MoA.
-
-        Receives N DeepSeek strategy variants and returns the synthesised best.
-        If QWEN is unavailable, returns None (caller falls back to T=0.7 variant).
-        """
-        variants_block = "\n\n".join(
-            f"--- VARIANT {i + 1} (T={self._MOA_TEMPERATURES[i]:.1f}) ---\n{text}" for i, text in enumerate(moa_texts)
-        )
+    async def _synthesis_critic(
+        self, moa_texts: list[str], market_context: Any, state: AgentState | None = None
+    ) -> str | None:
+        """Claude Haiku synthesis critic (legacy — kept for backward compatibility with tests)."""
+        variants_block = "\n\n".join(f"--- VARIANT {i + 1} ---\n{text}" for i, text in enumerate(moa_texts))
         critic_prompt = (
             "You are a quantitative trading strategy critic.\n\n"
-            "Below are multiple strategy proposals for the same market context, "
-            "generated at different creativity levels.\n\n"
-            f"{variants_block}\n\n"
-            "Your task:\n"
-            "1. Identify the strongest elements from each variant\n"
-            "2. Synthesise ONE final strategy that combines the best ideas\n"
-            "3. Ensure the strategy is concrete, implementable, and risk-controlled\n"
-            "4. Output in the SAME structured JSON format as the variants\n\n"
-            "Output only the synthesised strategy JSON, no explanation."
-        )
-        try:
-            return await self._call_llm(
-                "qwen",
-                critic_prompt,
-                "You are a precision strategy synthesiser. Output valid JSON only.",
-                temperature=0.3,  # deterministic for critic role
-                json_mode=True,
-            )
-        except Exception as e:
-            logger.debug(f"QWEN critic call failed: {e}")
-            return None
-
-    async def _synthesis_critic(self, moa_texts: list[str], market_context: Any) -> str | None:
-        """
-        Strategy synthesis critic for Self-MoA.
-
-        Tries Claude Haiku first (superior instruction-following for structured JSON
-        synthesis), falls back to QWEN if Claude is unavailable or fails.
-        Returns None only when both providers fail — caller uses T=0.7 variant.
-        """
-        variants_block = "\n\n".join(
-            f"--- VARIANT {i + 1} (T={self._MOA_TEMPERATURES[i]:.1f}) ---\n{text}"
-            for i, text in enumerate(moa_texts)
-        )
-        critic_prompt = (
-            "You are a quantitative trading strategy critic.\n\n"
-            "Below are multiple strategy proposals for the same market context, "
-            "generated at different creativity levels.\n\n"
+            "Below are multiple strategy proposals for the same market context.\n\n"
             f"{variants_block}\n\n"
             "Your task:\n"
             "1. Identify the strongest elements from each variant\n"
@@ -883,36 +928,13 @@ class GenerateStrategiesNode(AgentNode):
             "Output only the synthesised strategy JSON, no explanation."
         )
         system_msg = "You are a precision strategy synthesiser. Output valid JSON only."
-
-        # Claude first — better at following complex structured-output instructions
         try:
-            result = await self._call_llm(
-                "claude",
-                critic_prompt,
-                system_msg,
-                temperature=0.3,
-            )
+            result = await self._call_llm("claude-haiku", critic_prompt, system_msg, temperature=0.3, state=state)
             if result:
-                logger.debug("🟣 Claude synthesis critic succeeded")
+                logger.debug("Claude Haiku synthesis critic succeeded")
                 return result
         except Exception as e:
-            logger.debug(f"Claude synthesis critic failed, trying QWEN: {e}")
-
-        # QWEN fallback
-        try:
-            result = await self._call_llm(
-                "qwen",
-                critic_prompt,
-                system_msg,
-                temperature=0.3,
-                json_mode=True,
-            )
-            if result:
-                logger.debug("🟢 QWEN synthesis critic (fallback) succeeded")
-                return result
-        except Exception as e:
-            logger.debug(f"QWEN synthesis critic also failed: {e}")
-
+            logger.debug(f"Claude Haiku synthesis critic failed: {e}")
         return None
 
     async def _call_llm(
@@ -941,24 +963,41 @@ class GenerateStrategiesNode(AgentNode):
             LLMMessage,
             LLMProvider,
         )
+        from backend.agents.llm.model_router import ModelRouter
         from backend.security.key_manager import get_key_manager
 
         km = get_key_manager()
 
-        provider_map = {
-            "deepseek": (LLMProvider.DEEPSEEK, "DEEPSEEK_API_KEY", "deepseek-chat", 0.7),
-            "qwen": (LLMProvider.QWEN, "QWEN_API_KEY", "qwen-plus", 0.4),
-            "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "sonar-pro", 0.7),
-            # Claude: uses Anthropic Messages API (NOT OpenAI-compatible).
-            # json_mode is handled via prompt engineering inside ClaudeClient —
-            # no response_format field is sent, so _supports_json_mode stays False.
-            "claude": (LLMProvider.ANTHROPIC, "ANTHROPIC_API_KEY", "claude-haiku-4-5-20251001", 0.7),
+        # Map task/agent names to Claude model tiers + Perplexity
+        # Legacy agent names (deepseek, qwen) are silently routed to Claude equivalents
+        _AGENT_TO_CLAUDE_MODEL = {
+            "claude-haiku": "claude-haiku-4-5-20251001",
+            "claude-sonnet": "claude-sonnet-4-6",
+            "claude-opus": "claude-opus-4-6",
+            # Legacy aliases → Claude equivalents
+            "claude": "claude-haiku-4-5-20251001",
+            "deepseek": "claude-sonnet-4-6",  # was main generator → Sonnet
+            "qwen": "claude-haiku-4-5-20251001",  # was critic → Haiku
         }
 
-        if agent_name not in provider_map:
-            return None
+        # Perplexity stays as-is (real-time grounding only)
+        if agent_name == "perplexity":
+            provider = LLMProvider.PERPLEXITY
+            key_name = "PERPLEXITY_API_KEY"
+            model = "sonar-pro"
+            default_temp = 0.7
+        elif agent_name in _AGENT_TO_CLAUDE_MODEL:
+            provider = LLMProvider.ANTHROPIC
+            key_name = "ANTHROPIC_API_KEY"
+            model = _AGENT_TO_CLAUDE_MODEL[agent_name]
+            default_temp = 0.7
+        else:
+            # Unknown agent → try as Claude model name directly
+            provider = LLMProvider.ANTHROPIC
+            key_name = "ANTHROPIC_API_KEY"
+            model = ModelRouter.get_model(agent_name)
+            default_temp = 0.7
 
-        provider, key_name, model, default_temp = provider_map[agent_name]
         api_key = km.get_decrypted_key(key_name)
         if not api_key:
             return None
@@ -972,9 +1011,9 @@ class GenerateStrategiesNode(AgentNode):
             max_tokens=4096,
         )
         client = LLMClientFactory.create(config)
-        # json_mode is only supported by OpenAI-compatible providers.
-        # ClaudeClient silently drops json_mode (handled via prompt), so exclude here.
-        _supports_json_mode = agent_name in ("deepseek", "qwen")
+        # Claude handles json_mode via prompt engineering (no response_format field)
+        # Perplexity does not support json_mode at all
+        _supports_json_mode = False  # Claude: handled internally; Perplexity: unsupported
         try:
             messages = [
                 LLMMessage(role="system", content=system_msg),
@@ -1465,9 +1504,7 @@ class BacktestNode(AgentNode):
             # Enforce TP ≥ SL: inverted R:R (TP < SL) requires >67% win rate just to break even —
             # most LLM-generated strategies can't sustain that. Fall back to TP = SL * 1.5.
             if _tp < _sl:
-                logger.warning(
-                    f"[BacktestNode] Inverted R:R: TP={_tp:.3f} < SL={_sl:.3f} — correcting TP to SL*1.5"
-                )
+                logger.warning(f"[BacktestNode] Inverted R:R: TP={_tp:.3f} < SL={_sl:.3f} — correcting TP to SL*1.5")
                 _tp = min(_sl * 1.5, 0.15)
             logger.info(f"[BacktestNode] SL={_sl:.4f} ({_sl * 100:.2f}%)  TP={_tp:.4f} ({_tp * 100:.2f}%)")
             # Store for OptimizationNode so it uses the same SL/TP in Numba trials
@@ -1849,7 +1886,9 @@ class MemoryUpdateNode(AgentNode):
         opt_result = state.get_result("optimize_strategy") or {}
         if wf_ctx.get("passed") and opt_result.get("best_sharpe") is not None:
             sharpe = float(opt_result["best_sharpe"])
-            logger.debug(f"[MemoryUpdateNode] Using optimized sharpe={sharpe:.3f} (raw IS was {metrics.get('sharpe_ratio', 0):.3f})")
+            logger.debug(
+                f"[MemoryUpdateNode] Using optimized sharpe={sharpe:.3f} (raw IS was {metrics.get('sharpe_ratio', 0):.3f})"
+            )
 
         importance = min(1.0, max(0.1, (sharpe + 1.0) / 4.0))  # 0→0.25, 2→0.75
         # Outcome label helps BM25 recall: MemoryRecallNode queries "successful strategy … high sharpe profit"
@@ -1868,9 +1907,7 @@ class MemoryUpdateNode(AgentNode):
             from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
 
-            memory = HierarchicalMemory(
-                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
-            )
+            memory = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
             await memory.store(
                 content=episodic_content,
                 memory_type=MemoryType.EPISODIC,
@@ -1987,6 +2024,11 @@ class RefinementNode(AgentNode):
     async def execute(self, state: AgentState) -> AgentState:
         iteration = state.context.get("refinement_iteration", 0) + 1
         state.context["refinement_iteration"] = iteration
+
+        # Iteration 3 (final attempt) → escalate to Opus in GenerateStrategiesNode
+        if iteration >= self.MAX_REFINEMENTS:
+            state.context["force_escalate"] = True
+            logger.info("[Refinement] Iteration 3 — escalating to Claude Opus for final attempt")
 
         backtest_result = state.get_result("backtest") or {}
         metrics = backtest_result.get("metrics", {}) or {}
@@ -2223,7 +2265,7 @@ class OptimizationNode(AgentNode):
             "leverage": leverage,
             "commission": COMMISSION_TV,  # build_backtest_input key is 'commission'
             "direction": "both",
-            "stop_loss_pct": opt_sl * 100.0,   # decimal → percent (e.g. 0.02 → 2.0)
+            "stop_loss_pct": opt_sl * 100.0,  # decimal → percent (e.g. 0.02 → 2.0)
             "take_profit_pct": opt_tp * 100.0,  # decimal → percent (e.g. 0.03 → 3.0)
         }
 
@@ -2992,9 +3034,7 @@ class PostRunReflectionNode(AgentNode):
             from backend.agents.memory.backend_interface import SQLiteBackendAdapter
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
 
-            memory = HierarchicalMemory(
-                backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB)
-            )
+            memory = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
             await memory.store(
                 content=reflection_text,
                 memory_type=MemoryType.EPISODIC,
@@ -3050,8 +3090,8 @@ class WalkForwardValidationNode(AgentNode):
     falling back to the raw IS backtest Sharpe.
     """
 
-    WF_RATIO_THRESHOLD: float = 0.5   # wf_sharpe / is_sharpe must exceed this
-    WF_MIN_ABS_SHARPE: float = 0.5    # OR: absolute OOS Sharpe floor (passes even if ratio < threshold)
+    WF_RATIO_THRESHOLD: float = 0.5  # wf_sharpe / is_sharpe must exceed this
+    WF_MIN_ABS_SHARPE: float = 0.5  # OR: absolute OOS Sharpe floor (passes even if ratio < threshold)
     TRAIN_MONTHS: int = 3  # walk-forward training window
     TEST_MONTHS: int = 1  # walk-forward test window
     MIN_BARS_FOR_WF: int = 200  # skip WF if fewer bars available
@@ -3179,7 +3219,9 @@ class WalkForwardValidationNode(AgentNode):
 
         return state
 
-    def _run_rolling_wf(self, strategy_graph: dict, df: pd.DataFrame, is_sharpe: float, symbol: str = "BTCUSDT") -> list[float]:
+    def _run_rolling_wf(
+        self, strategy_graph: dict, df: pd.DataFrame, is_sharpe: float, symbol: str = "BTCUSDT"
+    ) -> list[float]:
         """Synchronous: run rolling walk-forward windows, return list of test Sharpes."""
         from datetime import UTC
 
@@ -3334,12 +3376,7 @@ def _should_refine(state: AgentState) -> bool:
         sig_long = int(backtest.get("signal_long_count", -1))
         sig_short = int(backtest.get("signal_short_count", -1))
         trades = int((backtest.get("metrics", {}) or {}).get("total_trades", 0))
-        if (
-            sig_long >= 0
-            and sig_short >= 0
-            and sig_long + sig_short >= 50
-            and trades >= RefinementNode.MIN_TRADES
-        ):
+        if sig_long >= 0 and sig_short >= 0 and sig_long + sig_short >= 50 and trades >= RefinementNode.MIN_TRADES:
             logger.info(
                 f"[_should_refine] Skipping refinement: root_cause=poor_risk_reward "
                 f"with {sig_long}L+{sig_short}S signals, {trades} trades — "
@@ -3447,6 +3484,7 @@ def build_trading_strategy_graph(
     # — run them in parallel to save ~10-15 s per pipeline run.
     graph.add_edge("analyze_market", "regime_classifier")
     graph.add_node(MemoryRecallNode())
+    graph.add_node(GroundingNode())
     if run_debate:
         graph.add_node(DebateNode())
         graph.add_edge(
@@ -3454,10 +3492,11 @@ def build_trading_strategy_graph(
             ["debate", "memory_recall"],
             edge_type=EdgeType.PARALLEL,
         )
-        graph.add_edge("debate", "generate_strategies")
+        graph.add_edge("debate", "grounding")
     else:
         graph.add_edge("regime_classifier", "memory_recall")
-    graph.add_edge("memory_recall", "generate_strategies")
+    graph.add_edge("memory_recall", "grounding")
+    graph.add_edge("grounding", "generate_strategies")
 
     graph.add_edge("generate_strategies", "parse_responses")
     graph.add_edge("parse_responses", "select_best")
@@ -3595,11 +3634,19 @@ async def run_strategy_pipeline(
         event_fn=event_fn,
     )
 
+    # Pre-flight health check (non-blocking — just warns, never raises)
+    from backend.agents.monitoring.provider_health import get_health_monitor
+
+    try:
+        await get_health_monitor().preflight_check()
+    except Exception as _e:
+        logger.debug(f"Preflight check error (non-fatal): {_e}")
+
     context: dict[str, Any] = {
         "symbol": symbol,
         "timeframe": timeframe,
         "df": df,
-        "agents": agents or ["deepseek"],
+        "agents": agents or ["claude"],
         "initial_capital": initial_capital,
         "leverage": leverage,
         "hitl_approved": hitl_approved,  # P2-3: HITL approval flag
