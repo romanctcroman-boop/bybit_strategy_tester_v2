@@ -421,6 +421,201 @@ class BuilderWorkflow:
                 }
             )
 
+    # ── Phase 7: Unified pipeline adapter ─────────────────────────────────────
+
+    # Pipeline node name → BuilderStage mapping (for SSE forwarding)
+    _NODE_TO_BUILDER_STAGE: dict[str, BuilderStage] = {
+        "analyze_market": BuilderStage.PLANNING,
+        "regime_classifier": BuilderStage.PLANNING,
+        "memory_recall": BuilderStage.PLANNING,
+        "generate_strategies": BuilderStage.CREATING,
+        "parse": BuilderStage.ADDING_BLOCKS,
+        "select_best": BuilderStage.ADDING_BLOCKS,
+        "build_graph": BuilderStage.CONNECTING,
+        "backtest": BuilderStage.BACKTESTING,
+        "backtest_analysis": BuilderStage.BACKTESTING,
+        "optimize_strategy": BuilderStage.EVALUATING,
+        "optimization_analysis": BuilderStage.EVALUATING,
+        "a2a_param_range": BuilderStage.EVALUATING,
+        "analysis_debate": BuilderStage.VALIDATING,
+        "wf_validation": BuilderStage.VALIDATING,
+        "ml_validation": BuilderStage.VALIDATING,
+        "memory_update": BuilderStage.COMPLETED,
+        "reflection": BuilderStage.COMPLETED,
+        "report": BuilderStage.COMPLETED,
+    }
+
+    def _forward_event(self, event_name: str, data: dict[str, Any]) -> None:
+        """Forward a pipeline node event to BuilderWorkflow SSE callbacks."""
+        stage = self._NODE_TO_BUILDER_STAGE.get(event_name)
+        if stage is not None:
+            self._set_stage(stage)
+        # Forward any LLM call data as agent_log
+        if data.get("llm_response") and self._on_agent_log is not None:
+            self._emit_agent_log(
+                agent=data.get("agent", "claude"),
+                role=event_name,
+                prompt=data.get("prompt", ""),
+                response=str(data.get("llm_response", "")),
+                title=f"[{event_name}]",
+            )
+
+    @staticmethod
+    def _state_to_result(
+        state: Any,
+        config: BuilderWorkflowConfig,
+        start_ts: str,
+        end_ts: str,
+        duration: float,
+    ) -> BuilderWorkflowResult:
+        """Convert AgentState → BuilderWorkflowResult for API compatibility."""
+        status = BuilderStage.FAILED if state.errors else BuilderStage.COMPLETED
+
+        # Blocks/connections from build_graph result
+        build_result = state.get_result("build_graph") or {}
+        blocks_added = build_result.get("blocks") or config.blocks or []
+        connections_made = build_result.get("connections") or config.connections or []
+
+        # Backtest metrics: prefer opt_result for richer post-optimization data
+        opt = state.get_result("optimize_strategy") or {}
+        backtest = state.get_result("backtest") or {}
+        backtest_results = {
+            "sharpe_ratio": opt.get("best_sharpe") or backtest.get("sharpe_ratio", 0.0),
+            "max_drawdown": opt.get("best_drawdown") or backtest.get("max_drawdown", 0.0),
+            "total_trades": opt.get("best_trades") or backtest.get("total_trades", 0),
+            "win_rate": backtest.get("win_rate", 0.0),
+            "best_params": opt.get("best_params", {}),
+        }
+
+        # Per-iteration history from optimization loop
+        iterations = [
+            {
+                "iteration": entry.get("iteration", i + 1),
+                "sharpe": entry.get("best_sharpe", 0.0),
+                "params": entry.get("best_params", {}),
+            }
+            for i, entry in enumerate(getattr(state, "opt_iterations", []))
+        ]
+
+        # Debate decision from AnalysisDebateNode
+        deliberation: dict[str, Any] = {}
+        debate = getattr(state, "debate_outcome", None)
+        if debate:
+            deliberation["decision"] = debate.get("decision", "proceed")
+            deliberation["risk_score"] = debate.get("risk_score", 0)
+            deliberation["rationale"] = debate.get("rationale", "")
+
+        # Flatten errors to strings
+        errors = [e.get("error", str(e)) if isinstance(e, dict) else str(e) for e in (state.errors or [])]
+
+        return BuilderWorkflowResult(
+            workflow_id=state.session_id,
+            strategy_id=config.existing_strategy_id or "",
+            status=status,
+            config=config.to_dict(),
+            blocks_added=blocks_added,
+            connections_made=connections_made,
+            backtest_results=backtest_results,
+            iterations=iterations,
+            deliberation=deliberation,
+            errors=errors,
+            duration_seconds=duration,
+            started_at=start_ts,
+            completed_at=end_ts,
+            used_optimizer_mode=True,
+        )
+
+    async def _load_df(self, symbol: str, timeframe: str) -> pd.DataFrame:
+        """Load OHLCV DataFrame for the given symbol/timeframe.
+
+        Returns an empty DataFrame on any error — the unified pipeline handles
+        missing data gracefully.  Extracted as a separate method so tests can
+        mock it without touching any real data services.
+        """
+        import pandas as pd
+
+        try:
+            from backend.services.kline_db_service import KlineDBService
+
+            svc = KlineDBService.get_instance()
+            rows: list[dict] = await asyncio.to_thread(svc.get_klines, symbol, timeframe)
+            if rows:
+                return pd.DataFrame(rows)
+        except Exception as exc:
+            logger.warning(f"[BuilderWorkflow] OHLCV load failed: {exc}")
+        return pd.DataFrame()
+
+    async def run_via_unified_pipeline(self, config: BuilderWorkflowConfig) -> BuilderWorkflowResult:
+        """Thin adapter — delegates to run_strategy_pipeline() (Phase 7).
+
+        Replaces the 3400-line run() with the 15-node unified LangGraph pipeline,
+        forwarding SSE callbacks and converting the resulting AgentState back to
+        BuilderWorkflowResult for full API compatibility.
+
+        Args:
+            config: Workflow configuration (symbol, timeframe, existing_strategy_id, ...)
+
+        Returns:
+            BuilderWorkflowResult compatible with existing /builder/task API.
+        """
+        from backend.agents.trading_strategy_graph import (
+            _load_strategy_graph_from_db,
+            run_strategy_pipeline,
+        )
+
+        start_ts = datetime.now(UTC).isoformat()
+        start_time = time.monotonic()
+
+        self._result = BuilderWorkflowResult(
+            workflow_id=f"bw_{uuid.uuid4().hex[:12]}",
+            config=config.to_dict(),
+            started_at=start_ts,
+            used_optimizer_mode=True,
+        )
+        self._set_stage(BuilderStage.PLANNING)
+
+        # Load seed_graph from DB when optimizing an existing strategy
+        seed_graph: dict[str, Any] | None = None
+        if config.existing_strategy_id:
+            try:
+                seed_graph = await _load_strategy_graph_from_db(config.existing_strategy_id)
+            except Exception as exc:
+                logger.warning(f"[BuilderWorkflow] Could not load seed_graph: {exc}")
+
+        # Load OHLCV data via dedicated method (easy to mock in tests)
+        df = await self._load_df(config.symbol, config.timeframe)
+
+        # Bridge pipeline node events → on_stage_change / on_agent_log callbacks
+        def _event_fn(event_name: str, data: dict[str, Any]) -> None:
+            self._forward_event(event_name, data)
+
+        # Run unified pipeline
+        try:
+            state = await run_strategy_pipeline(
+                symbol=config.symbol,
+                timeframe=config.timeframe,
+                df=df,
+                run_wf_validation=True,
+                pipeline_timeout=300.0,
+                seed_graph=seed_graph,
+                existing_strategy_id=config.existing_strategy_id,
+                event_fn=_event_fn,
+            )
+        except Exception as exc:
+            logger.error(f"[BuilderWorkflow] Unified pipeline error: {exc}")
+            from backend.agents.langgraph_orchestrator import AgentState
+
+            state = AgentState()
+            state.errors.append({"error": str(exc), "node": "run_via_unified_pipeline"})
+
+        duration = time.monotonic() - start_time
+        end_ts = datetime.now(UTC).isoformat()
+        result = self._state_to_result(state, config, start_ts, end_ts, duration)
+        self._result = result
+        return result
+
+    # ──────────────────────────────────────────────────────────────────────────
+
     async def run(self, config: BuilderWorkflowConfig) -> BuilderWorkflowResult:
         """
         Execute the full builder workflow.
