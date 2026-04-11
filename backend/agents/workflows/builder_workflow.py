@@ -136,8 +136,8 @@ class BuilderWorkflowConfig:
     # AI Deliberation — optional, uses real LLM agents for planning
     enable_deliberation: bool = False
 
-    # Primary LLM agent for single-agent calls (qwen | deepseek | perplexity)
-    agent: str = "qwen"
+    # Primary LLM agent for single-agent calls (claude | perplexity)
+    agent: str = "claude"
 
     # Existing strategy — when set, skip create/blocks/connect stages (optimize mode)
     existing_strategy_id: str | None = None
@@ -368,7 +368,7 @@ class BuilderWorkflow:
                 push stage events without patching the dataclass class.
             on_agent_log: Optional callback invoked with an ``agent_log`` dict
                 whenever an LLM agent is called.  Dict keys:
-                  - agent (str)  — "deepseek" | "qwen" | "perplexity" | "a2a"
+                  - agent (str)  — "claude" | "perplexity" | "a2a"
                   - role  (str)  — "planner" | "deliberation" | "optimizer"
                   - prompt (str) — first 400 chars of the prompt sent
                   - response (str) — first 600 chars of the response received
@@ -395,7 +395,7 @@ class BuilderWorkflow:
         """Fire the on_agent_log callback if registered.
 
         Args:
-            agent:    Agent name ("deepseek", "qwen", "perplexity").
+            agent:    Agent name ("claude", "perplexity").
             role:     Task role ("planner", "deliberation", "optimizer").
             prompt:   Full prompt sent (stored truncated for context).
             response: Full response received (displayed in the UI card).
@@ -438,7 +438,7 @@ class BuilderWorkflow:
             used_optimizer_mode=config.use_optimizer_mode,
         )
         # Store selected agent for use in helper methods that don't receive config
-        self._primary_agent: str = config.agent if config.agent in {"qwen", "deepseek", "perplexity"} else "qwen"
+        self._primary_agent: str = config.agent if config.agent in {"claude", "perplexity"} else "claude"
         start_time = time.monotonic()
 
         try:
@@ -1326,7 +1326,7 @@ Recommended approach for positive profit (EMA + RSI combination):
         try:
             from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
-            _agent_name = config.agent if config.agent in {"qwen", "deepseek", "perplexity"} else "qwen"
+            _agent_name = config.agent if config.agent in {"claude", "perplexity"} else "claude"
             _interface = UnifiedAgentInterface()
             raw_text: str = await _interface.ask(_agent_name, prompt) or ""
             logger.debug(f"[BuilderWorkflow] LLM plan raw response from {_agent_name} ({len(raw_text)} chars)")
@@ -2588,16 +2588,12 @@ Only include the specific parameters that should change."""
 
             a2a = _get_a2a_communicator()
 
-            # Only use agents for which we have API keys
+            # Only use Claude + Perplexity
             available_agents = []
-            if os.environ.get("DEEPSEEK_API_KEY"):
-                available_agents.append(AgentType.DEEPSEEK)
-            if os.environ.get("QWEN_API_KEY"):
-                available_agents.append(AgentType.QWEN)
-            if os.environ.get("PERPLEXITY_API_KEY"):
-                available_agents.append(AgentType.PERPLEXITY)
             if os.environ.get("ANTHROPIC_API_KEY"):
                 available_agents.append(AgentType.CLAUDE)
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                available_agents.append(AgentType.PERPLEXITY)
 
             if len(available_agents) >= 2:
                 logger.info(
@@ -2656,7 +2652,7 @@ Only include the specific parameters that should change."""
         try:
             from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
-            _agent_name = getattr(self, "_primary_agent", "qwen")
+            _agent_name = getattr(self, "_primary_agent", "claude")
             _interface = UnifiedAgentInterface()
             raw_text_fallback: str = await _interface.ask(_agent_name, prompt) or ""
 
@@ -3025,14 +3021,10 @@ you may propose adding it via topology changes in a separate step — not here.
 
             a2a = _get_a2a_communicator()
             available_agents = []
-            if os.environ.get("DEEPSEEK_API_KEY"):
-                available_agents.append(AgentType.DEEPSEEK)
-            if os.environ.get("QWEN_API_KEY"):
-                available_agents.append(AgentType.QWEN)
-            if os.environ.get("PERPLEXITY_API_KEY"):
-                available_agents.append(AgentType.PERPLEXITY)
             if os.environ.get("ANTHROPIC_API_KEY"):
                 available_agents.append(AgentType.CLAUDE)
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                available_agents.append(AgentType.PERPLEXITY)
 
             if len(available_agents) >= 2:
                 logger.info(
@@ -3075,7 +3067,7 @@ you may propose adding it via topology changes in a separate step — not here.
         try:
             from backend.agents.unified_agent_interface import UnifiedAgentInterface
 
-            _agent_name = getattr(self, "_primary_agent", "qwen")
+            _agent_name = getattr(self, "_primary_agent", "claude")
             _interface = UnifiedAgentInterface()
             raw_text: str = await _interface.ask(_agent_name, prompt) or ""
             self._emit_agent_log(
@@ -3382,7 +3374,7 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
 ]
 """
         # Ask agents via parallel_consensus (same API as _suggest_param_ranges).
-        # DeepSeek + Qwen both see the full catalog and vote on topology changes.
+        # Claude + Perplexity both see the full catalog and vote on topology changes.
         # We pick the first non-empty JSON array from the individual responses.
         try:
             import os
@@ -3392,10 +3384,10 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
 
             a2a: AgentToAgentCommunicator = _get_a2a_communicator()
             available_agents = []
-            if os.environ.get("DEEPSEEK_API_KEY"):
-                available_agents.append(AgentType.DEEPSEEK)
-            if os.environ.get("QWEN_API_KEY"):
-                available_agents.append(AgentType.QWEN)
+            if os.environ.get("ANTHROPIC_API_KEY"):
+                available_agents.append(AgentType.CLAUDE)
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                available_agents.append(AgentType.PERPLEXITY)
             if not available_agents:
                 logger.warning("[BuilderWorkflow] No API keys for topology agent — skipping")
                 return []
