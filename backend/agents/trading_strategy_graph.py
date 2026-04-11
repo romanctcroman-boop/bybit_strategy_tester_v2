@@ -3020,6 +3020,15 @@ class OptimizationAnalysisNode(AgentNode):
                 "n_trials_analysed": len(top_trials),
             },
         )
+        # Phase 4: record this sweep in opt_iterations for the loop router
+        state.opt_iterations.append(
+            {
+                "iteration": len(state.opt_iterations) + 1,
+                "best_sharpe": opt_result.get("best_sharpe", 0.0),
+                "best_params": opt_result.get("best_params", {}),
+                "n_trials": opt_result.get("tested_combinations", 0),
+            }
+        )
         return state
 
     @staticmethod
@@ -3074,6 +3083,160 @@ class OptimizationAnalysisNode(AgentNode):
         try:
             data = _json.loads(text)
             if isinstance(data, dict):
+                return data
+        except (_json.JSONDecodeError, ValueError):
+            pass
+        return {}
+
+
+# =============================================================================
+# Phase 4: Iterative Optimization Loop helpers + A2AParamRangeNode
+# =============================================================================
+
+_MAX_OPT_ITERATIONS = 3
+
+
+def _should_continue_opt(state: AgentState) -> bool:
+    """Return True if the optimization loop should run another iteration.
+
+    Conditions to CONTINUE:
+    - Fewer than _MAX_OPT_ITERATIONS completed so far  AND
+    - Not yet converged (top-1 params changed > 5% vs previous iteration)
+
+    Convergence is checked only once ≥ 2 iterations have been recorded.
+    """
+    iterations = state.opt_iterations
+    if len(iterations) >= _MAX_OPT_ITERATIONS:
+        return False
+    if len(iterations) < 2:
+        return True  # need at least 2 data points for convergence check
+
+    last = iterations[-1].get("best_params", {})
+    prev = iterations[-2].get("best_params", {})
+    diffs = [
+        abs(last[k] - prev[k]) / max(abs(float(prev[k])), 1e-9)
+        for k in last
+        if k in prev and isinstance(last[k], (int, float)) and isinstance(prev[k], (int, float))
+    ]
+    # Converged if all params moved by ≤ 5%
+    return not diffs or max(diffs) > 0.05
+
+
+class A2AParamRangeNode(AgentNode):
+    """Phase 4: Uses opt_insights (from OptimizationAnalysisNode) to propose
+    tighter parameter ranges for the next Optuna sweep.
+
+    Claude Haiku reads the winning_zones, next_ranges, and param_clusters from
+    the previous analysis and produces a refined ``{"ranges": {...}}`` dict that
+    is stored in ``state.context["agent_optimization_hints"]``.
+
+    If the LLM call fails, falls back to using opt_insights.next_ranges directly
+    so the optimisation loop can still proceed.
+    """
+
+    _SYSTEM = (
+        "You are a quantitative parameter optimiser. "
+        "Reply ONLY with a JSON object containing a single key 'ranges'. "
+        "No prose, no markdown fences."
+    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="param_range",
+            description="Propose tighter param ranges for the next optimisation sweep",
+            timeout=20.0,
+            retry_count=1,
+            retry_delay=2.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        insights = state.opt_insights
+        if not insights:
+            logger.info("[A2AParamRange] No opt_insights — skipping range refinement")
+            return state
+
+        iteration = len(state.opt_iterations)
+        symbol = state.context.get("symbol", "BTCUSDT")
+        regime = (state.context.get("regime_classification") or {}).get("regime", "unknown")
+
+        prompt = self._build_range_prompt(symbol, regime, iteration, insights)
+        new_hints: dict = {}
+        try:
+            raw = await self._call_llm(
+                "claude-haiku",
+                prompt,
+                self._SYSTEM,
+                temperature=0.1,
+                state=state,
+                json_mode=True,
+            )
+            parsed = self._parse_ranges(raw)
+            if parsed:
+                new_hints = parsed
+                logger.info(
+                    f"[A2AParamRange] iter={iteration} — "
+                    f"Claude proposed ranges for {len(parsed.get('ranges', {}))} params"
+                )
+        except Exception as exc:
+            logger.warning(f"[A2AParamRange] LLM call failed (non-fatal): {exc}")
+
+        # Fallback: use next_ranges from OptimizationAnalysisNode directly
+        if not new_hints:
+            next_ranges = insights.get("next_ranges", {})
+            if next_ranges:
+                new_hints = {
+                    "ranges": {k: [v["min"], v["max"]] for k, v in next_ranges.items() if "min" in v and "max" in v}
+                }
+                logger.info(f"[A2AParamRange] Fallback to direct next_ranges ({len(new_hints['ranges'])} params)")
+
+        if new_hints:
+            state.context["agent_optimization_hints"] = new_hints
+
+        state.set_result(
+            self.name,
+            {
+                "iteration": iteration,
+                "hints_applied": bool(new_hints),
+                "n_params_refined": len(new_hints.get("ranges") or {}),
+            },
+        )
+        return state
+
+    @staticmethod
+    def _build_range_prompt(symbol: str, regime: str, iteration: int, insights: dict) -> str:
+        import json as _json
+
+        data = {
+            "symbol": symbol,
+            "regime": regime,
+            "iteration": iteration,
+            "param_clusters": insights.get("param_clusters", {}),
+            "winning_zones": insights.get("winning_zones", {}),
+            "next_ranges": insights.get("next_ranges", {}),
+            "risks": insights.get("risks", []),
+        }
+        return (
+            f"Iteration {iteration} optimisation analysis:\n"
+            f"{_json.dumps(data, separators=(',', ':'))}\n\n"
+            "Based on the winning_zones and next_ranges above, propose the tightest "
+            "possible parameter ranges for the next sweep.\n"
+            'Return ONLY: {"ranges": {"<param_name>": [<min>, <max>], ...}}'
+        )
+
+    @staticmethod
+    def _parse_ranges(raw: str | None) -> dict:
+        if not raw:
+            return {}
+        import json as _json
+        import re as _re
+
+        text = raw.strip()
+        match = _re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if match:
+            text = match.group(1).strip()
+        try:
+            data = _json.loads(text)
+            if isinstance(data, dict) and "ranges" in data:
                 return data
         except (_json.JSONDecodeError, ValueError):
             pass
@@ -3530,8 +3693,16 @@ def build_trading_strategy_graph(
 
         graph.add_node(MLValidationNode())
         # Phase 3: OptimizationAnalysisNode sits between optimizer and WF/ML validation
+        # Phase 4: A2AParamRangeNode feeds refined ranges back into OptimizationNode
         graph.add_node(OptimizationAnalysisNode())
+        graph.add_node(A2AParamRangeNode())
         graph.add_edge("optimize_strategy", "optimization_analysis")
+        # Loop: param_range → optimize_strategy (cycles back)
+        graph.add_edge("param_range", "optimize_strategy")
+
+        # opt_iter_router: continue loop or exit to WF/ML
+        opt_iter_router = ConditionalRouter(name="opt_iter_router")
+        opt_iter_router.add_route(_should_continue_opt, "param_range")
 
         if run_wf_validation:
             # P1-2: walk-forward gate AFTER optimization — WF validates optimized params,
@@ -3542,9 +3713,11 @@ def build_trading_strategy_graph(
             wf_router.add_route(_should_refine, "refine_strategy")
             wf_router.set_default("ml_validation")
             graph.add_conditional_edges("wf_validation", wf_router)
-            graph.add_edge("optimization_analysis", "wf_validation")
+            opt_iter_router.set_default("wf_validation")
         else:
-            graph.add_edge("optimization_analysis", "ml_validation")
+            opt_iter_router.set_default("ml_validation")
+
+        graph.add_conditional_edges("optimization_analysis", opt_iter_router)
 
         if hitl_enabled:
             # P2-3: HITL checkpoint before memory_update
