@@ -682,10 +682,10 @@ class GenerateStrategiesNode(AgentNode):
                 logger.debug(f"[GenerateStrategy] Perplexity call failed (non-fatal): {exc}")
                 return None
 
-        # Check if Perplexity key is available before bothering to call it
+        # Check if Perplexity key is available AND perplexity is in the requested agents list
         from backend.security.key_manager import get_key_manager as _get_km
 
-        _has_perplexity = bool(_get_km().get_decrypted_key("PERPLEXITY_API_KEY"))
+        _has_perplexity = bool(_get_km().get_decrypted_key("PERPLEXITY_API_KEY")) and "perplexity" in agents
 
         if _has_perplexity:
             logger.info("[GenerateStrategy] Running Claude + Perplexity in parallel")

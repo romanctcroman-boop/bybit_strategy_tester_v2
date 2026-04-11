@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(agents): Unified AI Core — Phases 6–9 complete (2026-04-11)**
+
+        Phases 6-9 of the "Unified AI Core" plan that merges trading_strategy_graph.py and
+        builder_workflow.py into a single Claude+Perplexity-powered pipeline.
+
+        **Phase 6 — Memory-Guided Param Ranges (`backend/agents/trading_strategy_graph.py`)**
+        - `A2AParamRangeNode._recall_opt_params()` queries "optimization_params" memory namespace
+          to inject winning parameter regions from past successful runs into the Optuna search space.
+        - `_format_memory_context()` formats retrieved records into structured prompt context.
+        - `MemoryUpdateNode` saves param region data when `best_sharpe >= 0.4`.
+        - `_recall_opt_params` call wrapped in try/except so ConnectionErrors are non-fatal.
+        - 14 tests in `tests/backend/agents/test_memory_param_correlation.py` (CP6).
+
+        **Phase 7 — BuilderWorkflow Thin Adapter (`backend/agents/workflows/builder_workflow.py`)**
+        - `BuilderWorkflow.run_via_unified_pipeline()` delegates to `run_strategy_pipeline()`.
+        - `_state_to_result()` maps AgentState fields → BuilderWorkflowResult (sharpe, iterations,
+          deliberation, errors, status).
+        - `_forward_event()` maps graph node names → BuilderStage enum for SSE stage events;
+          also fires `on_agent_log` when event contains `llm_response`.
+        - `_load_df()` extracted as mockable async method (uses KlineDBService, not DataService).
+        - Seed graph loading via `_load_strategy_graph_from_db(existing_strategy_id)`.
+        - 18 tests in `tests/backend/agents/test_builder_workflow_adapter.py` (CP7).
+
+        **Phase 8 — Enhanced ReportNode (`backend/agents/trading_strategy_graph.py`)**
+        - `_report_node()` extended with: `top_trials_table` (top-20 Optuna trials with rank/sharpe/
+          max_drawdown/trades/params), `iteration_history` (sharpe+params per opt loop iteration),
+          `opt_insights` (OptimizationAnalysisNode output), `debate_outcome` (AnalysisDebateNode result),
+          `comparison` (initial_sharpe/final_sharpe/sharpe_improvement/drawdown delta),
+          `pipeline_mode`.
+        - 19 tests in `tests/backend/agents/test_enhanced_report_node.py` (CP8).
+
+        **Phase 9 — Regression Fixes**
+        - `GenerateStrategiesNode._has_perplexity` now requires both API key AND `"perplexity"` in
+          the `agents` list — prevents A2A from running when caller requests Claude-only mode.
+        - `_state_with_market()` in CP2 test helper updated to default to
+          `agents=["claude","perplexity"]` so A2A tests exercise the correct code path.
+        - `test_refinement_loop.py::TestGraphWiring::test_optimization_leads_to_wf_or_ml_validation`
+          updated to assert `optimize_strategy → optimization_analysis` (Phase 3 graph change).
+
 - **feat(agents): Claude Prompt Caching, Structured Outputs, Perplexity search params, sonar-reasoning-pro, model-aware pricing (2026-04-11)**
 
         Six improvements to the Claude and Perplexity LLM clients based on API best-practices research.

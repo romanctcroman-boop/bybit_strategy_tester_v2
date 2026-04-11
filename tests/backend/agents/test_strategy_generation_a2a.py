@@ -38,11 +38,14 @@ def _make_market_context() -> Any:
     return mc
 
 
-def _state_with_market(symbol: str = "BTCUSDT", timeframe: str = "15", seed: bool = False) -> AgentState:
+def _state_with_market(
+    symbol: str = "BTCUSDT", timeframe: str = "15", seed: bool = False, with_perplexity: bool = True
+) -> AgentState:
     state = AgentState()
     state.context["symbol"] = symbol
     state.context["timeframe"] = timeframe
-    state.context["agents"] = ["claude"]
+    # A2A tests request both claude + perplexity so Perplexity branch is exercised
+    state.context["agents"] = ["claude", "perplexity"] if with_perplexity else ["claude"]
     state.context["regime_classification"] = {"regime": "trending_up"}
     if seed:
         state.context["seed_mode"] = True

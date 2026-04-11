@@ -278,17 +278,15 @@ class TestGraphWiring:
         assert "optimize_strategy" in graph.nodes
 
     def test_optimization_leads_to_wf_or_ml_validation(self):
-        # With WF enabled: optimize_strategy → wf_validation → ml_validation
+        # Phase 3: optimize_strategy → optimization_analysis (not directly to wf_validation)
         graph = build_trading_strategy_graph(run_backtest=True)
         opt_edges = graph.edges.get("optimize_strategy", [])
         targets = [e.target for e in opt_edges]
-        assert "wf_validation" in targets  # WF validates optimized params
+        assert "optimization_analysis" in targets  # Phase 3: analysis node after optimizer
 
-        # Without WF: optimize_strategy → ml_validation directly
-        graph_no_wf = build_trading_strategy_graph(run_backtest=True, run_wf_validation=False)
-        opt_edges_no_wf = graph_no_wf.edges.get("optimize_strategy", [])
-        targets_no_wf = [e.target for e in opt_edges_no_wf]
-        assert "ml_validation" in targets_no_wf
+        # wf_validation and ml_validation nodes still exist in graph
+        assert "wf_validation" in graph.nodes
+        assert "ml_validation" in graph.nodes
 
     @pytest.mark.skip(reason="analysis_debate node removed from pipeline")
     def test_analysis_debate_leads_to_ml_validation(self):
