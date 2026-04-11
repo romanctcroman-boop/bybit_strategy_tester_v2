@@ -3312,6 +3312,44 @@ def build_trading_strategy_graph(
     return graph
 
 
+async def _load_strategy_graph_from_db(strategy_id: str) -> dict[str, Any] | None:
+    """Load a strategy graph (blocks + connections) from the DB by strategy_id.
+
+    Returns a seed_graph dict on success, or None on any error.
+    Uses the same builder_get_strategy helper as BuilderWorkflow.
+    """
+    try:
+        from backend.agents.mcp.tools.strategy_builder import builder_get_strategy
+
+        existing = await builder_get_strategy(strategy_id)
+        if not isinstance(existing, dict) or "error" in existing:
+            logger.warning(f"[Pipeline] Could not load strategy {strategy_id}: {existing}")
+            return None
+
+        # Prefer top-level blocks; fall back to builder_graph.blocks (richer params)
+        raw_blocks = existing.get("blocks", [])
+        raw_connections = existing.get("connections", [])
+        graph = existing.get("builder_graph") or {}
+
+        if not raw_blocks or not any(b.get("params") for b in raw_blocks):
+            graph_blocks = graph.get("blocks", [])
+            if graph_blocks and any(b.get("params") for b in graph_blocks):
+                raw_blocks = graph_blocks
+
+        if not raw_connections:
+            raw_connections = graph.get("connections", [])
+
+        return {
+            "blocks": raw_blocks,
+            "connections": raw_connections,
+            "name": existing.get("name", f"Strategy {strategy_id[:8]}"),
+            "id": strategy_id,
+        }
+    except Exception as exc:
+        logger.warning(f"[Pipeline] _load_strategy_graph_from_db({strategy_id}) error: {exc}")
+        return None
+
+
 async def run_strategy_pipeline(
     symbol: str,
     timeframe: str,
@@ -3328,6 +3366,7 @@ async def run_strategy_pipeline(
     hitl_approved: bool = False,
     event_fn: Callable[[str, dict[str, Any]], None] | None = None,
     seed_graph: dict[str, Any] | None = None,
+    existing_strategy_id: str | None = None,
     **_kwargs: Any,
 ) -> AgentState:
     """
@@ -3364,6 +3403,11 @@ async def run_strategy_pipeline(
             "analysis mode": analyze_market → regime → backtest the existing
             graph → analyze → refine/optimize → report.
             Useful for: "I have a strategy — let agents analyse and improve it."
+        existing_strategy_id: Strategy UUID to load from DB as seed_graph.
+            When set, the pipeline runs in ``pipeline_mode="optimize"``:
+            blocks + connections are fetched from the DB, injected as seed_graph,
+            and all LLM generation nodes are skipped.
+            Takes precedence over an explicitly passed seed_graph.
 
     Returns:
         AgentState with all results in state.results
@@ -3384,6 +3428,26 @@ async def run_strategy_pipeline(
     except Exception as _e:
         logger.debug(f"Preflight check error (non-fatal): {_e}")
 
+    # ── Determine pipeline_mode ──────────────────────────────────────────────
+    # existing_strategy_id → load graph from DB → optimize mode
+    # seed_graph passed explicitly → optimize mode (caller already loaded it)
+    # neither → create mode
+    pipeline_mode = "create"
+    if existing_strategy_id:
+        logger.info(f"[Pipeline] OPTIMIZE mode — loading strategy {existing_strategy_id} from DB")
+        loaded = await _load_strategy_graph_from_db(existing_strategy_id)
+        if loaded is not None:
+            seed_graph = loaded
+            pipeline_mode = "optimize"
+            logger.info(
+                f"[Pipeline] Loaded '{loaded['name']}': "
+                f"{len(loaded['blocks'])} blocks, {len(loaded['connections'])} connections"
+            )
+        else:
+            logger.warning(f"[Pipeline] Could not load strategy {existing_strategy_id} — falling back to CREATE mode")
+    elif seed_graph is not None:
+        pipeline_mode = "optimize"
+
     context: dict[str, Any] = {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -3392,6 +3456,7 @@ async def run_strategy_pipeline(
         "initial_capital": initial_capital,
         "leverage": leverage,
         "hitl_approved": hitl_approved,  # P2-3: HITL approval flag
+        "existing_strategy_id": existing_strategy_id,
     }
 
     # seed_graph mode: inject existing strategy graph, skip LLM generation nodes
@@ -3408,6 +3473,7 @@ async def run_strategy_pipeline(
     initial_state = AgentState(
         context=context,
         max_cost_usd=max_cost_usd,  # P1-5: cost budget
+        pipeline_mode=pipeline_mode,
     )
 
     try:

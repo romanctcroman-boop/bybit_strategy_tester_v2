@@ -83,6 +83,24 @@ class AgentState:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    # ── Unified pipeline mode (Фаза 1) ─────────────────────────────────────
+    # "create"   — LLM generates strategy from scratch (default)
+    # "optimize" — existing strategy loaded from DB via seed_graph
+    pipeline_mode: str = "create"
+
+    # Optimization iteration history — each entry: {iteration, best_sharpe, best_params,
+    # opt_score, ranges_used, timestamp}. Populated by A2AParamRangeNode (Фаза 4).
+    opt_iterations: list[dict[str, Any]] = field(default_factory=list)
+
+    # Structured analysis of Optuna top-20 results — populated by OptimizationAnalysisNode (Фаза 3).
+    # Fields: param_clusters, winning_zones, risks, next_ranges, summary
+    opt_insights: dict[str, Any] = field(default_factory=dict)
+
+    # Outcome of AnalysisDebateNode (Фаза 5).
+    # Fields: decision ("proceed"|"reject"|"conditional"), risk_score (0-10),
+    # conditions (list[str]), rationale (str)
+    debate_outcome: dict[str, Any] | None = None
+
     def add_message(self, role: str, content: str, agent: str = "system"):
         """Add a message to the state."""
         self.messages.append(
@@ -535,7 +553,7 @@ class AgentGraph:
             if self.checkpoint_fn is not None:
                 try:
                     self.checkpoint_fn(state, completed)
-                except Exception as _cp_exc:  # noqa: BLE001
+                except Exception as _cp_exc:
                     logger.warning(f"[Checkpoint] Non-critical error: {_cp_exc}")
 
             # P2-4: emit lightweight streaming event (no full state serialisation)
@@ -552,7 +570,7 @@ class AgentGraph:
                             "errors": len(state.errors),
                         },
                     )
-                except Exception as _ev_exc:  # noqa: BLE001
+                except Exception as _ev_exc:
                     logger.debug(f"[EventStream] Non-critical error: {_ev_exc}")
 
             # Check for exit AFTER execution
