@@ -2381,6 +2381,192 @@ class OptimizationNode(AgentNode):
         return result
 
 
+# =============================================================================
+# Phase 5: AnalysisDebateNode — structured Optimist vs Risk-Manager debate
+# =============================================================================
+
+
+class AnalysisDebateNode(AgentNode):
+    """Two-agent structured debate before Walk-Forward / ML validation.
+
+    Round 1 (parallel):
+      - Claude Sonnet  "Optimist"      — arguments FOR deploying the strategy
+      - Claude Haiku   "Risk Manager"  — arguments AGAINST (drawdown, overfitting)
+    Round 2 (sequential):
+      - Claude Haiku   "Synthesiser"   — weighs both sides, produces final verdict
+
+    Outcome stored in ``state.debate_outcome``:
+        {
+            "decision":   "proceed" | "reject" | "conditional",
+            "risk_score": 0–10  (0 = no risk, 10 = very high risk),
+            "conditions": ["...", ...]  (only meaningful for "conditional"),
+            "rationale":  "..."
+        }
+
+    Timeout: 45 s (not 150 s like the heavyweight DebateNode).
+    """
+
+    _OPTIMIST_SYS = (
+        "You are an experienced quantitative trader who is OPTIMISTIC about this strategy. "
+        "Provide 2-3 concise, data-backed arguments FOR deploying it. "
+        "Focus on positive metrics. Be brief."
+    )
+    _RISK_SYS = (
+        "You are a risk manager who is SCEPTICAL about this strategy. "
+        "Provide 2-3 concise arguments AGAINST deploying it, focusing on drawdown, "
+        "overfitting risk, and regime sensitivity. Be brief."
+    )
+    _SYNTH_SYS = (
+        "You are an impartial quantitative analyst. "
+        "Given the optimist and risk-manager arguments below, produce a final verdict. "
+        "Reply ONLY with a JSON object. No prose, no markdown fences."
+    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="analysis_debate",
+            description="Optimist vs Risk-Manager debate to gate strategy deployment",
+            timeout=45.0,
+            retry_count=1,
+            retry_delay=2.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        # Gather inputs
+        backtest_result = state.get_result("backtest") or {}
+        opt_result = state.get_result("optimize_strategy") or {}
+        opt_analysis = state.get_result("optimization_analysis") or {}
+
+        metrics_summary = self._build_metrics_summary(backtest_result, opt_result, opt_analysis)
+        iter_summary = self._build_iter_summary(state.opt_iterations)
+
+        optimist_prompt = (
+            f"Strategy performance summary:\n{metrics_summary}\n"
+            f"Optimisation history:\n{iter_summary}\n"
+            "Provide your arguments FOR deploying this strategy."
+        )
+        risk_prompt = (
+            f"Strategy performance summary:\n{metrics_summary}\n"
+            f"Optimisation history:\n{iter_summary}\n"
+            "Provide your arguments AGAINST deploying this strategy."
+        )
+
+        optimist_view: str | None = None
+        risk_view: str | None = None
+        try:
+            optimist_view, risk_view = await asyncio.gather(
+                self._call_llm("claude-sonnet", optimist_prompt, self._OPTIMIST_SYS, temperature=0.4, state=state),
+                self._call_llm("claude-haiku", risk_prompt, self._RISK_SYS, temperature=0.3, state=state),
+                return_exceptions=False,
+            )
+        except Exception as exc:
+            logger.warning(f"[AnalysisDebate] Parallel calls failed: {exc} — using safe default")
+
+        outcome = await self._synthesise(optimist_view, risk_view, metrics_summary, state)
+        state.debate_outcome = outcome
+        state.set_result(self.name, outcome)
+
+        logger.info(f"[AnalysisDebate] decision={outcome['decision']} risk_score={outcome['risk_score']}")
+        return state
+
+    async def _synthesise(
+        self,
+        optimist_view: str | None,
+        risk_view: str | None,
+        metrics_summary: str,
+        state: AgentState,
+    ) -> dict:
+        synth_prompt = (
+            f"Metrics:\n{metrics_summary}\n\n"
+            f"Optimist arguments:\n{optimist_view or '(unavailable)'}\n\n"
+            f"Risk Manager arguments:\n{risk_view or '(unavailable)'}\n\n"
+            "Produce a final verdict as JSON with keys:\n"
+            '  "decision": "proceed" | "reject" | "conditional"\n'
+            '  "risk_score": integer 0-10\n'
+            '  "conditions": list of strings (empty if not conditional)\n'
+            '  "rationale": one-sentence summary\n'
+        )
+        try:
+            raw = await self._call_llm(
+                "claude-haiku",
+                synth_prompt,
+                self._SYNTH_SYS,
+                temperature=0.1,
+                state=state,
+                json_mode=True,
+            )
+            parsed = self._parse_outcome(raw)
+            if parsed:
+                return parsed
+        except Exception as exc:
+            logger.warning(f"[AnalysisDebate] Synthesis call failed: {exc}")
+        # Safe default: proceed with moderate risk
+        return {
+            "decision": "proceed",
+            "risk_score": 5,
+            "conditions": [],
+            "rationale": "Synthesis unavailable — defaulting to proceed.",
+        }
+
+    @staticmethod
+    def _build_metrics_summary(backtest: dict, opt: dict, opt_analysis: dict) -> str:
+        sharpe = opt.get("best_sharpe") or backtest.get("sharpe_ratio", 0.0)
+        dd = opt.get("best_drawdown") or backtest.get("max_drawdown", 0.0)
+        trades = opt.get("best_trades") or backtest.get("total_trades", 0)
+        n_pos = opt.get("n_positive_sharpe", 0)
+        risks = opt_analysis.get("risks", [])
+        return (
+            f"Sharpe: {sharpe:.3f} | Max Drawdown: {dd:.1f}% | Trades: {trades} | "
+            f"Positive-Sharpe trials: {n_pos} | Risk flags: {len(risks)}"
+        )
+
+    @staticmethod
+    def _build_iter_summary(iterations: list) -> str:
+        if not iterations:
+            return "(no iteration history)"
+        lines = [
+            f"  Iter {it['iteration']}: Sharpe={it['best_sharpe']:.3f} params={it.get('best_params', {})}"
+            for it in iterations
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_outcome(raw: str | None) -> dict | None:
+        if not raw:
+            return None
+        import json as _json
+        import re as _re
+
+        text = raw.strip()
+        match = _re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if match:
+            text = match.group(1).strip()
+        try:
+            data = _json.loads(text)
+            if isinstance(data, dict) and "decision" in data:
+                # Normalise decision field
+                decision = str(data.get("decision", "proceed")).lower()
+                if decision not in {"proceed", "reject", "conditional"}:
+                    decision = "proceed"
+                return {
+                    "decision": decision,
+                    "risk_score": int(data.get("risk_score", 5)),
+                    "conditions": list(data.get("conditions", [])),
+                    "rationale": str(data.get("rationale", "")),
+                }
+        except (_json.JSONDecodeError, ValueError, TypeError):
+            pass
+        return None
+
+
+def _is_debate_rejected(state: AgentState) -> bool:
+    """Return True if AnalysisDebateNode decided to reject the strategy."""
+    outcome = getattr(state, "debate_outcome", None)
+    if not outcome:
+        return False
+    return str(outcome.get("decision", "")).lower() == "reject"
+
+
 class MLValidationNode(AgentNode):
     """
     Phase 7: ML Integration Layer — three lightweight validation checks on the
@@ -3700,9 +3886,17 @@ def build_trading_strategy_graph(
         # Loop: param_range → optimize_strategy (cycles back)
         graph.add_edge("param_range", "optimize_strategy")
 
-        # opt_iter_router: continue loop or exit to WF/ML
+        # Phase 5: AnalysisDebateNode — wired between opt loop exit and WF/ML
+        graph.add_node(AnalysisDebateNode())
+        # debate_router: reject → reflection (skip save), else → WF/ML
+        debate_router = ConditionalRouter(name="debate_router")
+        debate_router.add_route(_is_debate_rejected, "reflection")
+
+        # opt_iter_router: continue loop or exit to analysis_debate
         opt_iter_router = ConditionalRouter(name="opt_iter_router")
         opt_iter_router.add_route(_should_continue_opt, "param_range")
+        opt_iter_router.set_default("analysis_debate")
+        graph.add_conditional_edges("optimization_analysis", opt_iter_router)
 
         if run_wf_validation:
             # P1-2: walk-forward gate AFTER optimization — WF validates optimized params,
@@ -3713,11 +3907,11 @@ def build_trading_strategy_graph(
             wf_router.add_route(_should_refine, "refine_strategy")
             wf_router.set_default("ml_validation")
             graph.add_conditional_edges("wf_validation", wf_router)
-            opt_iter_router.set_default("wf_validation")
+            debate_router.set_default("wf_validation")
         else:
-            opt_iter_router.set_default("ml_validation")
+            debate_router.set_default("ml_validation")
 
-        graph.add_conditional_edges("optimization_analysis", opt_iter_router)
+        graph.add_conditional_edges("analysis_debate", debate_router)
 
         if hitl_enabled:
             # P2-3: HITL checkpoint before memory_update
