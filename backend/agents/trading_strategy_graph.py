@@ -1820,6 +1820,38 @@ class MemoryUpdateNode(AgentNode):
 
         state.set_result(self.name, {"stored": True, "importance": importance})
 
+        # Phase 6: save best optimization params to "optimization_params" namespace
+        # so A2AParamRangeNode can recall them in future runs for the same symbol/regime
+        opt_result = state.get_result("optimize_strategy") or {}
+        best_params = opt_result.get("best_params", {})
+        regime = (state.context.get("regime_classification") or {}).get("regime", "unknown")
+        if best_params and sharpe >= 0.4:
+            try:
+                from backend.agents.memory.backend_interface import SQLiteBackendAdapter
+                from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
+
+                memory2 = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
+                await memory2.store(
+                    content=(
+                        f"successful optimization {symbol} {regime} best params sharpe "
+                        f"symbol={symbol} regime={regime} sharpe={sharpe:.3f} params={best_params}"
+                    ),
+                    memory_type=MemoryType.EPISODIC,
+                    importance=importance,
+                    tags=["optimization", "best_params", symbol, regime],
+                    metadata={
+                        "symbol": symbol,
+                        "regime": regime,
+                        "best_params": best_params,
+                        "sharpe_ratio": sharpe,
+                    },
+                    source="trading_strategy_pipeline",
+                    agent_namespace="optimization_params",
+                )
+                logger.debug("[MemoryUpdateNode] Saved opt params to 'optimization_params' namespace")
+            except Exception as e:
+                logger.debug(f"[MemoryUpdateNode] opt_params namespace save failed (non-fatal): {e}")
+
         # Persist strategy to ORM so it appears in the Strategy Builder UI
         strategy_graph = state.context.get("strategy_graph")
         if strategy_graph is not None and strategy is not None:
@@ -3345,7 +3377,14 @@ class A2AParamRangeNode(AgentNode):
         symbol = state.context.get("symbol", "BTCUSDT")
         regime = (state.context.get("regime_classification") or {}).get("regime", "unknown")
 
-        prompt = self._build_range_prompt(symbol, regime, iteration, insights)
+        # Phase 6: memory recall — historical successful params for this symbol/regime
+        try:
+            memory_records = await self._recall_opt_params(symbol, regime)
+        except Exception:
+            memory_records = []
+        memory_context = self._format_memory_context(memory_records)
+
+        prompt = self._build_range_prompt(symbol, regime, iteration, insights, memory_context)
         new_hints: dict = {}
         try:
             raw = await self._call_llm(
@@ -3389,7 +3428,13 @@ class A2AParamRangeNode(AgentNode):
         return state
 
     @staticmethod
-    def _build_range_prompt(symbol: str, regime: str, iteration: int, insights: dict) -> str:
+    def _build_range_prompt(
+        symbol: str,
+        regime: str,
+        iteration: int,
+        insights: dict,
+        memory_context: str = "",
+    ) -> str:
         import json as _json
 
         data = {
@@ -3401,13 +3446,48 @@ class A2AParamRangeNode(AgentNode):
             "next_ranges": insights.get("next_ranges", {}),
             "risks": insights.get("risks", []),
         }
+        memory_section = f"\nHistorical optimization memory:\n{memory_context}\n" if memory_context else ""
         return (
             f"Iteration {iteration} optimisation analysis:\n"
-            f"{_json.dumps(data, separators=(',', ':'))}\n\n"
-            "Based on the winning_zones and next_ranges above, propose the tightest "
-            "possible parameter ranges for the next sweep.\n"
+            f"{_json.dumps(data, separators=(',', ':'))}\n"
+            f"{memory_section}\n"
+            "Based on the winning_zones, next_ranges, and historical memory above, "
+            "propose the tightest possible parameter ranges for the next sweep.\n"
             'Return ONLY: {"ranges": {"<param_name>": [<min>, <max>], ...}}'
         )
+
+    async def _recall_opt_params(self, symbol: str, regime: str) -> list:
+        """Query optimization_params namespace for historical best params.
+
+        Non-blocking — returns empty list on any error.
+        """
+        try:
+            from backend.agents.memory.backend_interface import SQLiteBackendAdapter
+            from backend.agents.memory.hierarchical_memory import HierarchicalMemory
+
+            memory = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
+            await memory.async_load()
+            results = await memory.recall(
+                query=f"successful optimization {symbol} {regime} best params sharpe",
+                top_k=3,
+                agent_namespace="optimization_params",
+            )
+            return results
+        except Exception as exc:
+            logger.debug(f"[A2AParamRange] Memory recall failed (non-fatal): {exc}")
+            return []
+
+    @staticmethod
+    def _format_memory_context(records: list) -> str:
+        """Format memory recall results into a short text block for the LLM prompt."""
+        if not records:
+            return ""
+        lines = []
+        for rec in records[:3]:
+            content = getattr(rec, "content", None) or (rec.get("content") if isinstance(rec, dict) else "")
+            if content:
+                lines.append(f"  - {str(content)[:200]}")
+        return "\n".join(lines)
 
     @staticmethod
     def _parse_ranges(raw: str | None) -> dict:
