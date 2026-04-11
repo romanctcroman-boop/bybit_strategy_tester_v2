@@ -2948,6 +2948,139 @@ class PostRunReflectionNode(AgentNode):
 
 
 # =============================================================================
+# Phase 3: Optimization Analysis Node — Claude analyses top-20 Optuna trials
+# =============================================================================
+
+
+class OptimizationAnalysisNode(AgentNode):
+    """Reads OptimizationNode's top_trials and asks Claude Haiku to identify:
+    - param_clusters: which param values appear in the top-5 results
+    - winning_zones: param ranges where Sharpe > 0.8
+    - risks: configs with good Sharpe but high drawdown (overfitting warning)
+    - next_ranges: tighter param ranges for the next sweep
+
+    Writes results to state.opt_insights and state.set_result("optimization_analysis", ...).
+    Skips gracefully when top_trials is empty or optimization was not run.
+    """
+
+    _SYSTEM = (
+        "You are a quantitative analyst reviewing optimization results. "
+        "Reply ONLY with a JSON object. No prose, no markdown fences."
+    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            name="optimization_analysis",
+            description="Claude analyses top-20 Optuna trials to extract winning parameter zones",
+            timeout=30.0,
+            retry_count=1,
+            retry_delay=2.0,
+        )
+
+    async def execute(self, state: AgentState) -> AgentState:
+        opt_result = state.get_result("optimize_strategy") or {}
+        top_trials: list[dict] = opt_result.get("top_trials", [])
+
+        if not top_trials:
+            logger.info("[OptimizationAnalysis] No top_trials — skipping")
+            state.set_result(self.name, {"skipped": True, "reason": "no_top_trials"})
+            return state
+
+        symbol = state.context.get("symbol", "BTCUSDT")
+        regime = (state.context.get("regime_classification") or {}).get("regime", "unknown")
+
+        prompt = self._build_analysis_prompt(symbol, regime, top_trials)
+        try:
+            raw = await self._call_llm(
+                "claude-haiku",
+                prompt,
+                self._SYSTEM,
+                temperature=0.2,
+                state=state,
+                json_mode=True,
+            )
+            insights = self._parse_insights(raw)
+            logger.info(
+                f"[OptimizationAnalysis] Analysis complete — "
+                f"{len(insights.get('param_clusters', {}))} clusters, "
+                f"{len(insights.get('winning_zones', {}))} winning zones"
+            )
+        except Exception as exc:
+            logger.warning(f"[OptimizationAnalysis] Claude call failed (non-fatal): {exc}")
+            insights = {}
+
+        state.opt_insights = insights
+        state.set_result(
+            self.name,
+            {
+                "param_clusters": insights.get("param_clusters", {}),
+                "winning_zones": insights.get("winning_zones", {}),
+                "risks": insights.get("risks", []),
+                "next_ranges": insights.get("next_ranges", {}),
+                "n_trials_analysed": len(top_trials),
+            },
+        )
+        return state
+
+    @staticmethod
+    def _build_analysis_prompt(symbol: str, regime: str, top_trials: list[dict]) -> str:
+        """Build a compact JSON prompt with trial data for Claude to analyse."""
+        # Summarise each trial: only the fields Claude needs
+        trial_rows = []
+        for i, t in enumerate(top_trials[:20], 1):
+            params = t.get("params", {})
+            row = {
+                "rank": i,
+                "sharpe": round(t.get("sharpe", 0.0), 3),
+                "drawdown_pct": round(t.get("max_drawdown", 0.0), 1),
+                "trades": t.get("trades", 0),
+                "params": {k: round(v, 4) if isinstance(v, float) else v for k, v in params.items()},
+            }
+            trial_rows.append(row)
+
+        import json as _json
+
+        trials_json = _json.dumps(trial_rows, separators=(",", ":"))
+
+        return (
+            f"Symbol: {symbol} | Market regime: {regime}\n"
+            f"Top-{len(trial_rows)} Optuna optimisation results:\n"
+            f"{trials_json}\n\n"
+            "Analyse these results and return a JSON object with EXACTLY these keys:\n"
+            '  "param_clusters": {{"<param_name>": [<most_common_values_in_top5>], ...}}\n'
+            '  "winning_zones": {{"<param_name>": {{"min": <v>, "max": <v>}}, ...}}  '
+            "(ranges where Sharpe > 0.8)\n"
+            '  "risks": [  // configs that look good but are risky\n'
+            '    {{"rank": <n>, "issue": "<description>"}},\n'
+            "    ...\n"
+            "  ]\n"
+            '  "next_ranges": {{"<param_name>": {{"min": <v>, "max": <v>}}, ...}}  '
+            "(tighter ranges for next sweep)\n"
+        )
+
+    @staticmethod
+    def _parse_insights(raw: str | None) -> dict:
+        """Parse JSON from Claude response. Returns empty dict on failure."""
+        if not raw:
+            return {}
+        import json as _json
+        import re as _re
+
+        text = raw.strip()
+        # Strip markdown code fences if present
+        match = _re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if match:
+            text = match.group(1).strip()
+        try:
+            data = _json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except (_json.JSONDecodeError, ValueError):
+            pass
+        return {}
+
+
+# =============================================================================
 # P1-2: Walk-forward validation gate
 # =============================================================================
 
@@ -3396,6 +3529,10 @@ def build_trading_strategy_graph(
         graph.add_edge("refine_strategy", "generate_strategies")
 
         graph.add_node(MLValidationNode())
+        # Phase 3: OptimizationAnalysisNode sits between optimizer and WF/ML validation
+        graph.add_node(OptimizationAnalysisNode())
+        graph.add_edge("optimize_strategy", "optimization_analysis")
+
         if run_wf_validation:
             # P1-2: walk-forward gate AFTER optimization — WF validates optimized params,
             # not raw IS params.  OptimizationNode stores best_params in state.context
@@ -3405,9 +3542,9 @@ def build_trading_strategy_graph(
             wf_router.add_route(_should_refine, "refine_strategy")
             wf_router.set_default("ml_validation")
             graph.add_conditional_edges("wf_validation", wf_router)
-            graph.add_edge("optimize_strategy", "wf_validation")  # WF validates optimized params
+            graph.add_edge("optimization_analysis", "wf_validation")
         else:
-            graph.add_edge("optimize_strategy", "ml_validation")
+            graph.add_edge("optimization_analysis", "ml_validation")
 
         if hitl_enabled:
             # P2-3: HITL checkpoint before memory_update
