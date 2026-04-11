@@ -3838,12 +3838,60 @@ def _should_refine(state: AgentState) -> bool:
 
 
 def _report_node(state: AgentState) -> AgentState:
-    """Final node: compile all results into a report."""
+    """Final node: compile all results into a report.
+
+    Phase 8 additions:
+    - top_trials_table  — top-20 Optuna trials with Sharpe/DD/trades/params
+    - iteration_history — per-iteration Sharpe + params from opt_iterations
+    - opt_insights      — param_clusters, winning_zones, risks from OptimizationAnalysisNode
+    - debate_outcome    — AnalysisDebateNode decision + risk_score + rationale
+    - comparison        — initial vs final Sharpe/DD (OPTIMIZE mode)
+    """
+    opt_result = state.get_result("optimize_strategy") or {}
+    backtest_result = state.get_result("backtest") or {}
+
+    # ── Top-20 Optuna trials table ──────────────────────────────────────────
+    top_trials = opt_result.get("top_trials", [])
+    top_trials_table = [
+        {
+            "rank": t.get("rank", i + 1),
+            "sharpe": round(float(t.get("sharpe", 0)), 4),
+            "max_drawdown": round(float(t.get("max_drawdown", 0)), 2),
+            "trades": int(t.get("trades", 0)),
+            "params": t.get("params", {}),
+        }
+        for i, t in enumerate(top_trials[:20])
+    ]
+
+    # ── Iteration history ───────────────────────────────────────────────────
+    iteration_history = [
+        {
+            "iteration": entry.get("iteration", i + 1),
+            "sharpe": round(float(entry.get("best_sharpe", 0)), 4),
+            "params": entry.get("best_params", {}),
+        }
+        for i, entry in enumerate(state.opt_iterations)
+    ]
+
+    # ── Initial vs final comparison (useful in OPTIMIZE mode) ───────────────
+    initial_sharpe = float(backtest_result.get("sharpe_ratio", 0) or 0)
+    final_sharpe = float(opt_result.get("best_sharpe", initial_sharpe) or initial_sharpe)
+    initial_dd = float(backtest_result.get("max_drawdown", 0) or 0)
+    final_dd = float(opt_result.get("best_drawdown", initial_dd) or initial_dd)
+    comparison = {
+        "initial_sharpe": round(initial_sharpe, 4),
+        "final_sharpe": round(final_sharpe, 4),
+        "sharpe_improvement": round(final_sharpe - initial_sharpe, 4),
+        "initial_drawdown": round(initial_dd, 2),
+        "final_drawdown": round(final_dd, 2),
+    }
+
     report = {
+        # ── Existing fields ────────────────────────────────────────────────
         "market_analysis": state.get_result("analyze_market"),
         "proposals_count": len((state.get_result("parse_responses") or {}).get("proposals", [])),
         "selected": state.get_result("select_best"),
-        "backtest": state.get_result("backtest"),
+        "backtest": backtest_result,
         "backtest_analysis": state.get_result("backtest_analysis"),
         "errors": state.errors,
         "execution_path": state.execution_path,
@@ -3853,6 +3901,13 @@ def _report_node(state: AgentState) -> AgentState:
             "node_timing_s": dict(state.execution_path),
             "total_wall_time_s": round(sum(t for _, t in state.execution_path), 3),
         },
+        # ── Phase 8: Enhanced report fields ───────────────────────────────
+        "top_trials_table": top_trials_table,
+        "iteration_history": iteration_history,
+        "opt_insights": state.opt_insights,
+        "debate_outcome": state.debate_outcome,
+        "comparison": comparison,
+        "pipeline_mode": state.pipeline_mode,
     }
     state.set_result("report", report)
     state.add_message("system", "Pipeline report generated", "report")
