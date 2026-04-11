@@ -612,8 +612,12 @@ class GenerateStrategiesNode(AgentNode):
         responses: list[dict[str, Any]] = []
         failed_agents: list[str] = []
 
-        # --- Strategy generation: single Claude Sonnet call (or Opus for escalation) ---
-        # Determine if this is an escalation run (novel/unknown regime)
+        # --- Strategy generation: A2A parallel (Claude Sonnet + Perplexity market validation) ---
+        # Claude Sonnet generates the StrategyDefinition JSON.
+        # Perplexity validates current market conditions for the symbol.
+        # Claude Haiku synthesizes both into the final strategy.
+        # Fallback chain: if Perplexity unavailable → single Claude; if Haiku fails → use Claude directly.
+
         clf = state.context.get("regime_classification", {})
         _am = state.get_result("analyze_market") or {}
         regime = clf.get("regime") or _am.get("regime", "unknown")
@@ -626,10 +630,11 @@ class GenerateStrategiesNode(AgentNode):
             market_context_text = getattr(market_context, "summary", str(market_context))
             state.context["_enriched_market_context"] = f"{grounding_context}\n\n{market_context_text}"
 
+        # Build Claude strategy prompt (unchanged from before)
         prompt = self._prompt_engineer.create_strategy_prompt(
             context=market_context,
             platform_config=platform_config,
-            agent_name=agent_name,  # "claude-sonnet" or "claude-opus" — uses correct specialization
+            agent_name=agent_name,
             include_examples=True,
         )
         if grounding_context:
@@ -642,21 +647,82 @@ class GenerateStrategiesNode(AgentNode):
             prompt = f"{prompt}\n\n{optimizer_insights_block}"
         if refinement_feedback:
             prompt = f"{prompt}\n\n{refinement_feedback}"
-        system_msg = self._prompt_engineer.get_system_message(agent_name)  # model-specific system msg
+        system_msg = self._prompt_engineer.get_system_message(agent_name)
 
         if is_novel_regime:
-            logger.info(f"[GenerateStrategy] Escalating to Opus (regime={regime})")
+            logger.info(f"[GenerateStrategy] A2A — escalating to Opus (regime={regime})")
         else:
-            logger.info(f"[GenerateStrategy] Using Claude Sonnet (regime={regime})")
+            logger.info(f"[GenerateStrategy] A2A — Claude Sonnet + Perplexity (regime={regime})")
 
-        try:
-            response_text = await self._call_llm(agent_name, prompt, system_msg, state=state)
-            if response_text:
-                responses.append({"agent": "claude", "response": response_text})
-                logger.info("Claude strategy generation succeeded")
-        except Exception as e:
-            logger.error(f"Claude strategy generation failed: {e}")
+        # ── Parallel A2A calls ────────────────────────────────────────────────
+        symbol: str = state.context.get("symbol", "")
+        timeframe: str = state.context.get("timeframe", "15")
+        perplexity_prompt = self._build_perplexity_market_prompt(symbol, timeframe, regime, market_context)
+
+        claude_response: str | None = None
+        perplexity_response: str | None = None
+
+        async def _call_claude() -> str | None:
+            try:
+                return await self._call_llm(agent_name, prompt, system_msg, state=state)
+            except Exception as exc:
+                logger.error(f"[GenerateStrategy] Claude call failed: {exc}")
+                return None
+
+        async def _call_perplexity() -> str | None:
+            try:
+                return await self._call_llm(
+                    "perplexity",
+                    perplexity_prompt,
+                    "You are a financial market analyst. Provide a concise, factual market analysis.",
+                    temperature=0.3,
+                    state=state,
+                )
+            except Exception as exc:
+                logger.debug(f"[GenerateStrategy] Perplexity call failed (non-fatal): {exc}")
+                return None
+
+        # Check if Perplexity key is available before bothering to call it
+        from backend.security.key_manager import get_key_manager as _get_km
+
+        _has_perplexity = bool(_get_km().get_decrypted_key("PERPLEXITY_API_KEY"))
+
+        if _has_perplexity:
+            logger.info("[GenerateStrategy] Running Claude + Perplexity in parallel")
+            claude_response, perplexity_response = await asyncio.gather(_call_claude(), _call_perplexity())
+        else:
+            logger.info("[GenerateStrategy] No Perplexity key — single Claude call")
+            claude_response = await _call_claude()
+
+        # ── Synthesis ─────────────────────────────────────────────────────────
+        final_response: str | None = None
+        synthesis_used = False
+
+        if claude_response and perplexity_response:
+            logger.info("[GenerateStrategy] Synthesising Claude strategy + Perplexity market insight via Haiku")
+            synthesized = await self._synthesis_critic(
+                [claude_response],
+                market_context,
+                state=state,
+                perplexity_market_analysis=perplexity_response,
+            )
+            if synthesized:
+                final_response = synthesized
+                synthesis_used = True
+                logger.info("[GenerateStrategy] A2A synthesis succeeded")
+            else:
+                # Synthesis failed → fall through to raw Claude response
+                logger.warning("[GenerateStrategy] Synthesis failed — using raw Claude response")
+                final_response = claude_response
+        elif claude_response:
+            final_response = claude_response
+        else:
             failed_agents.append("claude")
+
+        if final_response:
+            source = "claude+perplexity" if synthesis_used else "claude"
+            responses.append({"agent": source, "response": final_response})
+            logger.info(f"[GenerateStrategy] Generation complete (source={source})")
 
         if failed_agents:
             state.context["partial_generation"] = True
@@ -666,27 +732,85 @@ class GenerateStrategiesNode(AgentNode):
         state.set_result(self.name, {"responses": responses})
         state.add_message(
             "system",
-            f"Generated {len(responses)} responses (Claude Sonnet/Opus)",
+            f"Generated {len(responses)} responses (A2A: Claude Sonnet/Opus + Perplexity)",
             self.name,
         )
         return state
 
-    async def _synthesis_critic(
-        self, moa_texts: list[str], market_context: Any, state: AgentState | None = None
-    ) -> str | None:
-        """Claude Haiku synthesis critic (legacy — kept for backward compatibility with tests)."""
-        variants_block = "\n\n".join(f"--- VARIANT {i + 1} ---\n{text}" for i, text in enumerate(moa_texts))
-        critic_prompt = (
-            "You are a quantitative trading strategy critic.\n\n"
-            "Below are multiple strategy proposals for the same market context.\n\n"
-            f"{variants_block}\n\n"
-            "Your task:\n"
-            "1. Identify the strongest elements from each variant\n"
-            "2. Synthesise ONE final strategy that combines the best ideas\n"
-            "3. Ensure the strategy is concrete, implementable, and risk-controlled\n"
-            "4. Output in the SAME structured JSON format as the variants\n\n"
-            "Output only the synthesised strategy JSON, no explanation."
+    def _build_perplexity_market_prompt(
+        self,
+        symbol: str,
+        timeframe: str,
+        regime: str,
+        market_context: Any,
+    ) -> str:
+        """Build a concise market research prompt for Perplexity.
+
+        Perplexity's role: validate / enrich the market context with real-time data.
+        We do NOT ask it to generate a strategy JSON — that's Claude's job.
+        """
+        tf_label = f"{timeframe}m" if timeframe.isdigit() else timeframe
+        context_summary = getattr(market_context, "summary", "")[:300] if market_context else ""
+        return (
+            f"Provide a brief technical market analysis for {symbol} ({tf_label} timeframe).\n\n"
+            f"Current regime (from local indicators): {regime}\n"
+            f"{('Local context: ' + context_summary) if context_summary else ''}\n\n"
+            "Answer these questions concisely (3-5 sentences total):\n"
+            "1. Is the current regime confirmed by recent price action?\n"
+            "2. What are the key support/resistance levels or price zones to watch?\n"
+            "3. Any recent news or macro events that could affect this asset?\n"
+            "4. What technical approach (trend-following, mean-reversion, breakout) "
+            "fits the current conditions?\n\n"
+            "Be factual and concise. No trading advice — this is for strategy parameter tuning."
         )
+
+    async def _synthesis_critic(
+        self,
+        moa_texts: list[str],
+        market_context: Any,
+        state: AgentState | None = None,
+        perplexity_market_analysis: str | None = None,
+    ) -> str | None:
+        """Claude Haiku synthesis critic.
+
+        When ``perplexity_market_analysis`` is provided (A2A mode), the prompt
+        instructs Haiku to incorporate the real-time market insight into the
+        strategy — e.g. adjusting parameters for current volatility / regime.
+        Falls back to the legacy multi-variant merge when called without it.
+        """
+        variants_block = "\n\n".join(f"--- VARIANT {i + 1} ---\n{text}" for i, text in enumerate(moa_texts))
+
+        if perplexity_market_analysis:
+            # A2A synthesis: Claude strategy + Perplexity market insight → final strategy
+            critic_prompt = (
+                "You are a precision trading strategy synthesiser.\n\n"
+                "## Claude's strategy proposal\n"
+                f"{variants_block}\n\n"
+                "## Real-time market analysis (from Perplexity)\n"
+                f"{perplexity_market_analysis}\n\n"
+                "Your task:\n"
+                "1. Keep Claude's strategy structure and JSON format intact\n"
+                "2. Adjust parameters, filters, or conditions where the market analysis "
+                "suggests a better fit (e.g. wider stops in volatile conditions, "
+                "shorter periods in ranging markets)\n"
+                "3. Do NOT change the fundamental strategy logic — only tune it\n"
+                "4. Output the SAME structured JSON format as Claude's proposal\n\n"
+                "Output only the final strategy JSON, no explanation."
+            )
+        else:
+            # Legacy multi-variant merge (backward compatibility)
+            critic_prompt = (
+                "You are a quantitative trading strategy critic.\n\n"
+                "Below are multiple strategy proposals for the same market context.\n\n"
+                f"{variants_block}\n\n"
+                "Your task:\n"
+                "1. Identify the strongest elements from each variant\n"
+                "2. Synthesise ONE final strategy that combines the best ideas\n"
+                "3. Ensure the strategy is concrete, implementable, and risk-controlled\n"
+                "4. Output in the SAME structured JSON format as the variants\n\n"
+                "Output only the synthesised strategy JSON, no explanation."
+            )
+
         system_msg = "You are a precision strategy synthesiser. Output valid JSON only."
         try:
             result = await self._call_llm("claude-haiku", critic_prompt, system_msg, temperature=0.3, state=state)
