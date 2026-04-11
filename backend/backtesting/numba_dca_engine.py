@@ -47,6 +47,7 @@ Parity with V4 DCA engine:
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
 from numba import njit, prange
@@ -946,12 +947,12 @@ def _compute_summary_stats(
     n_trades: int,
     initial_capital: float,
     bars_per_month: int,  # approx bars per calendar month (e.g. 1460 for 30m)
-) -> tuple[float, float, float, float, float, int]:
+) -> tuple[float, float, float, float, float, int, float]:
     """
     Compute summary stats matching V4 DCA engine conventions.
 
     Returns:
-        net_profit, max_drawdown_frac, win_rate, sharpe_monthly_tv, profit_factor, n_trades
+        net_profit, max_drawdown_frac, win_rate, sharpe_monthly_tv, profit_factor, n_trades, sortino_monthly_tv
 
     max_drawdown_frac: (peak_closed_equity - closed_equity) / initial_capital
         Matches FallbackEngineV4._calculate_metrics() — closed-trade equity,
@@ -961,10 +962,14 @@ def _compute_summary_stats(
         Groups trades by approximate calendar month (exit_bar // bars_per_month).
         Formula: (mean(monthly_equity_returns) - rfr_monthly) / std(returns, ddof=0)
         Matches calc_sharpe_monthly_tv() in formulas.py.
+
+    sortino_monthly_tv: Sortino ratio using MAR=0 downside deviation of monthly returns.
+        Formula: mean(monthly_returns) / downside_dev * sqrt(12)
+        downside_dev = sqrt(mean(min(0, r)^2)) over monthly returns.
     """
     n_bars = len(equity)
     if n_bars == 0 or n_trades == 0:
-        return 0.0, 0.0, 0.0, 0.0, 0.0, 0
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0.0
 
     nt = min(n_trades, _MAX_DCA_TRADES)
 
@@ -997,8 +1002,9 @@ def _compute_summary_stats(
     win_rate = n_wins / nt if nt > 0 else 0.0
     profit_factor = gross_profit / max(gross_loss, 1e-10)
 
-    # === Sharpe: monthly TV-parity approximation ===
+    # === Sharpe + Sortino: monthly TV-parity approximation ===
     sharpe = 0.0
+    sortino = 0.0
     if nt >= 2 and bars_per_month > 0:
         closed_equity = np.empty(_MAX_DCA_TRADES + 1, dtype=np.float64)
         closed_equity[0] = initial_capital
@@ -1056,7 +1062,25 @@ def _compute_summary_stats(
                 elif sharpe < -100.0:
                     sharpe = -100.0
 
-    return net_profit, max_dd, win_rate, sharpe, profit_factor, n_trades
+            # Sortino: MAR=0, downside deviation of monthly returns
+            mar = 0.0
+            downside_sq_sum = 0.0
+            for m in range(n_months):
+                eq_start = initial_capital if m == 0 else month_eq[m - 1]
+                eq_end = month_eq[m]
+                r = (eq_end - eq_start) / max(eq_start, 1e-10)
+                diff = r - mar
+                if diff < 0.0:
+                    downside_sq_sum += diff * diff
+            downside_dev = math.sqrt(downside_sq_sum / n_months)
+            if downside_dev > 1e-10:
+                sortino = mean_r / downside_dev * math.sqrt(12.0)
+                if sortino > 100.0:
+                    sortino = 100.0
+                elif sortino < -100.0:
+                    sortino = -100.0
+
+    return net_profit, max_dd, win_rate, sharpe, profit_factor, n_trades, sortino
 
 
 # ---------------------------------------------------------------------------
@@ -1127,6 +1151,7 @@ def batch_simulate_dca(
     out_sharpe: np.ndarray,  # float64[N]
     out_profit_factor: np.ndarray,  # float64[N]
     out_n_trades: np.ndarray,  # int64[N]
+    out_sortino: np.ndarray,  # float64[N]
 ) -> None:
     """
     Batch-simulate N DCA parameter combinations in parallel.
@@ -1196,7 +1221,7 @@ def batch_simulate_dca(
             equity_buf,
         )
 
-        net_p, max_dd, wr, sharpe, pf, nt = _compute_summary_stats(
+        net_p, max_dd, wr, sharpe, pf, nt, sortino = _compute_summary_stats(
             equity_buf,
             pnl_buf,
             exit_bar_buf,
@@ -1211,6 +1236,7 @@ def batch_simulate_dca(
         out_sharpe[i] = sharpe
         out_profit_factor[i] = pf
         out_n_trades[i] = nt
+        out_sortino[i] = sortino
 
 
 # ---------------------------------------------------------------------------
@@ -1305,7 +1331,7 @@ def run_dca_batch_numba(
         atr_values: pre-computed ATR array (None = disabled)
 
     Returns:
-        dict with arrays: net_profit, max_drawdown, win_rate, sharpe, profit_factor, n_trades
+        dict with arrays: net_profit, max_drawdown, win_rate, sharpe, profit_factor, n_trades, sortino
     """
     n = len(sl_pct_arr)
     assert len(tp_pct_arr) == n, "sl_pct_arr and tp_pct_arr must have same length"
@@ -1337,6 +1363,7 @@ def run_dca_batch_numba(
     out_sharpe = np.empty(n, dtype=np.float64)
     out_profit_factor = np.empty(n, dtype=np.float64)
     out_n_trades = np.empty(n, dtype=np.int64)
+    out_sortino = np.zeros(n, dtype=np.float64)
 
     batch_simulate_dca(
         close,
@@ -1388,6 +1415,7 @@ def run_dca_batch_numba(
         out_sharpe,
         out_profit_factor,
         out_n_trades,
+        out_sortino,
     )
 
     return {
@@ -1397,6 +1425,7 @@ def run_dca_batch_numba(
         "sharpe": out_sharpe,
         "profit_factor": out_profit_factor,
         "n_trades": out_n_trades,
+        "sortino": out_sortino,
     }
 
 
@@ -1529,7 +1558,7 @@ def run_dca_single_numba(
         equity_curve,
     )
 
-    net_p, max_dd, wr, sharpe, pf, nt = _compute_summary_stats(
+    net_p, max_dd, wr, sharpe, pf, nt, sortino = _compute_summary_stats(
         equity_curve,
         pnl_buf,
         exit_bar_buf,
@@ -1545,6 +1574,7 @@ def run_dca_single_numba(
         "max_drawdown": float(max_dd * 100.0),  # as percent
         "win_rate": float(wr * 100.0),
         "sharpe_ratio": float(sharpe),
+        "sortino_ratio": float(sortino),
         "profit_factor": float(pf),
         "n_trades": int(nt),
         "equity_curve": equity_curve,

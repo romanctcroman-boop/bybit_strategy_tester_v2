@@ -4,10 +4,10 @@ Claude (Anthropic) LLM Client
 Native Anthropic Messages API client.
 NOT OpenAI-compatible — uses x-api-key header and a different message/response format.
 
-Supported models:
-  claude-haiku-4-5-20251001  — fastest, cheapest ($0.25/$1.25 per 1M tok) — DEFAULT
+Supported models (as of April 2026):
+  claude-haiku-4-5-20251001  — fastest, cheapest ($1/$5 per 1M tok) — DEFAULT
   claude-sonnet-4-6          — best balance of quality/cost ($3/$15 per 1M tok)
-  claude-opus-4-6            — most capable ($15/$75 per 1M tok)
+  claude-opus-4-6            — most capable ($5/$25 per 1M tok)  ← significantly cheaper than opus-4
 
 Key differences from OpenAI format:
   - Endpoint: POST /v1/messages  (not /v1/chat/completions)
@@ -15,8 +15,16 @@ Key differences from OpenAI format:
   - system message is a top-level field, NOT inside messages[]
   - Response content: data["content"][0]["text"]  (not choices[0].message.content)
   - Token fields: input_tokens / output_tokens  (not prompt_tokens / completion_tokens)
-  - json_mode: handled via prompt engineering — no response_format field needed.
-    Claude reliably follows JSON instructions without an explicit flag.
+
+JSON output modes (in order of reliability):
+  1. tool_use + strict schema (kwarg: tools=[...], tool_choice={"type":"tool",...}) → ~100%
+  2. Prompt engineering OUTPUT RULES (default) → ~95%
+  Note: response_format / json_mode is NOT a field in the Anthropic Messages API.
+
+Prompt caching (enabled by default via anthropic-beta header):
+  - Static system message parts get cache_control: {"type": "ephemeral"} (5-min TTL)
+  - Cache hit cost: 10% of normal input price (90% savings on repeated calls)
+  - Minimum cacheable block: 2048 tokens (Sonnet/Opus), 2048 (Haiku)
 """
 
 from __future__ import annotations
@@ -92,6 +100,7 @@ class ClaudeClient(LLMClient):
             headers = {
                 "x-api-key": self.config.api_key or "",
                 "anthropic-version": _ANTHROPIC_VERSION,
+                "anthropic-beta": "prompt-caching-2024-07-31",
                 "content-type": "application/json",
             }
             timeout = aiohttp.ClientTimeout(total=self.config.timeout_seconds)
@@ -105,6 +114,14 @@ class ClaudeClient(LLMClient):
         (Anthropic requirement — system may not appear inside messages[]).
         The json_mode kwarg is intentionally ignored: Claude follows JSON
         instructions reliably via prompt, no response_format field is needed.
+
+        Prompt caching: the first (static) system block gets
+        cache_control={"type":"ephemeral"} so repeated calls reuse the KV cache.
+        Minimum cacheable block: 2048 tokens — smaller blocks are silently skipped.
+
+        Structured outputs (tool use, ~100% reliability):
+          Pass tools=[...] and tool_choice={...} as kwargs to opt in.
+          _parse_response() will auto-extract JSON from the tool_use content block.
         """
         system_parts: list[str] = []
         user_messages: list[dict[str, str]] = []
@@ -121,17 +138,63 @@ class ClaudeClient(LLMClient):
             "temperature": kwargs.get("temperature", self.config.temperature),
             "messages": user_messages,
         }
+
         if system_parts:
-            payload["system"] = "\n\n".join(system_parts)
+            # Build structured system list so the first (static) block gets cached.
+            # Last block is dynamic market context — no cache_control.
+            if len(system_parts) == 1:
+                payload["system"] = [
+                    {
+                        "type": "text",
+                        "text": system_parts[0],
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+            else:
+                blocks: list[dict[str, Any]] = [
+                    {
+                        "type": "text",
+                        "text": system_parts[0],
+                        "cache_control": {"type": "ephemeral"},  # static specialization
+                    }
+                ]
+                for part in system_parts[1:-1]:
+                    blocks.append({"type": "text", "text": part, "cache_control": {"type": "ephemeral"}})
+                blocks.append({"type": "text", "text": system_parts[-1]})  # dynamic — no cache
+                payload["system"] = blocks
+
+        # Optional structured-output tool use (П1: ~100% JSON reliability)
+        if "tools" in kwargs:
+            payload["tools"] = kwargs["tools"]
+        if "tool_choice" in kwargs:
+            payload["tool_choice"] = kwargs["tool_choice"]
+
         return payload
 
     def _parse_response(self, data: dict[str, Any], latency: float) -> LLMResponse:
-        """Parse Anthropic Messages API response."""
+        """Parse Anthropic Messages API response.
+
+        Handles both plain text and tool_use content blocks.
+        When a tool_use block is present its ``input`` dict is serialised to
+        JSON and returned as the response content (structured-output path).
+        Cache token counters are forwarded to LLMResponse for cost tracking.
+        """
         content_blocks = data.get("content", [])
-        text = "".join(b.get("text", "") for b in content_blocks if b.get("type") == "text")
+        text = ""
+        for b in content_blocks:
+            if b.get("type") == "text":
+                text += b.get("text", "")
+            elif b.get("type") == "tool_use":
+                # Structured output: serialise the tool input as JSON string
+                tool_input = b.get("input", {})
+                text = json.dumps(tool_input, ensure_ascii=False)
+                break  # first tool_use block wins
+
         usage = data.get("usage", {})
         prompt_tokens = usage.get("input_tokens", 0)
         completion_tokens = usage.get("output_tokens", 0)
+        cache_hit = usage.get("cache_read_input_tokens", 0)
+        cache_miss = usage.get("cache_creation_input_tokens", 0)
 
         return LLMResponse(
             content=text,
@@ -143,6 +206,8 @@ class ClaudeClient(LLMClient):
             total_tokens=prompt_tokens + completion_tokens,
             latency_ms=latency,
             raw_response=data,
+            prompt_cache_hit_tokens=cache_hit,
+            prompt_cache_miss_tokens=cache_miss,
         )
 
     async def chat(self, messages: list[LLMMessage], **kwargs: Any) -> LLMResponse:

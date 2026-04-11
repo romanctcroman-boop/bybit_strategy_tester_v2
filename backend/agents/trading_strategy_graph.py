@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -373,6 +374,11 @@ class MemoryRecallNode(AgentNode):
         return state
 
 
+# Module-level TTL cache for GroundingNode: (symbol, timeframe) → (grounding_context, timestamp)
+_GROUNDING_CACHE: dict[tuple[str, str], tuple[str, float]] = {}
+_GROUNDING_CACHE_TTL = 900.0  # 15 minutes
+
+
 class GroundingNode(AgentNode):
     """
     Grounding Node: Perplexity sonar-pro provides real-time market context.
@@ -399,7 +405,9 @@ class GroundingNode(AgentNode):
 
         symbol = state.context.get("symbol", "BTCUSDT")
         timeframe = state.context.get("timeframe", "15")
-        regime = state.context.get("regime", "unknown")
+        clf = state.context.get("regime_classification", {})
+        _am = state.get_result("analyze_market") or {}
+        regime = clf.get("regime") or _am.get("regime", "unknown")
 
         km = get_key_manager()
         api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
@@ -408,6 +416,20 @@ class GroundingNode(AgentNode):
             state.set_result(self.name, {"grounding_context": "", "skipped": True})
             return state
 
+        # TTL cache check — avoid repeated Perplexity calls for same symbol+timeframe
+        cache_key = (symbol, timeframe)
+        cached = _GROUNDING_CACHE.get(cache_key)
+        if cached is not None:
+            cached_text, cached_at = cached
+            if time.time() - cached_at < _GROUNDING_CACHE_TTL:
+                logger.info(
+                    f"[Grounding] Cache hit for {symbol}/{timeframe}tf "
+                    f"(age {int(time.time() - cached_at)}s < {int(_GROUNDING_CACHE_TTL)}s) — skipping API call"
+                )
+                state.set_result(self.name, {"grounding_context": cached_text, "skipped": False, "cached": True})
+                state.context["grounding_context"] = cached_text
+                return state
+
         query = (
             f"{symbol} cryptocurrency current price, key support and resistance levels, "
             f"recent significant news or events, market sentiment, {timeframe}min timeframe. "
@@ -415,16 +437,22 @@ class GroundingNode(AgentNode):
             f"Provide specific price levels and actionable context for a trading strategy."
         )
 
+        # Escalate to sonar-reasoning-pro for regimes that need deeper CoT analysis
+        deep_analysis = regime in ("unknown", "extreme_volatile")
+
         try:
             grounding_text = await self._call_llm(
                 "perplexity",
                 query,
                 system_msg="Provide concise factual market data with specific price levels and sources.",
                 state=state,
+                deep_analysis=deep_analysis,
             )
 
             grounding_context = f"## Real-Time Market Grounding ({symbol})\n{grounding_text or ''}\n"
-            state.set_result(self.name, {"grounding_context": grounding_context, "skipped": False})
+            # Store in TTL cache
+            _GROUNDING_CACHE[cache_key] = (grounding_context, time.time())
+            state.set_result(self.name, {"grounding_context": grounding_context, "skipped": False, "cached": False})
             # Inject into state context so GenerateStrategiesNode can read it
             state.context["grounding_context"] = grounding_context
             logger.info(f"[Grounding] {symbol} real-time context fetched ({len(grounding_context)} chars)")
@@ -442,13 +470,21 @@ class GroundingNode(AgentNode):
         state: AgentState | None = None,
         **kwargs: Any,
     ) -> str | None:
-        """Minimal _call_llm for GroundingNode — Perplexity only."""
+        """Minimal _call_llm for GroundingNode — Perplexity only.
+
+        Model routing:
+          sonar-pro             — standard queries (default)
+          sonar-reasoning-pro   — deep CoT analysis for extreme/unknown regimes
+                                  (escalated via kwargs["deep_analysis"]=True)
+        Search quality defaults: search_context_size="medium", CRYPTO_SEARCH_DOMAINS filter.
+        """
         from backend.agents.llm.base_client import (
             LLMClientFactory,
             LLMConfig,
             LLMMessage,
             LLMProvider,
         )
+        from backend.agents.llm.clients.perplexity import CRYPTO_SEARCH_DOMAINS
         from backend.security.key_manager import get_key_manager
 
         km = get_key_manager()
@@ -456,10 +492,12 @@ class GroundingNode(AgentNode):
         if not api_key:
             return None
 
+        deep_analysis = kwargs.pop("deep_analysis", False)
+        model = "sonar-reasoning-pro" if deep_analysis else "sonar-pro"
         config = LLMConfig(
             provider=LLMProvider.PERPLEXITY,
             api_key=api_key,
-            model="sonar-pro",
+            model=model,
             temperature=0.3,
             max_tokens=1024,
         )
@@ -469,7 +507,11 @@ class GroundingNode(AgentNode):
                 LLMMessage(role="system", content=system_msg),
                 LLMMessage(role="user", content=query),
             ]
-            response = await client.chat(messages)
+            response = await client.chat(
+                messages,
+                search_context_size="medium",
+                search_domain_filter=CRYPTO_SEARCH_DOMAINS,
+            )
             if state is not None:
                 state.record_llm_cost(response.estimated_cost)
             return response.content
@@ -572,7 +614,9 @@ class GenerateStrategiesNode(AgentNode):
 
         # --- Strategy generation: single Claude Sonnet call (or Opus for escalation) ---
         # Determine if this is an escalation run (novel/unknown regime)
-        regime = state.context.get("regime", "unknown")
+        clf = state.context.get("regime_classification", {})
+        _am = state.get_result("analyze_market") or {}
+        regime = clf.get("regime") or _am.get("regime", "unknown")
         is_novel_regime = regime in ("unknown", "extreme_volatile") or state.context.get("force_escalate")
         agent_name = "claude-opus" if is_novel_regime else "claude-sonnet"
 
@@ -585,7 +629,7 @@ class GenerateStrategiesNode(AgentNode):
         prompt = self._prompt_engineer.create_strategy_prompt(
             context=market_context,
             platform_config=platform_config,
-            agent_name="claude",
+            agent_name=agent_name,  # "claude-sonnet" or "claude-opus" — uses correct specialization
             include_examples=True,
         )
         if grounding_context:
@@ -598,7 +642,7 @@ class GenerateStrategiesNode(AgentNode):
             prompt = f"{prompt}\n\n{optimizer_insights_block}"
         if refinement_feedback:
             prompt = f"{prompt}\n\n{refinement_feedback}"
-        system_msg = self._prompt_engineer.get_system_message("claude")
+        system_msg = self._prompt_engineer.get_system_message(agent_name)  # model-specific system msg
 
         if is_novel_regime:
             logger.info(f"[GenerateStrategy] Escalating to Opus (regime={regime})")
@@ -719,12 +763,16 @@ class GenerateStrategiesNode(AgentNode):
             return None
 
         effective_temp = temperature if temperature is not None else default_temp
+        # Claude Sonnet/Opus support up to 64K output tokens; 8192 gives room for
+        # large strategy JSONs without truncation (Haiku stays at 4096 — smaller role)
+        _is_large_claude = provider == LLMProvider.ANTHROPIC and "haiku" not in model.lower()
+        max_tokens = 8192 if _is_large_claude else 4096
         config = LLMConfig(
             provider=provider,
             api_key=api_key,
             model=model,
             temperature=effective_temp,
-            max_tokens=4096,
+            max_tokens=max_tokens,
         )
         client = LLMClientFactory.create(config)
         # Claude handles json_mode via prompt engineering (no response_format field)

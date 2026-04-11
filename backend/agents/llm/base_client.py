@@ -104,15 +104,26 @@ class LLMResponse:
             LLMProvider.DEEPSEEK: {"input": 0.14, "output": 0.28},
             LLMProvider.PERPLEXITY: {"input": 0.20, "output": 0.60},
             LLMProvider.OPENAI: {"input": 2.50, "output": 10.0},
-            LLMProvider.ANTHROPIC: {"input": 3.0, "output": 15.0},
+            LLMProvider.ANTHROPIC: {"input": 3.0, "output": 15.0},  # Sonnet default
             LLMProvider.QWEN: {"input": 0.40, "output": 1.20},
             LLMProvider.OLLAMA: {"input": 0.0, "output": 0.0},
         }
         rates = costs.get(self.provider, {"input": 0.0, "output": 0.0})
+
+        # Model-aware pricing for Anthropic (April 2026 rates, per 1M tokens)
+        if self.provider == LLMProvider.ANTHROPIC and self.model:
+            m = self.model.lower()
+            if "haiku" in m:
+                rates = {"input": 1.0, "output": 5.0}
+            elif "opus" in m:
+                rates = {"input": 5.0, "output": 25.0}
+            else:  # sonnet (default)
+                rates = {"input": 3.0, "output": 15.0}
+
         output_cost = (self.completion_tokens / 1_000_000) * rates["output"]
 
-        # Cache-aware input cost: cache hits are 10% of normal price (DeepSeek KV cache)
-        if self.provider == LLMProvider.DEEPSEEK and (self.prompt_cache_hit_tokens or self.prompt_cache_miss_tokens):
+        # Cache-aware input cost: cache hits are 10% of normal price (DeepSeek/Anthropic KV cache)
+        if self.prompt_cache_hit_tokens or self.prompt_cache_miss_tokens:
             hit_cost = (self.prompt_cache_hit_tokens / 1_000_000) * rates["input"] * 0.1
             miss_cost = (self.prompt_cache_miss_tokens / 1_000_000) * rates["input"]
             return hit_cost + miss_cost + output_cost

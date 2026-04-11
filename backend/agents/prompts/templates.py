@@ -1342,6 +1342,7 @@ AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
         "style": "systematic",
         "preferred_indicators": ["EMA", "RSI", "ATR", "Supertrend", "ADX"],
         "preferred_timeframes": ["1h", "4h", "1D"],
+        "json_emphasis": False,
     },
     "claude-haiku": {
         "primary_role": "strategy_validator",
@@ -1350,22 +1351,46 @@ AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
         "style": "concise",
         "preferred_indicators": ["EMA", "RSI"],
         "preferred_timeframes": ["15m", "1h"],
+        "json_emphasis": True,
     },
     "claude-sonnet": {
         "primary_role": "strategy_synthesizer",
-        "description": "Senior systematic trader specialising in multi-factor strategy design",
-        "strengths": ["structured_reasoning", "risk_reward_balance", "strategy_synthesis"],
+        "description": (
+            "Senior quantitative crypto trader with deep expertise in regime-adaptive strategy design. "
+            "Specialises in 15m–1h Bybit perpetuals, favours high signal density (RSI range, Stoch range, "
+            "SuperTrend filter) with volatility-scaled SL/TP (1–4% SL, 1.5–6% TP). "
+            "Always activates indicator modes explicitly and validates signal density before finalising."
+        ),
+        "strengths": [
+            "regime_adaptive_design",
+            "signal_density_validation",
+            "structured_json_output",
+            "risk_reward_balance",
+            "indicator_activation_compliance",
+        ],
         "style": "systematic",
-        "preferred_indicators": ["EMA", "RSI", "ATR", "Supertrend", "ADX"],
-        "preferred_timeframes": ["1h", "4h", "1D"],
+        "preferred_indicators": ["RSI", "Stochastic", "SuperTrend", "MACD", "ATR", "QQE"],
+        "preferred_timeframes": ["15m", "1h", "4h"],
+        "json_emphasis": True,
     },
     "claude-opus": {
         "primary_role": "strategy_architect",
-        "description": "World-class quant strategist for novel regimes and complex market structures",
-        "strengths": ["deep_reasoning", "novel_regime_handling", "complex_synthesis", "edge_cases"],
+        "description": (
+            "World-class quant strategist specialising in novel and extreme market regimes. "
+            "Designs unconventional multi-factor strategies for volatile/unknown conditions, "
+            "prioritising capital preservation and regime-specific edge detection over standard patterns."
+        ),
+        "strengths": [
+            "deep_reasoning",
+            "novel_regime_handling",
+            "complex_multi_factor_synthesis",
+            "edge_case_robustness",
+            "structured_json_output",
+        ],
         "style": "rigorous",
-        "preferred_indicators": ["EMA", "RSI", "ATR", "ADX", "MACD", "Bollinger"],
-        "preferred_timeframes": ["4h", "1D"],
+        "preferred_indicators": ["RSI", "ATR", "ADX", "MACD", "SuperTrend", "Divergence", "Keltner"],
+        "preferred_timeframes": ["1h", "4h", "1D"],
+        "json_emphasis": True,
     },
 }
 

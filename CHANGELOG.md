@@ -9,6 +9,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(agents): Claude Prompt Caching, Structured Outputs, Perplexity search params, sonar-reasoning-pro, model-aware pricing (2026-04-11)**
+
+        Six improvements to the Claude and Perplexity LLM clients based on API best-practices research.
+
+        **П1 — Structured Outputs via tool use (`backend/agents/llm/clients/claude.py`)**
+        - `_build_payload()` now accepts optional `tools=[...]` and `tool_choice={...}` kwargs and
+          forwards them to the Anthropic Messages API payload (tool use = ~100% JSON reliability).
+        - `_parse_response()` detects `tool_use` content blocks and serialises their `input` dict
+          to a JSON string, returning it as `response.content` — callers need no changes.
+        - 2 new tests in `TestClaudeBuildPayload` / `TestClaudeParseResponse`.
+
+        **П2 — Prompt Caching (`backend/agents/llm/clients/claude.py`)**
+        - `_get_session()`: adds `anthropic-beta: prompt-caching-2024-07-31` header — enables the
+          prompt-caching beta on every Claude request.
+        - `_build_payload()`: system field changed from `str` to a list of structured content blocks.
+          The first (static, specialization) block gets `cache_control: {"type": "ephemeral"}`; the
+          last (dynamic market context) block has no cache annotation. Min cacheable block: 2048 tokens.
+          Cache hit cost: 10% of normal input price (90% savings).
+        - `_parse_response()`: forwards `cache_read_input_tokens` → `prompt_cache_hit_tokens` and
+          `cache_creation_input_tokens` → `prompt_cache_miss_tokens` on `LLMResponse`.
+        - Updated `TestClaudeBuildPayload.test_system_extracted_to_top_level` and
+          `test_multiple_system_messages_joined` to assert block-list format with `cache_control`.
+        - 3 new tests: `test_tool_use_block_serialised_as_json`, `test_cache_tokens_tracked`,
+          `test_prompt_caching_header_set`.
+
+        **П3 — Perplexity search quality params (`backend/agents/llm/clients/perplexity.py`)**
+        - Added `CRYPTO_SEARCH_DOMAINS` constant (9 authoritative crypto/finance domains).
+        - `PerplexityClient._build_payload()` override: injects `search_context_size` (default
+          `"medium"`) and optional `search_domain_filter` into the request payload.
+        - `GroundingNode._call_llm()` passes `search_context_size="medium"` and
+          `search_domain_filter=CRYPTO_SEARCH_DOMAINS` on every Perplexity call.
+
+        **П4 — Softer CAPS in Claude system messages (`backend/agents/prompts/prompt_engineer.py`)**
+        - `get_system_message()` for `json_emphasis=True`: `"OUTPUT RULES (STRICT):"` →
+          `"Output rules:"` and all `"MUST"` → `"must"`.
+        - Claude 4.x models over-trigger refusals on all-caps wording; lowercase preserves intent
+          without triggering the refusal path.
+        - `GenerateStrategiesNode._call_llm()` (`backend/agents/trading_strategy_graph.py`):
+          `max_tokens` raised from 4096 → 8192 for Sonnet and Opus models (Haiku stays at 4096).
+          Prevents truncation of large strategy JSON outputs.
+
+        **П5 — sonar-reasoning-pro for extreme regimes (`backend/agents/trading_strategy_graph.py`)**
+        - `GroundingNode.execute()` sets `deep_analysis=True` when `regime in ("unknown",
+          "extreme_volatile")`.
+        - `GroundingNode._call_llm()` routes to `sonar-reasoning-pro` (chain-of-thought + web search)
+          when `deep_analysis=True`, otherwise uses `sonar-pro` (standard).
+
+        **П6 — Model-aware Anthropic pricing (`backend/agents/llm/base_client.py`)**
+        - `LLMResponse.estimated_cost`: Anthropic pricing is now model-aware:
+          Haiku → $1/$5, Sonnet → $3/$15, Opus → $5/$25 per 1M tokens (April 2026 rates).
+        - Cache-aware cost path now covers both DeepSeek and Anthropic (previously DeepSeek only).
+
+- **feat(agents): GroundingNode TTL cache, Claude prompt tuning, regime-routing to Sonnet/Opus (2026-04-11)**
+
+        Three improvements to the AI pipeline grounding and generation layer.
+
+        **1. GroundingNode TTL cache (`backend/agents/trading_strategy_graph.py`)**
+        - Added module-level `_GROUNDING_CACHE: dict[tuple[str, str], tuple[str, float]]` and
+          `_GROUNDING_CACHE_TTL = 900.0` (15 min) before the `GroundingNode` class.
+        - `GroundingNode.execute()` checks the cache before calling Perplexity sonar-pro.
+          Cache hit: logs `[Grounding] Cache hit … skipping API call`, injects text, sets
+          `"cached": True` in result. Miss: fetches, stores `(text, time.time())` in cache.
+        - No-key path (skip) does NOT write to cache.
+        - **Why:** avoids redundant Perplexity API calls when multiple pipeline runs target the
+          same symbol/timeframe within a 15-minute window (optimization loops, test suites).
+        - **Tests:** `TestGroundingNodeCache` (5 tests) in `tests/backend/agents/test_p2_features.py`.
+
+        **2. Claude prompt specialization — `claude-sonnet` and `claude-opus` profiles
+           (`backend/agents/prompts/templates.py`, `backend/agents/prompts/prompt_engineer.py`)**
+        - `AGENT_SPECIALIZATIONS["claude-sonnet"]`: *regime-adaptive strategy synthesizer*,
+          preferred indicators RSI/Stochastic/SuperTrend/MACD/ATR/QQE, `json_emphasis=True`.
+        - `AGENT_SPECIALIZATIONS["claude-opus"]`: *novel/extreme-regime architect*,
+          preferred indicators RSI/ATR/ADX/SuperTrend/Divergence/Keltner, `json_emphasis=True`.
+        - `get_system_message()` branches on `json_emphasis`: when `True` returns 5 explicit
+          OUTPUT RULES (valid JSON only, activation flags required, SL/TP bounds, signal density
+          ≥ 50 fires, no generic defaults); when `False` returns the generic instruction.
+        - Bug fix: `GenerateStrategiesNode.execute()` was hardcoding `agent_name="claude"` in
+          `create_strategy_prompt()` and `get_system_message()` — now uses the resolved
+          `agent_name` variable (`"claude-sonnet"` or `"claude-opus"`).
+
+        **3. Regime-based model routing in `GenerateStrategiesNode`**
+        - Known regimes (trending_up/down, ranging, volatile, breakout) → `"claude-sonnet"`.
+        - Novel/extreme regimes (`"unknown"`, `"extreme_volatile"`) or `force_escalate=True`
+          → `"claude-opus"`.
+        - **Tests:** `TestEvalScenarioA` (6 tests) + `TestEvalRegimeSplit` (8 tests) in
+          `tests/backend/agents/test_pipeline_real_api.py`.
+
+        **Fix: `TestPipelineRealApiStructure.setup_method` clears grounding cache**
+        - Added `setup_method` to `TestPipelineRealApiStructure` to clear `_GROUNDING_CACHE`
+          before each real-API test, preventing cache hits from sibling tests from causing
+          `llm_call_count=0` when Claude returns 400 and grounding is served from cache.
+
+- **fix(numba-dca): Sortino ratio computation in Numba DCA batch engine (2026-04-10)**
+
+        `sortino_ratio` was always 0.0 for DCA strategies optimized via the Numba batch path
+        because the kernel computed Sharpe but discarded downside deviation entirely.
+
+        **Changes in `backend/backtesting/numba_dca_engine.py`:**
+        - Added `import math` (required for `math.sqrt` inside `@njit` functions — `np.sqrt` is
+          not usable in Numba JIT context).
+        - `_compute_summary_stats()`: return type extended from 6-tuple to 7-tuple
+          `(net_profit, max_dd, win_rate, sharpe, profit_factor, n_trades, sortino)`.
+          In the same monthly-returns loop that already computed Sharpe, now also computes:
+          `downside_sq_sum = sum(min(0, r - MAR)^2)` with MAR = 0.0, then
+          `downside_dev = sqrt(downside_sq_sum / n_months)`, then
+          `sortino = mean_r / downside_dev * sqrt(12)` (annualized, capped ±100 like Sharpe).
+        - `batch_simulate_dca()`: added `out_sortino: np.ndarray` (float64[N]) output parameter;
+          unpacks the new 7-element tuple from `_compute_summary_stats` and writes
+          `out_sortino[i] = sortino`.
+        - `run_dca_batch_numba()`: allocates `out_sortino = np.zeros(n, dtype=np.float64)`,
+          passes it to `batch_simulate_dca`, adds `"sortino": out_sortino` to the returned dict.
+        - `run_dca_single_numba()`: updated unpacking to 7-tuple; adds `"sortino_ratio"` key
+          to the returned dict.
+
+        **Changes in `backend/optimization/builder_optimizer.py`:**
+        - `_run_dca_pure_batch_numba()`: replaced `"sortino_ratio": 0.0` with
+          `"sortino_ratio": float(batch["sortino"][i])`.
+        - `_run_dca_mixed_batch_numba()`: replaced `"sortino_ratio": 0.0` with
+          `"sortino_ratio": float(batch["sortino"][j])`.
+
+        **Tests:** 108 passed (`tests/test_builder_optimizer.py`),
+        425 passed (`tests/backend/backtesting/`)
+
 - **feat(optimization): Bayesian optimization modernization — GPSampler, native constrained BO, warm-start (2026-04-09)**
 
         Five improvements to `run_builder_optuna_search` in `backend/optimization/builder_optimizer.py`:

@@ -302,11 +302,29 @@ class PromptEngineer:
         spec = AGENT_SPECIALIZATIONS.get(agent_name, AGENT_SPECIALIZATIONS["claude"])
         strengths = ", ".join(spec.get("strengths", []))
 
-        return (
+        base = (
             f"You are a {spec['description']}. "
             f"Your strengths are: {strengths}. "
             f"Your trading style is {spec.get('style', 'balanced')}. "
-            "Always respond with valid JSON when asked for structured output. "
+        )
+
+        if spec.get("json_emphasis"):
+            # Claude models: use clear, unambiguous output rules without excessive CAPS
+            # (all-caps wording causes Claude 4.x to over-trigger refusals)
+            return (
+                base + "Output rules:\n"
+                "1. Return only a single valid JSON object — no markdown fences, no prose outside the JSON.\n"
+                "2. Every indicator block must include its activation flag "
+                "(e.g., use_long_range=true, use_supertrend=true, use_macd_cross_signal=true).\n"
+                "3. stop_loss_percent must be 0.5–5.0; take_profit_percent must be 1.0–10.0 "
+                "and >= stop_loss_percent.\n"
+                "4. Each entry signal must independently fire ≥ 50 times over a 6-month period "
+                "(~17 000 bars). Prefer RSI RANGE / Stochastic RANGE modes over CROSS LEVEL.\n"
+                "5. Be specific with all parameter values — do not use generic defaults (e.g., period=14)."
+            )
+
+        return (
+            base + "Always respond with valid JSON when asked for structured output. "
             "Be specific with parameter values — avoid generic defaults."
         )
 

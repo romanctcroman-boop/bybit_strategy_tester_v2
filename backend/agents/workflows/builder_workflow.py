@@ -2148,13 +2148,39 @@ Recommended approach for positive profit (EMA + RSI combination):
             # Filters (AND-gate: connect fromPort='long' toPort='filter_long' on strategy)
             # IMPORTANT: filter block OUTPUT ports are 'long' and 'short' — NOT 'filter_long'/'filter_short'
             # 'filter_long'/'filter_short' are TARGET ports on the strategy node, not source ports
-            # ⚠️ RULE: ONLY use block types listed here — hallucinated types like atr_volatility,
-            #   volume_filter, macd_filter, stochastic_filter, two_ma_filter, qqe_filter, rsi_filter
-            #   do NOT exist and will be silently rejected. To filter with MACD/RSI/ADX: use the
-            #   base block type (macd/rsi/adx) connected fromPort="long" toPort="filter_long".
             "supertrend_filter": {
                 "cat": "filter",
                 "desc": "SuperTrend AND-gate filter — enforce trend alignment (alias: supertrend). Use generate_on_trend_change=True.",
+                "ports": "long, short",
+            },
+            "rsi_filter": {
+                "cat": "filter",
+                "desc": "RSI level range filter (oversold/overbought gates)",
+                "ports": "long, short",
+            },
+            "macd_filter": {
+                "cat": "filter",
+                "desc": "MACD histogram sign filter — bullish/bearish bias gate",
+                "ports": "long, short",
+            },
+            "stochastic_filter": {
+                "cat": "filter",
+                "desc": "Stochastic %K range filter — overbought/oversold gate",
+                "ports": "long, short",
+            },
+            "two_ma_filter": {
+                "cat": "filter",
+                "desc": "Two-MA alignment filter — price above/below MA pair",
+                "ports": "long, short",
+            },
+            "qqe_filter": {
+                "cat": "filter",
+                "desc": "QQE trend direction filter — smoothed RSI bias gate",
+                "ports": "long, short",
+            },
+            "volume_filter": {
+                "cat": "filter",
+                "desc": "Volume ratio filter — confirms with above-average volume",
                 "ports": "long, short",
             },
             "rvi_filter": {"cat": "filter", "desc": "Relative Vigor Index filter", "ports": "long, short"},

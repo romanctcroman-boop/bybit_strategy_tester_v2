@@ -2657,9 +2657,7 @@ def _run_dca_sltp_batch_numba(
                     "profit_factor": _pf,
                     "total_trades": nt,
                     "n_trades": nt,
-                    # sortino_ratio requires downside deviation — not available from Numba batch
-                    # output; left as 0.0. Avoid using sortino as optimize_metric for DCA strategies.
-                    "sortino_ratio": 0.0,
+                    "sortino_ratio": float(batch["sortino"][i]),
                     "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
                     "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
                     # expectancy / avg_win / avg_loss not available from Numba batch
@@ -2890,7 +2888,7 @@ def _run_dca_mixed_batch_numba(
                     "profit_factor": _pf,
                     "total_trades": nt,
                     "n_trades": nt,
-                    "sortino_ratio": 0.0,
+                    "sortino_ratio": float(batch["sortino"][j]),
                     "calmar_ratio": float(np.clip(_calmar, -1e6, 1e6)),
                     "payoff_ratio": float(np.clip(_payoff, 0.0, 1e6)),
                     "expectancy": 0.0,

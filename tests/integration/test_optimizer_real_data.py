@@ -20,9 +20,12 @@ from datetime import UTC, datetime
 import pytest
 
 from backend.optimization.builder_optimizer import (
+    clone_graph_with_params,
     generate_builder_param_combinations,
     run_builder_backtest,
     run_builder_grid_search,
+    run_builder_optuna_search,
+    split_ohlcv_is_oos,
 )
 
 # ---------------------------------------------------------------------------
@@ -862,3 +865,192 @@ class TestOtherIndicatorTypes:
         assert r_fb.get("total_trades") == r_nb.get("total_trades"), (
             f"Supertrend parity fail: V4={r_fb.get('total_trades')}, Numba={r_nb.get('total_trades')}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 9. Bayesian / Optuna optimization — 200 trials
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestOptunaSearch200Trials:
+    """Run Optuna TPE optimization with 200 trials on real ETHUSDT data.
+
+    Parameter space: RSI(period, oversold, overbought) × SL/TP(sl%, tp%) = ~10^5 combos.
+    Grid search is infeasible; Bayesian sampling explores intelligently.
+    """
+
+    # Wide RSI + SL/TP param specs — large enough that 200 trials ≪ exhaustive
+    PARAM_SPECS = [
+        {"param_path": "rsi_test.period", "type": "int", "low": 7, "high": 30, "step": 1, "enabled": True},
+        {
+            "param_path": "rsi_test.long_rsi_more",
+            "type": "float",
+            "low": 20.0,
+            "high": 40.0,
+            "step": 1.0,
+            "enabled": True,
+        },
+        {
+            "param_path": "rsi_test.long_rsi_less",
+            "type": "float",
+            "low": 50.0,
+            "high": 70.0,
+            "step": 1.0,
+            "enabled": True,
+        },
+        {
+            "param_path": "sltp_test.stop_loss_percent",
+            "type": "float",
+            "low": 1.0,
+            "high": 4.0,
+            "step": 0.5,
+            "enabled": True,
+        },
+        {
+            "param_path": "sltp_test.take_profit_percent",
+            "type": "float",
+            "low": 1.5,
+            "high": 6.0,
+            "step": 0.5,
+            "enabled": True,
+        },
+    ]
+
+    def test_optuna_200_trials_completes(self, real_ohlcv):
+        """200 Optuna TPE trials must complete without errors."""
+        result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=5,
+            timeout_seconds=300,
+        )
+        assert result is not None
+        assert result.get("status") != "error", f"Optuna search failed: {result.get('error')}"
+        # Optuna may prune some trials (QMC startup, infeasibility); accept >=50 completed
+        assert result.get("tested_combinations", 0) >= 50, (
+            f"Expected >=50 trials completed, got {result.get('tested_combinations')}"
+        )
+
+    def test_optuna_200_trials_returns_top_results(self, real_ohlcv):
+        """Top results must be populated and ranked by sharpe_ratio."""
+        result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=5,
+            timeout_seconds=300,
+        )
+        tops = result.get("top_results", [])
+        assert len(tops) > 0, "No top results returned from 200-trial Optuna search"
+        # Must be ranked: first sharpe >= last sharpe
+        sharpes = [r.get("sharpe_ratio", 0) or 0 for r in tops]
+        assert sharpes[0] >= sharpes[-1], f"Top results not sorted: {sharpes}"
+
+    def test_optuna_200_trials_top_params_valid(self, real_ohlcv):
+        """Best result params must include all optimized param paths."""
+        result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=5,
+            timeout_seconds=300,
+        )
+        tops = result.get("top_results", [])
+        assert len(tops) > 0
+        best_params = tops[0].get("params", {})
+        for spec in self.PARAM_SPECS:
+            path = spec["param_path"]
+            assert path in best_params, f"Missing param '{path}' in best result"
+
+    def test_optuna_200_trials_metrics_finite(self, real_ohlcv):
+        """All metric values in top results must be finite (no NaN/inf)."""
+        result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=5,
+            timeout_seconds=300,
+        )
+        import math
+
+        for res in result.get("top_results", []):
+            for key in ("sharpe_ratio", "net_profit", "win_rate", "max_drawdown"):
+                val = res.get(key)
+                if val is not None:
+                    assert math.isfinite(val), f"{key}={val} is not finite in Optuna top result"
+
+    def test_optuna_200_trials_beats_default(self, real_ohlcv):
+        """Best Optuna result should have sharpe_ratio >= default params (not strictly required, logged)."""
+        default_result = run_builder_backtest(RSI_GRAPH, real_ohlcv, BASE_CONFIG)
+        optuna_result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=real_ohlcv,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=5,
+            timeout_seconds=300,
+        )
+        tops = optuna_result.get("top_results", [])
+        # This is a soft check — optimizer should find something better than nothing
+        assert default_result is not None
+        assert len(tops) > 0
+        # Log for visibility, don't hard-fail (market might not be favorable for RSI)
+        best_sharpe = tops[0].get("sharpe_ratio", 0) or 0
+        default_sharpe = default_result.get("sharpe_ratio", 0) or 0
+        print(f"\n[Optuna 200] best_sharpe={best_sharpe:.4f} vs default_sharpe={default_sharpe:.4f}")
+
+    def test_optuna_200_trials_is_oos_split(self, real_ohlcv):
+        """200-trial optimization on IS, validate top-1 on OOS — no leakage."""
+        is_df, oos_df, _ = split_ohlcv_is_oos(real_ohlcv, oos_ratio=0.3)
+        assert len(is_df) >= 500, f"IS too short: {len(is_df)} bars"
+        assert oos_df is not None and len(oos_df) >= 100, (
+            f"OOS too short: {len(oos_df) if oos_df is not None else 0} bars"
+        )
+
+        # Optimize on IS
+        optuna_result = run_builder_optuna_search(
+            base_graph=RSI_GRAPH,
+            ohlcv=is_df,
+            param_specs=self.PARAM_SPECS,
+            config_params=BASE_CONFIG,
+            optimize_metric="sharpe_ratio",
+            n_trials=200,
+            sampler_type="tpe",
+            top_n=3,
+            timeout_seconds=300,
+        )
+        tops = optuna_result.get("top_results", [])
+        assert len(tops) > 0, "No results from IS optimization"
+
+        # Validate top-1 on OOS
+        best_params = tops[0].get("params", {})
+
+        oos_graph = clone_graph_with_params(RSI_GRAPH, best_params)
+        oos_result = run_builder_backtest(oos_graph, oos_df, BASE_CONFIG)
+        assert oos_result is not None, "OOS backtest returned None"
+        assert "total_trades" in oos_result or "sharpe_ratio" in oos_result
+
+        is_sharpe = tops[0].get("sharpe_ratio", 0) or 0
+        oos_sharpe = oos_result.get("sharpe_ratio", 0) or 0
+        print(f"\n[IS/OOS] IS sharpe={is_sharpe:.4f}, OOS sharpe={oos_sharpe:.4f}")

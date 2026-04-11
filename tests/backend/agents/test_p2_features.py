@@ -374,3 +374,109 @@ class TestBuildGraphP2:
     def test_graph_without_event_fn_has_none(self):
         graph = build_trading_strategy_graph(run_backtest=False, event_fn=None)
         assert graph.event_fn is None
+
+
+class TestGroundingNodeCache:
+    """Tests for GroundingNode TTL cache (Task 7)."""
+
+    def setup_method(self):
+        import backend.agents.trading_strategy_graph as tsg
+
+        tsg._GROUNDING_CACHE.clear()
+
+    def _make_state(self, symbol: str = "BTCUSDT", timeframe: str = "15") -> AgentState:
+        state = AgentState(context={"symbol": symbol, "timeframe": timeframe})
+        return state
+
+    def test_cache_miss_calls_perplexity(self):
+        """First call with no cache entry must attempt the API."""
+        from unittest.mock import AsyncMock, patch
+
+        import backend.agents.trading_strategy_graph as tsg
+        from backend.agents.trading_strategy_graph import GroundingNode
+
+        node = GroundingNode()
+        state = self._make_state("ETHUSDT", "60")
+
+        with patch("backend.security.key_manager.get_key_manager") as mock_km:
+            mock_km.return_value.get_decrypted_key.return_value = "fake-key"
+            node._call_llm = AsyncMock(return_value="ETH price context")
+
+            asyncio.run(node.execute(state))
+
+        node._call_llm.assert_awaited_once()
+        assert ("ETHUSDT", "60") in tsg._GROUNDING_CACHE
+
+    def test_cache_hit_skips_api_call(self):
+        """Second call within TTL must use cache, not call Perplexity."""
+        import time
+        from unittest.mock import AsyncMock, patch
+
+        import backend.agents.trading_strategy_graph as tsg
+        from backend.agents.trading_strategy_graph import GroundingNode
+
+        # Warm up cache manually
+        tsg._GROUNDING_CACHE[("BTCUSDT", "15")] = ("## Cached context\n", time.time())
+
+        node = GroundingNode()
+        state = self._make_state("BTCUSDT", "15")
+
+        with patch("backend.security.key_manager.get_key_manager") as mock_km:
+            mock_km.return_value.get_decrypted_key.return_value = "fake-key"
+            node._call_llm = AsyncMock()
+
+            asyncio.run(node.execute(state))
+
+        node._call_llm.assert_not_awaited()
+        result = state.get_result("grounding")
+        assert result["cached"] is True
+        assert result["grounding_context"] == "## Cached context\n"
+
+    def test_cache_expired_calls_perplexity(self):
+        """Call after TTL expiry must bypass cache and call Perplexity."""
+        import time
+        from unittest.mock import AsyncMock, patch
+
+        import backend.agents.trading_strategy_graph as tsg
+        from backend.agents.trading_strategy_graph import GroundingNode
+
+        # Store stale cache entry (1000 seconds old)
+        tsg._GROUNDING_CACHE[("SOLUSDT", "5")] = ("old context", time.time() - 1000)
+
+        node = GroundingNode()
+        state = self._make_state("SOLUSDT", "5")
+
+        with patch("backend.security.key_manager.get_key_manager") as mock_km:
+            mock_km.return_value.get_decrypted_key.return_value = "fake-key"
+            node._call_llm = AsyncMock(return_value="fresh context")
+
+            asyncio.run(node.execute(state))
+
+        node._call_llm.assert_awaited_once()
+        # Cache should be refreshed
+        cached_text, cached_at = tsg._GROUNDING_CACHE[("SOLUSDT", "5")]
+        assert "fresh context" in cached_text
+        assert time.time() - cached_at < 5
+
+    def test_no_api_key_skips_and_no_cache(self):
+        """When PERPLEXITY_API_KEY is absent, node skips and does NOT write cache."""
+        from unittest.mock import patch
+
+        import backend.agents.trading_strategy_graph as tsg
+        from backend.agents.trading_strategy_graph import GroundingNode
+
+        node = GroundingNode()
+        state = self._make_state()
+
+        with patch("backend.security.key_manager.get_key_manager") as mock_km:
+            mock_km.return_value.get_decrypted_key.return_value = None
+            asyncio.run(node.execute(state))
+
+        assert len(tsg._GROUNDING_CACHE) == 0
+        result = state.get_result("grounding")
+        assert result["skipped"] is True
+
+    def test_cache_ttl_constant(self):
+        import backend.agents.trading_strategy_graph as tsg
+
+        assert tsg._GROUNDING_CACHE_TTL == 900.0

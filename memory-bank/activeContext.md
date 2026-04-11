@@ -1,10 +1,48 @@
 # Active Context — Текущая работа
 
-> Обновлено: 2026-04-10 (сессия 15)
+> Обновлено: 2026-04-11 (сессия 16)
 
 ## Текущий фокус
 
-**Optimization system audit + bugfixes — завершён. Все баги исправлены.**
+**Claude/Perplexity API improvements — завершён. 1743 тестов прошли, 0 упали.**
+
+## Что сделано (2026-04-11 сессия 16) — LLM Client API improvements (П1–П6)
+
+### П1 — Structured Outputs (`claude.py`)
+- `_build_payload()`: optional `tools`/`tool_choice` kwargs → Anthropic tool use (~100% JSON)
+- `_parse_response()`: `tool_use` content block → JSON string (прозрачно для caller)
+
+### П2 — Prompt Caching (`claude.py`)
+- `_get_session()`: `anthropic-beta: prompt-caching-2024-07-31` header
+- `_build_payload()`: system → list of blocks; первый (static) получает `cache_control: ephemeral`
+- `_parse_response()`: трекинг `cache_read_input_tokens` → `prompt_cache_hit_tokens`
+- Экономия: 90% на повторных вызовах с тем же system message
+
+### П3 — Perplexity search quality (`perplexity.py`, `trading_strategy_graph.py`)
+- `CRYPTO_SEARCH_DOMAINS` (9 доменов) — константа в perplexity.py
+- `PerplexityClient._build_payload()`: `search_context_size="medium"`, `search_domain_filter`
+- `GroundingNode._call_llm()` передаёт оба параметра автоматически
+
+### П4 — Смягчить CAPS (`prompt_engineer.py`, `trading_strategy_graph.py`)
+- `"OUTPUT RULES (STRICT):"` → `"Output rules:"`, `"MUST"` → `"must"`
+- `max_tokens` Sonnet/Opus: 4096 → 8192 (Haiku остаётся 4096)
+
+### П5 — sonar-reasoning-pro (`trading_strategy_graph.py`)
+- `regime in ("unknown", "extreme_volatile")` → `deep_analysis=True` → `sonar-reasoning-pro`
+- Стандартные режимы → `sonar-pro`
+
+### П6 — Model-aware pricing (`base_client.py`)
+- Anthropic: Haiku=$1/$5, Sonnet=$3/$15, Opus=$5/$25 per 1M tokens
+- Cache-aware cost распространён на Anthropic (было только DeepSeek)
+
+### Тесты
+- `test_claude_client.py`: 18 → 22 теста (+4: tool_use, cache tokens, beta header, tool kwargs)
+- `test_pipeline_real_api.py`: 2 теста обновлены под `"Output rules:"` (было `"OUTPUT RULES"`)
+- **Итог: 1743 passed, 27 skipped, 0 failed**
+
+## Следующие шаги
+- Нет открытых задач по LLM clients
+- При необходимости: реальные integration тесты с live API ключами
 
 ## Что сделано (2026-04-10 сессия 15) — Optimization system bugfixes
 

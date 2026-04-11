@@ -63,7 +63,10 @@ class TestClaudeBuildPayload:
             LLMMessage(role="user", content="Hello"),
         ]
         payload = self.client._build_payload(messages)
-        assert payload["system"] == "Be concise."
+        # system is now a list of content blocks (prompt-caching format)
+        assert isinstance(payload["system"], list)
+        assert payload["system"][0]["text"] == "Be concise."
+        assert payload["system"][0]["cache_control"] == {"type": "ephemeral"}
         assert all(m["role"] != "system" for m in payload["messages"])
         assert payload["messages"][0] == {"role": "user", "content": "Hello"}
 
@@ -86,8 +89,12 @@ class TestClaudeBuildPayload:
             LLMMessage(role="user", content="Go"),
         ]
         payload = self.client._build_payload(messages)
-        assert "Part 1." in payload["system"]
-        assert "Part 2." in payload["system"]
+        # first block is static (cached), last block is dynamic (no cache_control)
+        texts = [b["text"] for b in payload["system"]]
+        assert "Part 1." in texts
+        assert "Part 2." in texts
+        assert payload["system"][0].get("cache_control") == {"type": "ephemeral"}
+        assert "cache_control" not in payload["system"][-1]
 
     def test_temperature_and_max_tokens_passed(self):
         messages = [LLMMessage(role="user", content="x")]
@@ -134,6 +141,70 @@ class TestClaudeParseResponse:
     def test_provider_is_anthropic(self):
         resp = self.client._parse_response(_anthropic_response(), latency=0.0)
         assert resp.provider == LLMProvider.ANTHROPIC
+
+    def test_tool_use_block_serialised_as_json(self):
+        """П1 Structured Outputs: tool_use content block → JSON string."""
+        data = {
+            "id": "msg_tool",
+            "type": "message",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "toolu_01",
+                    "name": "strategy_output",
+                    "input": {"name": "RSI Strategy", "sharpe": 1.5},
+                }
+            ],
+            "model": "claude-sonnet-4-6",
+            "stop_reason": "tool_use",
+            "usage": {"input_tokens": 20, "output_tokens": 10},
+        }
+        resp = self.client._parse_response(data, latency=0.0)
+        import json as _json
+
+        parsed = _json.loads(resp.content)
+        assert parsed["name"] == "RSI Strategy"
+        assert parsed["sharpe"] == 1.5
+
+    def test_cache_tokens_tracked(self):
+        """П2 Prompt Caching: cache_read/cache_creation tokens forwarded."""
+        data = {
+            "id": "msg_cached",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "cached"}],
+            "model": "claude-haiku-4-5-20251001",
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_input_tokens": 2000,
+                "cache_creation_input_tokens": 0,
+            },
+        }
+        resp = self.client._parse_response(data, latency=0.0)
+        assert resp.prompt_cache_hit_tokens == 2000
+        assert resp.prompt_cache_miss_tokens == 0
+
+    def test_prompt_caching_header_set(self):
+        """П2 Prompt Caching: session headers include anthropic-beta."""
+        import asyncio
+
+        client = ClaudeClient(_make_config())
+        session = asyncio.run(client._get_session())
+        headers = dict(session.headers)
+        assert headers.get("anthropic-beta") == "prompt-caching-2024-07-31"
+        asyncio.run(client.close())
+
+    def test_tool_use_kwargs_passed_to_payload(self):
+        """П1 Structured Outputs: tools/tool_choice kwargs included in payload."""
+        messages = [LLMMessage(role="user", content="Generate")]
+        tools = [{"name": "output", "input_schema": {"type": "object"}}]
+        tool_choice = {"type": "tool", "name": "output"}
+        payload = self.client._build_payload(messages, tools=tools, tool_choice=tool_choice)
+        assert payload["tools"] == tools
+        assert payload["tool_choice"] == tool_choice
 
 
 class TestClaudeChatRetry:
