@@ -917,40 +917,59 @@ function setSeedStatus(msg, type) {
 }
 
 /**
- * Submit the selected strategy to POST /ai-pipeline/analyze-strategy.
- * The backend runs seed_graph mode: backtest → debate → refine → report.
+ * Submit the selected strategy to the AI agent pipeline.
+ *
+ * Two modes:
+ *  - Normal analysis: POST /ai-pipeline/analyze-strategy (backtest → debate → report)
+ *  - Optimize mode:  POST /api/v1/agents/advanced/builder/task
+ *                    (existing_strategy_id + use_optimizer_mode=true → agents suggest
+ *                     param ranges → optimizer sweeps → best params applied)
  */
 async function analyzeExistingStrategy() {
     const select = document.getElementById('seedStrategySelect');
-    const strategyId = select ? parseInt(select.value, 10) : 0;
+    const strategyId = select?.value;
     if (!strategyId) { setSeedStatus('Select a strategy first.', 'error'); return; }
 
     const btn = document.getElementById('btnAnalyzeStrategy');
+    const optimizeMode = document.getElementById('seedOptimize')?.checked || false;
     const runDebate = document.getElementById('seedRunDebate')?.checked !== false;
     const symbol = document.getElementById('symbol')?.value || 'BTCUSDT';
     const timeframe = document.getElementById('timeframe')?.value || '15';
     const startDate = document.getElementById('startDate')?.value || '2025-01-01';
     const endDate = document.getElementById('endDate')?.value || '2025-06-01';
     const initialCapital = parseFloat(document.getElementById('initialCapital')?.value) || 10000;
-    const leverage = parseInt(document.getElementById('leverage')?.value, 10) || 1;
+    const leverage = parseInt(document.getElementById('leverage')?.value, 10) || 10;
     const agents = getSelectedAgents();
 
     if (btn) btn.disabled = true;
+
+    if (optimizeMode) {
+        await _runOptimizeMode(strategyId, { symbol, timeframe, startDate, endDate, initialCapital, leverage, agents, runDebate });
+    } else {
+        await _runAnalyzeMode(parseInt(strategyId, 10), { symbol, timeframe, startDate, endDate, initialCapital, leverage, agents, runDebate });
+    }
+
+    if (btn) btn.disabled = !select?.value;
+}
+
+/** Normal analysis mode — calls /ai-pipeline/analyze-strategy */
+async function _runAnalyzeMode(strategyId, cfg) {
     setSeedStatus('Running analysis — this may take 1–3 minutes…');
     _showProgress('Analysing existing strategy with AI agents…');
-
     try {
         const resp = await fetch('/ai-pipeline/analyze-strategy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 strategy_id: strategyId,
-                symbol, timeframe, agents,
-                run_debate: runDebate,
-                initial_capital: initialCapital,
-                leverage,
-                start_date: startDate,
-                end_date: endDate,
+                symbol: cfg.symbol,
+                timeframe: cfg.timeframe,
+                agents: cfg.agents,
+                run_debate: cfg.runDebate,
+                initial_capital: cfg.initialCapital,
+                leverage: cfg.leverage,
+                start_date: cfg.startDate,
+                end_date: cfg.endDate,
                 pipeline_timeout: 300,
             }),
         });
@@ -961,14 +980,189 @@ async function analyzeExistingStrategy() {
         const result = await resp.json();
         _hideProgress();
         _displayAnalysisResult(result);
-        setSeedStatus(`Analysis complete — pipeline ${escapeHtml(result.pipeline_id)}`, 'success');
+        setSeedStatus(`Analysis complete — pipeline ${escapeHtml(result.pipeline_id || '')}`, 'success');
     } catch (err) {
         _hideProgress();
         setSeedStatus(`Failed: ${escapeHtml(err.message)}`, 'error');
         showNotification(`Analysis failed: ${err.message}`, 'error');
-    } finally {
-        if (btn) btn.disabled = !select?.value;
     }
+}
+
+/**
+ * Optimize mode — calls /api/v1/agents/advanced/builder/task
+ * with existing_strategy_id + use_optimizer_mode=true.
+ *
+ * Agents suggest parameter ranges → Optuna sweeps them →
+ * best params are applied back to the strategy (up to 3 iterations).
+ */
+async function _runOptimizeMode(strategyId, cfg) {
+    setSeedStatus('Running optimization — agents are proposing parameter ranges… (3–7 min)');
+    _showProgress('🔬 Optimize mode: agents → param ranges → Optuna sweep → best params applied');
+
+    try {
+        const resp = await fetch(`${ADVANCED_API}/builder/task`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                existing_strategy_id: String(strategyId),
+                use_optimizer_mode: true,
+                enable_deliberation: cfg.runDebate,
+                symbol: cfg.symbol,
+                timeframe: cfg.timeframe,
+                start_date: cfg.startDate,
+                end_date: cfg.endDate,
+                initial_capital: cfg.initialCapital,
+                leverage: cfg.leverage,
+                max_iterations: 3,
+                min_sharpe: 0.5,
+                min_win_rate: 0.4,
+                agent: cfg.agents.includes('deepseek') ? 'deepseek' : (cfg.agents[0] || 'qwen'),
+                // Evaluation: maximize Sharpe, max_drawdown ≤ 25%
+                evaluation_config: {
+                    primary_metric: 'sharpe_ratio',
+                    secondary_metrics: ['win_rate', 'profit_factor'],
+                    constraints: [
+                        { metric: 'max_drawdown', operator: '<=', value: 25 },
+                        { metric: 'total_trades', operator: '>=', value: 5 },
+                    ],
+                    sort_order: [],
+                    use_composite: false,
+                    weights: null,
+                    min_primary: 0.5,
+                },
+                blocks: [],
+                connections: [],
+            }),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        _hideProgress();
+        _displayBuilderTaskResult(data, strategyId);
+
+        const wf = data.workflow || {};
+        const status = wf.status || (data.success ? 'completed' : 'failed');
+        setSeedStatus(`Optimization ${status} — strategy updated`, status === 'completed' ? 'success' : 'error');
+    } catch (err) {
+        _hideProgress();
+        setSeedStatus(`Optimization failed: ${escapeHtml(err.message)}`, 'error');
+        showNotification(`Optimization failed: ${err.message}`, 'error');
+    }
+}
+
+/**
+ * Render result from /builder/task (optimize mode).
+ * Shows per-iteration optimizer findings + final best params.
+ */
+function _displayBuilderTaskResult(data, strategyId) {
+    const section = document.getElementById('resultsSection');
+    if (section) section.classList.add('visible');
+
+    const wf = data.workflow || {};
+    const iterations = wf.iterations || [];
+    const finalMetrics = wf.final_metrics || wf.backtest_results?.metrics || {};
+
+    // ── Strategy card ────────────────────────────────────────
+    const stratCard = document.getElementById('strategyCard');
+    const stratInfo = document.getElementById('strategyInfo');
+    if (stratCard && stratInfo) {
+        stratCard.classList.remove('hidden');
+        const statusIcon = data.success ? '✅' : '⚠️';
+        stratInfo.innerHTML = `
+            <div>${statusIcon} <strong>Strategy ID:</strong> ${escapeHtml(String(strategyId))}</div>
+            <div><strong>Mode:</strong> 🔬 Optimize Parameters (${iterations.length} iteration${iterations.length !== 1 ? 's' : ''})</div>
+            <div><strong>Status:</strong> ${escapeHtml(wf.status || (data.success ? 'completed' : 'failed'))}</div>
+        `;
+    }
+
+    // ── Backtest metrics (final) ─────────────────────────────
+    const metricsCard = document.getElementById('metricsCard');
+    const metricsGrid = document.getElementById('metricsGrid');
+    const m = finalMetrics;
+    if (metricsCard && metricsGrid && Object.keys(m).length) {
+        metricsCard.classList.remove('hidden');
+        metricsGrid.innerHTML = [
+            ['Total Return', m.total_return != null ? `${parseFloat(m.total_return).toFixed(2)}%` : 'N/A'],
+            ['Sharpe Ratio', m.sharpe_ratio != null ? parseFloat(m.sharpe_ratio).toFixed(3) : 'N/A'],
+            ['Max Drawdown', m.max_drawdown != null ? `${Math.abs(parseFloat(m.max_drawdown)).toFixed(2)}%` : 'N/A'],
+            ['Total Trades', m.total_trades ?? 'N/A'],
+            ['Win Rate', m.win_rate != null ? `${parseFloat(m.win_rate).toFixed(1)}%` : 'N/A'],
+            ['Profit Factor', m.profit_factor != null ? parseFloat(m.profit_factor).toFixed(2) : 'N/A'],
+        ].map(([label, val]) => `
+            <div class="metric-item">
+                <div class="metric-label">${escapeHtml(label)}</div>
+                <div class="metric-value">${escapeHtml(String(val))}</div>
+            </div>
+        `).join('');
+    }
+
+    // ── Optimization iterations ──────────────────────────────
+    if (iterations.length > 0) {
+        // Find the consensusCard or create a dedicated opt card in resultsSection
+        const consensusCard = document.getElementById('consensusCard');
+        const consensusBox = document.getElementById('consensusBox');
+        if (consensusCard && consensusBox) {
+            consensusCard.classList.remove('hidden');
+            consensusBox.innerHTML = _renderOptIterations(iterations);
+        }
+    }
+}
+
+/** Render optimization iteration list with best params per iteration. */
+function _renderOptIterations(iterations) {
+    const iterItems = iterations.map((iter, idx) => {
+        const score = iter.optimizer_score ?? iter.backtest_score ?? iter.primary_score;
+        const scoreStr = score != null ? parseFloat(score).toFixed(3) : '—';
+        const bestParams = iter.best_params || iter.optimizer_best_params || {};
+        const paramStr = Object.entries(bestParams)
+            .slice(0, 4)
+            .map(([k, v]) => `${k.split('.').pop()}=${typeof v === 'number' ? parseFloat(v).toFixed(2) : v}`)
+            .join(' · ') || 'no params recorded';
+
+        const scoreClass = score != null && score >= 0.5 ? '' : 'worse';
+        return `
+            <div class="opt-iteration-item">
+                <div class="opt-iter-num">${idx + 1}</div>
+                <div class="opt-iter-details" title="${escapeHtml(JSON.stringify(bestParams, null, 2))}">
+                    ${escapeHtml(paramStr)}
+                </div>
+                <div class="opt-iter-score ${scoreClass}">Sharpe ${scoreStr}</div>
+            </div>
+        `;
+    }).join('');
+
+    // Best params from last successful iteration
+    const bestIter = [...iterations].reverse().find(i => i.best_params || i.optimizer_best_params);
+    const bestParams = bestIter ? (bestIter.best_params || bestIter.optimizer_best_params || {}) : null;
+
+    const bestParamsHtml = bestParams && Object.keys(bestParams).length > 0
+        ? `<div class="opt-params-grid">
+            ${Object.entries(bestParams).map(([k, v]) => `
+                <div class="opt-param-item">
+                    <div class="opt-param-name">${escapeHtml(k)}</div>
+                    <div class="opt-param-value">${escapeHtml(String(typeof v === 'number' ? parseFloat(v).toFixed(4) : v))}</div>
+                </div>
+            `).join('')}
+           </div>`
+        : '<p style="color:var(--color-text-muted)">Parameters applied directly to strategy in Builder.</p>';
+
+    return `
+        <div class="opt-result-card">
+            <div class="opt-result-header">
+                <h4>🔬 Optimizer Results</h4>
+            </div>
+            <p style="font-size:0.85rem;color:var(--color-text-muted,#8b949e);margin-bottom:12px">
+                Best parameters found by Optuna and applied to strategy:
+            </p>
+            ${bestParamsHtml}
+        </div>
+        <h4 style="margin:16px 0 8px;color:var(--color-text-secondary)">Iteration Log</h4>
+        <div class="opt-iteration-list">${iterItems}</div>
+    `;
 }
 
 function _showProgress(msg) {
@@ -1056,3 +1250,155 @@ function formatNum(value) {
 document.addEventListener('DOMContentLoaded', () => {
     loadStrategiesForSeed();
 });
+
+/* ============================================
+   QUICK STRATEGY GENERATOR
+   ============================================ */
+const QG_API = '/api/v1/ai-strategy-generator';
+
+function toggleIndicator(chip) {
+    chip.classList.toggle('selected');
+}
+
+function getSelectedIndicators() {
+    const chips = document.querySelectorAll('#qgIndicators .agent-chip.selected');
+    return Array.from(chips).map((c) => c.dataset.ind);
+}
+
+async function runQuickGenerator() {
+    const btn = document.getElementById('btnQuickGen');
+    const statusEl = document.getElementById('qgStatus');
+    const resultDiv = document.getElementById('qgResult');
+
+    const name = document.getElementById('qgName').value.trim() || 'Quick Strategy';
+    const patternType = document.getElementById('qgPattern').value;
+    const riskPerTrade = parseFloat(document.getElementById('qgRiskPerTrade').value);
+    const targetRR = parseFloat(document.getElementById('qgRR').value);
+    const indicators = getSelectedIndicators();
+    const description = document.getElementById('qgDescription').value.trim();
+
+    btn.disabled = true;
+    statusEl.textContent = '⏳ Генерирую стратегию...';
+    resultDiv.style.display = 'none';
+
+    try {
+        // 1. Submit generation request
+        const createRes = await fetch(`${QG_API}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                description,
+                pattern_type: patternType,
+                indicators,
+                risk_per_trade: riskPerTrade,
+                target_risk_reward: targetRR,
+            }),
+        });
+
+        if (!createRes.ok) {
+            const err = await createRes.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${createRes.status}`);
+        }
+
+        const created = await createRes.json();
+        const strategyId = created.id;
+        statusEl.textContent = `⏳ ID: ${strategyId} — ожидаю результата...`;
+
+        // 2. Poll for completion (max 60s, poll every 2s)
+        const maxWait = 60_000;
+        const pollInterval = 2_000;
+        const deadline = Date.now() + maxWait;
+        let result = null;
+
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, pollInterval));
+
+            const pollRes = await fetch(`${QG_API}/${strategyId}`);
+            if (!pollRes.ok) break;
+
+            const data = await pollRes.json();
+            if (data.status === 'completed' || data.status === 'failed') {
+                result = data;
+                break;
+            }
+            statusEl.textContent = `⏳ Статус: ${data.status}...`;
+        }
+
+        if (!result) {
+            throw new Error('Timeout: стратегия не сгенерирована за 60 сек');
+        }
+
+        if (result.status === 'failed') {
+            throw new Error(result.error_message || 'Generation failed');
+        }
+
+        // 3. Render result
+        renderQuickGenResult(result);
+        statusEl.textContent = `✅ Готово: ${result.name}`;
+    } catch (err) {
+        statusEl.textContent = `❌ ${err.message}`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function renderQuickGenResult(strategy) {
+    const resultDiv = document.getElementById('qgResult');
+    const contentDiv = document.getElementById('qgResultContent');
+
+    const indicators = (strategy.indicators_used || []).join(', ') || '—';
+    const valid = strategy.is_valid ? '✅ Валидна' : '⚠️ Есть ошибки';
+    const errors = strategy.validation_errors || [];
+
+    contentDiv.innerHTML = `
+        <div class="qg-result-meta">
+            <div class="qg-meta-item">
+                <div class="qg-meta-label">Паттерн</div>
+                <div class="qg-meta-value">${strategy.pattern_type || '—'}</div>
+            </div>
+            <div class="qg-meta-item">
+                <div class="qg-meta-label">Индикаторы</div>
+                <div class="qg-meta-value">${indicators}</div>
+            </div>
+            <div class="qg-meta-item">
+                <div class="qg-meta-label">Статус</div>
+                <div class="qg-meta-value">${valid}</div>
+            </div>
+            ${strategy.class_name ? `
+            <div class="qg-meta-item">
+                <div class="qg-meta-label">Класс</div>
+                <div class="qg-meta-value">${strategy.class_name}</div>
+            </div>` : ''}
+        </div>
+        ${errors.length > 0 ? `<p style="color:var(--color-danger,#ef4444);font-size:0.85rem">${errors.join('; ')}</p>` : ''}
+        ${strategy.code ? `
+        <details>
+            <summary style="cursor:pointer;color:var(--color-accent);font-size:0.85rem;margin-bottom:8px">📄 Показать код стратегии</summary>
+            <pre class="qg-code-block">${escapeHtml(strategy.code)}</pre>
+        </details>` : ''}
+        <div class="actions-bar" style="margin-top:12px">
+            <button type="button" class="btn-secondary btn-sm" onclick="copyStrategyCode('${strategy.id}')">
+                <i class="bi bi-clipboard"></i> Копировать ID
+            </button>
+        </div>
+    `;
+
+    resultDiv.style.display = 'block';
+}
+
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function copyStrategyCode(strategyId) {
+    navigator.clipboard.writeText(strategyId).then(() => {
+        showNotification(`ID скопирован: ${strategyId}`, 'success');
+    }).catch(() => {
+        showNotification('Не удалось скопировать', 'error');
+    });
+}

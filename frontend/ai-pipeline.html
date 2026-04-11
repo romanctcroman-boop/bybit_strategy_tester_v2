@@ -263,12 +263,93 @@
               <span>Multi-agent Debate</span>
             </label>
           </div>
+          <div class="form-group">
+            <label class="seed-optimize-label">
+              <input type="checkbox" id="seedOptimize" />
+              <span>🔬 Optimize Parameters</span>
+            </label>
+            <div class="seed-optimize-hint hidden" id="seedOptimizeHint">
+              Agents предложат диапазоны → оптимизатор найдёт лучшие значения (3–5 мин)
+            </div>
+          </div>
           <button type="button" class="btn-primary" id="btnAnalyzeStrategy" onclick="analyzeExistingStrategy()" disabled>
             <i class="bi bi-cpu"></i>
-            Let Agents Analyse
+            <span id="btnAnalyzeLabel">Let Agents Analyse</span>
           </button>
         </div>
         <div class="seed-status" id="seedStatus"></div>
+      </section>
+
+      <!-- Quick Strategy Generator Section -->
+      <section class="config-panel seed-panel" id="quickGenPanel">
+        <h2><i class="bi bi-magic"></i> Quick Strategy Generator</h2>
+        <p class="seed-description">
+          Генерирует торговую стратегию по описанию паттерна без запуска полного AI-пайплайна.
+          Использует <code>/api/v1/ai-strategy-generator</code>.
+        </p>
+        <div class="config-grid">
+          <div class="form-group">
+            <label for="qgName">Название стратегии</label>
+            <input type="text" id="qgName" placeholder="RSI Momentum 15m" value="Quick Strategy" maxlength="100" />
+          </div>
+          <div class="form-group">
+            <label for="qgPattern">Тип паттерна</label>
+            <select id="qgPattern">
+              <option value="trend_following" selected>📈 Trend Following</option>
+              <option value="mean_reversion">🔄 Mean Reversion</option>
+              <option value="breakout">💥 Breakout</option>
+              <option value="momentum">🚀 Momentum</option>
+              <option value="scalping">⚡ Scalping</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="qgRiskPerTrade">Risk per Trade</label>
+            <select id="qgRiskPerTrade">
+              <option value="0.01">1%</option>
+              <option value="0.02" selected>2%</option>
+              <option value="0.03">3%</option>
+              <option value="0.05">5%</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="qgRR">Target R:R</label>
+            <select id="qgRR">
+              <option value="1.5">1.5:1</option>
+              <option value="2.0" selected>2:1</option>
+              <option value="2.5">2.5:1</option>
+              <option value="3.0">3:1</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group qg-indicators-row">
+          <label>Индикаторы</label>
+          <div class="agent-chips" id="qgIndicators">
+            <div class="agent-chip selected" data-ind="rsi" onclick="toggleIndicator(this)">RSI</div>
+            <div class="agent-chip selected" data-ind="ema" onclick="toggleIndicator(this)">EMA</div>
+            <div class="agent-chip" data-ind="macd" onclick="toggleIndicator(this)">MACD</div>
+            <div class="agent-chip selected" data-ind="atr" onclick="toggleIndicator(this)">ATR</div>
+            <div class="agent-chip" data-ind="bb" onclick="toggleIndicator(this)">Bollinger</div>
+            <div class="agent-chip" data-ind="vwap" onclick="toggleIndicator(this)">VWAP</div>
+            <div class="agent-chip" data-ind="supertrend" onclick="toggleIndicator(this)">Supertrend</div>
+          </div>
+        </div>
+        <div class="form-group qg-description-group">
+          <label for="qgDescription">Описание условий (опционально)</label>
+          <textarea id="qgDescription" rows="2" class="qg-description-input" placeholder="Например: входить в лонг когда RSI(14) пересекает 30 снизу вверх при восходящем тренде EMA(50)..."></textarea>
+        </div>
+        <div class="actions-bar qg-actions-row">
+          <button type="button" class="btn-primary" id="btnQuickGen" onclick="runQuickGenerator()">
+            <i class="bi bi-magic"></i> Generate
+          </button>
+          <span id="qgStatus" class="qg-status"></span>
+        </div>
+        <!-- Result area -->
+        <div id="qgResult" class="qg-result">
+          <div class="result-card">
+            <h4><i class="bi bi-code-slash"></i> Сгенерированная стратегия</h4>
+            <div id="qgResultContent"></div>
+          </div>
+        </div>
       </section>
 
       <!-- Progress Section -->

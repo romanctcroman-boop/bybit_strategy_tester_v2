@@ -20,6 +20,7 @@ class AIAnalysisResult {
         this.metrics = data.metrics || {};
         this.ai_analysis = data.ai_analysis || {};
         this.metadata = data.metadata || {};
+        this.latency_ms = data.latency_ms || 0;
     }
 
     get summary() { return this.ai_analysis.summary || ''; }
@@ -61,8 +62,8 @@ class AIAssistant {
                 <button class="ai-panel-close" id="aiPanelClose">×</button>
             </div>
             <div class="ai-panel-status">
-                <span class="ai-status-dot online"></span>
-                <span id="aiStatusText">DeepSeek + Perplexity Online</span>
+                <span class="ai-status-dot" id="aiSystemDot"></span>
+                <span id="aiStatusText">Проверка системы...</span>
             </div>
             <div class="ai-panel-messages" id="aiMessages">
                 <div class="ai-message assistant">
@@ -133,6 +134,30 @@ class AIAssistant {
         this.panel.classList.add('open');
         this.isOpen = true;
         document.getElementById('aiInput').focus();
+        this.checkSystemHealth();
+    }
+
+    async checkSystemHealth() {
+        const dot = document.getElementById('aiSystemDot');
+        const text = document.getElementById('aiStatusText');
+        try {
+            const res = await fetch(`${AI_API_BASE}/system/overview`);
+            if (res.ok) {
+                const data = await res.json();
+                const status = data.status || 'unknown';
+                dot.className = 'ai-status-dot ' + (status === 'operational' ? 'online' : 'warning');
+                const memCount = data.components?.memory?.total_memories ?? '?';
+                text.textContent = status === 'operational'
+                    ? `AI Online · Памяти: ${memCount}`
+                    : `AI Деградация · Статус: ${status}`;
+            } else {
+                dot.className = 'ai-status-dot offline';
+                text.textContent = 'AI Offline';
+            }
+        } catch {
+            dot.className = 'ai-status-dot offline';
+            text.textContent = 'AI Недоступен';
+        }
     }
 
     close() {
@@ -154,6 +179,7 @@ class AIAssistant {
         this.isLoading = true;
         const loadingId = this.addMessage('assistant', '🤔 Анализирую...', true);
 
+        const t0 = Date.now();
         try {
             const response = await fetch(`${AI_API_BASE}/deliberate`, {
                 method: 'POST',
@@ -167,6 +193,7 @@ class AIAssistant {
                 })
             });
 
+            const latency = Date.now() - t0;
             const data = await response.json();
 
             // Remove loading message
@@ -175,7 +202,7 @@ class AIAssistant {
             if (response.ok) {
                 const answer = data.decision || 'Не удалось получить ответ';
                 const confidence = (data.confidence * 100).toFixed(0);
-                this.addMessage('assistant', `${answer}\n\n📊 Уверенность: ${confidence}%`);
+                this.addMessage('assistant', `${answer}\n\n📊 Уверенность: ${confidence}% · ⚡ ${latency}мс`);
             } else {
                 this.addMessage('assistant', `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`);
             }
@@ -254,6 +281,7 @@ class AIBacktestAnalyzer {
             agents: ['deepseek', 'qwen', 'perplexity']
         };
 
+        const t0 = Date.now();
         try {
             const response = await fetch(`${AI_API_BASE}/analyze-backtest`, {
                 method: 'POST',
@@ -266,6 +294,7 @@ class AIBacktestAnalyzer {
             }
 
             const data = await response.json();
+            data.latency_ms = Date.now() - t0;
             this.currentAnalysis = new AIAnalysisResult(data);
             return this.currentAnalysis;
         } catch (error) {
@@ -382,6 +411,11 @@ class AIBacktestAnalyzer {
                             <span class="ai-metric-label">AI Confidence</span>
                             <span class="ai-metric-value">${(result.confidence * 100).toFixed(0)}%</span>
                         </div>
+                        ${result.latency_ms > 0 ? `
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Время анализа</span>
+                            <span class="ai-metric-value">⚡ ${result.latency_ms}мс</span>
+                        </div>` : ''}
                     </div>
                 </div>
             </div>

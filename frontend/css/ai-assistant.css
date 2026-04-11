@@ -123,6 +123,15 @@
     animation: blink 1.5s infinite;
 }
 
+.ai-status-dot.warning {
+    background: #f59e0b;
+    animation: blink 1.5s infinite;
+}
+
+.ai-status-dot.offline {
+    background: #ef4444;
+}
+
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
