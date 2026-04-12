@@ -728,7 +728,97 @@
 #optProgressSection #optProgressDetails {
     margin-top: 5px;
     font-size: 0.75rem;
-    color: #888;
+    color: #666;
+}
+
+/* ---- Stage step indicators ---- */
+.opt-stages {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.opt-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.opt-stage-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.opt-stage.completed .opt-stage-dot {
+    background: #22c55e;
+    border-color: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+.opt-stage.active .opt-stage-dot {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+    animation: opt-stage-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes opt-stage-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}
+
+.opt-stage-label {
+    font-size: 0.62rem;
+    color: #444;
+    transition: color 0.3s ease;
+    white-space: nowrap;
+}
+
+.opt-stage.completed .opt-stage-label { color: #22c55e; }
+.opt-stage.active    .opt-stage-label { color: #f59e0b; }
+
+.opt-stage-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-bottom: 14px; /* visually aligns with dot center-line */
+}
+
+/* ---- Stats row: speed · ETA · best score ---- */
+.opt-stats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.opt-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    flex: 1;
+}
+
+.opt-stat-label {
+    font-size: 0.6rem;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.opt-stat-value {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #bbb;
+    transition: color 0.3s ease;
 }
 
 .opt-progress-container--compact {
@@ -996,6 +1086,7 @@
 
 .opt-results-table th.sortable {
     cursor: pointer;
+    -webkit-user-select: none;
     user-select: none;
     transition: background var(--transition-fast);
 }

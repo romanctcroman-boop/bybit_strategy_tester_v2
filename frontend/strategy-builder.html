@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="./css/components.css?v=20260204d" />
   <link rel="stylesheet" href="./css/common.css?v=20260204d" />
   <link rel="stylesheet" href="./css/strategy_builder.css?v=20260314b" />
+  <link rel="stylesheet" href="./css/optimization_components.css?v=20260412a" />
 
   <!-- auto-event-binding.js removed - using native event listeners in strategy_builder.js -->
 </head>
@@ -451,19 +452,57 @@
               <button class="btn btn-primary w-100 mt-3" id="btnStartOptimization">
                 <i class="bi bi-play-fill"></i> Start Optimization
               </button>
+            </div>
 
-              <!-- Progress bar — shown while optimization is running -->
-              <div id="optProgressSection">
-                <div class="opt-progress-container opt-progress-container--compact">
-                  <div class="opt-progress-header">
-                    <span class="opt-progress-label">Optimizing...</span>
-                    <span id="optProgressPercent" class="opt-progress-value">0%</span>
+            <!-- Progress bar — OUTSIDE optimizationConfigSection so OptimizationConfigPanel doesn't overwrite it -->
+            <div id="optProgressSection">
+              <div class="opt-progress-container opt-progress-container--compact">
+                <!-- Stage steps -->
+                <div class="opt-stages">
+                  <div class="opt-stage active" id="optStage1">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Data</span>
                   </div>
-                  <div class="opt-progress-bar">
-                    <div id="optProgressFill" class="opt-progress-fill" style="width:0%"></div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage2">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Compile</span>
                   </div>
-                  <div id="optProgressDetails"></div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage3">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Search</span>
+                  </div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage4">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Done</span>
+                  </div>
                 </div>
+                <!-- Progress bar -->
+                <div class="opt-progress-header">
+                  <span class="opt-progress-label" id="optProgressLabel">Initializing...</span>
+                  <span id="optProgressPercent" class="opt-progress-value">0%</span>
+                </div>
+                <div class="opt-progress-bar">
+                  <div id="optProgressFill" class="opt-progress-fill" style="width:0%"></div>
+                </div>
+                <!-- Stats row: speed · ETA · best score -->
+                <div class="opt-stats-row">
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">Speed</span>
+                    <span class="opt-stat-value" id="optStatSpeed">—</span>
+                  </div>
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">ETA</span>
+                    <span class="opt-stat-value" id="optStatEta">—</span>
+                  </div>
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">Best score</span>
+                    <span class="opt-stat-value" id="optStatScore">—</span>
+                  </div>
+                </div>
+                <div id="optProgressDetails"></div>
               </div>
             </div>
           </div>
@@ -707,7 +746,7 @@
       <script src="./js/pages/strategy_builder_debug.js"></script>
       <script type="module" src="./js/pages/strategy_builder.js?v=20260330g"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
-      <script src="./js/pages/optimization_panels.js?v=1773520393"></script>
+      <script src="./js/pages/optimization_panels.js?v=20260412b"></script>
       <script type="module" src="./js/pages/optimization.js"></script>
       <script src="./js/pages/evaluation_criteria_panel.js?v=20260204"></script>
       <script src="./js/pages/optimization_config_panel.js?v=1773520393"></script>

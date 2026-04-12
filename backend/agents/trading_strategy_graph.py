@@ -1763,7 +1763,11 @@ class MemoryUpdateNode(AgentNode):
         timeframe = state.context.get("timeframe", "15")
         selected_agent = select_result.get("selected_agent", "unknown")
         strategy = select_result.get("selected_strategy")
-        strategy_name = getattr(strategy, "strategy_name", "unknown")
+        strategy_name = (
+            getattr(strategy, "strategy_name", None)
+            or (strategy.get("name") if isinstance(strategy, dict) else None)
+            or "unknown"
+        )
         sharpe = metrics.get("sharpe_ratio", 0.0)
         dd = metrics.get("max_drawdown", 0.0)
         trades = metrics.get("total_trades", 0)
@@ -4196,7 +4200,8 @@ async def run_strategy_pipeline(
     # seed_graph passed explicitly → optimize mode (caller already loaded it)
     # neither → create mode
     pipeline_mode = "create"
-    if existing_strategy_id:
+    if existing_strategy_id and seed_graph is None:
+        # seed_graph already provided by caller (e.g. BuilderWorkflow pre-loaded it) — skip DB fetch
         logger.info(f"[Pipeline] OPTIMIZE mode — loading strategy {existing_strategy_id} from DB")
         loaded = await _load_strategy_graph_from_db(existing_strategy_id)
         if loaded is not None:
@@ -4208,6 +4213,12 @@ async def run_strategy_pipeline(
             )
         else:
             logger.warning(f"[Pipeline] Could not load strategy {existing_strategy_id} — falling back to CREATE mode")
+    elif existing_strategy_id and seed_graph is not None:
+        # seed_graph was pre-loaded by caller — avoid duplicate DB fetch
+        pipeline_mode = "optimize"
+        logger.debug(
+            f"[Pipeline] OPTIMIZE mode — seed_graph pre-loaded by caller, skipping DB fetch for {existing_strategy_id}"
+        )
     elif seed_graph is not None:
         pipeline_mode = "optimize"
 

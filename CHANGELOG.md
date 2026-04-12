@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **fix(agents): 3 bug fixes in trading_strategy_graph.py and optimizer_progress.json (2026-04-12)**
+
+        **Bug 1 — MEDIUM: strategy_name always "unknown" in seed_mode (`backend/agents/trading_strategy_graph.py`, line ~1766)**
+        - `MemoryUpdateNode.execute()`: `getattr(strategy, "strategy_name", "unknown")` returned
+          "unknown" when `selected_strategy` is a dict (as in seed_mode where `select_best` returns
+          `{"name": "RSI_ST_ETHUSDT_01", "seed_mode": True, ...}`).
+        - Fixed: cascading lookup — `getattr` first (object), then `strategy.get("name")` for dicts,
+          fallback to "unknown". Memory now stores the real strategy name in seed/optimize flows.
+
+        **Bug 2 — LOW: Double _load_strategy_graph_from_db call (`backend/agents/trading_strategy_graph.py`, line ~4199)**
+        - When `BuilderWorkflow.run_via_unified_pipeline()` pre-loads `seed_graph` from DB and then
+          passes both `seed_graph=seed_graph` and `existing_strategy_id=...` to `run_strategy_pipeline()`,
+          the pipeline was unconditionally calling `_load_strategy_graph_from_db` again — one extra
+          DB round-trip per optimize run.
+        - Fixed: guard changed from `if existing_strategy_id:` to `if existing_strategy_id and seed_graph is None:`.
+          Added explicit `elif existing_strategy_id and seed_graph is not None:` branch that sets
+          `pipeline_mode = "optimize"` and emits a debug log without re-fetching from DB.
+
+        **Bug 3 — stale entries in `.run/optimizer_progress.json`**
+        - Removed two stale records with key "test" and "test-x", both frozen in status "running"
+          from old debug sessions. All remaining entries are completed/partial with real UUIDs.
+
 ### Added / Changed
 
 - **feat(agents): Unified AI Core — Phases 6–9 complete (2026-04-11)**

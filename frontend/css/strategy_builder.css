@@ -4588,9 +4588,9 @@ body {
     transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* When floating windows are open, move zoom left */
+/* When floating windows are open, move zoom left (panel is 560px wide + 20px gap) */
 body.floating-window-open .zoom-controls {
-    right: 520px;
+    right: 580px;
 }
 
 .zoom-controls.zoom-controls-dragging {

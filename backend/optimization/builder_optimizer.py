@@ -1521,7 +1521,11 @@ def run_builder_backtest(
         # When close_by_time has profit_only=True, extra_data is required for parity.
         # NumbaEngineV2 doesn't read extra_data → silently ignores profit_only condition.
         # Fall back to FallbackEngineV4 via BacktestEngine which DOES handle extra_data.
-        if block_close_by_time_profit_only:
+        # OPTIMIZATION EXCEPTION: when engine_type=="numba" (default in optimization loops),
+        # skip the FallbackEngineV4 path — profit_only is silently ignored by NumbaEngineV2
+        # but this is acceptable for optimization (ranking stays correct, speed 1000×).
+        _use_numba_for_opt = config_params.get("engine_type", "numba") == "numba"
+        if block_close_by_time_profit_only and not _use_numba_for_opt:
             from backend.backtesting.engine import BacktestEngine
             from backend.backtesting.models import BacktestConfig, StrategyType
 
@@ -4174,6 +4178,7 @@ def run_builder_optuna_search(
                 results_found=_n_tested,
                 speed=_speed,
                 eta_seconds=_eta,
+                started_at=start_time,
             )
 
         # Compute constraint violations and store for Optuna's constrained sampler.

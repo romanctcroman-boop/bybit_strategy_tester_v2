@@ -1234,12 +1234,13 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
         try:
             import asyncio as _asyncio
 
-            from backend.database.session import get_session
+            from backend.database import SessionLocal
 
             def _load_strategy() -> dict[str, Any] | None:
-                with get_session() as session:
-                    from backend.database.models.strategy import Strategy as StrategyModel
+                from backend.database.models.strategy import Strategy as StrategyModel
 
+                session = SessionLocal()
+                try:
                     row = session.get(StrategyModel, request.strategy_id)
                     if row is None:
                         return None
@@ -1249,6 +1250,8 @@ async def analyze_existing_strategy(request: AnalyzeStrategyRequest) -> AnalyzeS
                         "connections": row.builder_connections or [],
                         "interval": row.timeframe or request.timeframe,
                     }
+                finally:
+                    session.close()
 
             loaded = await _asyncio.to_thread(_load_strategy)
             if loaded is None:
@@ -1355,41 +1358,24 @@ async def _load_ohlcv_data(
     start_date: str,
     end_date: str,
 ) -> pd.DataFrame:
-    """Load OHLCV data from the database."""
-    import asyncio
+    """Load OHLCV data using BacktestService (same path as optimizer)."""
 
-    from backend.database.repository.kline_repository import KlineRepository
-    from backend.database.session import get_session
+    from backend.backtesting.service import BacktestService
 
-    def _fetch() -> pd.DataFrame:
-        start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() * 1000)
-        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() * 1000)
-        with get_session() as session:
-            repo = KlineRepository(session)
-            klines = repo.get_klines(
-                symbol=symbol,
-                interval=timeframe,
-                start_time=start_ts,
-                end_time=end_ts,
-                limit=100_000,
-                ascending=True,
-            )
-            if not klines:
-                return pd.DataFrame()
-            records = [
-                {
-                    "open_time": k.open_time,
-                    "open": float(k.open_price),
-                    "high": float(k.high_price),
-                    "low": float(k.low_price),
-                    "close": float(k.close_price),
-                    "volume": float(k.volume),
-                }
-                for k in klines
-            ]
-            return pd.DataFrame(records)
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=UTC)
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=UTC)
 
-    df = await asyncio.to_thread(_fetch)
+    service = BacktestService()
+    df = await asyncio.wait_for(
+        service._fetch_historical_data(
+            symbol=symbol,
+            interval=timeframe,
+            start_date=start_dt,
+            end_date=end_dt,
+            market_type="linear",
+        ),
+        timeout=120.0,
+    )
 
     if df is None or df.empty:
         raise ValueError(f"No OHLCV data for {symbol} {timeframe} from {start_date} to {end_date}")

@@ -64,6 +64,8 @@ class OptimizationPanels {
         if (builderStrategyId) {
             // Delay slightly so DOM is ready
             setTimeout(() => this.fetchBuilderOptimizableParams(builderStrategyId), 1500);
+            // Auto-restore progress bar if optimization is already running after page reload
+            setTimeout(() => this._restoreProgressIfRunning(builderStrategyId), 800);
         }
 
         // Listen for startOptimization event from optimization_config_panel.js
@@ -863,6 +865,137 @@ class OptimizationPanels {
     }
 
     /**
+     * On page load: check if optimization is already running for this strategy and restore the progress UI.
+     * This handles the case where the user reloads the page while optimization is in progress.
+     */
+    async _restoreProgressIfRunning(strategyId) {
+        if (!strategyId) return;
+        if (this._builderProgressInterval) return; // already polling
+        try {
+            const res = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/optimize/progress`);
+            if (!res.ok) return;
+            const prog = await res.json();
+            if (prog.status !== 'running' && prog.status !== 'starting') return;
+
+            // Optimization is active — restore UI
+            console.log('[OptPanels] Restoring progress UI for running optimization', prog);
+            const btn = document.getElementById('btnStartOptimization');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Running...';
+            }
+            const section = document.getElementById('optProgressSection');
+            if (section) section.style.display = 'block';
+            // Open the Optimization floating window
+            const optWin = document.getElementById('floatingWindowOptimization');
+            if (optWin) optWin.classList.remove('floating-window-collapsed');
+
+            this.state.isRunning = true;
+            this._optimizationStartTime = prog.started_at || (Date.now() / 1000 - 60);
+
+            // Start polling
+            this._builderProgressInterval = setInterval(async () => {
+                try {
+                    const pRes = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/optimize/progress`);
+                    if (!pRes.ok) return;
+                    const p = await pRes.json();
+                    if (p.status !== 'running' && p.status !== 'starting') {
+                        clearInterval(this._builderProgressInterval);
+                        this._builderProgressInterval = null;
+                        // If completed, update final state
+                        if (p.status === 'completed' || p.status === 'partial') {
+                            const section = document.getElementById('optProgressSection');
+                            const fillEl = document.getElementById('optProgressFill');
+                            const pctEl = document.getElementById('optProgressPercent');
+                            const labelEl = document.getElementById('optProgressLabel');
+                            const detailsEl = document.getElementById('optProgressDetails');
+                            if (fillEl) fillEl.style.width = '100%';
+                            if (pctEl) pctEl.textContent = '100%';
+                            if (labelEl) labelEl.textContent = 'Completed!';
+                            if (detailsEl) detailsEl.textContent = `Done — ${(p.results_found || p.total || 0).toLocaleString()} results`;
+                            ['optStage1','optStage2','optStage3','optStage4'].forEach(id => {
+                                const el = document.getElementById(id);
+                                if (el) { el.classList.remove('active'); el.classList.add('completed'); }
+                            });
+                            const bBtn = document.getElementById('btnStartOptimization');
+                            if (bBtn) { bBtn.disabled = false; bBtn.innerHTML = '<i class="bi bi-play-fill"></i> Start Optimization'; }
+                            this.state.isRunning = false;
+                            setTimeout(() => { if (section) section.style.display = 'none'; }, 3000);
+                        }
+                        return;
+                    }
+                    // Re-use the same progress update logic as the main polling loop
+                    this._applyProgressUpdate(p);
+                } catch (_e) { /* ignore */ }
+            }, 2000);
+        } catch (_e) {
+            console.debug('[OptPanels] Progress restore check failed:', _e);
+        }
+    }
+
+    /**
+     * Apply a progress data object to the progress UI elements.
+     * Shared between the main polling loop and the restore-on-reload path.
+     */
+    _applyProgressUpdate(prog) {
+        const pct = prog.percent || 0;
+        const tested = prog.tested || 0;
+        const total = prog.total || 0;
+        const speed = prog.speed || 0;
+        const eta = prog.eta_seconds || 0;
+
+        const fillEl = document.getElementById('optProgressFill');
+        const pctEl = document.getElementById('optProgressPercent');
+        const labelEl = document.getElementById('optProgressLabel');
+        const detailsEl = document.getElementById('optProgressDetails');
+        const speedEl = document.getElementById('optStatSpeed');
+        const etaEl = document.getElementById('optStatEta');
+        const scoreEl = document.getElementById('optStatScore');
+
+        if (fillEl) fillEl.style.width = `${pct}%`;
+        if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+
+        let stageIdx = 0;
+        if (prog.status === 'starting') stageIdx = 0;
+        else if (prog.status === 'running' && tested === 0) stageIdx = 1;
+        else if (prog.status === 'running' && tested > 0) stageIdx = 2;
+        else if (prog.status === 'completed' || prog.status === 'partial') stageIdx = 3;
+
+        const _stageNames = ['Loading data', 'Compiling', 'Searching', 'Done'];
+        ['optStage1','optStage2','optStage3','optStage4'].forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('active','completed');
+            if (i < stageIdx) el.classList.add('completed');
+            else if (i === stageIdx) el.classList.add('active');
+        });
+
+        if (labelEl) labelEl.textContent = _stageNames[stageIdx] + '...';
+        if (speedEl) speedEl.textContent = speed > 0 ? `${speed.toLocaleString()} c/s` : '—';
+        if (etaEl) {
+            if (eta > 3600) etaEl.textContent = `${Math.floor(eta/3600)}h ${Math.floor((eta%3600)/60)}m`;
+            else if (eta > 60) etaEl.textContent = `${Math.floor(eta/60)}m ${Math.round(eta%60)}s`;
+            else if (eta > 0) etaEl.textContent = `${eta}s`;
+            else etaEl.textContent = '—';
+        }
+        if (scoreEl) {
+            const sc = prog.best_score;
+            scoreEl.textContent = (sc !== undefined && sc !== null && sc !== 0)
+                ? (typeof sc === 'number' ? sc.toFixed(4) : String(sc))
+                : '—';
+        }
+        if (detailsEl) {
+            if (prog.status === 'starting') {
+                detailsEl.textContent = 'Loading market data...';
+            } else if (prog.status === 'running' && total > 0 && tested === 0) {
+                detailsEl.textContent = `Preparing... ${total.toLocaleString()} combos total`;
+            } else if (prog.status === 'running' && total > 0) {
+                detailsEl.textContent = `${tested.toLocaleString()} / ${total.toLocaleString()} trials`;
+            }
+        }
+    }
+
+    /**
      * Start optimization — routes to Builder endpoint or classic endpoint
      * - Builder strategies: POST /api/v1/strategy-builder/strategies/{id}/optimize
      * - Classic strategies: POST /api/v1/optimizations/sync/grid-search or optuna-search
@@ -1037,35 +1170,9 @@ class OptimizationPanels {
                         return;
                     }
                     if (prog.status === 'running' || prog.status === 'starting' || prog.status === 'completed' || prog.status === 'partial') {
-                        const pct = prog.percent || 0;
-
-                        // Update progress bar inside Optimization panel (not Results)
                         const section = document.getElementById('optProgressSection');
-                        const fillEl = document.getElementById('optProgressFill');
-                        const pctEl = document.getElementById('optProgressPercent');
-                        const detailsEl = document.getElementById('optProgressDetails');
-
                         if (section) section.style.display = 'block';
-                        if (fillEl) fillEl.style.width = `${pct}%`;
-                        if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
-
-                        if (detailsEl) {
-                            const tested = prog.tested || 0;
-                            const total = prog.total || 0;
-                            const speed = prog.speed || 0;
-                            const eta = prog.eta_seconds || 0;
-                            if (prog.status === 'starting') {
-                                detailsEl.textContent = 'Loading market data...';
-                            } else if (prog.status === 'running' && total > 0 && tested === 0) {
-                                // JIT compiling or just started
-                                detailsEl.textContent = `Preparing... ${total.toLocaleString()} combos total`;
-                            } else if (prog.status === 'running' && total > 0) {
-                                const etaText = eta > 60 ? `${Math.floor(eta / 60)}m ${Math.round(eta % 60)}s` : `${eta}s`;
-                                detailsEl.textContent = `${tested.toLocaleString()}/${total.toLocaleString()} · ${speed.toLocaleString()} c/s · ETA ${etaText}`;
-                            } else if (prog.status === 'completed') {
-                                detailsEl.textContent = `Done — ${total.toLocaleString()} combos`;
-                            }
-                        }
+                        this._applyProgressUpdate(prog);
                     }
                 } catch (_e) {
                     console.debug('[OptPanels] Progress poll error:', _e);
@@ -1746,10 +1853,24 @@ class OptimizationPanels {
             const fillEl = document.getElementById('optProgressFill');
             const pctEl = document.getElementById('optProgressPercent');
             const detailsEl = document.getElementById('optProgressDetails');
+            const labelEl = document.getElementById('optProgressLabel');
             if (section) section.style.display = 'block';
             if (fillEl) fillEl.style.width = '0%';
             if (pctEl) pctEl.textContent = '0%';
+            if (labelEl) labelEl.textContent = 'Initializing...';
             if (detailsEl) detailsEl.textContent = 'Starting... (Numba JIT compile ~30s first run)';
+            // Reset stage dots to initial state
+            ['optStage1', 'optStage2', 'optStage3', 'optStage4'].forEach((id, i) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.classList.remove('active', 'completed');
+                if (i === 0) el.classList.add('active');
+            });
+            // Reset stats
+            ['optStatSpeed', 'optStatEta', 'optStatScore'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '—';
+            });
         }
         // When stopping: handleOptimizationComplete will hide progress bar and open Results panel
     }
