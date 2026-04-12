@@ -1310,8 +1310,11 @@ class BacktestNode(AgentNode):
             from backend.agents.self_improvement.agent_tracker import AgentPerformanceTracker
 
             tracker = AgentPerformanceTracker()
-            selected_agent = select_result.get("selected_agent", "unknown")
-            strategy_type = getattr(bridge_strategy, "strategy_type", "unknown")
+            # In seed_mode select_result / bridge_strategy may be unbound — read from state
+            _sr = state.get_result("select_best") or {}
+            selected_agent = _sr.get("selected_agent", "unknown")
+            _bs = locals().get("bridge_strategy")
+            strategy_type = getattr(_bs, "strategy_type", "seed") if _bs else "seed"
             sharpe = metrics.get("sharpe_ratio", 0.0)
             passed = metrics.get("total_trades", 0) >= 5 and sharpe > 0 and metrics.get("max_drawdown", 100) < 30
             tracker.record_result(
@@ -4201,7 +4204,7 @@ async def run_strategy_pipeline(
     # neither → create mode
     pipeline_mode = "create"
     if existing_strategy_id and seed_graph is None:
-        # seed_graph already provided by caller (e.g. BuilderWorkflow pre-loaded it) — skip DB fetch
+        # seed_graph not yet loaded — fetch from DB now
         logger.info(f"[Pipeline] OPTIMIZE mode — loading strategy {existing_strategy_id} from DB")
         loaded = await _load_strategy_graph_from_db(existing_strategy_id)
         if loaded is not None:
