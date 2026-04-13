@@ -422,5 +422,152 @@ class TestMTFIntegration:
         assert np.sum(short_entries[:warmup]) == 0
 
 
+# ---------------------------------------------------------------------------
+# B3 — MTF commission passthrough regression test
+# ---------------------------------------------------------------------------
+
+
+class TestMTFCommissionPassthrough:
+    """
+    B3: MTFOptimizer.optimize() accepted the `commission` param but never
+    forwarded it to BacktestInput.
+
+    Before fix: BacktestInput always received the default taker_fee (0.0004)
+    regardless of what the caller passed as the commission argument.
+    After fix: taker_fee=commission is passed explicitly.
+
+    Strategy: patch BacktestInput at the import site inside mtf_optimizer so
+    we can capture the kwargs it was called with, then verify taker_fee equals
+    the fee value we passed in.
+    """
+
+    # ------------------------------------------------------------------ helpers
+
+    @staticmethod
+    def _make_candles(n: int = 200, seed: int = 0) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        close = 100.0 + np.cumsum(rng.normal(0, 0.5, n))
+        high = close + rng.uniform(0.1, 0.5, n)
+        low = close - rng.uniform(0.1, 0.5, n)
+        idx = pd.date_range("2025-01-01", periods=n, freq="5min")
+        return pd.DataFrame({"open": close, "high": high, "low": low, "close": close, "volume": 1000.0}, index=idx)
+
+    @staticmethod
+    def _make_htf_index_map(n_ltf: int, ratio: int = 12) -> np.ndarray:
+        """LTF→HTF map with 1-bar delay (lookahead prevention)."""
+        htf_map = np.array([(i // ratio) - 1 for i in range(n_ltf)])
+        return np.maximum(htf_map, -1)
+
+    # ------------------------------------------------------------------ tests
+
+    def test_custom_fee_forwarded_to_backtest_input(self):
+        """
+        A non-default fee rate must reach BacktestInput as taker_fee.
+
+        Before fix (B3): BacktestInput was constructed without taker_fee, so the
+        caller's commission arg was silently discarded.
+        """
+        from unittest.mock import MagicMock, patch
+
+        calls = []
+
+        def capturing_backtest_input(*args, **kwargs):
+            calls.append(kwargs)
+            mock = MagicMock()
+            return mock
+
+        ltf = self._make_candles(200)
+        htf_ratio = 12
+        n_htf = len(ltf) // htf_ratio
+        htf = self._make_candles(n_htf, seed=1)
+        htf_map = self._make_htf_index_map(len(ltf), htf_ratio)
+
+        # Use a non-default taker fee to verify it's forwarded
+        test_fee = 0.002  # deliberately different from the 0.0007 default
+
+        with patch("backend.backtesting.mtf_optimizer.BacktestInput", side_effect=capturing_backtest_input):
+            with patch("backend.backtesting.mtf_optimizer.FallbackEngineV4") as mock_engine_cls:
+                mock_engine = MagicMock()
+                mock_result = MagicMock()
+                mock_result.metrics = MagicMock()
+                mock_result.metrics.to_dict.return_value = {"sharpe_ratio": 1.0, "net_profit": 100.0}
+                mock_engine.run.return_value = mock_result
+                mock_engine_cls.return_value = mock_engine
+
+                from backend.backtesting.mtf_optimizer import MTFOptimizer
+
+                optimizer = MTFOptimizer()
+                optimizer.optimize(
+                    ltf_candles=ltf,
+                    htf_candles=htf,
+                    htf_index_map=htf_map,
+                    commission=test_fee,
+                    rsi_period_range=[14],
+                    stop_loss_range=[0.02],
+                    take_profit_range=[0.03],
+                    direction="long",
+                )
+
+        assert calls, "BacktestInput was never called — optimizer did not reach backtest step"
+        for call_kwargs in calls:
+            assert "taker_fee" in call_kwargs, (
+                "BacktestInput must receive taker_fee kwarg. "
+                "Before B3 fix it was missing (commission arg silently ignored)."
+            )
+            assert call_kwargs["taker_fee"] == test_fee, (
+                f"Expected taker_fee={test_fee!r}, got {call_kwargs.get('taker_fee')!r}. "
+                "B3 regression: commission not forwarded to BacktestInput."
+            )
+
+    def test_default_commission_forwarded(self):
+        """
+        When commission is left at default (0.0007), taker_fee=0.0007 must still
+        be passed explicitly (not rely on BacktestInput default).
+        """
+        from unittest.mock import MagicMock, patch
+
+        calls = []
+
+        def capturing_backtest_input(*args, **kwargs):
+            calls.append(kwargs)
+            mock = MagicMock()
+            return mock
+
+        ltf = self._make_candles(200)
+        htf_ratio = 12
+        n_htf = len(ltf) // htf_ratio
+        htf = self._make_candles(n_htf, seed=2)
+        htf_map = self._make_htf_index_map(len(ltf), htf_ratio)
+
+        with patch("backend.backtesting.mtf_optimizer.BacktestInput", side_effect=capturing_backtest_input):
+            with patch("backend.backtesting.mtf_optimizer.FallbackEngineV4") as mock_engine_cls:
+                mock_engine = MagicMock()
+                mock_result = MagicMock()
+                mock_result.metrics = MagicMock()
+                mock_result.metrics.to_dict.return_value = {"sharpe_ratio": 0.5, "net_profit": 50.0}
+                mock_engine.run.return_value = mock_result
+                mock_engine_cls.return_value = mock_engine
+
+                from backend.backtesting.mtf_optimizer import MTFOptimizer
+
+                optimizer = MTFOptimizer()
+                # commission left at default (0.0007)
+                optimizer.optimize(
+                    ltf_candles=ltf,
+                    htf_candles=htf,
+                    htf_index_map=htf_map,
+                    rsi_period_range=[14],
+                    stop_loss_range=[0.02],
+                    take_profit_range=[0.03],
+                    direction="long",
+                )
+
+        assert calls, "BacktestInput was never called"
+        for call_kwargs in calls:
+            assert call_kwargs.get("taker_fee") == 0.0007, (
+                f"Default fee must be forwarded as taker_fee=0.0007, got {call_kwargs.get('taker_fee')}"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

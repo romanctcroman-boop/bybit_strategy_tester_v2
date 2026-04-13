@@ -309,8 +309,8 @@ class StopLossManager:
         elif stop.stop_type == StopLossType.ATR_BASED and current_atr:
             self._update_atr_stop(stop, current_price, current_atr)
 
-        # Check breakeven
-        if stop.stop_type == StopLossType.BREAKEVEN or not stop.is_at_breakeven:
+        # Check breakeven — only for BREAKEVEN stops that haven't moved yet
+        if stop.stop_type == StopLossType.BREAKEVEN and not stop.is_at_breakeven:
             self._check_breakeven(stop, current_price)
 
         return False
@@ -470,7 +470,7 @@ class StopLossManager:
     def cancel_stop(self, stop_id: str) -> bool:
         """Cancel a stop order."""
         stop = self.stops.get(stop_id)
-        if stop and stop.state == StopLossState.ACTIVE:
+        if stop and stop.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN):
             stop.state = StopLossState.CANCELLED
             stop.updated_at = datetime.now(UTC)
             logger.info(f"Stop cancelled: {stop_id}")

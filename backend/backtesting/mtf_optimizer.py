@@ -270,10 +270,10 @@ class MTFOptimizer:
             logger.info(f"🔧 MTF Optimization: {total_combinations} combinations")
 
         # Precompute HTF indicators (stored for potential future use)
-        precomputed = self._precompute_htf_indicators(htf_candles, htf_filter_types, htf_filter_periods)
+        _precomputed = self._precompute_htf_indicators(htf_candles, htf_filter_types, htf_filter_periods)
 
         # Prepare data (stored for potential future use)
-        htf_close = htf_candles["close"].values.astype(float)
+        _htf_close = htf_candles["close"].values.astype(float)
 
         # Results storage
         all_results: list[dict[str, Any]] = []
@@ -327,6 +327,7 @@ class MTFOptimizer:
                     stop_loss=sl,
                     take_profit=tp,
                     direction=TradeDirection(direction),
+                    taker_fee=commission,
                 )
 
                 engine = FallbackEngineV4()

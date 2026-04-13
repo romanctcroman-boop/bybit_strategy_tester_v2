@@ -8,7 +8,7 @@ Pre-trade checks for position sizing, exposure, and strategy constraints.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -489,7 +489,15 @@ class TradeValidator:
 
         # Minimum interval between trades
         if account_state.last_trade_time:
-            elapsed = (datetime.now() - account_state.last_trade_time).total_seconds()
+            _last = account_state.last_trade_time
+            # Normalise: always compare in the same timezone domain
+            if getattr(_last, "tzinfo", None) is not None:
+                # last_trade_time is aware → use UTC-aware now for correct delta
+                _now = datetime.now(UTC)
+            else:
+                # last_trade_time is naive → use naive now
+                _now = datetime.now()
+            elapsed = (_now - _last).total_seconds()
             if elapsed < self.config.min_trade_interval_seconds:
                 errors.append(RejectionReason.COOLDOWN_ACTIVE)
 
