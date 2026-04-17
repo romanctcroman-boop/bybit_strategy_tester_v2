@@ -122,7 +122,7 @@ class TestResponseParserIntegration:
     def test_parse_valid_json_response(self):
         """Valid JSON response parsed into StrategyDefinition."""
         parser = ResponseParser()
-        strategy = parser.parse_strategy(MOCK_LLM_RESPONSE, agent_name="deepseek")
+        strategy = parser.parse_strategy(MOCK_LLM_RESPONSE, agent_name="claude")
         assert strategy is not None
         assert strategy.strategy_name == "RSI Momentum v1"
         assert len(strategy.signals) == 1
@@ -132,7 +132,7 @@ class TestResponseParserIntegration:
         """JSON wrapped in markdown code block parsed correctly."""
         parser = ResponseParser()
         markdown_response = f"Here's my strategy:\n\n```json\n{MOCK_LLM_RESPONSE}\n```\n\nThis should work well."
-        strategy = parser.parse_strategy(markdown_response, agent_name="qwen")
+        strategy = parser.parse_strategy(markdown_response, agent_name="claude")
         assert strategy is not None
         assert strategy.strategy_name == "RSI Momentum v1"
 
@@ -181,7 +181,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
             )
 
@@ -216,7 +216,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=True,
             )
 
@@ -256,7 +256,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek", "qwen"],
+                agents=["claude", "perplexity"],
                 run_backtest=False,
             )
 
@@ -281,7 +281,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
             )
 
@@ -305,7 +305,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
             )
 
         serialized = result.to_dict()
@@ -331,7 +331,7 @@ class TestStrategyControllerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agent="deepseek",
+                agent="claude",
             )
 
         assert strategy is not None
@@ -403,7 +403,7 @@ class TestPipelineToOptimizerIntegration:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=True,
             )
 
@@ -471,7 +471,7 @@ class TestPipelineErrorRecovery:
             symbol="BTCUSDT",
             timeframe="15",
             df=empty_df,
-            agents=["deepseek"],
+            agents=["claude"],
         )
 
         assert not result.success
@@ -493,7 +493,7 @@ class TestPipelineErrorRecovery:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
             )
 
         assert not result.success
@@ -523,7 +523,7 @@ class TestPipelineErrorRecovery:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=True,
             )
 

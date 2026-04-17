@@ -178,12 +178,12 @@ class AgentOrchestrator:
 
     # Agent capability mapping
     AGENT_CAPABILITIES: dict[str, list[AgentCapability]] = {
-        "deepseek": [
+        "claude": [
             AgentCapability.CODE_GENERATION,
             AgentCapability.DATA_ANALYSIS,
             AgentCapability.VALIDATION,
         ],
-        "qwen": [
+        "claude": [
             AgentCapability.CODE_GENERATION,
             AgentCapability.STRATEGY_OPTIMIZATION,
             AgentCapability.EXPLANATION,

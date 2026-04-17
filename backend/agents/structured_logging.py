@@ -2,7 +2,7 @@
 Structured Logging with Correlation IDs
 
 Provides correlation ID propagation across all agent calls for distributed tracing.
-Addresses audit finding: "Need structured logging with correlation IDs" (DeepSeek+Perplexity, P1)
+Addresses audit finding: "Need structured logging with correlation IDs" (Claude+Perplexity, P1)
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def agent_log(
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR)
         message: Log message
-        agent: Agent name (deepseek, qwen, perplexity)
+        agent: Agent name (claude, perplexity)
         component: Component name (key_pool, rate_limiter, memory)
         extra: Additional structured data
     """

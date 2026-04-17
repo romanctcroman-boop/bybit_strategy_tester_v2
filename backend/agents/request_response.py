@@ -26,7 +26,7 @@ class AgentRequest:
     """
     Unified request to an agent.
 
-    Supports both DeepSeek and Perplexity with proper formatting.
+    Supports both Claude and Perplexity with proper formatting.
     Includes thinking mode, strict mode, and streaming options.
     """
 
@@ -35,8 +35,8 @@ class AgentRequest:
     prompt: str
     code: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
-    thinking_mode: bool = False  # DeepSeek V3.2 Thinking Mode (CoT) — disabled by default for cost
-    strict_mode: bool = False  # DeepSeek Strict Mode for guaranteed JSON
+    thinking_mode: bool = False  # Claude V3.2 Thinking Mode (CoT) — disabled by default for cost
+    strict_mode: bool = False  # Claude Strict Mode for guaranteed JSON
     stream: bool = False  # Enable streaming for real-time output
 
     # Unsafe patterns for prompt injection protection
@@ -62,30 +62,32 @@ class AgentRequest:
         """
         Convert to direct API format.
 
-        DeepSeek V3.2 improvements:
+        Claude V3.2 improvements:
         - Thinking mode with reasoning_content
         - Optimized sampling params
         - Developer role for search scenarios
         """
-        if self.agent_type == AgentType.DEEPSEEK:
-            return self._build_deepseek_payload(include_tools)
+        if self.agent_type == AgentType.CLAUDE:
+            return self._build_claude_payload(include_tools)
         else:
             return self._build_perplexity_payload()
 
-    def _build_deepseek_payload(self, include_tools: bool) -> dict[str, Any]:
-        """Build DeepSeek API payload.
+    def _build_claude_payload(self, include_tools: bool) -> dict[str, Any]:
+        """Build Claude API payload.
 
-        Cost protection: deepseek-reasoner is blocked unless
-        DEEPSEEK_ALLOW_REASONER=true is set in env.
+        Cost protection: claude-sonnet with extended thinking is blocked unless
+        CLAUDE_ALLOW_REASONER=true is set in env.
         """
         # Cost guard: block reasoner unless explicitly allowed
-        allow_reasoner = os.getenv("DEEPSEEK_ALLOW_REASONER", "false").lower() == "true"
+        allow_reasoner = os.getenv("CLAUDE_ALLOW_REASONER", "false").lower() == "true"
         use_thinking = self.thinking_mode and allow_reasoner
 
         if self.thinking_mode and not allow_reasoner:
-            logger.warning("⚠️ deepseek-reasoner blocked (DEEPSEEK_ALLOW_REASONER=false). Using deepseek-chat instead.")
+            logger.warning(
+                "⚠️ Claude extended thinking blocked (CLAUDE_ALLOW_REASONER=false). Using claude-haiku-4-5-20251001 instead."
+            )
 
-        model = "deepseek-reasoner" if use_thinking else "deepseek-chat"
+        model = "claude-sonnet-4-20250514" if use_thinking else "claude-haiku-4-5-20251001"
         max_tokens = 16000 if use_thinking else 4000
 
         # V3.2 recommended sampling params
@@ -115,7 +117,7 @@ class AgentRequest:
         if include_tools and use_file_access:
             tools = self._get_mcp_tools_definition(strict_mode=self.strict_mode)
             payload["tools"] = tools
-            logger.info(f"🔧 Added {len(tools)} MCP tools to DeepSeek request")
+            logger.info(f"🔧 Added {len(tools)} MCP tools to Claude request")
 
         return payload
 
@@ -215,7 +217,7 @@ class AgentRequest:
 
     @staticmethod
     def _get_mcp_tools_definition(strict_mode: bool = False) -> list[dict[str, Any]]:
-        """Get MCP file access tools definition for DeepSeek."""
+        """Get MCP file access tools definition for Claude."""
         tools = [
             {
                 "type": "function",
@@ -308,9 +310,9 @@ class TokenUsage:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
-    reasoning_tokens: int = 0  # DeepSeek V3.2: tokens in reasoning_content
+    reasoning_tokens: int = 0  # Claude V3.2: tokens in reasoning_content
     cost_usd: float | None = None  # Perplexity returns cost directly
-    # DeepSeek Context Caching (V3.2)
+    # Claude Context Caching (V3.2)
     cache_hit_tokens: int = 0
     cache_miss_tokens: int = 0
     cache_savings_pct: float = 0.0
@@ -329,8 +331,8 @@ class TokenUsage:
         }
 
     @classmethod
-    def from_deepseek_response(cls, usage: dict) -> "TokenUsage":
-        """Parse from DeepSeek API response."""
+    def from_claude_response(cls, usage: dict) -> "TokenUsage":
+        """Parse from Claude API response."""
         return cls(
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
@@ -358,7 +360,7 @@ class AgentResponse:
     Contains:
     - Response content
     - Metadata (latency, channel, etc.)
-    - Optional reasoning content (DeepSeek thinking mode)
+    - Optional reasoning content (Claude thinking mode)
     - Optional tool calls
     - Optional citations (Perplexity)
     """
@@ -370,7 +372,7 @@ class AgentResponse:
     latency_ms: float = 0
     error: str | None = None
     timestamp: float = field(default_factory=time.time)
-    reasoning_content: str | None = None  # DeepSeek V3.2 Thinking Mode CoT
+    reasoning_content: str | None = None  # Claude V3.2 Thinking Mode CoT
     tool_calls: list[dict] | None = None
     tokens_used: TokenUsage | None = None
     citations: list[str] | None = None  # Perplexity: list of source URLs

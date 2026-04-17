@@ -386,7 +386,7 @@ class DashboardDataProvider:
         health_status = {
             "overall": "healthy",
             "components": {
-                "deepseek_api": {"status": "healthy", "latency_ms": 450},
+                "claude_api": {"status": "healthy", "latency_ms": 450},
                 "perplexity_api": {"status": "healthy", "latency_ms": 380},
                 "memory_system": {"status": "healthy", "items": 265},
                 "consensus_engine": {"status": "healthy", "confidence": 0.92},
@@ -412,7 +412,7 @@ class DashboardDataProvider:
     ) -> WidgetData:
         """Get requests breakdown by agent type"""
         data = {
-            "labels": ["DeepSeek", "Perplexity", "Local"],
+            "labels": ["Claude", "Perplexity", "Local"],
             "values": [150, 80, 45],
         }
         return WidgetData(widget_id=widget.id, data=data)

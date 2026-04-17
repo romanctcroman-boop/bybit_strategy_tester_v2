@@ -9,7 +9,7 @@ Motivation: ZenML incident — runaway agent loop cost $47K in one session.
 Reference: "Cost Circuit Breaker" pattern from production ML systems.
 
 Limits (configurable via env vars):
-    AGENT_COST_LIMIT_PER_CALL=2.00     # single Perplexity/DeepSeek call
+    AGENT_COST_LIMIT_PER_CALL=2.00     # single Perplexity/Claude call
     AGENT_COST_LIMIT_PER_HOUR=20.00    # rolling 60-minute window
     AGENT_COST_LIMIT_PER_DAY=50.00     # rolling 24-hour window
 
@@ -85,8 +85,7 @@ class CostCircuitBreaker:
         # Approximate per-token costs for pre-call estimation (USD/token)
         self._token_costs: dict[str, float] = {
             "perplexity": 0.60 / 1_000_000,  # sonar output rate
-            "deepseek": 0.28 / 1_000_000,  # deepseek-chat output rate
-            "qwen": 1.20 / 1_000_000,  # qwen3-max output rate
+            "claude": 1.20 / 1_000_000,  # claude output rate
         }
 
         logger.info(

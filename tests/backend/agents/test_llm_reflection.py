@@ -59,16 +59,11 @@ class TestLLMReflectionProvider:
     """Test LLMReflectionProvider."""
 
     def test_init_default_provider(self):
-        """Default provider is deepseek."""
+        """Default provider is claude."""
         provider = LLMReflectionProvider()
-        assert provider.provider_name == "deepseek"
+        assert provider.provider_name == "claude"
         assert provider._call_count == 0
         assert provider._error_count == 0
-
-    def test_init_qwen_provider(self):
-        """Can initialize with qwen."""
-        provider = LLMReflectionProvider("qwen")
-        assert provider.provider_name == "qwen"
 
     def test_init_perplexity_provider(self):
         """Can initialize with perplexity."""
@@ -81,9 +76,8 @@ class TestLLMReflectionProvider:
             LLMReflectionProvider("gpt4")
 
     def test_provider_configs_exist(self):
-        """All 3 providers must have configs."""
-        assert "deepseek" in LLMReflectionProvider.PROVIDER_CONFIGS
-        assert "qwen" in LLMReflectionProvider.PROVIDER_CONFIGS
+        """All providers must have configs."""
+        assert "claude" in LLMReflectionProvider.PROVIDER_CONFIGS
         assert "perplexity" in LLMReflectionProvider.PROVIDER_CONFIGS
 
     def test_provider_configs_have_required_fields(self):
@@ -97,14 +91,14 @@ class TestLLMReflectionProvider:
 
     def test_get_system_prompt_default(self):
         """System prompt includes specialization."""
-        provider = LLMReflectionProvider("deepseek")
+        provider = LLMReflectionProvider("claude")
         prompt = provider.get_system_prompt()
         assert "quantitative" in prompt.lower()
 
     def test_get_system_prompt_custom(self):
         """Custom system prompt overrides default."""
         custom = "My custom prompt"
-        provider = LLMReflectionProvider("deepseek", custom_system_prompt=custom)
+        provider = LLMReflectionProvider("claude", custom_system_prompt=custom)
         assert provider.get_system_prompt() == custom
 
     def test_build_reflection_prompt(self):
@@ -119,7 +113,7 @@ class TestLLMReflectionProvider:
         """Initial stats should be zeros."""
         provider = LLMReflectionProvider()
         stats = provider.get_stats()
-        assert stats["provider"] == "deepseek"
+        assert stats["provider"] == "claude"
         assert stats["total_calls"] == 0
         assert stats["errors"] == 0
         assert stats["error_rate"] == 0.0
@@ -202,17 +196,17 @@ class TestLLMSelfReflectionEngine:
     def test_init_default(self):
         """Default initialization."""
         engine = LLMSelfReflectionEngine(api_key="test-key")
-        assert engine._active_provider == "deepseek"
+        assert engine._active_provider == "claude"
         assert engine._fallback_providers == []
 
     def test_init_with_fallbacks(self):
         """Initialization with fallback providers."""
         engine = LLMSelfReflectionEngine(
-            provider_name="deepseek",
-            fallback_providers=["qwen", "perplexity"],
+            provider_name="claude",
+            fallback_providers=["perplexity"],
             api_key="test-key",
         )
-        assert engine._fallback_providers == ["qwen", "perplexity"]
+        assert engine._fallback_providers == ["perplexity"]
 
     def test_is_subclass_of_self_reflection_engine(self):
         """Must be subclass of SelfReflectionEngine."""

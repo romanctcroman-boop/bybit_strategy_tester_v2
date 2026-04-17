@@ -311,7 +311,7 @@ class ResponseParser:
 
     Example:
         parser = ResponseParser()
-        result = parser.parse_strategy(llm_response_text, agent_name="deepseek")
+        result = parser.parse_strategy(llm_response_text, agent_name="claude")
         if result:
             print(result.strategy_name)
             print(result.signals)

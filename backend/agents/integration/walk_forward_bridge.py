@@ -387,7 +387,7 @@ class WalkForwardBridge:
 
         m = output.metrics
         return {
-            "return": m.total_return_pct / 100 if m.total_return_pct else 0,
+            "return": m.total_return / 100 if m.total_return else 0,
             "sharpe": m.sharpe_ratio or 0,
             "max_drawdown": m.max_drawdown_pct / 100 if m.max_drawdown_pct else 0,
             "trades": m.total_trades or 0,

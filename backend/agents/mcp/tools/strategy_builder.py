@@ -912,9 +912,16 @@ async def builder_update_block_params(
         # Coerce boolean-typed params: LLM agents sometimes return 0/1 or "true"/"false"
         # instead of proper JSON booleans. Fix them before saving to prevent validator errors.
         _BOOL_KEYS = {
-            "use_long_range", "use_short_range", "use_cross_level", "use_cross_memory",
-            "use_btc_source", "use_supertrend", "generate_on_trend_change",
-            "activate_breakeven", "close_only_in_profit", "enabled",
+            "use_long_range",
+            "use_short_range",
+            "use_cross_level",
+            "use_cross_memory",
+            "use_btc_source",
+            "use_supertrend",
+            "generate_on_trend_change",
+            "activate_breakeven",
+            "close_only_in_profit",
+            "enabled",
         }
         for _k, _v in existing_params.items():
             if _k in _BOOL_KEYS and not isinstance(_v, bool):

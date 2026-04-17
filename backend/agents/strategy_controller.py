@@ -131,7 +131,7 @@ class StrategyController:
     Coordinates all components:
     - MarketContextBuilder → analyze market data
     - PromptEngineer → create LLM prompts
-    - LLM clients → call DeepSeek/Qwen/Perplexity
+    - LLM clients → call Claude/Claude/Perplexity
     - ResponseParser → parse and validate responses
     - RealLLMDeliberation → multi-agent consensus
     - BacktestBridge → run backtest on selected strategy
@@ -143,7 +143,7 @@ class StrategyController:
             symbol="BTCUSDT",
             timeframe="15",
             df=ohlcv_dataframe,
-            agents=["deepseek", "qwen"],
+            agents=["claude", "claude"],
             run_backtest=True,
         )
 
@@ -177,7 +177,7 @@ class StrategyController:
             symbol: Trading pair (e.g. "BTCUSDT")
             timeframe: Candle interval (e.g. "15", "60", "D")
             df: OHLCV DataFrame with columns: open, high, low, close, volume
-            agents: LLM agents to use (default: ["deepseek"])
+            agents: LLM agents to use (default: ["claude"])
             run_backtest: Whether to backtest the generated strategy
             enable_walk_forward: Whether to run walk-forward validation after backtest
             backtest_config: Additional backtest configuration
@@ -187,12 +187,16 @@ class StrategyController:
             PipelineResult with strategy, validation, and optional backtest results
         """
         if agents is None:
-            agents = ["deepseek"]
+            agents = ["claude"]
 
         if platform_config is None:
+            # Use COMMISSION_TV from constants to preserve TradingView parity
+            # (single source of truth — see .github/copilot-instructions.md §7)
+            from backend.config.constants import COMMISSION_TV
+
             platform_config = {
                 "exchange": "Bybit",
-                "commission": 0.0007,
+                "commission": COMMISSION_TV,
                 "max_leverage": 100,
                 "min_order": 0.001,
                 "available_indicators": [
@@ -510,17 +514,21 @@ class StrategyController:
             km = get_key_manager()
 
             # Map agent name to provider config
+            _LEGACY_ALIAS: dict[str, str] = {}  # No legacy aliases remaining
+            resolved = _LEGACY_ALIAS.get(agent_name, agent_name)
+            if resolved != agent_name:
+                logger.debug(f"Legacy alias '{agent_name}' → '{resolved}'")
+
             provider_configs: dict[str, tuple[LLMProvider, str, str, float]] = {
-                "deepseek": (LLMProvider.DEEPSEEK, "DEEPSEEK_API_KEY", "deepseek-chat", 0.7),
-                "qwen": (LLMProvider.QWEN, "QWEN_API_KEY", "qwen-plus", 0.4),
+                "claude": (LLMProvider.ANTHROPIC, "ANTHROPIC_API_KEY", "claude-haiku-4-5-20251001", 0.7),
                 "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "sonar-pro", 0.7),
             }
 
-            if agent_name not in provider_configs:
+            if resolved not in provider_configs:
                 logger.warning(f"Unknown agent '{agent_name}', skipping")
                 return None
 
-            provider, key_name, model, temperature = provider_configs[agent_name]
+            provider, key_name, model, temperature = provider_configs[resolved]
             api_key = km.get_decrypted_key(key_name)
             if not api_key:
                 logger.warning(f"No API key for {agent_name}")
@@ -789,7 +797,7 @@ class StrategyController:
         symbol: str,
         timeframe: str,
         df: pd.DataFrame,
-        agent: str = "deepseek",
+        agent: str = "claude",
     ) -> StrategyDefinition | None:
         """
         Quick strategy generation with a single agent, no backtest.

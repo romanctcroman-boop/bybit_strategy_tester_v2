@@ -156,7 +156,7 @@ class PerformanceEvaluator:
 
         # Evaluate single response
         metrics = await evaluator.evaluate_response(
-            agent_type="deepseek",
+            agent_type="claude",
             prompt="Explain RSI",
             response=agent_response,
             latency_ms=1500
@@ -281,7 +281,7 @@ class PerformanceEvaluator:
         Evaluate a single agent response
 
         Args:
-            agent_type: Type of agent (deepseek, perplexity, etc.)
+            agent_type: Type of agent (claude, perplexity, etc.)
             prompt: Original prompt
             response: Agent response
             latency_ms: Response latency in milliseconds

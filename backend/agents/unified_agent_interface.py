@@ -3,7 +3,7 @@
 
 Architecture:
 1. MCP Server (primary) → Direct API (fallback)
-2. Automatic decryption of 8 DeepSeek + 8 Qwen + 8 Perplexity API keys
+2. Automatic decryption of Claude + Perplexity API keys
 3. Health checks every 30s
 4. Automatic API key rotation on errors
 5. Unified request format (works via any channel)
@@ -126,13 +126,13 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
             "auto_recoveries": 0,  # Phase 1: Track successful auto-recoveries
             "mcp_breaker_rejections": 0,
             "rate_limit_events": 0,
-            "deepseek_rate_limits": 0,
+            "claude_rate_limits": 0,
             "perplexity_rate_limits": 0,
             "key_pool_alerts": 0,
         }
 
         logger.info("🚀 Unified Agent Interface initialized")
-        logger.info("🛡️ Circuit breakers registered: deepseek_api, perplexity_api, mcp_server")
+        logger.info("🛡️ Circuit breakers registered: claude_api, perplexity_api, mcp_server")
         logger.info("🏥 Health monitoring ready (will start with event loop)")
 
         # Start background health monitoring - lazy initialization
@@ -141,8 +141,8 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
 
     # ensure_monitoring_started, _register_circuit_breakers, _register_health_checks,
     # _handle_pool_alert, _record_rate_limit_event,
-    # _check_deepseek_health, _check_perplexity_health, _check_mcp_health,
-    # _test_key_health, _recover_deepseek, _recover_perplexity, _recover_mcp
+    # _check_claude_health, _check_perplexity_health, _check_mcp_health,
+    # _test_key_health, _recover_claude, _recover_perplexity, _recover_mcp
     # → moved to _health_mixin.py
 
     # _get_retry_after_seconds, get_key_pool_snapshot → moved to _api_mixin.py
@@ -365,8 +365,8 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
             await bridge.initialize()
 
             # Determine which MCP tool to call based on agent type
-            if request.agent_type == AgentType.DEEPSEEK:
-                tool_name = "mcp_agent_to_agent_send_to_deepseek"
+            if request.agent_type == AgentType.CLAUDE:
+                tool_name = "mcp_agent_to_agent_send_to_claude"
             else:  # PERPLEXITY
                 tool_name = "mcp_agent_to_agent_send_to_perplexity"
 
@@ -416,7 +416,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         start_time = time.time()
 
         # Determine circuit breaker name
-        breaker_name = "deepseek_api" if request.agent_type == AgentType.DEEPSEEK else "perplexity_api"
+        breaker_name = "claude_api" if request.agent_type == AgentType.CLAUDE else "perplexity_api"
 
         # Wrap API call with circuit breaker
         try:
@@ -579,8 +579,8 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                         logger.debug(f"   API response keys: {list(data.keys())}")
                         logger.debug(f"   Response data: {json.dumps(data, indent=2)[:500]}...")
 
-                        # Check if agent wants to call tools (DeepSeek only)
-                        if request.agent_type == AgentType.DEEPSEEK:
+                        # Check if agent wants to call tools (Claude only)
+                        if request.agent_type == AgentType.CLAUDE:
                             message = data.get("choices", [{}])[0].get("message", {})
                             logger.debug(f"   Message keys: {list(message.keys())}")
                             tool_calls = message.get("tool_calls")
@@ -623,7 +623,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                                         f"   Tool call #{total_tool_calls}/{tool_call_budget} completed: {tool_name}"
                                     )
 
-                                    # Format tool result for DeepSeek
+                                    # Format tool result for Claude
                                     # If successful, return the actual content/data
                                     # If failed, return error message
                                     if tool_result.get("success"):
@@ -654,16 +654,16 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                                 # Continue iteration loop to get agent's final response
                                 continue
 
-                        # No tool calls (or non-DeepSeek agent) — exit iteration loop
+                        # No tool calls (or non-Claude agent) — exit iteration loop
                         break
 
                     # No more tool calls - extract final content
                     logger.debug(f"🔍 Extracting content from API response. Keys: {list(data.keys())}")
                     content = self._extract_content(data, request.agent_type)
 
-                    # Extract reasoning_content for DeepSeek Thinking Mode
+                    # Extract reasoning_content for Claude Thinking Mode
                     reasoning_content = None
-                    if request.agent_type == AgentType.DEEPSEEK and request.thinking_mode:
+                    if request.agent_type == AgentType.CLAUDE and request.thinking_mode:
                         reasoning_content = self._extract_reasoning_content(data)
                         if reasoning_content:
                             logger.info(f"🧠 Thinking Mode CoT extracted: {len(reasoning_content)} chars")
@@ -751,7 +751,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                         channel=AgentChannel.DIRECT_API,
                         api_key_index=key.index,
                         latency_ms=latency,
-                        reasoning_content=reasoning_content,  # DeepSeek V3.2 Thinking Mode
+                        reasoning_content=reasoning_content,  # Claude Thinking Mode
                         tokens_used=token_usage,  # Token usage tracking
                         citations=citations,  # Perplexity sources
                     )
@@ -897,7 +897,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
     # =========================================================================
     # HIGH-LEVEL API CONVENIENCE METHODS
     # =========================================================================
-    # query_deepseek() and query_perplexity() → moved to _query_mixin.py
+    # query_claude() and query_perplexity() → moved to _query_mixin.py
     # They are available via QueryMixin inheritance.
 
 
@@ -917,11 +917,11 @@ def get_agent_interface() -> UnifiedAgentInterface:
     return _agent_interface
 
 
-async def analyze_with_deepseek(code: str, focus: str = "all") -> AgentResponse:
-    """Quick method for code analysis via DeepSeek"""
+async def analyze_with_claude(code: str, focus: str = "all") -> AgentResponse:
+    """Quick method for code analysis via Claude"""
     interface = get_agent_interface()
     request = AgentRequest(
-        agent_type=AgentType.DEEPSEEK,
+        agent_type=AgentType.CLAUDE,
         task_type="analyze",
         prompt="Analyze this code for issues, bugs, and improvements",
         code=code,

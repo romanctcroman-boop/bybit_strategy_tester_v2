@@ -116,7 +116,7 @@ class TestResponseParser:
 
     def test_parse_strategy_valid_json(self, parser, valid_llm_response):
         """Test parsing a valid LLM response."""
-        result = parser.parse_strategy(valid_llm_response, agent_name="deepseek")
+        result = parser.parse_strategy(valid_llm_response, agent_name="claude")
 
         assert result is not None
         assert result.strategy_name == "RSI Mean Reversion"
@@ -124,7 +124,7 @@ class TestResponseParser:
         assert result.signals[0].type == "RSI"
         assert result.signals[0].params["period"] == 14
         assert result.agent_metadata is not None
-        assert result.agent_metadata.agent_name == "deepseek"
+        assert result.agent_metadata.agent_name == "claude"
 
     def test_parse_strategy_empty_input(self, parser):
         """Test parsing empty string returns None."""
@@ -143,7 +143,7 @@ class TestResponseParser:
                 "signals": [{"id": "s1", "type": "MACD", "params": {"fast_period": 12}}],
             }
         )
-        result = parser.parse_strategy(raw, agent_name="qwen")
+        result = parser.parse_strategy(raw, agent_name="claude")
 
         assert result is not None
         assert result.strategy_name == "Simple MACD"
@@ -327,7 +327,7 @@ class TestPromptEngineer:
         prompt = prompt_engineer.create_strategy_prompt(
             context=ctx,
             platform_config=platform_config,
-            agent_name="deepseek",
+            agent_name="claude",
         )
 
         assert "BTCUSDT" in prompt
@@ -337,8 +337,8 @@ class TestPromptEngineer:
 
     def test_get_system_message(self, prompt_engineer):
         """Test system message generation."""
-        msg_ds = prompt_engineer.get_system_message("deepseek")
-        msg_qw = prompt_engineer.get_system_message("qwen")
+        msg_ds = prompt_engineer.get_system_message("claude")
+        msg_qw = prompt_engineer.get_system_message("claude")
         msg_unknown = prompt_engineer.get_system_message("unknown_agent")
 
         assert len(msg_ds) > 0

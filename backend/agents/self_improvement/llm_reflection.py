@@ -1,7 +1,7 @@
 """
 LLM-backed Self-Reflection Provider
 
-Connects real LLM clients (DeepSeek, Qwen, Perplexity) to the
+Connects real LLM clients (Claude, Perplexity) to the
 SelfReflectionEngine for deep analysis of strategy results.
 
 Instead of heuristic-based reflection, this module sends structured
@@ -9,7 +9,7 @@ prompts to LLMs and parses their analytical responses into
 ReflectionResult components.
 
 Key Features:
-- Multi-provider support (DeepSeek for quantitative, Qwen for technical)
+- Multi-provider support (Claude for quantitative, Perplexity for market context)
 - Structured reflection prompts with trading-specific context
 - Graceful fallback to heuristics when LLM unavailable
 - Response quality validation and scoring
@@ -119,7 +119,7 @@ class LLMReflectionProvider:
     for deep analysis, with graceful fallback to heuristics.
 
     Example:
-        provider = LLMReflectionProvider(provider_name="deepseek")
+        provider = LLMReflectionProvider(provider_name="claude")
         reflection_fn = await provider.get_reflection_fn()
 
         engine = SelfReflectionEngine(reflection_fn=reflection_fn)
@@ -128,19 +128,12 @@ class LLMReflectionProvider:
 
     # Provider-specific configs
     PROVIDER_CONFIGS = {
-        "deepseek": {
-            "model": "deepseek-chat",
+        "claude": {
+            "model": "claude-haiku-4-5-20251001",
             "temperature": 0.4,
             "max_tokens": 1024,
             "system_prompt": REFLECTION_SYSTEM_PROMPT,
             "specialization": "quantitative analysis and risk metrics",
-        },
-        "qwen": {
-            "model": "qwen-plus",
-            "temperature": 0.3,
-            "max_tokens": 1024,
-            "system_prompt": REFLECTION_SYSTEM_PROMPT,
-            "specialization": "technical analysis and pattern recognition",
         },
         "perplexity": {
             "model": "sonar-pro",
@@ -153,7 +146,7 @@ class LLMReflectionProvider:
 
     def __init__(
         self,
-        provider_name: str = "deepseek",
+        provider_name: str = "claude",
         *,
         api_key: str | None = None,
         custom_system_prompt: str | None = None,
@@ -162,7 +155,7 @@ class LLMReflectionProvider:
         Initialize LLM reflection provider.
 
         Args:
-            provider_name: LLM provider ("deepseek", "qwen", "perplexity")
+            provider_name: LLM provider ("claude", "perplexity")
             api_key: Optional API key override
             custom_system_prompt: Optional custom system prompt
         """
@@ -197,8 +190,7 @@ class LLMReflectionProvider:
 
             km = KeyManager()
             key_map = {
-                "deepseek": "DEEPSEEK_API_KEY",
-                "qwen": "DASHSCOPE_API_KEY",
+                "claude": "ANTHROPIC_API_KEY",
                 "perplexity": "PERPLEXITY_API_KEY",
             }
             api_key = km.get_key(key_map.get(self.provider_name, ""))
@@ -208,8 +200,7 @@ class LLMReflectionProvider:
             return None
 
         provider_map = {
-            "deepseek": LLMProvider.DEEPSEEK,
-            "qwen": LLMProvider.QWEN,
+            "claude": LLMProvider.ANTHROPIC,
             "perplexity": LLMProvider.PERPLEXITY,
         }
 
@@ -331,7 +322,7 @@ class LLMSelfReflectionEngine(SelfReflectionEngine):
 
     Example:
         engine = LLMSelfReflectionEngine(
-            provider_name="deepseek",
+            provider_name="claude",
             persist_path="./reflections",
         )
 
@@ -344,7 +335,7 @@ class LLMSelfReflectionEngine(SelfReflectionEngine):
 
     def __init__(
         self,
-        provider_name: str = "deepseek",
+        provider_name: str = "claude",
         *,
         persist_path: str | None = None,
         api_key: str | None = None,

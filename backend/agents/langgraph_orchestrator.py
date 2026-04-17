@@ -122,8 +122,35 @@ class AgentState:
         """Get result from a node execution."""
         return self.results.get(node)
 
+    def check_llm_budget(self, estimated_cost_usd: float = 0.0) -> None:
+        """Pre-flight budget check BEFORE making an LLM call.
+
+        Call this before incurring the cost (e.g. before dispatching an LLM
+        request).  Raises immediately if the projected total would exceed
+        the configured budget — this prevents "one request over the line"
+        leaks that would otherwise be caught only AFTER the money is spent.
+
+        Args:
+            estimated_cost_usd: Expected cost of the upcoming call.  Use 0.0
+                for a pure "am I already over budget?" check.
+
+        Raises:
+            BudgetExceededError: if max_cost_usd > 0 and the projected total
+                would exceed it.
+        """
+        if self.max_cost_usd > 0:
+            projected = self.total_cost_usd + max(0.0, estimated_cost_usd)
+            if projected > self.max_cost_usd:
+                self.budget_exceeded = True
+                raise BudgetExceededError(projected, self.max_cost_usd)
+
     def record_llm_cost(self, cost_usd: float) -> None:
         """Accumulate LLM API cost and increment call counter.
+
+        Note:
+            Prefer calling :meth:`check_llm_budget(estimated)` BEFORE the
+            actual LLM request, then :meth:`record_llm_cost(actual)` after,
+            so budget overruns are caught pre-flight.
 
         Raises:
             BudgetExceededError: if max_cost_usd > 0 and the new total exceeds it.
@@ -252,12 +279,12 @@ class FunctionAgent(AgentNode):
 
 
 class LLMAgent(AgentNode):
-    """Agent that calls an LLM (DeepSeek/Perplexity) for processing."""
+    """Agent that calls an LLM (Claude/Perplexity) for processing."""
 
     def __init__(
         self,
         name: str,
-        agent_type: str = "deepseek",  # "deepseek" or "perplexity"
+        agent_type: str = "claude",  # "claude" or "perplexity"
         system_prompt: str = "",
         description: str = "",
         **kwargs,
@@ -267,14 +294,22 @@ class LLMAgent(AgentNode):
         self.system_prompt = system_prompt
 
     async def execute(self, state: AgentState) -> AgentState:
-        """Execute LLM call."""
+        """Execute LLM call via AgentToAgentCommunicator.route_message().
+
+        Fix 2026-04-17: previous implementation called a non-existent
+        ``async_send_message`` method and crashed at runtime. Now builds a proper
+        ``AgentMessage`` and routes it through the communicator, which handles
+        provider selection, key pool, circuit breakers, and retries.
+        """
         try:
-            # Import agent communicator
+            # Import agent communicator (lazy to avoid circular deps)
+            import uuid as _uuid
+
             from backend.agents.agent_to_agent_communicator import (
-                AgentType,
-                MessageType,
+                AgentMessage,
                 get_communicator,
             )
+            from backend.agents.models import AgentType, MessageType
 
             communicator = get_communicator()
 
@@ -285,20 +320,30 @@ class LLMAgent(AgentNode):
             if self.system_prompt:
                 prompt = f"{self.system_prompt}\n\n{prompt}"
 
-            # Select agent type
-            agent_type = AgentType.PERPLEXITY if self.agent_type == "perplexity" else AgentType.DEEPSEEK
+            # Select target agent type
+            target = AgentType.PERPLEXITY if self.agent_type == "perplexity" else AgentType.CLAUDE
 
-            # Execute agent call
-            response = await communicator.async_send_message(
-                target=agent_type,
+            msg = AgentMessage(
+                message_id=str(_uuid.uuid4()),
+                from_agent=AgentType.ORCHESTRATOR,
+                to_agent=target,
                 message_type=MessageType.QUERY,
                 content=prompt,
                 context=state.context,
+                conversation_id=state.session_id,
+                iteration=1,
             )
 
-            # Store result
-            state.set_result(self.name, response)
-            state.add_message("assistant", response.get("response", ""), self.name)
+            response = await communicator.route_message(msg)
+
+            # Store structured result
+            payload = {
+                "response": response.content,
+                "confidence": response.confidence_score,
+                "metadata": response.metadata or {},
+            }
+            state.set_result(self.name, payload)
+            state.add_message("assistant", response.content or "", self.name)
 
         except Exception as e:
             logger.error(f"LLM Agent '{self.name}' error: {e}")
@@ -669,7 +714,7 @@ class TradingAnalysisChain:
 
         tech_analysis = LLMAgent(
             name="technical_analysis",
-            agent_type="deepseek",
+            agent_type="claude",
             system_prompt=(
                 "You are a technical analysis expert. Analyze the following "
                 "market data and identify patterns, trends, and key levels."
@@ -679,7 +724,7 @@ class TradingAnalysisChain:
 
         risk_assessment = LLMAgent(
             name="risk_assessment",
-            agent_type="deepseek",
+            agent_type="claude",
             system_prompt=(
                 "You are a risk management expert. Evaluate the risks and "
                 "provide risk metrics for the trading strategy."
@@ -815,8 +860,14 @@ def make_sqlite_checkpointer(
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    # Create table once
-    with sqlite3.connect(db_path) as _conn:
+    # Create table once — enable WAL for concurrent reads & set busy timeout
+    with sqlite3.connect(db_path, timeout=10.0) as _conn:
+        try:
+            _conn.execute("PRAGMA journal_mode=WAL")
+            _conn.execute("PRAGMA synchronous=NORMAL")
+            _conn.execute("PRAGMA busy_timeout=10000")
+        except sqlite3.Error as pragma_err:  # pragma: no cover — best-effort
+            logger.debug(f"[checkpointer] PRAGMA setup skipped: {pragma_err}")
         _conn.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {table} (
@@ -839,7 +890,9 @@ def make_sqlite_checkpointer(
             "llm_call_count": state.llm_call_count,
             "budget_exceeded": state.budget_exceeded,
         }
-        with sqlite3.connect(db_path) as conn:
+        # timeout=10s avoids "database is locked" under concurrent pipelines
+        with sqlite3.connect(db_path, timeout=10.0) as conn:
+            conn.execute("PRAGMA busy_timeout=10000")
             conn.execute(
                 f"INSERT INTO {table} (session_id, node_name, ts, state_json) VALUES (?,?,?,?)",
                 (state.session_id, node_name, datetime.now(UTC).isoformat(), json.dumps(snapshot)),

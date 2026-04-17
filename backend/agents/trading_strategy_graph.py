@@ -374,6 +374,276 @@ class MemoryRecallNode(AgentNode):
         return state
 
 
+# ---------------------------------------------------------------------------
+# Shared LLM routing mixin — inherited by any node that needs to call LLMs
+# directly (without going through the full UnifiedAgentInterface pipeline).
+# ---------------------------------------------------------------------------
+
+
+class _LLMCallMixin:
+    """Mixin that provides a shared ``_call_llm`` helper for agent nodes.
+
+    Routing table (Claude + Perplexity only):
+      ``claude-haiku``  → Claude claude-haiku-4-5-20251001
+      ``claude-sonnet`` → Claude claude-sonnet-4-6
+      ``claude-opus``   → Claude claude-opus-4-6
+      ``claude``        → Claude claude-haiku-4-5-20251001  (lightweight alias)
+      ``perplexity``    → PerplexityClient (sonar-pro)
+      ``<unknown>``     → ModelRouter fallback (Claude family)
+
+    json_mode is accepted for API compatibility.  Claude ignores it (JSON enforced
+    via system prompt); Perplexity does not support response_format either.
+
+    All provider keys are resolved via :class:`APIKeyPoolManager` first
+    (enabling rotation, health-tracking, rate-limit backoff) and fall back to
+    the raw :class:`KeyManager` only when the pool lookup fails.
+    """
+
+    @staticmethod
+    async def _resolve_api_key(
+        agent_type: Any,
+        fallback_name: str,
+    ) -> tuple[str | None, Any | None]:
+        """Resolve an API key via APIKeyPoolManager → KeyManager fallback.
+
+        Args:
+            agent_type:    AgentType.CLAUDE / AgentType.PERPLEXITY etc.
+            fallback_name: KeyManager slot name used to resolve the *actual*
+                           decrypted value (the pool only tracks health
+                           metadata — see ``APIKey.value is None`` contract).
+
+        Returns:
+            ``(api_key_value, pool_apikey_obj)`` where ``pool_apikey_obj`` is
+            the :class:`APIKey` instance to pass to ``mark_success`` /
+            ``mark_error`` / ``mark_rate_limit`` / ``mark_auth_error``, or
+            ``None`` when the pool is unavailable.
+
+        Note:
+            This coroutine is safe to call from any ``async def`` node
+            method.  On any pool error it silently falls back to a direct
+            KeyManager lookup so core pipeline flow is never blocked.
+        """
+        from backend.security.key_manager import get_key_manager
+
+        km = get_key_manager()
+        pool_obj: Any | None = None
+
+        # 1) Pool lookup (best-effort — handles rotation + health tracking)
+        try:
+            from backend.agents.api_key_pool import APIKeyPoolManager
+
+            pool = APIKeyPoolManager()
+            pool_obj = await pool.get_active_key(agent_type)
+        except Exception as pool_err:  # pragma: no cover — best-effort
+            logger.debug(f"[_resolve_api_key] pool lookup failed for {agent_type}: {pool_err}")
+            pool_obj = None
+
+        # 2) Always resolve the decrypted value via KeyManager
+        #    (APIKey objects in the pool intentionally store ``value=None``)
+        try:
+            if pool_obj is not None and getattr(pool_obj, "key_name", None):
+                try:
+                    decrypted = km.get_decrypted_key(pool_obj.key_name)
+                    if decrypted:
+                        return decrypted, pool_obj
+                except ValueError:
+                    pass
+            return km.get_decrypted_key(fallback_name), pool_obj
+        except ValueError:
+            return None, pool_obj
+
+    async def _call_llm(
+        self,
+        agent_name: str,
+        prompt: str,
+        system_msg: str,
+        temperature: float | None = None,
+        state: AgentState | None = None,
+        json_mode: bool = False,
+    ) -> str | None:
+        """Route an LLM call to the appropriate provider.
+
+        Args:
+            agent_name:  Model alias — see routing table above.
+            prompt:      User-turn message.
+            system_msg:  System message.
+            temperature: Override temperature (None = 0.7 default).
+            state:       If provided, LLM cost and call count are recorded.
+            json_mode:   Hint to include JSON formatting (no-op for Claude/Perplexity API).
+
+        Safety:
+            Every prompt is passed through :class:`SecurityOrchestrator`
+            (prompt-injection + semantic guards) BEFORE it leaves the
+            process.  Unsafe prompts return ``None`` without ever contacting
+            the provider, and the verdict is recorded on ``state.errors``
+            for audit trail.
+        """
+        # ── Prompt-injection gate (fail-closed) ────────────────────────────────
+        try:
+            from backend.agents.security.security_orchestrator import (
+                get_security_orchestrator,
+            )
+
+            verdict = get_security_orchestrator().analyze(prompt)
+            if not verdict.is_safe:
+                logger.warning(
+                    f"🛡️ [_call_llm] SecurityOrchestrator BLOCKED prompt "
+                    f"(agent={agent_name}, blocked_by={verdict.blocked_by}, "
+                    f"confidence={verdict.overall_confidence:.3f})"
+                )
+                if state is not None:
+                    state.add_error(
+                        "_call_llm",
+                        RuntimeError(
+                            f"Prompt blocked by SecurityOrchestrator: {verdict.blocked_by} "
+                            f"(confidence={verdict.overall_confidence:.3f})"
+                        ),
+                    )
+                return None
+        except Exception as sec_err:  # pragma: no cover — fail-open on orchestrator errors
+            # Defensive: never block the pipeline if safety code itself is broken
+            logger.debug(f"[_call_llm] SecurityOrchestrator check skipped: {sec_err}")
+
+        from backend.agents.llm.base_client import (
+            LLMClientFactory,
+            LLMConfig,
+            LLMMessage,
+            LLMProvider,
+        )
+        from backend.agents.llm.model_router import ModelRouter
+
+        _AGENT_TO_CLAUDE_MODEL: dict[str, str] = {
+            "claude-haiku": "claude-haiku-4-5-20251001",
+            "claude-sonnet": "claude-sonnet-4-6",
+            "claude-opus": "claude-opus-4-6",
+            "claude": "claude-haiku-4-5-20251001",
+        }
+
+        effective_temp = temperature if temperature is not None else 0.7
+
+        # ── Perplexity branch ─────────────────────────────────────────────────
+        if agent_name == "perplexity":
+            from backend.agents.llm.clients.perplexity import CRYPTO_SEARCH_DOMAINS
+            from backend.agents.models import AgentType as _AgentType
+
+            api_key, pool_key = await self._resolve_api_key(_AgentType.PERPLEXITY, "PERPLEXITY_API_KEY")
+            if not api_key:
+                return None
+            config = LLMConfig(
+                provider=LLMProvider.PERPLEXITY,
+                api_key=api_key,
+                model="sonar-pro",
+                temperature=effective_temp,
+                max_tokens=1024,
+            )
+            client = LLMClientFactory.create(config)
+            try:
+                messages = [
+                    LLMMessage(role="system", content=system_msg),
+                    LLMMessage(role="user", content=prompt),
+                ]
+                # Pre-flight: abort if budget already exhausted to avoid wasting an LLM call
+                if state is not None:
+                    state.check_llm_budget()
+                try:
+                    response = await client.chat(
+                        messages,
+                        search_context_size="medium",
+                        search_domain_filter=CRYPTO_SEARCH_DOMAINS,
+                    )
+                except Exception as chat_err:
+                    # Record failure into pool so health/rotation stays accurate
+                    if pool_key:
+                        try:
+                            from backend.agents.api_key_pool import APIKeyPoolManager
+
+                            pool_mgr = APIKeyPoolManager()
+                            err_str = str(chat_err).lower()
+                            if "429" in err_str or "rate" in err_str:
+                                pool_mgr.mark_rate_limit(pool_key)
+                            elif "401" in err_str or "403" in err_str or "auth" in err_str:
+                                pool_mgr.mark_auth_error(pool_key)
+                            else:
+                                pool_mgr.mark_error(pool_key)
+                        except Exception as telemetry_err:
+                            logger.debug(f"[perplexity] pool telemetry update failed: {telemetry_err}")
+                    raise
+                # Success → mark health
+                if pool_key:
+                    try:
+                        from backend.agents.api_key_pool import APIKeyPoolManager
+
+                        APIKeyPoolManager().mark_success(pool_key)
+                    except Exception as telemetry_err:
+                        logger.debug(f"[perplexity] pool success-mark failed: {telemetry_err}")
+                if state is not None:
+                    state.record_llm_cost(response.estimated_cost)
+                return response.content
+            finally:
+                await client.close()
+
+        # ── Claude branch (default) ───────────────────────────────────────────
+        if agent_name in _AGENT_TO_CLAUDE_MODEL:
+            model = _AGENT_TO_CLAUDE_MODEL[agent_name]
+        else:
+            model = ModelRouter.get_model(agent_name)
+
+        from backend.agents.models import AgentType as _AgentType
+
+        api_key, pool_key = await self._resolve_api_key(_AgentType.CLAUDE, "ANTHROPIC_API_KEY")
+        if not api_key:
+            return None
+
+        _is_large = "haiku" not in model.lower()
+        max_tokens = 8192 if _is_large else 4096
+        config = LLMConfig(
+            provider=LLMProvider.ANTHROPIC,
+            api_key=api_key,
+            model=model,
+            temperature=effective_temp,
+            max_tokens=max_tokens,
+        )
+        client = LLMClientFactory.create(config)
+        try:
+            messages = [
+                LLMMessage(role="system", content=system_msg),
+                LLMMessage(role="user", content=prompt),
+            ]
+            # Pre-flight: abort if budget already exhausted to avoid wasting an LLM call
+            if state is not None:
+                state.check_llm_budget()
+            try:
+                response = await client.chat(messages, json_mode=False)
+            except Exception as chat_err:
+                if pool_key:
+                    try:
+                        from backend.agents.api_key_pool import APIKeyPoolManager
+
+                        pool_mgr = APIKeyPoolManager()
+                        err_str = str(chat_err).lower()
+                        if "429" in err_str or "rate" in err_str:
+                            pool_mgr.mark_rate_limit(pool_key)
+                        elif "401" in err_str or "403" in err_str or "auth" in err_str:
+                            pool_mgr.mark_auth_error(pool_key)
+                        else:
+                            pool_mgr.mark_error(pool_key)
+                    except Exception as telemetry_err:
+                        logger.debug(f"[claude] pool telemetry update failed: {telemetry_err}")
+                raise
+            if pool_key:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    APIKeyPoolManager().mark_success(pool_key)
+                except Exception as telemetry_err:
+                    logger.debug(f"[claude] pool success-mark failed: {telemetry_err}")
+            if state is not None:
+                state.record_llm_cost(response.estimated_cost)
+            return response.content
+        finally:
+            await client.close()
+
+
 # Module-level TTL cache for GroundingNode: (symbol, timeframe) → (grounding_context, timestamp)
 _GROUNDING_CACHE: dict[tuple[str, str], tuple[str, float]] = {}
 _GROUNDING_CACHE_TTL = 900.0  # 15 minutes
@@ -401,7 +671,7 @@ class GroundingNode(AgentNode):
         )
 
     async def execute(self, state: AgentState) -> AgentState:
-        from backend.security.key_manager import get_key_manager
+        from backend.agents.models import AgentType as _AgentType
 
         symbol = state.context.get("symbol", "BTCUSDT")
         timeframe = state.context.get("timeframe", "15")
@@ -409,8 +679,7 @@ class GroundingNode(AgentNode):
         _am = state.get_result("analyze_market") or {}
         regime = clf.get("regime") or _am.get("regime", "unknown")
 
-        km = get_key_manager()
-        api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
+        api_key, _ = await _LLMCallMixin._resolve_api_key(_AgentType.PERPLEXITY, "PERPLEXITY_API_KEY")
         if not api_key:
             logger.info("[Grounding] PERPLEXITY_API_KEY not set — skipping grounding")
             state.set_result(self.name, {"grounding_context": "", "skipped": True})
@@ -485,10 +754,9 @@ class GroundingNode(AgentNode):
             LLMProvider,
         )
         from backend.agents.llm.clients.perplexity import CRYPTO_SEARCH_DOMAINS
-        from backend.security.key_manager import get_key_manager
+        from backend.agents.models import AgentType as _AgentType
 
-        km = get_key_manager()
-        api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
+        api_key, pool_key = await _LLMCallMixin._resolve_api_key(_AgentType.PERPLEXITY, "PERPLEXITY_API_KEY")
         if not api_key:
             return None
 
@@ -507,11 +775,38 @@ class GroundingNode(AgentNode):
                 LLMMessage(role="system", content=system_msg),
                 LLMMessage(role="user", content=query),
             ]
-            response = await client.chat(
-                messages,
-                search_context_size="medium",
-                search_domain_filter=CRYPTO_SEARCH_DOMAINS,
-            )
+            # Pre-flight: abort if budget already exhausted to avoid wasting an LLM call
+            if state is not None:
+                state.check_llm_budget()
+            try:
+                response = await client.chat(
+                    messages,
+                    search_context_size="medium",
+                    search_domain_filter=CRYPTO_SEARCH_DOMAINS,
+                )
+            except Exception as chat_err:
+                if pool_key:
+                    try:
+                        from backend.agents.api_key_pool import APIKeyPoolManager
+
+                        pool_mgr = APIKeyPoolManager()
+                        err_str = str(chat_err).lower()
+                        if "429" in err_str or "rate" in err_str:
+                            pool_mgr.mark_rate_limit(pool_key)
+                        elif "401" in err_str or "403" in err_str or "auth" in err_str:
+                            pool_mgr.mark_auth_error(pool_key)
+                        else:
+                            pool_mgr.mark_error(pool_key)
+                    except Exception as telemetry_err:
+                        logger.debug(f"[grounding] pool telemetry update failed: {telemetry_err}")
+                raise
+            if pool_key:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    APIKeyPoolManager().mark_success(pool_key)
+                except Exception as telemetry_err:
+                    logger.debug(f"[grounding] pool success-mark failed: {telemetry_err}")
             if state is not None:
                 state.record_llm_cost(response.estimated_cost)
             return response.content
@@ -519,7 +814,7 @@ class GroundingNode(AgentNode):
             await client.close()
 
 
-class GenerateStrategiesNode(AgentNode):
+class GenerateStrategiesNode(_LLMCallMixin, AgentNode):
     """
     Node 2: Generate strategy proposals from LLM agents.
 
@@ -683,9 +978,10 @@ class GenerateStrategiesNode(AgentNode):
                 return None
 
         # Check if Perplexity key is available AND perplexity is in the requested agents list
-        from backend.security.key_manager import get_key_manager as _get_km
+        from backend.agents.models import AgentType as _AgentType
 
-        _has_perplexity = bool(_get_km().get_decrypted_key("PERPLEXITY_API_KEY")) and "perplexity" in agents
+        _px_key, _ = await _LLMCallMixin._resolve_api_key(_AgentType.PERPLEXITY, "PERPLEXITY_API_KEY")
+        _has_perplexity = bool(_px_key) and "perplexity" in agents
 
         if _has_perplexity:
             logger.info("[GenerateStrategy] Running Claude + Perplexity in parallel")
@@ -820,102 +1116,6 @@ class GenerateStrategiesNode(AgentNode):
         except Exception as e:
             logger.debug(f"Claude Haiku synthesis critic failed: {e}")
         return None
-
-    async def _call_llm(
-        self,
-        agent_name: str,
-        prompt: str,
-        system_msg: str,
-        temperature: float | None = None,
-        state: AgentState | None = None,
-        json_mode: bool = False,
-    ) -> str | None:
-        """Call LLM using the connections module (temperature override supported).
-
-        Args:
-            state:     If provided, LLM cost and call count are recorded on the state
-                       for pipeline-level observability via ``state.total_cost_usd``.
-            json_mode: If True, passes ``response_format={"type":"json_object"}`` to
-                       OpenAI-compatible providers (deepseek, qwen).  The system_msg
-                       MUST contain the word "JSON" (API requirement).  Eliminates
-                       regex-based extraction in ResponseParser.  Not set for
-                       Perplexity (unsupported by sonar-pro model).
-        """
-        from backend.agents.llm.base_client import (
-            LLMClientFactory,
-            LLMConfig,
-            LLMMessage,
-            LLMProvider,
-        )
-        from backend.agents.llm.model_router import ModelRouter
-        from backend.security.key_manager import get_key_manager
-
-        km = get_key_manager()
-
-        # Map task/agent names to Claude model tiers + Perplexity
-        # Legacy agent names (deepseek, qwen) are silently routed to Claude equivalents
-        _AGENT_TO_CLAUDE_MODEL = {
-            "claude-haiku": "claude-haiku-4-5-20251001",
-            "claude-sonnet": "claude-sonnet-4-6",
-            "claude-opus": "claude-opus-4-6",
-            # Legacy aliases → Claude equivalents
-            "claude": "claude-haiku-4-5-20251001",
-            "deepseek": "claude-sonnet-4-6",  # was main generator → Sonnet
-            "qwen": "claude-haiku-4-5-20251001",  # was critic → Haiku
-        }
-
-        # Perplexity stays as-is (real-time grounding only)
-        if agent_name == "perplexity":
-            provider = LLMProvider.PERPLEXITY
-            key_name = "PERPLEXITY_API_KEY"
-            model = "sonar-pro"
-            default_temp = 0.7
-        elif agent_name in _AGENT_TO_CLAUDE_MODEL:
-            provider = LLMProvider.ANTHROPIC
-            key_name = "ANTHROPIC_API_KEY"
-            model = _AGENT_TO_CLAUDE_MODEL[agent_name]
-            default_temp = 0.7
-        else:
-            # Unknown agent → try as Claude model name directly
-            provider = LLMProvider.ANTHROPIC
-            key_name = "ANTHROPIC_API_KEY"
-            model = ModelRouter.get_model(agent_name)
-            default_temp = 0.7
-
-        api_key = km.get_decrypted_key(key_name)
-        if not api_key:
-            return None
-
-        effective_temp = temperature if temperature is not None else default_temp
-        # Claude Sonnet/Opus support up to 64K output tokens; 8192 gives room for
-        # large strategy JSONs without truncation (Haiku stays at 4096 — smaller role)
-        _is_large_claude = provider == LLMProvider.ANTHROPIC and "haiku" not in model.lower()
-        max_tokens = 8192 if _is_large_claude else 4096
-        config = LLMConfig(
-            provider=provider,
-            api_key=api_key,
-            model=model,
-            temperature=effective_temp,
-            max_tokens=max_tokens,
-        )
-        client = LLMClientFactory.create(config)
-        # Claude handles json_mode via prompt engineering (no response_format field)
-        # Perplexity does not support json_mode at all
-        _supports_json_mode = False  # Claude: handled internally; Perplexity: unsupported
-        try:
-            messages = [
-                LLMMessage(role="system", content=system_msg),
-                LLMMessage(role="user", content=prompt),
-            ]
-            response = await client.chat(
-                messages,
-                json_mode=(json_mode and _supports_json_mode),
-            )
-            if state is not None:
-                state.record_llm_cost(response.estimated_cost)
-            return response.content
-        finally:
-            await client.close()
 
 
 class ParseResponsesNode(AgentNode):
@@ -1347,26 +1547,42 @@ class BacktestNode(AgentNode):
         def _run_sync() -> dict:
             from datetime import UTC
 
+            import pandas as _pd
+
+            # Normalise DataFrame index to DatetimeIndex before running the adapter.
+            # If df has an integer RangeIndex, promote the timestamp/date column.
+            _df = df
+            if not isinstance(_df.index, _pd.DatetimeIndex):
+                _ts_col = next(
+                    (c for c in ("timestamp", "date", "time", "open_time") if c in _df.columns),
+                    None,
+                )
+                if _ts_col is not None:
+                    _df = _df.set_index(_ts_col)
+                    _df.index = _pd.to_datetime(_df.index)
+                # else: let the adapter handle it (may produce degraded output)
+
             adapter = StrategyBuilderAdapter(strategy_graph)
-            signal_result = adapter.generate_signals(df)
+            signal_result = adapter.generate_signals(_df)
 
             # Capture raw signal counts before the engine runs — used by
             # BacktestAnalysisNode and RefinementNode for better diagnostics.
             _sig_long = int(signal_result.entries.sum()) if signal_result.entries is not None else 0
             _sig_short = int(signal_result.short_entries.sum()) if signal_result.short_entries is not None else 0
 
-            # Derive start/end dates from the OHLCV DataFrame index
+            # Derive start/end dates from the DataFrame index
             # (BacktestConfig requires interval, start_date, end_date as mandatory fields)
-            df_start = df.index[0]
-            df_end = df.index[-1]
+            df_start = _df.index[0]
+            df_end = _df.index[-1]
             if hasattr(df_start, "to_pydatetime"):
                 df_start = df_start.to_pydatetime()
             if hasattr(df_end, "to_pydatetime"):
                 df_end = df_end.to_pydatetime()
+
             # Ensure timezone-aware datetimes
-            if df_start.tzinfo is None:
+            if hasattr(df_start, "tzinfo") and df_start.tzinfo is None:
                 df_start = df_start.replace(tzinfo=UTC)
-            if df_end.tzinfo is None:
+            if hasattr(df_end, "tzinfo") and df_end.tzinfo is None:
                 df_end = df_end.replace(tzinfo=UTC)
 
             # Extract SL/TP from StrategyDefinition so positions actually close.
@@ -1384,8 +1600,8 @@ class BacktestNode(AgentNode):
                         if getattr(ec, "take_profit", None):
                             v = float(ec.take_profit.value)
                             _tp = v / 100 if v > 1 else v
-                except Exception:
-                    pass
+                except Exception as exit_parse_err:
+                    logger.debug(f"[build_bt_cfg] exit-config parse failed: {exit_parse_err}")
             # Clamp to realistic intraday ranges (15m–1h strategies):
             # SL > 7% means BTC must move $7k+ before stopping out → position held forever.
             # TP > 15% means BTC must move $15k+ → equally unrealistic for short-term.
@@ -1434,7 +1650,7 @@ class BacktestNode(AgentNode):
             engine = BacktestEngine()
             result = engine.run(
                 config=cfg,
-                ohlcv=df,
+                ohlcv=_df,
                 custom_strategy=_PrecomputedStrategy(),
             )
 
@@ -1722,6 +1938,61 @@ class BacktestAnalysisNode(AgentNode):
             "engine_warnings": engine_warnings,
         }
 
+        # ── RiskVetoGuard (hard safety override) ──────────────────────────────
+        # Added 2026-04-17 — enforce mandatory safety checks before any
+        # strategy can be accepted downstream.  If vetoed, force-fail the
+        # analysis so the pipeline routes to refinement/optimization or halts.
+        try:
+            from backend.agents.consensus.risk_veto_guard import (
+                VetoConfig,
+                get_risk_veto_guard,
+            )
+
+            # Build synthetic portfolio state from backtest metrics.
+            # Uses INITIAL_CAPITAL and backtest drawdown as proxies — real
+            # live-trading state must be plumbed in when running on exchange.
+            initial_equity = float(INITIAL_CAPITAL)
+            dd_frac = max(0.0, min(1.0, dd / 100.0))
+            portfolio_equity = initial_equity * (1.0 - dd_frac)
+
+            # Pick up agreement score from consensus node if present
+            consensus_result = state.get_result("consensus") or {}
+            agreement = float(consensus_result.get("agreement_score", 1.0))
+
+            guard = get_risk_veto_guard(
+                VetoConfig(
+                    max_drawdown_pct=self.MAX_DD_PCT,
+                    max_daily_loss_pct=self.MAX_DD_PCT,
+                    min_agreement_score=0.3,
+                )
+            )
+            veto = guard.check(
+                portfolio_equity=portfolio_equity,
+                peak_equity=initial_equity,
+                open_positions=open_trades,
+                daily_pnl=0.0,
+                initial_daily_equity=initial_equity,
+                agreement_score=agreement,
+            )
+            analysis["veto"] = veto.to_dict()
+            state.context["veto_decision"] = veto.to_dict()
+            if veto.is_vetoed:
+                analysis["passed"] = False
+                # Elevate severity so refinement is triggered
+                if analysis["severity"] == "pass":
+                    analysis["severity"] = "moderate"
+                analysis["suggestions"].insert(
+                    0,
+                    f"🚫 RiskVetoGuard blocked this strategy: {', '.join(r.value for r in veto.reasons)}. "
+                    f"Tighten risk limits before accepting.",
+                )
+                logger.warning(
+                    f"🚫 [BacktestAnalysisNode] RiskVetoGuard VETO — reasons={[r.value for r in veto.reasons]}"
+                )
+        except Exception as veto_exc:
+            logger.warning(f"[BacktestAnalysisNode] RiskVetoGuard check failed: {veto_exc}")
+            state.add_error(self.name, veto_exc)
+
         state.context["backtest_analysis"] = analysis
         state.set_result(self.name, analysis)
 
@@ -1785,7 +2056,18 @@ class MemoryUpdateNode(AgentNode):
                 f"[MemoryUpdateNode] Using optimized sharpe={sharpe:.3f} (raw IS was {metrics.get('sharpe_ratio', 0):.3f})"
             )
 
-        importance = min(1.0, max(0.1, (sharpe + 1.0) / 4.0))  # 0→0.25, 2→0.75
+        # DSR gate: statistically insignificant results get noise tag + reduced importance
+        dsr_warning = opt_result.get("dsr_warning", False)
+        dsr_value = opt_result.get("dsr_value")
+        if dsr_warning:
+            logger.warning(
+                f"[MemoryUpdateNode] DSR={dsr_value} < 0.1 — optimization result is "
+                f"statistically indistinguishable from noise (sharpe={sharpe:.3f}). "
+                f"Saving to memory with reduced importance and 'dsr_noise' tag."
+            )
+
+        # importance: noise results capped at 0.05 so they rank below any real result
+        importance = 0.05 if dsr_warning else min(1.0, max(0.1, (sharpe + 1.0) / 4.0))  # 0→0.25, 2→0.75
         # Outcome label helps BM25 recall: MemoryRecallNode queries "successful strategy … high sharpe profit"
         # and "failed strategy … low sharpe no trades". Without matching keywords, BM25 returns 0 hits.
         outcome_label = "successful profitable high sharpe" if sharpe >= 0.4 else "failed poor low sharpe"
@@ -1803,11 +2085,14 @@ class MemoryUpdateNode(AgentNode):
             from backend.agents.memory.hierarchical_memory import HierarchicalMemory, MemoryType
 
             memory = HierarchicalMemory(backend=SQLiteBackendAdapter(db_path=_PIPELINE_MEMORY_DB))
+            episodic_tags = ["backtest", outcome_tag, symbol, timeframe, selected_agent, strategy_name]
+            if dsr_warning:
+                episodic_tags.append("dsr_noise")
             await memory.store(
                 content=episodic_content,
                 memory_type=MemoryType.EPISODIC,
                 importance=importance,
-                tags=["backtest", outcome_tag, symbol, timeframe, selected_agent, strategy_name],
+                tags=episodic_tags,
                 metadata={
                     "symbol": symbol,
                     "timeframe": timeframe,
@@ -1815,12 +2100,16 @@ class MemoryUpdateNode(AgentNode):
                     "sharpe_ratio": sharpe,
                     "max_drawdown": dd,
                     "total_trades": trades,
+                    "dsr_noise": dsr_warning,
+                    "dsr_value": dsr_value,
                 },
                 source="trading_strategy_pipeline",
                 agent_namespace="strategy_gen",
             )
             logger.info(
-                f"🧠 MemoryUpdateNode: stored episodic memory (importance={importance:.2f}, sharpe={sharpe:.2f})"
+                f"🧠 MemoryUpdateNode: stored episodic memory (importance={importance:.2f}, sharpe={sharpe:.2f}"
+                + (f", DSR={dsr_value} [NOISE]" if dsr_warning else "")
+                + ")"
             )
         except Exception as e:
             logger.warning(f"[MemoryUpdateNode] HierarchicalMemory store failed (non-fatal): {e}")
@@ -2425,7 +2714,7 @@ class OptimizationNode(AgentNode):
 # =============================================================================
 
 
-class AnalysisDebateNode(AgentNode):
+class AnalysisDebateNode(_LLMCallMixin, AgentNode):
     """Two-agent structured debate before Walk-Forward / ML validation.
 
     Round 1 (parallel):
@@ -2465,7 +2754,7 @@ class AnalysisDebateNode(AgentNode):
         super().__init__(
             name="analysis_debate",
             description="Optimist vs Risk-Manager debate to gate strategy deployment",
-            timeout=45.0,
+            timeout=90.0,  # up to 3 sequential Claude calls (~20s each)
             retry_count=1,
             retry_delay=2.0,
         )
@@ -2869,8 +3158,9 @@ class MLValidationNode(AgentNode):
             adapter = StrategyBuilderAdapter(strategy_graph)
             signal_result = adapter.generate_signals(df)
             _ = signal_result.entries.values if hasattr(signal_result.entries, "values") else signal_result.entries
-        except Exception:
-            pass
+        except Exception as sig_err:
+            # Signals are used only as an optional warm-up check; regime analysis proceeds without them.
+            logger.debug(f"[RegimeAnalysis] pre-signal generation failed, continuing: {sig_err}")
 
         regime_sharpes: dict[str, float] = {}
         for i in range(n_regimes):
@@ -2989,15 +3279,16 @@ class HITLCheckNode(AgentNode):
         # Build a compact summary for the human reviewer
         best = state.get_result("select_best") or {}
         bt = state.get_result("backtest") or {}
+        bt_metrics = bt.get("metrics", {}) or {}  # Bug C1 fix: metrics are nested under "metrics" key
         wf = state.get_result("wf_validation") or {}
 
         payload = {
             "strategy_name": (best.get("strategy", {}) or {}).get("strategy_name", "unknown"),
             "backtest_summary": {
-                "trades": bt.get("total_trades", 0),
-                "sharpe": round(bt.get("sharpe_ratio", 0.0), 3),
-                "max_dd": round(bt.get("max_drawdown", 0.0), 2),
-                "net_profit": round(bt.get("net_profit", 0.0), 2),
+                "trades": bt_metrics.get("total_trades", 0),
+                "sharpe": round(bt_metrics.get("sharpe_ratio", 0.0), 3),
+                "max_dd": round(bt_metrics.get("max_drawdown", 0.0), 2),
+                "net_profit": round(bt_metrics.get("net_profit", 0.0), 2),
             },
             "wf_passed": wf.get("wf_passed", None),
             "regime": state.context.get("regime_classification", {}).get("regime", "unknown"),
@@ -3177,7 +3468,7 @@ class PostRunReflectionNode(AgentNode):
 # =============================================================================
 
 
-class OptimizationAnalysisNode(AgentNode):
+class OptimizationAnalysisNode(_LLMCallMixin, AgentNode):
     """Reads OptimizationNode's top_trials and asks Claude Haiku to identify:
     - param_clusters: which param values appear in the top-5 results
     - winning_zones: param ranges where Sharpe > 0.8
@@ -3197,7 +3488,7 @@ class OptimizationAnalysisNode(AgentNode):
         super().__init__(
             name="optimization_analysis",
             description="Claude analyses top-20 Optuna trials to extract winning parameter zones",
-            timeout=30.0,
+            timeout=60.0,  # single Claude Haiku call (~10s typical)
             retry_count=1,
             retry_delay=2.0,
         )
@@ -3347,7 +3638,7 @@ def _should_continue_opt(state: AgentState) -> bool:
     return not diffs or max(diffs) > 0.05
 
 
-class A2AParamRangeNode(AgentNode):
+class A2AParamRangeNode(_LLMCallMixin, AgentNode):
     """Phase 4: Uses opt_insights (from OptimizationAnalysisNode) to propose
     tighter parameter ranges for the next Optuna sweep.
 
@@ -3369,7 +3660,7 @@ class A2AParamRangeNode(AgentNode):
         super().__init__(
             name="param_range",
             description="Propose tighter param ranges for the next optimisation sweep",
-            timeout=20.0,
+            timeout=60.0,  # single Claude Haiku call (~10s typical)
             retry_count=1,
             retry_delay=2.0,
         )

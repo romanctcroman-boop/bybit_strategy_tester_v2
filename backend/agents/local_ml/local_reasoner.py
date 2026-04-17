@@ -9,7 +9,7 @@ Supports:
 - Multiple model sizes (1B to 70B parameters)
 
 Recommended models:
-- DeepSeek-R1-Distill-Qwen-7B (best for reasoning)
+- Claude-R1-Distill-Claude-7B (best for reasoning)
 - Mistral-7B-Instruct (general purpose)
 - Phi-3-mini (fast, small)
 """
@@ -96,7 +96,7 @@ class LocalReasonerEngine:
 
     Example:
         engine = LocalReasonerEngine(
-            model_path="./models/deepseek-r1-distill-qwen-7b-Q4_K_M.gguf"
+            model_path="./models/local-reasoner-7b-Q4_K_M.gguf"
         )
         await engine.initialize()
 

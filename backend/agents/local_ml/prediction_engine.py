@@ -428,7 +428,7 @@ class PredictionEngine:
         actual_positive = actual_return > threshold
 
         # Track correctness for ensemble accuracy
-        was_correct = predicted_positive == actual_positive
+        _was_correct = predicted_positive == actual_positive  # reserved for ensemble tracking
 
         # Update individual model accuracy
         for name, vote in last_prediction.model_votes.items():

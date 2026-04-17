@@ -3,7 +3,7 @@ Tests for HierarchicalMemory with SQLite-backed persistence.
 
 Covers audit finding: "Tests contain zero coverage for SQLite-backed persistence —
 no test instantiates HierarchicalMemory(persist_path=...) and validates disk
-round-trip, TTL expiration, or LRU eviction under load." (Qwen, HIGH severity)
+round-trip, TTL expiration, or LRU eviction under load." (Claude, HIGH severity)
 
 Tests:
 - SQLiteBackendAdapter save/load/delete round-trip

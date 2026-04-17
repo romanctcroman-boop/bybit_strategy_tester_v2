@@ -136,7 +136,7 @@ async def validate_strategy(
     name="evolve_strategy",
     description=(
         "Run AI-powered strategy evolution: iteratively improve a trading strategy "
-        "using LLM reflection and backtesting. Requires OHLCV data in DB and a DeepSeek API key."
+        "using LLM reflection and backtesting. Requires OHLCV data in DB and a Claude API key."
     ),
     category="backtesting",
 )

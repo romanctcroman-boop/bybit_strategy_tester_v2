@@ -92,7 +92,7 @@ class TestTokenAwareRateLimiter:
     async def test_acquire_within_budget(self):
         """acquire() returns True when within budget."""
         budget = TokenBudget(max_tokens_per_minute=10_000)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
         result = await limiter.acquire(estimated_tokens=1000)
         assert result is True
 
@@ -100,7 +100,7 @@ class TestTokenAwareRateLimiter:
     async def test_acquire_exceeds_hourly_budget(self):
         """acquire() returns False when hourly budget exceeded."""
         budget = TokenBudget(max_tokens_per_hour=1000)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
         limiter.record_usage(tokens=900)
         result = await limiter.acquire(estimated_tokens=200)
         assert result is False
@@ -109,7 +109,7 @@ class TestTokenAwareRateLimiter:
     async def test_acquire_exceeds_daily_budget(self):
         """acquire() returns False when daily budget exceeded."""
         budget = TokenBudget(max_tokens_per_day=500)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
         limiter.record_usage(tokens=400)
         result = await limiter.acquire(estimated_tokens=200)
         assert result is False
@@ -118,14 +118,14 @@ class TestTokenAwareRateLimiter:
     async def test_acquire_exceeds_cost_budget(self):
         """acquire() returns False when hourly cost exceeded."""
         budget = TokenBudget(max_cost_per_hour_usd=0.01)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
         limiter.record_usage(tokens=1000, cost_usd=0.02)
         result = await limiter.acquire(estimated_tokens=100)
         assert result is False
 
     def test_record_usage_accumulates(self):
         """record_usage() accumulates totals."""
-        limiter = TokenAwareRateLimiter("deepseek")
+        limiter = TokenAwareRateLimiter("claude")
         limiter.record_usage(tokens=1000, cost_usd=0.01)
         limiter.record_usage(tokens=2000, cost_usd=0.02)
         assert limiter._total_tokens == 3000
@@ -134,10 +134,10 @@ class TestTokenAwareRateLimiter:
 
     def test_get_metrics(self):
         """get_metrics() returns structured dict."""
-        limiter = TokenAwareRateLimiter("deepseek")
+        limiter = TokenAwareRateLimiter("claude")
         limiter.record_usage(tokens=5000, cost_usd=0.05)
         metrics = limiter.get_metrics()
-        assert metrics["provider"] == "deepseek"
+        assert metrics["provider"] == "claude"
         assert metrics["total_tokens"] == 5000
         assert metrics["total_cost_usd"] == 0.05
         assert metrics["total_requests"] == 1
@@ -157,11 +157,11 @@ class TestTokenAwareRateLimiter:
 
         Verifies the critical recovery path: minute exhaustion → asyncio.sleep() →
         window reset → acquire() returns True (not False). Addresses audit finding
-        that recovery behavior was untested (Qwen, HIGH severity).
+        that recovery behavior was untested (Claude, HIGH severity).
         """
         # Tiny window so it expires fast
         budget = TokenBudget(max_tokens_per_minute=500)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
 
         # Exhaust minute budget
         limiter.record_usage(tokens=500)
@@ -181,7 +181,7 @@ class TestTokenAwareRateLimiter:
         End-to-end: exhaust → expire → record new → verify isolated window.
         """
         budget = TokenBudget(max_tokens_per_minute=1000)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
 
         # Exhaust minute budget
         limiter.record_usage(tokens=1000)
@@ -206,7 +206,7 @@ class TestTokenAwareRateLimiter:
         import asyncio
 
         budget = TokenBudget(max_tokens_per_minute=10_000)
-        limiter = TokenAwareRateLimiter("deepseek", budget)
+        limiter = TokenAwareRateLimiter("claude", budget)
 
         async def do_acquire():
             return await limiter.acquire(estimated_tokens=500)

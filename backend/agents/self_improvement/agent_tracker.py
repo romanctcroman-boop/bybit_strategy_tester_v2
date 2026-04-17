@@ -3,7 +3,7 @@ Agent Performance Tracker
 
 Per-agent accuracy tracking for dynamic ConsensusEngine weight adjustment.
 
-Tracks each agent's (DeepSeek, Qwen, Perplexity) strategy quality over time:
+Tracks each agent's (Claude, Perplexity) strategy quality over time:
 - Strategy pass/fail rate
 - Average Sharpe ratio achieved
 - Win rate consistency
@@ -17,12 +17,12 @@ Example:
     tracker = AgentPerformanceTracker()
 
     # Record after each backtest
-    tracker.record_result("deepseek", backtest_metrics, strategy_passed=True)
-    tracker.record_result("qwen", backtest_metrics, strategy_passed=False)
+    tracker.record_result("claude", backtest_metrics, strategy_passed=True)
+    tracker.record_result("perplexity", backtest_metrics, strategy_passed=False)
 
     # Get dynamic weights for consensus
-    weights = tracker.compute_dynamic_weights(["deepseek", "qwen", "perplexity"])
-    # → {"deepseek": 0.45, "qwen": 0.25, "perplexity": 0.30}
+    weights = tracker.compute_dynamic_weights(["claude", "perplexity"])
+    # → {"claude": 0.55, "perplexity": 0.45}
 
     # Apply to ConsensusEngine
     consensus_engine.set_external_weights(weights)
@@ -157,7 +157,7 @@ class AgentPerformanceTracker:
 
         # Record results
         tracker.record_result(
-            agent_name="deepseek",
+            agent_name="claude",
             metrics={"sharpe_ratio": 1.5, "win_rate": 0.55, ...},
             strategy_type="rsi",
             passed=True,
@@ -166,12 +166,12 @@ class AgentPerformanceTracker:
 
         # Get dynamic weights
         weights = tracker.compute_dynamic_weights(
-            agents=["deepseek", "qwen", "perplexity"]
+            agents=["claude", "claude", "perplexity"]
         )
 
         # Get agent profile
-        profile = tracker.get_profile("deepseek")
-        print(f"DeepSeek composite: {profile.composite_score}")
+        profile = tracker.get_profile("claude")
+        print(f"Claude composite: {profile.composite_score}")
     """
 
     # Weight computation parameters
@@ -222,7 +222,7 @@ class AgentPerformanceTracker:
         Record a backtest result for an agent.
 
         Args:
-            agent_name: Agent identifier (e.g., "deepseek", "qwen")
+            agent_name: Agent identifier (e.g., "claude", "claude")
             metrics: Backtest metrics dict
             strategy_type: Type of strategy tested
             passed: Whether strategy met quality threshold

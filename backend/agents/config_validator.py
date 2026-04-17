@@ -2,7 +2,7 @@
 Agent Configuration Validation
 
 Centralized configuration with Pydantic Settings and fail-fast startup validation.
-Addresses audit finding: "Configuration fragmented, no validation at startup" (DeepSeek+Qwen, P1)
+System uses Claude (Anthropic) + Perplexity only — Claude and Claude have been removed.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     _Converter = Callable[[str], Any]
 
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 try:
     from backend.agents.mcp_config import MCPConfig, get_mcp_config, validate_mcp_startup
@@ -70,8 +70,7 @@ class AgentConfig(BaseModel):
     prompt: PromptConfig = Field(default_factory=PromptConfig)
     rate_limit: dict[str, RateLimitConfig] = Field(
         default_factory=lambda: {
-            "deepseek": RateLimitConfig(),
-            "qwen": RateLimitConfig(),
+            "claude": RateLimitConfig(),
             "perplexity": RateLimitConfig(),
         }
     )
@@ -80,22 +79,12 @@ class AgentConfig(BaseModel):
     mcp: MCPConfig | None = None  # Optional MCP configuration
 
     # API endpoints
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    qwen_base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
     perplexity_base_url: str = "https://api.perplexity.ai"
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
 
     # Models
-    deepseek_model: str = "deepseek-chat"
-    qwen_model: str = "qwen-plus"
+    claude_model: str = "claude-haiku-4-5-20251001"
     perplexity_model: str = "sonar-pro"
-
-    @field_validator("deepseek_model")
-    @classmethod
-    def validate_deepseek_model(cls, v: str) -> str:
-        allowed = {"deepseek-chat", "deepseek-reasoner"}
-        if v not in allowed:
-            raise ValueError(f"deepseek_model must be one of {allowed}")
-        return v
 
 
 # Singleton
@@ -121,8 +110,8 @@ def _load_config() -> AgentConfig:
         "AGENT_MEMORY_BACKEND": ("memory", "backend", str),
         "AGENT_MEMORY_SQLITE_PATH": ("memory", "sqlite_path", str),
         "AGENT_SECURITY_SEMANTIC_GUARD": ("security", "enable_semantic_guard", lambda x: x.lower() == "true"),
-        "DEEPSEEK_MODEL": ("deepseek_model", None, str),
-        "QWEN_MODEL": ("qwen_model", None, str),
+        "CLAUDE_MODEL": ("claude_model", None, str),
+        "ANTHROPIC_MODEL": ("claude_model", None, str),
         "PERPLEXITY_MODEL": ("perplexity_model", None, str),
     }
 
@@ -164,8 +153,8 @@ def validate_startup_config() -> list[str]:
     """
     errors: list[str] = []
 
-    # Check API keys exist
-    required_keys = ["DEEPSEEK_API_KEY", "QWEN_API_KEY", "PERPLEXITY_API_KEY"]
+    # Check API keys exist — Claude (Anthropic) + Perplexity only
+    required_keys = ["ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY"]
     for key in required_keys:
         if not os.getenv(key):
             errors.append(f"Missing required environment variable: {key}")

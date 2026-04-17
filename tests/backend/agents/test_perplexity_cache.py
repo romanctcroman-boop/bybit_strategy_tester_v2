@@ -20,6 +20,13 @@ import pytest
 
 pytestmark = pytest.mark.skip(reason="PerplexityIntegration removed from consensus module")
 
+
+# Stub — the real class was removed; entire file is skipped.
+class PerplexityIntegration:
+    def __init__(self, **_kw: object) -> None:
+        self.cache_ttl_seconds = 60
+
+
 # =============================================================================
 # FIXTURES
 # =============================================================================

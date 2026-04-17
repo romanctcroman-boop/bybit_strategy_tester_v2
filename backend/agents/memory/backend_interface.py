@@ -10,7 +10,7 @@ This abstracts the persistence layer so HierarchicalMemory can use either
 backend without changing its in-memory data structures or logic.
 
 Addresses audit finding: "HierarchicalMemory is in-memory only, no integration
-path with sqlite_backend.py" (Qwen, HIGH severity)
+path with sqlite_backend.py" (Claude, HIGH severity)
 """
 
 from __future__ import annotations

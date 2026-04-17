@@ -482,9 +482,7 @@ class StrategyDefToGraphConverter:
         _wire_direction(short_signal_ids, filter_short_ids, "short", "entry_short")
 
         # ── Exit conditions → static_sltp block ─────────────────────────
-        self._build_exit_block(
-            strategy_def, strategy_node_id, blocks, connections, warnings
-        )
+        self._build_exit_block(strategy_def, strategy_node_id, blocks, connections, warnings)
 
         # ── Remove orphan blocks (not connected to strategy_node) ────────
         n_before = len(blocks)
@@ -531,7 +529,7 @@ class StrategyDefToGraphConverter:
             "strategy": 920,
         }
         _ROW_H = 110  # vertical spacing between blocks in the same column
-        _col_y: dict[str, int] = {k: 80 for k in _COL_X}
+        _col_y: dict[str, int] = dict.fromkeys(_COL_X, 80)
 
         def _col_key(block: dict[str, Any]) -> str:
             btype = block.get("type", "")
@@ -557,7 +555,7 @@ class StrategyDefToGraphConverter:
 
     def _build_exit_block(
         self,
-        strategy_def: "StrategyDefinition",
+        strategy_def: StrategyDefinition,
         strategy_node_id: str,
         blocks: list[dict[str, Any]],
         connections: list[dict[str, Any]],
@@ -581,22 +579,26 @@ class StrategyDefToGraphConverter:
         sl_pct = max(0.3, min(20.0, sl_val)) if sl_val > 0 else 1.5
 
         block_id = f"static_sltp_{next(self._id_counter)}"
-        blocks.append({
-            "id": block_id,
-            "type": "static_sltp",
-            "params": {
-                "take_profit_percent": round(tp_pct, 2),
-                "stop_loss_percent": round(sl_pct, 2),
-                "activate_breakeven": False,
-                "close_only_in_profit": False,
-            },
-        })
-        connections.append({
-            "from": block_id,
-            "fromPort": "exit",
-            "to": strategy_node_id,
-            "toPort": "sl_tp",
-        })
+        blocks.append(
+            {
+                "id": block_id,
+                "type": "static_sltp",
+                "params": {
+                    "take_profit_percent": round(tp_pct, 2),
+                    "stop_loss_percent": round(sl_pct, 2),
+                    "activate_breakeven": False,
+                    "close_only_in_profit": False,
+                },
+            }
+        )
+        connections.append(
+            {
+                "from": block_id,
+                "fromPort": "exit",
+                "to": strategy_node_id,
+                "toPort": "sl_tp",
+            }
+        )
         logger.debug(f"[GraphConverter] Added static_sltp: TP={tp_pct}% SL={sl_pct}%")
 
     @staticmethod
@@ -629,10 +631,7 @@ class StrategyDefToGraphConverter:
                     queue.append(src)
 
         kept_blocks = [b for b in blocks if b.get("id") in reachable]
-        kept_conns = [
-            c for c in connections
-            if c.get("from") in reachable and c.get("to") in reachable
-        ]
+        kept_conns = [c for c in connections if c.get("from") in reachable and c.get("to") in reachable]
         return kept_blocks, kept_conns
 
     # ------------------------------------------------------------------

@@ -6,7 +6,7 @@ Uses ChromaDB for local vector storage with optional API-based embedding generat
 
 Supports:
 - Local sentence-transformers embeddings (offline)
-- DeepSeek API embeddings (online)
+- Claude API embeddings (online)
 - Hybrid approach (local with API fallback)
 """
 
@@ -45,7 +45,7 @@ class VectorMemoryStore:
     Uses ChromaDB for local persistent vector storage.
     Supports multiple embedding strategies:
     1. Local: sentence-transformers (no API needed)
-    2. Remote: DeepSeek/OpenAI API
+    2. Remote: Claude/OpenAI API
     3. Hybrid: Local with remote fallback
 
     Example:
@@ -553,18 +553,18 @@ class VectorMemoryStore:
             return []
 
 
-class DeepSeekEmbeddingProvider:
+class ClaudeEmbeddingProvider:
     """
-    DeepSeek API-based embedding provider
+    Claude API-based embedding provider
 
-    Uses DeepSeek's embedding endpoint for high-quality embeddings.
-    Requires DEEPSEEK_API_KEY to be configured.
+    Uses Claude's embedding endpoint for high-quality embeddings.
+    Requires Claude_API_KEY to be configured.
     """
 
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "deepseek-chat",  # DeepSeek doesn't have separate embedding model yet
+        model: str = "claude-haiku-4-5-20251001",  # Claude doesn't have separate embedding model yet
     ):
         self.api_key = api_key
         self.model = model
@@ -577,25 +577,25 @@ class DeepSeekEmbeddingProvider:
 
             km = KeyManager()
             try:
-                self.api_key = km.get_decrypted_key("DEEPSEEK_API_KEY")
+                self.api_key = km.get_decrypted_key("Claude_API_KEY")
             except Exception:
-                logger.warning("DeepSeek API key not available for embeddings")
+                logger.warning("Claude API key not available for embeddings")
 
     async def get_embedding(self, text: str) -> list[float] | None:
-        """Get embedding from DeepSeek API"""
+        """Get embedding from Claude API"""
         if not self.api_key:
             return None
 
-        # Note: DeepSeek doesn't have a dedicated embedding endpoint yet
+        # Note: Claude doesn't have a dedicated embedding endpoint yet
         # This is a placeholder for when they add one
         # For now, use local embeddings or sentence-transformers
 
-        logger.debug("DeepSeek embedding API not yet available, using fallback")
+        logger.debug("Claude embedding API not yet available, using fallback")
         return None
 
 
 __all__ = [
-    "DeepSeekEmbeddingProvider",
+    "ClaudeEmbeddingProvider",
     "SearchResult",
     "VectorMemoryStore",
 ]

@@ -153,8 +153,8 @@ class BacktestBridge:
 
         # Map direction
         dir_map = {
-            "long": TradeDirection.LONG_ONLY,
-            "short": TradeDirection.SHORT_ONLY,
+            "long": TradeDirection.LONG,
+            "short": TradeDirection.SHORT,
             "both": TradeDirection.BOTH,
         }
         trade_direction = dir_map.get(direction, TradeDirection.BOTH)
@@ -189,8 +189,9 @@ class BacktestBridge:
         # Extract metrics
         m = output.metrics
         return {
-            "net_pnl": m.net_pnl,
-            "total_return_pct": m.total_return_pct,
+            "net_pnl": m.net_profit,
+            "net_profit": m.net_profit,  # alias used by strategy_evolution.compute_fitness()
+            "total_return_pct": m.total_return,
             "sharpe_ratio": m.sharpe_ratio,
             "max_drawdown_pct": m.max_drawdown_pct,
             "win_rate": m.win_rate,
@@ -198,12 +199,13 @@ class BacktestBridge:
             "total_trades": m.total_trades,
             "winning_trades": m.winning_trades,
             "losing_trades": m.losing_trades,
-            "avg_trade_pnl": m.avg_trade_pnl,
+            "avg_trade_pnl": m.avg_trade,
             "largest_win": m.largest_win,
             "largest_loss": m.largest_loss,
             "execution_time": output.execution_time,
             "engine_name": output.engine_name,
             "bars_processed": output.bars_processed,
+            "initial_capital": initial_capital,  # needed by compute_fitness() normalization
             "strategy_type": strategy_type,
             "strategy_params": strategy_params,
         }

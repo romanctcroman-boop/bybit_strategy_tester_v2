@@ -30,14 +30,14 @@ class TestConsolidationUnblocked:
             memory_type=MemoryType.EPISODIC,
             importance=0.8,
             tags=["RSI", "trading"],
-            agent_namespace="deepseek",
+            agent_namespace="claude",
         )
         await memory.store(
             content="RSI_indicator crossed below 30 on ETHUSDT, oversold signal",
             memory_type=MemoryType.EPISODIC,
             importance=0.7,
             tags=["RSI_indicator", "trade"],
-            agent_namespace="qwen",
+            agent_namespace="claude",
         )
         await memory.store(
             content="Relative strength index divergence detected on SOLUSDT",

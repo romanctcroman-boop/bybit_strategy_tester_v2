@@ -1,7 +1,9 @@
 """
 API Key Pool Manager
 
-Manages API key rotation, health tracking, and cooldown for DeepSeek/Perplexity APIs.
+Manages API key rotation, health tracking, and cooldown for Claude (Anthropic)
+and Perplexity APIs.  OpenAI and DeepSeek providers were removed — the system
+now uses Claude + Perplexity only.
 Extracted from unified_agent_interface.py for better modularity (P1 fix 2026-01-28).
 
 Features:
@@ -35,7 +37,7 @@ class APIKeyPoolManager:
 
     Example:
         manager = APIKeyPoolManager()
-        key = await manager.get_active_key(AgentType.DEEPSEEK)
+        key = await manager.get_active_key(AgentType.CLAUDE)
         if key:
             try:
                 # Use key
@@ -50,9 +52,8 @@ class APIKeyPoolManager:
     COOLDOWN_ALERT_COOLDOWN = 60.0
 
     def __init__(self):
-        self.deepseek_keys: list[APIKey] = []
         self.perplexity_keys: list[APIKey] = []
-        self.qwen_keys: list[APIKey] = []
+        self.claude_keys: list[APIKey] = []
 
         # Async lock for thread-safe key selection
         self._key_selection_lock = asyncio.Lock()
@@ -68,27 +69,11 @@ class APIKeyPoolManager:
         self._load_keys()
 
     def _load_keys(self):
-        """Load API keys via KeyManager — 1 key per provider."""
+        """Load API keys via KeyManager — 1 key per provider (Claude + Perplexity)."""
         try:
             from backend.security.key_manager import KeyManager
 
             km = KeyManager()
-
-            # DeepSeek (1 key)
-            key_name = "DEEPSEEK_API_KEY"
-            try:
-                if km.has_key(key_name, require_decryptable=True):
-                    self.deepseek_keys.append(
-                        APIKey(
-                            value=None,
-                            agent_type=AgentType.DEEPSEEK,
-                            index=0,
-                            key_name=key_name,
-                        )
-                    )
-                    logger.debug(f"DeepSeek key registered (pool size: {len(self.deepseek_keys)})")
-            except Exception as e:
-                logger.warning(f"DeepSeek key lookup failed: {e}")
 
             # Perplexity (1 key)
             key_name = "PERPLEXITY_API_KEY"
@@ -106,39 +91,33 @@ class APIKeyPoolManager:
             except Exception as e:
                 logger.warning(f"Perplexity key lookup failed: {e}")
 
-            # Qwen (1 key)
-            key_name = "QWEN_API_KEY"
+            # Claude / Anthropic (1 key)
+            key_name = "ANTHROPIC_API_KEY"
             try:
                 if km.has_key(key_name, require_decryptable=True):
-                    self.qwen_keys.append(
+                    self.claude_keys.append(
                         APIKey(
                             value=None,
-                            agent_type=AgentType.QWEN,
+                            agent_type=AgentType.CLAUDE,
                             index=0,
                             key_name=key_name,
                         )
                     )
-                    logger.debug(f"Qwen key registered (pool size: {len(self.qwen_keys)})")
+                    logger.debug(f"Claude key registered (pool size: {len(self.claude_keys)})")
             except Exception as e:
-                logger.warning(f"Qwen key lookup failed: {e}")
+                logger.warning(f"Claude key lookup failed: {e}")
 
-            logger.info(
-                f"Loaded {len(self.deepseek_keys)} DeepSeek + "
-                f"{len(self.perplexity_keys)} Perplexity + "
-                f"{len(self.qwen_keys)} Qwen keys"
-            )
+            logger.info(f"Loaded {len(self.perplexity_keys)} Perplexity + {len(self.claude_keys)} Claude keys")
 
         except ImportError:
             logger.error("Encryption system not available!")
             raise
 
     def _get_pool(self, agent_type: AgentType) -> list[APIKey]:
-        """Get key pool by agent type"""
-        if agent_type == AgentType.DEEPSEEK:
-            return self.deepseek_keys
-        elif agent_type == AgentType.QWEN:
-            return self.qwen_keys
-        return self.perplexity_keys
+        """Get key pool by agent type."""
+        if agent_type == AgentType.PERPLEXITY:
+            return self.perplexity_keys
+        return self.claude_keys
 
     def _refresh_cooldowns(self, agent_type: AgentType) -> None:
         """Restore keys that have finished cooling"""
@@ -381,31 +360,26 @@ class APIKeyPoolManager:
 
         Returns:
             Dict with per-provider validation results:
-            {"deepseek": {"valid": True, "status": 200}, ...}
+            {"claude": {"valid": True, "status": 200}, ...}
         """
         import httpx
 
         results: dict[str, Any] = {}
 
-        # Validation endpoints — minimal requests for each provider
+        # Validation endpoints — minimal requests for each active provider
+        # Claude and Claude have been removed; only Claude + Perplexity remain.
         checks = [
-            (
-                "deepseek",
-                self.deepseek_keys,
-                "https://api.deepseek.com/models",
-                "DEEPSEEK_API_KEY",
-            ),
-            (
-                "qwen",
-                self.qwen_keys,
-                "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
-                "QWEN_API_KEY",
-            ),
             (
                 "perplexity",
                 self.perplexity_keys,
                 "https://api.perplexity.ai/chat/completions",
                 "PERPLEXITY_API_KEY",
+            ),
+            (
+                "claude",
+                self.claude_keys,
+                "https://api.anthropic.com/v1/messages",
+                "ANTHROPIC_API_KEY",
             ),
         ]
 
@@ -427,13 +401,12 @@ class APIKeyPoolManager:
                     logger.error(f"❌ Pre-flight: {provider} key not decryptable")
                     continue
 
-                # Lightweight validation request
-                headers = {"Authorization": f"Bearer {api_key}"}
-
-                # Perplexity doesn't have a /models endpoint, use a different check
+                # Lightweight validation request — provider-specific auth
                 if provider == "perplexity":
-                    # Just check that auth header is accepted with a tiny request
-                    headers["Content-Type"] = "application/json"
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    }
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         resp = await client.post(
                             url,
@@ -444,7 +417,25 @@ class APIKeyPoolManager:
                                 "max_tokens": 1,
                             },
                         )
+                elif provider == "claude":
+                    # Anthropic uses x-api-key header, not Bearer
+                    headers = {
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    }
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.post(
+                            url,
+                            headers=headers,
+                            json={
+                                "model": "claude-haiku-4-5-20251001",
+                                "messages": [{"role": "user", "content": "ping"}],
+                                "max_tokens": 1,
+                            },
+                        )
                 else:
+                    headers = {"Authorization": f"Bearer {api_key}"}
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         resp = await client.get(url, headers=headers)
 

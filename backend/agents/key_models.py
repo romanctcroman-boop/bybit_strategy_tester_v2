@@ -54,7 +54,7 @@ class APIKey:
     Example:
         key = APIKey(
             value="sk-xxx",
-            agent_type=AgentType.DEEPSEEK,
+            agent_type=AgentType.CLAUDE,
             index=0,
         )
         assert key.is_usable
@@ -63,7 +63,7 @@ class APIKey:
     """
 
     agent_type: AgentType
-    index: int  # 0-7 for DeepSeek, 0-7 for Qwen, 0-7 for Perplexity
+    index: int  # 0-7 for Claude, 0-7 for Claude, 0-7 for Perplexity
     health: APIKeyHealth = APIKeyHealth.HEALTHY
     last_used: float | None = None
     error_count: int = 0
@@ -81,7 +81,7 @@ class APIKey:
     def __init__(
         self,
         value: str | None = None,
-        agent_type: AgentType = AgentType.DEEPSEEK,
+        agent_type: AgentType = AgentType.CLAUDE,
         index: int = 0,
         *,
         key_name: str | None = None,
@@ -109,7 +109,7 @@ class APIKey:
 
         Args:
             value: Direct key value (primary)
-            agent_type: Provider type (DeepSeek, Qwen, Perplexity)
+            agent_type: Provider type (Claude, Claude, Perplexity)
             index: Key index in pool
             key_name: Secret name for KeyManager decryption
             health: Initial health state
@@ -139,8 +139,8 @@ class APIKey:
         # Auto-generate key_name if not provided
         if not self.key_name and self._value_override is None:
             prefix_map = {
-                AgentType.DEEPSEEK: "DS",
-                AgentType.QWEN: "QW",
+                AgentType.CLAUDE: "CL",
+                AgentType.COPILOT: "CP",
                 AgentType.PERPLEXITY: "PP",
             }
             prefix = prefix_map.get(agent_type, "UK")
@@ -188,8 +188,8 @@ class APIKey:
     def _get_env_var_name(self) -> str:
         """Get environment variable name for this key."""
         name_map = {
-            AgentType.DEEPSEEK: "DEEPSEEK_API_KEY",
-            AgentType.QWEN: "QWEN_API_KEY",
+            AgentType.CLAUDE: "Claude_API_KEY",
+            AgentType.CLAUDE: "Claude_API_KEY",
             AgentType.PERPLEXITY: "PERPLEXITY_API_KEY",
         }
         base = name_map.get(self.agent_type, "API_KEY")

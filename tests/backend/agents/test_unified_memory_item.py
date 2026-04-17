@@ -38,7 +38,7 @@ def memory_item() -> MemoryItem:
         id="test-001",
         content="BTCUSDT RSI crossed above 70",
         memory_type=MemoryType.EPISODIC,  # type: ignore[arg-type]
-        agent_namespace="deepseek",
+        agent_namespace="claude",
         importance=0.85,
         ttl_seconds=3600.0,
         tags=["btc", "rsi", "overbought"],
@@ -151,14 +151,14 @@ class TestNamespaceIsolation:
     def test_store_with_different_namespaces(self, sqlite_backend: SQLiteMemoryBackend):
         sqlite_backend.store(
             "working",
-            "DeepSeek analysis",
-            agent_namespace="deepseek",
+            "Claude analysis",
+            agent_namespace="claude",
             importance=0.9,
         )
         sqlite_backend.store(
             "working",
-            "Qwen analysis",
-            agent_namespace="qwen",
+            "Perplexity analysis",
+            agent_namespace="perplexity",
             importance=0.8,
         )
         sqlite_backend.store(
@@ -169,20 +169,20 @@ class TestNamespaceIsolation:
         )
 
         # Query with namespace filter
-        deepseek_items = sqlite_backend.query("working", agent_namespace="deepseek")
-        qwen_items = sqlite_backend.query("working", agent_namespace="qwen")
+        claude_items = sqlite_backend.query("working", agent_namespace="claude")
+        perplexity_items = sqlite_backend.query("working", agent_namespace="perplexity")
 
         # Each agent sees its own + shared items
-        deepseek_contents = {i["content"] for i in deepseek_items}
-        qwen_contents = {i["content"] for i in qwen_items}
+        claude_contents = {i["content"] for i in claude_items}
+        perplexity_contents = {i["content"] for i in perplexity_items}
 
-        assert "DeepSeek analysis" in deepseek_contents
-        assert "Shared insight" in deepseek_contents
-        assert "Qwen analysis" not in deepseek_contents
+        assert "Claude analysis" in claude_contents
+        assert "Shared insight" in claude_contents
+        assert "Perplexity analysis" not in claude_contents
 
-        assert "Qwen analysis" in qwen_contents
-        assert "Shared insight" in qwen_contents
-        assert "DeepSeek analysis" not in qwen_contents
+        assert "Perplexity analysis" in perplexity_contents
+        assert "Shared insight" in perplexity_contents
+        assert "Claude analysis" not in perplexity_contents
 
     def test_default_namespace_is_shared(self, sqlite_backend: SQLiteMemoryBackend):
         sqlite_backend.store("working", "Default namespace item")

@@ -10,7 +10,7 @@ Policy options:
 - WEIGHTED: Block based on weighted score threshold (default)
 
 Addresses audit finding: "PromptGuard and SemanticPromptGuard operate
-independently — no orchestration layer to fuse results" (Qwen, P1)
+independently — no orchestration layer to fuse results" (Claude, P1)
 """
 
 from __future__ import annotations
@@ -210,4 +210,29 @@ __all__ = [
     "FusionPolicy",
     "SecurityOrchestrator",
     "SecurityVerdict",
+    "get_security_orchestrator",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton
+# ---------------------------------------------------------------------------
+
+_DEFAULT_ORCHESTRATOR: SecurityOrchestrator | None = None
+
+
+def get_security_orchestrator(
+    policy: FusionPolicy = FusionPolicy.WEIGHTED,
+    threshold: float = 0.7,
+) -> SecurityOrchestrator:
+    """Return the process-wide SecurityOrchestrator singleton.
+
+    Guards and embeddings are expensive to initialize — this shared instance
+    is the preferred entry point for pipeline nodes that must validate every
+    LLM prompt.  Configuration is only applied on first call; subsequent
+    calls return the cached instance regardless of args.
+    """
+    global _DEFAULT_ORCHESTRATOR
+    if _DEFAULT_ORCHESTRATOR is None:
+        _DEFAULT_ORCHESTRATOR = SecurityOrchestrator(policy=policy, threshold=threshold)
+    return _DEFAULT_ORCHESTRATOR

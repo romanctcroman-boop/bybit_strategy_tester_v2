@@ -26,11 +26,13 @@ from backend.utils.time import utc_now
 
 
 class AgentType(str, Enum):
-    """AI agent types in the system"""
+    """AI agent types in the system.
 
-    DEEPSEEK = "deepseek"
+    Active providers: CLAUDE (Anthropic), PERPLEXITY.
+    Claude and Claude have been removed — the system now uses Claude + Perplexity only.
+    """
+
     PERPLEXITY = "perplexity"
-    QWEN = "qwen"
     CLAUDE = "claude"
     COPILOT = "copilot"
     ORCHESTRATOR = "orchestrator"
@@ -120,7 +122,7 @@ class AgentRequest(BaseModel):
 
     Examples:
         >>> request = AgentRequest(
-        ...     agent_type=AgentType.DEEPSEEK,
+        ...     agent_type=AgentType.CLAUDE,
         ...     task_type="analyze",
         ...     prompt="Analyze this trading strategy",
         ...     code="def my_strategy(): pass"
@@ -169,27 +171,8 @@ class AgentRequest(BaseModel):
         }
 
     def to_direct_api_format(self, include_tools: bool = True) -> dict[str, Any]:
-        """Convert to direct API format"""
-        if self.agent_type == AgentType.DEEPSEEK:
-            payload = {
-                "model": "deepseek-chat",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": ("You are an expert Python developer analyzing trading strategies."),
-                    },
-                    {"role": "user", "content": self._build_prompt()},
-                ],
-                "temperature": 0.7,
-                "max_tokens": 4000,
-            }
-
-            # Add tools if needed
-            if include_tools and self.context.get("use_file_access", False):
-                payload["tools"] = self._get_mcp_tools_definition()
-
-            return payload
-        else:  # Perplexity
+        """Convert to direct API format (Claude or Perplexity)."""
+        if self.agent_type == AgentType.PERPLEXITY:
             return {
                 "model": "sonar-pro",
                 "messages": [
@@ -201,6 +184,20 @@ class AgentRequest(BaseModel):
                 ],
                 "temperature": 0.2,
                 "max_tokens": 2000,
+            }
+        else:
+            # Claude
+            return {
+                "model": "claude-haiku-4-5-20251001",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are an expert Python developer analyzing trading strategies.",
+                    },
+                    {"role": "user", "content": self._build_prompt()},
+                ],
+                "temperature": 0.7,
+                "max_tokens": 4000,
             }
 
     def _build_prompt(self) -> str:
@@ -261,7 +258,7 @@ class AgentRequest(BaseModel):
 
     @staticmethod
     def _get_mcp_tools_definition() -> list[dict[str, Any]]:
-        """MCP file access tools for DeepSeek"""
+        """MCP file access tools for Claude"""
         return [
             {
                 "type": "function",
@@ -295,7 +292,7 @@ class AgentMessage(BaseModel):
     Examples:
         >>> msg = AgentMessage(
         ...     message_id="msg-123",
-        ...     from_agent=AgentType.DEEPSEEK,
+        ...     from_agent=AgentType.CLAUDE,
         ...     to_agent=AgentType.COPILOT,
         ...     message_type=MessageType.RESPONSE,
         ...     content="Analysis complete",
@@ -366,7 +363,7 @@ class ConsensusRequest(BaseModel):
     Examples:
         >>> req = ConsensusRequest(
         ...     question="What are the best indicators for crypto?",
-        ...     agents=[AgentType.DEEPSEEK, AgentType.PERPLEXITY],
+        ...     agents=[AgentType.CLAUDE, AgentType.PERPLEXITY],
         ...     context={"domain": "crypto_trading"}
         ... )
     """
@@ -395,7 +392,7 @@ class ConsensusResponse(BaseModel):
         >>> resp = ConsensusResponse(
         ...     question="Original question",
         ...     consensus="Agreed answer",
-        ...     individual_responses={"deepseek": "...", "perplexity": "..."},
+        ...     individual_responses={"claude": "...", "perplexity": "..."},
         ...     agreement_level=0.85
         ... )
     """
@@ -420,7 +417,7 @@ class APIKey(BaseModel):
     Examples:
         >>> key = APIKey(
         ...     value="sk-xxx",
-        ...     agent_type=AgentType.DEEPSEEK,
+        ...     agent_type=AgentType.CLAUDE,
         ...     index=0
         ... )
     """

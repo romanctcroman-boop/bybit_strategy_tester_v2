@@ -39,16 +39,12 @@ class APIMixin:
     def _get_api_url(self, agent_type: AgentType, strict_mode: bool = False) -> str:
         """Get URL for API.
 
-        Qwen uses Singapore (intl) endpoint.
-        Available models: qwen3-max (trading), qwen-plus, qwen-flash, qwq-plus, qwen3-coder-plus
+        Claude uses Anthropic Messages API.
+        Perplexity uses OpenAI-compatible chat completions endpoint.
         """
-        if agent_type == AgentType.DEEPSEEK:
-            if strict_mode:
-                return "https://api.deepseek.com/beta/chat/completions"
-            return "https://api.deepseek.com/v1/chat/completions"
-        elif agent_type == AgentType.QWEN:
-            # Singapore (International) region — dashscope-intl
-            return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+        if agent_type in (AgentType.CLAUDE, AgentType.COPILOT):
+            # All agent types route to Claude / Anthropic
+            return "https://api.anthropic.com/v1/messages"
         return "https://api.perplexity.ai/chat/completions"
 
     def _get_headers(self, key: APIKey) -> dict[str, str]:
@@ -80,8 +76,7 @@ class APIMixin:
     def get_key_pool_snapshot(self) -> dict[str, Any]:
         """Export current key pool metrics for monitoring"""
         return {
-            "deepseek": self.key_manager.get_pool_metrics(AgentType.DEEPSEEK),
-            "qwen": self.key_manager.get_pool_metrics(AgentType.QWEN),
+            "claude": self.key_manager.get_pool_metrics(AgentType.CLAUDE),
             "perplexity": self.key_manager.get_pool_metrics(AgentType.PERPLEXITY),
             "telemetry": self.key_manager.pool_telemetry.copy(),
         }
@@ -99,7 +94,7 @@ class APIMixin:
         """
         Stream a request with real-time output.
 
-        DeepSeek V3.2 streaming returns:
+        Claude streaming returns:
         - reasoning_content chunks (Chain-of-Thought)
         - content chunks (Final answer)
         """
@@ -239,7 +234,7 @@ class APIMixin:
         return json.dumps(data, indent=2)
 
     def _extract_reasoning_content(self, data: dict) -> str | None:
-        """Extract reasoning_content from DeepSeek V3.2 Thinking Mode response."""
+        """Extract reasoning_content from Claude Thinking Mode response."""
         try:
             message = data.get("choices", [{}])[0].get("message", {})
             reasoning = message.get("reasoning_content")
@@ -263,7 +258,7 @@ class APIMixin:
             log_file = log_dir / f"reasoning_{timestamp}.md"
 
             content = (
-                f"# DeepSeek V3.2 Reasoning Log\n"
+                f"# Claude Reasoning Log\n"
                 f"**Timestamp:** {datetime.now().isoformat()}\n"
                 f"**Length:** {len(reasoning)} chars\n\n"
                 f"## Chain-of-Thought\n\n{reasoning}\n"
@@ -314,14 +309,14 @@ class APIMixin:
             total_tokens = usage.get("total_tokens", 0)
 
             reasoning_tokens = 0
-            if agent_type == AgentType.DEEPSEEK:
+            if agent_type == AgentType.CLAUDE:
                 details = usage.get("completion_tokens_details", {})
                 reasoning_tokens = details.get("reasoning_tokens", 0)
 
             cache_hit_tokens = 0
             cache_miss_tokens = 0
             cache_savings_pct = 0.0
-            if agent_type == AgentType.DEEPSEEK:
+            if agent_type == AgentType.CLAUDE:
                 prompt_details = usage.get("prompt_tokens_details", {})
                 cache_hit_tokens = prompt_details.get("cached_tokens", 0)
                 if cache_hit_tokens == 0:
@@ -338,13 +333,10 @@ class APIMixin:
                 cost_info = usage.get("cost", {})
                 cost_usd = cost_info.get("total_cost")
 
-            if agent_type == AgentType.DEEPSEEK and cost_usd is None:
-                if reasoning_tokens > 0:
-                    input_cost = prompt_tokens * 0.55 / 1_000_000
-                    output_cost = completion_tokens * 2.19 / 1_000_000
-                else:
-                    input_cost = prompt_tokens * 0.14 / 1_000_000
-                    output_cost = completion_tokens * 0.28 / 1_000_000
+            if agent_type == AgentType.CLAUDE and cost_usd is None:
+                # Claude Sonnet 4 pricing: $3/M input, $15/M output
+                input_cost = prompt_tokens * 3.0 / 1_000_000
+                output_cost = completion_tokens * 15.0 / 1_000_000
                 cost_usd = round(input_cost + output_cost, 6)
 
             token_usage = TokenUsage(

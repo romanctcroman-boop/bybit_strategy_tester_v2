@@ -2,7 +2,7 @@
 Query Mixin — High-level convenience query methods.
 
 Extracted from UnifiedAgentInterface to reduce god-class size.
-Provides query_deepseek() and query_perplexity() with caching support.
+Provides query_claude() and query_perplexity() with caching support.
 """
 
 from __future__ import annotations
@@ -19,22 +19,22 @@ from backend.agents.request_models import AgentRequest, AgentResponse
 class QueryMixin:
     """Mixin providing high-level query convenience methods with caching."""
 
-    async def query_deepseek(
+    async def query_claude(
         self,
         prompt: str,
         *,
-        model: str = "deepseek-chat",
+        model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.7,
         max_tokens: int = 2000,
         use_cache: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """
-        Convenient method to query DeepSeek AI with caching support.
+        Convenient method to query Claude AI with caching support.
 
         Args:
             prompt: The question or prompt.
-            model: DeepSeek model name.
+            model: Claude model name.
             temperature: Response randomness (0.0-2.0).
             max_tokens: Maximum response length.
             use_cache: Enable/disable caching for this request (default: True).
@@ -46,11 +46,11 @@ class QueryMixin:
         """
         cached = self._try_cache_get(prompt, model, temperature, max_tokens, use_cache, **kwargs)
         if cached is not None:
-            logger.info("⚡ Cache HIT for DeepSeek query (latency: ~0ms)")
+            logger.info("⚡ Cache HIT for Claude query (latency: ~0ms)")
             return cached
 
         request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK,
+            agent_type=AgentType.CLAUDE,
             task_type="chat",
             prompt=prompt,
         )

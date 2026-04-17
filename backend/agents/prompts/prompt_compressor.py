@@ -52,7 +52,7 @@ class PromptCompressor:
         print(f"Saved {result.tokens_saved} tokens (${result.cost_saved_usd:.4f})")
     """
 
-    # Cost per 1M tokens (qwen3-max)
+    # Cost per 1M tokens (claude)
     INPUT_COST_PER_M = 1.20
     OUTPUT_COST_PER_M = 6.00
 
@@ -119,7 +119,7 @@ class PromptCompressor:
         self,
         prompt: str,
         max_tokens: int | None = None,
-        model: str = "qwen3-max",
+        model: str = "claude-haiku-4-5-20251001",
     ) -> str:
         """
         Compress a prompt string.

@@ -9,7 +9,7 @@ Logs prompts and responses for:
 
 Usage:
     logger = PromptLogger()
-    prompt_id = logger.log_prompt(agent_type="qwen", task_type="strategy", prompt="...")
+    prompt_id = logger.log_prompt(agent_type="claude", task_type="strategy", prompt="...")
     logger.log_response(prompt_id, response="...", tokens=1000, cost=0.01)
 """
 
@@ -57,7 +57,7 @@ class PromptLogger:
     Example:
         logger = PromptLogger()
         prompt_id = logger.log_prompt(
-            agent_type="qwen",
+            agent_type="claude",
             task_type="strategy_generation",
             prompt="Generate RSI strategy",
             context={"symbol": "BTCUSDT"}
@@ -91,10 +91,30 @@ class PromptLogger:
 
         logger.info(f"📝 PromptLogger initialized (db={db_path}, retention={retention_days}d)")
 
+    def _connect(self) -> sqlite3.Connection:
+        """Open SQLite connection with busy-timeout to avoid 'database is locked'.
+
+        All internal DB operations should go through this helper so that
+        concurrent writes (multi-worker uvicorn) don't collide.
+        """
+        import contextlib
+
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        with contextlib.suppress(sqlite3.Error):
+            conn.execute("PRAGMA busy_timeout=10000")
+        return conn
+
     def _init_database(self) -> None:
         """Initialize database schema."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
+
+        # Enable WAL for concurrent reads during writes (multi-worker deployment)
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.Error as pragma_err:  # pragma: no cover — best-effort
+            logger.debug(f"[prompt_logger] PRAGMA setup skipped: {pragma_err}")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS prompt_logs (
@@ -144,7 +164,7 @@ class PromptLogger:
         Log a prompt before sending to LLM.
 
         Args:
-            agent_type: Agent type (qwen, deepseek, perplexity)
+            agent_type: Agent type (claude, perplexity)
             task_type: Task type (strategy_generation, optimization, etc.)
             prompt: Prompt text
             context: Additional context dict
@@ -155,12 +175,12 @@ class PromptLogger:
         prompt_id = str(uuid.uuid4())
         timestamp = datetime.now(UTC).isoformat()
 
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         cursor.execute(
             """
-            INSERT INTO prompt_logs 
+            INSERT INTO prompt_logs
             (prompt_id, timestamp, agent_type, task_type, prompt, context)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -203,7 +223,7 @@ class PromptLogger:
             success: Whether request succeeded
             error_message: Error message if failed
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -244,7 +264,7 @@ class PromptLogger:
         Returns:
             Log entry or None if not found
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -283,7 +303,7 @@ class PromptLogger:
         Returns:
             List of log entries
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         query = "SELECT * FROM prompt_logs WHERE 1=1"
@@ -331,7 +351,7 @@ class PromptLogger:
         Returns:
             Statistics dict
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         start_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
@@ -415,7 +435,7 @@ class PromptLogger:
         Returns:
             Number of deleted logs
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
 
         cutoff_date = (datetime.now(UTC) - timedelta(days=self.retention_days)).isoformat()

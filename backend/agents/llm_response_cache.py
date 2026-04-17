@@ -9,7 +9,7 @@ Key design decisions:
 - Normalizes queries: strips timestamps, current prices, and ephemeral numbers
   so semantically identical questions get the same cache key
 - TTL: 300s for Perplexity (market context changes slowly on minute scale)
-        60s for DeepSeek strategy generation (more unique per request)
+        60s for Claude strategy generation (more unique per request)
 - Thread-safe: ContextCache uses dict, Python GIL covers single ops
 """
 
@@ -27,8 +27,8 @@ from backend.agents.prompts.context_cache import ContextCache
 # Per-provider TTL in seconds
 _TTL_BY_AGENT: dict[str, int] = {
     "perplexity": 300,  # 5 min — market regime doesn't change that fast
-    "deepseek": 60,  # 1 min — strategy generation is more query-specific
-    "qwen": 90,  # 1.5 min
+    "claude": 60,  # 1 min — strategy generation is more query-specific
+    "claude": 90,  # 1.5 min
 }
 
 # Patterns to strip before hashing (ephemeral, frequently-changing values)

@@ -17,7 +17,7 @@ Thread-safe using simple locking.
 
 Usage:
     limiter = AgentRateLimiter()
-    result = limiter.check("deepseek")
+    result = limiter.check("claude")
     if result.allowed:
         # proceed with API call
     else:
@@ -84,8 +84,8 @@ class RateLimitResult:
 # ═══════════════════════════════════════════════════════════════════
 
 DEFAULT_LIMITS: dict[str, RateLimitConfig] = {
-    "deepseek": RateLimitConfig(
-        agent_id="deepseek",
+    "claude": RateLimitConfig(
+        agent_id="claude",
         requests_per_minute=30,
         requests_per_hour=500,
         burst_size=5,
@@ -98,8 +98,8 @@ DEFAULT_LIMITS: dict[str, RateLimitConfig] = {
         burst_size=3,
         cooldown_seconds=3.0,
     ),
-    "qwen": RateLimitConfig(
-        agent_id="qwen",
+    "claude": RateLimitConfig(
+        agent_id="claude",
         requests_per_minute=30,
         requests_per_hour=500,
         burst_size=5,

@@ -10,7 +10,7 @@ Tests cover:
 - OpenAICompatibleClient shared behavior
 - LLMClientFactory creation
 - LLMClientPool failover
-- DeepSeek/Perplexity/Qwen/Ollama client initialization
+- Claude/Perplexity/Ollama client initialization
 """
 
 import asyncio
@@ -28,20 +28,17 @@ from backend.agents.llm.base_client import (
     LLMResponse,
     RateLimiter,
 )
-from backend.agents.llm.clients.deepseek import DeepSeekClient
+from backend.agents.llm.clients.claude import ClaudeClient
 from backend.agents.llm.clients.ollama import OllamaClient
 from backend.agents.llm.clients.perplexity import PerplexityClient
-from backend.agents.llm.clients.qwen import QwenClient
 
 
 class TestLLMProvider:
     """Test LLMProvider enum."""
 
-    def test_all_providers(self):
-        """All 7 providers are defined."""
-        assert LLMProvider.DEEPSEEK.value == "deepseek"
+    def test_active_providers(self):
+        """Active providers are defined."""
         assert LLMProvider.PERPLEXITY.value == "perplexity"
-        assert LLMProvider.QWEN.value == "qwen"
         assert LLMProvider.OLLAMA.value == "ollama"
         assert LLMProvider.OPENAI.value == "openai"
         assert LLMProvider.ANTHROPIC.value == "anthropic"
@@ -73,24 +70,24 @@ class TestLLMMessage:
 class TestLLMResponse:
     """Test LLMResponse and cost estimation."""
 
-    def test_estimated_cost_deepseek(self):
-        """DeepSeek cost estimation."""
+    def test_estimated_cost_anthropic(self):
+        """Anthropic cost estimation (Haiku model)."""
         resp = LLMResponse(
             content="test",
-            model="deepseek-chat",
-            provider=LLMProvider.DEEPSEEK,
+            model="claude-haiku-4-5-20251001",
+            provider=LLMProvider.ANTHROPIC,
             prompt_tokens=1_000_000,
             completion_tokens=1_000_000,
         )
-        # 0.14 + 0.28 = 0.42 per 1M tokens
-        assert abs(resp.estimated_cost - 0.42) < 0.01
+        # Haiku: $0.80 input + $4.00 output per 1M tokens
+        assert resp.estimated_cost > 0
 
     def test_estimated_cost_zero_tokens(self):
         """Zero tokens = zero cost."""
         resp = LLMResponse(
             content="test",
-            model="test",
-            provider=LLMProvider.DEEPSEEK,
+            model="claude-haiku-4-5-20251001",
+            provider=LLMProvider.ANTHROPIC,
         )
         assert resp.estimated_cost == 0.0
 
@@ -109,124 +106,11 @@ class TestLLMResponse:
         """Reasoning content is optional."""
         resp = LLMResponse(
             content="result",
-            model="qwen-plus",
-            provider=LLMProvider.QWEN,
+            model="claude-sonnet-4-6",
+            provider=LLMProvider.ANTHROPIC,
             reasoning_content="Step 1: ...",
         )
         assert resp.reasoning_content == "Step 1: ..."
-
-    def test_estimated_cost_deepseek_cache_hit(self):
-        """Cache hits cost 10% of normal input price."""
-        resp = LLMResponse(
-            content="test",
-            model="deepseek-chat",
-            provider=LLMProvider.DEEPSEEK,
-            prompt_tokens=1_000_000,
-            completion_tokens=0,
-            prompt_cache_hit_tokens=1_000_000,
-            prompt_cache_miss_tokens=0,
-        )
-        # hit: 1M * $0.14 * 0.1 = $0.014
-        assert abs(resp.estimated_cost - 0.014) < 0.0001
-
-    def test_estimated_cost_deepseek_cache_miss(self):
-        """Cache misses use full input price."""
-        resp = LLMResponse(
-            content="test",
-            model="deepseek-chat",
-            provider=LLMProvider.DEEPSEEK,
-            prompt_tokens=1_000_000,
-            completion_tokens=0,
-            prompt_cache_hit_tokens=0,
-            prompt_cache_miss_tokens=1_000_000,
-        )
-        # miss: 1M * $0.14 = $0.14
-        assert abs(resp.estimated_cost - 0.14) < 0.0001
-
-    def test_estimated_cost_deepseek_mixed_cache(self):
-        """Mixed hit/miss: 800K hit + 200K miss + 100K completion."""
-        resp = LLMResponse(
-            content="test",
-            model="deepseek-chat",
-            provider=LLMProvider.DEEPSEEK,
-            prompt_tokens=1_000_000,
-            completion_tokens=100_000,
-            prompt_cache_hit_tokens=800_000,
-            prompt_cache_miss_tokens=200_000,
-        )
-        # hit: 800K * 0.14 * 0.1 = 0.01120
-        # miss: 200K * 0.14       = 0.02800
-        # out:  100K * 0.28       = 0.02800
-        expected = 0.01120 + 0.02800 + 0.02800
-        assert abs(resp.estimated_cost - expected) < 0.0001
-
-    def test_estimated_cost_deepseek_no_cache_fields_unchanged(self):
-        """Without cache fields, falls back to normal prompt_tokens pricing."""
-        resp = LLMResponse(
-            content="test",
-            model="deepseek-chat",
-            provider=LLMProvider.DEEPSEEK,
-            prompt_tokens=1_000_000,
-            completion_tokens=1_000_000,
-        )
-        # Normal: 0.14 + 0.28 = 0.42
-        assert abs(resp.estimated_cost - 0.42) < 0.01
-
-
-class TestDeepSeekClientCacheParsing:
-    """Test DeepSeekClient._parse_response() cache token extraction."""
-
-    def _make_api_response(
-        self,
-        cache_hit: int = 0,
-        cache_miss: int = 0,
-        prompt_tokens: int = 1000,
-        completion_tokens: int = 100,
-    ) -> dict:
-        return {
-            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-            "model": "deepseek-chat",
-            "usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": prompt_tokens + completion_tokens,
-                "prompt_cache_hit_tokens": cache_hit,
-                "prompt_cache_miss_tokens": cache_miss,
-            },
-        }
-
-    def _make_client(self) -> "DeepSeekClient":
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
-        return DeepSeekClient(config)
-
-    def test_cache_hit_tokens_extracted(self):
-        """prompt_cache_hit_tokens is parsed from API response."""
-        client = self._make_client()
-        data = self._make_api_response(cache_hit=800, cache_miss=200)
-        resp = client._parse_response(data, latency=50.0)
-        assert resp.prompt_cache_hit_tokens == 800
-        assert resp.prompt_cache_miss_tokens == 200
-
-    def test_no_cache_fields_defaults_to_zero(self):
-        """Missing cache fields default to 0 (older API responses)."""
-        client = self._make_client()
-        data = {
-            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-            "model": "deepseek-chat",
-            "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
-        }
-        resp = client._parse_response(data, latency=50.0)
-        assert resp.prompt_cache_hit_tokens == 0
-        assert resp.prompt_cache_miss_tokens == 0
-
-    def test_cost_saving_with_full_cache_hit(self):
-        """Full cache hit: cost is ~10x cheaper than no cache."""
-        client = self._make_client()
-        data_cached = self._make_api_response(cache_hit=1_000_000, cache_miss=0, completion_tokens=0)
-        data_uncached = self._make_api_response(cache_hit=0, cache_miss=0, prompt_tokens=1_000_000, completion_tokens=0)
-        resp_cached = client._parse_response(data_cached, latency=0)
-        resp_uncached = client._parse_response(data_uncached, latency=0)
-        assert resp_cached.estimated_cost < resp_uncached.estimated_cost * 0.15  # at least 85% cheaper
 
 
 class TestLLMConfig:
@@ -234,7 +118,7 @@ class TestLLMConfig:
 
     def test_default_values(self):
         """Config has sensible defaults."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK)
+        config = LLMConfig(provider=LLMProvider.ANTHROPIC)
         assert config.temperature == 0.7
         assert config.max_tokens == 4096
         assert config.timeout_seconds == 60
@@ -289,31 +173,29 @@ class TestRateLimiter:
             assert "TokenAwareRateLimiter" in str(w[0].message)
 
 
-class TestDeepSeekClient:
-    """Test DeepSeekClient configuration."""
+class TestClaudeClient:
+    """Test ClaudeClient configuration."""
 
     def test_default_config(self):
-        """Default DeepSeek settings."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test-key")
-        client = DeepSeekClient(config)
-        assert client.base_url == "https://api.deepseek.com/v1"
-        assert client.model == "deepseek-chat"
-        assert client.PROVIDER == LLMProvider.DEEPSEEK
+        """Default Claude settings."""
+        config = LLMConfig(provider=LLMProvider.ANTHROPIC, api_key="sk-ant-test-key")
+        client = ClaudeClient(config)
+        assert client.PROVIDER == LLMProvider.ANTHROPIC
 
     def test_custom_model(self):
         """Custom model override."""
         config = LLMConfig(
-            provider=LLMProvider.DEEPSEEK,
-            api_key="test-key",
-            model="deepseek-reasoner",
+            provider=LLMProvider.ANTHROPIC,
+            api_key="sk-ant-test-key",
+            model="claude-sonnet-4-6",
         )
-        client = DeepSeekClient(config)
-        assert client.model == "deepseek-reasoner"
+        client = ClaudeClient(config)
+        assert client.model == "claude-sonnet-4-6"
 
     async def test_close_no_session(self):
         """Close without session doesn't error."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test-key")
-        client = DeepSeekClient(config)
+        config = LLMConfig(provider=LLMProvider.ANTHROPIC, api_key="sk-ant-test-key")
+        client = ClaudeClient(config)
         await client.close()  # Should not raise
 
 
@@ -327,52 +209,6 @@ class TestPerplexityClient:
         assert client.base_url == "https://api.perplexity.ai"
         assert client.model == "sonar-pro"
         assert client.PROVIDER == LLMProvider.PERPLEXITY
-
-
-class TestQwenClient:
-    """Test QwenClient with thinking mode."""
-
-    def test_default_config(self):
-        """Default Qwen settings."""
-        config = LLMConfig(provider=LLMProvider.QWEN, api_key="test-key")
-        client = QwenClient(config)
-        assert "dashscope-intl" in client.base_url
-        assert client.model == "qwen-plus"
-        assert client.PROVIDER == LLMProvider.QWEN
-
-    def test_thinking_models_set(self):
-        """Thinking models are defined."""
-        assert "qwen-plus" in QwenClient.THINKING_MODELS
-        assert "qwen-flash" in QwenClient.THINKING_MODELS
-        assert "qwen3-max" in QwenClient.THINKING_MODELS
-
-    def test_build_payload_basic(self):
-        """Basic payload without thinking mode."""
-        config = LLMConfig(provider=LLMProvider.QWEN, api_key="test-key")
-        client = QwenClient(config)
-        messages = [LLMMessage(role="user", content="test")]
-
-        payload = client._build_payload(messages)
-        assert payload["model"] == "qwen-plus"
-        assert "enable_thinking" not in payload
-
-    def test_build_payload_with_thinking(self):
-        """Payload with thinking mode enabled."""
-        config = LLMConfig(provider=LLMProvider.QWEN, api_key="test-key")
-        client = QwenClient(config)
-        messages = [LLMMessage(role="user", content="test")]
-
-        payload = client._build_payload(messages, enable_thinking=True)
-        assert payload["enable_thinking"] is True
-
-    def test_build_payload_non_thinking_model(self):
-        """Thinking mode ignored for non-thinking models."""
-        config = LLMConfig(provider=LLMProvider.QWEN, api_key="test-key", model="random-model")
-        client = QwenClient(config)
-        messages = [LLMMessage(role="user", content="test")]
-
-        payload = client._build_payload(messages, enable_thinking=True)
-        assert "enable_thinking" not in payload
 
 
 class TestOllamaClient:
@@ -389,23 +225,17 @@ class TestOllamaClient:
 class TestLLMClientFactory:
     """Test LLMClientFactory creation."""
 
-    def test_create_deepseek(self):
-        """Factory creates DeepSeekClient."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
+    def test_create_claude(self):
+        """Factory creates ClaudeClient."""
+        config = LLMConfig(provider=LLMProvider.ANTHROPIC, api_key="sk-ant-test")
         client = LLMClientFactory.create(config)
-        assert isinstance(client, DeepSeekClient)
+        assert isinstance(client, ClaudeClient)
 
     def test_create_perplexity(self):
         """Factory creates PerplexityClient."""
         config = LLMConfig(provider=LLMProvider.PERPLEXITY, api_key="test")
         client = LLMClientFactory.create(config)
         assert isinstance(client, PerplexityClient)
-
-    def test_create_qwen(self):
-        """Factory creates QwenClient."""
-        config = LLMConfig(provider=LLMProvider.QWEN, api_key="test")
-        client = LLMClientFactory.create(config)
-        assert isinstance(client, QwenClient)
 
     def test_create_ollama(self):
         """Factory creates OllamaClient."""
@@ -457,7 +287,7 @@ class TestLLMClientPool:
         expected_response = LLMResponse(
             content="Hello",
             model="test",
-            provider=LLMProvider.DEEPSEEK,
+            provider=LLMProvider.ANTHROPIC,
         )
         mock_client.chat.return_value = expected_response
         pool.add_client(mock_client)
@@ -488,24 +318,24 @@ class TestLLMClientPool:
 
 
 class TestOpenAICompatibleClient:
-    """Test OpenAICompatibleClient shared behavior."""
+    """Test OpenAICompatibleClient shared behavior via PerplexityClient."""
 
     def test_build_payload(self):
         """Default payload building."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
-        client = DeepSeekClient(config)
+        config = LLMConfig(provider=LLMProvider.PERPLEXITY, api_key="test")
+        client = PerplexityClient(config)
         messages = [LLMMessage(role="user", content="hello")]
 
         payload = client._build_payload(messages)
-        assert payload["model"] == "deepseek-chat"
+        assert payload["model"] == "sonar-pro"
         assert payload["temperature"] == 0.7
         assert payload["max_tokens"] == 4096
         assert len(payload["messages"]) == 1
 
     def test_parse_response(self):
         """Default response parsing."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
-        client = DeepSeekClient(config)
+        config = LLMConfig(provider=LLMProvider.PERPLEXITY, api_key="test")
+        client = PerplexityClient(config)
 
         mock_data = {
             "choices": [
@@ -514,7 +344,7 @@ class TestOpenAICompatibleClient:
                     "finish_reason": "stop",
                 }
             ],
-            "model": "deepseek-chat",
+            "model": "sonar-pro",
             "usage": {
                 "prompt_tokens": 10,
                 "completion_tokens": 5,
@@ -524,15 +354,15 @@ class TestOpenAICompatibleClient:
 
         resp = client._parse_response(mock_data, latency=100.0)
         assert resp.content == "Hello world"
-        assert resp.model == "deepseek-chat"
-        assert resp.provider == LLMProvider.DEEPSEEK
+        assert resp.model == "sonar-pro"
+        assert resp.provider == LLMProvider.PERPLEXITY
         assert resp.total_tokens == 15
         assert resp.latency_ms == 100.0
 
     def test_stats_initialized_zero(self):
         """Stats start at zero."""
-        config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
-        client = DeepSeekClient(config)
+        config = LLMConfig(provider=LLMProvider.PERPLEXITY, api_key="test")
+        client = PerplexityClient(config)
         assert client.total_requests == 0
         assert client.total_tokens == 0
         assert client.total_cost == 0.0
@@ -543,10 +373,14 @@ class TestBackwardCompatibility:
 
     def test_import_from_connections(self):
         """All symbols importable from connections.py."""
-        from backend.agents.llm import connections
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from backend.agents.llm import connections
 
         symbols = [
-            "DeepSeekClient",
+            "ClaudeClient",
             "LLMClient",
             "LLMClientFactory",
             "LLMClientPool",
@@ -556,7 +390,6 @@ class TestBackwardCompatibility:
             "LLMResponse",
             "OllamaClient",
             "PerplexityClient",
-            "QwenClient",
             "RateLimiter",
         ]
         for sym in symbols:

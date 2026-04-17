@@ -26,7 +26,7 @@ class ToolMixin:
         Execute MCP tool call with exponential backoff retry.
 
         Args:
-            tool_call: Tool call from DeepSeek API
+            tool_call: Tool call from Claude API
             max_retries: Maximum number of retry attempts
 
         Returns:
@@ -91,7 +91,7 @@ class ToolMixin:
         Выполнить MCP tool call
 
         Args:
-            tool_call: Tool call от DeepSeek API
+            tool_call: Tool call от Claude API
 
         Returns:
             Tool result dict

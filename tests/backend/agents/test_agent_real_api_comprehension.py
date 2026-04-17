@@ -1,9 +1,9 @@
 """
-Real API Comprehension Test — DeepSeek, Qwen, Perplexity.
+Real API Comprehension Test — Claude, Perplexity.
 
 PURPOSE:
   Sends block documentation excerpts from STRATEGY_GENERATION_TEMPLATE to each
-  real AI agent (DeepSeek, Qwen, Perplexity) and validates that they correctly
+  real AI agent (Claude, Perplexity) and validates that they correctly
   parse and understand the block parameters, defaults, optimization ranges,
   and signal modes.
 
@@ -12,21 +12,21 @@ PURPOSE:
 HOW IT WORKS:
   1. Extract a block documentation section from the raw template
   2. Build a structured prompt asking the agent to parse the block
-  3. Send via the project's LLM clients (DeepSeek/Qwen/Perplexity)
+  3. Send via the project's LLM clients (Claude/Perplexity)
   4. Parse the JSON response and compare against BLOCK_GROUND_TRUTH
   5. Score each agent on: params, defaults, optimization ranges, modes
 
 USAGE:
   pytest tests/backend/agents/test_agent_real_api_comprehension.py -v -m api_live
-  pytest tests/backend/agents/test_agent_real_api_comprehension.py -v -m api_live -k deepseek
-  pytest tests/backend/agents/test_agent_real_api_comprehension.py -v -m api_live -k qwen
+  pytest tests/backend/agents/test_agent_real_api_comprehension.py -v -m api_live -k claude
+  pytest tests/backend/agents/test_agent_real_api_comprehension.py -v -m api_live -k perplexity
 
 COST ESTIMATE:
-  ~34 blocks x 3 agents = 102 API calls
-  ~$0.05-0.15 total (DeepSeek/Qwen are very cheap; Perplexity slightly more)
+  ~34 blocks x 2 agents = 68 API calls
+  ~$0.10-0.30 total (Claude Haiku is cheap; Perplexity slightly more)
 
 REQUIRES:
-  Environment variables: DEEPSEEK_API_KEY, QWEN_API_KEY, PERPLEXITY_API_KEY
+  Environment variables: ANTHROPIC_API_KEY, PERPLEXITY_API_KEY
 """
 
 from __future__ import annotations
@@ -46,9 +46,8 @@ from loguru import logger
 load_dotenv(override=True)
 
 from backend.agents.llm.base_client import LLMConfig, LLMMessage, LLMProvider, LLMResponse
-from backend.agents.llm.clients.deepseek import DeepSeekClient
+from backend.agents.llm.clients.claude import ClaudeClient
 from backend.agents.llm.clients.perplexity import PerplexityClient
-from backend.agents.llm.clients.qwen import QwenClient
 from backend.agents.prompts.templates import STRATEGY_GENERATION_TEMPLATE
 
 # =============================================================================
@@ -733,16 +732,14 @@ def _score_comprehension(
 # =============================================================================
 
 
-def _make_client(provider: str) -> DeepSeekClient | QwenClient | PerplexityClient | None:
+def _make_client(provider: str) -> ClaudeClient | PerplexityClient | None:
     """Create LLM client from env vars. Returns None if key missing."""
     key_map = {
-        "deepseek": ("DEEPSEEK_API_KEY", LLMProvider.DEEPSEEK, "deepseek-chat"),
-        "qwen": ("QWEN_API_KEY", LLMProvider.QWEN, "qwen-plus"),
+        "claude": ("ANTHROPIC_API_KEY", LLMProvider.ANTHROPIC, "claude-haiku-4-5-20251001"),
         "perplexity": ("PERPLEXITY_API_KEY", LLMProvider.PERPLEXITY, "sonar-pro"),
     }
-    client_classes: dict[str, type[DeepSeekClient] | type[QwenClient] | type[PerplexityClient]] = {
-        "deepseek": DeepSeekClient,
-        "qwen": QwenClient,
+    client_classes: dict[str, type[ClaudeClient] | type[PerplexityClient]] = {
+        "claude": ClaudeClient,
         "perplexity": PerplexityClient,
     }
     env_key, llm_provider, model = key_map[provider]
@@ -767,7 +764,7 @@ def _make_client(provider: str) -> DeepSeekClient | QwenClient | PerplexityClien
 
 
 async def _ask_agent(
-    client: DeepSeekClient | QwenClient | PerplexityClient,
+    client: ClaudeClient | PerplexityClient,
     block_type: str,
     block_doc: str,
 ) -> dict[str, Any]:
@@ -849,7 +846,7 @@ pytestmark = [
 
 
 # Module-level client cache (avoids creating new clients per test)
-_client_cache: dict[str, DeepSeekClient | QwenClient | PerplexityClient | None] = {}
+_client_cache: dict[str, ClaudeClient | PerplexityClient | None] = {}
 
 
 def _get_cached_client(provider: str):
@@ -860,20 +857,11 @@ def _get_cached_client(provider: str):
 
 
 @pytest.fixture
-def deepseek_client():
-    """DeepSeek client (cached at module level)."""
-    client = _get_cached_client("deepseek")
+def claude_client():
+    """Claude client (cached at module level)."""
+    client = _get_cached_client("claude")
     if client is None:
-        pytest.skip("DEEPSEEK_API_KEY not set or invalid")
-    return client
-
-
-@pytest.fixture
-def qwen_client():
-    """Qwen client (cached at module level)."""
-    client = _get_cached_client("qwen")
-    if client is None:
-        pytest.skip("QWEN_API_KEY not set or invalid")
+        pytest.skip("ANTHROPIC_API_KEY not set or invalid")
     return client
 
 
@@ -906,29 +894,29 @@ def _record_result(agent: str, block: str, score: dict[str, Any]) -> None:
 # =============================================================================
 
 
-class TestDeepSeekComprehension:
-    """Test DeepSeek's understanding of block parameters."""
+class TestClaudeComprehension:
+    """Test Claude's understanding of block parameters."""
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("block_type", list(TEST_BLOCKS.keys()))
-    async def test_block_comprehension(self, deepseek_client, block_type: str):
-        """DeepSeek should correctly parse block params, defaults, and modes."""
+    async def test_block_comprehension(self, claude_client, block_type: str):
+        """Claude should correctly parse block params, defaults, and modes."""
         truth = TEST_BLOCKS[block_type]
         block_doc = _extract_block_doc(block_type, truth["header"])
-        result = await _ask_agent(deepseek_client, block_type, block_doc)
+        result = await _ask_agent(claude_client, block_type, block_doc)
 
         assert result["parsed"] is not None, (
-            f"DeepSeek failed to return valid JSON for {block_type}. Raw: {result['raw'][:300]}"
+            f"Claude failed to return valid JSON for {block_type}. Raw: {result['raw'][:300]}"
         )
 
         score = _score_comprehension(result["parsed"], truth, block_type)
         score["tokens"] = result["tokens"]
         score["latency_ms"] = result["latency_ms"]
         score["cost"] = result["cost"]
-        _record_result("deepseek", block_type, score)
+        _record_result("claude", block_type, score)
 
         logger.info(
-            f"🔵 DeepSeek/{block_type}: score={score['total_score']:.0%} "
+            f"🔵 Claude/{block_type}: score={score['total_score']:.0%} "
             f"params={score['params_found']}/{score['params_total']} "
             f"defaults={score['defaults_correct']}/{score['params_total']} "
             f"opt={score['optimizable_found']}/{score['optimizable_total']} "
@@ -938,47 +926,7 @@ class TestDeepSeekComprehension:
 
         # Minimum threshold: 60% overall
         assert score["total_score"] >= 0.6, (
-            f"DeepSeek comprehension too low for {block_type}: "
-            f"{score['total_score']:.0%}\n"
-            f"Details: {json.dumps(score['details'], indent=2)}"
-        )
-
-
-class TestQwenComprehension:
-    """Test Qwen's understanding of block parameters."""
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("block_type", list(TEST_BLOCKS.keys()))
-    async def test_block_comprehension(self, qwen_client, block_type: str):
-        """Qwen should correctly parse block params, defaults, and modes."""
-        truth = TEST_BLOCKS[block_type]
-        block_doc = _extract_block_doc(block_type, truth["header"])
-        result = await _ask_agent(qwen_client, block_type, block_doc)
-
-        assert result["parsed"] is not None, (
-            f"Qwen failed to return valid JSON for {block_type}. Raw: {result['raw'][:300]}"
-        )
-
-        score = _score_comprehension(result["parsed"], truth, block_type)
-        score["tokens"] = result["tokens"]
-        score["latency_ms"] = result["latency_ms"]
-        score["cost"] = result["cost"]
-        _record_result("qwen", block_type, score)
-
-        logger.info(
-            f"🟢 Qwen/{block_type}: score={score['total_score']:.0%} "
-            f"params={score['params_found']}/{score['params_total']} "
-            f"defaults={score['defaults_correct']}/{score['params_total']} "
-            f"opt={score['optimizable_found']}/{score['optimizable_total']} "
-            f"modes={score['modes_found']}/{score['modes_total']} "
-            f"tokens={score['tokens']} latency={score['latency_ms']:.0f}ms"
-        )
-
-        if score["total_score"] < 0.8:
-            logger.warning(f"🟢 Qwen/{block_type} RAW response:\n{result['raw'][:500]}")
-
-        assert score["total_score"] >= 0.6, (
-            f"Qwen comprehension too low for {block_type}: "
+            f"Claude comprehension too low for {block_type}: "
             f"{score['total_score']:.0%}\n"
             f"Details: {json.dumps(score['details'], indent=2)}"
         )

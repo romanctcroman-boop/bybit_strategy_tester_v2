@@ -41,7 +41,7 @@ class TaskComplexity(Enum):
 # This eliminates ~31% of input tokens that were previously wasted.
 
 AGENT_REQUIRED_METRICS: dict[str, set[str]] = {
-    "deepseek": {
+    "claude": {
         # Quantitative analyst: risk metrics & statistical validation
         "sharpe_ratio",
         "sortino_ratio",
@@ -62,29 +62,6 @@ AGENT_REQUIRED_METRICS: dict[str, set[str]] = {
         "risk_reward_ratio",
         "recovery_factor",
         "payoff_ratio",
-    },
-    "qwen": {
-        # Technical analyst: signal quality & indicator performance
-        "win_rate",
-        "total_trades",
-        "avg_trade_pnl",
-        "avg_trade_pnl_pct",
-        "avg_win",
-        "avg_loss",
-        "max_consecutive_wins",
-        "max_consecutive_losses",
-        "profit_factor",
-        "net_profit",
-        "net_profit_pct",
-        "long_trades",
-        "short_trades",
-        "long_win_rate",
-        "short_win_rate",
-        "avg_holding_time",
-        "max_drawdown_pct",
-        "sharpe_ratio",
-        "sortino_ratio",
-        "expectancy",
     },
     "perplexity": {
         # Market researcher: high-level performance & context
@@ -211,7 +188,7 @@ class PromptOptimizer:
         optimizer = PromptOptimizer()
 
         # Filter metrics for a specific agent
-        filtered = optimizer.filter_metrics_for_agent("deepseek", full_metrics)
+        filtered = optimizer.filter_metrics_for_agent("claude", full_metrics)
 
         # Quantize floats in a dict
         quantized = optimizer.quantize_floats(metrics_dict)
@@ -220,10 +197,10 @@ class PromptOptimizer:
         complexity = optimizer.classify_task_complexity("analyze RSI divergence pattern")
 
         # Check if thinking mode should be enabled
-        should_think = optimizer.should_enable_thinking("deepseek", "calculate RSI")
+        should_think = optimizer.should_enable_thinking("claude", "calculate RSI")
 
         # Full optimization pipeline
-        optimized_prompt = optimizer.optimize_prompt("deepseek", prompt, metrics)
+        optimized_prompt = optimizer.optimize_prompt("claude", prompt, metrics)
     """
 
     # LRU cache for identical prompts (keyed by prompt hash)
@@ -245,7 +222,7 @@ class PromptOptimizer:
         Filter metrics to only include those relevant to the agent's role.
 
         Args:
-            agent_type: "deepseek", "qwen", or "perplexity"
+            agent_type: "claude" or "perplexity"
             metrics: Full metrics dictionary
 
         Returns:
@@ -290,7 +267,7 @@ class PromptOptimizer:
         Returns:
             Dictionary with quantized float values
         """
-        quantized = {}
+        quantized: dict[str, Any] = {}
         for key, value in data.items():
             if isinstance(value, float):
                 p = precision or METRIC_PRECISION_OVERRIDES.get(key, DEFAULT_FLOAT_PRECISION)
@@ -346,14 +323,14 @@ class PromptOptimizer:
         task_description: str,
     ) -> bool:
         """
-        Decide whether to enable thinking mode for a Qwen request.
+        Decide whether to enable thinking mode for a Claude request.
 
         Thinking mode adds 40-60% token overhead. Only enable for complex tasks
         where multi-step reasoning provides clear value.
-        Blocked by default unless QWEN_ENABLE_THINKING=true.
+        Blocked by default unless CLAUDE_ENABLE_THINKING=true.
 
         Args:
-            agent_type: "deepseek", "qwen", or "perplexity"
+            agent_type: "claude" or "perplexity"
             task_description: Combined task_type + prompt
 
         Returns:
@@ -361,15 +338,15 @@ class PromptOptimizer:
         """
         import os
 
-        # Only Qwen supports dynamic thinking mode toggle
-        if agent_type.lower() != "qwen":
+        # Only Claude supports dynamic thinking mode toggle
+        if agent_type.lower() != "claude":
             return False
 
         # Cost guard: respect env var override
-        allow_thinking = os.getenv("QWEN_ENABLE_THINKING", "false").lower() == "true"
+        allow_thinking = os.getenv("CLAUDE_ENABLE_THINKING", "false").lower() == "true"
         if not allow_thinking:
             self.stats.thinking_mode_skipped += 1
-            logger.debug(f"Thinking mode BLOCKED by QWEN_ENABLE_THINKING=false: {task_description[:60]}...")
+            logger.debug(f"Thinking mode BLOCKED by CLAUDE_ENABLE_THINKING=false: {task_description[:60]}...")
             return False
 
         complexity = self.classify_task_complexity(task_description)
@@ -499,7 +476,7 @@ class PromptOptimizer:
         4. Inject optimized metrics into prompt
 
         Args:
-            agent_type: "deepseek", "qwen", or "perplexity"
+            agent_type: "claude" or "perplexity"
             prompt: Original prompt text
             metrics: Optional metrics dict to optimize and inject
 

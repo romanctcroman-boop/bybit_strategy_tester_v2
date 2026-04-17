@@ -190,7 +190,7 @@ class AIBacktestAnalyzer:
                 "net_pnl": 15000,
                 "sharpe_ratio": 1.8,
                 "max_drawdown_pct": 12.5,
-                "win_rate": 0.58,
+                "win_rate": 58.0,  # PERCENT (MetricsCalculator scale)
                 "total_trades": 145,
             },
             strategy_name="Momentum RSI",
@@ -217,7 +217,7 @@ CORE METRICS:
 - Sharpe Ratio: {sharpe_ratio:.2f}
 - Sortino Ratio: {sortino_ratio:.2f}
 - Max Drawdown: {max_drawdown_pct:.2f}%
-- Win Rate: {win_rate:.1%}
+- Win Rate: {win_rate:.1f}%
 - Profit Factor: {profit_factor:.2f}
 - Total Trades: {total_trades}
 
@@ -276,7 +276,7 @@ Return ONLY this JSON:
         agents: list[str] | None = None,
     ) -> AIBacktestResult:
         """
-        Analyze backtest results with AI (supports DeepSeek, Qwen, Perplexity).
+        Analyze backtest results with AI (supports Claude, Claude, Perplexity).
 
         Args:
             metrics: Backtest metrics dict (all available metrics)
@@ -289,7 +289,7 @@ Return ONLY this JSON:
         Returns:
             AIBacktestResult with AI insights
         """
-        agents = agents or ["deepseek", "qwen", "perplexity"]
+        agents = agents or ["claude", "claude", "perplexity"]
 
         # Build prompt with extended metrics
         prompt = self.ANALYSIS_PROMPT.format(
@@ -665,7 +665,7 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
         )
 
         # Call LLM directly for raw response
-        raw_response = await self._call_llm("deepseek", prompt)
+        raw_response = await self._call_llm("claude", prompt)
 
         analysis = self._parse_optimization_analysis(raw_response)
 

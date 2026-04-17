@@ -198,23 +198,23 @@ class TestNamespaceIsolation:
         from backend.agents.mcp.tools.memory import memory_recall, memory_store
 
         await memory_store(
-            content="deepseek secret",
-            namespace="deepseek",
+            content="claude secret",
+            namespace="claude",
             importance=0.9,
         )
         await memory_store(
-            content="qwen secret",
-            namespace="qwen",
+            content="perplexity secret",
+            namespace="perplexity",
             importance=0.9,
         )
 
-        # DeepSeek can see its own data
-        ds_result = await memory_recall(query="secret", namespace="deepseek")
+        # Claude can see its own data
+        ds_result = await memory_recall(query="secret", namespace="claude")
         ds_contents = [r["content"] for r in ds_result["results"]]
-        assert any("deepseek" in c for c in ds_contents)
+        assert any("claude" in c for c in ds_contents)
 
-        # DeepSeek cannot see Qwen data
-        assert not any("qwen" in c for c in ds_contents)
+        # Claude cannot see Perplexity data
+        assert not any("perplexity" in c for c in ds_contents)
 
     @pytest.mark.asyncio
     async def test_shared_namespace_visible_to_all(self, global_memory):
@@ -227,7 +227,7 @@ class TestNamespaceIsolation:
         )
 
         # Both agents can see shared data
-        for ns in ("deepseek", "qwen"):
+        for ns in ("claude", "perplexity"):
             result = await memory_recall(query="shared knowledge", namespace=ns)
             contents = [r["content"] for r in result["results"]]
             assert any("shared" in c for c in contents), f"Agent {ns} should see shared namespace"

@@ -51,7 +51,7 @@ class HealthMixin:
     def _register_circuit_breakers(self) -> None:
         """Register circuit breakers for all external dependencies"""
         self.circuit_manager.register_breaker(
-            name="deepseek_api",
+            name="claude_api",
             fail_max=5,
             timeout_duration=60,
             expected_exception=Exception,
@@ -72,9 +72,9 @@ class HealthMixin:
     def _register_health_checks(self) -> None:
         """Register health checks for all components"""
         self.health_monitor.register_health_check(
-            component="deepseek_api",
-            health_check_func=self._check_deepseek_health,
-            recovery_func=self._recover_deepseek,
+            component="claude_api",
+            health_check_func=self._check_claude_health,
+            recovery_func=self._recover_claude,
         )
         self.health_monitor.register_health_check(
             component="perplexity_api",
@@ -104,31 +104,31 @@ class HealthMixin:
     # Health check implementations
     # ------------------------------------------------------------------
 
-    async def _check_deepseek_health(self) -> HealthCheckResult:
-        """Health check for DeepSeek API"""
-        active_keys = sum(1 for k in self.key_manager.deepseek_keys if k.is_usable)
-        total_keys = len(self.key_manager.deepseek_keys)
+    async def _check_claude_health(self) -> HealthCheckResult:
+        """Health check for Claude API"""
+        active_keys = sum(1 for k in self.key_manager.claude_keys if k.is_usable)
+        total_keys = len(self.key_manager.claude_keys)
 
         if active_keys == 0:
             return HealthCheckResult(
-                component="deepseek_api",
+                component="claude_api",
                 status=HealthStatus.UNHEALTHY,
-                message=f"No active DeepSeek keys (0/{total_keys})",
+                message=f"No active Claude keys (0/{total_keys})",
                 details={"active_keys": active_keys, "total_keys": total_keys},
                 recovery_suggested=RecoveryActionType.RESET_ERRORS,
             )
         elif active_keys < total_keys * 0.5:
             return HealthCheckResult(
-                component="deepseek_api",
+                component="claude_api",
                 status=HealthStatus.DEGRADED,
-                message=f"Only {active_keys}/{total_keys} DeepSeek keys active",
+                message=f"Only {active_keys}/{total_keys} Claude keys active",
                 details={"active_keys": active_keys, "total_keys": total_keys},
                 recovery_suggested=RecoveryActionType.RESET_ERRORS,
             )
         return HealthCheckResult(
-            component="deepseek_api",
+            component="claude_api",
             status=HealthStatus.HEALTHY,
-            message=f"DeepSeek API healthy ({active_keys}/{total_keys} keys active)",
+            message=f"Claude API healthy ({active_keys}/{total_keys} keys active)",
             details={"active_keys": active_keys, "total_keys": total_keys},
         )
 
@@ -203,7 +203,7 @@ class HealthMixin:
         url = self._get_api_url(agent_type)
         headers = self._get_headers(key)
         payload = {
-            "model": "deepseek-chat" if agent_type == AgentType.DEEPSEEK else "sonar-pro",
+            "model": "claude-sonnet-4-20250514" if agent_type == AgentType.CLAUDE else "sonar-pro",
             "messages": [
                 {"role": "system", "content": "Health check ping"},
                 {"role": "user", "content": "ping"},
@@ -238,25 +238,25 @@ class HealthMixin:
     # Recovery actions
     # ------------------------------------------------------------------
 
-    async def _recover_deepseek(self, action_type: RecoveryActionType) -> None:
-        """Recovery action for DeepSeek API"""
+    async def _recover_claude(self, action_type: RecoveryActionType) -> None:
+        """Recovery action for Claude API"""
         if action_type == RecoveryActionType.RESET_ERRORS:
             recovered = 0
-            for key in self.key_manager.deepseek_keys:
+            for key in self.key_manager.claude_keys:
                 if not key.is_usable:
-                    is_healthy = await self._test_key_health(AgentType.DEEPSEEK, key)
+                    is_healthy = await self._test_key_health(AgentType.CLAUDE, key)
                     if is_healthy:
                         key.error_count = 1
                         key.health = APIKeyHealth.DEGRADED
                         key.last_error_time = None
                         recovered += 1
-                        logger.info(f"✅ Validated DeepSeek key #{key.index} (re-enabled in DEGRADED state)")
+                        logger.info(f"✅ Validated Claude key #{key.index} (re-enabled in DEGRADED state)")
                     else:
-                        logger.warning(f"❌ DeepSeek key #{key.index} failed validation, remains disabled")
+                        logger.warning(f"❌ Claude key #{key.index} failed validation, remains disabled")
             if recovered:
                 self.stats["auto_recoveries"] += recovered
         elif action_type == RecoveryActionType.RESET_CIRCUIT_BREAKER:
-            self.circuit_manager.reset_breaker("deepseek_api")
+            self.circuit_manager.reset_breaker("claude_api")
             self.stats["auto_recoveries"] += 1
 
     async def _recover_perplexity(self, action_type: RecoveryActionType) -> None:
@@ -316,12 +316,13 @@ class HealthMixin:
                 logger.debug(f"MCP health probe failed: {e}")
                 self.mcp_available = False
 
-        deepseek_active = sum(1 for k in self.key_manager.deepseek_keys if k.is_usable)
+        claude_active = sum(1 for k in self.key_manager.claude_keys if k.is_usable)
         perplexity_active = sum(1 for k in self.key_manager.perplexity_keys if k.is_usable)
 
         logger.info(
             f"🏥 Health: MCP={'✅' if self.mcp_available else '❌'} | "
-            f"DeepSeek={deepseek_active}/8 | Perplexity={perplexity_active}/4"
+            f"Claude={claude_active}/{len(self.key_manager.claude_keys)} | "
+            f"Perplexity={perplexity_active}/{len(self.key_manager.perplexity_keys)}"
         )
 
         adaptations = self.circuit_manager.maybe_adapt_breakers(force=True, min_interval_seconds=0)
@@ -341,7 +342,7 @@ class HealthMixin:
             **self.stats,
             "mcp_available": self.mcp_available,
             "mcp_disabled": self.mcp_disabled,
-            "deepseek_keys_active": sum(1 for k in self.key_manager.deepseek_keys if k.is_usable),
+            "claude_keys_active": sum(1 for k in self.key_manager.claude_keys if k.is_usable),
             "perplexity_keys_active": sum(1 for k in self.key_manager.perplexity_keys if k.is_usable),
             "last_health_check": datetime.fromtimestamp(self.last_health_check).isoformat(),
             "circuit_breakers": cb_metrics.to_dict(),

@@ -29,7 +29,7 @@ class MCPConfig(BaseModel):
     """MCP infrastructure configuration."""
 
     # Server configurations
-    deepseek_enabled: bool = True
+    claude_enabled: bool = True
     bybit_enabled: bool = True
     perplexity_enabled: bool = True
 
@@ -66,7 +66,7 @@ def get_mcp_config() -> MCPConfig:
 
     # Override from env vars
     env_mappings = {
-        "MCP_DEEPSEEK_ENABLED": ("deepseek_enabled", lambda x: x.lower() == "true"),
+        "MCP_CLAUDE_ENABLED": ("claude_enabled", lambda x: x.lower() == "true"),
         "MCP_BYBIT_ENABLED": ("bybit_enabled", lambda x: x.lower() == "true"),
         "MCP_PERPLEXITY_ENABLED": ("perplexity_enabled", lambda x: x.lower() == "true"),
         "MCP_DEFAULT_TIMEOUT": ("default_timeout", int),
@@ -88,7 +88,7 @@ def get_mcp_config() -> MCPConfig:
 
     config = MCPConfig(**config_data)
     logger.info(
-        f"✅ MCP config: deepseek={config.deepseek_enabled}, "
+        f"✅ MCP config: claude={config.claude_enabled}, "
         f"bybit={config.bybit_enabled}, perplexity={config.perplexity_enabled}, "
         f"timeout={config.default_timeout}s"
     )
@@ -105,8 +105,8 @@ def validate_mcp_startup() -> list[str]:
     # Check API keys for enabled servers
     config = get_mcp_config()
 
-    if config.deepseek_enabled and not os.getenv("DEEPSEEK_API_KEY"):
-        errors.append("MCP: DeepSeek enabled but DEEPSEEK_API_KEY not set")
+    if config.claude_enabled and not os.getenv("ANTHROPIC_API_KEY"):
+        errors.append("MCP: Claude enabled but ANTHROPIC_API_KEY not set")
 
     if config.perplexity_enabled and not os.getenv("PERPLEXITY_API_KEY"):
         errors.append("MCP: Perplexity enabled but PERPLEXITY_API_KEY not set")

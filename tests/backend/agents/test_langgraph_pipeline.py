@@ -78,7 +78,7 @@ def mock_strategy():
     strategy.filters = []
     strategy.optimization_hints = None
     strategy.entry_conditions = MagicMock()
-    strategy.agent_metadata = MagicMock(agent_name="deepseek")
+    strategy.agent_metadata = MagicMock(agent_name="claude")
     strategy.to_dict.return_value = {"name": "test_rsi_strategy", "type": "rsi"}
     return strategy
 
@@ -169,7 +169,7 @@ class TestPipelineConfig:
         assert config.max_drawdown_pct == 20.0
         assert config.max_reoptimize_cycles == 2
         assert config.max_regenerate_cycles == 1
-        assert config.agents == ["deepseek", "qwen", "perplexity"]
+        assert config.agents == ["claude", "copilot", "perplexity"]
         assert config.initial_capital == 10000.0
         assert config.leverage == 1.0
         assert config.commission == 0.0007  # TradingView parity
@@ -180,12 +180,12 @@ class TestPipelineConfig:
         config = PipelineConfig(
             min_sharpe=2.0,
             max_drawdown_pct=10.0,
-            agents=["deepseek"],
+            agents=["claude"],
             initial_capital=50000,
         )
         assert config.min_sharpe == 2.0
         assert config.max_drawdown_pct == 10.0
-        assert config.agents == ["deepseek"]
+        assert config.agents == ["claude"]
         assert config.initial_capital == 50000
 
     def test_commission_never_change(self):
@@ -262,7 +262,7 @@ class TestGraphConstruction:
         config = PipelineConfig(
             min_sharpe=2.5,
             max_drawdown_pct=5.0,
-            agents=["deepseek"],
+            agents=["claude"],
         )
         graph = TradingStrategyGraph.create_graph(config)
         assert graph is not None
@@ -318,7 +318,7 @@ class TestConsensusNode:
         strategy2.filters = []
         strategy2.optimization_hints = None
         strategy2.entry_conditions = MagicMock()
-        strategy2.agent_metadata = MagicMock(agent_name="qwen")
+        strategy2.agent_metadata = MagicMock(agent_name="claude")
         strategy2.to_dict.return_value = {"name": "test_macd", "type": "macd"}
 
         state = base_state
@@ -588,7 +588,7 @@ class TestFullPipeline:
 
             mock_gen.side_effect = gen_side_effect
 
-            config = PipelineConfig(agents=["deepseek"])
+            config = PipelineConfig(agents=["claude"])
             report = await TradingStrategyGraph.run(
                 symbol="BTCUSDT",
                 timeframe="15",
@@ -643,7 +643,7 @@ class TestFullPipeline:
             mock_gen.side_effect = gen_side_effect
 
             config = PipelineConfig(
-                agents=["deepseek"],
+                agents=["claude"],
                 min_sharpe=1.0,
                 max_reoptimize_cycles=2,
             )

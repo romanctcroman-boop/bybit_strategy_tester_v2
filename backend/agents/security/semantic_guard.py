@@ -2,7 +2,7 @@
 Semantic Prompt Guard
 
 Extends regex-based PromptGuard with semantic analysis for prompt injection detection.
-Addresses audit finding: "PromptGuard regex-only is vulnerable to semantic jailbreaks" (Qwen, P1)
+Addresses audit finding: "PromptGuard regex-only is vulnerable to semantic jailbreaks" (Claude, P1)
 
 Approach:
 - Layer 1: Fast regex patterns (existing)

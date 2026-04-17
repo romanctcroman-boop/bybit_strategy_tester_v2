@@ -7,7 +7,6 @@ Verifies:
 3. Port semantics info is present
 4. Categories and param ranges render correctly
 """
-import pytest
 from backend.agents.workflows.builder_workflow import BuilderWorkflow
 from backend.optimization.builder_optimizer import DEFAULT_PARAM_RANGES
 

@@ -209,7 +209,7 @@ class TestPromptEngineerCoverage:
         from backend.agents.prompts.prompt_engineer import PromptEngineer
 
         engineer = PromptEngineer()
-        for agent in ["deepseek", "qwen", "perplexity"]:
+        for agent in ["claude", "copilot", "perplexity"]:
             msg = engineer.get_system_message(agent)
             assert "JSON" in msg
             assert len(msg) > 50
@@ -244,7 +244,7 @@ class TestStrategyControllerCoverage:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 initial_capital=10000,
                 leverage=1,
             )
@@ -279,7 +279,7 @@ class TestStrategyControllerCoverage:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=sample_ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=True,
                 enable_walk_forward=True,
             )
@@ -466,7 +466,7 @@ class TestDeliberationCoverage:
         )
         result = await delib.deliberate(
             question="Which indicator for BTC entry?",
-            agents=["deepseek", "qwen"],
+            agents=["claude", "perplexity"],
             max_rounds=1,
             min_confidence=0.5,
         )
@@ -555,7 +555,7 @@ class TestAgentTrackerCoverage:
 
         tracker = AgentPerformanceTracker()
         record = tracker.record_result(
-            agent_name="deepseek",
+            agent_name="claude",
             metrics={
                 "sharpe_ratio": 1.5,
                 "win_rate": 0.6,
@@ -567,7 +567,7 @@ class TestAgentTrackerCoverage:
             passed=True,
             fitness_score=75.0,
         )
-        assert record.agent_name == "deepseek"
+        assert record.agent_name == "claude"
         assert record.fitness_score == 75.0
 
     def test_tracker_get_profile_unknown(self):
@@ -590,13 +590,13 @@ class TestAgentTrackerCoverage:
         tracker = AgentPerformanceTracker()
         for i in range(5):
             tracker.record_result(
-                agent_name="deepseek",
+                agent_name="claude",
                 metrics={"sharpe_ratio": 1.0 + i * 0.2, "win_rate": 0.5 + i * 0.05},
                 strategy_type="rsi",
                 passed=i % 2 == 0,
                 fitness_score=60 + i * 5,
             )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert profile.total_strategies == 5
 
     def test_tracker_leaderboard(self):
@@ -606,7 +606,7 @@ class TestAgentTrackerCoverage:
         )
 
         tracker = AgentPerformanceTracker()
-        for agent in ["deepseek", "qwen", "perplexity"]:
+        for agent in ["claude", "copilot", "perplexity"]:
             tracker.record_result(
                 agent_name=agent,
                 metrics={"sharpe_ratio": 1.5, "win_rate": 0.6},
@@ -625,7 +625,7 @@ class TestAgentTrackerCoverage:
 
         tracker = AgentPerformanceTracker()
         tracker.record_result(
-            agent_name="deepseek",
+            agent_name="claude",
             metrics={"sharpe_ratio": 1.5},
             passed=True,
             fitness_score=70.0,

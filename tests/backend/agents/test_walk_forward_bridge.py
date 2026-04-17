@@ -431,7 +431,7 @@ class TestExecuteBacktest:
 
         # Mock engine
         mock_metrics = MagicMock()
-        mock_metrics.total_return_pct = 5.0
+        mock_metrics.total_return = 5.0  # Bug B5 fix: BacktestMetrics has .total_return, not .total_return_pct
         mock_metrics.sharpe_ratio = 1.5
         mock_metrics.max_drawdown_pct = 10.0
         mock_metrics.total_trades = 3

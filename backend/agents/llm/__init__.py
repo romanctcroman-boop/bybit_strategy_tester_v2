@@ -2,7 +2,8 @@
 LLM Integration Module
 
 Provides real LLM API connections for AI agents.
-Imports directly from base_client and clients/* (connections.py is deprecated).
+Supported providers: Claude (Anthropic), Perplexity, Ollama.
+Claude and Claude have been removed — use ClaudeClient instead.
 """
 
 from .base_client import (
@@ -16,13 +17,12 @@ from .base_client import (
     OpenAICompatibleClient,
     RateLimiter,
 )
-from .clients.deepseek import DeepSeekClient
+from .clients.claude import ClaudeClient
 from .clients.ollama import OllamaClient
 from .clients.perplexity import PerplexityClient
-from .clients.qwen import QwenClient
 
 __all__ = [
-    "DeepSeekClient",
+    "ClaudeClient",
     "LLMClient",
     "LLMClientFactory",
     "LLMClientPool",
@@ -33,6 +33,5 @@ __all__ = [
     "OllamaClient",
     "OpenAICompatibleClient",
     "PerplexityClient",
-    "QwenClient",
     "RateLimiter",
 ]

@@ -165,7 +165,7 @@ class MetricsCollector:
         ))
 
         # Record metrics
-        collector.increment("agent_requests_total", labels={"agent_type": "deepseek", "status": "success"})
+        collector.increment("agent_requests_total", labels={"agent_type": "claude", "status": "success"})
         collector.observe("agent_latency_ms", 1234.5)
 
         # Query metrics

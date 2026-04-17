@@ -173,14 +173,21 @@ class TestHITLCheckNode:
         assert result.context.get("hitl_pending") is True
 
     def test_hitl_payload_contains_strategy_info(self):
+        """Regression C1: backtest result is nested under 'metrics' key."""
         node = HITLCheckNode()
         state = AgentState()
         state.context["hitl_approved"] = False
-        state.set_result("backtest", {"total_trades": 25, "sharpe_ratio": 1.3, "max_drawdown": 12.0, "net_profit": 500})
+        # BacktestNode stores: {"metrics": {...}, "engine_warnings": [], ...}
+        state.set_result("backtest", {
+            "metrics": {"total_trades": 25, "sharpe_ratio": 1.3, "max_drawdown": 12.0, "net_profit": 500},
+            "engine_warnings": [],
+        })
         result = _run(node.execute(state))
         payload = result.context.get("hitl_payload", {})
         assert "backtest_summary" in payload
         assert payload["backtest_summary"]["trades"] == 25
+        assert payload["backtest_summary"]["sharpe"] == pytest.approx(1.3)
+        assert payload["backtest_summary"]["net_profit"] == pytest.approx(500.0)
 
     def test_hitl_payload_includes_regime(self):
         node = HITLCheckNode()

@@ -6,7 +6,7 @@ triggers recovery actions when issues are detected. Works alongside circuit brea
 to provide comprehensive resilience.
 
 Monitored Components:
-- DeepSeek API: Key rotation health, error rates, response times
+- Claude API: Key rotation health, error rates, response times
 - Perplexity API: Key rotation health, error rates, response times
 - MCP Server: Process health, connectivity, tool availability
 
@@ -123,16 +123,16 @@ class HealthMonitor:
 
         # Register a health check
         monitor.register_health_check(
-            "deepseek_api",
-            check_deepseek_health,
-            recovery_action=recover_deepseek
+            "claude_api",
+            check_claude_health,
+            recovery_action=recover_claude
         )
 
         # Start background monitoring
         await monitor.start_monitoring(interval_seconds=30)
 
         # Get current health status
-        status = monitor.get_component_health("deepseek_api")
+        status = monitor.get_component_health("claude_api")
     """
 
     def __init__(
@@ -180,7 +180,7 @@ class HealthMonitor:
         Register a health check for a component.
 
         Args:
-            component: Unique component name (e.g., "deepseek_api")
+            component: Unique component name (e.g., "claude_api")
             health_check_func: Async function that returns HealthCheckResult
             recovery_func: Optional async function to execute for recovery
         """

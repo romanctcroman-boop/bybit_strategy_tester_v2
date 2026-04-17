@@ -277,7 +277,7 @@ async def log_agent_action(
     stored both in memory and on disk.
 
     Args:
-        agent_name: Name of the agent (e.g., "deepseek", "qwen")
+        agent_name: Name of the agent (e.g., "claude", "claude")
         action: Action performed (e.g., "run_backtest", "evolve_strategy")
         details: Optional dict with action-specific details
         result_summary: Brief description of the result

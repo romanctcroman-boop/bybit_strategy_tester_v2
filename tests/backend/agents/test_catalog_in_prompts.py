@@ -4,13 +4,13 @@ Tests that _build_block_catalog() is actually injected into agent prompts.
 Uses mock A2A communicator to capture the exact prompts sent to agents
 without making real LLM API calls.
 """
-import asyncio
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from backend.agents.workflows.builder_workflow import BuilderWorkflow
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -45,9 +45,10 @@ SAMPLE_METRICS = {
 def make_workflow() -> BuilderWorkflow:
     wf = BuilderWorkflow.__new__(BuilderWorkflow)
     wf._on_agent_log = None
-    wf._primary_agent = "qwen"
+    wf._primary_agent = "claude"
 
     from backend.agents.workflows.builder_workflow import BuilderWorkflowResult
+
     wf._result = BuilderWorkflowResult(
         workflow_id="test_wf",
         config={},
@@ -59,6 +60,7 @@ def make_workflow() -> BuilderWorkflow:
 
 # ── Tests: _suggest_topology_changes prompt ──────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_topology_prompt_contains_catalog():
     """_suggest_topology_changes must inject full block catalog into the prompt."""
@@ -68,13 +70,18 @@ async def test_topology_prompt_contains_catalog():
 
     async def fake_parallel_consensus(question, agents, context=None):
         captured_prompt.append(question)
-        return {"individual_responses": [{"agent": "deepseek", "content": "[]"}], "consensus": "[]"}
+        return {"individual_responses": [{"agent": "claude", "content": "[]"}], "consensus": "[]"}
 
     mock_a2a = MagicMock()
     mock_a2a.parallel_consensus = fake_parallel_consensus
 
-    with patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a), \
-         patch("os.environ.get", side_effect=lambda k, d=None: "fake_key" if k in ("DEEPSEEK_API_KEY", "QWEN_API_KEY") else d):
+    with (
+        patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a),
+        patch(
+            "os.environ.get",
+            side_effect=lambda k, d=None: "fake_key" if k in ("ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY") else d,
+        ),
+    ):
         result = await wf._suggest_topology_changes(
             blocks=SAMPLE_BLOCKS,
             connections=SAMPLE_CONNECTIONS,
@@ -92,9 +99,20 @@ async def test_topology_prompt_contains_catalog():
     assert "EXIT BLOCKS" in prompt, "Exit category missing"
 
     # Must include non-RSI blocks
-    for block in ["macd", "stochastic", "supertrend", "qqe", "keltner_bollinger",
-                  "atr_volatility", "volume_filter", "mfi_filter", "two_ma_filter",
-                  "close_rsi", "chandelier_exit", "break_even_exit"]:
+    for block in [
+        "macd",
+        "stochastic",
+        "supertrend",
+        "qqe",
+        "keltner_bollinger",
+        "atr_volatility",
+        "volume_filter",
+        "mfi_filter",
+        "two_ma_filter",
+        "close_rsi",
+        "chandelier_exit",
+        "break_even_exit",
+    ]:
         assert block in prompt, f"Block '{block}' missing from topology prompt"
 
     # Port semantics must be there
@@ -111,17 +129,24 @@ async def test_topology_prompt_has_over_trading_diagnosis():
 
     async def fake_parallel_consensus(question, agents, context=None):
         captured.append(question)
-        return {"individual_responses": [{"agent": "deepseek", "content": "[]"}], "consensus": "[]"}
+        return {"individual_responses": [{"agent": "claude", "content": "[]"}], "consensus": "[]"}
 
     mock_a2a = MagicMock()
     mock_a2a.parallel_consensus = fake_parallel_consensus
 
     bad_metrics = dict(SAMPLE_METRICS, total_trades=180, win_rate=28.0, sharpe_ratio=-1.2)
-    with patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a), \
-         patch("os.environ.get", side_effect=lambda k, d=None: "fake_key" if k in ("DEEPSEEK_API_KEY", "QWEN_API_KEY") else d):
+    with (
+        patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a),
+        patch(
+            "os.environ.get",
+            side_effect=lambda k, d=None: "fake_key" if k in ("ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY") else d,
+        ),
+    ):
         await wf._suggest_topology_changes(
-            blocks=SAMPLE_BLOCKS, connections=SAMPLE_CONNECTIONS,
-            metrics=bad_metrics, iteration=1,
+            blocks=SAMPLE_BLOCKS,
+            connections=SAMPLE_CONNECTIONS,
+            metrics=bad_metrics,
+            iteration=1,
         )
 
     prompt = captured[0]
@@ -130,6 +155,7 @@ async def test_topology_prompt_has_over_trading_diagnosis():
 
 
 # ── Tests: _suggest_param_ranges prompt ──────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_param_ranges_prompt_contains_catalog():
@@ -141,18 +167,26 @@ async def test_param_ranges_prompt_contains_catalog():
         captured.append(question)
         return {
             "individual_responses": [
-                {"agent": "qwen", "content": json.dumps([
-                    {"block_id": "rsi_1", "ranges": {"period": {"min": 7, "max": 50, "step": 1, "type": "int"}}}
-                ])}
+                {
+                    "agent": "claude",
+                    "content": json.dumps(
+                        [{"block_id": "rsi_1", "ranges": {"period": {"min": 7, "max": 50, "step": 1, "type": "int"}}}]
+                    ),
+                }
             ]
         }
 
     mock_a2a = MagicMock()
     mock_a2a.parallel_consensus = fake_parallel_consensus
 
-    with patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a), \
-         patch("backend.agents.workflows.builder_workflow._get_workflow_memory") as mock_mem, \
-         patch("os.environ.get", side_effect=lambda k, d=None: "fake_key" if k in ("DEEPSEEK_API_KEY", "QWEN_API_KEY") else d):
+    with (
+        patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a),
+        patch("backend.agents.workflows.builder_workflow._get_workflow_memory") as mock_mem,
+        patch(
+            "os.environ.get",
+            side_effect=lambda k, d=None: "fake_key" if k in ("ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY") else d,
+        ),
+    ):
         mock_mem.return_value.recall = AsyncMock(return_value=[])
         result = await wf._suggest_param_ranges(
             blocks_added=SAMPLE_BLOCKS,
@@ -185,14 +219,19 @@ async def test_param_ranges_prompt_strategy_blocks_separate_from_catalog():
 
     async def fake_parallel_consensus(question, agents, context):
         captured.append(question)
-        return {"individual_responses": [{"agent": "qwen", "content": "[]"}]}
+        return {"individual_responses": [{"agent": "claude", "content": "[]"}]}
 
     mock_a2a = MagicMock()
     mock_a2a.parallel_consensus = fake_parallel_consensus
 
-    with patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a), \
-         patch("backend.agents.workflows.builder_workflow._get_workflow_memory") as mock_mem, \
-         patch("os.environ.get", side_effect=lambda k, d=None: "fake_key" if k in ("DEEPSEEK_API_KEY", "QWEN_API_KEY") else d):
+    with (
+        patch("backend.agents.workflows.builder_workflow._get_a2a_communicator", return_value=mock_a2a),
+        patch("backend.agents.workflows.builder_workflow._get_workflow_memory") as mock_mem,
+        patch(
+            "os.environ.get",
+            side_effect=lambda k, d=None: "fake_key" if k in ("ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY") else d,
+        ),
+    ):
         mock_mem.return_value.recall = AsyncMock(return_value=[])
         await wf._suggest_param_ranges(
             blocks_added=SAMPLE_BLOCKS,

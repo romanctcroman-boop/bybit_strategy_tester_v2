@@ -222,7 +222,7 @@ class TemperatureAdapter:
         Get temperature optimized for specific agent type.
 
         Args:
-            agent_type: Agent type (qwen, deepseek, perplexity)
+            agent_type: Agent type (claude, perplexity)
             confidence: Confidence level
             market_regime: Market regime
 
@@ -231,8 +231,7 @@ class TemperatureAdapter:
         """
         # Agent-specific base temperatures
         agent_bases = {
-            "qwen": 0.3,  # Balanced
-            "deepseek": 0.25,  # More deterministic (quantitative)
+            "claude": 0.25,  # Balanced / deterministic
             "perplexity": 0.35,  # More exploratory (research)
         }
 

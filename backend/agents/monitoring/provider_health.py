@@ -71,6 +71,15 @@ class ProviderHealthMonitor:
 
         key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         if not key:
+            # Fallback: try key_manager (respects .env loaded at server start)
+            try:
+                from backend.security.key_manager import get_key_manager
+
+                km = get_key_manager()
+                key = km.get_key("ANTHROPIC_API_KEY") or ""
+            except Exception:
+                pass
+        if not key:
             return HealthResult("anthropic", ProviderStatus.UNKNOWN, "ANTHROPIC_API_KEY not set")
 
         start = time.time()
@@ -99,8 +108,16 @@ class ProviderHealthMonitor:
                             "anthropic", ProviderStatus.DEGRADED, f"Server error: {resp.status}", latency
                         )
                     else:
+                        try:
+                            body = await resp.json()
+                            detail = body.get("error", {}).get("message", "")[:120]
+                        except Exception:
+                            detail = ""
                         result = HealthResult(
-                            "anthropic", ProviderStatus.UNKNOWN, f"Unexpected status: {resp.status}", latency
+                            "anthropic",
+                            ProviderStatus.UNKNOWN,
+                            f"Unexpected status: {resp.status}" + (f" — {detail}" if detail else ""),
+                            latency,
                         )
         except TimeoutError:
             result = HealthResult("anthropic", ProviderStatus.DOWN, "Timeout (>10s)")

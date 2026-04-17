@@ -320,16 +320,16 @@ class StrategyEvolution:
         from backend.security.key_manager import KeyManager
 
         km = KeyManager()
-        api_key = km.get_key("DEEPSEEK_API_KEY")
+        api_key = km.get_key("ANTHROPIC_API_KEY")
 
         if not api_key:
-            logger.warning("No DEEPSEEK_API_KEY found, evolution LLM disabled")
+            logger.warning("No ANTHROPIC_API_KEY found, evolution LLM disabled")
             return None
 
         config = LLMConfig(
-            provider=LLMProvider.DEEPSEEK,
+            provider=LLMProvider.ANTHROPIC,
             api_key=api_key,
-            model="deepseek-chat",
+            model="claude-haiku-4-5-20251001",
             temperature=0.7,
             max_tokens=4096,
         )
@@ -348,7 +348,7 @@ class StrategyEvolution:
         leverage: int = 1,
         direction: str = "both",
         fitness_weights: dict[str, float] | None = None,
-        agent_name: str = "deepseek",
+        agent_name: str = "claude",
     ) -> EvolutionResult:
         """
         Run the full evolution loop.
@@ -508,11 +508,12 @@ class StrategyEvolution:
     ) -> StrategyDefinition | None:
         """Generate initial strategy from scratch using LLM."""
         from backend.agents.prompts.prompt_engineer import PromptEngineer
+        from backend.config.constants import COMMISSION_TV
 
         pe = PromptEngineer()
         prompt = pe.create_strategy_prompt(
             context=market_ctx,
-            platform_config={"exchange": "Bybit", "commission": 0.0007},
+            platform_config={"exchange": "Bybit", "commission": COMMISSION_TV},
             agent_name=agent_name,
         )
 

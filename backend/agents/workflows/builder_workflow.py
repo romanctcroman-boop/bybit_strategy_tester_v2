@@ -32,7 +32,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from loguru import logger
 
@@ -73,9 +76,9 @@ def _get_workflow_memory():
 def _get_a2a_communicator():
     """Return the process-wide AgentToAgentCommunicator instance.
 
-    Used in _suggest_adjustments to run a 3-agent parallel consensus instead
-    of a single DeepSeek query — DeepSeek, Qwen, and Perplexity each propose
-    parameter changes which are then merged into a unified adjustment list.
+    Used in _suggest_adjustments to run a multi-agent parallel consensus —
+    Claude and Perplexity each propose parameter changes which are then
+    merged into a unified adjustment list.
     """
     from backend.agents.agent_to_agent_communicator import AgentToAgentCommunicator
 
@@ -1421,7 +1424,7 @@ class BuilderWorkflow:
     }
 
     async def _plan_blocks(self, config: BuilderWorkflowConfig) -> None:
-        """Ask DeepSeek to design the block graph from a free-text strategy description.
+        """Ask Claude to design the block graph from a free-text strategy description.
 
         Called when ``config.blocks`` is empty — i.e. the user typed a description
         instead of picking a preset.  The LLM returns a JSON object with ``blocks``
@@ -2524,13 +2527,13 @@ Recommended approach for positive profit (EMA + RSI combination):
         """Use a 3-agent parallel consensus to suggest parameter adjustments.
 
         Sends the complete visual block graph (blocks + connections + topology)
-        along with backtest metrics to DeepSeek, Qwen, and Perplexity in
+        along with backtest metrics to Claude and Perplexity in
         parallel via AgentToAgentCommunicator.parallel_consensus().  Each agent
         proposes parameter-only adjustments; structural changes are explicitly
         forbidden in the prompt.  Their responses are merged: adjustments that
         appear in 2+ responses take priority.
 
-        Falls back to a single DeepSeek call if A2A is unavailable, and to
+        Falls back to a single Claude call if A2A is unavailable, and to
         the rule-based heuristic if all LLM calls fail.
 
         Args:
@@ -2707,7 +2710,7 @@ Recommended approach for positive profit (EMA + RSI combination):
             )
 
         prompt = f"""You are a quantitative strategy parameter optimizer and part of a MULTI-AGENT system.
-Other AI agents (DeepSeek, Qwen, Claude) are independently analyzing the same strategy.
+Other AI agents (Claude, Perplexity) are independently analyzing the same strategy.
 Your suggestions will be merged with theirs — propose well-reasoned, evidence-based changes.
 {_history_section}{_warnings_section}{_delib_section}
 ══════════════════════════════════════════════════════════════
@@ -3058,8 +3061,8 @@ Only include the specific parameters that should change."""
                 _memory_context_ranges = "\n## Past successful configurations (from memory)\n"
                 for _p in _past:
                     _memory_context_ranges += f"- {_p.content}\n"
-        except Exception:
-            pass  # memory unavailable — continue without
+        except Exception as mem_err:
+            logger.debug(f"[builder_workflow] memory lookup failed, continuing without: {mem_err}")
 
         # Long/short breakdown for direction mismatch awareness
         _long_tr = metrics.get("long_trades", total_trades)
@@ -3143,7 +3146,7 @@ Only include the specific parameters that should change."""
             _hypothesis_section += "\n"
 
         prompt = f"""You are part of a MULTI-AGENT system optimizing a visual block-based trading strategy.
-Other AI agents (DeepSeek, Qwen, Claude) propose ranges independently — yours will be MERGED with theirs.
+Other AI agents (Claude, Perplexity) propose ranges independently — yours will be MERGED with theirs.
 Propose WIDE, well-reasoned ranges focused on fixing the biggest problem first.
 The Bayesian optimizer (Optuna TPE) handles LARGE parameter spaces efficiently — use WIDE ranges and FINE steps.
 {_hypothesis_section}{_history_lines}{_memory_context_ranges}{_delib_ranges}{_warn_ranges}
@@ -3833,8 +3836,10 @@ Your task: propose STRUCTURAL changes to fix fundamental problems that parameter
                                 f"Skipping to prevent silent signal loss."
                             )
                             continue
-                    except Exception:
-                        pass  # If registry import fails, proceed and let the API handle it
+                    except Exception as reg_err:
+                        logger.debug(
+                            f"[BuilderWorkflow] BLOCK_REGISTRY import failed, deferring validation to API: {reg_err}"
+                        )
 
                     result = await builder_add_block(
                         strategy_id=strategy_id,

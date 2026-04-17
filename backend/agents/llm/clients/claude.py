@@ -240,7 +240,20 @@ class ClaudeClient(LLMClient):
                             f"ClaudeClient: rate limit exceeded after {self.config.max_retries} attempts"
                         )
 
-                    resp.raise_for_status()
+                    if resp.status >= 400:
+                        error_body = await resp.text()
+                        # Parse and surface the Anthropic error message if available
+                        try:
+                            err_data = json.loads(error_body)
+                            err_msg = err_data.get("error", {}).get("message", error_body[:200])
+                        except Exception:
+                            err_msg = error_body[:200]
+                        # Non-retriable billing/auth errors — fail immediately
+                        if "credit balance" in err_msg or "insufficient" in err_msg.lower():
+                            logger.error(f"{self.EMOJI} Claude API billing error (no credits): {err_msg}")
+                            raise RuntimeError(f"Claude API: {err_msg}")
+                        logger.warning(f"{self.EMOJI} HTTP {resp.status}: {err_msg}")
+                        resp.raise_for_status()
                     data = await resp.json()
                     latency = (time.time() - start_time) * 1000
                     response = self._parse_response(data, latency)

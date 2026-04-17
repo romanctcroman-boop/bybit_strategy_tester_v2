@@ -75,23 +75,31 @@ def communicator(mock_agent_interface, mock_redis):
 
 
 class TestCommunicatorThreeAgentRouting:
-    """All four handler types are callable and return valid AgentMessages."""
+    """Claude and Perplexity handler types are callable and return valid AgentMessages."""
 
     @pytest.mark.asyncio
-    async def test_route_to_deepseek(self, communicator):
-        msg = _make_msg(to_agent=AgentType.DEEPSEEK)
-        resp = await communicator.route_message(msg)
-        assert resp.from_agent == AgentType.DEEPSEEK
+    async def test_route_to_claude(self, communicator):
+        msg = _make_msg(to_agent=AgentType.CLAUDE)
+        with patch("backend.agents.agent_to_agent_communicator.LLMClientFactory") as mock_factory:
+            mock_client = AsyncMock()
+            mock_client.chat = AsyncMock(return_value=MagicMock(content="Claude response"))
+            mock_factory.create.return_value = mock_client
+            resp = await communicator.route_message(msg)
+        assert resp.from_agent == AgentType.CLAUDE
         assert resp.message_type == MessageType.RESPONSE
         assert resp.confidence_score == 0.9
 
     @pytest.mark.asyncio
-    async def test_route_to_qwen(self, communicator):
-        msg = _make_msg(to_agent=AgentType.QWEN)
-        resp = await communicator.route_message(msg)
-        assert resp.from_agent == AgentType.QWEN
+    async def test_route_to_claude_variant(self, communicator):
+        msg = _make_msg(to_agent=AgentType.CLAUDE)
+        with patch("backend.agents.agent_to_agent_communicator.LLMClientFactory") as mock_factory:
+            mock_client = AsyncMock()
+            mock_client.chat = AsyncMock(return_value=MagicMock(content="Claude analysis"))
+            mock_factory.create.return_value = mock_client
+            resp = await communicator.route_message(msg)
+        assert resp.from_agent == AgentType.CLAUDE
         assert resp.message_type == MessageType.RESPONSE
-        assert resp.confidence_score == 0.85
+        assert resp.confidence_score == 0.9
 
     @pytest.mark.asyncio
     async def test_route_to_perplexity(self, communicator):
@@ -117,14 +125,14 @@ class TestParallelConsensus:
     async def test_consensus_three_agents(self, communicator):
         result = await communicator.parallel_consensus(
             question="Should we enter long on BTCUSDT?",
-            agents=[AgentType.DEEPSEEK, AgentType.QWEN, AgentType.PERPLEXITY],
+            agents=[AgentType.CLAUDE, AgentType.CLAUDE, AgentType.PERPLEXITY],
             context={"symbol": "BTCUSDT"},
         )
 
         assert "consensus" in result
         assert len(result["individual_responses"]) == 3
         agents_seen = {r["agent"] for r in result["individual_responses"]}
-        assert agents_seen == {"deepseek", "qwen", "perplexity"}
+        assert agents_seen == {"claude", "perplexity"}
         assert 0.0 <= result["confidence_score"] <= 1.0
 
 
@@ -134,10 +142,14 @@ class TestConsensusToRiskVeto:
     @pytest.mark.asyncio
     async def test_high_consensus_passes_veto(self, communicator):
         """When agreement_score is high and equity is healthy → no veto."""
-        result = await communicator.parallel_consensus(
-            question="Enter long?",
-            agents=[AgentType.DEEPSEEK, AgentType.QWEN],
-        )
+        with patch("backend.agents.agent_to_agent_communicator.LLMClientFactory") as mock_factory:
+            mock_client = AsyncMock()
+            mock_client.chat = AsyncMock(return_value=MagicMock(content="Analysis complete"))
+            mock_factory.create.return_value = mock_client
+            result = await communicator.parallel_consensus(
+                question="Enter long?",
+                agents=[AgentType.CLAUDE, AgentType.CLAUDE],
+            )
 
         guard = RiskVetoGuard(VetoConfig(enabled=True))
         decision = guard.check(
@@ -200,14 +212,14 @@ class TestConsensusToRiskVeto:
 
 
 class TestMultiTurnRotation:
-    """_determine_next_message follows DeepSeek→Qwen→Perplexity cycle."""
+    """_determine_next_message follows Claude→Claude→Perplexity cycle."""
 
     @pytest.mark.asyncio
     async def test_rotation_order(self, communicator):
-        agents_order = [AgentType.DEEPSEEK, AgentType.QWEN, AgentType.PERPLEXITY]
-        current = _make_msg(from_agent=AgentType.DEEPSEEK, to_agent=AgentType.ORCHESTRATOR)
+        agents_order = [AgentType.CLAUDE, AgentType.PERPLEXITY]
+        current = _make_msg(from_agent=AgentType.CLAUDE, to_agent=AgentType.ORCHESTRATOR)
 
-        for expected_next in [AgentType.QWEN, AgentType.PERPLEXITY, AgentType.DEEPSEEK]:
+        for expected_next in [AgentType.PERPLEXITY, AgentType.CLAUDE]:
             nxt = await communicator._determine_next_message(current, CommunicationPattern.COLLABORATIVE, [])
             assert nxt.to_agent == expected_next
             current = _make_msg(from_agent=expected_next, to_agent=AgentType.ORCHESTRATOR)
@@ -221,7 +233,7 @@ class TestMultiTurnRotation:
 def _make_msg(
     *,
     from_agent: AgentType = AgentType.ORCHESTRATOR,
-    to_agent: AgentType = AgentType.DEEPSEEK,
+    to_agent: AgentType = AgentType.CLAUDE,
     content: str = "Test message",
 ) -> AgentMessage:
     return AgentMessage(

@@ -77,15 +77,17 @@ def _make_strategy(
 
 @pytest.fixture
 def engine() -> ConsensusEngine:
-    """Fresh ConsensusEngine instance."""
-    return ConsensusEngine()
+    """Fresh ConsensusEngine instance with clean performance data."""
+    eng = ConsensusEngine()
+    eng._performance.clear()  # Isolate from DB state
+    return eng
 
 
 @pytest.fixture
 def two_strategies() -> dict[str, StrategyDefinition]:
     """Two distinct strategies from different agents."""
     return {
-        "deepseek": _make_strategy(
+        "claude": _make_strategy(
             "RSI Strategy",
             signals=[
                 _make_signal("RSI", weight=0.8, period=14, overbought=70, oversold=30),
@@ -104,7 +106,7 @@ def two_strategies() -> dict[str, StrategyDefinition]:
                 primary_objective="sharpe_ratio",
             ),
         ),
-        "qwen": _make_strategy(
+        "perplexity": _make_strategy(
             "EMA Crossover",
             signals=[
                 _make_signal("EMA_Crossover", weight=0.9, fast_period=9, slow_period=21),
@@ -128,9 +130,9 @@ def two_strategies() -> dict[str, StrategyDefinition]:
 
 @pytest.fixture
 def three_strategies(two_strategies: dict) -> dict[str, StrategyDefinition]:
-    """Three strategies (adds perplexity with overlapping RSI signal)."""
+    """Three strategies (adds copilot with overlapping RSI signal)."""
     strats = dict(two_strategies)
-    strats["perplexity"] = _make_strategy(
+    strats["copilot"] = _make_strategy(
         "Bollinger RSI",
         signals=[
             _make_signal("RSI", weight=0.7, period=14, overbought=70, oversold=30),
@@ -228,11 +230,11 @@ class TestWeightedVoting:
 
     def test_weighted_voting_with_performance_history(self, engine: ConsensusEngine, two_strategies: dict):
         """Agent with better history gets higher weight."""
-        engine.update_performance("deepseek", sharpe=2.5, profit_factor=2.0, win_rate=0.6, backtest_passed=True)
-        engine.update_performance("qwen", sharpe=0.5, profit_factor=0.8, win_rate=0.4, backtest_passed=False)
+        engine.update_performance("claude", sharpe=2.5, profit_factor=2.0, win_rate=0.6, backtest_passed=True)
+        engine.update_performance("perplexity", sharpe=0.5, profit_factor=0.8, win_rate=0.4, backtest_passed=False)
 
         result = engine.aggregate(two_strategies, method="weighted_voting")
-        assert result.agent_weights["deepseek"] > result.agent_weights["qwen"]
+        assert result.agent_weights["claude"] > result.agent_weights["perplexity"]
 
 
 # =============================================================================
@@ -275,12 +277,12 @@ class TestBestOf:
 
     def test_best_of_with_performance_prefers_better_agent(self, engine: ConsensusEngine, two_strategies: dict):
         """Best-of with history picks the better-performing agent."""
-        engine.update_performance("deepseek", sharpe=3.0, profit_factor=2.5, win_rate=0.7, backtest_passed=True)
-        engine.update_performance("qwen", sharpe=0.2, profit_factor=0.5, win_rate=0.3, backtest_passed=False)
+        engine.update_performance("claude", sharpe=3.0, profit_factor=2.5, win_rate=0.7, backtest_passed=True)
+        engine.update_performance("perplexity", sharpe=0.2, profit_factor=0.5, win_rate=0.3, backtest_passed=False)
 
         result = engine.aggregate(two_strategies, method="best_of")
-        # With much better history, deepseek should be picked
-        assert result.agent_weights["deepseek"] > result.agent_weights["qwen"]
+        # With much better history, claude should be picked
+        assert result.agent_weights["claude"] > result.agent_weights["perplexity"]
 
 
 # =============================================================================
@@ -296,7 +298,7 @@ class TestAgentWeights:
         result = engine.aggregate(two_strategies)
         w = result.agent_weights
         # Weights may differ slightly due to strategy quality, but should be close
-        assert abs(w["deepseek"] - w["qwen"]) < 0.5
+        assert abs(w["claude"] - w["perplexity"]) < 0.5
 
     def test_weights_sum_to_one(self, engine: ConsensusEngine, three_strategies: dict):
         """Agent weights should sum to 1.0."""
@@ -394,7 +396,7 @@ class TestSignalVotes:
         assert result.signal_votes.get("RSI", 0) == 3
 
     def test_unique_signal_has_one_vote(self, engine: ConsensusEngine, two_strategies: dict):
-        """EMA_Crossover only in qwen → 1 vote."""
+        """EMA_Crossover only in perplexity → 1 vote."""
         result = engine.aggregate(two_strategies)
         assert result.signal_votes.get("EMA_Crossover", 0) == 1
 
@@ -481,7 +483,7 @@ class TestConsensusFallback:
         """Only one agent responds → result is that strategy, method=single_agent."""
         engine = ConsensusEngine()
         s = _make_strategy("Solo")
-        result = engine.aggregate({"deepseek": s})
+        result = engine.aggregate({"claude": s})
         assert result.strategy.strategy_name == "Solo"
         assert result.method == "single_agent"
         assert result.agreement_score == 1.0
@@ -490,8 +492,8 @@ class TestConsensusFallback:
         """Two of three expected agents respond → still produces a result."""
         engine = ConsensusEngine()
         strategies = {
-            "deepseek": _make_strategy("A", [_make_signal("RSI")]),
-            "qwen": _make_strategy("B", [_make_signal("MACD")]),
+            "claude": _make_strategy("A", [_make_signal("RSI")]),
+            "perplexity": _make_strategy("B", [_make_signal("MACD")]),
         }
         result = engine.aggregate(strategies, method="weighted_voting")
         assert result is not None
@@ -510,29 +512,30 @@ class TestConsensusFallback:
         """Agent weight (success_rate) declines when backtest_passed=False repeatedly."""
         engine = ConsensusEngine()
         # Initial prior: 0.5
-        engine.update_performance("deepseek", backtest_passed=True)  # baseline
-        initial_rate = engine._performance["deepseek"].success_rate
+        engine.update_performance("claude", backtest_passed=True)  # baseline
+        initial_rate = engine._performance["claude"].success_rate
 
         # Three consecutive failures
         for _ in range(3):
-            engine.update_performance("deepseek", backtest_passed=False)
+            engine.update_performance("claude", backtest_passed=False)
 
-        degraded_rate = engine._performance["deepseek"].success_rate
+        degraded_rate = engine._performance["claude"].success_rate
         assert degraded_rate < initial_rate, (
             f"success_rate should drop after failures: {initial_rate:.3f} → {degraded_rate:.3f}"
         )
 
     def test_different_agents_have_independent_weights(self):
-        """Updating deepseek's record does not change qwen's weight."""
+        """Updating claude's record does not change perplexity's weight."""
         engine = ConsensusEngine()
-        engine.update_performance("deepseek", backtest_passed=False)
-        engine.update_performance("deepseek", backtest_passed=False)
+        engine._performance.clear()  # Isolate from DB state
+        engine.update_performance("claude", backtest_passed=False)
+        engine.update_performance("claude", backtest_passed=False)
 
-        # qwen has never been recorded — must have the default prior
-        if "qwen" in engine._performance:
-            assert engine._performance["qwen"].total_strategies == 0
+        # perplexity has never been recorded — must have the default prior
+        if "perplexity" in engine._performance:
+            assert engine._performance["perplexity"].total_strategies == 0
         else:
-            pass  # qwen not present at all — also fine
+            pass  # perplexity not present at all — also fine
 
     # ── ConsensusNode fallback (via trading_strategy_graph) ──────────────────
 
@@ -555,8 +558,8 @@ class TestConsensusFallback:
             "parse_responses",
             {
                 "proposals": [
-                    {"agent": "deepseek", "strategy": strategy_a, "validation": val},
-                    {"agent": "qwen", "strategy": strategy_b, "validation": val},
+                    {"agent": "claude", "strategy": strategy_a, "validation": val},
+                    {"agent": "claude", "strategy": strategy_b, "validation": val},
                 ]
             },
         )
@@ -572,7 +575,7 @@ class TestConsensusFallback:
         result = result_state.get_result("select_best")
         assert result is not None
         assert result["selected_strategy"] is not None
-        assert result["selected_agent"] in ("deepseek", "qwen")
+        assert result["selected_agent"] in ("claude", "perplexity")
 
     def test_unusual_signal_type_does_not_crash_aggregation(self):
         """Strategy with a rare signal type is still valid ConsensusEngine input."""
@@ -580,5 +583,5 @@ class TestConsensusFallback:
         # Both strategies have signals — StrategyDefinition requires at least 1
         s_rsi = _make_strategy("RSI Strategy", [_make_signal("RSI")])
         s_weird = _make_strategy("Weird Strategy", [_make_signal("CUSTOM_INDICATOR_X")])
-        result = engine.aggregate({"deepseek": s_rsi, "qwen": s_weird})
+        result = engine.aggregate({"claude": s_rsi, "perplexity": s_weird})
         assert result.strategy is not None

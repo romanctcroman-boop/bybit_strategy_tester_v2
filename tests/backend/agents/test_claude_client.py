@@ -7,7 +7,7 @@ Coverage:
   - ClaudeClient.chat: retry on 429, raise on network error
   - GenerateStrategiesNode._synthesis_critic:
       Claude succeeds → returns result
-      Claude fails → QWEN fallback succeeds
+      Claude fails → CLAUDE fallback succeeds
       Both fail → returns None
 """
 
@@ -273,7 +273,7 @@ class TestClaudeChatRetry:
 class TestSynthesisCritic:
     """Tests for GenerateStrategiesNode._synthesis_critic.
 
-    _synthesis_critic now uses Claude Haiku as sole critic (no QWEN fallback).
+    _synthesis_critic now uses Claude Haiku as sole critic (no CLAUDE fallback).
     It is a legacy helper kept for backward compatibility — the primary generation
     path is a single Claude Sonnet/Opus call in execute().
     """
@@ -305,7 +305,7 @@ class TestSynthesisCritic:
 
     @pytest.mark.asyncio
     async def test_returns_none_when_claude_haiku_fails(self):
-        """Claude Haiku raises → None returned (no QWEN fallback in new architecture)."""
+        """Claude Haiku raises → None returned (no CLAUDE fallback in new architecture)."""
         node = self._make_node()
         call_log: list[str] = []
 

@@ -160,8 +160,8 @@ class TestMetadataMapping:
         assert "source:backtest_engine" in tags
 
     def test_agent_namespace_tag(self, tagger: AutoTagger):
-        tags = tagger.generate_tags("result", agent_namespace="deepseek")
-        assert "agent:deepseek" in tags
+        tags = tagger.generate_tags("result", agent_namespace="claude")
+        assert "agent:claude" in tags
 
     def test_shared_namespace_no_tag(self, tagger: AutoTagger):
         """Shared namespace should NOT produce an agent: tag."""

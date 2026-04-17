@@ -25,7 +25,7 @@ class TestAgentRecord:
         from datetime import UTC, datetime
 
         record = AgentRecord(
-            agent_name="deepseek",
+            agent_name="claude",
             timestamp=datetime.now(UTC),
             strategy_type="rsi",
             fitness_score=72.5,
@@ -36,7 +36,7 @@ class TestAgentRecord:
             total_trades=25,
             passed=True,
         )
-        assert record.agent_name == "deepseek"
+        assert record.agent_name == "claude"
         assert record.fitness_score == 72.5
         assert record.passed is True
 
@@ -45,7 +45,7 @@ class TestAgentRecord:
         from datetime import UTC, datetime
 
         record = AgentRecord(
-            agent_name="qwen",
+            agent_name="claude",
             timestamp=datetime.now(UTC),
             strategy_type="macd",
             fitness_score=55.0,
@@ -57,7 +57,7 @@ class TestAgentRecord:
             passed=False,
         )
         d = record.to_dict()
-        assert d["agent_name"] == "qwen"
+        assert d["agent_name"] == "claude"
         assert d["passed"] is False
         assert "timestamp" in d
 
@@ -123,13 +123,13 @@ class TestAgentProfile:
     def test_to_dict(self):
         """to_dict should include all fields."""
         profile = AgentProfile(
-            agent_name="deepseek",
+            agent_name="claude",
             total_strategies=5,
             passed_strategies=3,
             avg_sharpe=1.2,
         )
         d = profile.to_dict()
-        assert d["agent_name"] == "deepseek"
+        assert d["agent_name"] == "claude"
         assert d["pass_rate"] == 0.6
         assert "composite_score" in d
         assert "last_updated" in d
@@ -158,7 +158,7 @@ class TestAgentPerformanceTracker:
         """Record a result and verify profile update."""
         tracker = AgentPerformanceTracker()
         record = tracker.record_result(
-            agent_name="deepseek",
+            agent_name="claude",
             metrics={
                 "sharpe_ratio": 1.5,
                 "win_rate": 0.55,
@@ -170,16 +170,16 @@ class TestAgentPerformanceTracker:
             passed=True,
             fitness_score=72.5,
         )
-        assert record.agent_name == "deepseek"
+        assert record.agent_name == "claude"
         assert record.sharpe_ratio == 1.5
-        assert len(tracker._records["deepseek"]) == 1
+        assert len(tracker._records["claude"]) == 1
 
     def test_record_multiple_results(self):
         """Record multiple results for same agent."""
         tracker = AgentPerformanceTracker()
         for i in range(5):
             tracker.record_result(
-                agent_name="deepseek",
+                agent_name="claude",
                 metrics={
                     "sharpe_ratio": 1.0 + i * 0.2,
                     "win_rate": 0.5,
@@ -190,15 +190,15 @@ class TestAgentPerformanceTracker:
                 passed=True,
                 fitness_score=60 + i * 5,
             )
-        assert len(tracker._records["deepseek"]) == 5
-        profile = tracker.get_profile("deepseek")
+        assert len(tracker._records["claude"]) == 5
+        profile = tracker.get_profile("claude")
         assert profile.total_strategies == 5
         assert profile.passed_strategies == 5
 
     def test_record_multiple_agents(self):
         """Record results for different agents."""
         tracker = AgentPerformanceTracker()
-        for agent in ["deepseek", "qwen", "perplexity"]:
+        for agent in ["claude", "copilot", "perplexity"]:
             tracker.record_result(
                 agent_name=agent,
                 metrics={"sharpe_ratio": 1.0, "win_rate": 0.5},
@@ -217,18 +217,18 @@ class TestAgentPerformanceTracker:
         """Profile should compute correct averages."""
         tracker = AgentPerformanceTracker()
         tracker.record_result(
-            "deepseek",
+            "claude",
             {"sharpe_ratio": 1.0, "win_rate": 0.4},
             passed=True,
             fitness_score=50,
         )
         tracker.record_result(
-            "deepseek",
+            "claude",
             {"sharpe_ratio": 2.0, "win_rate": 0.6},
             passed=True,
             fitness_score=70,
         )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert abs(profile.avg_sharpe - 1.5) < 0.01
         assert abs(profile.avg_win_rate - 0.5) < 0.01
         assert abs(profile.avg_fitness - 60.0) < 0.01
@@ -236,26 +236,26 @@ class TestAgentPerformanceTracker:
     def test_compute_dynamic_weights_no_history(self):
         """No history → uniform weights."""
         tracker = AgentPerformanceTracker()
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen", "perplexity"])
+        weights = tracker.compute_dynamic_weights(["claude", "copilot", "perplexity"])
         assert len(weights) == 3
         assert abs(sum(weights.values()) - 1.0) < 0.01
 
     def test_compute_dynamic_weights_default_for_few_records(self):
         """Agents with < MIN_RECORDS should get default weight."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 2.0}, passed=True)
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen"])
-        # Both should be similar since deepseek has < MIN_RECORDS
-        assert abs(weights["deepseek"] - weights["qwen"]) < 0.1
+        tracker.record_result("claude", {"sharpe_ratio": 2.0}, passed=True)
+        weights = tracker.compute_dynamic_weights(["claude", "perplexity"])
+        # Both should be similar since claude has < MIN_RECORDS
+        assert abs(weights["claude"] - weights["perplexity"]) < 0.1
 
     def test_compute_dynamic_weights_composite(self):
         """Better agent should get higher weight."""
         tracker = AgentPerformanceTracker()
 
-        # DeepSeek: consistently good
+        # Claude: consistently good
         for _ in range(5):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {
                     "sharpe_ratio": 2.0,
                     "win_rate": 0.6,
@@ -267,10 +267,10 @@ class TestAgentPerformanceTracker:
                 fitness_score=80,
             )
 
-        # Qwen: consistently poor
+        # Perplexity: consistently poor
         for _ in range(5):
             tracker.record_result(
-                "qwen",
+                "perplexity",
                 {
                     "sharpe_ratio": 0.3,
                     "win_rate": 0.35,
@@ -283,92 +283,92 @@ class TestAgentPerformanceTracker:
             )
 
         weights = tracker.compute_dynamic_weights(
-            ["deepseek", "qwen"],
+            ["claude", "perplexity"],
             method="composite",
         )
-        assert weights["deepseek"] > weights["qwen"]
+        assert weights["claude"] > weights["perplexity"]
 
     def test_compute_dynamic_weights_sharpe_method(self):
         """Sharpe method should weight by avg Sharpe."""
         tracker = AgentPerformanceTracker()
         for _ in range(5):
-            tracker.record_result("deepseek", {"sharpe_ratio": 2.0}, passed=True, fitness_score=70)
-            tracker.record_result("qwen", {"sharpe_ratio": 0.5}, passed=True, fitness_score=40)
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen"], method="sharpe")
-        assert weights["deepseek"] > weights["qwen"]
+            tracker.record_result("claude", {"sharpe_ratio": 2.0}, passed=True, fitness_score=70)
+            tracker.record_result("perplexity", {"sharpe_ratio": 0.5}, passed=True, fitness_score=40)
+        weights = tracker.compute_dynamic_weights(["claude", "perplexity"], method="sharpe")
+        assert weights["claude"] > weights["perplexity"]
 
     def test_compute_dynamic_weights_pass_rate_method(self):
         """Pass rate method should weight by pass rate."""
         tracker = AgentPerformanceTracker()
         for _ in range(5):
-            tracker.record_result("deepseek", {"sharpe_ratio": 1.0}, passed=True)
-            tracker.record_result("qwen", {"sharpe_ratio": 1.0}, passed=False)
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen"], method="pass_rate")
-        assert weights["deepseek"] > weights["qwen"]
+            tracker.record_result("claude", {"sharpe_ratio": 1.0}, passed=True)
+            tracker.record_result("perplexity", {"sharpe_ratio": 1.0}, passed=False)
+        weights = tracker.compute_dynamic_weights(["claude", "perplexity"], method="pass_rate")
+        assert weights["claude"] > weights["perplexity"]
 
     def test_compute_dynamic_weights_normalize(self):
         """Weights should sum to 1.0."""
         tracker = AgentPerformanceTracker()
         for _ in range(5):
-            tracker.record_result("deepseek", {"sharpe_ratio": 1.5}, passed=True, fitness_score=65)
-            tracker.record_result("qwen", {"sharpe_ratio": 1.0}, passed=True, fitness_score=55)
+            tracker.record_result("claude", {"sharpe_ratio": 1.5}, passed=True, fitness_score=65)
+            tracker.record_result("copilot", {"sharpe_ratio": 1.0}, passed=True, fitness_score=55)
             tracker.record_result("perplexity", {"sharpe_ratio": 0.8}, passed=False, fitness_score=40)
 
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen", "perplexity"])
+        weights = tracker.compute_dynamic_weights(["claude", "copilot", "perplexity"])
         assert abs(sum(weights.values()) - 1.0) < 0.01
 
     def test_get_leaderboard(self):
         """Leaderboard should be sorted by composite score."""
         tracker = AgentPerformanceTracker()
         for _ in range(5):
-            tracker.record_result("deepseek", {"sharpe_ratio": 2.0}, passed=True, fitness_score=80)
-            tracker.record_result("qwen", {"sharpe_ratio": 0.5}, passed=False, fitness_score=30)
+            tracker.record_result("claude", {"sharpe_ratio": 2.0}, passed=True, fitness_score=80)
+            tracker.record_result("perplexity", {"sharpe_ratio": 0.5}, passed=False, fitness_score=30)
 
         leaderboard = tracker.get_leaderboard()
         assert len(leaderboard) == 2
-        assert leaderboard[0]["agent_name"] == "deepseek"
+        assert leaderboard[0]["agent_name"] == "claude"
         assert leaderboard[0]["composite_score"] > leaderboard[1]["composite_score"]
 
     def test_get_comparison(self):
         """Comparison should return all agents."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 1.5}, passed=True)
-        tracker.record_result("qwen", {"sharpe_ratio": 1.0}, passed=True)
+        tracker.record_result("claude", {"sharpe_ratio": 1.5}, passed=True)
+        tracker.record_result("perplexity", {"sharpe_ratio": 1.0}, passed=True)
 
         comparison = tracker.get_comparison()
-        assert "deepseek" in comparison
-        assert "qwen" in comparison
+        assert "claude" in comparison
+        assert "perplexity" in comparison
 
     def test_get_comparison_specific_agents(self):
         """Comparison with specific agents."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 1.5}, passed=True)
-        tracker.record_result("qwen", {"sharpe_ratio": 1.0}, passed=True)
-        tracker.record_result("perplexity", {"sharpe_ratio": 0.8}, passed=True)
+        tracker.record_result("claude", {"sharpe_ratio": 1.5}, passed=True)
+        tracker.record_result("perplexity", {"sharpe_ratio": 1.0}, passed=True)
+        tracker.record_result("copilot", {"sharpe_ratio": 0.8}, passed=True)
 
-        comparison = tracker.get_comparison(["deepseek", "qwen"])
+        comparison = tracker.get_comparison(["claude", "perplexity"])
         assert len(comparison) == 2
-        assert "perplexity" not in comparison
+        assert "copilot" not in comparison
 
     def test_get_specialization_analysis(self):
         """Specialization analysis by strategy type."""
         tracker = AgentPerformanceTracker()
         tracker.record_result(
-            "deepseek",
+            "claude",
             {"sharpe_ratio": 2.0},
             strategy_type="rsi",
             passed=True,
             fitness_score=80,
         )
         tracker.record_result(
-            "deepseek",
+            "claude",
             {"sharpe_ratio": 0.5},
             strategy_type="macd",
             passed=False,
             fitness_score=30,
         )
 
-        analysis = tracker.get_specialization_analysis("deepseek")
+        analysis = tracker.get_specialization_analysis("claude")
         assert "rsi" in analysis
         assert "macd" in analysis
         assert analysis["rsi"] > analysis["macd"]
@@ -380,7 +380,7 @@ class TestAgentPerformanceTracker:
         tracker = AgentPerformanceTracker()
         for _ in range(3):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": 1.5, "win_rate": 0.55, "profit_factor": 1.8},
                 passed=True,
             )
@@ -390,35 +390,35 @@ class TestAgentPerformanceTracker:
         mock_consensus.update_performance.assert_called_once()
 
         call_kwargs = mock_consensus.update_performance.call_args
-        assert call_kwargs[1]["agent_name"] == "deepseek"
+        assert call_kwargs[1]["agent_name"] == "claude"
 
     def test_get_stats(self):
         """Stats should show tracker state."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 1.0}, passed=True)
-        tracker.record_result("qwen", {"sharpe_ratio": 0.8}, passed=True)
+        tracker.record_result("claude", {"sharpe_ratio": 1.0}, passed=True)
+        tracker.record_result("perplexity", {"sharpe_ratio": 0.8}, passed=True)
 
         stats = tracker.get_stats()
         assert stats["tracked_agents"] == 2
         assert stats["total_records"] == 2
-        assert "deepseek" in stats["agents"]
-        assert "qwen" in stats["agents"]
+        assert "claude" in stats["agents"]
+        assert "perplexity" in stats["agents"]
 
     def test_reset_specific_agent(self):
         """Reset specific agent should clear only that agent."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 1.0}, passed=True)
-        tracker.record_result("qwen", {"sharpe_ratio": 0.8}, passed=True)
+        tracker.record_result("claude", {"sharpe_ratio": 1.0}, passed=True)
+        tracker.record_result("perplexity", {"sharpe_ratio": 0.8}, passed=True)
 
-        tracker.reset("deepseek")
-        assert "deepseek" not in tracker._records
-        assert "qwen" in tracker._records
+        tracker.reset("claude")
+        assert "claude" not in tracker._records
+        assert "perplexity" in tracker._records
 
     def test_reset_all(self):
         """Reset all should clear everything."""
         tracker = AgentPerformanceTracker()
-        tracker.record_result("deepseek", {"sharpe_ratio": 1.0}, passed=True)
-        tracker.record_result("qwen", {"sharpe_ratio": 0.8}, passed=True)
+        tracker.record_result("claude", {"sharpe_ratio": 1.0}, passed=True)
+        tracker.record_result("perplexity", {"sharpe_ratio": 0.8}, passed=True)
 
         tracker.reset()
         assert len(tracker._records) == 0
@@ -429,24 +429,24 @@ class TestAgentPerformanceTracker:
         tracker = AgentPerformanceTracker(window_size=5)
         for i in range(10):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": float(i)},
                 passed=True,
                 fitness_score=float(i * 10),
             )
-        assert len(tracker._records["deepseek"]) == 5
+        assert len(tracker._records["claude"]) == 5
 
     def test_sharpe_trend_improving(self):
         """Improving Sharpe should have positive trend."""
         tracker = AgentPerformanceTracker()
         for i in range(6):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": 0.5 + i * 0.3},
                 passed=True,
                 fitness_score=50 + i * 5,
             )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert profile.sharpe_trend > 0
 
     def test_sharpe_trend_declining(self):
@@ -454,12 +454,12 @@ class TestAgentPerformanceTracker:
         tracker = AgentPerformanceTracker()
         for i in range(6):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": 2.0 - i * 0.3},
                 passed=True,
                 fitness_score=80 - i * 5,
             )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert profile.sharpe_trend < 0
 
     def test_consistency_score_high(self):
@@ -467,12 +467,12 @@ class TestAgentPerformanceTracker:
         tracker = AgentPerformanceTracker()
         for _ in range(5):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": 1.5},
                 passed=True,
                 fitness_score=70,
             )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert profile.consistency_score > 0.8
 
     def test_consistency_score_low(self):
@@ -481,37 +481,37 @@ class TestAgentPerformanceTracker:
         sharpes = [0.1, 3.0, 0.5, 2.5, 0.2]
         for s in sharpes:
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": s},
                 passed=True,
                 fitness_score=s * 30,
             )
-        profile = tracker.get_profile("deepseek")
+        profile = tracker.get_profile("claude")
         assert profile.consistency_score < 0.5
 
     def test_recency_bonus_in_weights(self):
         """Positive trend should boost weight slightly."""
         tracker = AgentPerformanceTracker()
 
-        # DeepSeek: improving
+        # Claude: improving
         for i in range(5):
             tracker.record_result(
-                "deepseek",
+                "claude",
                 {"sharpe_ratio": 1.0 + i * 0.3},
                 passed=True,
                 fitness_score=50 + i * 10,
             )
 
-        # Qwen: stable
+        # Perplexity: stable
         for _ in range(5):
             tracker.record_result(
-                "qwen",
+                "perplexity",
                 {"sharpe_ratio": 1.5},
                 passed=True,
                 fitness_score=65,
             )
 
-        weights = tracker.compute_dynamic_weights(["deepseek", "qwen"])
+        weights = tracker.compute_dynamic_weights(["claude", "perplexity"])
         # Both should have reasonable weights
-        assert weights["deepseek"] > 0.1
-        assert weights["qwen"] > 0.1
+        assert weights["claude"] > 0.1
+        assert weights["perplexity"] > 0.1

@@ -345,8 +345,8 @@ class AgentPaperTrader:
             if klines and len(klines) > 0:
                 last = klines[-1]
                 return float(last.get("close", last.get("close_price", 0)))
-        except Exception:
-            pass
+        except Exception as kline_err:
+            logger.debug(f"[paper_trader] kline-repo price lookup failed: {kline_err}")
 
         # Fallback: try Bybit API
         try:
@@ -356,8 +356,8 @@ class AgentPaperTrader:
             ticker = await asyncio.to_thread(adapter.get_ticker, symbol)
             if ticker and "lastPrice" in ticker:
                 return float(ticker["lastPrice"])
-        except Exception:
-            pass
+        except Exception as bybit_err:
+            logger.debug(f"[paper_trader] Bybit ticker fallback failed: {bybit_err}")
 
         return None
 
@@ -408,7 +408,13 @@ class AgentPaperTrader:
         leverage: float,
         position_size_pct: float,
     ) -> None:
-        """Execute a paper signal on the session."""
+        """Execute a paper signal on the session.
+
+        Safety: every BUY/SELL signal is gated by :class:`RiskVetoGuard`.
+        If the guard vetoes (excessive drawdown, too many open positions,
+        daily-loss breach, low agent agreement), the order is dropped and
+        the decision recorded for audit.
+        """
         if signal == "close":
             # Close all open trades
             for trade in session.trades:
@@ -416,6 +422,41 @@ class AgentPaperTrader:
                     AgentPaperTrader._close_paper_trade(session, trade, price)
 
         elif signal in ("buy", "sell"):
+            # ── RiskVetoGuard hard safety gate (2026-04-17) ───────────────
+            # BLOCK the order entirely if the guard vetoes it.  This is the
+            # last line of defence before position opening — must run even
+            # on paper trades to keep logic parity with live trading.
+            try:
+                from backend.agents.consensus.risk_veto_guard import get_risk_veto_guard
+
+                guard = get_risk_veto_guard()
+                open_positions = sum(1 for t in session.trades if t.is_open)
+                # Peak equity = max(initial, current) to give conservative DD estimate
+                peak_eq = max(session.initial_balance, session.current_balance)
+                decision = guard.check(
+                    portfolio_equity=session.current_balance,
+                    peak_equity=peak_eq,
+                    open_positions=open_positions,
+                    daily_pnl=session.current_balance - session.initial_balance,
+                    initial_daily_equity=session.initial_balance,
+                    agreement_score=1.0,  # paper session = no multi-agent consensus
+                )
+                if decision.is_vetoed:
+                    logger.warning(
+                        f"🚫 [paper_trader] Order BLOCKED by RiskVetoGuard "
+                        f"session={session.session_id} signal={signal} "
+                        f"reasons={[r.value for r in decision.reasons]}"
+                    )
+                    # Record veto on the session for UI/audit surfacing
+                    if not hasattr(session, "veto_log"):
+                        session.veto_log = []  # type: ignore[attr-defined]
+                    session.veto_log.append(decision.to_dict())  # type: ignore[attr-defined]
+                    return
+            except Exception as veto_err:
+                # Fail-open on guard errors but log loudly — never block real
+                # trading if safety code itself is broken (defensive)
+                logger.error(f"[paper_trader] RiskVetoGuard check errored, proceeding: {veto_err}")
+
             # Open a new paper trade
             risk_amount = session.current_balance * (position_size_pct / 100)
             qty = (risk_amount * leverage) / price if price > 0 else 0

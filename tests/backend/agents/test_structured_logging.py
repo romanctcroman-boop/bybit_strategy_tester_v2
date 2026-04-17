@@ -41,11 +41,11 @@ class TestAgentLog:
 
     def test_log_with_agent(self):
         new_correlation_id()
-        agent_log("INFO", "Test", agent="deepseek")
+        agent_log("INFO", "Test", agent="claude")
 
     def test_log_with_component(self):
         new_correlation_id()
-        agent_log("DEBUG", "Test", agent="qwen", component="rate_limiter")
+        agent_log("DEBUG", "Test", agent="claude", component="rate_limiter")
 
     def test_log_with_extra(self):
         new_correlation_id()
@@ -54,16 +54,16 @@ class TestAgentLog:
 
 class TestAgentLogger:
     def test_creation(self):
-        logger = AgentLogger(agent="deepseek", component="pool")
-        assert logger.agent == "deepseek"
+        logger = AgentLogger(agent="claude", component="pool")
+        assert logger.agent == "claude"
         assert logger.component == "pool"
 
     def test_debug(self):
-        logger = AgentLogger(agent="deepseek")
+        logger = AgentLogger(agent="claude")
         logger.debug("Debug message")
 
     def test_info(self):
-        logger = AgentLogger(agent="qwen")
+        logger = AgentLogger(agent="claude")
         logger.info("Info message")
 
     def test_warning(self):
@@ -71,9 +71,9 @@ class TestAgentLogger:
         logger.warning("Warning message")
 
     def test_error(self):
-        logger = AgentLogger(agent="deepseek")
+        logger = AgentLogger(agent="claude")
         logger.error("Error message")
 
     def test_with_extra_kwargs(self):
-        logger = AgentLogger(agent="deepseek", component="cost")
+        logger = AgentLogger(agent="claude", component="cost")
         logger.info("Usage recorded", tokens=500, cost=0.01)

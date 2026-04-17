@@ -51,16 +51,6 @@ class CostSummary:
 
 # Provider cost tables (USD per 1M tokens: input, output)
 COST_TABLE: dict[str, dict[str, tuple[float, float]]] = {
-    "deepseek": {
-        "deepseek-chat": (0.14, 0.28),
-        "deepseek-reasoner": (0.55, 2.19),
-    },
-    "qwen": {
-        "qwen-plus": (0.40, 1.20),
-        "qwen-flash": (0.05, 0.40),
-        "qwen3-max": (1.20, 6.00),
-        "qwq-plus": (0.80, 2.40),
-    },
     "perplexity": {
         "sonar": (0.20, 0.60),
         "sonar-pro": (0.20, 0.60),
@@ -95,7 +85,7 @@ class CostTracker:
     Example::
 
         tracker = CostTracker()
-        tracker.record("deepseek", "deepseek-chat", 1000, 500, 1500)
+        tracker.record("claude", "claude-sonnet-4-6", 1000, 500, 1500)
         print(tracker.get_summary())
     """
 
@@ -303,10 +293,8 @@ class CostTracker:
                         "total_cost": sum(r.cost_usd for r in day_records),
                         "requests": len(day_records),
                         "tokens": sum(r.total_tokens for r in day_records),
-                        "deepseek": sum(r.cost_usd for r in day_records if r.agent == "deepseek"),
-                        "qwen": sum(r.cost_usd for r in day_records if r.agent == "qwen"),
-                        "perplexity": sum(r.cost_usd for r in day_records if r.agent == "perplexity"),
                         "claude": sum(r.cost_usd for r in day_records if r.agent in ("claude", "anthropic")),
+                        "perplexity": sum(r.cost_usd for r in day_records if r.agent == "perplexity"),
                     }
                 )
 

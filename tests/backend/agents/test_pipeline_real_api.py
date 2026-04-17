@@ -1,24 +1,24 @@
-"""
-Real API Integration Tests — Full run_strategy_pipeline() with live LLMs.
+﻿"""
+Real API Integration Tests вЂ” Full run_strategy_pipeline() with live LLMs.
 
 PURPOSE:
     Tests that the full pipeline runs end-to-end against real Claude / Perplexity
     APIs without mocks.  Each test is individually skipable when the relevant
     key is absent.
 
-    NOTE: After the pipeline refactor, agents=["deepseek"] now routes to
-    claude-sonnet-4-6, and agents=["qwen"] routes to claude-haiku-4-5-20251001.
+    NOTE: After the pipeline refactor, agents=["claude"] now routes to
+    claude-sonnet-4-6, and agents=["claude"] routes to claude-haiku-4-5-20251001.
     The primary guard is therefore ANTHROPIC_API_KEY.
 
 MARKS:
-    api_live   — any test that makes a real HTTP call to an LLM provider
+    api_live   вЂ” any test that makes a real HTTP call to an LLM provider
 
 USAGE:
     pytest tests/backend/agents/test_pipeline_real_api.py -v -m api_live
     pytest tests/backend/agents/test_pipeline_real_api.py -v -m api_live --timeout=600
 
 COST ESTIMATE:
-    ~1-3 API calls per test at Claude pricing ≈ $0.001-0.01 per test.
+    ~1-3 API calls per test at Claude pricing в‰€ $0.001-0.01 per test.
     Total suite: ~$0.05-0.15
 
 REQUIRES:
@@ -46,14 +46,13 @@ from backend.agents.trading_strategy_graph import run_strategy_pipeline
 # Guards
 # ---------------------------------------------------------------------------
 HAS_ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY"))
-HAS_DEEPSEEK = bool(os.getenv("DEEPSEEK_API_KEY"))  # kept for legacy debate test
-HAS_QWEN = bool(os.getenv("QWEN_API_KEY"))  # kept for legacy debate test
+HAS_CLAUDE = bool(os.getenv("CLAUDE_API_KEY"))  # kept for legacy debate test
 HAS_PERPLEXITY = bool(os.getenv("PERPLEXITY_API_KEY"))
-HAS_ANY_KEY = HAS_DEEPSEEK or HAS_QWEN or HAS_ANTHROPIC
+HAS_ANY_KEY = HAS_CLAUDE or HAS_ANTHROPIC
 
-# Primary skip guard: agents=["deepseek"] → claude-sonnet-4-6 → needs ANTHROPIC_API_KEY
-skip_no_deepseek = pytest.mark.skipif(not HAS_ANTHROPIC, reason="ANTHROPIC_API_KEY not set")
-skip_no_qwen = pytest.mark.skipif(not HAS_QWEN, reason="QWEN_API_KEY not set")
+# Primary skip guard: agents=["claude"] в†’ claude-sonnet-4-6 в†’ needs ANTHROPIC_API_KEY
+skip_no_claude = pytest.mark.skipif(not HAS_ANTHROPIC, reason="ANTHROPIC_API_KEY not set")
+skip_no_perplexity = pytest.mark.skipif(not HAS_PERPLEXITY, reason="PERPLEXITY_API_KEY not set")
 skip_no_any = pytest.mark.skipif(not HAS_ANY_KEY, reason="No LLM API key set")
 
 pytestmark = pytest.mark.api_live
@@ -110,28 +109,28 @@ class TestPipelineRealApiStructure:
 
         tsg._GROUNDING_CACHE.clear()
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_returns_agent_state(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
         )
         assert isinstance(state, AgentState)
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_populates_results(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -139,14 +138,14 @@ class TestPipelineRealApiStructure:
         assert isinstance(state.results, dict)
         assert len(state.results) > 0
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_tracks_execution_path(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -155,7 +154,7 @@ class TestPipelineRealApiStructure:
         node_names = [name for name, _ in state.execution_path]
         assert "analyze_market" in node_names
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_records_llm_calls(self, ohlcv):
         """At least one LLM call should be made and tracked."""
         state = _run(
@@ -163,28 +162,28 @@ class TestPipelineRealApiStructure:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
         )
         assert state.llm_call_count >= 1
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_cost_is_non_negative(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
         )
         assert state.total_cost_usd >= 0.0
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_has_no_critical_errors(self, ohlcv):
         """Pipeline may have warnings but should not crash with unhandled errors."""
         state = _run(
@@ -192,7 +191,7 @@ class TestPipelineRealApiStructure:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -210,32 +209,32 @@ class TestPipelineRealApiStructure:
 class TestPipelineRealApiOutput:
     """Verify that real LLM responses produce parseable, valid strategy graphs."""
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_generate_strategies_produces_parsed_responses(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
         )
-        # parse_responses stores {"proposals": [...]} — check the proposals list
+        # parse_responses stores {"proposals": [...]} вЂ” check the proposals list
         parsed = state.results.get("parse_responses", {})
         assert isinstance(parsed, dict)
         proposals = parsed.get("proposals", [])
         assert isinstance(proposals, list)
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_select_best_returns_dict_or_none(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -244,14 +243,14 @@ class TestPipelineRealApiOutput:
         # None is acceptable if LLM returned unparseable output
         assert best is None or isinstance(best, dict)
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_strategy_graph_has_required_keys_when_present(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -262,14 +261,14 @@ class TestPipelineRealApiOutput:
             # Must have at minimum blocks and connections (or name)
             assert "blocks" in graph or "name" in graph
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_report_node_included_in_results(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -279,14 +278,14 @@ class TestPipelineRealApiOutput:
         assert report is not None
         assert isinstance(report, dict)
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_report_contains_pipeline_metrics(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -312,14 +311,14 @@ class TestPipelineRealApiDebate:
     )
     def test_debate_path_runs_with_two_agents(self, ohlcv):
         # Both aliases now map to Claude models; debate node was removed in
-        # the refactor — verify the pipeline still completes successfully
+        # the refactor вЂ” verify the pipeline still completes successfully
         # with >=3 nodes visited.
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek", "qwen"],
+                agents=["claude", "perplexity"],
                 run_backtest=False,
                 pipeline_timeout=180.0,
             )
@@ -328,7 +327,7 @@ class TestPipelineRealApiDebate:
         node_names = [name for name, _ in state.execution_path]
         assert len(node_names) >= 3
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_no_debate_path_completes_faster(self, ohlcv):
         """Pipeline without debate should complete with fewer nodes."""
         state_no_debate = _run(
@@ -336,7 +335,7 @@ class TestPipelineRealApiDebate:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -354,7 +353,7 @@ class TestPipelineRealApiDebate:
 class TestPipelineRealApiTimeout:
     """Verify pipeline_timeout is enforced."""
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_pipeline_respects_short_timeout(self, ohlcv):
         """A 1-second timeout should return partial state without crashing."""
         state = _run(
@@ -362,7 +361,7 @@ class TestPipelineRealApiTimeout:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=1.0,
             )
@@ -371,7 +370,7 @@ class TestPipelineRealApiTimeout:
         # Either timed out (error recorded) or pipeline was fast enough
         assert state.errors is not None
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_timeout_records_pipeline_error(self, ohlcv):
         """When timeout fires, 'pipeline' key appears in state.errors."""
         state = _run(
@@ -379,7 +378,7 @@ class TestPipelineRealApiTimeout:
                 symbol="BTCUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=0.001,  # near-instant timeout
             )
@@ -398,7 +397,7 @@ class TestPipelineRealApiTimeout:
 class TestPipelineRealApiSymbols:
     """Verify pipeline handles different market configurations."""
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_ethusdt_symbol(self):
         ohlcv = _make_ohlcv(200)
         state = _run(
@@ -406,7 +405,7 @@ class TestPipelineRealApiSymbols:
                 symbol="ETHUSDT",
                 timeframe="60",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -414,28 +413,28 @@ class TestPipelineRealApiSymbols:
         assert isinstance(state, AgentState)
         assert state.context.get("symbol") == "ETHUSDT"
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_context_symbol_preserved(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="SOLUSDT",
                 timeframe="15",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
         )
         assert state.context.get("symbol") == "SOLUSDT"
 
-    @skip_no_deepseek
+    @skip_no_claude
     def test_context_timeframe_preserved(self, ohlcv):
         state = _run(
             run_strategy_pipeline(
                 symbol="BTCUSDT",
                 timeframe="240",
                 df=ohlcv,
-                agents=["deepseek"],
+                agents=["claude"],
                 run_backtest=False,
                 pipeline_timeout=120.0,
             )
@@ -444,7 +443,7 @@ class TestPipelineRealApiSymbols:
 
 
 # ---------------------------------------------------------------------------
-# Eval scenario_a — baseline pipeline smoke test (no live LLM, all mocked)
+# Eval scenario_a вЂ” baseline pipeline smoke test (no live LLM, all mocked)
 # ---------------------------------------------------------------------------
 
 
@@ -452,7 +451,7 @@ class TestEvalScenarioA:
     """
     Eval scenario_a: Baseline pipeline validation with mocked LLMs.
 
-    Verifies that the full GenerateStrategiesNode → ParseResponses → SelectBest
+    Verifies that the full GenerateStrategiesNode в†’ ParseResponses в†’ SelectBest
     chain works end-to-end with a minimal valid strategy JSON returned by the
     mock. Tests the *system integration* (prompt building, specialization
     routing, response parsing) without spending real API budget.
@@ -506,7 +505,7 @@ class TestEvalScenarioA:
 
         pe = PromptEngineer()
         msg = pe.get_system_message("claude-sonnet")
-        # Lowercased in П4 — avoid over-triggering Claude 4.x refusals with all-caps
+        # Lowercased in Рџ4 вЂ” avoid over-triggering Claude 4.x refusals with all-caps
         assert "Output rules" in msg, "claude-sonnet system_msg must include Output rules block"
         assert "activation flag" in msg, "Must hint about activation flags (use_long_range, etc.)"
         assert "stop_loss_percent" in msg or "0.5" in msg, "Must enforce SL/TP boundaries"
@@ -518,7 +517,7 @@ class TestEvalScenarioA:
 
         pe = PromptEngineer()
         msg = pe.get_system_message("claude-opus")
-        assert "Output rules" in msg  # lowercased in П4
+        assert "Output rules" in msg  # lowercased in Рџ4
         spec = AGENT_SPECIALIZATIONS["claude-opus"]
         assert "deep_reasoning" in spec["strengths"]
 
@@ -579,7 +578,7 @@ class TestEvalScenarioA:
             context={
                 "symbol": "BTCUSDT",
                 "timeframe": "15",
-                "agents": ["deepseek"],
+                "agents": ["claude"],
                 "regime_classification": {"regime": "ranging"},
             }
         )
@@ -625,7 +624,7 @@ class TestEvalScenarioA:
             context={
                 "symbol": "BTCUSDT",
                 "timeframe": "15",
-                "agents": ["deepseek"],
+                "agents": ["claude"],
                 "regime_classification": {"regime": "unknown"},
             }
         )
@@ -646,7 +645,7 @@ class TestEvalScenarioA:
 
 
 # ---------------------------------------------------------------------------
-# Eval scenario: regime_split — verify correct model routing per regime
+# Eval scenario: regime_split вЂ” verify correct model routing per regime
 # ---------------------------------------------------------------------------
 
 
@@ -655,8 +654,8 @@ class TestEvalRegimeSplit:
     Eval regime_split: All 5 regime types route to the correct Claude model tier.
 
     Standard regimes (trending_up/down, ranging, consolidating, volatile)
-    → claude-sonnet.
-    Novel regimes (unknown, extreme_volatile) or force_escalate=True → claude-opus.
+    в†’ claude-sonnet.
+    Novel regimes (unknown, extreme_volatile) or force_escalate=True в†’ claude-opus.
     This verifies the escalation logic introduced alongside the Claude pipeline.
     """
 
@@ -688,7 +687,7 @@ class TestEvalRegimeSplit:
                 context={
                     "symbol": "BTCUSDT",
                     "timeframe": "15",
-                    "agents": ["deepseek"],
+                    "agents": ["claude"],
                     "regime_classification": {"regime": regime},
                 }
             )
@@ -732,7 +731,7 @@ class TestEvalRegimeSplit:
                 context={
                     "symbol": "BTCUSDT",
                     "timeframe": "15",
-                    "agents": ["deepseek"],
+                    "agents": ["claude"],
                     "regime_classification": {"regime": regime},
                 }
             )
@@ -775,7 +774,7 @@ class TestEvalRegimeSplit:
                 context={
                     "symbol": "BTCUSDT",
                     "timeframe": "15",
-                    "agents": ["deepseek"],
+                    "agents": ["claude"],
                     "regime_classification": {"regime": "trending_up"},
                     "force_escalate": True,  # overrides
                 }

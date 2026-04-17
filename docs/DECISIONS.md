@@ -184,3 +184,151 @@ series.setData(sorted.map(k => ({time: Math.floor(k.open_time / 1000), ...})));
 ```
 
 **Ссылка:** [v4→v5 migration guide](https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5), коммит `1a40a672`.
+
+---
+
+
+
+## ADR-008: Unified API-key resolution via APIKeyPoolManager
+
+**Дата:** 2026-04-17
+**Статус:** Принято
+
+### Контекст
+
+В слое AI-агентов (`backend/agents/trading_strategy_graph.py`) одновременно использовались два источника API-ключей:
+
+1. `KeyManager.get_decrypted_key("ANTHROPIC_API_KEY")` — прямой lookup без health-tracking.
+2. `APIKeyPoolManager` — health-tracking, ротация, cooldown — но только для Claude.
+
+Perplexity ключ всегда шёл мимо pool → никакой rotation/rate-limit телеметрии → при 429 весь pipeline ложился.
+
+### Решение
+
+Введён единый резолвер `_LLMCallMixin._resolve_api_key(agent_type, fallback_name) → (api_key, pool_obj)`:
+
+```python
+@staticmethod
+async def _resolve_api_key(agent_type, fallback_name):
+    pool = APIKeyPoolManager()
+    pool_obj = await pool.get_active_key(agent_type)       # health-tracking
+    if pool_obj and pool_obj.key_name:
+        return km.get_decrypted_key(pool_obj.key_name), pool_obj
+    return km.get_decrypted_key(fallback_name), None       # fallback
+```
+
+Все 5 сайтов lookup'а (Perplexity + Claude в `_call_llm`, 2 в `GroundingNode`, 1 в `GenerateStrategiesNode`) мигрированы. Каждый `client.chat()` обёрнут в `try/except` с `pool.mark_success / mark_rate_limit / mark_auth_error / mark_error`.
+
+### Последствия
+
+- ✅ Единый контракт: pool → KeyManager → None (fail-safe chain).
+- ✅ Health-tracking и ротация работают для всех провайдеров.
+- ✅ `pool_obj` — opaque ручка, передаётся обратно для `mark_*` — никакой утечки имени ключа.
+- ⚠️ `_resolve_api_key` теперь `async` — все call-сайты должны использовать `await`.
+
+**Ссылка:** тесты `tests/backend/agents/test_integration_polish.py::TestResolveApiKeyPoolFirst`.
+
+---
+
+
+## ADR-009: SecurityOrchestrator как fail-closed gate в `_call_llm`
+
+**Дата:** 2026-04-17
+**Статус:** Принято
+
+### Контекст
+
+`PromptGuard` (regex) и `SemanticPromptGuard` (embedding) существовали как независимые компоненты — ни один не вызывался автоматически из pipeline. Вредоносный промпт мог пройти прямо в `client.chat()`, попасть в логи провайдера и увеличить биллинг.
+
+`SecurityOrchestrator.analyze(prompt) → SecurityVerdict` уже существовал (собирает оба guard'а по WEIGHTED policy), но никогда не подключался.
+
+### Решение
+
+`_LLMCallMixin._call_llm()` теперь **первой строкой** запускает:
+
+```python
+verdict = get_security_orchestrator().analyze(prompt)
+if not verdict.is_safe:
+    state.add_error("_call_llm", RuntimeError(f"blocked: {verdict.blocked_by}"))
+    return None                                            # fail-closed
+```
+
+При ошибке самого orchestrator'а (импорт, инициализация guard'ов) — **fail-open** с `logger.debug`: безопасность не должна ломать pipeline. Введён singleton `get_security_orchestrator()` — guards инициализируются 1 раз на процесс (semantic guard тянет embeddings).
+
+### Последствия
+
+- ✅ 100 % промптов проходят двухслойную проверку.
+- ✅ Блокировка записывается в `state.errors` для audit trail.
+- ✅ Fail-closed: при срабатывании — `return None`, провайдер НЕ вызывается, токены не тратятся.
+- ⚠️ При ложном срабатывании (false positive) — ответ будет `None`; вызывающий код уже обрабатывает `None` как "LLM unavailable".
+
+**Ссылка:** `backend/agents/security/security_orchestrator.py:214`, тесты `TestLLMCallSecurityGate`.
+
+---
+
+
+## ADR-010: Логический split `trading_strategy_graph.py` через `nodes/` package
+
+**Дата:** 2026-04-17
+**Статус:** Принято (первый этап)
+
+### Контекст
+
+`backend/agents/trading_strategy_graph.py` разросся до **4569 строк**, содержит **22 Node-класса** + mixin + глобальный кэш. Навигация затруднена, архитектурные границы (market / generation / backtest / refine / control) не видны.
+
+Физический перенос классов ломает 1771+ импорт в тестах и внешних модулях → нужен безопасный переходный этап.
+
+### Решение
+
+Создан пакет `backend/agents/nodes/` с 6 тонкими **re-export** модулями:
+
+| Модуль        | Node-классы                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `llm`         | `_LLMCallMixin` + публичный alias `LLMCallMixin`                                                                 |
+| `market`      | `AnalyzeMarketNode`, `RegimeClassifierNode`, `GroundingNode`, `MemoryRecallNode`                                 |
+| `generation`  | `GenerateStrategiesNode`, `ParseResponsesNode`, `ConsensusNode`, `BuildGraphNode`                                |
+| `backtest`    | `BacktestNode`, `BacktestAnalysisNode`, `MLValidationNode`                                                       |
+| `refine`      | `RefinementNode`, `OptimizationNode`, `OptimizationAnalysisNode`, `A2AParamRangeNode`, `WalkForwardValidationNode`, `AnalysisDebateNode` |
+| `control`     | `HITLCheckNode`, `PostRunReflectionNode`, `MemoryUpdateNode`                                                     |
+
+### Последствия
+
+- ✅ Новый код пишет `from backend.agents.nodes.market import GroundingNode` — canonical.
+- ✅ Старые импорты `from backend.agents.trading_strategy_graph import ...` продолжают работать.
+- ✅ Архитектурные границы видны в tree view и в тестах.
+- 🔄 Этап 2 (физический перенос) — отдельный PR, выполняется инкрементально (класс за классом с sed-обновлением импортов).
+
+**Ссылка:** `backend/agents/nodes/__init__.py`, тесты `TestNodesPackageReExports`.
+
+---
+
+
+## ADR-011: RiskVetoGuard как hard-safety gate в paper trading
+
+**Дата:** 2026-04-17
+**Статус:** Принято
+
+### Контекст
+
+`RiskVetoGuard` (drawdown / daily-loss / max-positions / agreement / emergency-stop / manual-block) подключён в `BacktestAnalysisNode` (аудит консенсуса), но **не** в `AgentPaperTrader`. При этом paper trading — это ближайший к production слой и должен иметь identical safety-контракт.
+
+### Решение
+
+`AgentPaperTrader._execute_paper_signal()` прогоняет каждый `buy`/`sell` через `get_risk_veto_guard().check(...)` ДО открытия позиции. При `is_vetoed=True`:
+
+1. WARNING в лог с `session_id`, `signal`, `reasons`.
+2. `session.veto_log.append(decision.to_dict())` — audit trail для UI.
+3. `return` — позиция НЕ создаётся.
+
+Сигнал `close` намеренно **не** проходит через guard — закрытие позиций не должно быть заблокировано ни при каких обстоятельствах. При ошибке guard'а — fail-open с `logger.error`: защитный код никогда не ломает торговую логику.
+
+### Последствия
+
+- ✅ Paper trading = live trading по safety-контракту.
+- ✅ `session.veto_log` — прозрачный audit trail.
+- ✅ Close-сигналы не блокируются — избежать "стрельбы в ногу" при срабатывании на выходе.
+- ⚠️ `session.veto_log` — динамический атрибут (не в dataclass), намеренно — чтобы не ломать legacy сериализацию `to_dict()`.
+
+**Ссылка:** `backend/agents/trading/paper_trader.py:404-472`, тесты `TestPaperTraderRiskVeto`.
+
+---

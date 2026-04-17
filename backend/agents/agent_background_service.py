@@ -3,7 +3,7 @@
 
 Функции:
 1. ✅ Автоматический запуск при старте IDE (через runOptions.runOn: "folderOpen")
-2. ✅ Расшифровка всех API ключей (8 DeepSeek + 4 Perplexity)
+2. ✅ Расшифровка всех API ключей (Claude + Perplexity)
 3. ✅ Health checks каждые 30 секунд
 4. ✅ Автоматический fallback MCP → Direct API
 5. ✅ Мониторинг и логирование всех операций
@@ -109,7 +109,7 @@ class AIAgentBackgroundService:
         # Initialize fallback service for graceful degradation
         try:
             self.fallback_service = get_fallback_service()
-            self.fallback_service.register_service("deepseek")
+            self.fallback_service.register_service("claude")
             self.fallback_service.register_service("perplexity")
             self.fallback_service.register_service("mcp_server")
             logger.success("✅ FallbackService initialized")
@@ -126,7 +126,7 @@ class AIAgentBackgroundService:
         logger.info("=" * 80)
         # UTC-aware start timestamp
         logger.info(f"📅 Started at: {utc_now().isoformat()}")
-        logger.info(f"🔑 DeepSeek keys: {len(self.interface.key_manager.deepseek_keys)}")
+        logger.info(f"🔑 Claude keys: {len(self.interface.key_manager.claude_keys)}")
         logger.info(f"🔑 Perplexity keys: {len(self.interface.key_manager.perplexity_keys)}")
         logger.info("=" * 80)
 
@@ -176,12 +176,12 @@ class AIAgentBackgroundService:
             # 2. Check MCP Server (always lightweight)
             await self._check_mcp_server()
 
-            # 3. Test DeepSeek connection
+            # 3. Test Claude connection
             if is_full_check:
-                await self._test_deepseek_connection_full()
+                await self._test_claude_connection_full()
                 self.last_full_check = current_time
             else:
-                await self._test_deepseek_connection()
+                await self._test_claude_connection()
 
             # 4. Test Perplexity connection
             if is_full_check:
@@ -205,29 +205,29 @@ class AIAgentBackgroundService:
         """Проверка API ключей"""
         km = self.interface.key_manager
 
-        deepseek_active = sum(1 for k in km.deepseek_keys if k.is_usable)
-        deepseek_total = len(km.deepseek_keys)
+        claude_active = sum(1 for k in km.claude_keys if k.is_usable)
+        claude_total = len(km.claude_keys)
 
         perplexity_active = sum(1 for k in km.perplexity_keys if k.is_usable)
         perplexity_total = len(km.perplexity_keys)
 
-        logger.info(f"🔑 DeepSeek keys: {deepseek_active}/{deepseek_total} usable")
+        logger.info(f"🔑 Claude keys: {claude_active}/{claude_total} usable")
         logger.info(f"🔑 Perplexity keys: {perplexity_active}/{perplexity_total} usable")
 
         # Check if need to rotate keys (all have errors)
-        if deepseek_active == 0 and deepseek_total > 0:
-            logger.warning("⚠️ All DeepSeek keys disabled, attempting validation-based recovery...")
+        if claude_active == 0 and claude_total > 0:
+            logger.warning("⚠️ All Claude keys disabled, attempting validation-based recovery...")
             recovered = 0
-            for key in km.deepseek_keys:
+            for key in km.claude_keys:
                 if getattr(key, "health", None) == APIKeyHealth.DISABLED:
-                    ok = await self.interface._test_key_health(AgentType.DEEPSEEK, key)
+                    ok = await self.interface._test_key_health(AgentType.CLAUDE, key)
                     if ok:
                         key.error_count = 1
                         key.health = APIKeyHealth.DEGRADED
                         key.last_error_time = None
                         recovered += 1
             if recovered:
-                logger.info(f"✅ DeepSeek: Re-enabled {recovered} keys (DEGRADED)")
+                logger.info(f"✅ Claude: Re-enabled {recovered} keys (DEGRADED)")
                 self.stats["api_key_rotations"] += 1
 
         if perplexity_active == 0 and perplexity_total > 0:
@@ -279,7 +279,7 @@ class AIAgentBackgroundService:
 
             # Check if agent tools are registered
             required_tools = [
-                "mcp_agent_to_agent_send_to_deepseek",
+                "mcp_agent_to_agent_send_to_claude",
                 "mcp_agent_to_agent_send_to_perplexity",
                 "mcp_agent_to_agent_get_consensus",
             ]
@@ -340,7 +340,7 @@ class AIAgentBackgroundService:
             logger.debug("No circuit manager available")
             return
 
-        breaker_names = ["deepseek", "perplexity", "mcp_server"]
+        breaker_names = ["claude", "perplexity", "mcp_server"]
         open_breakers = []
         half_open_breakers = []
 
@@ -384,21 +384,20 @@ class AIAgentBackgroundService:
         if not open_breakers and not half_open_breakers:
             logger.info("✅ All circuit breakers: CLOSED")
 
-    async def _test_deepseek_connection(self):
-        """Легковесная проверка DeepSeek (без реальных API calls)"""
+    async def _test_claude_connection(self):
+        """Легковесная проверка Claude (без реальных API calls)"""
         try:
             km = self.interface.key_manager
-            active_keys = [k for k in km.deepseek_keys if k.is_usable]
+            active_keys = [k for k in km.claude_keys if k.is_usable]
 
             if active_keys:
-                # Check if at least one key is available (no actual API call)
-                total = len(km.deepseek_keys)
-                logger.success(f"✅ DeepSeek: Ready ({len(active_keys)}/{total} keys)")
+                total = len(km.claude_keys)
+                logger.success(f"✅ Claude: Ready ({len(active_keys)}/{total} keys)")
             else:
-                logger.warning("⚠️ DeepSeek: No usable keys available")
+                logger.warning("⚠️ Claude: No usable keys available")
 
         except Exception as e:
-            logger.error(f"❌ DeepSeek: Health check failed - {e}")
+            logger.error(f"❌ Claude: Health check failed - {e}")
 
     async def _test_perplexity_connection(self):
         """Легковесная проверка Perplexity (без реальных API calls)"""
@@ -416,12 +415,12 @@ class AIAgentBackgroundService:
         except Exception as e:
             logger.error(f"❌ Perplexity: Health check failed - {e}")
 
-    async def _test_deepseek_connection_full(self):
-        """Полная проверка DeepSeek с реальным API call"""
+    async def _test_claude_connection_full(self):
+        """Полная проверка Claude с реальным API call"""
         try:
-            logger.info("🔍 DeepSeek: Running full connectivity test...")
+            logger.info("🔍 Claude: Running full connectivity test...")
             request = AgentRequest(
-                agent_type=AgentType.DEEPSEEK,
+                agent_type=AgentType.CLAUDE,
                 task_type="health_check",
                 prompt="Reply with 'OK' if you can read this message.",
             )
@@ -431,12 +430,12 @@ class AIAgentBackgroundService:
             if response.success:
                 key_idx = response.api_key_index
                 latency = response.latency_ms
-                logger.success(f"✅ DeepSeek: Connected (key #{key_idx}, {latency:.0f}ms)")
+                logger.success(f"✅ Claude: Connected (key #{key_idx}, {latency:.0f}ms)")
             else:
-                logger.warning(f"⚠️ DeepSeek: Failed - {response.error}")
+                logger.warning(f"⚠️ Claude: Failed - {response.error}")
 
         except Exception as e:
-            logger.error(f"❌ DeepSeek: Connection test failed - {e}")
+            logger.error(f"❌ Claude: Connection test failed - {e}")
 
     async def _test_perplexity_connection_full(self):
         """Полная проверка Perplexity с реальным API call"""

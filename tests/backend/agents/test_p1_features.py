@@ -433,7 +433,7 @@ class TestFewShotInjection:
         mock_win = MagicMock()
         mock_win.content = "RSI strategy: period=14, oversold=30. Sharpe=1.2, Trades=25."
         mock_win.importance = 0.8
-        mock_win.metadata = {"sharpe_ratio": 1.2, "agent": "deepseek"}
+        mock_win.metadata = {"sharpe_ratio": 1.2, "agent": "claude"}
         mock_win.tags = ["backtest", "BTCUSDT"]
 
         mock_memory = MagicMock()
@@ -457,8 +457,8 @@ class TestFewShotInjection:
             context={
                 "symbol": "BTCUSDT",
                 "timeframe": "15",
-                "agents": ["deepseek"],
-                "few_shot_examples": ["EXAMPLE (Sharpe=1.2, agent=deepseek): RSI period=14 works well in trend."],
+                "agents": ["claude"],
+                "few_shot_examples": ["EXAMPLE (Sharpe=1.2, agent=claude): RSI period=14 works well in trend."],
             }
         )
         _market_ctx = MagicMock(market_regime="trending_bull", trend_direction="up", current_price=40000.0)

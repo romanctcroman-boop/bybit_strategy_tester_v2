@@ -27,16 +27,16 @@ from backend.agents.prompts.prompt_validator import PromptValidator
 class AgentRequest:
     """Unified request to an AI agent.
 
-    Supports DeepSeek, Qwen, and Perplexity with provider-specific formatting.
+    Supports Claude (Anthropic) and Perplexity with provider-specific formatting.
 
     Attributes:
-        agent_type: Target provider (DeepSeek, Qwen, Perplexity)
+        agent_type: Target provider (CLAUDE, PERPLEXITY)
         task_type: Task category ("analyze", "fix", "search", etc.)
         prompt: User prompt text
         code: Optional code to analyze
         context: Additional context dict
-        thinking_mode: Enable CoT reasoning (DeepSeek V3.2)
-        strict_mode: Guarantee JSON tool output (DeepSeek)
+        thinking_mode: Enable CoT reasoning
+        strict_mode: Guarantee JSON tool output
         stream: Enable streaming response
     """
 
@@ -88,119 +88,38 @@ class AgentRequest:
         """Convert to direct API format with provider-specific settings.
 
         Args:
-            include_tools: Whether to include tool definitions (DeepSeek only)
+            include_tools: Whether to include tool definitions
 
         Returns:
             API payload dict ready for HTTP POST
         """
-        if self.agent_type == AgentType.DEEPSEEK:
-            return self._build_deepseek_payload(include_tools)
-        elif self.agent_type == AgentType.QWEN:
-            return self._build_qwen_payload()
-        else:
+        if self.agent_type == AgentType.PERPLEXITY:
             return self._build_perplexity_payload()
+        # Default: Claude / Anthropic payload
+        return self._build_claude_payload(include_tools)
 
-    def _build_deepseek_payload(self, include_tools: bool) -> dict[str, Any]:
-        """Build DeepSeek V3.2 API payload.
-
-        Cost protection: deepseek-reasoner is blocked unless
-        DEEPSEEK_ALLOW_REASONER=true is set in env.
-        """
-        # Cost guard: block reasoner unless explicitly allowed
-        allow_reasoner = os.getenv("DEEPSEEK_ALLOW_REASONER", "false").lower() == "true"
-        use_thinking = self.thinking_mode and allow_reasoner
-
-        if self.thinking_mode and not allow_reasoner:
-            logger.warning(
-                "⚠️ deepseek-reasoner blocked (DEEPSEEK_ALLOW_REASONER=false). "
-                "Using deepseek-chat instead. Set DEEPSEEK_ALLOW_REASONER=true to allow."
-            )
-
-        model = "deepseek-reasoner" if use_thinking else "deepseek-chat"
-        max_tokens = 16000 if use_thinking else 4000
-
-        sampling_params = {"top_p": 0.95} if use_thinking else {"temperature": 0.7}
-
-        task_type = self.task_type.lower()
-        is_search_task = task_type in ("search", "research", "web", "find", "lookup")
-        system_role = "developer" if is_search_task else "system"
-
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": system_role,
-                    "content": "You are an expert Python developer analyzing trading strategies.",
-                },
-                {"role": "user", "content": self._build_prompt()},
-            ],
-            "max_tokens": max_tokens,
-            **sampling_params,
-        }
-
-        use_file_access = self.context.get("use_file_access", False)
-        if include_tools and use_file_access:
-            tools = self._get_mcp_tools_definition(strict_mode=self.strict_mode)
-            payload["tools"] = tools
-
-        return payload
-
-    def _build_qwen_payload(self) -> dict[str, Any]:
-        """Build Qwen API payload."""
-        model = os.getenv("QWEN_MODEL", "qwen-plus")
-        temperature = float(os.getenv("QWEN_TEMPERATURE", "0.4"))
-
-        # Cost guard: block thinking mode unless explicitly allowed via env var
-        allow_thinking = os.getenv("QWEN_ENABLE_THINKING", "false").lower() == "true"
-
-        if not allow_thinking:
-            enable_thinking = False
-            if self.task_type.lower() in (
-                "analyze",
-                "optimize",
-                "compare",
-                "deliberation",
-                "strategy_evolution",
-            ):
-                logger.warning(
-                    "⚠️ Qwen thinking mode blocked (QWEN_ENABLE_THINKING=false). "
-                    f"Task '{self.task_type}' would have triggered thinking. Using standard mode."
-                )
-        else:
-            # Dynamic thinking mode — only when explicitly allowed
-            try:
-                from backend.agents.llm.prompt_optimizer import get_prompt_optimizer
-
-                optimizer = get_prompt_optimizer()
-                task_desc = f"{self.task_type} {self.prompt[:200]}"
-                enable_thinking = optimizer.should_enable_thinking("qwen", task_desc)
-            except ImportError:
-                enable_thinking = self.task_type.lower() in (
-                    "analyze",
-                    "optimize",
-                    "compare",
-                    "deliberation",
-                    "strategy_evolution",
-                )
-
-        if not enable_thinking and os.getenv("QWEN_MODEL_FAST"):
-            model = os.getenv("QWEN_MODEL_FAST", model)
+    def _build_claude_payload(self, include_tools: bool) -> dict[str, Any]:
+        """Build Claude (Anthropic) API payload."""
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+        max_tokens = 4096
 
         payload = {
             "model": model,
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are an expert quantitative analyst and algorithmic trader.",
+                    "content": "You are an expert Python developer analyzing trading strategies.",
                 },
                 {"role": "user", "content": self._build_prompt()},
             ],
-            "temperature": temperature,
-            "max_tokens": 8192 if enable_thinking else 4096,
+            "max_tokens": max_tokens,
+            "temperature": 0.7,
         }
 
-        if enable_thinking:
-            payload["enable_thinking"] = True
+        use_file_access = self.context.get("use_file_access", False)
+        if include_tools and use_file_access:
+            tools = self._get_mcp_tools_definition(strict_mode=self.strict_mode)
+            payload["tools"] = tools
 
         return payload
 
@@ -333,7 +252,7 @@ class AgentRequest:
 
     @staticmethod
     def _get_mcp_tools_definition(strict_mode: bool = False) -> list[dict[str, Any]]:
-        """Get MCP file access tool definitions for DeepSeek."""
+        """Get MCP file access tool definitions for Claude."""
         tools = [
             {
                 "type": "function",
@@ -430,7 +349,7 @@ class TokenUsage:
     """Token usage statistics from API response.
 
     Tracks prompt, completion, reasoning tokens and cost.
-    Supports DeepSeek V3.2 context caching metrics.
+    Supports Claude V3.2 context caching metrics.
     """
 
     prompt_tokens: int = 0
@@ -438,7 +357,7 @@ class TokenUsage:
     total_tokens: int = 0
     reasoning_tokens: int = 0
     cost_usd: float | None = None
-    # DeepSeek Context Caching (V3.2)
+    # Claude Context Caching (V3.2)
     cache_hit_tokens: int = 0
     cache_miss_tokens: int = 0
     cache_savings_pct: float = 0.0

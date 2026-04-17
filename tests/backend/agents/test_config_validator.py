@@ -69,29 +69,18 @@ class TestAgentConfig:
         assert isinstance(config.prompt, PromptConfig)
         assert isinstance(config.security, SecurityConfig)
         assert isinstance(config.memory, MemoryConfig)
-        assert "deepseek" in config.rate_limit
+        assert "claude" in config.rate_limit
+        assert "perplexity" in config.rate_limit
 
     def test_default_models(self):
         config = AgentConfig()
-        assert config.deepseek_model == "deepseek-chat"
-        assert config.qwen_model == "qwen-plus"
+        assert config.claude_model == "claude-haiku-4-5-20251001"
         assert config.perplexity_model == "sonar-pro"
 
     def test_default_urls(self):
         config = AgentConfig()
-        assert "deepseek" in config.deepseek_base_url
-        assert "dashscope" in config.qwen_base_url
+        assert "anthropic" in config.anthropic_base_url
         assert "perplexity" in config.perplexity_base_url
-
-    def test_invalid_deepseek_model(self):
-        with pytest.raises(ValidationError):
-            AgentConfig(deepseek_model="gpt-4")
-
-    def test_valid_deepseek_models(self):
-        c1 = AgentConfig(deepseek_model="deepseek-chat")
-        assert c1.deepseek_model == "deepseek-chat"
-        c2 = AgentConfig(deepseek_model="deepseek-reasoner")
-        assert c2.deepseek_model == "deepseek-reasoner"
 
 
 class TestValidateStartupConfig:
@@ -106,9 +95,8 @@ class TestValidateStartupConfig:
 
     def test_with_all_keys_present(self):
         env = {
-            "DEEPSEEK_API_KEY": "sk-test",
-            "QWEN_API_KEY": "sk-test",
-            "PERPLEXITY_API_KEY": "sk-test",
+            "ANTHROPIC_API_KEY": "sk-ant-test",
+            "PERPLEXITY_API_KEY": "pplx-test",
         }
         with patch.dict(os.environ, env):
             import backend.agents.config_validator as cv

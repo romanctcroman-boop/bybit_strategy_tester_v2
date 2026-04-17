@@ -48,12 +48,10 @@ T = TypeVar("T")
 class LLMProvider(Enum):
     """Supported LLM providers."""
 
-    DEEPSEEK = "deepseek"
     PERPLEXITY = "perplexity"
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     OLLAMA = "ollama"
-    QWEN = "qwen"
     CUSTOM = "custom"
 
 
@@ -86,9 +84,9 @@ class LLMResponse:
     total_tokens: int = 0
     latency_ms: float = 0.0
     raw_response: dict[str, Any] | None = None
-    reasoning_content: str | None = None  # CoT reasoning (Qwen3, DeepSeek-R1)
-    prompt_cache_hit_tokens: int = 0  # DeepSeek: tokens served from KV cache (10% cost)
-    prompt_cache_miss_tokens: int = 0  # DeepSeek: tokens not in cache (100% cost)
+    reasoning_content: str | None = None  # CoT reasoning (Claude3, Claude-R1)
+    prompt_cache_hit_tokens: int = 0  # Claude: tokens served from KV cache (10% cost)
+    prompt_cache_miss_tokens: int = 0  # Claude: tokens not in cache (100% cost)
     citations: list[str] | None = None  # Perplexity sonar-pro: source URLs
 
     @property
@@ -101,11 +99,9 @@ class LLMResponse:
             This property uses a simplified cost table and may diverge.
         """
         costs = {
-            LLMProvider.DEEPSEEK: {"input": 0.14, "output": 0.28},
             LLMProvider.PERPLEXITY: {"input": 0.20, "output": 0.60},
             LLMProvider.OPENAI: {"input": 2.50, "output": 10.0},
             LLMProvider.ANTHROPIC: {"input": 3.0, "output": 15.0},  # Sonnet default
-            LLMProvider.QWEN: {"input": 0.40, "output": 1.20},
             LLMProvider.OLLAMA: {"input": 0.0, "output": 0.0},
         }
         rates = costs.get(self.provider, {"input": 0.0, "output": 0.0})
@@ -122,7 +118,7 @@ class LLMResponse:
 
         output_cost = (self.completion_tokens / 1_000_000) * rates["output"]
 
-        # Cache-aware input cost: cache hits are 10% of normal price (DeepSeek/Anthropic KV cache)
+        # Cache-aware input cost: cache hits are 10% of normal price (Claude/Anthropic KV cache)
         if self.prompt_cache_hit_tokens or self.prompt_cache_miss_tokens:
             hit_cost = (self.prompt_cache_hit_tokens / 1_000_000) * rates["input"] * 0.1
             miss_cost = (self.prompt_cache_miss_tokens / 1_000_000) * rates["input"]
@@ -307,8 +303,8 @@ class OpenAICompatibleClient(LLMClient):
             "temperature": kwargs.get("temperature", self.config.temperature),
             "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
         }
-        # JSON mode: forces OpenAI-compatible APIs (DeepSeek, Qwen) to return valid
-        # JSON, eliminating regex-based extraction in ResponseParser.
+        # JSON mode: forces OpenAI-compatible APIs to return valid JSON,
+        # eliminating regex-based extraction in ResponseParser.
         # Caller must include "JSON" in the prompt/system message (API requirement).
         if kwargs.get("json_mode"):
             payload["response_format"] = {"type": "json_object"}
@@ -436,18 +432,14 @@ class LLMClientFactory:
     # Lazy import map to avoid circular imports at module level
     _CLIENT_CLASSES: dict[LLMProvider, str] = {
         LLMProvider.ANTHROPIC: "ClaudeClient",
-        LLMProvider.DEEPSEEK: "DeepSeekClient",
         LLMProvider.PERPLEXITY: "PerplexityClient",
-        LLMProvider.QWEN: "QwenClient",
         LLMProvider.OLLAMA: "OllamaClient",
     }
 
     _ENV_KEYS: dict[LLMProvider, str] = {
-        LLMProvider.DEEPSEEK: "DEEPSEEK_API_KEY",
         LLMProvider.PERPLEXITY: "PERPLEXITY_API_KEY",
         LLMProvider.OPENAI: "OPENAI_API_KEY",
         LLMProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
-        LLMProvider.QWEN: "QWEN_API_KEY",
     }
 
     @staticmethod
@@ -455,16 +447,12 @@ class LLMClientFactory:
         """Create client based on provider config."""
         # Import here to break circular dependency
         from backend.agents.llm.clients.claude import ClaudeClient
-        from backend.agents.llm.clients.deepseek import DeepSeekClient
         from backend.agents.llm.clients.ollama import OllamaClient
         from backend.agents.llm.clients.perplexity import PerplexityClient
-        from backend.agents.llm.clients.qwen import QwenClient
 
         provider_map: dict[LLMProvider, type[LLMClient]] = {
             LLMProvider.ANTHROPIC: ClaudeClient,
-            LLMProvider.DEEPSEEK: DeepSeekClient,
             LLMProvider.PERPLEXITY: PerplexityClient,
-            LLMProvider.QWEN: QwenClient,
             LLMProvider.OLLAMA: OllamaClient,
         }
 

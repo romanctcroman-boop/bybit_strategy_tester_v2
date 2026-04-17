@@ -55,7 +55,7 @@ class APIKeyManager:
 
     # Key counts per agent type
     KEY_COUNTS = {
-        AgentType.DEEPSEEK: 8,
+        AgentType.CLAUDE: 8,
         AgentType.PERPLEXITY: 4,
     }
 
@@ -74,7 +74,7 @@ class APIKeyManager:
 
     def _initialize_keys(self):
         """Initialize all API keys."""
-        for agent_type in [AgentType.DEEPSEEK, AgentType.PERPLEXITY]:
+        for agent_type in [AgentType.CLAUDE, AgentType.PERPLEXITY]:
             count = self.KEY_COUNTS.get(agent_type, 0)
             self.keys[agent_type] = [
                 APIKey(

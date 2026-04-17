@@ -1,5 +1,5 @@
 """
-Real API Quality Test — AI Backtest Analysis (DeepSeek, Qwen, Perplexity).
+Real API Quality Test — AI Backtest Analysis (Claude, Claude, Perplexity).
 
 PURPOSE:
   Sends realistic backtest metrics to each AI agent and validates that they
@@ -9,13 +9,13 @@ PURPOSE:
 HOW IT WORKS:
   1. Prepare realistic backtest metric scenarios (good, bad, mediocre strategies)
   2. Build the ANALYSIS_PROMPT with real numbers
-  3. Send via LLM clients (DeepSeek/Qwen/Perplexity)
+  3. Send via LLM clients (Claude/Claude/Perplexity)
   4. Parse JSON response and score completeness + correctness
   5. Verify grade/risk assessment match the metric profile
 
 USAGE:
   pytest tests/backend/agents/test_ai_backtest_analysis_quality.py -v -m api_live
-  pytest tests/backend/agents/test_ai_backtest_analysis_quality.py -v -m api_live -k deepseek
+  pytest tests/backend/agents/test_ai_backtest_analysis_quality.py -v -m api_live -k claude
   pytest tests/backend/agents/test_ai_backtest_analysis_quality.py -v -m api_live -k "scenario"
 
 COST ESTIMATE:
@@ -23,7 +23,7 @@ COST ESTIMATE:
   ~$0.02-0.05 total
 
 REQUIRES:
-  Environment variables: DEEPSEEK_API_KEY, QWEN_API_KEY, PERPLEXITY_API_KEY
+  Environment variables: CLAUDE_API_KEY, CLAUDE_API_KEY, PERPLEXITY_API_KEY
 """
 
 from __future__ import annotations
@@ -42,10 +42,9 @@ from loguru import logger
 load_dotenv(override=True)
 
 from backend.agents.integration.ai_backtest_integration import AIBacktestAnalyzer
-from backend.agents.llm.base_client import LLMConfig, LLMMessage, LLMProvider, LLMResponse, OpenAICompatibleClient
-from backend.agents.llm.clients.deepseek import DeepSeekClient
+from backend.agents.llm.base_client import LLMClient, LLMConfig, LLMMessage, LLMProvider, LLMResponse
+from backend.agents.llm.clients.claude import ClaudeClient
 from backend.agents.llm.clients.perplexity import PerplexityClient
-from backend.agents.llm.clients.qwen import QwenClient
 
 # =============================================================================
 # TEST SCENARIOS — realistic backtest metric profiles
@@ -333,16 +332,17 @@ def _score_analysis(
 # Client factory (reuse from comprehension test)
 # =============================================================================
 
-_client_cache: dict[str, OpenAICompatibleClient | None] = {}
+_client_cache: dict[str, LLMClient | None] = {}
 
 
-def _make_client(provider: str) -> OpenAICompatibleClient | None:
+def _make_client(provider: str) -> LLMClient | None:
     """Create LLM client from env vars. Returns None if key missing."""
     key_map = {
-        "deepseek": ("DEEPSEEK_API_KEY", LLMProvider.DEEPSEEK, "deepseek-chat"),
-        "qwen": ("QWEN_API_KEY", LLMProvider.QWEN, "qwen-plus"),
+        "claude": ("ANTHROPIC_API_KEY", LLMProvider.ANTHROPIC, "claude-haiku-4-5-20251001"),
         "perplexity": ("PERPLEXITY_API_KEY", LLMProvider.PERPLEXITY, "sonar-pro"),
     }
+    if provider not in key_map:
+        return None
     env_key, llm_provider, model = key_map[provider]
     api_key = os.environ.get(env_key)
     if not api_key or "YOUR_" in api_key:
@@ -360,10 +360,8 @@ def _make_client(provider: str) -> OpenAICompatibleClient | None:
         max_retries=3 if provider == "perplexity" else 2,
         retry_delay_seconds=2.0 if provider == "perplexity" else 1.0,
     )
-    if provider == "deepseek":
-        return DeepSeekClient(config)
-    elif provider == "qwen":
-        return QwenClient(config)
+    if provider == "claude":
+        return ClaudeClient(config)
     elif provider == "perplexity":
         return PerplexityClient(config)
     return None
@@ -377,7 +375,7 @@ def _get_cached_client(provider: str):
 
 
 async def _ask_agent_analysis(
-    client: OpenAICompatibleClient,
+    client: LLMClient,
     scenario_name: str,
     scenario: dict[str, Any],
 ) -> dict[str, Any]:
@@ -472,18 +470,10 @@ pytestmark = [
 
 
 @pytest.fixture
-def deepseek_client():
-    client = _get_cached_client("deepseek")
+def claude_client():
+    client = _get_cached_client("claude")
     if client is None:
-        pytest.skip("DEEPSEEK_API_KEY not set")
-    return client
-
-
-@pytest.fixture
-def qwen_client():
-    client = _get_cached_client("qwen")
-    if client is None:
-        pytest.skip("QWEN_API_KEY not set")
+        pytest.skip("ANTHROPIC_API_KEY not set")
     return client
 
 
@@ -513,28 +503,28 @@ def _record_result(agent: str, scenario: str, score: dict[str, Any]) -> None:
 # =============================================================================
 
 
-class TestDeepSeekBacktestAnalysis:
-    """Test DeepSeek's backtest analysis quality."""
+class TestClaudeBacktestAnalysis:
+    """Test Claude's backtest analysis quality."""
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("scenario_name", list(SCENARIOS.keys()))
-    async def test_analysis_quality(self, deepseek_client, scenario_name: str):
-        """DeepSeek should produce complete, accurate backtest analysis."""
+    async def test_analysis_quality(self, claude_client, scenario_name: str):
+        """Claude should produce complete, accurate backtest analysis."""
         scenario = SCENARIOS[scenario_name]
-        result = await _ask_agent_analysis(deepseek_client, scenario_name, scenario)
+        result = await _ask_agent_analysis(claude_client, scenario_name, scenario)
 
         assert result["parsed"] is not None, (
-            f"DeepSeek returned invalid JSON for {scenario_name}. Raw: {result['raw'][:500]}"
+            f"Claude returned invalid JSON for {scenario_name}. Raw: {result['raw'][:500]}"
         )
 
         score = _score_analysis(result["parsed"], scenario, scenario_name)
         score["tokens"] = result["tokens"]
         score["latency_ms"] = result["latency_ms"]
         score["cost"] = result["cost"]
-        _record_result("deepseek", scenario_name, score)
+        _record_result("claude", scenario_name, score)
 
         logger.info(
-            f"🔵 DeepSeek/{scenario_name}: score={score['total_score']:.0%} "
+            f"🔵 Claude/{scenario_name}: score={score['total_score']:.0%} "
             f"fields={score['fields_present']}/{score['fields_total']} "
             f"grade={'✅' if score['grade_correct'] else '❌'} "
             f"overfit={'✅' if score['overfit_correct'] else '❌'} "
@@ -542,42 +532,7 @@ class TestDeepSeekBacktestAnalysis:
         )
 
         assert score["total_score"] >= 0.6, (
-            f"DeepSeek analysis quality too low for {scenario_name}: "
-            f"{score['total_score']:.0%}\n"
-            f"Details: {json.dumps(score['details'], indent=2)}"
-        )
-
-
-class TestQwenBacktestAnalysis:
-    """Test Qwen's backtest analysis quality."""
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("scenario_name", list(SCENARIOS.keys()))
-    async def test_analysis_quality(self, qwen_client, scenario_name: str):
-        """Qwen should produce complete, accurate backtest analysis."""
-        scenario = SCENARIOS[scenario_name]
-        result = await _ask_agent_analysis(qwen_client, scenario_name, scenario)
-
-        assert result["parsed"] is not None, (
-            f"Qwen returned invalid JSON for {scenario_name}. Raw: {result['raw'][:500]}"
-        )
-
-        score = _score_analysis(result["parsed"], scenario, scenario_name)
-        score["tokens"] = result["tokens"]
-        score["latency_ms"] = result["latency_ms"]
-        score["cost"] = result["cost"]
-        _record_result("qwen", scenario_name, score)
-
-        logger.info(
-            f"🟢 Qwen/{scenario_name}: score={score['total_score']:.0%} "
-            f"fields={score['fields_present']}/{score['fields_total']} "
-            f"grade={'✅' if score['grade_correct'] else '❌'} "
-            f"overfit={'✅' if score['overfit_correct'] else '❌'} "
-            f"tokens={score['tokens']} latency={score['latency_ms']:.0f}ms"
-        )
-
-        assert score["total_score"] >= 0.6, (
-            f"Qwen analysis quality too low for {scenario_name}: "
+            f"Claude analysis quality too low for {scenario_name}: "
             f"{score['total_score']:.0%}\n"
             f"Details: {json.dumps(score['details'], indent=2)}"
         )
@@ -721,7 +676,7 @@ class TestMergeAnalyses:
             "summary": "Good",
             "grade": "B",
             "confidence": 0.8,
-            "_agent": "deepseek",
+            "_agent": "claude",
         }
         result = self.analyzer._merge_analyses([analysis])
         assert result["summary"] == "Good"
@@ -741,7 +696,7 @@ class TestMergeAnalyses:
                 "market_regime_detail": "Best in uptrend",
                 "grade": "A",
                 "confidence": 0.9,
-                "_agent": "deepseek",
+                "_agent": "claude",
             },
             {
                 "summary": "Strong strategy",
@@ -755,7 +710,7 @@ class TestMergeAnalyses:
                 "market_regime_detail": "Works well in trending markets with moderate volatility",
                 "grade": "A",
                 "confidence": 0.85,
-                "_agent": "qwen",
+                "_agent": "claude",
             },
             {
                 "summary": "Solid results",
@@ -775,8 +730,8 @@ class TestMergeAnalyses:
         result = self.analyzer._merge_analyses(analyses)
 
         # Check all agents mentioned in summary
-        assert "DEEPSEEK" in result["summary"]
-        assert "QWEN" in result["summary"]
+        assert "CLAUDE" in result["summary"]
+        assert "CLAUDE" in result["summary"]
         assert "PERPLEXITY" in result["summary"]
 
         # Check recommendations deduplicated

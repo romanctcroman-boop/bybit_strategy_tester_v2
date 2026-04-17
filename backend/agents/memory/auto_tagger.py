@@ -139,7 +139,7 @@ class AutoTagger:
        with stop-word removal.
     3. **Metadata mapping** -- ``source`` and ``agent_namespace``
        are mapped to prefixed tags (``source:backtest``,
-       ``agent:deepseek``).
+       ``agent:claude``).
 
     All tags are normalized via :class:`TagNormalizer` and deduplicated.
     """

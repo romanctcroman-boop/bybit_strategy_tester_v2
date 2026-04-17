@@ -2,7 +2,7 @@
 Tests that AI agent prompts contain complete, accurate block parameter knowledge.
 
 PURPOSE:
-  Simulates what an AI agent (DeepSeek, Qwen, Perplexity) "sees" when reading
+  Simulates what an AI agent (Claude, Claude, Perplexity) "sees" when reading
   the STRATEGY_GENERATION_TEMPLATE. Verifies that:
   1. Every Library block is documented in the prompt
   2. All params for each block are mentioned with correct defaults

@@ -576,7 +576,7 @@ CONFIDENCE: [0.0-1.0]
 
                 request = AgentRequest(
                     task_type="rl_guidance",
-                    agent_type=AgentType.DEEPSEEK,
+                    agent_type=AgentType.CLAUDE,
                     prompt=prompt,
                 )
                 response = await self.ai_interface.send_request(request)

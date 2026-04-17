@@ -213,7 +213,7 @@ def _patch_prompt_engineer(node: object) -> None:
 
 
 class TestGenerateStrategiesNodeWithClaude:
-    """Claude goes through the single-call path (not DeepSeek MoA) as primary generator."""
+    """Claude goes through the single-call path (not Claude MoA) as primary generator."""
 
     @pytest.mark.asyncio
     async def test_claude_only_calls_claude_via_for_loop(self):
@@ -256,13 +256,13 @@ class TestGenerateStrategiesNodeWithClaude:
         assert responses[0]["agent"] == "claude"
 
     @pytest.mark.asyncio
-    async def test_deepseek_and_claude_produce_one_response(self):
-        """agents=['deepseek','claude'] → 1 response: all agent names route to Claude Sonnet."""
+    async def test_claude_and_claude_produce_one_response(self):
+        """agents=['claude','claude'] → 1 response: all agent names route to Claude Sonnet."""
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
 
         node = GenerateStrategiesNode()
         _patch_prompt_engineer(node)
-        state = _make_state_with_market(["deepseek", "claude"])
+        state = _make_state_with_market(["claude", "perplexity"])
 
         async def fake_call_llm(agent_name, *args, **kwargs):
             return f'{{"strategy_name":"{agent_name} strategy"}}'
@@ -300,8 +300,8 @@ class TestGenerateStrategiesNodeWithClaude:
         assert "claude" in state.context.get("failed_agents", [])
 
     @pytest.mark.asyncio
-    async def test_claude_only_no_deepseek_moa_triggered(self):
-        """agents=['claude'] → synthesis_critic never called (no DeepSeek MoA)."""
+    async def test_claude_only_no_extra_agents_moa_triggered(self):
+        """agents=['claude'] → synthesis_critic never called (no MoA needed)."""
         from backend.agents.trading_strategy_graph import GenerateStrategiesNode
 
         node = GenerateStrategiesNode()
@@ -321,7 +321,7 @@ class TestGenerateStrategiesNodeWithClaude:
         node._synthesis_critic = fake_critic
 
         await node.execute(state)
-        assert critic_called == [], "synthesis_critic should not be called when deepseek is absent"
+        assert critic_called == [], "synthesis_critic should not be called with single agent"
 
 
 # ============================================================================

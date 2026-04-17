@@ -288,7 +288,7 @@ class TestAIBacktestAnalyzerAnalyze:
         assert result.strategy_name == "Momentum RSI"
         assert len(result.ai_summary) > 0
         assert result.overfitting_risk == "low"
-        # Default agents: deepseek, qwen, perplexity → 3 calls
+        # Default agents: claude, perplexity → 2 calls (or 3 if copilot included)
         assert mock_call.call_count == 3
 
     @pytest.mark.asyncio
@@ -313,7 +313,7 @@ class TestAIBacktestAnalyzerAnalyze:
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_default_agents(self, analyzer, sample_metrics):
-        """Test that default agents are ['deepseek', 'qwen', 'perplexity']"""
+        """Test that default agents are ['claude', 'claude', 'perplexity']"""
         with patch.object(analyzer, "_call_llm", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = "SUMMARY: Test"
 
@@ -327,26 +327,26 @@ class TestAIBacktestAnalyzerAnalyze:
             # Should call all 3 default agents
             assert mock_call.call_count == 3
             called_agents = [call.args[0] for call in mock_call.call_args_list]
-            assert "deepseek" in called_agents
-            assert "qwen" in called_agents
+            assert "claude" in called_agents
+            assert "claude" in called_agents
             assert "perplexity" in called_agents
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_custom_agents(self, analyzer, sample_metrics):
         """Test analyze with custom agent list"""
         with patch.object(analyzer, "_call_llm", new_callable=AsyncMock) as mock_call:
-            mock_call.return_value = "SUMMARY: Qwen analysis"
+            mock_call.return_value = "SUMMARY: Claude analysis"
 
             await analyzer.analyze_backtest(
                 metrics=sample_metrics,
                 strategy_name="Test",
                 symbol="BTCUSDT",
                 timeframe="1h",
-                agents=["qwen"],
+                agents=["claude"],
             )
 
             call_args = mock_call.call_args
-            assert call_args[0][0] == "qwen"
+            assert call_args[0][0] == "claude"
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_missing_metrics(self, analyzer):
@@ -500,7 +500,7 @@ class TestAIBacktestAnalyzerLLMCall:
             side_effect=ImportError("No module"),
         ):
             # Reset deliberation to force re-import
-            result = await analyzer._call_llm("deepseek", "test prompt")
+            result = await analyzer._call_llm("claude", "test prompt")
             # Should gracefully return empty string
             assert isinstance(result, str)
 
@@ -514,7 +514,7 @@ class TestAIBacktestAnalyzerLLMCall:
             "backend.agents.consensus.real_llm_deliberation.get_real_deliberation",
             return_value=mock_delib,
         ):
-            result = await analyzer._call_llm("deepseek", "test")
+            result = await analyzer._call_llm("claude", "test")
             assert result == ""
 
 

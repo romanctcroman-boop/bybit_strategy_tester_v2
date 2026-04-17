@@ -1311,7 +1311,7 @@ Validate and return JSON:
 # =============================================================================
 
 AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
-    "deepseek": {
+    "claude": {
         "primary_role": "quantitative_analyst",
         "description": "Senior quantitative analyst at a hedge fund",
         "strengths": ["statistical_analysis", "mean_reversion", "risk_management"],
@@ -1319,7 +1319,7 @@ AGENT_SPECIALIZATIONS: dict[str, dict[str, str | list[str]]] = {
         "preferred_indicators": ["RSI", "Bollinger", "ATR", "ADX"],
         "preferred_timeframes": ["4h", "1D"],
     },
-    "qwen": {
+    "claude": {
         "primary_role": "technical_analyst",
         "description": "Expert technical analyst with pattern recognition focus",
         "strengths": ["pattern_recognition", "momentum", "market_structure"],

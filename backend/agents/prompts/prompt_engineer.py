@@ -17,7 +17,7 @@ Example:
     prompt = engineer.create_strategy_prompt(
         context=context,
         platform_config={"leverage": 10, "commission": 0.0007},
-        agent_name="deepseek",
+        agent_name="claude",
     )
 """
 
@@ -53,7 +53,7 @@ class PromptEngineer:
     - Optimization suggestions (based on backtest results)
     - Strategy validation
 
-    Each prompt type supports agent specialization (DeepSeek/Qwen/Perplexity)
+    Each prompt type supports agent specialization (Claude/Claude/Perplexity)
     and few-shot examples for better response quality.
     """
 
@@ -61,7 +61,7 @@ class PromptEngineer:
         self,
         context: MarketContext,
         platform_config: dict[str, Any],
-        agent_name: str = "deepseek",
+        agent_name: str = "claude",
         include_examples: bool = True,
         dynamic_examples: bool = True,
     ) -> str:
@@ -71,7 +71,7 @@ class PromptEngineer:
         Args:
             context: MarketContext from MarketContextBuilder
             platform_config: Platform settings (leverage, commission, etc.)
-            agent_name: Agent name for specialization ("deepseek", "qwen", "perplexity")
+            agent_name: Agent name for specialization ("claude", "claude", "perplexity")
             include_examples: Whether to append few-shot examples
             dynamic_examples: Choose examples based on market regime (default: True)
 
@@ -289,7 +289,7 @@ class PromptEngineer:
             leverage=leverage,
         )
 
-    def get_system_message(self, agent_name: str = "deepseek") -> str:
+    def get_system_message(self, agent_name: str = "claude") -> str:
         """
         Get system message for LLM API call based on agent specialization.
 

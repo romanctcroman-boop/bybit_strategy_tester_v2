@@ -7,7 +7,7 @@ Extends basic token-bucket rate limiting with:
 - Thread-safe async operations
 - Metrics emission for observability
 
-Addresses audit finding: "RateLimiter lacks per-provider token budgeting" (Qwen, P1)
+Addresses audit finding: "RateLimiter lacks per-provider token budgeting" (Claude, P1)
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ class TokenAwareRateLimiter:
 
     Example:
         limiter = TokenAwareRateLimiter(
-            provider="deepseek",
+            provider="claude",
             budget=TokenBudget(max_tokens_per_minute=100_000)
         )
         can_proceed = await limiter.acquire(estimated_tokens=5000)

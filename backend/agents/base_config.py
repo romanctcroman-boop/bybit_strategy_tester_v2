@@ -32,7 +32,7 @@ class AgentSettings(BaseSettings):
     )
 
     # API availability (derived from key presence)
-    deepseek_api_key: str = Field(default="", description="DeepSeek API key.")
+    anthropic_api_key: str = Field(default="", description="Anthropic (Claude) API key.")
     perplexity_api_key: str = Field(default="", description="Perplexity API key.")
 
     # Memory
@@ -113,7 +113,7 @@ _settings = _get_settings()
 
 FORCE_DIRECT_AGENT_API: Final[bool] = _settings.force_direct_agent_api
 MCP_DISABLED: Final[bool] = _settings.mcp_disabled
-DEEPSEEK_AVAILABLE: Final[bool] = bool(_settings.deepseek_api_key.strip())
+CLAUDE_AVAILABLE: Final[bool] = bool(_settings.anthropic_api_key.strip())
 PERPLEXITY_AVAILABLE: Final[bool] = bool(_settings.perplexity_api_key.strip())
 AGENT_MEMORY_BACKEND: Final[str] = _settings.agent_memory_backend
 AGENT_MEMORY_DIR: Final[str] = _settings.agent_memory_dir
@@ -129,9 +129,9 @@ __all__ = [
     "AGENT_MEMORY_BACKEND",
     "AGENT_MEMORY_DIR",
     "AGENT_TIMEOUT_SECONDS",
+    "CLAUDE_AVAILABLE",
     "DEBUG_AGENTS",
     "DEBUG_AGENT_COMMUNICATION",
-    "DEEPSEEK_AVAILABLE",
     "FORCE_DIRECT_AGENT_API",
     "MCP_DISABLED",
     "PERPLEXITY_AVAILABLE",

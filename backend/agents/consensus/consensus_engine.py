@@ -14,13 +14,14 @@ ConsensusEngine operates on StrategyDefinition objects (structured data).
 Usage:
     engine = ConsensusEngine()
     consensus = engine.aggregate(
-        strategies={"deepseek": strategy1, "qwen": strategy2},
+        strategies={"claude": strategy1, "perplexity": strategy2},
         method="weighted_voting",
     )
 """
 
 from __future__ import annotations
 
+import sqlite3
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -130,10 +131,10 @@ class ConsensusEngine:
         engine = ConsensusEngine()
 
         # Register historical performance (optional)
-        engine.update_performance("deepseek", sharpe=1.8, win_rate=0.55)
+        engine.update_performance("claude", sharpe=1.8, win_rate=0.55)
 
         result = engine.aggregate(
-            strategies={"deepseek": s1, "qwen": s2},
+            strategies={"claude": s1, "perplexity": s2},
             method="weighted_voting",
         )
         print(result.strategy.strategy_name)
@@ -340,7 +341,7 @@ class ConsensusEngine:
         Agent weights in future consensus rounds will reflect this history.
 
         Args:
-            agent_name: Agent identifier (e.g. "deepseek")
+            agent_name: Agent identifier (e.g. "claude")
             sharpe: Sharpe ratio from backtest
             profit_factor: Profit factor
             win_rate: Win rate (0-1)

@@ -246,8 +246,8 @@ class DistributedTracer:
         tracer = DistributedTracer()
 
         async with tracer.start_span("agent_request", kind=SpanKind.CLIENT) as span:
-            span.set_attribute("agent_type", "deepseek")
-            span.set_attribute("model", "deepseek-chat")
+            span.set_attribute("agent_type", "claude")
+            span.set_attribute("model", "claude-haiku-4-5-20251001")
 
             # Do work...
             response = await agent.send_request(request)

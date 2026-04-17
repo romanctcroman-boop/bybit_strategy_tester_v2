@@ -63,7 +63,7 @@ class PipelineConfig:
     max_drawdown_pct: float = 20.0
     max_reoptimize_cycles: int = 2
     max_regenerate_cycles: int = 1
-    agents: list[str] = field(default_factory=lambda: ["deepseek", "qwen", "perplexity"])
+    agents: list[str] = field(default_factory=lambda: ["claude", "copilot", "perplexity"])
     initial_capital: float = 10000.0
     leverage: float = 1.0
     commission: float = 0.0007  # TradingView parity — NEVER change

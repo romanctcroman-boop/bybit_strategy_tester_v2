@@ -346,8 +346,8 @@ class MarketContextBuilder:
             rsi_val = float(rsi.iloc[-1])
             rsi_zone = "oversold" if rsi_val < 30 else "overbought" if rsi_val > 70 else "neutral"
             lines.append(f"RSI(14): {rsi_val:.1f} ({rsi_zone})")
-        except Exception:
-            pass
+        except Exception as ind_err:
+            logger.debug(f"[context_builder] RSI compute failed: {ind_err}")
 
         try:
             # MACD
@@ -358,8 +358,8 @@ class MarketContextBuilder:
             histogram = macd_line - signal_line
             macd_signal = "bullish" if float(histogram.iloc[-1]) > 0 else "bearish"
             lines.append(f"MACD(12,26,9): {macd_signal}, histogram={float(histogram.iloc[-1]):.2f}")
-        except Exception:
-            pass
+        except Exception as ind_err:
+            logger.debug(f"[context_builder] MACD compute failed: {ind_err}")
 
         try:
             # EMAs
@@ -369,8 +369,8 @@ class MarketContextBuilder:
             pos = "above" if current > ema20 else "below"
             lines.append(f"EMA(20): {ema20:.2f} (price {pos})")
             lines.append(f"EMA(50): {ema50:.2f}")
-        except Exception:
-            pass
+        except Exception as ind_err:
+            logger.debug(f"[context_builder] EMA compute failed: {ind_err}")
 
         try:
             # Bollinger Bands
@@ -381,8 +381,8 @@ class MarketContextBuilder:
             current = float(close.iloc[-1])
             bb_pct = (current - lower) / (upper - lower) * 100 if (upper - lower) > 0 else 50
             lines.append(f"Bollinger(20,2): upper={upper:.2f}, lower={lower:.2f}, %B={bb_pct:.0f}%")
-        except Exception:
-            pass
+        except Exception as ind_err:
+            logger.debug(f"[context_builder] Bollinger compute failed: {ind_err}")
 
         return "\n".join(lines) if lines else "No indicators available"
 

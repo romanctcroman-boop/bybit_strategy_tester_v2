@@ -1,6 +1,6 @@
 """Agent-to-agent communication orchestrator.
 
-This module wires DeepSeek, Qwen, Perplexity, and Copilot style agents together
+This module wires Claude, Perplexity, and Copilot style agents together
 so that they can exchange structured messages, run multi-turn conversations,
 build parallel consensus, and iterate toward better answers. It intentionally
 mirrors what the original implementation provided (see
@@ -30,6 +30,7 @@ from backend.agents.interface import (
     AgentResponse,
     get_agent_interface,
 )
+from backend.agents.llm.base_client import LLMClientFactory, LLMConfig, LLMMessage, LLMProvider
 from backend.agents.models import AgentType, CommunicationPattern, MessageType
 from backend.agents.unified_agent_interface import AgentChannel
 
@@ -118,9 +119,7 @@ class AgentToAgentCommunicator:
         self.redis_url = redis_url
         self.redis_client: redis.Redis | None = None
         self.message_handlers: dict[AgentType, MessageHandler] = {
-            AgentType.DEEPSEEK: self._handle_deepseek_message,
             AgentType.PERPLEXITY: self._handle_perplexity_message,
-            AgentType.QWEN: self._handle_qwen_message,
             AgentType.CLAUDE: self._handle_claude_message,
             AgentType.COPILOT: self._handle_copilot_message,
         }
@@ -216,35 +215,6 @@ class AgentToAgentCommunicator:
         ttl = int(self.max_conversation_age.total_seconds())
         await redis_client.setex(key, ttl, message.from_agent.value)
 
-    async def _handle_deepseek_message(self, message: AgentMessage) -> AgentMessage:
-        from_mcp_tool = message.context.get("from_mcp_tool", False)
-        use_file_access = message.context.get("use_file_access", False)
-        force_direct = FORCE_DIRECT_AGENT_API or use_file_access or from_mcp_tool
-        preferred_channel = AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
-        logger.info(
-            "🔀 DeepSeek routing via {} (use_file_access={}, from_mcp={})",
-            preferred_channel.value,
-            use_file_access,
-            from_mcp_tool,
-        )
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK,
-            task_type=message.context.get("task_type", "analyze"),
-            prompt=message.content,
-            code=message.context.get("code"),
-            context=message.context,
-        )
-        agent_response = await self.agent_interface.send_request(
-            request,
-            preferred_channel=preferred_channel,
-        )
-        return self._build_agent_reply(
-            original_message=message,
-            agent_type=AgentType.DEEPSEEK,
-            agent_response=agent_response,
-            success_confidence=0.9,
-        )
-
     async def _handle_perplexity_message(self, message: AgentMessage) -> AgentMessage:
         from_mcp_tool = message.context.get("from_mcp_tool", False)
         force_direct = FORCE_DIRECT_AGENT_API or from_mcp_tool
@@ -272,45 +242,41 @@ class AgentToAgentCommunicator:
             success_confidence=0.85,
         )
 
-    async def _handle_qwen_message(self, message: AgentMessage) -> AgentMessage:
-        """Route a message to the Qwen agent via direct API.
-
-        Qwen (Alibaba Cloud Model Studio) is used for fast, cost-effective
-        analysis and as a third voice in consensus rounds.  It always uses the
-        direct API channel because there is no MCP bridge for Qwen.
-        """
-        logger.info("🔀 Qwen routing via DIRECT_API")
-        request = AgentRequest(
-            agent_type=AgentType.QWEN,
-            task_type=message.context.get("task_type", "analyze"),
-            prompt=message.content,
-            code=message.context.get("code"),
-            context=message.context,
-        )
-        agent_response = await self.agent_interface.send_request(
-            request,
-            preferred_channel=AgentChannel.DIRECT_API,
-        )
-        return self._build_agent_reply(
-            original_message=message,
-            agent_type=AgentType.QWEN,
-            agent_response=agent_response,
-            success_confidence=0.85,
-        )
-
     async def _handle_claude_message(self, message: AgentMessage) -> AgentMessage:
         """Route a message to Claude (Anthropic) via ClaudeClient.
 
         Claude uses the Anthropic Messages API which is NOT OpenAI-compatible,
         so it bypasses unified_agent_interface and calls ClaudeClient directly.
         Claude acts as a synthesis critic and strategic reasoner in consensus rounds.
+
+        Fix 2026-04-17: key is now obtained via APIKeyPoolManager (health/rotation/
+        cooldown) instead of direct ``os.environ`` lookup. Errors mark the key
+        (rate-limit / auth / generic) so circuit-breaker logic works for Claude too.
         """
-        import os
-
-        from backend.agents.llm.base_client import LLMClientFactory, LLMConfig, LLMProvider
-
         logger.info("🔀 Claude routing via ClaudeClient (Anthropic Messages API)")
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+        # Resolve API key through the pool (adds health tracking + rotation)
+        api_key: str | None = None
+        pool_key = None
+        try:
+            from backend.agents.api_key_pool import APIKeyPoolManager
+            from backend.agents.models import AgentType as _AgentType
+            from backend.security.key_manager import KeyManager
+
+            pool = APIKeyPoolManager()
+            pool_key = await pool.get_active_key(_AgentType.CLAUDE)
+            if pool_key is not None:
+                key_name = getattr(pool_key, "key_name", "ANTHROPIC_API_KEY")
+                api_key = KeyManager().get_decrypted_key(key_name)
+        except Exception as exc:
+            logger.warning(f"Claude key pool lookup failed, falling back to env: {exc}")
+
+        # Fallback: env var (keeps backward compat in dev without key manager)
+        if not api_key:
+            import os as _os
+
+            api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
+
         if not api_key:
             return AgentMessage(
                 message_id=str(uuid.uuid4()),
@@ -334,14 +300,40 @@ class AgentToAgentCommunicator:
         )
         client = LLMClientFactory.create(config)
         try:
-            response_text = await client.complete(message.content)
+            messages = [LLMMessage(role="user", content=message.content)]
+            response = await client.chat(messages)
+            response_text = response.content
             confidence = 0.90
             metadata: dict[str, Any] = {"status": "ok", "model": "claude-haiku-4-5-20251001"}
+            # Record success on the pool key so cooldown/error counters update
+            if pool_key is not None:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    APIKeyPoolManager().mark_success(pool_key)
+                except Exception:  # best-effort telemetry
+                    pass
         except Exception as exc:
             logger.warning(f"⚠️ Claude API error: {exc}")
             response_text = f"Claude unavailable: {exc}"
             confidence = 0.0
             metadata = {"status": "error", "error": str(exc)}
+            # Classify error on the pool key
+            if pool_key is not None:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    pool_mgr = APIKeyPoolManager()
+                    err_str = str(exc).lower()
+                    if "429" in err_str or "rate" in err_str:
+                        pool_mgr.mark_rate_limit(pool_key)
+                    elif "401" in err_str or "403" in err_str or "auth" in err_str:
+                        pool_mgr.mark_auth_error(pool_key)
+                    else:
+                        pool_mgr.mark_error(pool_key)
+                except Exception as pool_update_err:
+                    # Pool telemetry is best-effort; don't mask original LLM error
+                    logger.debug(f"[claude] pool telemetry update failed: {pool_update_err}")
 
         return AgentMessage(
             message_id=str(uuid.uuid4()),
@@ -563,7 +555,7 @@ class AgentToAgentCommunicator:
         }
 
         ds_request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK,
+            agent_type=AgentType.CLAUDE,
             task_type="review",
             prompt=validation_prompt,
             code=(implementation_content or "")[:5000],
@@ -577,28 +569,28 @@ class AgentToAgentCommunicator:
             context=request_context,
         )
 
-        ds_response = await self._run_validation_request(ds_request, AgentType.DEEPSEEK)
+        claude_response = await self._run_validation_request(ds_request, AgentType.CLAUDE)
         pp_response = await self._run_validation_request(pp_request, AgentType.PERPLEXITY)
 
-        ds_summary = self._summarize_validation_response(AgentType.DEEPSEEK, ds_response)
+        claude_summary = self._summarize_validation_response(AgentType.CLAUDE, claude_response)
         pp_summary = self._summarize_validation_response(AgentType.PERPLEXITY, pp_response)
 
         validated = (
-            ds_summary["verdict"] == "VALIDATED"
+            claude_summary["verdict"] == "VALIDATED"
             and pp_summary["verdict"] == "VALIDATED"
-            and not ds_summary["critical_issues"]
+            and not claude_summary["critical_issues"]
             and not pp_summary["critical_issues"]
         )
 
         rolled_back = False
-        if (ds_summary["critical_issues"] or pp_summary["critical_issues"]) and backup_file and target_file:
+        if (claude_summary["critical_issues"] or pp_summary["critical_issues"]) and backup_file and target_file:
             rolled_back = await self._rollback_to_backup(backup_file, target_file)
 
         payload = {
             "success": True,
             "validated": validated,
             "rolled_back": rolled_back,
-            "deepseek_validation": ds_summary,
+            "claude_validation": claude_summary,
             "perplexity_validation": pp_summary,
         }
 
@@ -608,7 +600,7 @@ class AgentToAgentCommunicator:
                 "cycle": cycle,
                 "validated": validated,
                 "rolled_back": rolled_back,
-                "deepseek": ds_summary,
+                "claude": claude_summary,
                 "perplexity": pp_summary,
                 "backup_available": bool(backup_file),
             },
@@ -686,16 +678,15 @@ class AgentToAgentCommunicator:
 
         # Round-robin order for collaborative / sequential patterns
         _ROTATION = {
-            AgentType.DEEPSEEK: AgentType.QWEN,
-            AgentType.QWEN: AgentType.PERPLEXITY,
-            AgentType.PERPLEXITY: AgentType.DEEPSEEK,
+            AgentType.CLAUDE: AgentType.PERPLEXITY,
+            AgentType.PERPLEXITY: AgentType.CLAUDE,
         }
 
         if pattern in (
             CommunicationPattern.COLLABORATIVE,
             CommunicationPattern.SEQUENTIAL,
         ):
-            next_agent = _ROTATION.get(response.from_agent, AgentType.DEEPSEEK)
+            next_agent = _ROTATION.get(response.from_agent, AgentType.CLAUDE)
         else:
             return response
 
