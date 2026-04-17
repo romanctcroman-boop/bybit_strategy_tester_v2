@@ -88,8 +88,7 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       }
-    }
-  ],
+    },
     {
       "name": "Python: pytest (debug current file)",
       "type": "debugpy",

@@ -2,14 +2,17 @@
   // ═══════════════════════════════════════════════════════════
   // Python — Interpreter & Environment
   // ═══════════════════════════════════════════════════════════
-  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  // Forward slashes work on Windows, Linux and macOS.
+  // On POSIX the venv layout is `.venv/bin/python` — adjust locally if needed.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
   "python.terminal.activateEnvironment": true,
-
   // ═══════════════════════════════════════════════════════════
   // Editor — General
   // ═══════════════════════════════════════════════════════════
   "editor.formatOnSave": true,
-  "editor.rulers": [120],
+  "editor.rulers": [
+    120
+  ],
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
   "files.trimTrailingWhitespace": true,
@@ -20,7 +23,6 @@
   // Bracket pair guides — визуализация вложенности
   "editor.guides.bracketPairs": "active",
   "editor.bracketPairColorization.enabled": true,
-
   // ═══════════════════════════════════════════════════════════
   // Python Formatting — Ruff (matches pyproject.toml: line-length=120)
   // ═══════════════════════════════════════════════════════════
@@ -31,7 +33,6 @@
       "source.organizeImports.ruff": "explicit"
     }
   },
-
   // ═══════════════════════════════════════════════════════════
   // JavaScript / TypeScript Formatting
   // ═══════════════════════════════════════════════════════════
@@ -49,7 +50,7 @@
     }
   ],
   "[javascript]": {
-    "editor.defaultFormatter": "vscode.typescript-language-features",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
       "source.fixAll.eslint": "explicit"
     }
@@ -85,7 +86,6 @@
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-
   // ═══════════════════════════════════════════════════════════
   // YAML Schema associations
   // ═══════════════════════════════════════════════════════════
@@ -98,7 +98,6 @@
       "deployment/prometheus/*.yaml"
     ]
   },
-
   // ═══════════════════════════════════════════════════════════
   // Git — Hide nested mcp-server repo from parent workspace view
   // ═══════════════════════════════════════════════════════════
@@ -107,7 +106,6 @@
   ],
   // Автоматически скрывать в Explorer всё из .gitignore
   "explorer.excludeGitIgnore": true,
-
   // ═══════════════════════════════════════════════════════════
   // File Watching — exclude heavy dirs to save CPU + RAM
   // ═══════════════════════════════════════════════════════════
@@ -137,29 +135,24 @@
     "**/data/**": true,
     "**/temp_analysis/**": true
   },
-
   // ═══════════════════════════════════════════════════════════
   // Explorer — hide non-essential dirs from sidebar
+  // Note: `explorer.excludeGitIgnore: true` (above) already hides everything
+  // listed in .gitignore (__pycache__, .mypy_cache, .ruff_cache, .pytest_cache,
+  // *.egg-info, .cache, screenshots, etc.). The entries below cover items
+  // that are NOT in .gitignore or are tracked but clutter the sidebar.
   // ═══════════════════════════════════════════════════════════
   "files.exclude": {
-    "**/.mypy_cache": true,
-    "**/.ruff_cache": true,
-    "**/.pytest_cache": true,
     "**/mcp-deepseek": true,
-    "**/__pycache__": true,
     "**/.cursor": true,
     "**/.vs": true,
-    "**/bybit_strategy_tester.egg-info": true,
-    "**/.cache": true,
     "test_e2e_test_*": true,
     "test_eval_test_*": true,
     "test_memory_test_*": true,
-    "**/screenshots": true,
     "temp_analysis": true,
     ".run": true,
     "temp_*.py": true
   },
-
   // ═══════════════════════════════════════════════════════════
   // Search — exclude build artifacts and data dirs
   // ═══════════════════════════════════════════════════════════
@@ -195,12 +188,10 @@
     "temp_*.py": true,
     "memory-bank/**": true
   },
-
   // ═══════════════════════════════════════════════════════════
   // Tasks
   // ═══════════════════════════════════════════════════════════
   "task.allowAutomaticTasks": "on",
-
   // ═══════════════════════════════════════════════════════════
   // Python Testing — pytest
   // ═══════════════════════════════════════════════════════════
@@ -210,7 +201,6 @@
     "tests",
     "--tb=short"
   ],
-
   // ═══════════════════════════════════════════════════════════
   // Pylance / Pyright — Type Checking
   // ═══════════════════════════════════════════════════════════
@@ -242,12 +232,10 @@
     "reportCallIssue": "warning",
     "reportAssignmentType": "warning"
   },
-
   // ═══════════════════════════════════════════════════════════
   // MyPy — disabled (Pylance + Ruff handle linting/types)
   // ═══════════════════════════════════════════════════════════
   "mypy-type-checker.enabled": false,
-
   // ═══════════════════════════════════════════════════════════
   // GitHub Copilot — Agent Mode
   // ═══════════════════════════════════════════════════════════
@@ -274,7 +262,6 @@
     "json": true,
     "yaml": true
   },
-
   // ═══════════════════════════════════════════════════════════
   // Claude Code
   // ═══════════════════════════════════════════════════════════
