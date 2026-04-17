@@ -3244,68 +3244,11 @@ class MLValidationNode(AgentNode):
 # =============================================================================
 # P2-3: Human-in-the-Loop (HITL) interrupt node
 # =============================================================================
-
-
-class HITLCheckNode(AgentNode):
-    """
-    P2-3: Human-in-the-loop checkpoint before memory is updated (optional).
-
-    When enabled, the node inspects ``state.context["hitl_approved"]``:
-    - If ``True``  → pipeline continues normally (human approved)
-    - If ``False`` or missing → sets ``state.context["hitl_pending"] = True``
-      and ``state.context["hitl_payload"]`` with the strategy summary for review,
-      then returns early.  ``run_strategy_pipeline()`` callers can detect this
-      and pause/resume by re-calling with ``hitl_approved=True`` in context.
-
-    The node is wired between ``ml_validation`` and ``memory_update`` when
-    ``build_trading_strategy_graph(hitl_enabled=True)`` is called.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            name="hitl_check",
-            description="HITL: pause pipeline for human review before memory update",
-            timeout=5.0,
-        )
-
-    async def execute(self, state: AgentState) -> AgentState:
-        approved: bool = bool(state.context.get("hitl_approved", False))
-
-        if approved:
-            logger.info("✅ [HITL] Human approved — continuing to memory_update")
-            state.context.pop("hitl_pending", None)
-            return state
-
-        # Build a compact summary for the human reviewer
-        best = state.get_result("select_best") or {}
-        bt = state.get_result("backtest") or {}
-        bt_metrics = bt.get("metrics", {}) or {}  # Bug C1 fix: metrics are nested under "metrics" key
-        wf = state.get_result("wf_validation") or {}
-
-        payload = {
-            "strategy_name": (best.get("strategy", {}) or {}).get("strategy_name", "unknown"),
-            "backtest_summary": {
-                "trades": bt_metrics.get("total_trades", 0),
-                "sharpe": round(bt_metrics.get("sharpe_ratio", 0.0), 3),
-                "max_dd": round(bt_metrics.get("max_drawdown", 0.0), 2),
-                "net_profit": round(bt_metrics.get("net_profit", 0.0), 2),
-            },
-            "wf_passed": wf.get("wf_passed", None),
-            "regime": state.context.get("regime_classification", {}).get("regime", "unknown"),
-            "message": (
-                "Pipeline paused for human review. Set state.context['hitl_approved'] = True and re-run to continue."
-            ),
-        }
-
-        state.context["hitl_pending"] = True
-        state.context["hitl_payload"] = payload
-        logger.info(
-            f"⏸️ [HITL] Pipeline paused — strategy='{payload['strategy_name']}' "
-            f"sharpe={payload['backtest_summary']['sharpe']}. "
-            f"Set hitl_approved=True to continue."
-        )
-        state.set_result(self.name, payload)
-        return state
+# HITLCheckNode has been physically migrated to backend.agents.nodes.control
+# (ADR-010 Stage 2, 2026-04-18) as a proof-of-concept for the incremental
+# split of this monolith.  Re-exported at the bottom of this module for
+# backwards compatibility.  See backend/agents/nodes/control.py for the
+# canonical implementation and the migration pattern for future PRs.
 
 
 # =============================================================================
@@ -4575,6 +4518,12 @@ async def run_strategy_pipeline(
     )
     return result_state
 
+
+# ADR-010 Stage 2 — re-export physically migrated node classes.
+# Import placed at the end of the module (after all definitions) so that
+# nodes/control.py's reverse-imports of MemoryUpdateNode/PostRunReflectionNode
+# resolve against a fully-populated tsg module and no circular import occurs.
+from backend.agents.nodes.control import HITLCheckNode
 
 # Register in global graph registry
 register_graph(build_trading_strategy_graph(run_backtest=False))
