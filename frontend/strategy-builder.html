@@ -522,6 +522,18 @@
                     <div class="opt-stage-dot"></div>
                     <span class="opt-stage-label">Search</span>
                   </div>
+                  <!-- Optional hardening pills (shown only when the backend
+                       reports a post_grid_refine / overfit_guards stage). -->
+                  <div class="opt-stage-line" id="optStageRefineLine" style="display:none"></div>
+                  <div class="opt-stage" id="optStageRefine" style="display:none" title="Post-grid refinement: ±pct grid around top-K trials">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Refine</span>
+                  </div>
+                  <div class="opt-stage-line" id="optStageGuardsLine" style="display:none"></div>
+                  <div class="opt-stage" id="optStageGuards" style="display:none" title="Overfit guards: anti-phantom-optimum checks on top-K results">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Guards</span>
+                  </div>
                   <div class="opt-stage-line"></div>
                   <div class="opt-stage" id="optStage4">
                     <div class="opt-stage-dot"></div>

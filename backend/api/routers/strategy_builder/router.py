@@ -1838,6 +1838,12 @@ async def _execute_optimization_bg(
     if request.ranking_mode in ("balanced", "weighted") and request.ranking_mode != "single":
         _internal_max_results = max(request.max_results, 500)
 
+    # Emit initial stage so UI shows "Preparing" before the first trial runs.
+    # Subsequent per-trial updates inside run_builder_* will preserve this stage
+    # (they omit the `stage` kwarg, and update_optimization_progress keeps the
+    # previously stored value).  When a new pipeline phase starts we re-emit.
+    update_optimization_progress(strategy_id, status="running", stage="preparing")
+
     try:
         if request.method == "bayesian":
             custom_ranges = request.parameter_ranges or None
@@ -1908,6 +1914,16 @@ async def _execute_optimization_bg(
                         f"steps={request.post_grid_steps})"
                     )
                     if _grid_candidates:
+                        # Announce the new stage BEFORE the refine sweep so the UI
+                        # can switch from "Search" to "Refine" instead of showing a
+                        # stalled progress bar while the grid warms up.
+                        update_optimization_progress(
+                            strategy_id,
+                            status="running",
+                            tested=0,
+                            total=len(_grid_candidates),
+                            stage="post_grid_refine",
+                        )
                         _refine_result = await asyncio.to_thread(
                             run_builder_grid_search,
                             base_graph=strategy_graph,
@@ -2071,6 +2087,17 @@ async def _execute_optimization_bg(
                         thresholds_from_config,
                     )
 
+                    # Switch UI to "Guards" stage so users see what the pipeline is
+                    # doing between the search and the final ranking.
+                    _guard_total = len(result[_results_key])
+                    update_optimization_progress(
+                        strategy_id,
+                        status="running",
+                        tested=0,
+                        total=_guard_total,
+                        stage="overfit_guards",
+                    )
+
                     _guard_th = thresholds_from_config(config_params)
                     # Apply request-level overrides on top of config defaults.
                     _overrides: dict[str, Any] = {}
@@ -2088,7 +2115,7 @@ async def _execute_optimization_bg(
                     _n_bars = len(ohlcv) if ohlcv is not None else None
                     _guard_pass = 0
                     _guard_fail = 0
-                    for _r in result[_results_key]:
+                    for _i, _r in enumerate(result[_results_key], start=1):
                         _gr = evaluate_overfit_guards(_r, thresholds=_guard_th, n_bars=_n_bars)
                         _r["guard_passed"] = _gr.passed
                         _r["guard_violations"] = list(_gr.failed_guards)
@@ -2096,6 +2123,14 @@ async def _execute_optimization_bg(
                             _guard_pass += 1
                         else:
                             _guard_fail += 1
+                        # Per-result progress tick — stays in "overfit_guards" stage.
+                        if _guard_total and (_i == _guard_total or _i % 10 == 0):
+                            update_optimization_progress(
+                                strategy_id,
+                                status="running",
+                                tested=_i,
+                                total=_guard_total,
+                            )
                     result["overfit_guards"] = {
                         "applied": True,
                         "passed": _guard_pass,
@@ -2117,6 +2152,11 @@ async def _execute_optimization_bg(
                     logger.warning(f"Overfit guards failed (non-fatal): {_guard_exc}")
                     if isinstance(result, dict):
                         result.setdefault("warnings", []).append(f"overfit_guards_failed: {_guard_exc}")
+
+        # JSON-sanitize + assemble response.  Emit "finalizing" stage so the
+        # UI has a distinct pill for the ranking / composite-score / context
+        # assembly phase (vs. the prior search/refine/guard phases).
+        update_optimization_progress(strategy_id, status="running", stage="finalizing")
 
         result = _sanitize_for_json(result)
 
@@ -2164,6 +2204,14 @@ async def _execute_optimization_bg(
             **result,
         }
         store_optimization_result(strategy_id, response_data)
+        # Terminal stage: pipeline fully finished and result stored.
+        # Mark as completed+done so the UI can light up the final stage pill
+        # and freeze the progress bar at 100% regardless of which features ran.
+        update_optimization_progress(
+            strategy_id,
+            status="completed",
+            stage="done",
+        )
 
     except asyncio.CancelledError:
         logger.warning(f"Builder optimization cancelled (background task): {strategy_id}")

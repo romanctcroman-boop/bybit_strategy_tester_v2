@@ -145,6 +145,20 @@ def _write_progress_file(data: dict[str, Any]) -> None:
         pass
 
 
+#: Ordered list of optimization pipeline stages.  The UI uses this to
+#: render a staged progress bar.  Stages added for hardening features
+#: (2026-04-19) are only emitted when the corresponding feature is active.
+OPTIMIZATION_STAGES: tuple[str, ...] = (
+    "loading_data",  # market data fetch + sanity-check
+    "preparing",  # warmup, param-spec merge, OOS split
+    "searching",  # main trial loop (grid/random/Bayesian)
+    "post_grid_refine",  # hardening: local ±pct grid around top-K
+    "overfit_guards",  # hardening: annotate top-K with guard checks
+    "finalizing",  # scoring, composite, context assembly
+    "done",  # completed successfully
+)
+
+
 def update_optimization_progress(
     strategy_id: str,
     *,
@@ -157,18 +171,32 @@ def update_optimization_progress(
     eta_seconds: int = 0,
     started_at: float | None = None,
     context: dict | None = None,
+    stage: str | None = None,
 ) -> None:
     """Update progress for a running builder optimization.
 
     Writes to in-memory cache every call; flushes to disk every
     _PROGRESS_FLUSH_INTERVAL trials to reduce I/O bottleneck.
     Status transitions (running→completed/failed) always flush immediately.
+
+    The ``stage`` argument lets callers tag the current pipeline phase
+    (see :data:`OPTIMIZATION_STAGES`).  When omitted, the previously
+    stored stage is preserved so per-trial updates don't clobber the
+    stage set by the surrounding pipeline driver.  Transitions to a new
+    stage always force an immediate flush so the UI sees the change
+    without waiting for the trial-counter flush interval.
     """
     percent = round(tested * 100 / total, 1) if total > 0 else 0.0
     with _progress_lock:
         existing = _progress_memory_cache.get(strategy_id, {})
+        # Preserve previously recorded stage across incremental updates;
+        # only overwrite when a new stage is explicitly supplied.
+        prev_stage = existing.get("stage", "")
+        resolved_stage = stage if stage is not None else prev_stage
+        stage_transitioned = bool(stage) and stage != prev_stage
         entry: dict = {
             "status": status,
+            "stage": resolved_stage,
             "tested": tested,
             "total": total,
             "percent": percent,
@@ -190,11 +218,17 @@ def update_optimization_progress(
         # Flush to disk:
         #   - always on terminal states (completed/failed/stopped)
         #   - always on first call for a new strategy_id (creates the disk entry)
+        #   - always on stage transition (so UI reflects pipeline phase immediately)
         #   - otherwise every N trials (reduces I/O bottleneck)
         terminal = status in ("completed", "failed", "stopped")
         _progress_trial_counter[strategy_id] = _progress_trial_counter.get(strategy_id, 0) + 1
         is_first = _progress_trial_counter[strategy_id] == 1
-        should_flush = terminal or is_first or (_progress_trial_counter[strategy_id] % _PROGRESS_FLUSH_INTERVAL == 0)
+        should_flush = (
+            terminal
+            or is_first
+            or stage_transitioned
+            or (_progress_trial_counter[strategy_id] % _PROGRESS_FLUSH_INTERVAL == 0)
+        )
         if should_flush:
             disk_data = _read_progress_file()
             disk_data[strategy_id] = entry
@@ -1857,8 +1891,9 @@ def _run_fast_rsi_threshold_optimization(
 
     # Initialize progress
     if strategy_id:
-        update_optimization_progress(strategy_id, status="running", tested=0, total=total, started_at=start_time)
-
+        update_optimization_progress(
+            strategy_id, status="running", tested=0, total=total, started_at=start_time, stage="searching"
+        )
     # Get the RSI block's base params
     rsi_block = None
     for block in base_graph.get("blocks", []):
@@ -3399,7 +3434,9 @@ def run_builder_grid_search(
 
     # Initialize progress for standard path
     if strategy_id:
-        update_optimization_progress(strategy_id, status="running", tested=0, total=total, started_at=start_time)
+        update_optimization_progress(
+            strategy_id, status="running", tested=0, total=total, started_at=start_time, stage="searching"
+        )
 
     # Log to console every ~5% to avoid spam; but update progress store after EVERY combo
     # so the frontend polling sees real-time progress (critical for slow DCA backtests).
@@ -3989,11 +4026,7 @@ def _apply_cross_block_constraints(
     # TP >= SL * 1.5 (minimum risk/reward ratio).
     # Skipped when close_by_time block is present — those strategies use time-exit
     # as the primary exit mechanism and TP < SL is a valid design (quick profit + wide SL).
-    if (
-        _tp_path and _sl_path
-        and _tp_path in overrides and _sl_path in overrides
-        and not _has_close_by_time
-    ):
+    if _tp_path and _sl_path and _tp_path in overrides and _sl_path in overrides and not _has_close_by_time:
         _tp_val_rr = float(overrides[_tp_path])
         _sl_val_rr = float(overrides[_sl_path])
         _min_tp = round(_sl_val_rr * 1.5, 2)
@@ -4058,7 +4091,7 @@ def run_builder_optuna_search(
     """
     try:
         import optuna
-        from optuna.pruners import MedianPruner
+        from optuna.pruners import HyperbandPruner, MedianPruner
         from optuna.samplers import CmaEsSampler, RandomSampler, TPESampler
 
         try:
@@ -4115,6 +4148,7 @@ def run_builder_optuna_search(
     # Optuna n_jobs > 1 spawns new processes that re-import the module and
     # try to re-bind the same port → server crash. Force single-threaded on Windows.
     import sys as _sys
+
     if _sys.platform == "win32":
         if n_jobs > 1:
             logger.info(
@@ -4188,9 +4222,17 @@ def run_builder_optuna_search(
         sampler = AutoSampler(seed=42)  # type: ignore[assignment]
         logger.info("Using Optuna 4.6 AutoSampler (automatic sampler selection)")
     elif sampler_type == "auto":
-        # Fallback for Optuna < 4.6 — TPE with multivariate
-        logger.warning("AutoSampler not available (requires Optuna ≥ 4.6), falling back to TPE")
-        sampler_type = "tpe"  # will fall through to TPE block below
+        # Fallback for Optuna < 4.6 — pick a sampler based on dimensionality
+        # using sampler_factory.prefer_for_high_dim (TPE for ≤ 20 dims, CMA-ES above).
+        from backend.optimization.sampler_factory import prefer_for_high_dim
+
+        _fallback = prefer_for_high_dim(_n_params)
+        logger.warning(
+            "AutoSampler not available (requires Optuna ≥ 4.6); sampler_factory.prefer_for_high_dim(D=%d) → %s",
+            _n_params,
+            _fallback,
+        )
+        sampler_type = _fallback  # will fall through to the matching block below
 
     if sampler_type == "random":
         sampler = RandomSampler(seed=42)
@@ -4290,15 +4332,21 @@ def run_builder_optuna_search(
             "multivariate": True,
             "group": True,  # group correlated params (e.g. MACD fast/slow/signal)
             "constraints_func": _constraints_func,
+            # constant_liar: when n_jobs > 1, in-flight (running) trials are
+            # treated as if they returned the worst-known score. Without this,
+            # parallel workers all sample the same "promising" point and waste
+            # 50-80 % of the budget on duplicates. Harmless for n_jobs == 1.
+            "constant_liar": effective_n_jobs > 1,
         }
         if _tpe_seed_sampler is not None:
             _tpe_kwargs["seed_sampler"] = _tpe_seed_sampler
-        # seed_sampler supported in Optuna ≥ 3.0; group in ≥ 3.1 — degrade gracefully
+        # seed_sampler supported in Optuna ≥ 3.0; group + constant_liar in ≥ 3.1 — degrade gracefully
         try:
             sampler = TPESampler(**_tpe_kwargs)  # type: ignore[assignment]
         except TypeError:
             _tpe_kwargs.pop("seed_sampler", None)
             _tpe_kwargs.pop("group", None)
+            _tpe_kwargs.pop("constant_liar", None)
             sampler = TPESampler(**_tpe_kwargs)  # type: ignore[assignment]
 
     # Suppress Optuna logging
@@ -4317,10 +4365,27 @@ def run_builder_optuna_search(
 
     # Optuna's default in-memory storage is thread-safe for n_jobs > 1.
     # No external storage backend needed.
+    # Pruner choice: HyperbandPruner is preferred for long backtests because it
+    # uses successive halving to allocate compute, but it requires a meaningful
+    # ``max_resource``. For our single-step objective (one report() per trial)
+    # we keep MedianPruner — falling back to it preserves identical behaviour
+    # when callers don't opt into multi-step reporting. HyperbandPruner is wired
+    # up so future walk-forward objectives (which report per-fold) gain its
+    # benefits automatically.
+    _use_hyperband = bool(config_params.get("use_hyperband_pruner", False))
+    if _use_hyperband:
+        _pruner: optuna.pruners.BasePruner = HyperbandPruner(
+            min_resource=1,
+            reduction_factor=3,
+        )
+        logger.info("Using HyperbandPruner (min_resource=1, reduction_factor=3)")
+    else:
+        _pruner = MedianPruner(n_startup_trials=10, n_warmup_steps=0)
+
     study = optuna.create_study(
         direction="maximize",
         sampler=sampler,
-        pruner=MedianPruner(n_startup_trials=10, n_warmup_steps=0),
+        pruner=_pruner,
         study_name=f"builder_opt_{int(time.time())}",
     )
 
@@ -4537,9 +4602,9 @@ def run_builder_optuna_search(
             try:
                 _thr_f = float(_thr)
                 if _op == "<=":
-                    _violations.append(_val - _thr_f)      # >0 if value exceeds threshold
+                    _violations.append(_val - _thr_f)  # >0 if value exceeds threshold
                 elif _op == ">=":
-                    _violations.append(_thr_f - _val)      # >0 if value below threshold
+                    _violations.append(_thr_f - _val)  # >0 if value below threshold
                 elif _op == "<":
                     _violations.append(_val - _thr_f + 1e-9)
                 elif _op == ">":
@@ -4556,6 +4621,17 @@ def run_builder_optuna_search(
         return score_raw
 
     # Run optimization
+    # Emit explicit stage transition so the UI switches from "Preparing" to
+    # "Searching" at the moment the main trial loop begins.
+    if strategy_id:
+        update_optimization_progress(
+            strategy_id,
+            status="running",
+            tested=0,
+            total=n_trials or 0,
+            started_at=start_time,
+            stage="searching",
+        )
     try:
         study.optimize(
             objective,
@@ -4695,10 +4771,12 @@ def run_builder_optuna_search(
             _evaluator = None
             try:
                 from optuna_fast_fanova import FanovaImportanceEvaluator as _FanovaEval
+
                 _evaluator = _FanovaEval(seed=42)
             except ImportError:
                 try:
                     from optuna.importance import FanovaImportanceEvaluator as _FanovaEval
+
                     _evaluator = _FanovaEval(seed=42)
                 except (ImportError, AttributeError):
                     pass  # Use default evaluator below

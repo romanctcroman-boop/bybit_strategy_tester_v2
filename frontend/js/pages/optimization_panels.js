@@ -1179,22 +1179,99 @@ class OptimizationPanels {
         if (fillEl) fillEl.style.width = `${pct}%`;
         if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
 
-        let stageIdx = 0;
-        if (prog.status === 'starting') stageIdx = 0;
-        else if (prog.status === 'running' && tested === 0) stageIdx = 1;
-        else if (prog.status === 'running' && tested > 0) stageIdx = 2;
-        else if (prog.status === 'completed' || prog.status === 'partial') stageIdx = 3;
+        // Stage rendering.
+        //
+        // Backend emits an explicit `stage` string (2026-04-19):
+        //   loading_data → preparing → searching → post_grid_refine →
+        //   overfit_guards → finalizing → done
+        // When absent (older backends or edge cases) we fall back to the
+        // legacy 4-stage heuristic based on `status` + `tested`.
+        //
+        // UI layout: 4 built-in pills (Data / Compile / Search / Done) plus
+        // two optional pills (Refine / Guards) that light up only when the
+        // backend reports the corresponding hardening stage.  This keeps
+        // the minimal mode visually identical to the pre-hardening UI.
+        const _BACKEND_STAGE_TO_IDX = {
+            loading_data: 0,
+            preparing: 1,
+            searching: 2,
+            post_grid_refine: 3,
+            overfit_guards: 4,
+            finalizing: 5,
+            done: 6
+        };
+        const _STAGE_LABELS = [
+            'Loading data',
+            'Compiling',
+            'Searching',
+            'Refining (post-grid)',
+            'Overfit guards',
+            'Finalizing',
+            'Done'
+        ];
+        const _PILL_FOR_IDX = [
+            'optStage1',
+            'optStage2',
+            'optStage3',
+            'optStageRefine',
+            'optStageGuards',
+            'optStage3',
+            'optStage4'
+        ];
 
-        const _stageNames = ['Loading data', 'Compiling', 'Searching', 'Done'];
-        ['optStage1', 'optStage2', 'optStage3', 'optStage4'].forEach((id, i) => {
+        let stageIdx;
+        const backendStage = typeof prog.stage === 'string' ? prog.stage : '';
+        if (backendStage && Object.prototype.hasOwnProperty.call(_BACKEND_STAGE_TO_IDX, backendStage)) {
+            stageIdx = _BACKEND_STAGE_TO_IDX[backendStage];
+        } else {
+            // Legacy heuristic — preserves behaviour on pre-2026-04-19 servers.
+            if (prog.status === 'starting') stageIdx = 0;
+            else if (prog.status === 'running' && tested === 0) stageIdx = 1;
+            else if (prog.status === 'running' && tested > 0) stageIdx = 2;
+            else if (prog.status === 'completed' || prog.status === 'partial') stageIdx = 6;
+            else stageIdx = 0;
+        }
+        // Terminal status always forces the "Done" pill regardless of stage.
+        if (prog.status === 'completed' || prog.status === 'partial') stageIdx = 6;
+
+        // Show/hide optional hardening pills.  Once a stage has been observed
+        // its pill stays visible for the remainder of the run so the UI layout
+        // doesn't flicker when polling catches intermediate updates.
+        const _showRefine = backendStage === 'post_grid_refine' || stageIdx > 3 || this._seenRefineStage;
+        const _showGuards = backendStage === 'overfit_guards' || stageIdx > 4 || this._seenGuardsStage;
+        if (backendStage === 'post_grid_refine') this._seenRefineStage = true;
+        if (backendStage === 'overfit_guards') this._seenGuardsStage = true;
+        const _refineEl = document.getElementById('optStageRefine');
+        const _refineLine = document.getElementById('optStageRefineLine');
+        const _guardsEl = document.getElementById('optStageGuards');
+        const _guardsLine = document.getElementById('optStageGuardsLine');
+        if (_refineEl) _refineEl.style.display = _showRefine ? '' : 'none';
+        if (_refineLine) _refineLine.style.display = _showRefine ? '' : 'none';
+        if (_guardsEl) _guardsEl.style.display = _showGuards ? '' : 'none';
+        if (_guardsLine) _guardsLine.style.display = _showGuards ? '' : 'none';
+
+        // Reset all pills, then mark completed/active according to stageIdx.
+        ['optStage1', 'optStage2', 'optStage3', 'optStageRefine', 'optStageGuards', 'optStage4'].forEach((id) => {
             const el = document.getElementById(id);
             if (!el) return;
             el.classList.remove('active', 'completed');
-            if (i < stageIdx) el.classList.add('completed');
-            else if (i === stageIdx) el.classList.add('active');
         });
+        // Walk _PILL_FOR_IDX up to and including stageIdx.  Previous pills →
+        // completed, current pill → active.  Skip pills hidden by display:none.
+        for (let i = 0; i <= stageIdx && i < _PILL_FOR_IDX.length; i++) {
+            const pillId = _PILL_FOR_IDX[i];
+            const el = document.getElementById(pillId);
+            if (!el || el.style.display === 'none') continue;
+            if (i < stageIdx) {
+                el.classList.remove('active');
+                el.classList.add('completed');
+            } else {
+                el.classList.remove('completed');
+                el.classList.add('active');
+            }
+        }
 
-        if (labelEl) labelEl.textContent = _stageNames[stageIdx] + '...';
+        if (labelEl) labelEl.textContent = _STAGE_LABELS[stageIdx] + (stageIdx === 6 ? '' : '...');
         if (speedEl)
             speedEl.textContent =
                 speed > 0 ? `${Number.isInteger(speed) ? speed.toLocaleString() : speed.toFixed(1)} c/s` : '—';

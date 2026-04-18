@@ -1502,6 +1502,279 @@ class TestRunDcaMixedBatchNumba:
         # At least one result should have trades (RSI<70 fires often on 500 bars)
         assert any(r is not None for r in results), "Expected at least one non-None result"
 
+
+# =============================================================================
+# TESTS: Bug W1 — Walk-Forward used wrong metric key names
+# =============================================================================
+
+
+def _make_large_ohlcv(n: int = 1200) -> pd.DataFrame:
+    """Generate a large OHLCV DataFrame for walk-forward tests (needs many bars)."""
+    np.random.seed(42)
+    prices = 50000.0 * np.cumprod(1 + np.random.randn(n) * 0.002)
+    idx = pd.date_range("2025-01-01", periods=n, freq="15min", tz="UTC")
+    return pd.DataFrame(
+        {
+            "open": prices * (1 + np.random.randn(n) * 0.001),
+            "high": prices * (1 + abs(np.random.randn(n)) * 0.002),
+            "low": prices * (1 - abs(np.random.randn(n)) * 0.002),
+            "close": prices,
+            "volume": np.ones(n) * 500,
+        },
+        index=idx,
+    )
+
+
+class TestWalkForwardMetricKeys:
+    """Regression tests for Bug W1: walk-forward used 'total_return_pct' and
+    'max_drawdown_pct' which don't exist in extract_metrics_from_output().
+    The correct keys are 'total_return' and 'max_drawdown'.
+    """
+
+    def _mock_is_result(
+        self, total_return: float = 22.5, max_drawdown: float = 8.3, sharpe: float = 1.5, params: dict | None = None
+    ) -> dict:
+        return {
+            "status": "completed",
+            "best_params": params or {"rsi_1.period": 14},
+            "best_metrics": {
+                "total_return": total_return,  # PERCENT — correct key
+                "max_drawdown": max_drawdown,  # PERCENT — correct key
+                "sharpe_ratio": sharpe,
+                "total_trades": 15,
+            },
+            "best_score": sharpe,
+        }
+
+    def test_consistency_ratio_counts_positive_oos_returns(self, sample_rsi_graph, backtest_config_params):
+        """consistency_ratio_pct must count windows where OOS total_return > 0.
+
+        Bug W1: used .get('total_return_pct') → always 0 → consistency always 0%.
+        Fix: use .get('total_return') → real OOS return.
+        """
+        from unittest.mock import patch
+
+        from backend.optimization.builder_optimizer import run_builder_walk_forward
+
+        ohlcv = _make_large_ohlcv(1200)
+        # 4 windows: OOS returns +5, -2, +3, -1 → 2 positive → 50%
+        oos_returns = [5.0, -2.0, 3.0, -1.0]
+        call_counter = {"n": 0}
+
+        def mock_oos_backtest(graph, data, config, **kwargs):
+            r = oos_returns[call_counter["n"] % len(oos_returns)]
+            call_counter["n"] += 1
+            return {"total_return": r, "max_drawdown": 5.0, "sharpe_ratio": 0.5, "total_trades": 8}
+
+        mock_is = self._mock_is_result()
+
+        with (
+            patch("backend.optimization.builder_optimizer.run_builder_grid_search", return_value=mock_is),
+            patch("backend.optimization.builder_optimizer.run_builder_backtest", side_effect=mock_oos_backtest),
+        ):
+            result = run_builder_walk_forward(
+                base_graph=sample_rsi_graph,
+                ohlcv=ohlcv,
+                param_specs=[{"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 14, "step": 4}],
+                config_params=backtest_config_params,
+                n_splits=4,
+                optimize_metric="sharpe_ratio",
+            )
+
+        consistency = result["robustness"]["consistency_ratio_pct"]
+        assert consistency == pytest.approx(50.0, abs=0.01), (
+            f"Expected consistency_ratio_pct=50.0 (2/4 positive OOS), got {consistency}. "
+            "Bug W1: wrong key 'total_return_pct' returns 0 → 0% consistency."
+        )
+
+    def test_window_return_pct_reflects_actual_total_return(self, sample_rsi_graph, backtest_config_params):
+        """is_metrics.return_pct and oos_metrics.return_pct must match actual total_return values.
+
+        Bug W1: used .get('total_return_pct') → 0.0 for all windows.
+        Fix: use .get('total_return') → real value.
+        """
+        from unittest.mock import patch
+
+        from backend.optimization.builder_optimizer import run_builder_walk_forward
+
+        ohlcv = _make_large_ohlcv(600)
+        mock_is = self._mock_is_result(total_return=22.5, max_drawdown=8.3, sharpe=1.5)
+        mock_oos = {"total_return": 11.2, "max_drawdown": 4.7, "sharpe_ratio": 0.9, "total_trades": 8}
+
+        with (
+            patch("backend.optimization.builder_optimizer.run_builder_grid_search", return_value=mock_is),
+            patch("backend.optimization.builder_optimizer.run_builder_backtest", return_value=mock_oos),
+        ):
+            result = run_builder_walk_forward(
+                base_graph=sample_rsi_graph,
+                ohlcv=ohlcv,
+                param_specs=[{"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 14, "step": 4}],
+                config_params=backtest_config_params,
+                n_splits=2,
+            )
+
+        for w in result["windows"]:
+            assert w["is_metrics"]["return_pct"] == pytest.approx(22.5, abs=0.01), (
+                f"IS return_pct={w['is_metrics']['return_pct']}, expected 22.5"
+            )
+            assert w["is_metrics"]["max_drawdown_pct"] == pytest.approx(8.3, abs=0.01), (
+                f"IS max_drawdown_pct={w['is_metrics']['max_drawdown_pct']}, expected 8.3"
+            )
+            assert w["oos_metrics"]["return_pct"] == pytest.approx(11.2, abs=0.01), (
+                f"OOS return_pct={w['oos_metrics']['return_pct']}, expected 11.2"
+            )
+            assert w["oos_metrics"]["max_drawdown_pct"] == pytest.approx(4.7, abs=0.01), (
+                f"OOS max_drawdown_pct={w['oos_metrics']['max_drawdown_pct']}, expected 4.7"
+            )
+
+    def test_confidence_high_when_consistency_and_overfit_qualify(self, sample_rsi_graph, backtest_config_params):
+        """confidence='high' requires consistency_ratio>=0.7 AND overfit_score<0.3.
+
+        Bug W1: consistency always 0 → confidence always 'low'.
+        """
+        from unittest.mock import patch
+
+        from backend.optimization.builder_optimizer import run_builder_walk_forward
+
+        ohlcv = _make_large_ohlcv(1500)
+        # All 5 windows have positive OOS return → consistency=100% → 'high' if overfit ok
+        mock_is = self._mock_is_result(sharpe=1.0)  # IS sharpe=1.0
+        mock_oos = {"total_return": 8.0, "max_drawdown": 5.0, "sharpe_ratio": 0.85, "total_trades": 12}
+
+        with (
+            patch("backend.optimization.builder_optimizer.run_builder_grid_search", return_value=mock_is),
+            patch("backend.optimization.builder_optimizer.run_builder_backtest", return_value=mock_oos),
+        ):
+            result = run_builder_walk_forward(
+                base_graph=sample_rsi_graph,
+                ohlcv=ohlcv,
+                param_specs=[{"param_path": "rsi_1.period", "type": "int", "low": 10, "high": 14, "step": 4}],
+                config_params=backtest_config_params,
+                n_splits=5,
+                optimize_metric="sharpe_ratio",
+            )
+
+        # consistency=100% (all OOS positive), overfit=1-0.85/1.0=0.15 → 'high'
+        assert result["recommendation"]["confidence"] == "high", (
+            f"Expected confidence='high', got '{result['recommendation']['confidence']}'. "
+            f"robustness={result['robustness']}"
+        )
+
+
+# =============================================================================
+# TESTS: Bug W2 — V4 fallback path stored total_return as FRACTION not PERCENT
+# =============================================================================
+
+
+class TestV4FallbackTotalReturnScale:
+    """Regression tests for Bug W2: V4 fallback path (close_by_time profit_only=True)
+    returned total_return as FRACTION (0.15) instead of PERCENT (15.0).
+    engine.py line 457: total_return = (equity - capital) / capital  ← FRACTION, no *100.
+    Fix: multiply by 100 in run_builder_backtest V4 path.
+    """
+
+    def test_v4_path_total_return_is_percent_not_fraction(self, backtest_config_params):
+        """V4 fallback dict must have total_return in PERCENT (e.g. 15.0, not 0.15)."""
+        from unittest.mock import MagicMock, patch
+
+        from backend.backtesting.strategies import SignalResult
+        from backend.optimization.builder_optimizer import run_builder_backtest
+
+        # Graph that triggers V4 path: close_by_time block with profit_only=True
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {"period": 5, "oversold": 30, "overbought": 70},
+                },
+                {
+                    "id": "cbt_1",
+                    "type": "close_by_time",
+                    "name": "CloseByTime",
+                    "params": {"profit_only": True, "bars": 10},
+                },
+                {"id": "strategy_1", "type": "strategy", "isMain": True, "params": {}},
+            ],
+            "connections": [
+                {"from": "rsi_1", "fromPort": "long", "to": "strategy_1", "toPort": "entry_long"},
+                {"from": "cbt_1", "fromPort": "output", "to": "strategy_1", "toPort": "exit_long"},
+            ],
+        }
+        config = {**backtest_config_params, "engine_type": "fallback"}  # NOT numba
+
+        n = 150
+        np.random.seed(3)
+        prices = 50000.0 * np.cumprod(1 + np.random.randn(n) * 0.002)
+        idx = pd.date_range("2025-01-01", periods=n, freq="15min", tz="UTC")
+        ohlcv = pd.DataFrame(
+            {
+                "open": prices,
+                "high": prices * 1.001,
+                "low": prices * 0.999,
+                "close": prices,
+                "volume": np.ones(n) * 500,
+            },
+            index=idx,
+        )
+
+        # PerformanceMetrics.total_return is FRACTION (as engine.py line 457 computes it)
+        mock_metrics = MagicMock()
+        mock_metrics.total_return = 0.15  # FRACTION (engine.py stores this way)
+        mock_metrics.max_drawdown = 12.5  # PERCENT (from MetricsCalculator)
+        mock_metrics.sharpe_ratio = 1.2
+        mock_metrics.win_rate = 65.0
+        mock_metrics.total_trades = 20
+        mock_metrics.profit_factor = 1.8
+        mock_metrics.winning_trades = 13
+        mock_metrics.losing_trades = 7
+        mock_metrics.net_profit = 1500.0
+        mock_metrics.gross_profit = 2000.0
+        mock_metrics.gross_loss = 500.0
+        mock_metrics.avg_win = 154.0
+        mock_metrics.avg_loss = 71.0
+        mock_metrics.largest_win = 400.0
+        mock_metrics.largest_loss = 150.0
+        mock_metrics.recovery_factor = 5.0
+        mock_metrics.expectancy = 65.0
+        mock_metrics.expectancy_pct = 0.65
+        mock_metrics.sortino_ratio = 1.5
+        mock_metrics.calmar_ratio = 2.1
+        mock_metrics.long_trades = 20
+        mock_metrics.short_trades = 0
+
+        mock_v4_result = MagicMock()
+        mock_v4_result.metrics = mock_metrics
+
+        # Mock the adapter so it doesn't actually run the strategy
+        mock_signals = SignalResult(
+            entries=pd.Series([False] * n, dtype=bool, index=idx),
+            exits=pd.Series([False] * n, dtype=bool, index=idx),
+        )
+        mock_adapter = MagicMock()
+        mock_adapter.extract_dca_config.return_value = {}
+        mock_adapter.has_dca_blocks.return_value = False
+        mock_adapter.generate_signals.return_value = mock_signals
+
+        with (
+            patch("backend.backtesting.strategy_builder_adapter.StrategyBuilderAdapter", return_value=mock_adapter),
+            patch("backend.backtesting.engine.BacktestEngine") as MockBE,
+        ):
+            MockBE.return_value.run.return_value = mock_v4_result
+            result = run_builder_backtest(graph, ohlcv, config)
+
+        assert result is not None, "V4 path returned None — check mock setup"
+        assert result["total_return"] == pytest.approx(15.0, abs=0.01), (
+            f"Expected total_return=15.0 (PERCENT), got {result['total_return']}. "
+            "Bug W2: V4 path must multiply engine.py FRACTION by 100."
+        )
+        assert result["net_profit_pct"] == pytest.approx(15.0, abs=0.01), (
+            f"Expected net_profit_pct=15.0 (PERCENT), got {result['net_profit_pct']}."
+        )
+        # max_drawdown stays in PERCENT (comes from MetricsCalculator via PerformanceMetrics)
+        assert result["max_drawdown"] == pytest.approx(12.5, abs=0.01)
+
     def test_empty_combos_returns_empty_list(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
         """Empty combo list returns empty list (no crash)."""
         from backend.optimization.builder_optimizer import _run_dca_mixed_batch_numba
@@ -1521,6 +1794,132 @@ class TestRunDcaMixedBatchNumba:
             sltp_block_ids=["sltp_1"],
         )
         assert results == []
+
+
+# =============================================================================
+# TESTS: Bug O1 — long_win_rate/short_win_rate unconditional ×100
+# =============================================================================
+
+
+class TestExtractMetricsWinRateScale:
+    """Regression tests for Bug O1: long_win_rate and short_win_rate were
+    unconditionally multiplied by 100 when win_rate_as_pct=True, despite
+    MetricsCalculator already returning them in PERCENT (0-100).
+    Fix: apply same ≤1.0 guard as the main win_rate field.
+    """
+
+    def _make_bt_output(
+        self,
+        win_rate: float = 55.0,
+        long_win_rate: float = 60.0,
+        short_win_rate: float = 40.0,
+    ):
+        """Create a minimal BacktestOutput mock with realistic PERCENT win rates."""
+        from unittest.mock import MagicMock
+
+        metrics = MagicMock()
+        metrics.win_rate = win_rate
+        metrics.long_win_rate = long_win_rate
+        metrics.short_win_rate = short_win_rate
+        # Minimal required attrs so extract_metrics_from_output doesn't crash
+        metrics.total_return = 12.5
+        metrics.sharpe_ratio = 1.1
+        metrics.max_drawdown = 8.0
+        metrics.total_trades = 30
+        metrics.profit_factor = 1.5
+        metrics.winning_trades = 17
+        metrics.losing_trades = 13
+        metrics.net_profit = 1250.0
+        metrics.gross_profit = 2000.0
+        metrics.gross_loss = 750.0
+        metrics.avg_win = 117.0
+        metrics.avg_loss = 57.7
+        metrics.largest_win = 300.0
+        metrics.largest_loss = 120.0
+        metrics.recovery_factor = 3.0
+        metrics.expectancy = 41.7
+        metrics.sortino_ratio = 1.3
+        metrics.calmar_ratio = 1.8
+        metrics.long_trades = 20
+        metrics.short_trades = 10
+        metrics.long_winning_trades = 12
+        metrics.long_losing_trades = 8
+        metrics.long_gross_profit = 1400.0
+        metrics.long_gross_loss = 600.0
+        metrics.long_profit = 800.0
+        metrics.long_profit_factor = 2.3
+        metrics.long_avg_win = 116.7
+        metrics.long_avg_loss = 75.0
+        metrics.short_winning_trades = 5
+        metrics.short_losing_trades = 5
+        metrics.short_gross_profit = 600.0
+        metrics.short_gross_loss = 150.0
+        metrics.short_profit = 450.0
+        metrics.short_profit_factor = 4.0
+        metrics.short_avg_win = 120.0
+        metrics.short_avg_loss = 30.0
+        metrics.avg_trade_duration = 4.0
+        metrics.avg_winning_duration = 5.0
+        metrics.avg_losing_duration = 3.0
+
+        bt_output = MagicMock()
+        bt_output.metrics = metrics
+        bt_output.trades = []
+        return bt_output
+
+    def test_long_win_rate_pct_not_doubled(self):
+        """long_win_rate=60.0 (PERCENT) must stay 60.0, not become 6000.0."""
+        from backend.optimization.utils import extract_metrics_from_output
+
+        result = extract_metrics_from_output(self._make_bt_output(long_win_rate=60.0), win_rate_as_pct=True)
+        assert result["long_win_rate"] == pytest.approx(60.0, abs=0.01), (
+            f"Expected long_win_rate=60.0, got {result['long_win_rate']}. "
+            "Bug O1: unconditional ×100 doubled already-PERCENT value."
+        )
+
+    def test_short_win_rate_pct_not_doubled(self):
+        """short_win_rate=40.0 (PERCENT) must stay 40.0, not become 4000.0."""
+        from backend.optimization.utils import extract_metrics_from_output
+
+        result = extract_metrics_from_output(self._make_bt_output(short_win_rate=40.0), win_rate_as_pct=True)
+        assert result["short_win_rate"] == pytest.approx(40.0, abs=0.01), (
+            f"Expected short_win_rate=40.0, got {result['short_win_rate']}. "
+            "Bug O1: unconditional ×100 doubled already-PERCENT value."
+        )
+
+    def test_fraction_win_rate_is_converted(self):
+        """If long_win_rate happens to be fraction (≤1.0), it should be converted."""
+        from backend.optimization.utils import extract_metrics_from_output
+
+        result = extract_metrics_from_output(
+            self._make_bt_output(long_win_rate=0.6, short_win_rate=0.4),
+            win_rate_as_pct=True,
+        )
+        assert result["long_win_rate"] == pytest.approx(60.0, abs=0.01), (
+            f"Expected long_win_rate=60.0 after fraction→pct, got {result['long_win_rate']}."
+        )
+        assert result["short_win_rate"] == pytest.approx(40.0, abs=0.01), (
+            f"Expected short_win_rate=40.0 after fraction→pct, got {result['short_win_rate']}."
+        )
+
+    def test_win_rate_as_pct_false_returns_raw(self):
+        """With win_rate_as_pct=False, long/short win rates are returned verbatim."""
+        from backend.optimization.utils import extract_metrics_from_output
+
+        result = extract_metrics_from_output(
+            self._make_bt_output(long_win_rate=60.0, short_win_rate=40.0),
+            win_rate_as_pct=False,
+        )
+        assert result["long_win_rate"] == pytest.approx(60.0, abs=0.01)
+        assert result["short_win_rate"] == pytest.approx(40.0, abs=0.01)
+
+    def test_main_win_rate_unaffected(self):
+        """Main win_rate field still uses existing guard logic (not regressed)."""
+        from backend.optimization.utils import extract_metrics_from_output
+
+        result = extract_metrics_from_output(self._make_bt_output(win_rate=55.0), win_rate_as_pct=True)
+        # 55.0 > 1.0 → stays 55.0 (already PERCENT)
+        assert result["win_rate"] == pytest.approx(55.0, abs=0.01), f"Expected win_rate=55.0, got {result['win_rate']}."
 
     def test_single_rsi_group_matches_sltp_only_batch(self, dca_rsi_graph, sample_ohlcv, backtest_config_params):
         """When only one RSI combo exists, mixed batch result == SLTP-only batch result."""
@@ -1574,7 +1973,7 @@ class TestRunDcaMixedBatchNumba:
             sltp_block_ids=["sltp_1"],
         )
         # n_trades must match exactly between the two paths
-        for m, s in zip(mixed, sltp):
+        for m, s in zip(mixed, sltp, strict=False):
             if m is not None and s is not None:
                 assert m["total_trades"] == s["total_trades"], (
                     f"Trade count mismatch: mixed={m['total_trades']}, sltp={s['total_trades']}"
@@ -1665,6 +2064,7 @@ class TestProgressTracking:
         entry = get_optimization_progress("strat-schema")
         required_fields = {
             "status",
+            "stage",
             "tested",
             "total",
             "percent",
