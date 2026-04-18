@@ -1,7 +1,25 @@
 from datetime import UTC, datetime
 
 import psycopg2
+import pytest
 from testcontainers.postgres import PostgresContainer
+
+
+def _docker_available() -> bool:
+    """Return True if a Docker daemon is reachable."""
+    try:
+        import docker  # type: ignore[import-not-found]
+
+        docker.from_env().ping()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker daemon unavailable (skip testcontainers-based test)",
+)
 
 
 def get_column_type(conn, table_name, column_name):

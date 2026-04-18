@@ -1,14 +1,14 @@
-"""
+﻿"""
 Test: AI Agents Collaboratively Solve a Trading Strategy Task
 
 This integration test verifies that multiple AI agents (simulated) can work
 together to solve a complex trading strategy optimization problem through:
 
-1. Domain Expert Analysis — TradingStrategyAgent + RiskManagementAgent + CodeAuditAgent
+1. Domain Expert Analysis вЂ” TradingStrategyAgent + RiskManagementAgent + CodeAuditAgent
    each analyze the same strategy from their own perspective.
-2. Multi-Agent Deliberation — agents debate which stop-loss approach is best
+2. Multi-Agent Deliberation вЂ” agents debate which stop-loss approach is best
    (trailing vs fixed), refine positions, and reach consensus.
-3. Consensus Engine — combines two separate strategy definitions proposed by
+3. Consensus Engine вЂ” combines two separate strategy definitions proposed by
    different "LLM agents" into a single consensus strategy via weighted voting.
 
 The test uses mock ask_fn / simulated responses (no real LLM calls) so it runs
@@ -28,15 +28,50 @@ import pytest
 
 pytestmark = pytest.mark.skip(reason="Debate system removed")
 
+
+# Stubs вЂ” debate system was removed; entire file is skipped.
+class MultiAgentDeliberation:
+    def __init__(self, **_kw: object) -> None: ...
+    async def deliberate(self, **_kw: object) -> object: ...
+
+
+class VotingStrategy:
+    MAJORITY = "majority"
+
+
+class DeliberationResult:
+    pass
+
+
 from backend.agents.consensus.consensus_engine import ConsensusEngine, ConsensusResult
-from backend.agents.consensus.domain_agents import (
-    AgentExpertise,
-    AnalysisResult,
-    CodeAuditAgent,
-    RiskManagementAgent,
-    TradingStrategyAgent,
-    ValidationResult,
-)
+
+
+# Debate/deliberation system was removed (see backend/agents/consensus/domain_agents.py).
+# Provide local stubs so the module still imports — pytestmark above skips all tests.
+class AgentExpertise:  # type: ignore[no-redef]
+    pass
+
+
+class AnalysisResult:  # type: ignore[no-redef]
+    pass
+
+
+class CodeAuditAgent:  # type: ignore[no-redef]
+    pass
+
+
+class RiskManagementAgent:  # type: ignore[no-redef]
+    pass
+
+
+class TradingStrategyAgent:  # type: ignore[no-redef]
+    pass
+
+
+class ValidationResult:  # type: ignore[no-redef]
+    pass
+
+
 from backend.agents.prompts.response_parser import (
     ExitCondition,
     ExitConditions,
@@ -100,24 +135,24 @@ _MOCK_RESPONSES: dict[str, str] = {
         "CODE_QUALITY_SCORE: 85\n"
         "CONFIDENCE: 0.90\n"
     ),
-    # Deliberation — initial opinion
+    # Deliberation вЂ” initial opinion
     "provide your position": (
         "POSITION: Use a trailing stop with ATR multiplier for better risk management\n"
         "CONFIDENCE: 0.80\n"
         "REASONING: Trailing stop adapts to volatility and locks in profits.\n"
         "EVIDENCE: TradingView backtests show 12% drawdown reduction with trailing stops\n"
     ),
-    # Deliberation — critique
+    # Deliberation вЂ” critique
     "reviewing another agent": (
         "AGREES: yes\n"
         "AGREEMENT_POINTS: Trailing stop does reduce drawdown\n"
         "DISAGREEMENT_POINTS: Fixed stop is simpler to implement and test\n"
-        "IMPROVEMENTS: Consider hybrid approach — fixed initial stop, then trail after +1R\n"
+        "IMPROVEMENTS: Consider hybrid approach вЂ” fixed initial stop, then trail after +1R\n"
         "CONFIDENCE_ADJUSTMENT: 0.05\n"
     ),
-    # Deliberation — refine
+    # Deliberation вЂ” refine
     "refining your position": (
-        "POSITION: Use hybrid stop — fixed initial stop-loss at 1.5%, switch to trailing after +1R\n"
+        "POSITION: Use hybrid stop вЂ” fixed initial stop-loss at 1.5%, switch to trailing after +1R\n"
         "CONFIDENCE: 0.88\n"
         "REASONING: Hybrid approach combines simplicity of fixed stop with upside protection.\n"
         "MAINTAINED_POINTS: ATR-based trailing remains optimal for trend capture\n"
@@ -151,7 +186,7 @@ async def _async_mock_ask(prompt: str) -> str:
 
 
 async def _async_mock_ask_agent(agent_type: str, prompt: str) -> str:
-    """Deliberation-compatible ask_fn(agent_type, prompt) → response."""
+    """Deliberation-compatible ask_fn(agent_type, prompt) в†’ response."""
     return _mock_ask_fn(prompt)
 
 
@@ -327,7 +362,7 @@ class TestMultiAgentDeliberation:
 
         result = await deliberation.deliberate(
             question="Should we use a trailing stop or fixed stop loss for the RSI+MACD strategy on BTCUSDT 15m?",
-            agents=["deepseek", "perplexity", "qwen"],
+            agents=["claude", "perplexity", "copilot"],
             context={
                 "strategy": "rsi_macd",
                 "timeframe": "15m",
@@ -357,7 +392,7 @@ class TestMultiAgentDeliberation:
 
         result = await deliberation.deliberate(
             question="Is RSI period 14 optimal for BTC on 15m timeframe?",
-            agents=["deepseek", "perplexity"],
+            agents=["claude", "perplexity"],
             max_rounds=2,
         )
 
@@ -376,7 +411,7 @@ class TestMultiAgentDeliberation:
 
         result = await deliberation.deliberate(
             question="Should we increase leverage from 3x to 5x?",
-            agents=["deepseek", "perplexity"],
+            agents=["claude", "perplexity"],
             voting_strategy=VotingStrategy.MAJORITY,
             max_rounds=2,
         )
@@ -395,7 +430,7 @@ class TestMultiAgentDeliberation:
         for _ in range(3):
             await deliberation.deliberate(
                 question="Best indicator combo for scalping?",
-                agents=["deepseek", "perplexity"],
+                agents=["claude", "perplexity"],
                 max_rounds=1,
             )
 
@@ -404,7 +439,7 @@ class TestMultiAgentDeliberation:
 
 
 # ---------------------------------------------------------------------------
-# 3. Consensus Engine Phase — Merge Strategies
+# 3. Consensus Engine Phase вЂ” Merge Strategies
 # ---------------------------------------------------------------------------
 
 
@@ -412,9 +447,9 @@ class TestConsensusEngine:
     """Consensus engine merges strategy proposals from multiple agents."""
 
     @pytest.fixture
-    def deepseek_strategy(self) -> StrategyDefinition:
+    def claude_strategy(self) -> StrategyDefinition:
         return _make_strategy(
-            name="DeepSeek_RSI_MACD",
+            name="Claude_RSI_MACD",
             signals=[
                 ("RSI", "RSI", 30.0),
                 ("MACD", "MACD", 0.0),
@@ -425,9 +460,9 @@ class TestConsensusEngine:
         )
 
     @pytest.fixture
-    def qwen_strategy(self) -> StrategyDefinition:
+    def copilot_strategy(self) -> StrategyDefinition:
         return _make_strategy(
-            name="Qwen_RSI_BB",
+            name="Copilot_RSI_BB",
             signals=[
                 ("RSI", "RSI", 25.0),
                 ("Bollinger", "BollingerBands", -2.0),
@@ -450,19 +485,19 @@ class TestConsensusEngine:
             take_profit=0.045,
         )
 
-    def test_weighted_voting_consensus(self, deepseek_strategy, qwen_strategy, perplexity_strategy):
+    def test_weighted_voting_consensus(self, claude_strategy, copilot_strategy, perplexity_strategy):
         """Weighted voting merges three strategies into one consensus."""
         engine = ConsensusEngine()
 
         # Register historical performance to influence weights
-        engine.update_performance("deepseek", sharpe=1.8, win_rate=0.58)
-        engine.update_performance("qwen", sharpe=1.2, win_rate=0.55)
+        engine.update_performance("claude", sharpe=1.8, win_rate=0.58)
+        engine.update_performance("copilot", sharpe=1.2, win_rate=0.55)
         engine.update_performance("perplexity", sharpe=1.5, win_rate=0.56)
 
         result = engine.aggregate(
             strategies={
-                "deepseek": deepseek_strategy,
-                "qwen": qwen_strategy,
+                "claude": claude_strategy,
+                "copilot": copilot_strategy,
                 "perplexity": perplexity_strategy,
             },
             method="weighted_voting",
@@ -475,50 +510,50 @@ class TestConsensusEngine:
         assert result.strategy is not None
         assert len(result.strategy.signals) >= 1
 
-        # RSI was proposed by ALL three agents → must survive consensus
+        # RSI was proposed by ALL three agents в†’ must survive consensus
         signal_types = [s.type for s in result.strategy.signals]
         assert "RSI" in signal_types, "RSI signal was proposed by all 3 agents and must appear in consensus"
 
-    def test_bayesian_aggregation(self, deepseek_strategy, qwen_strategy):
+    def test_bayesian_aggregation(self, claude_strategy, copilot_strategy):
         """Bayesian method combines two strategies."""
         engine = ConsensusEngine()
-        engine.update_performance("deepseek", sharpe=2.0, win_rate=0.60)
-        engine.update_performance("qwen", sharpe=1.0, win_rate=0.50)
+        engine.update_performance("claude", sharpe=2.0, win_rate=0.60)
+        engine.update_performance("copilot", sharpe=1.0, win_rate=0.50)
 
         result = engine.aggregate(
-            strategies={"deepseek": deepseek_strategy, "qwen": qwen_strategy},
+            strategies={"claude": claude_strategy, "copilot": copilot_strategy},
             method="bayesian_aggregation",
         )
 
         assert isinstance(result, ConsensusResult)
         assert result.method == "bayesian_aggregation"
-        # DeepSeek has higher performance → should have higher weight
-        assert result.agent_weights["deepseek"] >= result.agent_weights["qwen"]
+        # Claude has higher performance в†’ should have higher weight
+        assert result.agent_weights["claude"] >= result.agent_weights["copilot"]
 
-    def test_best_of_picks_strongest_strategy(self, deepseek_strategy, qwen_strategy):
+    def test_best_of_picks_strongest_strategy(self, claude_strategy, copilot_strategy):
         """best_of method picks the single best strategy by heuristic."""
         engine = ConsensusEngine()
-        engine.update_performance("deepseek", sharpe=2.5, win_rate=0.62)
-        engine.update_performance("qwen", sharpe=0.8, win_rate=0.48)
+        engine.update_performance("claude", sharpe=2.5, win_rate=0.62)
+        engine.update_performance("copilot", sharpe=0.8, win_rate=0.48)
 
         result = engine.aggregate(
-            strategies={"deepseek": deepseek_strategy, "qwen": qwen_strategy},
+            strategies={"claude": claude_strategy, "copilot": copilot_strategy},
             method="best_of",
         )
 
         assert isinstance(result, ConsensusResult)
         assert result.method == "best_of"
-        # Best-of should pick deepseek (higher perf)
-        assert result.strategy.strategy_name == deepseek_strategy.strategy_name
+        # Best-of should pick claude (higher perf)
+        assert result.strategy.strategy_name == claude_strategy.strategy_name
 
-    def test_single_agent_passthrough(self, deepseek_strategy):
+    def test_single_agent_passthrough(self, claude_strategy):
         """Single agent strategy is returned as-is."""
         engine = ConsensusEngine()
-        result = engine.aggregate(strategies={"deepseek": deepseek_strategy})
+        result = engine.aggregate(strategies={"claude": claude_strategy})
 
         assert result.method == "single_agent"
         assert result.agreement_score == 1.0
-        assert result.strategy.strategy_name == deepseek_strategy.strategy_name
+        assert result.strategy.strategy_name == claude_strategy.strategy_name
 
     def test_empty_strategies_raises(self):
         """Empty strategies dict raises ValueError."""
@@ -526,22 +561,22 @@ class TestConsensusEngine:
         with pytest.raises(ValueError, match="empty"):
             engine.aggregate(strategies={})
 
-    def test_signal_votes_count(self, deepseek_strategy, qwen_strategy, perplexity_strategy):
+    def test_signal_votes_count(self, claude_strategy, copilot_strategy, perplexity_strategy):
         """Signal vote counts reflect how many agents proposed each signal."""
         engine = ConsensusEngine()
         result = engine.aggregate(
             strategies={
-                "deepseek": deepseek_strategy,
-                "qwen": qwen_strategy,
+                "claude": claude_strategy,
+                "copilot": copilot_strategy,
                 "perplexity": perplexity_strategy,
             },
         )
 
         # RSI proposed by all 3
         assert result.signal_votes.get("RSI", 0) == 3
-        # MACD proposed by deepseek + perplexity = 2
+        # MACD proposed by claude + perplexity = 2
         assert result.signal_votes.get("MACD", 0) == 2
-        # Bollinger only by qwen = 1
+        # Bollinger only by copilot = 1
         assert result.signal_votes.get("Bollinger", 0) == 1
 
 
@@ -552,7 +587,7 @@ class TestConsensusEngine:
 
 class TestFullCollaborativePipeline:
     """
-    End-to-end: domain experts analyse → agents deliberate → consensus merges.
+    End-to-end: domain experts analyse в†’ agents deliberate в†’ consensus merges.
 
     This simulates the real workflow where AI agents cooperatively build
     a trading strategy: experts assess quality, agents debate parameters,
@@ -568,7 +603,7 @@ class TestFullCollaborativePipeline:
         3. Two proposed strategies are merged via consensus
         """
 
-        # ── Step 1: Domain expert analysis ──────────────────────────
+        # в”Ђв”Ђ Step 1: Domain expert analysis в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         trading_agent = TradingStrategyAgent(ask_fn=_async_mock_ask)
         risk_agent = RiskManagementAgent(ask_fn=_async_mock_ask)
         code_agent = CodeAuditAgent(ask_fn=_async_mock_ask)
@@ -604,7 +639,7 @@ class TestFullCollaborativePipeline:
             assert isinstance(r, AnalysisResult)
             assert r.confidence > 0.0
 
-        # ── Step 2: Deliberation on stop-loss ───────────────────────
+        # в”Ђв”Ђ Step 2: Deliberation on stop-loss в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         deliberation = MultiAgentDeliberation(
             ask_fn=_async_mock_ask_agent,
             enable_parallel_calls=True,
@@ -615,7 +650,7 @@ class TestFullCollaborativePipeline:
                 "Given the expert analysis results, should we use a trailing stop "
                 "or fixed stop for the RSI+MACD strategy?"
             ),
-            agents=["deepseek", "perplexity"],
+            agents=["claude", "perplexity"],
             context={
                 "trading_analysis": expert_results[0].to_dict(),
                 "risk_analysis": expert_results[1].to_dict(),
@@ -627,7 +662,7 @@ class TestFullCollaborativePipeline:
         assert isinstance(delib_result, DeliberationResult)
         assert delib_result.decision
 
-        # ── Step 3: Consensus merges two proposed strategies ────────
+        # в”Ђв”Ђ Step 3: Consensus merges two proposed strategies в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         strategy_a = _make_strategy(
             name="Agent_A_Trailing_Stop",
             signals=[
@@ -661,7 +696,7 @@ class TestFullCollaborativePipeline:
         assert len(consensus.input_agents) == 2
         assert consensus.agreement_score >= 0.0
 
-        # ── Verify end-to-end coherence ─────────────────────────────
+        # в”Ђв”Ђ Verify end-to-end coherence в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
         # The final strategy should contain the RSI signal
         # (proposed by both agents)
         consensus_signal_types = [s.type for s in consensus.strategy.signals]

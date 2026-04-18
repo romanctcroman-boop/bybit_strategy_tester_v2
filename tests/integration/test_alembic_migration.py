@@ -2,7 +2,25 @@ import importlib.util
 from pathlib import Path
 
 import psycopg2
+import pytest
 from testcontainers.postgres import PostgresContainer
+
+
+def _docker_available() -> bool:
+    """Return True if a Docker daemon is reachable."""
+    try:
+        import docker  # type: ignore[import-not-found]
+
+        docker.from_env().ping()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker daemon unavailable (skip testcontainers-based test)",
+)
 
 # Load migration module by file path because its filename starts with digits and
 # cannot be imported via a normal dotted import.
