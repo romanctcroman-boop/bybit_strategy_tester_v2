@@ -3,6 +3,7 @@
 > **Audience:** developers extending `backend/optimization/`
 > **Status:** implemented 2026-04-18, additive, opt-in
 > **Tests:** 71 new (`tests/backend/optimization/test_{sampler_factory,overfit_guards,post_grid,walk_forward}.py`); full suite 133/133 green
+> **End-user guide:** [`OPTIMIZER_GUIDE.md`](./OPTIMIZER_GUIDE.md) — full feature reference, API, presets, workflows
 > **Companion doc:** [`OPTIMIZATION_RECOMMENDATIONS.md`](./OPTIMIZATION_RECOMMENDATIONS.md)
 
 ## 1. Problem statement
