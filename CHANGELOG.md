@@ -9,6 +9,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added / Changed
 
+- **feat(optimization): expose hardening modules through API + UI presets (2026-04-18)**
+
+    Wires the four hardening modules
+    (`sampler_factory`, `overfit_guards`, `post_grid`, `walk_forward`)
+    through the `/api/v1/strategy-builder/strategies/{id}/optimize`
+    endpoint and adds a 4-button preset bar to the Strategy Builder UI
+    so the workflow from
+    `docs/architecture/OPTIMIZATION_HARDENING.md` is reachable from the
+    GUI without code changes.
+
+    **Backend (additive, opt-in, all defaults preserve old behaviour):**
+    - `BuilderOptimizationRequest` — 9 new fields:
+      `use_hyperband_pruner`, `apply_overfit_guards`,
+      `overfit_guard_min_trades`, `overfit_guard_max_drawdown_pct`,
+      `overfit_guard_min_profit_factor`, `run_post_grid_refine`,
+      `post_grid_top_k`, `post_grid_pct`, `post_grid_steps`,
+      `post_grid_max_evals`.
+    - `_execute_optimization_bg`:
+      - threads `use_hyperband_pruner` into `config_params` (consumed by
+        `create_study`);
+      - after Bayesian search, optionally calls `build_refinement_grid()`
+        to generate ±pct candidates around top-K trials and re-evaluates
+        them via the existing `run_builder_grid_search` (no new
+        backtest engine), merging + de-duplicating results;
+      - after ranking, optionally annotates each top result with
+        `guard_passed` / `guard_violations` from
+        `evaluate_overfit_guards()`. Adds an `overfit_guards` summary
+        block (`passed`/`failed`/`thresholds`) and a `post_grid_refine`
+        diagnostic block (`candidates_evaluated`/`improved`).
+    - New public helper
+      `backend.optimization.build_refinement_grid()` — same neighbourhood
+      generator as `refine_top_k`, but returns just the candidate list
+      so callers with their own batched evaluator (the project's grid
+      search) can use it.
+
+    **Frontend:**
+    - `frontend/strategy-builder.html` — new "Hardening Preset" 4-button
+      group (Coarse / Main / Refine / Confirm) and a collapsible
+      "Hardening options" panel with checkboxes for each backend flag
+      and inputs for `top_k` / `pct` / `steps_per_param`. Inserted
+      directly above the "Start Optimization" button.
+    - `frontend/js/pages/optimization_panels.js`:
+      - 8 new state keys (`preset`, `useHyperbandPruner`,
+        `applyOverfitGuards`, `runPostGridRefine`, `postGridTopK`,
+        `postGridPct`, `postGridSteps`, `postGridMaxEvals`);
+      - new method `applyHardeningPreset(preset)` implementing the
+        4-phase workflow from
+        `docs/architecture/OPTIMIZATION_HARDENING.md`:
+        - **Coarse** — 200 trials, TPE, guards on, no refine.
+        - **Main** — `max(200, 50·D)` trials, sampler routed by D
+          (TPE ≤ 12, Auto 13–20, CMA-ES ≥ 21), Hyperband, guards on.
+        - **Refine** — 60 reseed trials + post-grid (top-5, ±15 %, 4 steps).
+        - **Confirm** — 100 trials + OOS validation enabled.
+      - 9 new payload fields shipped to the API; pre-existing
+        Walk-Forward / OOS payloads still work unchanged.
+      - Event bindings reset `preset = null` if the user manually
+        diverges from a preset's values, so the active preset highlight
+        accurately reflects current state.
+
+    **Tests:**
+    - Optimization + API-router test suite **187/187 pass**
+      (`tests/backend/optimization/` 133 + `test_optimizations.py` 54).
+    - Pydantic smoke test confirms all 9 new request fields validate
+      end-to-end with sensible bounds.
+    - Full-repo pytest run: 18 pre-existing failures (CUDA / agent
+      system / load tests / 2 unrelated optimizer tests with
+      Pydantic-int-vs-string and `_apply_cross_block_constraints`
+      assertion drift) — none introduced by this PR; verified
+      individually that each failure pre-dates the change.
+    - `ruff check` clean across all 14 modified files.
+
+    **JS:** `node --check` passes on `optimization_panels.js`.
+
+    **Compatibility:** zero breaking changes. All defaults match
+    pre-PR behaviour (`False` / `None`); existing strategies, UI flows,
+    and integration tests are unaffected unless the user clicks a
+    preset button or sets one of the new flags.
+
+- **feat(optimization): hardening for 8–30-D parameter spaces (2026-04-18)**
+
+    Adds defences against the failure modes that dominate real strategy
+    optimisation when the search space has 8+ parameters and the history
+    spans 6–24 months. All new modules are **additive**; behaviour for
+    existing callers is unchanged unless they opt in.
+
+    **New modules** (all under `backend/optimization/`):
+    - `sampler_factory.py` — `pick_sampler(n_params)` routes to TPE (D ≤ 12),
+      AutoSampler (13–20), or CMA-ES (≥ 21); `recommend_n_trials()` /
+      `recommend_n_startup()` produce sensible budgets via `max(200, 50×D)`.
+    - `overfit_guards.py` — `evaluate_overfit_guards()` rejects phantom
+      optima before the surrogate sees them: min trades, drawdown, profit
+      factor, Sharpe-vs-buy-and-hold, consecutive losses, single-trade
+      dominance. Driven by `GuardThresholds`; reuses existing config keys
+      (`min_trades`, `max_drawdown_limit`, `min_profit_factor`).
+    - `post_grid.py` — `refine_top_k()` builds a ±pct local Cartesian grid
+      around the top-K Optuna trials and re-evaluates. Catches sharp peaks
+      that TPE/CMA-ES KDE/GP surrogates smooth over (typical lift 5–15 %).
+    - `walk_forward.py` — `wrap_walk_forward()` decorates a per-fold
+      objective into a walk-forward objective that aggregates per-fold
+      scores with median/mean/min/trimmed_mean. Anchored or rolling mode.
+
+    **Patches to `builder_optimizer.py`:**
+    - TPE now sets `constant_liar=True` automatically when
+      `effective_n_jobs > 1`. Fixes the well-known parallel-Optuna issue
+      where workers all sample the same "promising" point and waste 50–80 %
+      of the budget. Falls back gracefully on Optuna < 3.1.
+    - When `sampler_type="auto"` and Optuna's `AutoSampler` is unavailable
+      (Optuna < 4.6), the dimensionality-aware fallback now uses
+      `sampler_factory.prefer_for_high_dim(n_params)` instead of
+      blindly defaulting to TPE — so 25-D spaces correctly downgrade to
+      CMA-ES.
+    - New `config_params["use_hyperband_pruner"]` opts a study into
+      `HyperbandPruner(min_resource=1, reduction_factor=3)` instead of the
+      default `MedianPruner`. HyperbandPruner is preferable for objectives
+      that report intermediate values (e.g. walk-forward folds).
+
+    **Tests:** 71 new tests in `tests/backend/optimization/`:
+    - `test_sampler_factory.py` (31): routing rules, budget formula,
+      startup-cap, end-to-end recommend bundle.
+    - `test_overfit_guards.py` (17): per-guard violations, NaN safety,
+      config-key auto-detection, drawdown unit auto-conversion.
+    - `test_post_grid.py` (9): grid coverage, max-evals cap, exception
+      isolation, int-type preservation, progress callback robustness.
+    - `test_walk_forward.py` (14): anchored/rolling fold construction,
+      aggregator semantics (median/mean/min/trimmed), short-history
+      fallback, NaN-safe aggregation.
+    - Full optimizer test suite still green: **133/133 pass**, ruff clean.
+
+    **Why this matters (rationale captured in
+    `docs/architecture/OPTIMIZATION_HARDENING.md`):** with D ≥ 8 and 24-mo
+    histories the dominant failure modes are (1) TPE cold-start bias,
+    (2) parallel duplicate sampling, (3) phantom optima from low trade
+    counts and (4) overfit on a single contiguous backtest. The four new
+    modules + two patches address each in isolation while keeping the
+    public optimizer signature unchanged.
+
 - **feat(agents): AI agent layer audit — integration polish to 10/10 (2026-04-17)**
 
     End-to-end audit of `backend/agents/` (~30 k LOC). Three waves: critical bug-fixes → silent-except cleanup → integration-level wins. Final score: **structure 10/10 · integration 10/10 · tests 1786/1786**.
@@ -56,354 +192,354 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **fix(agents): 3 bug fixes in trading_strategy_graph.py and optimizer_progress.json (2026-04-12)**
 
-          **Bug 1 — MEDIUM: strategy_name always "unknown" in seed_mode (`backend/agents/trading_strategy_graph.py`, line ~1766)**
-          - `MemoryUpdateNode.execute()`: `getattr(strategy, "strategy_name", "unknown")` returned
-            "unknown" when `selected_strategy` is a dict (as in seed_mode where `select_best` returns
-            `{"name": "RSI_ST_ETHUSDT_01", "seed_mode": True, ...}`).
-          - Fixed: cascading lookup — `getattr` first (object), then `strategy.get("name")` for dicts,
-            fallback to "unknown". Memory now stores the real strategy name in seed/optimize flows.
+            **Bug 1 — MEDIUM: strategy_name always "unknown" in seed_mode (`backend/agents/trading_strategy_graph.py`, line ~1766)**
+            - `MemoryUpdateNode.execute()`: `getattr(strategy, "strategy_name", "unknown")` returned
+              "unknown" when `selected_strategy` is a dict (as in seed_mode where `select_best` returns
+              `{"name": "RSI_ST_ETHUSDT_01", "seed_mode": True, ...}`).
+            - Fixed: cascading lookup — `getattr` first (object), then `strategy.get("name")` for dicts,
+              fallback to "unknown". Memory now stores the real strategy name in seed/optimize flows.
 
-          **Bug 2 — LOW: Double _load_strategy_graph_from_db call (`backend/agents/trading_strategy_graph.py`, line ~4199)**
-          - When `BuilderWorkflow.run_via_unified_pipeline()` pre-loads `seed_graph` from DB and then
-            passes both `seed_graph=seed_graph` and `existing_strategy_id=...` to `run_strategy_pipeline()`,
-            the pipeline was unconditionally calling `_load_strategy_graph_from_db` again — one extra
-            DB round-trip per optimize run.
-          - Fixed: guard changed from `if existing_strategy_id:` to `if existing_strategy_id and seed_graph is None:`.
-            Added explicit `elif existing_strategy_id and seed_graph is not None:` branch that sets
-            `pipeline_mode = "optimize"` and emits a debug log without re-fetching from DB.
+            **Bug 2 — LOW: Double _load_strategy_graph_from_db call (`backend/agents/trading_strategy_graph.py`, line ~4199)**
+            - When `BuilderWorkflow.run_via_unified_pipeline()` pre-loads `seed_graph` from DB and then
+              passes both `seed_graph=seed_graph` and `existing_strategy_id=...` to `run_strategy_pipeline()`,
+              the pipeline was unconditionally calling `_load_strategy_graph_from_db` again — one extra
+              DB round-trip per optimize run.
+            - Fixed: guard changed from `if existing_strategy_id:` to `if existing_strategy_id and seed_graph is None:`.
+              Added explicit `elif existing_strategy_id and seed_graph is not None:` branch that sets
+              `pipeline_mode = "optimize"` and emits a debug log without re-fetching from DB.
 
-          **Bug 3 — stale entries in `.run/optimizer_progress.json`**
-          - Removed two stale records with key "test" and "test-x", both frozen in status "running"
-            from old debug sessions. All remaining entries are completed/partial with real UUIDs.
+            **Bug 3 — stale entries in `.run/optimizer_progress.json`**
+            - Removed two stale records with key "test" and "test-x", both frozen in status "running"
+              from old debug sessions. All remaining entries are completed/partial with real UUIDs.
 
 ### Added / Changed
 
 - **feat(agents): Unified AI Core — Phases 6–9 complete (2026-04-11)**
 
-          Phases 6-9 of the "Unified AI Core" plan that merges trading_strategy_graph.py and
-          builder_workflow.py into a single Claude+Perplexity-powered pipeline.
+            Phases 6-9 of the "Unified AI Core" plan that merges trading_strategy_graph.py and
+            builder_workflow.py into a single Claude+Perplexity-powered pipeline.
 
-          **Phase 6 — Memory-Guided Param Ranges (`backend/agents/trading_strategy_graph.py`)**
-          - `A2AParamRangeNode._recall_opt_params()` queries "optimization_params" memory namespace
-            to inject winning parameter regions from past successful runs into the Optuna search space.
-          - `_format_memory_context()` formats retrieved records into structured prompt context.
-          - `MemoryUpdateNode` saves param region data when `best_sharpe >= 0.4`.
-          - `_recall_opt_params` call wrapped in try/except so ConnectionErrors are non-fatal.
-          - 14 tests in `tests/backend/agents/test_memory_param_correlation.py` (CP6).
+            **Phase 6 — Memory-Guided Param Ranges (`backend/agents/trading_strategy_graph.py`)**
+            - `A2AParamRangeNode._recall_opt_params()` queries "optimization_params" memory namespace
+              to inject winning parameter regions from past successful runs into the Optuna search space.
+            - `_format_memory_context()` formats retrieved records into structured prompt context.
+            - `MemoryUpdateNode` saves param region data when `best_sharpe >= 0.4`.
+            - `_recall_opt_params` call wrapped in try/except so ConnectionErrors are non-fatal.
+            - 14 tests in `tests/backend/agents/test_memory_param_correlation.py` (CP6).
 
-          **Phase 7 — BuilderWorkflow Thin Adapter (`backend/agents/workflows/builder_workflow.py`)**
-          - `BuilderWorkflow.run_via_unified_pipeline()` delegates to `run_strategy_pipeline()`.
-          - `_state_to_result()` maps AgentState fields → BuilderWorkflowResult (sharpe, iterations,
-            deliberation, errors, status).
-          - `_forward_event()` maps graph node names → BuilderStage enum for SSE stage events;
-            also fires `on_agent_log` when event contains `llm_response`.
-          - `_load_df()` extracted as mockable async method (uses KlineDBService, not DataService).
-          - Seed graph loading via `_load_strategy_graph_from_db(existing_strategy_id)`.
-          - 18 tests in `tests/backend/agents/test_builder_workflow_adapter.py` (CP7).
+            **Phase 7 — BuilderWorkflow Thin Adapter (`backend/agents/workflows/builder_workflow.py`)**
+            - `BuilderWorkflow.run_via_unified_pipeline()` delegates to `run_strategy_pipeline()`.
+            - `_state_to_result()` maps AgentState fields → BuilderWorkflowResult (sharpe, iterations,
+              deliberation, errors, status).
+            - `_forward_event()` maps graph node names → BuilderStage enum for SSE stage events;
+              also fires `on_agent_log` when event contains `llm_response`.
+            - `_load_df()` extracted as mockable async method (uses KlineDBService, not DataService).
+            - Seed graph loading via `_load_strategy_graph_from_db(existing_strategy_id)`.
+            - 18 tests in `tests/backend/agents/test_builder_workflow_adapter.py` (CP7).
 
-          **Phase 8 — Enhanced ReportNode (`backend/agents/trading_strategy_graph.py`)**
-          - `_report_node()` extended with: `top_trials_table` (top-20 Optuna trials with rank/sharpe/
-            max_drawdown/trades/params), `iteration_history` (sharpe+params per opt loop iteration),
-            `opt_insights` (OptimizationAnalysisNode output), `debate_outcome` (AnalysisDebateNode result),
-            `comparison` (initial_sharpe/final_sharpe/sharpe_improvement/drawdown delta),
-            `pipeline_mode`.
-          - 19 tests in `tests/backend/agents/test_enhanced_report_node.py` (CP8).
+            **Phase 8 — Enhanced ReportNode (`backend/agents/trading_strategy_graph.py`)**
+            - `_report_node()` extended with: `top_trials_table` (top-20 Optuna trials with rank/sharpe/
+              max_drawdown/trades/params), `iteration_history` (sharpe+params per opt loop iteration),
+              `opt_insights` (OptimizationAnalysisNode output), `debate_outcome` (AnalysisDebateNode result),
+              `comparison` (initial_sharpe/final_sharpe/sharpe_improvement/drawdown delta),
+              `pipeline_mode`.
+            - 19 tests in `tests/backend/agents/test_enhanced_report_node.py` (CP8).
 
-          **Phase 9 — Regression Fixes**
-          - `GenerateStrategiesNode._has_perplexity` now requires both API key AND `"perplexity"` in
-            the `agents` list — prevents A2A from running when caller requests Claude-only mode.
-          - `_state_with_market()` in CP2 test helper updated to default to
-            `agents=["claude","perplexity"]` so A2A tests exercise the correct code path.
-          - `test_refinement_loop.py::TestGraphWiring::test_optimization_leads_to_wf_or_ml_validation`
-            updated to assert `optimize_strategy → optimization_analysis` (Phase 3 graph change).
+            **Phase 9 — Regression Fixes**
+            - `GenerateStrategiesNode._has_perplexity` now requires both API key AND `"perplexity"` in
+              the `agents` list — prevents A2A from running when caller requests Claude-only mode.
+            - `_state_with_market()` in CP2 test helper updated to default to
+              `agents=["claude","perplexity"]` so A2A tests exercise the correct code path.
+            - `test_refinement_loop.py::TestGraphWiring::test_optimization_leads_to_wf_or_ml_validation`
+              updated to assert `optimize_strategy → optimization_analysis` (Phase 3 graph change).
 
 - **feat(agents): Claude Prompt Caching, Structured Outputs, Perplexity search params, sonar-reasoning-pro, model-aware pricing (2026-04-11)**
 
-          Six improvements to the Claude and Perplexity LLM clients based on API best-practices research.
+            Six improvements to the Claude and Perplexity LLM clients based on API best-practices research.
 
-          **П1 — Structured Outputs via tool use (`backend/agents/llm/clients/claude.py`)**
-          - `_build_payload()` now accepts optional `tools=[...]` and `tool_choice={...}` kwargs and
-            forwards them to the Anthropic Messages API payload (tool use = ~100% JSON reliability).
-          - `_parse_response()` detects `tool_use` content blocks and serialises their `input` dict
-            to a JSON string, returning it as `response.content` — callers need no changes.
-          - 2 new tests in `TestClaudeBuildPayload` / `TestClaudeParseResponse`.
+            **П1 — Structured Outputs via tool use (`backend/agents/llm/clients/claude.py`)**
+            - `_build_payload()` now accepts optional `tools=[...]` and `tool_choice={...}` kwargs and
+              forwards them to the Anthropic Messages API payload (tool use = ~100% JSON reliability).
+            - `_parse_response()` detects `tool_use` content blocks and serialises their `input` dict
+              to a JSON string, returning it as `response.content` — callers need no changes.
+            - 2 new tests in `TestClaudeBuildPayload` / `TestClaudeParseResponse`.
 
-          **П2 — Prompt Caching (`backend/agents/llm/clients/claude.py`)**
-          - `_get_session()`: adds `anthropic-beta: prompt-caching-2024-07-31` header — enables the
-            prompt-caching beta on every Claude request.
-          - `_build_payload()`: system field changed from `str` to a list of structured content blocks.
-            The first (static, specialization) block gets `cache_control: {"type": "ephemeral"}`; the
-            last (dynamic market context) block has no cache annotation. Min cacheable block: 2048 tokens.
-            Cache hit cost: 10% of normal input price (90% savings).
-          - `_parse_response()`: forwards `cache_read_input_tokens` → `prompt_cache_hit_tokens` and
-            `cache_creation_input_tokens` → `prompt_cache_miss_tokens` on `LLMResponse`.
-          - Updated `TestClaudeBuildPayload.test_system_extracted_to_top_level` and
-            `test_multiple_system_messages_joined` to assert block-list format with `cache_control`.
-          - 3 new tests: `test_tool_use_block_serialised_as_json`, `test_cache_tokens_tracked`,
-            `test_prompt_caching_header_set`.
+            **П2 — Prompt Caching (`backend/agents/llm/clients/claude.py`)**
+            - `_get_session()`: adds `anthropic-beta: prompt-caching-2024-07-31` header — enables the
+              prompt-caching beta on every Claude request.
+            - `_build_payload()`: system field changed from `str` to a list of structured content blocks.
+              The first (static, specialization) block gets `cache_control: {"type": "ephemeral"}`; the
+              last (dynamic market context) block has no cache annotation. Min cacheable block: 2048 tokens.
+              Cache hit cost: 10% of normal input price (90% savings).
+            - `_parse_response()`: forwards `cache_read_input_tokens` → `prompt_cache_hit_tokens` and
+              `cache_creation_input_tokens` → `prompt_cache_miss_tokens` on `LLMResponse`.
+            - Updated `TestClaudeBuildPayload.test_system_extracted_to_top_level` and
+              `test_multiple_system_messages_joined` to assert block-list format with `cache_control`.
+            - 3 new tests: `test_tool_use_block_serialised_as_json`, `test_cache_tokens_tracked`,
+              `test_prompt_caching_header_set`.
 
-          **П3 — Perplexity search quality params (`backend/agents/llm/clients/perplexity.py`)**
-          - Added `CRYPTO_SEARCH_DOMAINS` constant (9 authoritative crypto/finance domains).
-          - `PerplexityClient._build_payload()` override: injects `search_context_size` (default
-            `"medium"`) and optional `search_domain_filter` into the request payload.
-          - `GroundingNode._call_llm()` passes `search_context_size="medium"` and
-            `search_domain_filter=CRYPTO_SEARCH_DOMAINS` on every Perplexity call.
+            **П3 — Perplexity search quality params (`backend/agents/llm/clients/perplexity.py`)**
+            - Added `CRYPTO_SEARCH_DOMAINS` constant (9 authoritative crypto/finance domains).
+            - `PerplexityClient._build_payload()` override: injects `search_context_size` (default
+              `"medium"`) and optional `search_domain_filter` into the request payload.
+            - `GroundingNode._call_llm()` passes `search_context_size="medium"` and
+              `search_domain_filter=CRYPTO_SEARCH_DOMAINS` on every Perplexity call.
 
-          **П4 — Softer CAPS in Claude system messages (`backend/agents/prompts/prompt_engineer.py`)**
-          - `get_system_message()` for `json_emphasis=True`: `"OUTPUT RULES (STRICT):"` →
-            `"Output rules:"` and all `"MUST"` → `"must"`.
-          - Claude 4.x models over-trigger refusals on all-caps wording; lowercase preserves intent
-            without triggering the refusal path.
-          - `GenerateStrategiesNode._call_llm()` (`backend/agents/trading_strategy_graph.py`):
-            `max_tokens` raised from 4096 → 8192 for Sonnet and Opus models (Haiku stays at 4096).
-            Prevents truncation of large strategy JSON outputs.
+            **П4 — Softer CAPS in Claude system messages (`backend/agents/prompts/prompt_engineer.py`)**
+            - `get_system_message()` for `json_emphasis=True`: `"OUTPUT RULES (STRICT):"` →
+              `"Output rules:"` and all `"MUST"` → `"must"`.
+            - Claude 4.x models over-trigger refusals on all-caps wording; lowercase preserves intent
+              without triggering the refusal path.
+            - `GenerateStrategiesNode._call_llm()` (`backend/agents/trading_strategy_graph.py`):
+              `max_tokens` raised from 4096 → 8192 for Sonnet and Opus models (Haiku stays at 4096).
+              Prevents truncation of large strategy JSON outputs.
 
-          **П5 — sonar-reasoning-pro for extreme regimes (`backend/agents/trading_strategy_graph.py`)**
-          - `GroundingNode.execute()` sets `deep_analysis=True` when `regime in ("unknown",
-            "extreme_volatile")`.
-          - `GroundingNode._call_llm()` routes to `sonar-reasoning-pro` (chain-of-thought + web search)
-            when `deep_analysis=True`, otherwise uses `sonar-pro` (standard).
+            **П5 — sonar-reasoning-pro for extreme regimes (`backend/agents/trading_strategy_graph.py`)**
+            - `GroundingNode.execute()` sets `deep_analysis=True` when `regime in ("unknown",
+              "extreme_volatile")`.
+            - `GroundingNode._call_llm()` routes to `sonar-reasoning-pro` (chain-of-thought + web search)
+              when `deep_analysis=True`, otherwise uses `sonar-pro` (standard).
 
-          **П6 — Model-aware Anthropic pricing (`backend/agents/llm/base_client.py`)**
-          - `LLMResponse.estimated_cost`: Anthropic pricing is now model-aware:
-            Haiku → $1/$5, Sonnet → $3/$15, Opus → $5/$25 per 1M tokens (April 2026 rates).
-          - Cache-aware cost path now covers both DeepSeek and Anthropic (previously DeepSeek only).
+            **П6 — Model-aware Anthropic pricing (`backend/agents/llm/base_client.py`)**
+            - `LLMResponse.estimated_cost`: Anthropic pricing is now model-aware:
+              Haiku → $1/$5, Sonnet → $3/$15, Opus → $5/$25 per 1M tokens (April 2026 rates).
+            - Cache-aware cost path now covers both DeepSeek and Anthropic (previously DeepSeek only).
 
 - **feat(agents): GroundingNode TTL cache, Claude prompt tuning, regime-routing to Sonnet/Opus (2026-04-11)**
 
-          Three improvements to the AI pipeline grounding and generation layer.
+            Three improvements to the AI pipeline grounding and generation layer.
 
-          **1. GroundingNode TTL cache (`backend/agents/trading_strategy_graph.py`)**
-          - Added module-level `_GROUNDING_CACHE: dict[tuple[str, str], tuple[str, float]]` and
-            `_GROUNDING_CACHE_TTL = 900.0` (15 min) before the `GroundingNode` class.
-          - `GroundingNode.execute()` checks the cache before calling Perplexity sonar-pro.
-            Cache hit: logs `[Grounding] Cache hit … skipping API call`, injects text, sets
-            `"cached": True` in result. Miss: fetches, stores `(text, time.time())` in cache.
-          - No-key path (skip) does NOT write to cache.
-          - **Why:** avoids redundant Perplexity API calls when multiple pipeline runs target the
-            same symbol/timeframe within a 15-minute window (optimization loops, test suites).
-          - **Tests:** `TestGroundingNodeCache` (5 tests) in `tests/backend/agents/test_p2_features.py`.
+            **1. GroundingNode TTL cache (`backend/agents/trading_strategy_graph.py`)**
+            - Added module-level `_GROUNDING_CACHE: dict[tuple[str, str], tuple[str, float]]` and
+              `_GROUNDING_CACHE_TTL = 900.0` (15 min) before the `GroundingNode` class.
+            - `GroundingNode.execute()` checks the cache before calling Perplexity sonar-pro.
+              Cache hit: logs `[Grounding] Cache hit … skipping API call`, injects text, sets
+              `"cached": True` in result. Miss: fetches, stores `(text, time.time())` in cache.
+            - No-key path (skip) does NOT write to cache.
+            - **Why:** avoids redundant Perplexity API calls when multiple pipeline runs target the
+              same symbol/timeframe within a 15-minute window (optimization loops, test suites).
+            - **Tests:** `TestGroundingNodeCache` (5 tests) in `tests/backend/agents/test_p2_features.py`.
 
-          **2. Claude prompt specialization — `claude-sonnet` and `claude-opus` profiles
-             (`backend/agents/prompts/templates.py`, `backend/agents/prompts/prompt_engineer.py`)**
-          - `AGENT_SPECIALIZATIONS["claude-sonnet"]`: *regime-adaptive strategy synthesizer*,
-            preferred indicators RSI/Stochastic/SuperTrend/MACD/ATR/QQE, `json_emphasis=True`.
-          - `AGENT_SPECIALIZATIONS["claude-opus"]`: *novel/extreme-regime architect*,
-            preferred indicators RSI/ATR/ADX/SuperTrend/Divergence/Keltner, `json_emphasis=True`.
-          - `get_system_message()` branches on `json_emphasis`: when `True` returns 5 explicit
-            OUTPUT RULES (valid JSON only, activation flags required, SL/TP bounds, signal density
-            ≥ 50 fires, no generic defaults); when `False` returns the generic instruction.
-          - Bug fix: `GenerateStrategiesNode.execute()` was hardcoding `agent_name="claude"` in
-            `create_strategy_prompt()` and `get_system_message()` — now uses the resolved
-            `agent_name` variable (`"claude-sonnet"` or `"claude-opus"`).
+            **2. Claude prompt specialization — `claude-sonnet` and `claude-opus` profiles
+               (`backend/agents/prompts/templates.py`, `backend/agents/prompts/prompt_engineer.py`)**
+            - `AGENT_SPECIALIZATIONS["claude-sonnet"]`: *regime-adaptive strategy synthesizer*,
+              preferred indicators RSI/Stochastic/SuperTrend/MACD/ATR/QQE, `json_emphasis=True`.
+            - `AGENT_SPECIALIZATIONS["claude-opus"]`: *novel/extreme-regime architect*,
+              preferred indicators RSI/ATR/ADX/SuperTrend/Divergence/Keltner, `json_emphasis=True`.
+            - `get_system_message()` branches on `json_emphasis`: when `True` returns 5 explicit
+              OUTPUT RULES (valid JSON only, activation flags required, SL/TP bounds, signal density
+              ≥ 50 fires, no generic defaults); when `False` returns the generic instruction.
+            - Bug fix: `GenerateStrategiesNode.execute()` was hardcoding `agent_name="claude"` in
+              `create_strategy_prompt()` and `get_system_message()` — now uses the resolved
+              `agent_name` variable (`"claude-sonnet"` or `"claude-opus"`).
 
-          **3. Regime-based model routing in `GenerateStrategiesNode`**
-          - Known regimes (trending_up/down, ranging, volatile, breakout) → `"claude-sonnet"`.
-          - Novel/extreme regimes (`"unknown"`, `"extreme_volatile"`) or `force_escalate=True`
-            → `"claude-opus"`.
-          - **Tests:** `TestEvalScenarioA` (6 tests) + `TestEvalRegimeSplit` (8 tests) in
-            `tests/backend/agents/test_pipeline_real_api.py`.
+            **3. Regime-based model routing in `GenerateStrategiesNode`**
+            - Known regimes (trending_up/down, ranging, volatile, breakout) → `"claude-sonnet"`.
+            - Novel/extreme regimes (`"unknown"`, `"extreme_volatile"`) or `force_escalate=True`
+              → `"claude-opus"`.
+            - **Tests:** `TestEvalScenarioA` (6 tests) + `TestEvalRegimeSplit` (8 tests) in
+              `tests/backend/agents/test_pipeline_real_api.py`.
 
-          **Fix: `TestPipelineRealApiStructure.setup_method` clears grounding cache**
-          - Added `setup_method` to `TestPipelineRealApiStructure` to clear `_GROUNDING_CACHE`
-            before each real-API test, preventing cache hits from sibling tests from causing
-            `llm_call_count=0` when Claude returns 400 and grounding is served from cache.
+            **Fix: `TestPipelineRealApiStructure.setup_method` clears grounding cache**
+            - Added `setup_method` to `TestPipelineRealApiStructure` to clear `_GROUNDING_CACHE`
+              before each real-API test, preventing cache hits from sibling tests from causing
+              `llm_call_count=0` when Claude returns 400 and grounding is served from cache.
 
 - **fix(numba-dca): Sortino ratio computation in Numba DCA batch engine (2026-04-10)**
 
-          `sortino_ratio` was always 0.0 for DCA strategies optimized via the Numba batch path
-          because the kernel computed Sharpe but discarded downside deviation entirely.
+            `sortino_ratio` was always 0.0 for DCA strategies optimized via the Numba batch path
+            because the kernel computed Sharpe but discarded downside deviation entirely.
 
-          **Changes in `backend/backtesting/numba_dca_engine.py`:**
-          - Added `import math` (required for `math.sqrt` inside `@njit` functions — `np.sqrt` is
-            not usable in Numba JIT context).
-          - `_compute_summary_stats()`: return type extended from 6-tuple to 7-tuple
-            `(net_profit, max_dd, win_rate, sharpe, profit_factor, n_trades, sortino)`.
-            In the same monthly-returns loop that already computed Sharpe, now also computes:
-            `downside_sq_sum = sum(min(0, r - MAR)^2)` with MAR = 0.0, then
-            `downside_dev = sqrt(downside_sq_sum / n_months)`, then
-            `sortino = mean_r / downside_dev * sqrt(12)` (annualized, capped ±100 like Sharpe).
-          - `batch_simulate_dca()`: added `out_sortino: np.ndarray` (float64[N]) output parameter;
-            unpacks the new 7-element tuple from `_compute_summary_stats` and writes
-            `out_sortino[i] = sortino`.
-          - `run_dca_batch_numba()`: allocates `out_sortino = np.zeros(n, dtype=np.float64)`,
-            passes it to `batch_simulate_dca`, adds `"sortino": out_sortino` to the returned dict.
-          - `run_dca_single_numba()`: updated unpacking to 7-tuple; adds `"sortino_ratio"` key
-            to the returned dict.
+            **Changes in `backend/backtesting/numba_dca_engine.py`:**
+            - Added `import math` (required for `math.sqrt` inside `@njit` functions — `np.sqrt` is
+              not usable in Numba JIT context).
+            - `_compute_summary_stats()`: return type extended from 6-tuple to 7-tuple
+              `(net_profit, max_dd, win_rate, sharpe, profit_factor, n_trades, sortino)`.
+              In the same monthly-returns loop that already computed Sharpe, now also computes:
+              `downside_sq_sum = sum(min(0, r - MAR)^2)` with MAR = 0.0, then
+              `downside_dev = sqrt(downside_sq_sum / n_months)`, then
+              `sortino = mean_r / downside_dev * sqrt(12)` (annualized, capped ±100 like Sharpe).
+            - `batch_simulate_dca()`: added `out_sortino: np.ndarray` (float64[N]) output parameter;
+              unpacks the new 7-element tuple from `_compute_summary_stats` and writes
+              `out_sortino[i] = sortino`.
+            - `run_dca_batch_numba()`: allocates `out_sortino = np.zeros(n, dtype=np.float64)`,
+              passes it to `batch_simulate_dca`, adds `"sortino": out_sortino` to the returned dict.
+            - `run_dca_single_numba()`: updated unpacking to 7-tuple; adds `"sortino_ratio"` key
+              to the returned dict.
 
-          **Changes in `backend/optimization/builder_optimizer.py`:**
-          - `_run_dca_pure_batch_numba()`: replaced `"sortino_ratio": 0.0` with
-            `"sortino_ratio": float(batch["sortino"][i])`.
-          - `_run_dca_mixed_batch_numba()`: replaced `"sortino_ratio": 0.0` with
-            `"sortino_ratio": float(batch["sortino"][j])`.
+            **Changes in `backend/optimization/builder_optimizer.py`:**
+            - `_run_dca_pure_batch_numba()`: replaced `"sortino_ratio": 0.0` with
+              `"sortino_ratio": float(batch["sortino"][i])`.
+            - `_run_dca_mixed_batch_numba()`: replaced `"sortino_ratio": 0.0` with
+              `"sortino_ratio": float(batch["sortino"][j])`.
 
-          **Tests:** 108 passed (`tests/test_builder_optimizer.py`),
-          425 passed (`tests/backend/backtesting/`)
+            **Tests:** 108 passed (`tests/test_builder_optimizer.py`),
+            425 passed (`tests/backend/backtesting/`)
 
 - **feat(optimization): Bayesian optimization modernization — GPSampler, native constrained BO, warm-start (2026-04-09)**
 
-          Five improvements to `run_builder_optuna_search` in `backend/optimization/builder_optimizer.py`:
+            Five improvements to `run_builder_optuna_search` in `backend/optimization/builder_optimizer.py`:
 
-          **1. GPSampler support (`sampler_type="gp"`)**
-          - Added `GPSampler` import (Optuna ≥ 3.6, graceful fallback to `None` if unavailable).
-          - New `elif sampler_type == "gp" and GPSampler is not None` branch: fits a GP (Matérn 5/2
-            kernel with ARD), optimizes Expected Improvement acquisition. Startup via QMC Sobol when
-            available. Best sample efficiency for < 200 trials; comparable to TPE at larger budgets.
-          - Docstring updated: `sampler_type` now includes `"gp"` option.
+            **1. GPSampler support (`sampler_type="gp"`)**
+            - Added `GPSampler` import (Optuna ≥ 3.6, graceful fallback to `None` if unavailable).
+            - New `elif sampler_type == "gp" and GPSampler is not None` branch: fits a GP (Matérn 5/2
+              kernel with ARD), optimizes Expected Improvement acquisition. Startup via QMC Sobol when
+              available. Best sample efficiency for < 200 trials; comparable to TPE at larger budgets.
+            - Docstring updated: `sampler_type` now includes `"gp"` option.
 
-          **2. Native constrained Bayesian optimization (replaces penalty approach)**
-          - Added `_constraints_func(trial)` that reads `trial.user_attrs["constraint"]` — a list of
-            floats where values > 0 signal a violated filter (min_trades, max_drawdown_limit,
-            min_profit_factor, min_win_rate). Passed to `constraints_func=` in TPE, CMA-ES, and GP kwargs.
-          - In `objective()`: replaced the old `return -1000.0 - penalty` block with native constraint
-            storage via `trial.set_user_attr("constraint", _violations)`. The true `score_raw` is now
-            returned for ALL trials — infeasible trials are deprioritised by the sampler without
-            warping the surrogate model with artificial penalty values.
-          - `RandomSampler` intentionally excluded (doesn't use a surrogate model; constraints_func
-            is irrelevant there).
+            **2. Native constrained Bayesian optimization (replaces penalty approach)**
+            - Added `_constraints_func(trial)` that reads `trial.user_attrs["constraint"]` — a list of
+              floats where values > 0 signal a violated filter (min_trades, max_drawdown_limit,
+              min_profit_factor, min_win_rate). Passed to `constraints_func=` in TPE, CMA-ES, and GP kwargs.
+            - In `objective()`: replaced the old `return -1000.0 - penalty` block with native constraint
+              storage via `trial.set_user_attr("constraint", _violations)`. The true `score_raw` is now
+              returned for ALL trials — infeasible trials are deprioritised by the sampler without
+              warping the surrogate model with artificial penalty values.
+            - `RandomSampler` intentionally excluded (doesn't use a surrogate model; constraints_func
+              is irrelevant there).
 
-          **3. Feasibility filter for passing_trials**
-          - Removed `PENALTY_THRESHOLD = -500.0` constant and the `t.value >= PENALTY_THRESHOLD` check.
-          - Replaced with `_trial_is_feasible(t)` helper: reads `user_attrs["constraint"]`, returns
-            `True` iff all values ≤ 0. Falls back to `passes_filters()` on stored result for trials
-            with no constraint attr (backward compatibility with warm-started trials).
+            **3. Feasibility filter for passing_trials**
+            - Removed `PENALTY_THRESHOLD = -500.0` constant and the `t.value >= PENALTY_THRESHOLD` check.
+            - Replaced with `_trial_is_feasible(t)` helper: reads `user_attrs["constraint"]`, returns
+              `True` iff all values ≤ 0. Falls back to `passes_filters()` on stored result for trials
+              with no constraint attr (backward compatibility with warm-started trials).
 
-          **4. Warm-start support (`warm_start_trials` parameter)**
-          - New optional parameter `warm_start_trials: list[dict[str, Any]] | None = None`.
-          - After `create_study()`, enqueues up to 10 previous best param dicts via
-            `study.enqueue_trial()` (not `add_trial`) so they go through the objective and produce
-            real constraint values. Validates that all param keys match current `param_specs`.
-          - Estimated improvement: ~30% better initial coverage via meta-learning.
+            **4. Warm-start support (`warm_start_trials` parameter)**
+            - New optional parameter `warm_start_trials: list[dict[str, Any]] | None = None`.
+            - After `create_study()`, enqueues up to 10 previous best param dicts via
+              `study.enqueue_trial()` (not `add_trial`) so they go through the objective and produce
+              real constraint values. Validates that all param keys match current `param_specs`.
+            - Estimated improvement: ~30% better initial coverage via meta-learning.
 
-          **5. `_trial_number` stored in `all_trial_results`**
-          - Added `"_trial_number": trial.number` to every entry in `all_trial_results` so the
-            `_trial_is_feasible` fallback can join by trial number.
+            **5. `_trial_number` stored in `all_trial_results`**
+            - Added `"_trial_number": trial.number` to every entry in `all_trial_results` so the
+              `_trial_is_feasible` fallback can join by trial number.
 
-          **Files affected:** `backend/optimization/builder_optimizer.py`
-          **Tests:** 98 passed (`tests/test_builder_optimizer.py`)
+            **Files affected:** `backend/optimization/builder_optimizer.py`
+            **Tests:** 98 passed (`tests/test_builder_optimizer.py`)
 
 - **docs: CLAUDE.md refactor — reduce root file from 74.5k to ~35k characters (2026-04-06)**
 
-          Root CLAUDE.md was too large (74.5k) to fit in context efficiently. Content moved to
-          sub-directory CLAUDE.md files and new dedicated docs files. No information was deleted.
+            Root CLAUDE.md was too large (74.5k) to fit in context efficiently. Content moved to
+            sub-directory CLAUDE.md files and new dedicated docs files. No information was deleted.
 
-          **New files created:**
-          - `tests/CLAUDE.md` — full test infrastructure docs (214 files, conftest layout,
-            test directories table, key fixtures, pytest commands, hook mapping)
-          - `docs/REFACTOR_CHECKLIST.md` — complete refactor checklist for AI agents
-            (pre-flight, high-risk params, engine/strategy/API/frontend changes, post-flight)
+            **New files created:**
+            - `tests/CLAUDE.md` — full test infrastructure docs (214 files, conftest layout,
+              test directories table, key fixtures, pytest commands, hook mapping)
+            - `docs/REFACTOR_CHECKLIST.md` — complete refactor checklist for AI agents
+              (pre-flight, high-risk params, engine/strategy/API/frontend changes, post-flight)
 
-          **Sub-directory CLAUDE.md files augmented (appended, not replaced):**
-          - `backend/backtesting/CLAUDE.md` — added: Strategy Builder graph format (JSON example),
-            full block types list, SignalResult full dataclass, built-in strategy param tables,
-            Strategy Builder block param tables, port alias mapping (_PORT_ALIASES, _SIGNAL_PORT_ALIASES),
-            timeframe key list
-          - `backend/api/CLAUDE.md` — added: warning codes table ([DIRECTION_MISMATCH], [NO_TRADES],
-            [INVALID_OHLC], [UNIVERSAL_BAR_MAGNIFIER]), direction default table (API vs engine vs builder),
-            market_type table (spot vs linear), cross-cutting parameters dependency table (7 params),
-            known inconsistencies (commission/position_size/leverage/pyramiding)
-          - `backend/optimization/CLAUDE.md` — added: key optimization metrics table (10 metrics
-            with direction), MM parameter dependencies formula block, filter unit mismatch note
+            **Sub-directory CLAUDE.md files augmented (appended, not replaced):**
+            - `backend/backtesting/CLAUDE.md` — added: Strategy Builder graph format (JSON example),
+              full block types list, SignalResult full dataclass, built-in strategy param tables,
+              Strategy Builder block param tables, port alias mapping (_PORT_ALIASES, _SIGNAL_PORT_ALIASES),
+              timeframe key list
+            - `backend/api/CLAUDE.md` — added: warning codes table ([DIRECTION_MISMATCH], [NO_TRADES],
+              [INVALID_OHLC], [UNIVERSAL_BAR_MAGNIFIER]), direction default table (API vs engine vs builder),
+              market_type table (spot vs linear), cross-cutting parameters dependency table (7 params),
+              known inconsistencies (commission/position_size/leverage/pyramiding)
+            - `backend/optimization/CLAUDE.md` — added: key optimization metrics table (10 metrics
+              with direction), MM parameter dependencies formula block, filter unit mismatch note
 
-          **Root CLAUDE.md: replaced with single-line references:**
-          - §3 graph format + SignalResult → `backend/backtesting/CLAUDE.md`
-          - §3 direction defaults + warning codes + market_type → `backend/api/CLAUDE.md`
-          - §6 strategy params (all tables + port aliases) → `backend/backtesting/CLAUDE.md`
-          - §7 MM dependencies + optimization metrics + cross-cutting params → sub-dir files
-          - §13 test infrastructure → `tests/CLAUDE.md`
-          - §14 recent changes — kept headlines only, details → `CHANGELOG.md`
-          - §15 refactor checklist → `docs/REFACTOR_CHECKLIST.md`
-          - §16 post-2026-02-21 changes — one-liner summary
+            **Root CLAUDE.md: replaced with single-line references:**
+            - §3 graph format + SignalResult → `backend/backtesting/CLAUDE.md`
+            - §3 direction defaults + warning codes + market_type → `backend/api/CLAUDE.md`
+            - §6 strategy params (all tables + port aliases) → `backend/backtesting/CLAUDE.md`
+            - §7 MM dependencies + optimization metrics + cross-cutting params → sub-dir files
+            - §13 test infrastructure → `tests/CLAUDE.md`
+            - §14 recent changes — kept headlines only, details → `CHANGELOG.md`
+            - §15 refactor checklist → `docs/REFACTOR_CHECKLIST.md`
+            - §16 post-2026-02-21 changes — one-liner summary
 
 - **fix(docs): infrastructure audit round 5 — deep re-audit with individual file reads (2026-04-05)**
 
-          Re-audit triggered by "Слишком оптимистично" — every file read individually, not just grep-matched.
+            Re-audit triggered by "Слишком оптимистично" — every file read individually, not just grep-matched.
 
-          **Files fixed:**
-          - `.github/prompts/walk-forward-optimization.prompt.md` line 11 — Input section showed
-            `[e.g., 15m, 1h]` as timeframe example, contradicting line 56 which says `# NOT '15m'`.
-            Fixed to: `[e.g., 15, 60 — Bybit format: numeric string, NOT "15m"/"1h"]`
+            **Files fixed:**
+            - `.github/prompts/walk-forward-optimization.prompt.md` line 11 — Input section showed
+              `[e.g., 15m, 1h]` as timeframe example, contradicting line 56 which says `# NOT '15m'`.
+              Fixed to: `[e.g., 15, 60 — Bybit format: numeric string, NOT "15m"/"1h"]`
 
-          **Files verified CLEAN (individually read):**
-          - All `.claude/hooks/`: `stop_reminder.py`, `post_tool_failure.py`, `ruff_format.py`,
-            `notification.py`, `user_prompt_submit.py`, `session_end.py` — pure infrastructure
-          - All `.github/prompts/` (GSD suite + walk-forward): clean after round 5 fix
-          - All `.github/instructions/`: `backtester.instructions.md`, `api-endpoints.instructions.md`
-          - All `.github/agents/`: `gsd-verifier.agent.md`, `gsd-integration-checker.agent.md`,
-            `backtester.agent.md`, `reviewer.agent.md`
-          - All `.github/skills/strategy-development/SKILL.md`
-          - All `.claude/commands/` (9 files), `.claude/agents/` (7 files)
+            **Files verified CLEAN (individually read):**
+            - All `.claude/hooks/`: `stop_reminder.py`, `post_tool_failure.py`, `ruff_format.py`,
+              `notification.py`, `user_prompt_submit.py`, `session_end.py` — pure infrastructure
+            - All `.github/prompts/` (GSD suite + walk-forward): clean after round 5 fix
+            - All `.github/instructions/`: `backtester.instructions.md`, `api-endpoints.instructions.md`
+            - All `.github/agents/`: `gsd-verifier.agent.md`, `gsd-integration-checker.agent.md`,
+              `backtester.agent.md`, `reviewer.agent.md`
+            - All `.github/skills/strategy-development/SKILL.md`
+            - All `.claude/commands/` (9 files), `.claude/agents/` (7 files)
 
 - **fix(docs): infrastructure audit round 4 — complete audit of all remaining .github/ and .claude/ files (2026-04-05)**
 
-          Final audit pass — all 57 .github/*.md and .claude/*.md files verified and cleaned.
+            Final audit pass — all 57 .github/*.md and .claude/*.md files verified and cleaned.
 
-          **Files fixed:**
-          - `.github/agents/tdd.agent.md` — wrong import (`strategies.rsi → strategies`), old DataFrame test template
-            (`"signal" in result.columns`) → SignalResult API, wrong test path (`tests/backtesting/ → tests/backend/backtesting/`)
-          - `.github/agents/gsd-debugger.agent.md` — "signal values must be 1/-1/0" →
-            "generate_signals() returns SignalResult with bool entries/exits Series"
-          - `.github/skills/gsd-diagnose-issues/SKILL.md` — "check signal column type" → SignalResult type check
-          - `.github/skills/backtest-execution/SKILL.md` — non-existent strategy file paths (macd.py, bollinger.py etc.)
-            replaced with correct strategy type keys and reference to strategies.py
-          - `.github/instructions/api-connectors.instructions.md` — Pydantic v1 `@validator` → v2 `@field_validator` + `@classmethod`
-          - `.github/prompts/tradingview-parity-check.prompt.md` — `tests/fixtures/` non-existent path → note + adjusted path
-          - `.github/prompts/add-strategy.prompt.md` — `tests/fixtures/` path + parity test updated to use SignalResult API
-          - `.github/instructions/tests.instructions.md` — `tests/fixtures/` path clarified with note
-          - `.github/prompts/implement-feature.prompt.md` — `backend/strategies/` → `backend/backtesting/strategies.py`
+            **Files fixed:**
+            - `.github/agents/tdd.agent.md` — wrong import (`strategies.rsi → strategies`), old DataFrame test template
+              (`"signal" in result.columns`) → SignalResult API, wrong test path (`tests/backtesting/ → tests/backend/backtesting/`)
+            - `.github/agents/gsd-debugger.agent.md` — "signal values must be 1/-1/0" →
+              "generate_signals() returns SignalResult with bool entries/exits Series"
+            - `.github/skills/gsd-diagnose-issues/SKILL.md` — "check signal column type" → SignalResult type check
+            - `.github/skills/backtest-execution/SKILL.md` — non-existent strategy file paths (macd.py, bollinger.py etc.)
+              replaced with correct strategy type keys and reference to strategies.py
+            - `.github/instructions/api-connectors.instructions.md` — Pydantic v1 `@validator` → v2 `@field_validator` + `@classmethod`
+            - `.github/prompts/tradingview-parity-check.prompt.md` — `tests/fixtures/` non-existent path → note + adjusted path
+            - `.github/prompts/add-strategy.prompt.md` — `tests/fixtures/` path + parity test updated to use SignalResult API
+            - `.github/instructions/tests.instructions.md` — `tests/fixtures/` path clarified with note
+            - `.github/prompts/implement-feature.prompt.md` — `backend/strategies/` → `backend/backtesting/strategies.py`
 
 - **fix(docs): infrastructure audit round 2 — fix stale SignalResult API in .github/agents/ and skills (2026-04-05)**
 
-          Deep audit pass: found and fixed 7 more files using old DataFrame signal API.
+            Deep audit pass: found and fixed 7 more files using old DataFrame signal API.
 
-          **Files fixed:**
-          - `.github/agents/implementer.agent.md` — full strategy template rewrite: old
-            `from backend.backtesting.strategies.base import BaseStrategy`, `generate_signals() → pd.DataFrame`,
-            `signals['signal'] = 0` replaced with correct `SignalResult` + `STRATEGY_REGISTRY` pattern
-          - `.github/agents/gsd-verifier.agent.md` — checklist updated: "returns DataFrame with 'signal' column"
-            → `SignalResult` with `bool` Series checks
-          - `.github/agents/gsd-integration-checker.agent.md` — "returns proper DataFrame"
-            → "returns `SignalResult` with bool entries/exits Series"
-          - `.github/instructions/gsd-verification-patterns.instructions.md` — strategy verification
-            checklist updated from old signal column API to SignalResult
-          - `.github/skills/strategy-development/SKILL.md` — `len(result)` → `len(result.entries)`;
-            `STRATEGY_MAP` → `STRATEGY_REGISTRY`
-          - `.github/prompts/add-strategy.prompt.md` — test/lint paths fixed
-            (`tests/test_strategies/` → `tests/backend/backtesting/`,
-            `strategies/new_strategy.py` → `strategies.py`);
-            `registered in __init__.py` → `STRATEGY_REGISTRY in strategies.py`
-          - `.claude/agents/tdd.md` — coverage table: `strategies/` (directory) → `strategies.py` (file)
+            **Files fixed:**
+            - `.github/agents/implementer.agent.md` — full strategy template rewrite: old
+              `from backend.backtesting.strategies.base import BaseStrategy`, `generate_signals() → pd.DataFrame`,
+              `signals['signal'] = 0` replaced with correct `SignalResult` + `STRATEGY_REGISTRY` pattern
+            - `.github/agents/gsd-verifier.agent.md` — checklist updated: "returns DataFrame with 'signal' column"
+              → `SignalResult` with `bool` Series checks
+            - `.github/agents/gsd-integration-checker.agent.md` — "returns proper DataFrame"
+              → "returns `SignalResult` with bool entries/exits Series"
+            - `.github/instructions/gsd-verification-patterns.instructions.md` — strategy verification
+              checklist updated from old signal column API to SignalResult
+            - `.github/skills/strategy-development/SKILL.md` — `len(result)` → `len(result.entries)`;
+              `STRATEGY_MAP` → `STRATEGY_REGISTRY`
+            - `.github/prompts/add-strategy.prompt.md` — test/lint paths fixed
+              (`tests/test_strategies/` → `tests/backend/backtesting/`,
+              `strategies/new_strategy.py` → `strategies.py`);
+              `registered in __init__.py` → `STRATEGY_REGISTRY in strategies.py`
+            - `.claude/agents/tdd.md` — coverage table: `strategies/` (directory) → `strategies.py` (file)
 
 - **fix(docs): infrastructure audit — fix stale API patterns across all agent/copilot files (2026-04-05)**
 
-          Full audit of all `.github/prompts/`, `.github/instructions/`, `.claude/commands/`,
-          `.claude/agents/`, `.claude/hooks/`, and sub-directory `CLAUDE.md` files.
+            Full audit of all `.github/prompts/`, `.github/instructions/`, `.claude/commands/`,
+            `.claude/agents/`, `.claude/hooks/`, and sub-directory `CLAUDE.md` files.
 
-          **Files fixed:**
-          - `.github/prompts/add-api-endpoint.prompt.md` — Pydantic v1→v2 patterns
-            (`@field_validator` + `@classmethod`, `model_config = {}`), `datetime.now(timezone.utc)`,
-            test path `tests/integration/test_api/` → `tests/backend/api/`
-          - `.github/prompts/walk-forward-optimization.prompt.md` — import path fixed
-            (`from backend.backtesting.strategies import RSIStrategy`), dates moved to
-            post-DATA_START_DATE (`2025-01-01`), timeframe `'15m'` → `'15'` (Bybit format)
-          - `.github/prompts/debug-session.prompt.md` — DataFrame signal API replaced with
-            `SignalResult` checks (`isinstance(signals, SignalResult)`, `signals.entries.dtype`)
-          - `.github/prompts/full-stack-debug.prompt.md` — stale `signal` column reference
-            → `generate_signals()` returns `SignalResult` (NOT DataFrame)
-          - `.claude/commands/new-strategy.md` — complete rewrite (3 critical errors):
-            wrong file path (separate vs. single file), wrong import path, entirely wrong API
-            (DataFrame → SignalResult), missing STRATEGY_REGISTRY registration
-          - `frontend/CLAUDE.md` — line count updated: `~7154` → `~13378` for `strategy_builder.js`
-          - `.github/instructions/tests.instructions.md` — timeframe `"15m"` → `"15"` in
-            integration test, `tests/unit/test_strategies/` → `tests/backend/backtesting/`,
-            `strategies/` (directory) → `strategies.py` (single file) in coverage table
+            **Files fixed:**
+            - `.github/prompts/add-api-endpoint.prompt.md` — Pydantic v1→v2 patterns
+              (`@field_validator` + `@classmethod`, `model_config = {}`), `datetime.now(timezone.utc)`,
+              test path `tests/integration/test_api/` → `tests/backend/api/`
+            - `.github/prompts/walk-forward-optimization.prompt.md` — import path fixed
+              (`from backend.backtesting.strategies import RSIStrategy`), dates moved to
+              post-DATA_START_DATE (`2025-01-01`), timeframe `'15m'` → `'15'` (Bybit format)
+            - `.github/prompts/debug-session.prompt.md` — DataFrame signal API replaced with
+              `SignalResult` checks (`isinstance(signals, SignalResult)`, `signals.entries.dtype`)
+            - `.github/prompts/full-stack-debug.prompt.md` — stale `signal` column reference
+              → `generate_signals()` returns `SignalResult` (NOT DataFrame)
+            - `.claude/commands/new-strategy.md` — complete rewrite (3 critical errors):
+              wrong file path (separate vs. single file), wrong import path, entirely wrong API
+              (DataFrame → SignalResult), missing STRATEGY_REGISTRY registration
+            - `frontend/CLAUDE.md` — line count updated: `~7154` → `~13378` for `strategy_builder.js`
+            - `.github/instructions/tests.instructions.md` — timeframe `"15m"` → `"15"` in
+              integration test, `tests/unit/test_strategies/` → `tests/backend/backtesting/`,
+              `strategies/` (directory) → `strategies.py` (single file) in coverage table
 
-          **Files audited and confirmed clean (no changes needed):**
-          `.github/copilot-instructions.md`, all sub-dir `CLAUDE.md` files (backtesting, api,
-          agents, services, ml, optimization, frontend), all `.claude/agents/`, all
-          `.claude/commands/` except new-strategy, all `.claude/hooks/`,
-          `.github/instructions/api-endpoints.instructions.md`,
-          `.github/instructions/strategies.instructions.md`
+            **Files audited and confirmed clean (no changes needed):**
+            `.github/copilot-instructions.md`, all sub-dir `CLAUDE.md` files (backtesting, api,
+            agents, services, ml, optimization, frontend), all `.claude/agents/`, all
+            `.claude/commands/` except new-strategy, all `.claude/hooks/`,
+            `.github/instructions/api-endpoints.instructions.md`,
+            `.github/instructions/strategies.instructions.md`
 
 - **fix: BUG-1/2/3 — calmar_ratio, filter port mismatch, two_ma_filter, MCP fetch (2026-04-03)**
 
@@ -518,139 +654,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **feat(agents): Claude as 4th MoA agent + synthesis critic (2026-03-30)**
 
-          New `ClaudeClient` (Anthropic native Messages API) + wired into AI pipeline.
+            New `ClaudeClient` (Anthropic native Messages API) + wired into AI pipeline.
 
-          **New files:**
-          - `backend/agents/llm/clients/claude.py` — `ClaudeClient` (Anthropic Messages API,
-            NOT OpenAI-compatible). Handles `x-api-key` header, top-level `system` field,
-            `content[0].text` response parsing, `input_tokens`/`output_tokens` usage counts.
-            Default model: `claude-haiku-4-5-20251001`. json_mode handled via prompt
-            engineering (no `response_format` field needed — Claude follows JSON instructions).
-          - `tests/backend/agents/test_claude_client.py` — 18 tests (payload, parse,
-            retry, json_mode isolation, _synthesis_critic Claude→QWEN→None fallback chain).
+            **New files:**
+            - `backend/agents/llm/clients/claude.py` — `ClaudeClient` (Anthropic Messages API,
+              NOT OpenAI-compatible). Handles `x-api-key` header, top-level `system` field,
+              `content[0].text` response parsing, `input_tokens`/`output_tokens` usage counts.
+              Default model: `claude-haiku-4-5-20251001`. json_mode handled via prompt
+              engineering (no `response_format` field needed — Claude follows JSON instructions).
+            - `tests/backend/agents/test_claude_client.py` — 18 tests (payload, parse,
+              retry, json_mode isolation, _synthesis_critic Claude→QWEN→None fallback chain).
 
-          **Modified files:**
-          - `backend/agents/llm/clients/__init__.py` — exports `ClaudeClient`
-          - `backend/agents/llm/base_client.py` — `LLMClientFactory.create()` registers
-            `LLMProvider.ANTHROPIC → ClaudeClient`
-          - `backend/agents/prompts/templates.py` — `AGENT_SPECIALIZATIONS["claude"]` added
-            (role: strategy_synthesizer, style: systematic)
-          - `backend/agents/trading_strategy_graph.py`:
-            - `_call_llm()` provider_map: `"claude"` → haiku model, `ANTHROPIC_API_KEY`
-            - New `_synthesis_critic()`: tries Claude first, falls back to QWEN, then None.
-              Previously `_qwen_critic()` was called directly; now a smarter wrapper.
-            - DebateNode agent filter: added `"claude"` (opt-in via `agents=["deepseek","claude"]`)
-            - AnalysisDebateNode agent filter: added `"claude"`
-          - `.env.example` — `ANTHROPIC_API_KEY` section added
+            **Modified files:**
+            - `backend/agents/llm/clients/__init__.py` — exports `ClaudeClient`
+            - `backend/agents/llm/base_client.py` — `LLMClientFactory.create()` registers
+              `LLMProvider.ANTHROPIC → ClaudeClient`
+            - `backend/agents/prompts/templates.py` — `AGENT_SPECIALIZATIONS["claude"]` added
+              (role: strategy_synthesizer, style: systematic)
+            - `backend/agents/trading_strategy_graph.py`:
+              - `_call_llm()` provider_map: `"claude"` → haiku model, `ANTHROPIC_API_KEY`
+              - New `_synthesis_critic()`: tries Claude first, falls back to QWEN, then None.
+                Previously `_qwen_critic()` was called directly; now a smarter wrapper.
+              - DebateNode agent filter: added `"claude"` (opt-in via `agents=["deepseek","claude"]`)
+              - AnalysisDebateNode agent filter: added `"claude"`
+            - `.env.example` — `ANTHROPIC_API_KEY` section added
 
-          **Architecture:** Claude used as CRITIC (always active when DeepSeek MoA runs),
-          not as primary generator — avoids 10-50× cost increase while gaining structured-
-          output quality improvement exactly where it matters (synthesis of 3 variants).
-          Claude as generator is opt-in via `agents=["deepseek", "claude"]`.
+            **Architecture:** Claude used as CRITIC (always active when DeepSeek MoA runs),
+            not as primary generator — avoids 10-50× cost increase while gaining structured-
+            output quality improvement exactly where it matters (synthesis of 3 variants).
+            Claude as generator is opt-in via `agents=["deepseek", "claude"]`.
 
-          **Tests:** 245/245 passing (no regressions).
+            **Tests:** 245/245 passing (no regressions).
 
 - **fix: Strategy Builder UI — 6 bugs fixed (2026-03-29)**
 
-          Full bug-fix pass across Strategy Builder frontend components.
+            Full bug-fix pass across Strategy Builder frontend components.
 
-          **Bug #8 — Undo/Redo loses connections on Redo (CRITICAL)**
-          - `frontend/js/components/UndoRedoModule.js` `restoreStateSnapshot()`: fixed
-            self-reference array-clearing bug. `setBlocks(blocks)` / `setConnections(conns)`
-            setters do `arr.length = 0; arr.push(...passed)` — when `passed === arr` (same
-            reference) the first `length=0` cleared what was just populated. Fixed by passing
-            `[...blocks]` / `[...conns]` shallow copies so the setter's round-trip is safe.
+            **Bug #8 — Undo/Redo loses connections on Redo (CRITICAL)**
+            - `frontend/js/components/UndoRedoModule.js` `restoreStateSnapshot()`: fixed
+              self-reference array-clearing bug. `setBlocks(blocks)` / `setConnections(conns)`
+              setters do `arr.length = 0; arr.push(...passed)` — when `passed === arr` (same
+              reference) the first `length=0` cleared what was just populated. Fixed by passing
+              `[...blocks]` / `[...conns]` shallow copies so the setter's round-trip is safe.
 
-          **Bug #12 — Database panel 503/timeout on first open**
-          - `frontend/js/strategy_builder/SymbolSyncModule.js` `loadAndRender()`: renamed to
-            `loadAndRender(attempt = 1)` and added one automatic retry with 2 s delay on
-            `AbortError` or non-OK response. Shows "Повторная попытка подключения..." while
-            waiting. Manual Refresh button still works for subsequent failures.
+            **Bug #12 — Database panel 503/timeout on first open**
+            - `frontend/js/strategy_builder/SymbolSyncModule.js` `loadAndRender()`: renamed to
+              `loadAndRender(attempt = 1)` and added one automatic retry with 2 s delay on
+              `AbortError` or non-OK response. Shows "Повторная попытка подключения..." while
+              waiting. Manual Refresh button still works for subsequent failures.
 
-          **Bug #6 — Fit to Screen ignores open floating panels**
-          - `frontend/js/pages/strategy_builder.js` `fitToScreen()`: replaced stub
-            `resetZoom()` call with proper implementation that (a) measures the bounding box
-            of all rendered blocks, (b) deducts 560 px for any open floating panel, (c) computes
-            `zoom = clamp(min(availW/contentW, availH/contentH), 0.2, 1.0)`, then scrolls
-            canvas so content is centred with 40 px padding.
+            **Bug #6 — Fit to Screen ignores open floating panels**
+            - `frontend/js/pages/strategy_builder.js` `fitToScreen()`: replaced stub
+              `resetZoom()` call with proper implementation that (a) measures the bounding box
+              of all rendered blocks, (b) deducts 560 px for any open floating panel, (c) computes
+              `zoom = clamp(min(availW/contentW, availH/contentH), 0.2, 1.0)`, then scrolls
+              canvas so content is centred with 40 px padding.
 
-          **Bug #2 — Navbar buttons inaccessible on narrow screens**
-          - `frontend/css/strategy_builder.css`: added three `@media` breakpoints.
-              - `≤ 1100 px`: action buttons show icon-only (text `font-size:0`).
-              - `≤ 860 px`: navbar wraps to two rows; `.navbar-actions` becomes horizontally
-                scrollable so all buttons remain reachable.
-              - `≤ 600 px`: strategy-name input shrinks to 120 px.
+            **Bug #2 — Navbar buttons inaccessible on narrow screens**
+            - `frontend/css/strategy_builder.css`: added three `@media` breakpoints.
+                - `≤ 1100 px`: action buttons show icon-only (text `font-size:0`).
+                - `≤ 860 px`: navbar wraps to two rows; `.navbar-actions` becomes horizontally
+                  scrollable so all buttons remain reachable.
+                - `≤ 600 px`: strategy-name input shrinks to 120 px.
 
-          **Bug #1 — Scroll wheel changes leverage unexpectedly (FIXED in prior step)**
-          - `frontend/js/pages/strategy_builder.js` line ~1255: `leverageBlock` wheel listener
-            now guards `if (e.target !== backtestLeverageRangeEl) return` — only intercepts
-            scroll when cursor is directly over the range input.
+            **Bug #1 — Scroll wheel changes leverage unexpectedly (FIXED in prior step)**
+            - `frontend/js/pages/strategy_builder.js` line ~1255: `leverageBlock` wheel listener
+              now guards `if (e.target !== backtestLeverageRangeEl) return` — only intercepts
+              scroll when cursor is directly over the range input.
 
-          **Bug #3 — No Russian notification for "Run Backtest / Optimize" without saved strategy**
-          - `frontend/js/pages/optimization_panels.js` lines 797, 879: translated English
-            "Save strategy first…" warning messages to Russian.
+            **Bug #3 — No Russian notification for "Run Backtest / Optimize" without saved strategy**
+            - `frontend/js/pages/optimization_panels.js` lines 797, 879: translated English
+              "Save strategy first…" warning messages to Russian.
 
-          **Bug #5 — Duplicate strategies in "My Strategies" modal**
-          - Root: some strategies appeared twice, likely due to duplicate DB rows or join artifacts.
-          - `backend/api/routers/strategy_builder/router.py` `list_strategies()`: added
-            `.distinct(Strategy.id)` to the SQLAlchemy query so the backend never emits
-            duplicate rows regardless of underlying joins.
-          - `frontend/js/components/MyStrategiesModule.js` `fetchStrategiesList()`: added
-            frontend deduplication by `id` as a defensive second layer.
+            **Bug #5 — Duplicate strategies in "My Strategies" modal**
+            - Root: some strategies appeared twice, likely due to duplicate DB rows or join artifacts.
+            - `backend/api/routers/strategy_builder/router.py` `list_strategies()`: added
+              `.distinct(Strategy.id)` to the SQLAlchemy query so the backend never emits
+              duplicate rows regardless of underlying joins.
+            - `frontend/js/components/MyStrategiesModule.js` `fetchStrategiesList()`: added
+              frontend deduplication by `id` as a defensive second layer.
 
-          **Bug #11 — No block library toggle button (FALSE ALARM)**
-          - `frontend/js/sidebar-toggle.js` already wires `#toggleLeftSidebarBtn` with full
-            collapse/expand logic and CSS (`sidebar-left.collapsed`). Toggle works correctly.
+            **Bug #11 — No block library toggle button (FALSE ALARM)**
+            - `frontend/js/sidebar-toggle.js` already wires `#toggleLeftSidebarBtn` with full
+              collapse/expand logic and CSS (`sidebar-left.collapsed`). Toggle works correctly.
 
-          Implemented RuFlo-inspired parallel agent execution and quality improvements across
-          the LangGraph pipeline. All changes verified: 211 tests passing.
+            Implemented RuFlo-inspired parallel agent execution and quality improvements across
+            the LangGraph pipeline. All changes verified: 211 tests passing.
 
-          **P3-1a — `debate ∥ memory_recall` parallel execution**
-          - `trading_strategy_graph.py` `build_trading_strategy_graph()`: replaced sequential
-            `regime_classifier → debate → memory_recall` chain with `EdgeType.PARALLEL` edge
-            so `debate` and `memory_recall` run concurrently after `regime_classifier`.
-          - `langgraph_orchestrator.py` `_execute_parallel()` / `EdgeType.PARALLEL` already
-            supported this pattern via `asyncio.gather`.
-          - Saves ~10-15s per pipeline run (memory_recall overlaps with debate's 90s LLM calls).
+            **P3-1a — `debate ∥ memory_recall` parallel execution**
+            - `trading_strategy_graph.py` `build_trading_strategy_graph()`: replaced sequential
+              `regime_classifier → debate → memory_recall` chain with `EdgeType.PARALLEL` edge
+              so `debate` and `memory_recall` run concurrently after `regime_classifier`.
+            - `langgraph_orchestrator.py` `_execute_parallel()` / `EdgeType.PARALLEL` already
+              supported this pattern via `asyncio.gather`.
+            - Saves ~10-15s per pipeline run (memory_recall overlaps with debate's 90s LLM calls).
 
-          **P3-1b — `_collect_refined_opinions` parallel (deliberation.py)**
-          - `backend/agents/consensus/deliberation.py`: converted sequential `for opinion in
+            **P3-1b — `_collect_refined_opinions` parallel (deliberation.py)**
+            - `backend/agents/consensus/deliberation.py`: converted sequential `for opinion in
 
     previous_opinions`loop to`asyncio.gather`pattern, matching how
-   `\_collect_initial_opinions`and`\_cross_examine` already work. - Saves ~10-20s per debate refinement round (2 agent calls overlap instead of serial).
+ `\_collect_initial_opinions`and`\_cross_examine` already work. - Saves ~10-20s per debate refinement round (2 agent calls overlap instead of serial).
 
-          **P3-2 — `MLValidationNode` 3 sub-checks parallel**
-          - `trading_strategy_graph.py` `MLValidationNode.execute()`: replaced 3 sequential
-            `await asyncio.to_thread(...)` calls (overfitting / regime / stability) with a single
-            `await asyncio.gather(..., return_exceptions=True)`.
-          - All 3 sub-checks are independent (same inputs, different slices/logic).
-          - Saves ~7-18s per run (dominant check ~12s, now runs in parallel with the others).
+            **P3-2 — `MLValidationNode` 3 sub-checks parallel**
+            - `trading_strategy_graph.py` `MLValidationNode.execute()`: replaced 3 sequential
+              `await asyncio.to_thread(...)` calls (overfitting / regime / stability) with a single
+              `await asyncio.gather(..., return_exceptions=True)`.
+            - All 3 sub-checks are independent (same inputs, different slices/logic).
+            - Saves ~7-18s per run (dominant check ~12s, now runs in parallel with the others).
 
-          **P3-3 — Optuna `n_jobs=2`, `N_TRIALS` 50→100**
-          - `OptimizationNode.N_TRIALS`: 50 → 100 (with `n_jobs=2` the 120s budget supports ~100 trials).
-          - `run_builder_optuna_search(n_jobs=2)`: 2 parallel Optuna workers, ~2× trial throughput.
+            **P3-3 — Optuna `n_jobs=2`, `N_TRIALS` 50→100**
+            - `OptimizationNode.N_TRIALS`: 50 → 100 (with `n_jobs=2` the 120s budget supports ~100 trials).
+            - `run_builder_optuna_search(n_jobs=2)`: 2 parallel Optuna workers, ~2× trial throughput.
 
-          **SELF-RAG — skip memory recall when DB is empty**
-          - `MemoryRecallNode.execute()`: added early-exit when `loaded_count == 0` (new session,
-            no memories yet), skipping all 3 `recall()` queries and their BM25+embedding overhead.
+            **SELF-RAG — skip memory recall when DB is empty**
+            - `MemoryRecallNode.execute()`: added early-exit when `loaded_count == 0` (new session,
+              no memories yet), skipping all 3 `recall()` queries and their BM25+embedding overhead.
 
-          **Memory deduplication across 3 recall queries**
-          - `MemoryRecallNode.execute()`: added `_dedup()` helper that removes items already seen
-            in a previous list (by `item.id`). The same high-importance memory can score in wins,
-            failures, and regime_memories simultaneously, inflating the LLM context block.
+            **Memory deduplication across 3 recall queries**
+            - `MemoryRecallNode.execute()`: added `_dedup()` helper that removes items already seen
+              in a previous list (by `item.id`). The same high-importance memory can score in wins,
+              failures, and regime_memories simultaneously, inflating the LLM context block.
 
-          **JSON mode for DeepSeek MoA + QWEN critic**
-          - `base_client.py` `_build_payload()`: added `json_mode` parameter; when `True`, injects
-            `response_format={"type":"json_object"}` for OpenAI-compatible providers (DeepSeek, Qwen).
-          - `GenerateStrategiesNode._call_llm()`: new `json_mode: bool = False` parameter, gated
-            to deepseek/qwen only (Perplexity sonar-pro does not support `response_format`).
-          - Enabled `json_mode=True` for all 3 DeepSeek MoA calls and the QWEN critic call.
-          - Eliminates ~90% of `ResponseParser._extract_json()` regex failures on malformed output.
+            **JSON mode for DeepSeek MoA + QWEN critic**
+            - `base_client.py` `_build_payload()`: added `json_mode` parameter; when `True`, injects
+              `response_format={"type":"json_object"}` for OpenAI-compatible providers (DeepSeek, Qwen).
+            - `GenerateStrategiesNode._call_llm()`: new `json_mode: bool = False` parameter, gated
+              to deepseek/qwen only (Perplexity sonar-pro does not support `response_format`).
+            - Enabled `json_mode=True` for all 3 DeepSeek MoA calls and the QWEN critic call.
+            - Eliminates ~90% of `ResponseParser._extract_json()` regex failures on malformed output.
 
-          **Total estimated savings: ~30-55s per full pipeline run.**
-          Files: `trading_strategy_graph.py`, `deliberation.py`, `base_client.py`,
-          `tests/test_memory_recall_and_analysis_nodes.py`, `tests/backend/agents/test_p1_features.py`,
-          `tests/backend/agents/test_p2_features.py`.
+            **Total estimated savings: ~30-55s per full pipeline run.**
+            Files: `trading_strategy_graph.py`, `deliberation.py`, `base_client.py`,
+            `tests/test_memory_recall_and_analysis_nodes.py`, `tests/backend/agents/test_p1_features.py`,
+            `tests/backend/agents/test_p2_features.py`.
 
 - **fix: backtest metrics UI bugs N1-N7 (2026-03-29)**
 
@@ -1574,19 +1710,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **fix(frontend-tests): Fix 25 failing tests across 5 test files — 759/759 passing (2026-03-24)**
 
-                        All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
-                        changes that were not reflected in the tests.
+                          All frontend Vitest tests now pass (759/759). Five files had failures caused by source code
+                          changes that were not reflected in the tests.
 
-                        **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
-                        - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
-                          now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
-                        - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
-                        - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
-                        - `renderPagination` tests updated: pagination is always removed, no elements created.
-                        - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
+                          **`frontend/tests/components/TradesTable.test.js`** (12 tests fixed)
+                          - Source v1.1.0 disabled pagination: `TRADES_PAGE_SIZE` changed from 25 → 100000; `renderPage`
+                            now renders all rows; `renderPagination`/`updatePaginationControls` are no-ops.
+                          - Updated `TRADES_PAGE_SIZE` assertion to `toBe(100000)`.
+                          - `renderPage` tests updated: all rows rendered regardless of page or pageSize argument.
+                          - `renderPagination` tests updated: pagination is always removed, no elements created.
+                          - `updatePaginationControls` tests updated: no-op — DOM buttons stay unchanged.
 
-                        **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
-                        - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
+                          **`frontend/tests/components/ValidateModule.test.js`** (2 tests fixed)
+                          - `validateStrategyCompleteness` added a `strategyTimeframe` check (`'⚙️ Parameters: Timeframe not
 
     selected'`) but `setDom()`helper did not create the`#strategyTimeframe`element.
     - Added`strategyTimeframe = '15'`parameter to`setDom()` and creates the element.
@@ -2937,7 +3073,7 @@ function calculateADX(data, period = 14) {
     TradingView within 0.02%. Section 8 (avg_bars) off-by-1 issue fixed in separate entry above
     (bars_in_trade now uses inclusive counting to match TV).
 
-                                                **File:** `scripts/_tv_calibration_check.py`
+                                                  **File:** `scripts/_tv_calibration_check.py`
 
 ### Fixed
 

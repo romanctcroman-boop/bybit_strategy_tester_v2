@@ -34,7 +34,11 @@ if TYPE_CHECKING:
 import pandas as pd
 
 from backend.config.constants import COMMISSION_TV
+from backend.optimization.early_pruning import should_prune_early
 from backend.optimization.filters import passes_filters
+from backend.optimization.graph_utils import MutableGraphUpdater
+from backend.optimization.indicator_cache import IndicatorCache, _ohlcv_fingerprint
+from backend.optimization.precompute import PrecomputedOHLCV
 from backend.optimization.scoring import apply_pareto_scores, calculate_composite_score
 
 logger = logging.getLogger(__name__)
@@ -88,6 +92,37 @@ _progress_lock = threading.Lock()
 _PROGRESS_DIR = Path(__file__).parent.parent.parent / ".run"
 _PROGRESS_FILE = _PROGRESS_DIR / "optimizer_progress.json"
 
+# In-memory cache: written every trial, flushed to disk every _PROGRESS_FLUSH_INTERVAL trials.
+# Reduces I/O bottleneck from O(n_trials) disk writes to O(n_trials / interval).
+_progress_memory_cache: dict[str, Any] = {}
+_progress_trial_counter: dict[str, int] = {}
+_PROGRESS_FLUSH_INTERVAL = 5  # flush to disk every 5 trials
+
+# =============================================================================
+# OPTIMIZATION RESULTS STORAGE (in-memory, keyed by strategy_id)
+# Used by fire-and-forget optimization endpoint to pass results to GET /results
+# =============================================================================
+_results_lock = threading.Lock()
+_opt_results: dict[str, Any] = {}
+
+
+def store_optimization_result(strategy_id: str, result: dict[str, Any]) -> None:
+    """Store completed optimization result for retrieval via GET /optimize/results."""
+    with _results_lock:
+        _opt_results[strategy_id] = result
+
+
+def get_optimization_result(strategy_id: str) -> dict[str, Any] | None:
+    """Retrieve stored optimization result. Returns None if not ready."""
+    with _results_lock:
+        return _opt_results.get(strategy_id)
+
+
+def clear_optimization_result(strategy_id: str) -> None:
+    """Clear stored result after it has been consumed."""
+    with _results_lock:
+        _opt_results.pop(strategy_id, None)
+
 
 def _read_progress_file() -> dict[str, Any]:
     """Read progress from shared JSON file (atomic read)."""
@@ -118,15 +153,21 @@ def update_optimization_progress(
     total: int = 0,
     best_score: float = 0.0,
     results_found: int = 0,
-    speed: int = 0,
+    speed: float = 0.0,
     eta_seconds: int = 0,
     started_at: float | None = None,
+    context: dict | None = None,
 ) -> None:
-    """Update progress for a running builder optimization (file-based, shared across workers)."""
+    """Update progress for a running builder optimization.
+
+    Writes to in-memory cache every call; flushes to disk every
+    _PROGRESS_FLUSH_INTERVAL trials to reduce I/O bottleneck.
+    Status transitions (running→completed/failed) always flush immediately.
+    """
     percent = round(tested * 100 / total, 1) if total > 0 else 0.0
     with _progress_lock:
-        data = _read_progress_file()
-        data[strategy_id] = {
+        existing = _progress_memory_cache.get(strategy_id, {})
+        entry: dict = {
             "status": status,
             "tested": tested,
             "total": total,
@@ -135,22 +176,49 @@ def update_optimization_progress(
             "results_found": results_found,
             "speed": speed,
             "eta_seconds": eta_seconds,
-            "started_at": started_at or time.time(),
+            "started_at": started_at or existing.get("started_at") or time.time(),
             "updated_at": time.time(),
         }
-        _write_progress_file(data)
+        # Preserve context across incremental updates — only set when explicitly provided
+        if context is not None:
+            entry["optimization_context"] = context
+        elif "optimization_context" in existing:
+            entry["optimization_context"] = existing["optimization_context"]
+
+        _progress_memory_cache[strategy_id] = entry
+
+        # Flush to disk:
+        #   - always on terminal states (completed/failed/stopped)
+        #   - always on first call for a new strategy_id (creates the disk entry)
+        #   - otherwise every N trials (reduces I/O bottleneck)
+        terminal = status in ("completed", "failed", "stopped")
+        _progress_trial_counter[strategy_id] = _progress_trial_counter.get(strategy_id, 0) + 1
+        is_first = _progress_trial_counter[strategy_id] == 1
+        should_flush = terminal or is_first or (_progress_trial_counter[strategy_id] % _PROGRESS_FLUSH_INTERVAL == 0)
+        if should_flush:
+            disk_data = _read_progress_file()
+            disk_data[strategy_id] = entry
+            _write_progress_file(disk_data)
 
 
 def get_optimization_progress(strategy_id: str) -> dict[str, Any]:
-    """Get current progress for a strategy optimization (file-based, shared across workers)."""
+    """Get current progress for a strategy optimization.
+
+    Reads from in-memory cache first (fastest path for in-process polling).
+    Falls back to disk for cross-worker reads (e.g. second uvicorn worker).
+    """
     with _progress_lock:
+        if strategy_id in _progress_memory_cache:
+            return _progress_memory_cache[strategy_id].copy()
         data = _read_progress_file()
         return data.get(strategy_id, {"status": "idle"}).copy()
 
 
 def clear_optimization_progress(strategy_id: str) -> None:
-    """Clear progress entry after optimization completes (file-based)."""
+    """Clear progress entry after optimization completes (memory + disk)."""
     with _progress_lock:
+        _progress_memory_cache.pop(strategy_id, None)
+        _progress_trial_counter.pop(strategy_id, None)
         data = _read_progress_file()
         data.pop(strategy_id, None)
         _write_progress_file(data)
@@ -858,12 +926,15 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
 
             # Normalize step for int params: frontend may store float step (e.g. 0.1)
             # which would produce step=0 after int() conversion → range() crash
+            step_was_clamped = False
+            original_step = effective_step
             if effective_type == "int" and float(effective_step) < 1:
                 logger.warning(
                     f"[OptExtract] Block '{block_id}' param '{param_key}': "
                     f"type=int but step={effective_step} < 1 — clamping to 1"
                 )
                 effective_step = 1
+                step_was_clamped = True
 
             params.append(
                 {
@@ -878,6 +949,9 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "step": effective_step,
                     "default": range_spec["default"],
                     "current_value": current_value,
+                    # Carry clamping info so callers can surface warnings to the user
+                    "step_clamped": step_was_clamped,
+                    "original_step": original_step if step_was_clamped else effective_step,
                 }
             )
             added_param_keys.add(param_key)
@@ -1273,6 +1347,7 @@ def run_builder_backtest(
     graph: dict[str, Any],
     ohlcv: pd.DataFrame,
     config_params: dict[str, Any],
+    indicator_cache: IndicatorCache | None = None,
 ) -> dict[str, Any] | None:
     """
     Run a single backtest using StrategyBuilderAdapter.
@@ -1285,6 +1360,8 @@ def run_builder_backtest(
         ohlcv: OHLCV DataFrame.
         config_params: Dict with symbol, interval, initial_capital, leverage,
                        commission, direction, stop_loss, take_profit, etc.
+        indicator_cache: Optional IndicatorCache shared across optimization trials.
+                         Pass None (default) for standalone backtests.
 
     Returns:
         Result dict with metrics, or None on failure.
@@ -1292,7 +1369,7 @@ def run_builder_backtest(
     from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
     try:
-        adapter = StrategyBuilderAdapter(graph)
+        adapter = StrategyBuilderAdapter(graph, indicator_cache=indicator_cache)
 
         # ── Extract block-level configs (mirrors router.py normal backtest) ──
         block_dca_config = adapter.extract_dca_config()
@@ -1367,7 +1444,7 @@ def run_builder_backtest(
                 },
                 initial_capital=config_params.get("initial_capital", 10000.0),
                 position_size=config_params.get("position_size", 1.0),
-                leverage=config_params.get("leverage", 1),
+                leverage=config_params.get("leverage", 10),
                 direction=direction_str,
                 stop_loss=block_stop_loss if block_stop_loss else None,
                 take_profit=block_take_profit if block_take_profit else None,
@@ -1403,6 +1480,8 @@ def run_builder_backtest(
                 # Close by time
                 max_bars_in_trade=block_max_bars_in_trade,
                 close_only_in_profit=block_close_only_in_profit,
+                pyramiding=config_params.get("pyramiding", 1),
+                no_trade_days=config_params.get("no_trade_days", ()),
             )
 
             engine = DCAEngine()
@@ -1448,7 +1527,7 @@ def run_builder_backtest(
                 "expectancy_pct": _safe(getattr(metrics, "expectancy_pct", 0)),
                 "sortino_ratio": _safe(getattr(metrics, "sortino_ratio", 0)),
                 "calmar_ratio": _safe(getattr(metrics, "calmar_ratio", 0)),
-                "max_drawdown_value": 0.0,
+                "max_drawdown_value": _safe(getattr(metrics, "max_drawdown_usdt", 0)),
                 "long_trades": int(getattr(metrics, "long_trades", 0) or 0),
                 "short_trades": int(getattr(metrics, "short_trades", 0) or 0),
             }
@@ -1561,6 +1640,9 @@ def run_builder_backtest(
                 sl_type=block_sl_type,
                 max_bars_in_trade=block_max_bars_in_trade,
                 close_only_in_profit=block_close_only_in_profit,
+                use_bar_magnifier=False,  # prevents 200k 1m-bar IntrabarEngine load per trial
+                pyramiding=config_params.get("pyramiding", 1),
+                no_trade_days=config_params.get("no_trade_days", ()),
             )
             _v4_engine = BacktestEngine()
             _v4_result = _v4_engine.run(_v4_config, ohlcv, custom_strategy=_PrecomputedStrategy())
@@ -1576,8 +1658,11 @@ def run_builder_backtest(
             win_rate_v4 = _safe_v4(getattr(_m, "win_rate", 0))
             if win_rate_v4 <= 1.0:
                 win_rate_v4 *= 100.0
+            # PerformanceMetrics.total_return is a FRACTION (engine.py line 457: no *100)
+            # extract_metrics_from_output() expects PERCENT — multiply by 100 for parity
+            _v4_total_return_pct = _safe_v4(getattr(_m, "total_return", 0)) * 100
             return {
-                "total_return": _safe_v4(getattr(_m, "total_return", 0)),
+                "total_return": _v4_total_return_pct,
                 "sharpe_ratio": _safe_v4(getattr(_m, "sharpe_ratio", 0)),
                 "max_drawdown": _safe_v4(getattr(_m, "max_drawdown", 0)),
                 "win_rate": win_rate_v4,
@@ -1586,7 +1671,7 @@ def run_builder_backtest(
                 "winning_trades": int(getattr(_m, "winning_trades", 0) or 0),
                 "losing_trades": int(getattr(_m, "losing_trades", 0) or 0),
                 "net_profit": _safe_v4(getattr(_m, "net_profit", 0)),
-                "net_profit_pct": _safe_v4(getattr(_m, "total_return", 0)),
+                "net_profit_pct": _v4_total_return_pct,
                 "gross_profit": _safe_v4(getattr(_m, "gross_profit", 0)),
                 "gross_loss": _safe_v4(getattr(_m, "gross_loss", 0)),
                 "avg_win": _safe_v4(getattr(_m, "avg_win", 0)),
@@ -1600,7 +1685,7 @@ def run_builder_backtest(
                 "expectancy_pct": _safe_v4(getattr(_m, "expectancy_pct", 0)),
                 "sortino_ratio": _safe_v4(getattr(_m, "sortino_ratio", 0)),
                 "calmar_ratio": _safe_v4(getattr(_m, "calmar_ratio", 0)),
-                "max_drawdown_value": 0.0,
+                "max_drawdown_value": _safe_v4(getattr(_m, "max_drawdown_value", 0)),
                 "long_trades": int(getattr(_m, "long_trades", 0) or 0),
                 "short_trades": int(getattr(_m, "short_trades", 0) or 0),
             }
@@ -1696,6 +1781,48 @@ def _is_rsi_threshold_only_optimization(
             rsi_block_id = block_id
         elif rsi_block_id != block_id:
             return False, None  # Multiple RSI blocks — not supported for fast path
+
+    # ── Topology checks: fast path can only handle simple signal chains ────────
+    # The fast path pre-computes RSI signals and applies only two_mas filter masks.
+    # If the graph has AND blocks in the entry chain or non-two_mas filter blocks,
+    # the fast path would silently ignore them → wrong signals → parity failure.
+    connections = base_graph.get("connections", [])
+    blocks_by_id: dict[str, dict] = {b.get("id", ""): b for b in base_graph.get("blocks", [])}
+
+    # Find strategy node ID (main collector)
+    strategy_block_id: str | None = None
+    for b in base_graph.get("blocks", []):
+        if b.get("type") == "strategy" or b.get("isMain"):
+            strategy_block_id = b.get("id")
+            break
+    if not strategy_block_id:
+        strategy_block_id = "main_strategy"
+
+    for conn in connections:
+        src = conn.get("source", {})
+        tgt = conn.get("target", {})
+        tgt_block_id = tgt.get("blockId", "")
+        tgt_port = tgt.get("portId", "")
+        src_block_id = src.get("blockId", "")
+
+        if tgt_block_id != strategy_block_id:
+            continue
+
+        if tgt_port in ("entry_long", "entry", "entry_short"):
+            # Fast path requires RSI to connect DIRECTLY to entry ports.
+            # If anything else (e.g. AND block) connects here, fall back.
+            if rsi_block_id and src_block_id != rsi_block_id:
+                return False, None
+            src_block = blocks_by_id.get(src_block_id, {})
+            if src_block.get("type") in ("and", "or", "condition", "filter"):
+                return False, None
+
+        elif tgt_port in ("filter_long", "confirm_long", "filter_short", "confirm_short"):
+            # Fast path only pre-computes two_mas filter masks; other block types
+            # (adx, supertrend, ema, sma, etc.) are silently skipped → fall back.
+            src_block = blocks_by_id.get(src_block_id, {})
+            if src_block.get("type", "") != "two_mas":
+                return False, None
 
     return True, rsi_block_id
 
@@ -2095,8 +2222,8 @@ def _run_fast_rsi_threshold_optimization(
         if strategy_id and (now - _last_progress_update) >= 0.05:
             _last_progress_update = now
             elapsed_now = now - start_time
-            speed_now = int(tested / max(elapsed_now, 0.001))
-            eta_now = int((total - tested) / max(speed_now, 1))
+            speed_now = round(tested / max(elapsed_now, 0.001), 1)
+            eta_now = int((total - tested) / speed_now) if speed_now > 0 else 0
             update_optimization_progress(
                 strategy_id,
                 status="running",
@@ -2112,8 +2239,8 @@ def _run_fast_rsi_threshold_optimization(
         # Log to console every 5%
         if tested > 0 and tested % log_interval == 0:
             elapsed_now = time.time() - start_time
-            speed_now = int(tested / max(elapsed_now, 0.001))
-            eta_now = int((total - tested) / max(speed_now, 1))
+            speed_now = round(tested / max(elapsed_now, 0.001), 1)
+            eta_now = int((total - tested) / speed_now) if speed_now > 0 else 0
             pct = tested * 100 // total if total > 0 else 0
             logger.info(
                 f"📊 Fast RSI optimization progress: {tested}/{total} ({pct}%) "
@@ -2193,8 +2320,8 @@ def _run_fast_rsi_threshold_optimization(
         if strategy_id and (now - _last_progress_update) >= 0.05:
             _last_progress_update = now
             elapsed_now = now - start_time
-            speed_now = int(tested / max(elapsed_now, 0.001))
-            eta_now = int((total - tested) / max(speed_now, 1))
+            speed_now = round(tested / max(elapsed_now, 0.001), 1)
+            eta_now = int((total - tested) / speed_now) if speed_now > 0 else 0
             update_optimization_progress(
                 strategy_id,
                 status="running",
@@ -2210,8 +2337,8 @@ def _run_fast_rsi_threshold_optimization(
         # Log to console every 5%
         if tested > 0 and tested % log_interval == 0:
             elapsed_now = time.time() - start_time
-            speed_now = int(tested / max(elapsed_now, 0.001))
-            eta_now = int((total - tested) / max(speed_now, 1))
+            speed_now = round(tested / max(elapsed_now, 0.001), 1)
+            eta_now = int((total - tested) / speed_now) if speed_now > 0 else 0
             pct = tested * 100 // total if total > 0 else 0
             logger.info(
                 f"📊 Fast RSI optimization progress: {tested}/{total} ({pct}%) "
@@ -2267,7 +2394,7 @@ def _run_fast_rsi_threshold_optimization(
         fallback_used = True
 
     execution_time = time.time() - start_time
-    speed = int(tested / max(execution_time, 0.001))
+    speed = round(tested / max(execution_time, 0.001), 1)
 
     logger.info(
         f"⚡ Fast RSI optimization complete: {tested}/{total} tested in {execution_time:.1f}s "
@@ -3135,6 +3262,37 @@ def combo_is_infeasible(overrides: dict[str, Any], base_graph: dict[str, Any]) -
     return build_infeasibility_checker(base_graph)(overrides)
 
 
+def _reeval_top_accurate(
+    top_results: list[dict[str, Any]],
+    base_graph: dict[str, Any],
+    ohlcv: pd.DataFrame,
+    config_params: dict[str, Any],
+    optimize_metric: str,
+    weights: dict[str, float] | None,
+) -> list[dict[str, Any]]:
+    """Variant A: re-evaluate top-N results with FallbackEngineV4 for optimizer-backtester parity.
+
+    NumbaEngineV2 (used during optimization trials for speed) silently ignores extra_data,
+    so profit_only / min_profit conditions in Close-by-Time are not enforced.
+    FallbackEngineV4 handles extra_data correctly — matching what the manual Backtest button produces.
+    """
+    from backend.optimization.scoring import calculate_composite_score
+
+    reeval_config = {**config_params, "engine_type": "fallback"}
+    accurate: list[dict[str, Any]] = []
+    for r in top_results:
+        modified_graph = clone_graph_with_params(base_graph, r["params"])
+        acc = run_builder_backtest(modified_graph, ohlcv, reeval_config)
+        if acc is not None:
+            score_raw = calculate_composite_score(acc, optimize_metric, weights or {})
+            score = _compress_score(score_raw, optimize_metric)
+            accurate.append({**r, **acc, "score_raw": score_raw, "score": score})
+    if not accurate:
+        return top_results
+    accurate.sort(key=lambda x: x["score"], reverse=True)
+    return accurate
+
+
 def run_builder_grid_search(
     base_graph: dict[str, Any],
     ohlcv: pd.DataFrame,
@@ -3497,7 +3655,7 @@ def run_builder_grid_search(
                         total=total,
                         best_score=_mx_top[0]["score"] if _mx_top else 0.0,
                         results_found=len(_mx_top),
-                        speed=int(_mx_tested / max(_mx_elapsed, 0.001)),
+                        speed=round(_mx_tested / max(_mx_elapsed, 0.001), 1),
                         eta_seconds=0,
                         started_at=start_time,
                     )
@@ -3516,7 +3674,7 @@ def run_builder_grid_search(
                     if _mx_top
                     else {},
                     "execution_time_seconds": round(_mx_elapsed, 2),
-                    "speed_combinations_per_sec": int(_mx_tested / max(_mx_elapsed, 0.001)),
+                    "speed_combinations_per_sec": round(_mx_tested / max(_mx_elapsed, 0.001), 1),
                     "early_stopped": False,
                     "optimize_metric": optimize_metric,
                     "numba_accelerated": True,
@@ -3629,8 +3787,8 @@ def run_builder_grid_search(
         # for the frontend. DCA backtests take 2-5s each, so this is cheap overhead.
         if strategy_id:
             elapsed_now = time.time() - start_time
-            speed = int(tested / max(elapsed_now, 0.001))
-            eta = int((total - tested) / max(speed, 1))
+            speed = round(tested / max(elapsed_now, 0.001), 1)
+            eta = int((total - tested) / speed) if speed > 0 else 0
             update_optimization_progress(
                 strategy_id,
                 status="running",
@@ -3646,8 +3804,8 @@ def run_builder_grid_search(
         # Log to console every 5% to avoid log spam
         if tested > 0 and tested % log_interval == 0:
             elapsed_now = time.time() - start_time
-            speed = int(tested / max(elapsed_now, 0.001))
-            eta = int((total - tested) / max(speed, 1))
+            speed = round(tested / max(elapsed_now, 0.001), 1)
+            eta = int((total - tested) / speed) if speed > 0 else 0
             pct = tested * 100 // total if total > 0 else 0
             _log_info(
                 f"📊 Builder optimization progress: {tested}/{total} ({pct}%) "
@@ -3719,11 +3877,15 @@ def run_builder_grid_search(
         top_results = _fb_candidates_gs[:max_results]
         fallback_used = True
 
+    # Variant A: re-evaluate top results with FallbackEngineV4 for metric parity
+    if top_results:
+        top_results = _reeval_top_accurate(top_results, base_graph, ohlcv, config_params, optimize_metric, weights)
+
     # Detect if best result has negative score for the optimize metric
     no_positive_results = bool(top_results and top_results[0].get("score", 0) < 0)
 
     execution_time = time.time() - start_time
-    speed = int(tested / max(execution_time, 0.001))
+    speed = round(tested / max(execution_time, 0.001), 1)
     timed_out = tested < total
 
     logger.info(
@@ -3766,6 +3928,86 @@ def run_builder_grid_search(
         "no_positive_results": no_positive_results,
         "optimize_metric": optimize_metric,
     }
+
+
+# =============================================================================
+# CROSS-BLOCK CONSTRAINT CLAMPING (shared by objective AND re-run)
+# =============================================================================
+
+
+def _apply_cross_block_constraints(
+    overrides: dict[str, Any],
+    param_specs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Apply cross-block constraints to parameter overrides.
+
+    Ensures structural consistency:
+    - MACD: fast_period < slow_period
+    - SL/TP: TP >= SL * 1.5 ONLY when no close_by_time block present
+      (strategies with close_by_time use time-exit as primary; TP < SL is valid)
+    - breakeven: activation < TP (clamped to 70% of TP)
+    - NOTE: min_profit >= TP + 2.0% removed — inverts close_by_time semantics
+      (min_profit < TP lets CBT close profitable trades before TP fires)
+
+    CRITICAL: Must be called in BOTH the objective function AND the re-run
+    top-N path.  trial.params stores values from suggest_*() BEFORE clamping,
+    so re-run with raw trial.params would produce a different backtest than
+    the original trial.
+
+    Args:
+        overrides: Dict mapping param_path to value (modified in-place).
+        param_specs: List of optimizable param specs.
+
+    Returns:
+        The same overrides dict (modified in-place) for convenience.
+    """
+    # ── MACD fast < slow constraint ─────────────────────────────────────────
+    for path in list(overrides.keys()):
+        if path.endswith("fast_period"):
+            slow_path = path[: -len("fast_period")] + "slow_period"
+            if slow_path in overrides:
+                fast_val = int(overrides[path])
+                slow_val = int(overrides[slow_path])
+                if slow_val <= fast_val:
+                    overrides[slow_path] = fast_val + 1
+
+    # ── SL/TP/close_by_time/breakeven constraints ───────────────────────────
+    _tp_path: str | None = None
+    _sl_path: str | None = None
+    _be_path: str | None = None
+    _has_close_by_time = any(s.get("block_type") == "close_by_time" for s in param_specs)
+    for _spec in param_specs:
+        _btype = _spec.get("block_type", "")
+        if _btype == "static_sltp":
+            if _spec.get("param_key") == "take_profit_percent":
+                _tp_path = _spec["param_path"]
+            elif _spec.get("param_key") == "stop_loss_percent":
+                _sl_path = _spec["param_path"]
+            elif _spec.get("param_key") == "breakeven_activation_percent":
+                _be_path = _spec["param_path"]
+
+    # TP >= SL * 1.5 (minimum risk/reward ratio).
+    # Skipped when close_by_time block is present — those strategies use time-exit
+    # as the primary exit mechanism and TP < SL is a valid design (quick profit + wide SL).
+    if (
+        _tp_path and _sl_path
+        and _tp_path in overrides and _sl_path in overrides
+        and not _has_close_by_time
+    ):
+        _tp_val_rr = float(overrides[_tp_path])
+        _sl_val_rr = float(overrides[_sl_path])
+        _min_tp = round(_sl_val_rr * 1.5, 2)
+        if _tp_val_rr < _min_tp:
+            overrides[_tp_path] = _min_tp
+
+    # breakeven_activation < TP (clamped to 70% of TP) — always valid.
+    if _tp_path and _be_path and _tp_path in overrides and _be_path in overrides:
+        _tp_val = float(overrides[_tp_path])
+        _be_val = float(overrides[_be_path])
+        if _be_val >= _tp_val:
+            overrides[_be_path] = round(_tp_val * 0.7, 2)
+
+    return overrides
 
 
 # =============================================================================
@@ -3863,19 +4105,70 @@ def run_builder_optuna_search(
 
     start_time = time.time()
 
-    # Clamp n_jobs to available CPUs
+    # Number of optimizable parameters — used to compute adaptive startup budgets.
+    _n_params = len(param_specs)
+
+    # P2: Auto-detect optimal n_jobs when set to 1 (default)
+    # Use min(4, cpu_count) for strategies with > 5 params (benefit outweighs overhead)
     _cpu_count = os.cpu_count() or 1
+    # Windows: multiprocessing uses spawn() — conflicts with Uvicorn's event loop.
+    # Optuna n_jobs > 1 spawns new processes that re-import the module and
+    # try to re-bind the same port → server crash. Force single-threaded on Windows.
+    import sys as _sys
+    if _sys.platform == "win32":
+        if n_jobs > 1:
+            logger.info(
+                f"P2: Windows detected — forcing n_jobs=1 (spawn-based multiprocessing "
+                f"conflicts with Uvicorn; requested n_jobs={n_jobs})"
+            )
+        n_jobs = 1
+    elif n_jobs <= 1 and _n_params >= 5 and _cpu_count >= 2:
+        n_jobs = min(4, _cpu_count)
+        logger.info(f"P2: Auto-enabled parallel trials: n_jobs={n_jobs} (params={_n_params}, CPUs={_cpu_count})")
+
+    # Clamp n_jobs to available CPUs
     effective_n_jobs = max(1, min(n_jobs, _cpu_count))
+
+    # P2-MEM: Memory-aware n_jobs capping — prevent OOM crashes on large datasets.
+    # Each parallel trial holds: OHLCV copy (~8 cols × 8B × N rows), engine state,
+    # indicator buffers (~3× OHLCV), signal arrays, and trade objects.
+    # Empirical estimate: ~500 bytes/candle per trial (conservative upper bound).
+    _n_candles = len(ohlcv)
+    _BYTES_PER_CANDLE_PER_TRIAL = 500
+    _est_mem_per_trial_mb = (_n_candles * _BYTES_PER_CANDLE_PER_TRIAL) / (1024 * 1024)
+    try:
+        import psutil
+
+        _avail_mb = psutil.virtual_memory().available / (1024 * 1024)
+        # Reserve 30% of available RAM for OS + uvicorn + other services
+        _usable_mb = _avail_mb * 0.7
+        _max_jobs_by_mem = max(1, int(_usable_mb / max(_est_mem_per_trial_mb, 1)))
+        if _max_jobs_by_mem < effective_n_jobs:
+            logger.warning(
+                f"P2-MEM: Reducing n_jobs {effective_n_jobs}→{_max_jobs_by_mem} "
+                f"(avail={_avail_mb:.0f}MB, est/trial={_est_mem_per_trial_mb:.0f}MB, "
+                f"candles={_n_candles})"
+            )
+            effective_n_jobs = _max_jobs_by_mem
+    except ImportError:
+        # psutil not available — use heuristic: >30K candles → reduce to max 2 jobs
+        if _n_candles > 30_000 and effective_n_jobs > 2:
+            logger.warning(
+                f"P2-MEM: Capping n_jobs {effective_n_jobs}→2 (no psutil, candles={_n_candles} > 30K threshold)"
+            )
+            effective_n_jobs = 2
+
     if effective_n_jobs > 1:
-        logger.info(f"Optuna parallel search: n_jobs={effective_n_jobs} (CPUs={_cpu_count})")
+        logger.info(
+            f"Optuna parallel search: n_jobs={effective_n_jobs} "
+            f"(CPUs={_cpu_count}, candles={_n_candles}, "
+            f"est_mem/trial={_est_mem_per_trial_mb:.1f}MB)"
+        )
 
     # Store all results (before min_trades filter) for fallback display.
     # Protected by a lock when n_jobs > 1 (multiple threads write concurrently).
     all_trial_results: list[dict[str, Any]] = []
     _results_lock = threading.Lock()
-
-    # Number of optimizable parameters — used to compute adaptive startup budgets.
-    _n_params = len(param_specs)
 
     # ── Native constraint function for Optuna's constrained BO ───────────────
     # Constraint values ≤ 0 = feasible; > 0 = violated.
@@ -4049,6 +4342,30 @@ def run_builder_optuna_search(
         if _enqueued:
             logger.info(f"Warm-start: enqueued {_enqueued} trials from previous optimization run")
 
+    # ── P0-P3: Performance optimization setup ──────────────────────────────
+    # P0: Indicator cache — shared across trials (thread-safe)
+    _indicator_cache = IndicatorCache(max_size=1024)
+
+    # P1: Mutable graph updater — one per thread for n_jobs > 1
+    # (stored in thread-local for safety)
+    import threading as _opt_threading
+
+    _graph_updater_local = _opt_threading.local()
+
+    def _get_graph_updater() -> MutableGraphUpdater:
+        """Get or create thread-local MutableGraphUpdater."""
+        if not hasattr(_graph_updater_local, "updater"):
+            _graph_updater_local.updater = MutableGraphUpdater(base_graph)
+        return _graph_updater_local.updater
+
+    # P3: Precompute OHLCV arrays once
+    _precomputed = PrecomputedOHLCV(ohlcv)
+    _ohlcv_fp = _ohlcv_fingerprint(ohlcv)
+
+    # Track best score for P4 early pruning
+    _best_score_so_far: list[float] = [float("-inf")]
+    _best_score_lock = _opt_threading.Lock()
+
     def objective(trial: optuna.Trial) -> float:
         """Optuna objective function for builder strategy."""
         # Suggest parameters
@@ -4063,75 +4380,62 @@ def run_builder_optuna_search(
                 val = trial.suggest_float(path, float(spec["low"]), float(spec["high"]), step=float(spec["step"]))
                 overrides[path] = val
 
-        # Enforce fast_period < slow_period for MACD blocks (cross-param constraint).
-        # param_path format is "{block_id}.{param_key}", so both share the same block prefix.
-        for path in list(overrides.keys()):
-            if path.endswith("fast_period"):
-                slow_path = path[: -len("fast_period")] + "slow_period"
-                if slow_path in overrides:
-                    fast_val = int(overrides[path])
-                    slow_val = int(overrides[slow_path])
-                    if slow_val <= fast_val:
-                        overrides[slow_path] = fast_val + 1
+        # Enforce fast_period < slow_period for MACD blocks + cross-block
+        # constraints (TP/SL/breakeven/close_by_time). Centralised so the same
+        # clamping is applied both here AND in the re-run top-N path.
+        _apply_cross_block_constraints(overrides, param_specs)
 
-        # ── Cross-block constraints ─────────────────────────────────────────────
-        # These prevent structurally dead configurations where one block can never
-        # fire because another block's exit condition pre-empts it.
-        #
-        # Find take_profit and close_by_time.min_profit paths by scanning param_specs.
-        _tp_path: str | None = None
-        _sl_path: str | None = None
-        _mp_path: str | None = None
-        _be_path: str | None = None
-        for _spec in param_specs:
-            _btype = _spec.get("block_type", "")
-            if _btype == "static_sltp":
-                if _spec.get("param_key") == "take_profit_percent":
-                    _tp_path = _spec["param_path"]
-                elif _spec.get("param_key") == "stop_loss_percent":
-                    _sl_path = _spec["param_path"]
-                elif _spec.get("param_key") == "breakeven_activation_percent":
-                    _be_path = _spec["param_path"]
-            elif _btype == "close_by_time" and _spec.get("param_key") == "min_profit_percent":
-                _mp_path = _spec["param_path"]
+        # P1: Use MutableGraphUpdater instead of deepcopy per trial
+        _updater = _get_graph_updater()
+        modified_graph = _updater.apply(overrides)
 
-        # Enforce TP >= SL * 1.5 (minimum risk/reward ratio 1:1.5).
-        # Without this constraint, the optimizer wastes trials on configurations
-        # where TP < SL — which are mathematically unprofitable at any win rate below ~60%.
-        if _tp_path and _sl_path and _tp_path in overrides and _sl_path in overrides:
-            _tp_val_rr = float(overrides[_tp_path])
-            _sl_val_rr = float(overrides[_sl_path])
-            _min_tp = round(_sl_val_rr * 1.5, 2)
-            if _tp_val_rr < _min_tp:
-                overrides[_tp_path] = _min_tp
+        _TRIAL_TIMEOUT_S = 120  # abort any trial that blocks longer than 2 minutes
+        _res: list[Any] = [None]
+        _exc: list[BaseException | None] = [None]
 
-        if _tp_path and _tp_path in overrides:
-            _tp_val = float(overrides[_tp_path])
-            # close_by_time.min_profit_percent MUST be > take_profit_percent.
-            # If min_profit <= TP, the time-based exit fires BEFORE TP, cutting gains
-            # short and creating a "false" win at a lower level than intended.
-            # Correct behavior (matching the baseline Sharpe=0.620):
-            #   min_profit=5.0 > TP=2.5 → TP fires first, close_by_time is a no-op for winners.
-            # Rule: min_profit >= TP + 2.0% (TP fires first with meaningful buffer).
-            if _mp_path and _mp_path in overrides:
-                _mp_val = float(overrides[_mp_path])
-                _mp_min = _tp_val + 2.0
-                if _mp_val < _mp_min:
-                    overrides[_mp_path] = round(_mp_min, 2)
-            # breakeven_activation must be strictly less than TP, with meaningful headroom.
-            # If activation >= TP, breakeven kicks in at the same moment TP fires — useless.
-            # Clamp to 70% of TP.
-            if _be_path and _be_path in overrides:
-                _be_val = float(overrides[_be_path])
-                if _be_val >= _tp_val:
-                    overrides[_be_path] = round(_tp_val * 0.7, 2)
+        def _run_trial() -> None:
+            try:
+                _res[0] = run_builder_backtest(modified_graph, ohlcv, config_params, indicator_cache=_indicator_cache)
+            except BaseException as _e:
+                _exc[0] = _e
 
-        # Clone graph and run backtest
-        modified_graph = clone_graph_with_params(base_graph, overrides)
-        result = run_builder_backtest(modified_graph, ohlcv, config_params)
+        _t = threading.Thread(target=_run_trial, daemon=True)
+        _t.start()
+        _t.join(timeout=_TRIAL_TIMEOUT_S)
 
-        if result is None:
+        # P1: Restore graph state after trial (before any early return)
+        _updater.restore()
+
+        if _t.is_alive():
+            logger.warning(
+                "Trial %d timed out after %ds — pruning",
+                trial.number,
+                _TRIAL_TIMEOUT_S,
+            )
             raise optuna.TrialPruned()
+        if _exc[0] is not None:
+            raise _exc[0]
+        result = _res[0]
+
+        # P4: Early pruning for structurally broken trials.
+        # Return a severe penalty score instead of TrialPruned() so the trial
+        # counts as COMPLETE (preserves tested_combinations semantics) but
+        # is ranked last and filtered out by passes_filters().
+        with _best_score_lock:
+            _current_best = _best_score_so_far[0]
+            _n_tested_so_far = len(all_trial_results)
+        if should_prune_early(result, config_params, _current_best, _n_tested_so_far):
+            _penalty_score = -1e6
+            with _results_lock:
+                all_trial_results.append(
+                    {
+                        "params": dict(overrides),
+                        "score": _penalty_score,
+                        "_trial_number": trial.number,
+                        **(result or {}),
+                    }
+                )
+            return _penalty_score
 
         # Always store result before applying min_trades filter (for fallback).
         # Lock protects the shared list when multiple threads write concurrently.
@@ -4162,13 +4466,18 @@ def run_builder_optuna_search(
             )
             _n_tested = len(all_trial_results)
 
+        # P4: Update best score for early pruning (thread-safe)
+        with _best_score_lock:
+            if score_raw > _best_score_so_far[0]:
+                _best_score_so_far[0] = score_raw
+
         # Update progress for frontend polling (every trial)
         if strategy_id:
             _best = max((r["score"] for r in all_trial_results), default=0.0)
             _elapsed = time.time() - start_time
-            _speed = int(_n_tested / max(_elapsed, 1))
+            _speed = round(_n_tested / max(_elapsed, 1), 1)
             _remaining = (n_trials - _n_tested) if n_trials else 0
-            _eta = int(_remaining / max(_speed, 1)) if _speed > 0 else 0
+            _eta = int(_remaining / _speed) if _speed > 0 else 0
             update_optimization_progress(
                 strategy_id,
                 status="running",
@@ -4202,6 +4511,42 @@ def run_builder_optuna_search(
         _min_wr = config_params.get("min_win_rate")
         if _min_wr is not None:
             _violations.append(float(_min_wr) - float(result.get("win_rate", 0) or 0) / 100.0)
+
+        # Dynamic constraints from EvaluationCriteriaPanel (grid/random apply these via
+        # passes_filters; Bayesian path must wire them into Optuna's constraint mechanism
+        # so the surrogate model also learns to avoid infeasible regions).
+        # Convention: violation > 0 → constraint violated; ≤ 0 → satisfied.
+        _dyn_constraints = config_params.get("constraints") or []
+        for _c in _dyn_constraints:
+            _m = _c.get("metric")
+            _op = _c.get("operator")
+            _thr = _c.get("value")
+            if not (_m and _op and _thr is not None):
+                continue
+            _metric_key = "total_trades" if _m == "min_trades" else _m
+            _raw = result.get(_metric_key)
+            try:
+                _val = float(_raw) if _raw is not None else 0.0
+                if not math.isfinite(_val):
+                    _val = 0.0
+            except (TypeError, ValueError):
+                _val = 0.0
+            # For drawdown, use absolute value
+            if _m in ("max_drawdown", "avg_drawdown") and _val < 0:
+                _val = abs(_val)
+            try:
+                _thr_f = float(_thr)
+                if _op == "<=":
+                    _violations.append(_val - _thr_f)      # >0 if value exceeds threshold
+                elif _op == ">=":
+                    _violations.append(_thr_f - _val)      # >0 if value below threshold
+                elif _op == "<":
+                    _violations.append(_val - _thr_f + 1e-9)
+                elif _op == ">":
+                    _violations.append(_thr_f - _val + 1e-9)
+            except (TypeError, ValueError):
+                pass
+
         trial.set_user_attr("constraint", _violations if _violations else [0.0])
 
         # With native constrained BO, return the true score for ALL trials.
@@ -4262,22 +4607,33 @@ def run_builder_optuna_search(
             deduped_passing.append(_t)
     top_trials = deduped_passing[:top_n]
 
-    # Re-run top-N for full metrics (suppress verbose logging — same as during study.optimize)
+    # Re-run top-N with FallbackEngineV4 for accurate metrics (Variant A parity fix).
+    # NumbaEngineV2 ignores extra_data → profit_only/min_profit in Close-by-Time silently dropped.
+    # Using fallback engine here ensures results match what the manual Backtest button produces.
+    _reeval_config = {**config_params, "engine_type": "fallback"}
     _loguru_logger.disable(_quiet_prefix)
     _loguru_logger.disable("backend.core")
     top_results: list[dict[str, Any]] = []
     try:
         for trial in top_trials:
-            overrides = trial.params
+            # CRITICAL: trial.params stores PRE-constraint values from suggest_*().
+            # Must re-apply the same cross-block constraints that the objective used,
+            # otherwise the re-run backtest uses different params than the original trial.
+            overrides = dict(trial.params)  # copy to avoid mutating Optuna internals
+            _apply_cross_block_constraints(overrides, param_specs)
             modified_graph = clone_graph_with_params(base_graph, overrides)
-            result = run_builder_backtest(modified_graph, ohlcv, config_params)
+            result = run_builder_backtest(modified_graph, ohlcv, _reeval_config)
 
             if result is not None:
-                score = calculate_composite_score(result, optimize_metric, weights)
+                score_raw = calculate_composite_score(result, optimize_metric, weights)
+                # Compress so re-run scores match objective scores and OOS
+                # validation compares like-for-like (both compressed).
+                score = _compress_score(score_raw, optimize_metric)
                 top_results.append(
                     {
                         "params": overrides,
                         "score": score,
+                        "score_raw": score_raw,
                         "trial_number": trial.number,
                         **result,
                     }
@@ -4288,6 +4644,10 @@ def run_builder_optuna_search(
 
     # Sort by score
     top_results.sort(key=lambda r: r["score"], reverse=True)
+
+    # Pareto post-processing: re-score top results by NP/DD balance (mirrors grid/random paths)
+    if optimize_metric == "pareto_balance" and top_results:
+        apply_pareto_scores(top_results)
 
     # ── P1-1: GT-Score post-processing (optional, opt-in via config_params) ──
     if config_params.get("run_gt_score", False) and top_results:
@@ -4329,18 +4689,27 @@ def run_builder_optuna_search(
     param_importance_low: list[str] = []
     if len(completed_trials) >= 30:
         try:
+            # Try fast fANOVA first, then default Optuna evaluator (version-agnostic).
+            # FanovaImportanceEvaluator was removed/moved in Optuna 4.x; the default
+            # evaluator (PedANOVA / MeanDecreaseImpurity) is always available.
+            _evaluator = None
             try:
                 from optuna_fast_fanova import FanovaImportanceEvaluator as _FanovaEval
+                _evaluator = _FanovaEval(seed=42)
             except ImportError:
-                from optuna.importance import FanovaImportanceEvaluator as _FanovaEval
+                try:
+                    from optuna.importance import FanovaImportanceEvaluator as _FanovaEval
+                    _evaluator = _FanovaEval(seed=42)
+                except (ImportError, AttributeError):
+                    pass  # Use default evaluator below
 
             importance_result = optuna.importance.get_param_importances(
                 study,
-                evaluator=_FanovaEval(seed=42),
+                evaluator=_evaluator,  # None → Optuna default (always works)
                 params=None,
             )
             param_importance = {k: round(float(v), 4) for k, v in importance_result.items()}
-            logger.info(f"fANOVA param importance: {param_importance}")
+            logger.info(f"Param importance: {param_importance}")
 
             # Tag low-importance params (<5%) — candidates for fixing in next optimization
             param_importance_low = [p for p, imp in param_importance.items() if imp < 0.05]
@@ -4348,7 +4717,7 @@ def run_builder_optuna_search(
                 logger.info(f"Low-importance params (consider fixing): {param_importance_low}")
 
         except Exception as _fanova_err:
-            logger.warning(f"fANOVA importance failed (non-critical): {_fanova_err}")
+            logger.warning(f"Param importance failed (non-critical): {_fanova_err}")
 
     # ── P2-1: CSCV validation (optional, opt-in via config_params) ──
     cscv_result: dict = {}
@@ -4464,6 +4833,8 @@ def run_builder_optuna_search(
         "dsr_warning": dsr_value is not None and not math.isnan(dsr_value) and dsr_value < 0.1,
         # P2-1: CSCV
         "cscv": cscv_result if cscv_result else None,
+        # Performance optimization stats (P0-P4)
+        "indicator_cache_stats": _indicator_cache.stats,
     }
 
 
@@ -4821,8 +5192,8 @@ def run_builder_walk_forward(
         oos_score = calculate_composite_score(oos_metrics, optimize_metric, weights) if oos_metrics else 0.0
 
         # Degradation: how much worse is OOS vs IS
-        is_ret = best_is_metrics.get("total_return_pct", 0.0) or 0.0
-        oos_ret = (oos_metrics or {}).get("total_return_pct", 0.0) or 0.0
+        is_ret = best_is_metrics.get("total_return", 0.0) or 0.0
+        oos_ret = (oos_metrics or {}).get("total_return", 0.0) or 0.0
         is_sharpe = best_is_metrics.get("sharpe_ratio", 0.0) or 0.0
         oos_sharpe = (oos_metrics or {}).get("sharpe_ratio", 0.0) or 0.0
         return_degradation = (oos_ret / is_ret - 1.0) if is_ret != 0 else 0.0
@@ -4851,13 +5222,13 @@ def run_builder_walk_forward(
             "is_metrics": {
                 "return_pct": round(is_ret, 2),
                 "sharpe": round(is_sharpe, 3),
-                "max_drawdown_pct": round(best_is_metrics.get("max_drawdown_pct", 0.0) or 0.0, 2),
+                "max_drawdown_pct": round(best_is_metrics.get("max_drawdown", 0.0) or 0.0, 2),
                 "trades": best_is_metrics.get("total_trades", 0) or 0,
             },
             "oos_metrics": {
                 "return_pct": round(oos_ret, 2),
                 "sharpe": round(oos_sharpe, 3),
-                "max_drawdown_pct": round((oos_metrics or {}).get("max_drawdown_pct", 0.0) or 0.0, 2),
+                "max_drawdown_pct": round((oos_metrics or {}).get("max_drawdown", 0.0) or 0.0, 2),
                 "trades": (oos_metrics or {}).get("total_trades", 0) or 0,
             },
             "degradation": {
@@ -4920,6 +5291,10 @@ def run_builder_walk_forward(
         if consistency_ratio >= 0.5 and overfit_score < 0.6
         else "low"
     )
+
+    # Pareto post-processing: re-score OOS results by NP/DD balance (mirrors grid/Bayesian paths)
+    if optimize_metric == "pareto_balance" and oos_results_all:
+        apply_pareto_scores(oos_results_all)
 
     # Sort OOS results for top_results
     oos_results_all.sort(key=lambda r: r["score"], reverse=True)

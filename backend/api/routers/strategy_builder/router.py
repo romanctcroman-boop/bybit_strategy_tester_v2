@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
+from backend.config.constants import COMMISSION_TV, DEFAULT_SLIPPAGE
 from backend.database import get_db
 from backend.database.models import (
     Backtest,
@@ -320,13 +321,23 @@ class BuilderOptimizationRequest(BaseModel):
         default=1.0, ge=0.01, le=1.0, description="Position size as fraction of capital (0.1 = 10%)"
     )
     commission: float = Field(
-        default=0.00055,
+        default=COMMISSION_TV,
         ge=0,
         le=1.0,
-        description="Commission rate (0.00055 = Bybit linear taker, auto-converts from percent)",
+        description="Commission rate as decimal (0.0007 = 0.07%). Must match BacktestRequest default for parity.",
     )
-    slippage: float = Field(default=0.0, ge=0, le=0.01, description="Slippage per side (0.0005 = 0.05%)")
+    slippage: float = Field(
+        default=DEFAULT_SLIPPAGE,
+        ge=0,
+        le=0.01,
+        description="Slippage per side (0.0005 = 0.05%). Must match BacktestRequest default for parity.",
+    )
     direction: str = Field(default="both", description="Trading direction: long/short/both")
+    pyramiding: int = Field(default=1, ge=1, le=10, description="Max concurrent positions")
+    no_trade_days: list[int] = Field(
+        default_factory=list,
+        description="Days of week to skip (0=Mon...6=Sun, Python weekday format)",
+    )
 
     # Optimization method
     method: str = Field(
@@ -388,6 +399,42 @@ class BuilderOptimizationRequest(BaseModel):
     # P2-1: CSCV (opt-in)
     run_cscv: bool = Field(default=False, description="Enable CSCV overfitting validation")
     cscv_n_splits: int = Field(default=16, ge=4, le=32, description="Number of CSCV chronological splits")
+
+    # ── Optimization Hardening (2026-04-18) — opt-in ─────────────────────
+    # See docs/architecture/OPTIMIZATION_HARDENING.md for rationale.
+    use_hyperband_pruner: bool = Field(
+        default=False,
+        description="Use HyperbandPruner instead of MedianPruner (better for objectives "
+        "that report intermediate values, e.g. walk-forward folds).",
+    )
+    apply_overfit_guards: bool = Field(
+        default=False,
+        description="Annotate top results with anti-phantom-optimum guard checks "
+        "(min trades, drawdown, profit factor, etc.). Adds 'guard_passed' and "
+        "'guard_violations' fields per result.",
+    )
+    overfit_guard_min_trades: int | None = Field(
+        default=None, ge=1, description="Override default min_trades guard (default: 30)."
+    )
+    overfit_guard_max_drawdown_pct: float | None = Field(
+        default=None, ge=1.0, le=99.0, description="Override default max_drawdown_pct guard (default: 50)."
+    )
+    overfit_guard_min_profit_factor: float | None = Field(
+        default=None, ge=0.5, le=5.0, description="Override default min_profit_factor guard (default: 1.0)."
+    )
+    run_post_grid_refine: bool = Field(
+        default=False,
+        description="After Bayesian search, refine the top-K results with a small "
+        "±pct local Cartesian grid. Catches sharp peaks the surrogate smoothed over.",
+    )
+    post_grid_top_k: int = Field(default=5, ge=1, le=20, description="Number of top trials to refine.")
+    post_grid_pct: float = Field(
+        default=0.20, ge=0.05, le=0.50, description="Half-width of the local box, fraction of param range."
+    )
+    post_grid_steps: int = Field(default=3, ge=2, le=7, description="Grid points per dimension.")
+    post_grid_max_evals: int = Field(
+        default=500, ge=10, le=5000, description="Hard cap on total refinement evaluations."
+    )
 
     @field_validator("interval")
     @classmethod
@@ -949,7 +996,7 @@ async def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
 @router.post("/strategies/{strategy_id}/clone")
 async def clone_strategy(
     strategy_id: str,
-    new_name: str | None = None,
+    new_name: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
 ):
     """Clone a strategy builder strategy in the database"""
@@ -970,7 +1017,7 @@ async def clone_strategy(
             detail=f"Strategy {strategy_id} not found",
         )
 
-    clone_name = new_name or f"{db_strategy.name} (copy)"
+    clone_name = (new_name or f"{db_strategy.name} (copy)")[:100]
     cloned = Strategy(
         id=str(uuid.uuid4()),
         name=clone_name,
@@ -1727,6 +1774,411 @@ async def diff_strategy_versions(strategy_id: str, version_id_1: str, version_id
 # === Optimization Endpoints ===
 
 
+async def _execute_optimization_bg(
+    strategy_id: str,
+    strategy_name: str,
+    request: "BuilderOptimizationRequest",
+    strategy_graph: dict[str, Any],
+    all_params: list[dict[str, Any]],
+    step_warnings: list[str],
+    ohlcv: Any,
+) -> None:
+    """Background optimization task.  Runs after the POST endpoint returns 202.
+    Stores the final result via store_optimization_result() for retrieval via
+    GET /optimize/results.  Updates progress to 'failed' on any error.
+    """
+    from backend.optimization.builder_optimizer import (
+        _merge_ranges,
+        clear_optimization_progress,
+        generate_builder_param_combinations,
+        run_builder_grid_search,
+        run_builder_optuna_multi_objective,
+        run_builder_optuna_search,
+        run_builder_walk_forward,
+        split_ohlcv_is_oos,
+        store_optimization_result,
+        update_optimization_progress,
+    )
+
+    ohlcv_len = len(ohlcv) if ohlcv is not None else 0
+
+    _no_trade_days_tuple = (
+        tuple(request.no_trade_days) if request.no_trade_days is not None and len(request.no_trade_days) > 0 else ()
+    )
+    config_params = {
+        "symbol": request.symbol,
+        "interval": request.interval,
+        "initial_capital": request.initial_capital,
+        "leverage": request.leverage,
+        "position_size": request.position_size,
+        "commission": request.commission,
+        "slippage": request.slippage,
+        "direction": request.direction,
+        "pyramiding": request.pyramiding,
+        "no_trade_days": _no_trade_days_tuple,
+        "use_fixed_amount": False,
+        "fixed_amount": 0.0,
+        "engine_type": "fallback",
+        "optimize_metric": request.optimize_metric,
+        "weights": request.weights,
+        "constraints": request.constraints,
+        "min_trades": request.min_trades,
+        "warmup_cutoff": request.start_date,
+        "run_gt_score": request.run_gt_score,
+        "gt_score_top_n": request.gt_score_top_n,
+        "gt_score_neighbors": request.gt_score_neighbors,
+        "gt_score_epsilon": request.gt_score_epsilon,
+        "run_cscv": request.run_cscv,
+        "cscv_n_splits": request.cscv_n_splits,
+        # Optimization Hardening (2026-04-18): consumed by builder_optimizer
+        "use_hyperband_pruner": request.use_hyperband_pruner,
+    }
+
+    _internal_max_results = request.max_results
+    if request.ranking_mode in ("balanced", "weighted") and request.ranking_mode != "single":
+        _internal_max_results = max(request.max_results, 500)
+
+    try:
+        if request.method == "bayesian":
+            custom_ranges = request.parameter_ranges or None
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            _oos_ohlcv = None
+            _oos_split_info: dict = {}
+            if request.run_oos_validation:
+                ohlcv_for_opt, _oos_ohlcv, _oos_split_info = split_ohlcv_is_oos(
+                    ohlcv,
+                    oos_ratio=request.oos_ratio,
+                    oos_min_bars=200,
+                )
+                if _oos_split_info.get("oos_skipped"):
+                    logger.warning(f"OOS skipped: {_oos_split_info['reason']}")
+                    ohlcv_for_opt = ohlcv
+            else:
+                ohlcv_for_opt = ohlcv
+
+            result = await asyncio.to_thread(
+                run_builder_optuna_search,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv_for_opt,
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_trials=request.n_trials,
+                sampler_type=request.sampler_type,
+                top_n=_internal_max_results,
+                timeout_seconds=request.timeout_seconds,
+                n_jobs=request.n_jobs,
+                strategy_id=strategy_id,
+            )
+
+            if _oos_ohlcv is not None and isinstance(result, dict) and result.get("top_results"):
+                from backend.optimization.builder_optimizer import run_oos_validation
+
+                result["top_results"] = run_oos_validation(
+                    top_results=result["top_results"],
+                    base_graph=strategy_graph,
+                    oos_ohlcv=_oos_ohlcv,
+                    config_params=config_params,
+                    oos_cutoff_ts=_oos_split_info["oos_cutoff_ts"],
+                    n_top=5,
+                )
+                result["oos_split_info"] = _oos_split_info
+
+            # ── Optimization Hardening: post-grid local refinement ───────
+            # Re-evaluate a small ±pct grid around the top-K Bayesian trials
+            # using the existing batched grid-search engine. Catches sharp
+            # peaks that the TPE/CMA-ES surrogates smoothed over.
+            if request.run_post_grid_refine and isinstance(result, dict) and result.get("top_results"):
+                try:
+                    from backend.optimization import build_refinement_grid
+
+                    _seeds = result["top_results"][: request.post_grid_top_k]
+                    _grid_candidates = build_refinement_grid(
+                        top_trials=_seeds,
+                        param_specs=active_specs,
+                        pct=request.post_grid_pct,
+                        steps_per_param=request.post_grid_steps,
+                        max_evals=request.post_grid_max_evals,
+                    )
+                    logger.info(
+                        f"Post-grid refine: {len(_grid_candidates)} candidates "
+                        f"around top-{len(_seeds)} (pct={request.post_grid_pct:.0%}, "
+                        f"steps={request.post_grid_steps})"
+                    )
+                    if _grid_candidates:
+                        _refine_result = await asyncio.to_thread(
+                            run_builder_grid_search,
+                            base_graph=strategy_graph,
+                            ohlcv=ohlcv_for_opt,
+                            param_combinations=_grid_candidates,
+                            config_params=config_params,
+                            optimize_metric=request.optimize_metric,
+                            weights=request.weights,
+                            max_results=len(_grid_candidates),
+                            early_stopping=False,
+                            early_stopping_patience=20,
+                            timeout_seconds=max(60, request.timeout_seconds // 4),
+                            strategy_id=strategy_id,
+                            total_combinations=len(_grid_candidates),
+                        )
+                        # Merge: concat originals + grid results, dedup by params,
+                        # keep highest score, re-sort. Tag each with _source.
+                        _orig = [{**r, "_source": r.get("_source", "optuna")} for r in result["top_results"]]
+                        _grid = [{**r, "_source": "post_grid"} for r in (_refine_result.get("top_results") or [])]
+                        _seen: dict[tuple, dict] = {}
+                        for _r in [*_orig, *_grid]:
+                            _k = tuple(sorted((_r.get("params") or {}).items()))
+                            _prev = _seen.get(_k)
+                            if _prev is None or float(_r.get("score") or float("-inf")) > float(
+                                _prev.get("score") or float("-inf")
+                            ):
+                                _seen[_k] = _r
+                        _merged = sorted(
+                            _seen.values(),
+                            key=lambda r: float(r.get("score") or float("-inf")),
+                            reverse=True,
+                        )
+                        result["top_results"] = _merged[:_internal_max_results]
+                        result["post_grid_refine"] = {
+                            "candidates_evaluated": len(_grid),
+                            "improved": any(r["_source"] == "post_grid" for r in _merged[:5]),
+                            "pct": request.post_grid_pct,
+                            "steps_per_param": request.post_grid_steps,
+                        }
+                except Exception as _refine_exc:
+                    logger.warning(f"Post-grid refine failed (non-fatal): {_refine_exc}")
+                    if isinstance(result, dict):
+                        result.setdefault("warnings", []).append(f"post_grid_refine_failed: {_refine_exc}")
+
+        elif request.method == "multi_objective":
+            if not request.run_oos_validation:
+                update_optimization_progress(strategy_id, status="failed")
+                return
+
+            custom_ranges = request.parameter_ranges or None
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            is_ohlcv, oos_ohlcv, split_info = split_ohlcv_is_oos(ohlcv, oos_ratio=request.oos_ratio)
+            if oos_ohlcv is None:
+                update_optimization_progress(strategy_id, status="failed")
+                return
+
+            result = await asyncio.to_thread(
+                run_builder_optuna_multi_objective,
+                base_graph=strategy_graph,
+                is_ohlcv=is_ohlcv,
+                oos_ohlcv=oos_ohlcv,
+                oos_cutoff_ts=split_info["oos_cutoff_ts"],
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_trials=request.n_trials,
+                top_n=_internal_max_results,
+                timeout_seconds=request.timeout_seconds,
+                strategy_id=strategy_id,
+            )
+            result["oos_split_info"] = split_info
+
+        elif request.method == "walk_forward":
+            custom_ranges = request.parameter_ranges or None
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            wf_config = getattr(request, "walk_forward", None) or {}
+            n_splits = int(wf_config.get("n_splits", 5)) if wf_config else 5
+            train_ratio = float(wf_config.get("train_ratio", 0.7)) if wf_config else 0.7
+            gap_periods = int(wf_config.get("gap_periods", 0)) if wf_config else 0
+            inner_method = str(wf_config.get("inner_method", "grid")) if wf_config else "grid"
+
+            result = await asyncio.to_thread(
+                run_builder_walk_forward,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv,
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_splits=n_splits,
+                train_ratio=train_ratio,
+                gap_periods=gap_periods,
+                inner_method=inner_method,
+                max_iterations=request.max_iterations,
+                n_trials=request.n_trials,
+                sampler_type=request.sampler_type,
+                max_results=_internal_max_results,
+                timeout_seconds=request.timeout_seconds,
+            )
+
+        else:
+            search_method = "random" if request.method == "random_search" else "grid"
+            custom_ranges = request.parameter_ranges or None
+            param_combinations, _total, _ = await asyncio.to_thread(
+                generate_builder_param_combinations,
+                param_specs=all_params,
+                custom_ranges=custom_ranges,
+                search_method=search_method,
+                max_iterations=request.max_iterations,
+                random_seed=42,
+            )
+            result = await asyncio.to_thread(
+                run_builder_grid_search,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv,
+                param_combinations=param_combinations,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                max_results=_internal_max_results,
+                early_stopping=request.early_stopping,
+                early_stopping_patience=request.early_stopping_patience,
+                timeout_seconds=request.timeout_seconds,
+                strategy_id=strategy_id,
+                total_combinations=_total,
+            )
+
+        # Post-processing: EvaluationCriteriaPanel ranking modes
+        _results_key = "top_results" if isinstance(result, dict) and "top_results" in result else "results"
+        if isinstance(result, dict) and _results_key in result:
+            from backend.optimization.scoring import (
+                apply_custom_sort_order,
+                apply_weighted_composite_scores,
+                rank_by_multi_criteria,
+            )
+
+            results_list = result[_results_key]
+            if request.ranking_mode == "balanced" and request.secondary_metrics:
+                all_criteria = list(dict.fromkeys([request.optimize_metric, *request.secondary_metrics]))
+                results_list = rank_by_multi_criteria(results_list, all_criteria)
+            elif request.ranking_mode == "weighted" and request.use_composite and request.weights:
+                results_list = apply_weighted_composite_scores(results_list, request.weights)
+            if request.sort_order:
+                results_list = apply_custom_sort_order(results_list, request.sort_order)
+            result[_results_key] = results_list[: request.max_results]
+            if results_list:
+                result["best_metrics"] = {k: v for k, v in results_list[0].items() if k not in ("params", "score")}
+                result["best_params"] = results_list[0].get("params", result.get("best_params", {}))
+                result["best_score"] = results_list[0].get("score", result.get("best_score", 0))
+
+            # ── Optimization Hardening: overfit guard annotations ────────
+            # Annotate (do not drop) each result with anti-phantom-optimum
+            # checks. UI can show a badge for results with guard failures.
+            if request.apply_overfit_guards:
+                try:
+                    from backend.optimization import (
+                        evaluate_overfit_guards,
+                        thresholds_from_config,
+                    )
+
+                    _guard_th = thresholds_from_config(config_params)
+                    # Apply request-level overrides on top of config defaults.
+                    _overrides: dict[str, Any] = {}
+                    if request.overfit_guard_min_trades is not None:
+                        _overrides["min_trades"] = request.overfit_guard_min_trades
+                    if request.overfit_guard_max_drawdown_pct is not None:
+                        _overrides["max_drawdown_pct"] = request.overfit_guard_max_drawdown_pct
+                    if request.overfit_guard_min_profit_factor is not None:
+                        _overrides["min_profit_factor"] = request.overfit_guard_min_profit_factor
+                    if _overrides:
+                        from dataclasses import replace as _dc_replace
+
+                        _guard_th = _dc_replace(_guard_th, **_overrides)
+
+                    _n_bars = len(ohlcv) if ohlcv is not None else None
+                    _guard_pass = 0
+                    _guard_fail = 0
+                    for _r in result[_results_key]:
+                        _gr = evaluate_overfit_guards(_r, thresholds=_guard_th, n_bars=_n_bars)
+                        _r["guard_passed"] = _gr.passed
+                        _r["guard_violations"] = list(_gr.failed_guards)
+                        if _gr.passed:
+                            _guard_pass += 1
+                        else:
+                            _guard_fail += 1
+                    result["overfit_guards"] = {
+                        "applied": True,
+                        "passed": _guard_pass,
+                        "failed": _guard_fail,
+                        "thresholds": {
+                            "min_trades": _guard_th.min_trades,
+                            "max_drawdown_pct": _guard_th.max_drawdown_pct,
+                            "min_profit_factor": _guard_th.min_profit_factor,
+                            "min_sharpe_vs_buyhold": _guard_th.min_sharpe_vs_buyhold,
+                            "max_consecutive_losses": _guard_th.max_consecutive_losses,
+                            "reject_single_trade_winner": _guard_th.reject_single_trade_winner,
+                        },
+                    }
+                    logger.info(
+                        f"Overfit guards: {_guard_pass} passed, {_guard_fail} failed "
+                        f"(of {len(result[_results_key])} top results)"
+                    )
+                except Exception as _guard_exc:
+                    logger.warning(f"Overfit guards failed (non-fatal): {_guard_exc}")
+                    if isinstance(result, dict):
+                        result.setdefault("warnings", []).append(f"overfit_guards_failed: {_guard_exc}")
+
+        result = _sanitize_for_json(result)
+
+        _response_warnings = list(step_warnings)
+        if isinstance(result, dict) and result.get("warnings"):
+            _response_warnings.extend(result["warnings"])
+
+        response_data = {
+            "strategy_id": strategy_id,
+            "strategy_name": strategy_name,
+            "optimize_metric": request.optimize_metric,
+            "warnings": _response_warnings,
+            "optimizable_params": [
+                {
+                    "param_path": p["param_path"],
+                    "block_type": p["block_type"],
+                    "block_name": p["block_name"],
+                    "param_key": p["param_key"],
+                    "type": p["type"],
+                    "low": p["low"],
+                    "high": p["high"],
+                    "step": p["step"],
+                    "current_value": p["current_value"],
+                    "step_clamped": p.get("step_clamped", False),
+                }
+                for p in all_params
+            ],
+            "optimization_context": {
+                "symbol": request.symbol,
+                "interval": request.interval,
+                "start_date": ohlcv.index[0].strftime("%Y-%m-%d")
+                if ohlcv is not None and len(ohlcv) > 0
+                else request.start_date,
+                "end_date": ohlcv.index[-1].strftime("%Y-%m-%d")
+                if ohlcv is not None and len(ohlcv) > 0
+                else request.end_date,
+                "market_type": request.market_type,
+                "initial_capital": request.initial_capital,
+                "position_size": request.position_size,
+                "leverage": request.leverage,
+                "commission": request.commission,
+                "slippage": request.slippage,
+                "direction": request.direction,
+            },
+            **result,
+        }
+        store_optimization_result(strategy_id, response_data)
+
+    except asyncio.CancelledError:
+        logger.warning(f"Builder optimization cancelled (background task): {strategy_id}")
+        clear_optimization_progress(strategy_id)
+    except MemoryError:
+        logger.critical(f"Builder optimization OOM: {strategy_id} (candles={ohlcv_len}, n_trials={request.n_trials})")
+        import gc
+
+        gc.collect()
+        update_optimization_progress(strategy_id, status="failed")
+    except Exception as e:
+        logger.error(f"Builder optimization failed (background): {e}", exc_info=True)
+        update_optimization_progress(strategy_id, status="failed")
+
+
 @router.post("/strategies/{strategy_id}/optimize")
 async def optimize_strategy(
     strategy_id: str,
@@ -1740,13 +2192,7 @@ async def optimize_strategy(
     (Grid/Random/Optuna), clones graphs with modified params, runs backtests
     via StrategyBuilderAdapter, and returns ranked results.
     """
-    from backend.optimization.builder_optimizer import (
-        extract_optimizable_params,
-        generate_builder_param_combinations,
-        run_builder_grid_search,
-        run_builder_optuna_search,
-        run_builder_walk_forward,
-    )
+    from backend.optimization.builder_optimizer import extract_optimizable_params
 
     # Fetch strategy from DB
     db_strategy = (
@@ -1787,6 +2233,14 @@ async def optimize_strategy(
     # Extract optimizable params from graph
     all_params = extract_optimizable_params(strategy_graph)
 
+    # Collect step-clamping warnings to surface in API response
+    _step_warnings: list[str] = [
+        f"[STEP_CLAMPED] Block '{p['block_name']}' param '{p['param_key']}': "
+        f"step {p['original_step']} → 1 (int params require step ≥ 1)"
+        for p in all_params
+        if p.get("step_clamped")
+    ]
+
     if not all_params and not request.parameter_ranges:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1810,6 +2264,19 @@ async def optimize_strategy(
         speed=0,
         eta_seconds=0,
         started_at=_time.time(),
+        context={
+            "symbol": request.symbol,
+            "interval": request.interval,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "market_type": request.market_type,
+            "initial_capital": request.initial_capital,
+            "position_size": request.position_size,
+            "leverage": request.leverage,
+            "commission": request.commission,
+            "slippage": request.slippage,
+            "direction": request.direction,
+        },
     )
 
     # Fetch OHLCV data (cached to avoid repeated Bybit API calls within a session)
@@ -1876,276 +2343,65 @@ async def optimize_strategy(
             detail=f"No data available for {request.symbol} {request.interval}",
         )
 
-    # Config params for backtest runner
-    config_params = {
-        "symbol": request.symbol,
-        "interval": request.interval,
-        "initial_capital": request.initial_capital,
-        "leverage": request.leverage,
-        "position_size": request.position_size,
-        "commission": request.commission,
-        "slippage": request.slippage,
-        "direction": request.direction,
-        "use_fixed_amount": False,
-        "fixed_amount": 0.0,
-        "engine_type": "numba",
-        "optimize_metric": request.optimize_metric,
-        "weights": request.weights,
-        "constraints": request.constraints,
-        "min_trades": request.min_trades,
-        "warmup_cutoff": request.start_date,  # slice signals/ohlcv to start_date after warm-start compute
-        # P1-1: GT-Score config (opt-in)
-        "run_gt_score": request.run_gt_score,
-        "gt_score_top_n": request.gt_score_top_n,
-        "gt_score_neighbors": request.gt_score_neighbors,
-        "gt_score_epsilon": request.gt_score_epsilon,
-        # P2-1: CSCV config (opt-in)
-        "run_cscv": request.run_cscv,
-        "cscv_n_splits": request.cscv_n_splits,
-    }
-
-    # For balanced/weighted modes, collect a much larger candidate pool before
-    # post-processing re-ranks it — otherwise rank_by_multi_criteria only sees
-    # the top-N already selected by a single metric inside the optimizer.
-    # We fetch up to 500 filtered results and trim to max_results after re-ranking.
-    _internal_max_results = request.max_results
-    if request.ranking_mode in ("balanced", "weighted") and request.ranking_mode != "single":
-        _internal_max_results = max(request.max_results, 500)
-
-    try:
-        if request.method == "bayesian":
-            # Optuna Bayesian search
-            custom_ranges = request.parameter_ranges or None
-            # Merge to get active specs
-            from backend.optimization.builder_optimizer import _merge_ranges, split_ohlcv_is_oos
-
-            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
-
-            # P0-2: OOS split (opt-in via request.run_oos_validation)
-            _oos_ohlcv = None
-            _oos_split_info: dict = {}
-            if request.run_oos_validation:
-                ohlcv_for_opt, _oos_ohlcv, _oos_split_info = split_ohlcv_is_oos(
-                    ohlcv,
-                    oos_ratio=request.oos_ratio,
-                    oos_min_bars=200,
-                )
-                if _oos_split_info.get("oos_skipped"):
-                    logger.warning(f"OOS skipped: {_oos_split_info['reason']}")
-                    ohlcv_for_opt = ohlcv
-            else:
-                ohlcv_for_opt = ohlcv
-
-            result = await asyncio.to_thread(
-                run_builder_optuna_search,
-                base_graph=strategy_graph,
-                ohlcv=ohlcv_for_opt,
-                param_specs=active_specs,
-                config_params=config_params,
-                optimize_metric=request.optimize_metric,
-                weights=request.weights,
-                n_trials=request.n_trials,
-                sampler_type=request.sampler_type,
-                top_n=_internal_max_results,
-                timeout_seconds=request.timeout_seconds,
-                n_jobs=request.n_jobs,
-                strategy_id=strategy_id,
-            )
-
-            # P0-2: OOS validation — re-run top results on OOS data
-            if _oos_ohlcv is not None and isinstance(result, dict) and result.get("top_results"):
-                from backend.optimization.builder_optimizer import run_oos_validation
-
-                result["top_results"] = run_oos_validation(
-                    top_results=result["top_results"],
-                    base_graph=strategy_graph,
-                    oos_ohlcv=_oos_ohlcv,
-                    config_params=config_params,
-                    oos_cutoff_ts=_oos_split_info["oos_cutoff_ts"],
-                    n_top=5,
-                )
-                result["oos_split_info"] = _oos_split_info
-
-        elif request.method == "multi_objective":
-            # P2-2: Multi-objective optimization (requires OOS split)
-            if not request.run_oos_validation:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="multi_objective method requires run_oos_validation=True (OOS split needed)",
-                )
-            from backend.optimization.builder_optimizer import (
-                _merge_ranges,
-                run_builder_optuna_multi_objective,
-                split_ohlcv_is_oos,
-            )
-
-            custom_ranges = request.parameter_ranges or None
-            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
-
-            is_ohlcv, oos_ohlcv, split_info = split_ohlcv_is_oos(
-                ohlcv,
-                oos_ratio=request.oos_ratio,
-            )
-            if oos_ohlcv is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Not enough data for OOS split: {split_info.get('reason', 'unknown')}",
-                )
-
-            result = await asyncio.to_thread(
-                run_builder_optuna_multi_objective,
-                base_graph=strategy_graph,
-                is_ohlcv=is_ohlcv,
-                oos_ohlcv=oos_ohlcv,
-                oos_cutoff_ts=split_info["oos_cutoff_ts"],
-                param_specs=active_specs,
-                config_params=config_params,
-                optimize_metric=request.optimize_metric,
-                weights=request.weights,
-                n_trials=request.n_trials,
-                top_n=_internal_max_results,
-                timeout_seconds=request.timeout_seconds,
-                strategy_id=strategy_id,
-            )
-            result["oos_split_info"] = split_info
-        elif request.method == "walk_forward":
-            # Walk-Forward Optimization
-            custom_ranges = request.parameter_ranges or None
-            from backend.optimization.builder_optimizer import _merge_ranges
-
-            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
-
-            wf_config = getattr(request, "walk_forward", None) or {}
-            n_splits = int(wf_config.get("n_splits", 5)) if wf_config else 5
-            train_ratio = float(wf_config.get("train_ratio", 0.7)) if wf_config else 0.7
-            gap_periods = int(wf_config.get("gap_periods", 0)) if wf_config else 0
-            inner_method = str(wf_config.get("inner_method", "grid")) if wf_config else "grid"
-
-            result = await asyncio.to_thread(
-                run_builder_walk_forward,
-                base_graph=strategy_graph,
-                ohlcv=ohlcv,
-                param_specs=active_specs,
-                config_params=config_params,
-                optimize_metric=request.optimize_metric,
-                weights=request.weights,
-                n_splits=n_splits,
-                train_ratio=train_ratio,
-                gap_periods=gap_periods,
-                inner_method=inner_method,
-                max_iterations=request.max_iterations,
-                n_trials=request.n_trials,
-                sampler_type=request.sampler_type,
-                max_results=_internal_max_results,
-                timeout_seconds=request.timeout_seconds,
-            )
-        else:
-            # Grid or Random search
-            search_method = "random" if request.method == "random_search" else "grid"
-            custom_ranges = request.parameter_ranges or None
-            # Run in thread to avoid blocking the event loop (can be slow for large grids)
-            param_combinations, _total, _ = await asyncio.to_thread(
-                generate_builder_param_combinations,
-                param_specs=all_params,
-                custom_ranges=custom_ranges,
-                search_method=search_method,
-                max_iterations=request.max_iterations,
-                random_seed=42,
-            )
-
-            result = await asyncio.to_thread(
-                run_builder_grid_search,
-                base_graph=strategy_graph,
-                ohlcv=ohlcv,
-                param_combinations=param_combinations,
-                config_params=config_params,
-                optimize_metric=request.optimize_metric,
-                weights=request.weights,
-                max_results=_internal_max_results,
-                early_stopping=request.early_stopping,
-                early_stopping_patience=request.early_stopping_patience,
-                timeout_seconds=request.timeout_seconds,
-                strategy_id=strategy_id,
-                total_combinations=_total,
-            )
-
-        # ── Post-processing: EvaluationCriteriaPanel ranking modes ──
-        # grid_search returns "top_results"; handle both keys for robustness
-        _results_key = "top_results" if isinstance(result, dict) and "top_results" in result else "results"
-        if isinstance(result, dict) and _results_key in result:
-            from backend.optimization.scoring import (
-                apply_custom_sort_order,
-                calculate_composite_score,
-                rank_by_multi_criteria,
-            )
-
-            results_list = result[_results_key]
-
-            if request.ranking_mode == "balanced" and request.secondary_metrics:
-                # Average-rank method: robust to mixed units ($ vs %)
-                # Works on the full _internal_max_results candidate pool
-                all_criteria = list(dict.fromkeys([request.optimize_metric, *request.secondary_metrics]))
-                results_list = rank_by_multi_criteria(results_list, all_criteria)
-
-            elif request.ranking_mode == "weighted" and request.use_composite and request.weights:
-                # Weighted composite score over the full candidate pool
-                for entry in results_list:
-                    entry["score"] = calculate_composite_score(entry, request.optimize_metric, request.weights)
-                results_list.sort(key=lambda r: r.get("score", float("-inf")), reverse=True)
-
-            # Custom tiebreaker sort (always applied last if provided)
-            if request.sort_order:
-                results_list = apply_custom_sort_order(results_list, request.sort_order)
-
-            # Trim to the user-requested max_results AFTER re-ranking
-            result[_results_key] = results_list[: request.max_results]
-            # Sync best_metrics from new top result after re-ranking
-            if results_list:
-                result["best_metrics"] = {k: v for k, v in results_list[0].items() if k not in ("params", "score")}
-                result["best_params"] = results_list[0].get("params", result.get("best_params", {}))
-                result["best_score"] = results_list[0].get("score", result.get("best_score", 0))
-
-        # Sanitize non-finite floats (inf/-inf/nan) before JSON serialization
-        result = _sanitize_for_json(result)
-
-        return {
-            "strategy_id": strategy_id,
-            "strategy_name": db_strategy.name,
-            "optimize_metric": request.optimize_metric,
-            "optimizable_params": [
-                {
-                    "param_path": p["param_path"],
-                    "block_type": p["block_type"],
-                    "block_name": p["block_name"],
-                    "param_key": p["param_key"],
-                    "type": p["type"],
-                    "low": p["low"],
-                    "high": p["high"],
-                    "step": p["step"],
-                    "current_value": p["current_value"],
-                }
-                for p in all_params
-            ],
-            **result,
-        }
-
-    except asyncio.CancelledError:
-        # Client disconnected mid-optimization — clear progress so next run starts clean.
-        logger.warning(f"Builder optimization cancelled (client disconnected): {strategy_id}")
-        from backend.optimization.builder_optimizer import clear_optimization_progress
-
-        clear_optimization_progress(strategy_id)
-        raise
-    except Exception as e:
-        logger.error(f"Builder optimization failed: {e}", exc_info=True)
-        # Clean up progress on error
-        from backend.optimization.builder_optimizer import clear_optimization_progress
-
-        clear_optimization_progress(strategy_id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Optimization failed: {e!s}",
+    # Fire-and-forget: launch optimization as background task and return 202 immediately.
+    # This prevents Kaspersky/proxy HTTP timeout (~60s) from killing long optimizations.
+    # Progress is tracked via GET /optimize/progress; results via GET /optimize/results.
+    _bg_task = asyncio.create_task(
+        _execute_optimization_bg(
+            strategy_id=strategy_id,
+            strategy_name=db_strategy.name,
+            request=request,
+            strategy_graph=strategy_graph,
+            all_params=all_params,
+            step_warnings=_step_warnings,
+            ohlcv=ohlcv,
         )
+    )
+
+    def _on_bg_done(t: asyncio.Task) -> None:
+        if not t.cancelled() and t.exception():
+            logger.error(f"[OPT_BG] Background optimization task failed: {t.exception()}", exc_info=t.exception())
+
+    _bg_task.add_done_callback(_on_bg_done)
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=202,
+        content={"status": "started", "strategy_id": strategy_id},
+    )
+
+
+@router.get("/strategies/{strategy_id}/optimize/results")
+async def get_optimize_results(strategy_id: str):
+    """
+    Retrieve completed optimization results for a background optimization task.
+
+    Returns the full result payload (same shape as the old synchronous response)
+    once the background task has finished.  Returns 202 while still running,
+    404 when no result is available yet or the strategy_id is unknown.
+    """
+    from backend.optimization.builder_optimizer import (
+        clear_optimization_result,
+        get_optimization_progress,
+        get_optimization_result,
+    )
+
+    result = get_optimization_result(strategy_id)
+    if result is None:
+        # Check if still running — return 202 so frontend can keep polling
+        progress = get_optimization_progress(strategy_id)
+        if progress and progress.get("status") in ("running", "starting"):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(status_code=202, content={"status": progress["status"]})
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No optimization result available. Either the optimization hasn't started, failed, or results were already consumed.",
+        )
+
+    # Consume the result (one-time retrieval to free memory)
+    clear_optimization_result(strategy_id)
+    return result
 
 
 @router.get("/strategies/{strategy_id}/optimize/progress")

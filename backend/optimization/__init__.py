@@ -39,6 +39,13 @@ from .optuna_optimizer import (
     create_rsi_param_space,
     create_sltp_param_space,
 )
+from .overfit_guards import (
+    GuardResult,
+    GuardThresholds,
+    evaluate_overfit_guards,
+    thresholds_from_config,
+)
+from .post_grid import build_refinement_grid, refine_top_k
 from .ray_optimizer import (
     RAY_AVAILABLE,
     MultiprocessingOptimizer,
@@ -47,6 +54,14 @@ from .ray_optimizer import (
     get_parallel_optimizer,
 )
 from .recommendations import generate_smart_recommendations
+from .sampler_factory import (
+    SamplerRecommendation,
+    pick_sampler,
+    prefer_for_high_dim,
+    recommend,
+    recommend_n_startup,
+    recommend_n_trials,
+)
 from .scoring import apply_custom_sort_order, calculate_composite_score, rank_by_multi_criteria
 from .utils import (
     EarlyStopper,
@@ -60,11 +75,15 @@ from .utils import (
     serialize_trades,
     split_candles,
 )
+from .walk_forward import FoldSpec, build_folds, wrap_walk_forward
 
 __all__ = [
     "OPTUNA_AVAILABLE",
     "RAY_AVAILABLE",
     "EarlyStopper",
+    "FoldSpec",
+    "GuardResult",
+    "GuardThresholds",
     "MultiprocessingOptimizer",
     "OptimizationResult",
     "OptunaOptimizationResult",
@@ -72,6 +91,7 @@ __all__ = [
     "OptunaSyncRequest",
     "ParallelOptimizationResult",
     "RayParallelOptimizer",
+    "SamplerRecommendation",
     "SmartRecommendation",
     "SmartRecommendations",
     "SyncOptimizationRequest",
@@ -82,12 +102,15 @@ __all__ = [
     "VectorbtOptimizationResponse",
     "apply_custom_sort_order",
     "build_backtest_input",
+    "build_folds",
+    "build_refinement_grid",
     "calculate_composite_score",
     "clone_graph_with_params",
     "combo_to_params",
     "create_full_strategy_param_space",
     "create_rsi_param_space",
     "create_sltp_param_space",
+    "evaluate_overfit_guards",
     "extract_metrics_from_output",
     "extract_optimizable_params",
     "generate_builder_param_combinations",
@@ -97,11 +120,19 @@ __all__ = [
     "parse_trade_direction",
     "passes_dynamic_constraints",
     "passes_filters",
+    "pick_sampler",
+    "prefer_for_high_dim",
     "rank_by_multi_criteria",
+    "recommend",
+    "recommend_n_startup",
+    "recommend_n_trials",
+    "refine_top_k",
     "run_builder_backtest",
     "run_builder_grid_search",
     "run_builder_optuna_search",
     "serialize_equity_curve",
     "serialize_trades",
     "split_candles",
+    "thresholds_from_config",
+    "wrap_walk_forward",
 ]

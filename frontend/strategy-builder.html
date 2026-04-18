@@ -4,9 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Security Headers (X-Frame-Options must be set via HTTP header, not meta) -->
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:* https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'" />
+  <!-- Security Headers are set via HTTP response headers by middleware (security_headers.py) -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -263,13 +261,13 @@
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestCommission" class="property-label">Commission %</label>
-                  <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.055"
-                    min="0" max="1" step="0.005" title="0.055% = Bybit Linear taker fee (market orders). 0.1% = Bybit Spot taker. 0% = без комиссии (для тестов)" />
+                  <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.07"
+                    min="0" max="1" step="0.005" title="0.07% = TradingView parity (0.0007). 0.055% = Bybit Linear taker fee. 0% = без комиссии (для тестов)" />
                 </div>
                 <div class="property-row property-row-vertical property-col-half">
                   <label for="backtestSlippage" class="property-label">Slippage %</label>
-                  <input type="number" class="property-input property-input-full" id="backtestSlippage" value="0.00"
-                    min="0" max="5" step="0.01" title="Проскальзывание в %. 0% = без проскальзывания (TradingView parity)" />
+                  <input type="number" class="property-input property-input-full" id="backtestSlippage" value="0.05"
+                    min="0" max="5" step="0.01" title="Проскальзывание в %. 0.05% = DEFAULT_SLIPPAGE (0.0005). 0% = без проскальзывания (TradingView parity)" />
                 </div>
               </div>
               <div class="property-row property-row-vertical properties-leverage-block">
@@ -449,6 +447,57 @@
                 <input type="number" class="property-input" id="optWorkers" value="4" min="1" max="16"
                   title="Parallel workers" />
               </div>
+
+              <!-- ── Optimization Hardening (2026-04-18) ─────────────── -->
+              <div class="property-row property-row-vertical" style="margin-top:10px;">
+                <label class="property-label" title="4-phase workflow from docs/architecture/OPTIMIZATION_HARDENING.md">
+                  Hardening Preset
+                </label>
+                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Hardening preset"
+                     style="display:flex;gap:4px;">
+                  <button type="button" class="btn btn-outline-secondary opt-preset-btn" data-preset="coarse"
+                          title="Phase 1 — Coarse: 200 trials, fast scan, all guards on">Coarse</button>
+                  <button type="button" class="btn btn-outline-primary opt-preset-btn" data-preset="main"
+                          title="Phase 2 — Main: max(200, 50·D) trials, parallel, full hardening">Main</button>
+                  <button type="button" class="btn btn-outline-success opt-preset-btn" data-preset="refine"
+                          title="Phase 3 — Refine: low trials + post-grid local refinement around top-K">Refine</button>
+                  <button type="button" class="btn btn-outline-info opt-preset-btn" data-preset="confirm"
+                          title="Phase 4 — Confirm: OOS validation only, no further search">Confirm</button>
+                </div>
+              </div>
+              <details id="optHardeningDetails" style="margin-top:8px;">
+                <summary class="property-label" style="cursor:pointer;">
+                  Hardening options <span class="text-muted text-sm">(advanced)</span>
+                </summary>
+                <div class="property-row" style="margin-top:6px;">
+                  <label class="property-label" for="optUseHyperband" title="Use HyperbandPruner instead of MedianPruner">
+                    <input type="checkbox" id="optUseHyperband" /> Hyperband pruner
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label class="property-label" for="optApplyGuards" title="Annotate top results with anti-phantom-optimum guards">
+                    <input type="checkbox" id="optApplyGuards" /> Apply overfit guards
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label class="property-label" for="optPostGridRefine" title="Refine top-K with ±pct local Cartesian grid">
+                    <input type="checkbox" id="optPostGridRefine" /> Post-grid refine
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridTopK" class="property-label">Refine top-K</label>
+                  <input type="number" class="property-input" id="optPostGridTopK" value="5" min="1" max="20" />
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridPct" class="property-label">Refine ±pct</label>
+                  <input type="number" class="property-input" id="optPostGridPct" value="0.20" step="0.05" min="0.05" max="0.50" />
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridSteps" class="property-label">Steps/dim</label>
+                  <input type="number" class="property-input" id="optPostGridSteps" value="3" min="2" max="7" />
+                </div>
+              </details>
+
               <button class="btn btn-primary w-100 mt-3" id="btnStartOptimization">
                 <i class="bi bi-play-fill"></i> Start Optimization
               </button>
@@ -832,17 +881,15 @@
               <div class="ai-build-row">
                 <label class="form-check-label">
                   <input type="checkbox" id="aiDeliberation" class="form-check-input">
-                  AI Deliberation <small class="text-muted">(DeepSeek + Qwen + Perplexity consensus — uses API credits)</small>
+                  AI Deliberation <small class="text-muted">(Claude + Perplexity consensus — uses API credits)</small>
                 </label>
               </div>
               <div class="ai-build-row d-flex align-items-center gap-2" id="aiAgentRow">
                 <label class="text-muted small mb-0" for="aiAgentSelect">Single-agent:</label>
                 <select id="aiAgentSelect" class="form-select form-select-sm w-auto"
                   title="Primary LLM agent when AI Deliberation is off">
-                  <option value="qwen" selected>Qwen</option>
-                  <option value="deepseek">DeepSeek</option>
+                  <option value="claude" selected>Claude</option>
                   <option value="perplexity">Perplexity</option>
-                  <option value="claude">Claude</option>
                 </select>
               </div>
               <div class="ai-build-row">
@@ -884,21 +931,13 @@
                 </button>
               </div>
               <div class="agent-cols" id="agentCols">
-                <div class="agent-col" data-agent="deepseek">
+                <div class="agent-col" data-agent="claude">
                   <div class="agent-col-header">
                     <i class="bi bi-stars"></i>
-                    <span>DeepSeek</span>
-                    <span class="agent-badge" id="agentBadge-deepseek">0</span>
+                    <span>Claude</span>
+                    <span class="agent-badge" id="agentBadge-claude">0</span>
                   </div>
-                  <div class="agent-col-feed" id="agentFeed-deepseek"></div>
-                </div>
-                <div class="agent-col" data-agent="qwen">
-                  <div class="agent-col-header">
-                    <i class="bi bi-lightning-charge"></i>
-                    <span>Qwen</span>
-                    <span class="agent-badge" id="agentBadge-qwen">0</span>
-                  </div>
-                  <div class="agent-col-feed" id="agentFeed-qwen"></div>
+                  <div class="agent-col-feed" id="agentFeed-claude"></div>
                 </div>
                 <div class="agent-col" data-agent="perplexity">
                   <div class="agent-col-header">
