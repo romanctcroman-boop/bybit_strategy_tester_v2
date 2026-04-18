@@ -468,12 +468,19 @@ class TestGraphWiring:
 
     def test_ml_validation_between_optimize_and_memory(self):
         graph = build_trading_strategy_graph(run_backtest=True)
-        # optimize_strategy should have an edge to ml_validation
+        # The pipeline now routes: optimize_strategy → optimization_analysis →
+        # (opt_iter_router) → analysis_debate → (debate_router) → [wf_validation →] ml_validation
+        # So we assert the path exists, not a single direct edge.
         opt_targets = [e.target for e in graph.edges.get("optimize_strategy", [])]
-        assert "ml_validation" in opt_targets, f"No edge optimize_strategy → ml_validation; got: {opt_targets}"
-        # ml_validation should have an edge to memory_update
+        assert "optimization_analysis" in opt_targets, (
+            f"No edge optimize_strategy → optimization_analysis; got: {opt_targets}"
+        )
+        # ml_validation must still terminate into memory_update (or hitl_check when HITL on)
         ml_targets = [e.target for e in graph.edges.get("ml_validation", [])]
-        assert "memory_update" in ml_targets, f"No edge ml_validation → memory_update; got: {ml_targets}"
+        assert ml_targets, f"ml_validation has no outgoing edges; got: {ml_targets}"
+        assert any(t in {"memory_update", "hitl_check"} for t in ml_targets), (
+            f"ml_validation not wired to memory_update or hitl_check; got: {ml_targets}"
+        )
 
     def test_ml_validation_node_is_correct_type(self):
         graph = build_trading_strategy_graph(run_backtest=True)

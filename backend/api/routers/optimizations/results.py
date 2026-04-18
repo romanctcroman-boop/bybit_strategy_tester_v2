@@ -65,7 +65,7 @@ class SensitivityDataResponse(BaseModel):
 class ApplyParamsRequest(BaseModel):
     """Request to apply optimization result parameters."""
 
-    strategy_id: int
+    strategy_id: str
     params: dict[str, Any]
 
 
@@ -166,7 +166,7 @@ async def get_sensitivity_data(optimization_id: int, param_name: str, db: Sessio
 async def apply_optimization_result(
     optimization_id: int,
     result_rank: int,
-    strategy_id: int | None = None,
+    strategy_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Apply parameters from a specific optimization result to a strategy."""
@@ -234,7 +234,7 @@ async def apply_optimization_result(
         f"Applied params from optimization {optimization_id} rank #{result_rank} to strategy {target_strategy_id}"
     )
 
-    return ApplyParamsResponse(  # type: ignore[arg-type]
+    return ApplyParamsResponse(
         success=True,
         message=f"Applied rank #{result_rank} parameters to strategy {target_strategy_id}",
         strategy_id=target_strategy_id,
