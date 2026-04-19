@@ -85,7 +85,7 @@ class EngineType(str, Enum):
 class BacktestConfig(BaseModel):
     """Configuration for a backtest run
 
-    DeepSeek рекомендация: добавлена расширенная валидация параметров
+    Claude рекомендация: добавлена расширенная валидация параметров
     для предотвращения некорректных значений (position_size=1000, leverage=1000 и т.д.)
     """
 
@@ -170,10 +170,15 @@ class BacktestConfig(BaseModel):
     # Fees and slippage
     # Bybit linear perpetuals: maker=0.02% (0.0002), taker=0.055% (0.00055)
     # Bybit spot: maker=0.1% (0.001), taker=0.1% (0.001)
-    maker_fee: float = Field(default=COMMISSION_LINEAR_MAKER, ge=0, le=0.01)  # 0.02% Bybit linear maker
+    # STUB: maker_fee is stored and set by auto_set_commission(), but BacktestEngine
+    # and FallbackEngineV4 always apply taker_fee for every fill.
+    # Maker/taker distinction (limit vs market orders) is not implemented.
+    maker_fee: float = Field(
+        default=COMMISSION_LINEAR_MAKER, ge=0, le=0.01
+    )  # 0.02% Bybit linear maker — STUB (unused by engines)
     taker_fee: float = Field(
         default=COMMISSION_LINEAR_TAKER, ge=0, le=0.01
-    )  # 0.055% Bybit linear taker (market orders)
+    )  # 0.055% Bybit linear taker (market orders) — always applied
     slippage: float = Field(default=0.0005, ge=0, le=0.05)  # max 5% slippage
     slippage_ticks: int = Field(
         default=0,
@@ -382,11 +387,15 @@ class BacktestConfig(BaseModel):
         description="Ticks beyond limit price required for fill (0 = fill at limit)",
     )
 
-    # ===== NEW: Bar Magnifier (TradingView Premium) =====
-    # Uses lower timeframe data for precise intrabar order execution
+    # ===== Bar Magnifier (TradingView Premium) — STUB =====
+    # FallbackEngineV4 builds the intrabar index (fallback_engine_v4.py:3102-3145)
+    # but NEVER queries it in the bar loop. SL/TP are always checked at bar close only.
+    # Setting use_bar_magnifier=True has NO effect on backtest results.
     use_bar_magnifier: bool = Field(
-        default=True,  # Enabled by default for precise SL/TP detection
-        description="Use lower timeframe data for precise order fills (TradingView Premium)",
+        default=True,
+        description=(
+            "STUB — no-op in FallbackEngineV4. Intrabar index is built but never queried; SL/TP remain bar-close only."
+        ),
     )
     bar_magnifier_timeframe: str | None = Field(
         default=None,
@@ -754,7 +763,7 @@ class BacktestConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self):
-        """Проверка корректности дат (DeepSeek рекомендация)"""
+        """Проверка корректности дат (Claude рекомендация)"""
         # Normalise to naive UTC before comparing to avoid TypeError when
         # one date is timezone-aware and the other is naive.
         s = self.start_date.replace(tzinfo=None) if self.start_date.tzinfo else self.start_date
@@ -997,8 +1006,12 @@ class PerformanceMetrics(BaseModel):
 
     # ===== РИСК-МЕТРИКИ (Risk/Performance Ratios) =====
     # TradingView: Sharpe = (MeanMonthlyReturn - RFR) / StdMonthlyReturn
-    sharpe_ratio: float = Field(default=0.0, description="Sharpe ratio (monthly returns, RFR=2%/year)")
-    sortino_ratio: float = Field(default=0.0, description="Sortino ratio (monthly returns, downside deviation)")
+    sharpe_ratio: float = Field(default=0.0, description="Sharpe ratio (adaptive periodicity, RFR=2%/year)")
+    sortino_ratio: float = Field(default=0.0, description="Sortino ratio (adaptive periodicity, downside deviation)")
+    sharpe_method: str = Field(
+        default="fallback", description="Sharpe/Sortino method: monthly | weekly | per-trade | fallback"
+    )
+    sharpe_samples: int = Field(default=0, description="Number of return samples used for Sharpe/Sortino")
     calmar_ratio: float = Field(default=0.0, description="Calmar ratio (annual return / max drawdown)")
     sqn: float = Field(default=0.0, description="System Quality Number (expectancy / stdev of trades)")
     stability: float = Field(default=0.0, description="R-squared of linear regression of equity curve (0-1)")

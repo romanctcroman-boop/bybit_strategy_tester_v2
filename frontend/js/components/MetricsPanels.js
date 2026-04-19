@@ -1055,6 +1055,22 @@ export function updateTVRiskReturnTab(metrics, _trades, _config) {
     // All
 
     setValue('rr-sharpe', metrics.sharpe_ratio, 'sharpe');
+    // Adaptive-Sharpe method tooltip + inline note
+    const _sharpeEl = document.getElementById('rr-sharpe');
+    if (_sharpeEl) {
+        const _method = metrics.sharpe_method || 'fallback';
+        const _N = Number(metrics.sharpe_samples ?? 0);
+        const _tips = {
+            monthly: 'Monthly returns, RFR=2%/yr — TV-parity',
+            weekly: 'Weekly returns, RFR=2%/yr — window <12 mo',
+            'per-trade': 'Trade-by-trade mean/std, non-annualized',
+            fallback: 'Hourly-annualized fallback — not TV-parity',
+        };
+        _sharpeEl.title = `Method: ${_method} (N=${_N})\n${_tips[_method] || _tips.fallback}`;
+        if (_method && _method !== 'fallback' && _N > 0) {
+            _sharpeEl.textContent = `${_sharpeEl.textContent}  ·  ${_method} N=${_N}`;
+        }
+    }
 
     setValue('rr-sortino', metrics.sortino_ratio, 'sortino');
 

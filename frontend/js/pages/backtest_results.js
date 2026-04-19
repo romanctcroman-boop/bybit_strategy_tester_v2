@@ -5503,6 +5503,36 @@ async function selectBacktest(backtestId) {
 }
 
 
+const SHARPE_METHOD_LABELS = {
+  monthly:    { short: 'monthly',    tip: 'Monthly returns (≥12), RFR=2%/yr — TradingView-parity.' },
+  weekly:     { short: 'weekly',     tip: 'Weekly returns (≥12), RFR=2%/yr — used when backtest window <12 months.' },
+  'per-trade':{ short: 'per-trade',  tip: 'Trade-by-trade mean/std, non-annualized, no RFR — used for short windows (<3 months).' },
+  fallback:   { short: 'fallback',   tip: 'Hourly-annualized fallback — not TV-parity. Insufficient samples for adaptive method.' },
+};
+
+function applySharpeMethodBadge(elId, metrics) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const method = metrics?.sharpe_method || 'fallback';
+  const N = Number(metrics?.sharpe_samples ?? 0);
+  const info = SHARPE_METHOD_LABELS[method] || SHARPE_METHOD_LABELS.fallback;
+  el.title = `Sharpe method: ${info.short} (N=${N})\n${info.tip}`;
+  // Inject/update sibling hint span
+  const hintId = `${elId}_methodHint`;
+  let hint = document.getElementById(hintId);
+  if (!hint && el.parentNode) {
+    hint = document.createElement('small');
+    hint.id = hintId;
+    hint.className = 'metric-method-hint';
+    hint.style.cssText = 'display:block;font-size:0.68em;color:#8888a0;margin-top:2px;line-height:1.1;';
+    el.parentNode.appendChild(hint);
+  }
+  if (hint) {
+    hint.textContent = N > 0 ? `${info.short} · N=${N}` : info.short;
+    hint.title = info.tip;
+  }
+}
+
 function updateMetrics(metrics) {
 
   if (!metrics) return;
@@ -5613,6 +5643,7 @@ function updateMetrics(metrics) {
   setMetric('metricProfitFactor', metrics.profit_factor, 'ratio', 1);
 
   setMetric('metricSharpe', metrics.sharpe_ratio, 'ratio', 1);
+  applySharpeMethodBadge('metricSharpe', metrics);
 
   setMetric('metricTrades', metrics.total_trades, 'number');
 
@@ -8078,10 +8109,10 @@ async function requestAIAnalysis() {
 
   const agentSelect = document.getElementById('aiAgentSelect');
 
-  const agent = (agentSelect && mode === 'single') ? agentSelect.value : 'qwen';
+  const agent = (agentSelect && mode === 'single') ? agentSelect.value : 'claude';
 
 
-  const agentLabels = { single: `1 агент (${agent})`, multi: '3 агента (консенсус)' };
+  const agentLabels = { single: `1 агент (${agent})`, multi: '2 агента (консенсус)' };
 
   showToast(`AI анализ: ${agentLabels[mode] || mode}...`, 'info');
 
@@ -8282,10 +8313,10 @@ async function compareWithAI() {
 
     const agentSelect = document.getElementById('aiAgentSelect');
 
-    const agent = (agentSelect && mode === 'single') ? agentSelect.value : 'qwen';
+    const agent = (agentSelect && mode === 'single') ? agentSelect.value : 'claude';
 
 
-    showToast(`Сравниваем стратегии (${mode === 'multi' ? '3 агента' : agent})...`, 'info');
+    showToast(`Сравниваем стратегии (${mode === 'multi' ? '2 агента' : agent})...`, 'info');
 
 
     const results = await Promise.all(

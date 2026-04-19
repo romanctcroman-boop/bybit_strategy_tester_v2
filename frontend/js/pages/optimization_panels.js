@@ -1215,7 +1215,7 @@ class OptimizationPanels {
             'optStage3',
             'optStageRefine',
             'optStageGuards',
-            'optStage3',
+            'optStage4',
             'optStage4'
         ];
 
@@ -1936,7 +1936,12 @@ class OptimizationPanels {
                 params: data.best_params || {},
                 metrics: bestMetrics
             },
-            total_trials: data.tested_combinations || data.total_combinations || 0
+            total_trials: data.tested_combinations || data.total_combinations || 0,
+            // Surface backend warnings (e.g. [DEGENERATE_SUPERTREND], [STEP_CLAMPED])
+            // and recommended param ranges so the UI can render actionable advice
+            // next to the results table. Previously silently dropped.
+            warnings: Array.isArray(data.warnings) ? data.warnings : [],
+            optimizable_params: Array.isArray(data.optimizable_params) ? data.optimizable_params : []
         };
 
         this.state.lastResults = results;
@@ -2091,7 +2096,10 @@ class OptimizationPanels {
                         position_size: ctx.position_size,
                         leverage: ctx.leverage,
                         commission: ctx.commission,
+                        slippage: ctx.slippage,
                         direction: ctx.direction,
+                        pyramiding: ctx.pyramiding,
+                        no_trade_days: ctx.no_trade_days,
                         parameters: rowParams
                     })
                 });
@@ -2668,11 +2676,36 @@ class OptimizationPanels {
                 const readyIcon = hasBacktest
                     ? '<span class="opt-flag-ready" title="Бэктест сохранён — откроется мгновенно">⚡</span>'
                     : '';
+                // Metric-conflict warning: positive pareto but negative Sharpe
+                // signals a low-expectancy strategy (wins outpaced by risk-free
+                // baseline). User should see this even if pareto_balance ranks it high.
+                const pareto = Number(row.pareto_balance ?? row.pareto_score ?? row.score ?? 0);
+                const sharpe = Number(row.sharpe_ratio ?? 0);
+                const conflictIcon =
+                    pareto > 0 && sharpe < 0
+                        ? '<span class="opt-flag-conflict" title="Pareto положительный, но Sharpe отрицательный — низкая ожидаемость (проигрывает безрисковой ставке). Проверь OOS.">⚠︎</span>'
+                        : '';
 
                 const cells = allCols
                     .map((k) => {
                         const rawVal = row[k];
                         const extra = cellClass(k, rawVal);
+                        // Sharpe: attach adaptive-method tooltip + badge
+                        if (k === 'sharpe_ratio') {
+                            const _mth = row.sharpe_method || 'fallback';
+                            const _n   = Number(row.sharpe_samples || 0);
+                            const _tips = {
+                                monthly:    'Monthly returns (N≥12), RFR=2%/yr — TV-parity',
+                                weekly:     'Weekly returns (N≥12), RFR=2%/yr — window <12 mo',
+                                'per-trade':'Trade-by-trade mean/std, non-annualized',
+                                fallback:   'Hourly-annualized fallback — not TV-parity'
+                            };
+                            const tip = `Method: ${_mth} (N=${_n})\n${_tips[_mth] || _tips.fallback}`;
+                            const badge = _mth !== 'fallback' && _n > 0
+                                ? ` <small style="color:#8888a0;font-size:0.68em">·${_mth[0]}N${_n}</small>`
+                                : '';
+                            return `<td class="${extra}" title="${tip.replace(/"/g, '&quot;')}">${fmt(rawVal, k, row)}${badge}</td>`;
+                        }
                         return `<td class="${extra}">${fmt(rawVal, k, row)}</td>`;
                     })
                     .join('');
@@ -2680,7 +2713,7 @@ class OptimizationPanels {
                 return `<tr class="opt-result-row ${isBest ? 'opt-row-best' : ''} ${belowFilter ? 'opt-row-below' : ''}"
                 data-idx="${idx}"
                 title="Один клик — открыть копию стратегии&#10;Двойной клик — полный бэктест${hasBacktest ? ' (сохранён ⚡)' : ''}">
-                <td class="opt-rank-cell">${flagHtml}${readyIcon}${idx + 1}</td>
+                <td class="opt-rank-cell">${flagHtml}${readyIcon}${conflictIcon}${idx + 1}</td>
                 ${cells}
             </tr>`;
             })
@@ -2794,7 +2827,11 @@ class OptimizationPanels {
                                     '[OptPanels] Clone blocks before patch:',
                                     blocks.map((b) => ({ id: b.id, params: { ...b.params } }))
                                 );
-                                // Apply param values into blocks
+                                // Apply param values into blocks + auto-enable mode flags.
+                                // Mirrors backend /backtest override logic (router.py:3477-3493) so that
+                                // a manual backtest on the clone reproduces the optimizer trial 1:1.
+                                // Without these flags the RSI/MACD blocks silently ignore the overridden
+                                // thresholds (e.g. long_rsi_more requires use_long_range=true to activate).
                                 let patchedCount = 0;
                                 Object.entries(rowParams).forEach(([key, value]) => {
                                     const dotIdx = key.indexOf('.');
@@ -2806,6 +2843,24 @@ class OptimizationPanels {
                                         if (!block.params) block.params = {};
                                         block.params[paramKey] = value;
                                         patchedCount++;
+                                        // Auto-enable RSI mode flags (parity with backend override path)
+                                        if (block.type === 'rsi') {
+                                            if (paramKey === 'cross_long_level' || paramKey === 'cross_short_level') {
+                                                block.params.use_cross_level = true;
+                                            } else if (paramKey === 'cross_memory_bars') {
+                                                block.params.use_cross_memory = true;
+                                            } else if (paramKey === 'long_rsi_more' || paramKey === 'long_rsi_less') {
+                                                block.params.use_long_range = true;
+                                            } else if (paramKey === 'short_rsi_more' || paramKey === 'short_rsi_less') {
+                                                block.params.use_short_range = true;
+                                            }
+                                        } else if (block.type === 'macd') {
+                                            if (paramKey === 'macd_cross_zero_level') {
+                                                block.params.use_macd_cross_zero = true;
+                                            } else if (paramKey === 'signal_memory_bars') {
+                                                block.params.disable_signal_memory = false;
+                                            }
+                                        }
                                         // Disable optimization flag for this param
                                         if (block.optimizationParams && block.optimizationParams[paramKey]) {
                                             block.optimizationParams[paramKey].enabled = false;
@@ -2845,21 +2900,42 @@ class OptimizationPanels {
                         }
 
                         // 4. Navigate the pre-opened tab to the clone URL with opt context
+                        //    PARITY FIX: prefer the stored backtest's config over lastOptContext.
+                        //    lastOptContext holds user's UI Properties values, but the actual
+                        //    optimizer trial may have used different engine defaults (e.g. the
+                        //    backtest endpoint sometimes substitutes position_size/direction/
+                        //    commission/slippage). Using the stored BT's config guarantees that
+                        //    a manual re-backtest on the clone reproduces the optimizer trial's
+                        //    numbers 1:1.
                         const _ctx = this.state.lastOptContext;
+                        let _cfg = null;
+                        if (row.backtest_id) {
+                            try {
+                                const _btResp = await fetch(`/api/v1/backtests/${row.backtest_id}`, { cache: 'no-store' });
+                                if (_btResp.ok) {
+                                    const _btData = await _btResp.json();
+                                    _cfg = _btData.config || null;
+                                }
+                            } catch (_e) { /* fall through to ctx */ }
+                        }
                         let _cloneUrl = `/frontend/strategy-builder.html?id=${cloneId}`;
-                        if (_ctx) {
-                            const _cp = new URLSearchParams();
-                            if (_ctx.symbol) _cp.set('opt_symbol', _ctx.symbol);
-                            if (_ctx.interval) _cp.set('opt_interval', _ctx.interval);
-                            if (_ctx.start_date) _cp.set('opt_start', _ctx.start_date);
-                            if (_ctx.end_date) _cp.set('opt_end', _ctx.end_date);
-                            if (_ctx.leverage != null) _cp.set('opt_leverage', _ctx.leverage);
-                            if (_ctx.position_size != null) _cp.set('opt_ps', _ctx.position_size);
-                            if (_ctx.slippage != null) _cp.set('opt_slip', _ctx.slippage);
-                            if (_ctx.commission != null) _cp.set('opt_com', _ctx.commission);
-                            if (_ctx.direction) _cp.set('opt_dir', _ctx.direction);
-                            if (_ctx.market_type) _cp.set('opt_mt', _ctx.market_type);
-                            if (_ctx.initial_capital != null) _cp.set('opt_cap', _ctx.initial_capital);
+                        const _cp = new URLSearchParams();
+                        const _pick = (cfgKey, ctxKey, urlKey) => {
+                            const v = _cfg && _cfg[cfgKey] != null ? _cfg[cfgKey] : (_ctx ? _ctx[ctxKey] : null);
+                            if (v != null) _cp.set(urlKey, v);
+                        };
+                        _pick('symbol', 'symbol', 'opt_symbol');
+                        _pick('interval', 'interval', 'opt_interval');
+                        _pick('start_date', 'start_date', 'opt_start');
+                        _pick('end_date', 'end_date', 'opt_end');
+                        _pick('leverage', 'leverage', 'opt_leverage');
+                        _pick('position_size', 'position_size', 'opt_ps');
+                        _pick('slippage', 'slippage', 'opt_slip');
+                        _pick('commission_value', 'commission', 'opt_com');
+                        _pick('direction', 'direction', 'opt_dir');
+                        _pick('market_type', 'market_type', 'opt_mt');
+                        _pick('initial_capital', 'initial_capital', 'opt_cap');
+                        if ([..._cp.keys()].length > 0) {
                             _cloneUrl += '&' + _cp.toString();
                         }
                         this.showNotification(`Создана копия: ${cloneName}`, 'success');

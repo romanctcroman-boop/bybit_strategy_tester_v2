@@ -265,9 +265,11 @@ def clear_optimization_progress(strategy_id: str) -> None:
 # Metrics where log1p compression is applied to the raw composite score before
 # storing in trial results and before OOS comparison.  Must stay in sync with
 # the objective function inside run_builder_optuna_search.
+# NOTE: "pareto_balance" is NOT in this set — after the 2026-04-19 rewrite its
+# formula already applies sign-preserving log1p internally (see
+# scoring.calculate_composite_score). Adding it here would double-compress.
 _LOG_SCALE_METRICS: frozenset[str] = frozenset(
     {
-        "pareto_balance",
         "profit_factor",
         "calmar_ratio",
         "recovery_factor",
@@ -499,7 +501,12 @@ DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
         "std_dev": {"type": "float", "low": 1.0, "high": 4.0, "step": 0.1, "default": 2.0},
     },
     "supertrend": {
-        "period": {"type": "int", "low": 3, "high": 30, "step": 1, "default": 10},
+        # period < 5 → ATR becomes noise-dominated (1–4 bars), direction
+        # flips every bar → block emits pure noise. min=5 is the floor that
+        # keeps ATR statistically meaningful on 15m+ timeframes.
+        "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 10},
+        # multiplier > 6 → ATR-bands wider than typical bar range → direction
+        # never flips → block disabled. Realistic range on liquid crypto.
         "multiplier": {"type": "float", "low": 0.5, "high": 6.0, "step": 0.25, "default": 3.0},
     },
     "stochastic": {
@@ -983,6 +990,12 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "step": effective_step,
                     "default": range_spec["default"],
                     "current_value": current_value,
+                    # Recommended ranges (backend defaults) — preserved even when
+                    # user overrides `low`/`high`. Frontend can compare current
+                    # range to recommended and highlight degenerate user ranges
+                    # (e.g. supertrend.multiplier user=1..40 vs recommended=0.5..6).
+                    "recommended_low": range_spec["low"],
+                    "recommended_high": range_spec["high"],
                     # Carry clamping info so callers can surface warnings to the user
                     "step_clamped": step_was_clamped,
                     "original_step": original_step if step_was_clamped else effective_step,
@@ -1539,6 +1552,8 @@ def run_builder_backtest(
             return {
                 "total_return": _safe(getattr(metrics, "total_return", 0)),
                 "sharpe_ratio": _safe(getattr(metrics, "sharpe_ratio", 0)),
+                "sharpe_method": str(getattr(metrics, "sharpe_method", "fallback") or "fallback"),
+                "sharpe_samples": int(getattr(metrics, "sharpe_samples", 0) or 0),
                 "max_drawdown": _safe(getattr(metrics, "max_drawdown", 0)),
                 "win_rate": win_rate,
                 "total_trades": int(getattr(metrics, "total_trades", 0) or 0),
@@ -1698,6 +1713,8 @@ def run_builder_backtest(
             return {
                 "total_return": _v4_total_return_pct,
                 "sharpe_ratio": _safe_v4(getattr(_m, "sharpe_ratio", 0)),
+                "sharpe_method": str(getattr(_m, "sharpe_method", "fallback") or "fallback"),
+                "sharpe_samples": int(getattr(_m, "sharpe_samples", 0) or 0),
                 "max_drawdown": _safe_v4(getattr(_m, "max_drawdown", 0)),
                 "win_rate": win_rate_v4,
                 "total_trades": int(getattr(_m, "total_trades", 0) or 0),
@@ -3199,6 +3216,8 @@ def _run_dca_with_signals(
         return {
             "total_return": _safe(getattr(metrics, "total_return", 0)),
             "sharpe_ratio": _safe(getattr(metrics, "sharpe_ratio", 0)),
+            "sharpe_method": str(getattr(metrics, "sharpe_method", "fallback") or "fallback"),
+            "sharpe_samples": int(getattr(metrics, "sharpe_samples", 0) or 0),
             "max_drawdown": _safe(getattr(metrics, "max_drawdown", 0)),
             "win_rate": win_rate,
             "total_trades": int(getattr(metrics, "total_trades", 0) or 0),
@@ -3917,6 +3936,9 @@ def run_builder_grid_search(
     # Variant A: re-evaluate top results with FallbackEngineV4 for metric parity
     if top_results:
         top_results = _reeval_top_accurate(top_results, base_graph, ohlcv, config_params, optimize_metric, weights)
+    # Re-apply cross-result pareto normalisation after reeval resets individual scores.
+    if optimize_metric == "pareto_balance" and top_results:
+        apply_pareto_scores(top_results)
 
     # Detect if best result has negative score for the optimize metric
     no_positive_results = bool(top_results and top_results[0].get("score", 0) < 0)
@@ -4039,6 +4061,26 @@ def _apply_cross_block_constraints(
         _be_val = float(overrides[_be_path])
         if _be_val >= _tp_val:
             overrides[_be_path] = round(_tp_val * 0.7, 2)
+
+    # ── Supertrend anti-degeneracy: multiplier clamp only ───────────────
+    # multiplier > 10 makes ATR-bands wider than typical bar range →
+    # direction never flips → block becomes inert signal source.
+    #
+    # NOTE: period-clamp (period<5 → 5) was tried and caused TPE hangs —
+    # when TPE suggests period values 1..4 all getting clamped to 5, the
+    # surrogate sees flat response across that axis → covariance matrix
+    # becomes rank-deficient on `period` dimension → scipy Cholesky fails
+    # → native C thread hangs uninterruptibly. Period-degeneracy is real
+    # but must be handled at the UI range layer, not via silent clamp.
+    for _spec in param_specs:
+        if _spec.get("block_type") != "supertrend":
+            continue
+        _pk = _spec.get("param_key")
+        _path = _spec["param_path"]
+        if _path not in overrides:
+            continue
+        if _pk == "multiplier" and float(overrides[_path]) > 10.0:
+            overrides[_path] = 10.0
 
     return overrides
 
@@ -4380,7 +4422,15 @@ def run_builder_optuna_search(
         )
         logger.info("Using HyperbandPruner (min_resource=1, reduction_factor=3)")
     else:
-        _pruner = MedianPruner(n_startup_trials=10, n_warmup_steps=0)
+        # n_startup_trials must exceed TPE's multivariate-fit requirement.
+        # Otherwise: MedianPruner starts pruning at trial 11; TPE tries to build a
+        # 10-dim Cholesky-factorised covariance with <5 COMPLETE trials → rank-deficient
+        # matrix → scipy.linalg.cholesky on Windows enters uninterruptible native C loop
+        # → `threading.Thread.join(_TRIAL_TIMEOUT_S)` doesn't help (C-thread ignores it).
+        # Rule of thumb: pruner_startup >= max(30, n_params * 3) to guarantee enough
+        # feasible samples for TPE's surrogate before pruning kicks in.
+        _pruner_startup = max(30, _n_params * 3)
+        _pruner = MedianPruner(n_startup_trials=_pruner_startup, n_warmup_steps=0)
 
     study = optuna.create_study(
         direction="maximize",
@@ -4686,12 +4736,23 @@ def run_builder_optuna_search(
     # Re-run top-N with FallbackEngineV4 for accurate metrics (Variant A parity fix).
     # NumbaEngineV2 ignores extra_data → profit_only/min_profit in Close-by-Time silently dropped.
     # Using fallback engine here ensures results match what the manual Backtest button produces.
+    # Emit "finalizing" stage so the UI progress bar doesn't appear stuck during the
+    # ~20 s FallbackEngineV4 re-evaluation pass (previously the bar stalled at the
+    # last "searching" tested=N value, looking like a hang).
+    if strategy_id and top_trials:
+        update_optimization_progress(
+            strategy_id,
+            status="running",
+            tested=0,
+            total=len(top_trials),
+            stage="finalizing",
+        )
     _reeval_config = {**config_params, "engine_type": "fallback"}
     _loguru_logger.disable(_quiet_prefix)
     _loguru_logger.disable("backend.core")
     top_results: list[dict[str, Any]] = []
     try:
-        for trial in top_trials:
+        for _reeval_idx, trial in enumerate(top_trials, start=1):
             # CRITICAL: trial.params stores PRE-constraint values from suggest_*().
             # Must re-apply the same cross-block constraints that the objective used,
             # otherwise the re-run backtest uses different params than the original trial.
@@ -4713,6 +4774,15 @@ def run_builder_optuna_search(
                         "trial_number": trial.number,
                         **result,
                     }
+                )
+            # Tick progress so UI knows finalizing is advancing, not stalled.
+            if strategy_id and top_trials:
+                update_optimization_progress(
+                    strategy_id,
+                    status="running",
+                    tested=_reeval_idx,
+                    total=len(top_trials),
+                    stage="finalizing",
                 )
     finally:
         _loguru_logger.enable(_quiet_prefix)
@@ -5056,6 +5126,16 @@ def run_builder_optuna_multi_objective(
 
         return oos_score, gap_penalty
 
+    # Emit stage transition for multi-objective path
+    if strategy_id:
+        update_optimization_progress(
+            strategy_id,
+            status="running",
+            tested=0,
+            total=n_trials or 0,
+            started_at=start_time,
+            stage="searching",
+        )
     try:
         study.optimize(
             objective,

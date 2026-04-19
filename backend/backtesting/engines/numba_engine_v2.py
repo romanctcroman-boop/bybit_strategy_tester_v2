@@ -3366,6 +3366,9 @@ class NumbaEngineV2(BaseBacktestEngine):
         # === DRAWDOWN (via formulas.py — TV-parity) ===
         max_dd_pct, _max_dd_val, _max_dd_dur = calc_max_drawdown(equity_curve)
         metrics.max_drawdown = max_dd_pct
+        # max_dd_val from equity_curve is in leveraged-position units (not account NAV).
+        # Use initial_capital × pct for a capital-denominated dollar drawdown (TV parity).
+        metrics.max_drawdown_usdt = initial_capital * max_dd_pct / 100.0
         # avg_drawdown: mean of per-bar drawdown series
         peak = np.maximum.accumulate(equity_curve)
         drawdown_pct_series = np.where(peak > 0, (peak - equity_curve) / peak * 100, 0.0)
@@ -3422,12 +3425,14 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics.short_avg_win = metrics.short_gross_profit / len(short_wins) if short_wins else 0.0
         metrics.short_avg_loss = metrics.short_gross_loss / len(short_losses) if short_losses else 0.0
         metrics.long_profit_factor = (
-            metrics.long_gross_profit / abs(metrics.long_gross_loss) if metrics.long_gross_loss != 0 else float("inf")
+            metrics.long_gross_profit / abs(metrics.long_gross_loss)
+            if metrics.long_gross_loss != 0
+            else (float("inf") if metrics.long_gross_profit > 0 else 0.0)
         )
         metrics.short_profit_factor = (
             metrics.short_gross_profit / abs(metrics.short_gross_loss)
             if metrics.short_gross_loss != 0
-            else float("inf")
+            else (float("inf") if metrics.short_gross_profit > 0 else 0.0)
         )
 
         # === DURATION ===
@@ -3443,10 +3448,33 @@ class NumbaEngineV2(BaseBacktestEngine):
         # TradingView uses MONTHLY returns bucketed by trade entry_time (not equity_curve).
         metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
         metrics.sortino_ratio = calc_sortino_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
+        # Record method/samples for downstream UI + optimizer dict-builders
+        try:
+            from backend.backtesting.formulas import _aggregate_monthly_equity_returns_from_trades as _agg_m
+
+            _m_samples = len(_agg_m(trades, initial_capital)) if trades else 0
+        except Exception:
+            _m_samples = 0
+        metrics.sharpe_samples = int(_m_samples)
+        metrics.sharpe_method = "monthly" if _m_samples >= 2 else "fallback"
 
         # Calmar: using total_return and max_drawdown
-        bars_per_year = 365 * 24
-        years = max(len(equity_curve) / bars_per_year, 1e-6)
+        # Infer bars_per_year from candles_index (actual timeframe) to avoid
+        # hardcoding 8760 (1h) when the data is 15m (35040) or other TF.
+        n_bars = len(equity_curve)
+        if candles_index is not None and len(candles_index) >= 2:
+            try:
+                import pandas as _pd_cal
+
+                _idx = _pd_cal.DatetimeIndex(candles_index)
+                _total_secs = (_idx[-1] - _idx[0]).total_seconds()
+                _bar_secs = _total_secs / max(len(_idx) - 1, 1)
+                bars_per_year = int(365 * 24 * 3600 / max(_bar_secs, 1))
+            except Exception:
+                bars_per_year = 365 * 24  # fallback to 1h
+        else:
+            bars_per_year = 365 * 24  # fallback to 1h
+        years = max(n_bars / bars_per_year, 1e-6)
         metrics.calmar_ratio = calc_calmar(metrics.total_return, metrics.max_drawdown, years=years)
 
         # === EXPECTANCY (via formulas.py — передаём % т.к. calc_expectancy ожидает win_rate_pct) ===

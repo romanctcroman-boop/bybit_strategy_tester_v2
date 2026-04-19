@@ -2341,6 +2341,19 @@ class FallbackEngineV4(BaseBacktestEngine):
                     pending_short_exit_reason = ExitReason.WEEKEND_CLOSE
                     pending_short_exit_price = close_price * (1 + effective_slippage)
 
+            # === EXIT ON NO-TRADE DAY ===
+            # Close open positions when entering a blocked weekday (entry is blocked AND
+            # holding overnight on a restricted day is also disallowed).
+            if no_trade_days and current_weekday in no_trade_days:
+                if pyramid_mgr.has_position("long"):
+                    pending_long_exit = True
+                    pending_long_exit_reason = ExitReason.SESSION_CLOSE
+                    pending_long_exit_price = close_price * (1 - effective_slippage)
+                if pyramid_mgr.has_position("short"):
+                    pending_short_exit = True
+                    pending_short_exit_reason = ExitReason.SESSION_CLOSE
+                    pending_short_exit_price = close_price * (1 + effective_slippage)
+
             # === ВХОДЫ ===
             can_long = direction in (
                 TradeDirection.LONG,
@@ -2590,13 +2603,16 @@ class FallbackEngineV4(BaseBacktestEngine):
                                 _max_so = pyramiding - pyramid_mgr.get_position("long").entry_count
                                 if dca_safety_orders > _max_so:
                                     import logging as _log
+
                                     _log.getLogger(__name__).warning(
                                         "DCA safety_orders=%d превышает доступные слоты pyramiding=%d "
                                         "(занято=%d). Исполнится только %d SO. "
                                         "Увеличьте pyramiding до %d для полного DCA.",
-                                        dca_safety_orders, pyramiding,
+                                        dca_safety_orders,
+                                        pyramiding,
                                         pyramid_mgr.get_position("long").entry_count,
-                                        _max_so, dca_safety_orders + 1,
+                                        _max_so,
+                                        dca_safety_orders + 1,
                                     )
                                 dca_state = {
                                     "direction": "long",
@@ -2752,13 +2768,16 @@ class FallbackEngineV4(BaseBacktestEngine):
                                 _max_so_s = pyramiding - pyramid_mgr.get_position("short").entry_count
                                 if dca_safety_orders > _max_so_s:
                                     import logging as _log
+
                                     _log.getLogger(__name__).warning(
                                         "DCA safety_orders=%d превышает доступные слоты pyramiding=%d "
                                         "(занято=%d). Исполнится только %d SO. "
                                         "Увеличьте pyramiding до %d для полного DCA.",
-                                        dca_safety_orders, pyramiding,
+                                        dca_safety_orders,
+                                        pyramiding,
                                         pyramid_mgr.get_position("short").entry_count,
-                                        _max_so_s, dca_safety_orders + 1,
+                                        _max_so_s,
+                                        dca_safety_orders + 1,
                                     )
                                 dca_state = {
                                     "direction": "short",
@@ -2853,7 +2872,9 @@ class FallbackEngineV4(BaseBacktestEngine):
                         if sl_price_check and low_price <= sl_price_check:
                             # SL overrides TP set above (worst-case principle)
                             pending_long_exit = True
-                            pending_long_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            pending_long_exit_reason = (
+                                ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            )
                             pending_long_exit_price = sl_price_check
 
                 # SHORT SL check
@@ -2862,12 +2883,16 @@ class FallbackEngineV4(BaseBacktestEngine):
                     if short_pos is not None and short_pos.first_entry_bar == i:
                         sl_price_check = None
                         if sl_mode == SlMode.ATR and atr_values is not None and current_atr > 0:
-                            sl_price_check = pyramid_mgr.get_atr_sl_price("short", current_atr, _atr_sl_multiplier_local)
+                            sl_price_check = pyramid_mgr.get_atr_sl_price(
+                                "short", current_atr, _atr_sl_multiplier_local
+                            )
                         elif sl_mode == SlMode.FIXED and stop_loss > 0:
                             sl_price_check = pyramid_mgr.get_sl_price("short", stop_loss)
                         if sl_price_check and high_price >= sl_price_check:
                             pending_short_exit = True
-                            pending_short_exit_reason = ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            pending_short_exit_reason = (
+                                ExitReason.ATR_SL if sl_mode == SlMode.ATR else ExitReason.STOP_LOSS
+                            )
                             pending_short_exit_price = sl_price_check
 
             # === FUNDING FEE CALCULATION ===
@@ -3250,6 +3275,14 @@ class FallbackEngineV4(BaseBacktestEngine):
         equity_arr = np.asarray(equity_curve, dtype=np.float64)
         metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_arr, candles_index, initial_capital, trades=trades)
         metrics.sortino_ratio = calc_sortino_monthly_tv(equity_arr, candles_index, initial_capital, trades=trades)
+        try:
+            from backend.backtesting.formulas import _aggregate_monthly_equity_returns_from_trades as _agg_m
+
+            _m_samples = len(_agg_m(trades, initial_capital)) if trades else 0
+        except Exception:
+            _m_samples = 0
+        metrics.sharpe_samples = int(_m_samples)
+        metrics.sharpe_method = "monthly" if _m_samples >= 2 else "fallback"
 
         # Recovery factor
         metrics.recovery_factor = calc_recovery_factor(metrics.net_profit, initial_capital, metrics.max_drawdown)

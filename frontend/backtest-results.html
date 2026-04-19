@@ -1221,8 +1221,7 @@
                                     class="form-select form-select-sm w-auto"
                                     title="Выберите агента для одиночного анализа"
                                 >
-                                    <option value="qwen" selected>Qwen</option>
-                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="claude" selected>Claude</option>
                                     <option value="perplexity">Perplexity</option>
                                 </select>
                                 <!-- Trigger button -->
@@ -1940,6 +1939,19 @@
                         setVal('metricProfitFactor', m.profit_factor, 'num');
                         setVal('metricDrawdown', m.max_drawdown ? '-' + m.max_drawdown.toFixed(2) + '%' : null);
                         setVal('metricSharpe', m.sharpe_ratio, 'num');
+                        (function(){
+                            var _sel = document.getElementById('metricSharpe');
+                            if (!_sel) return;
+                            var _mth = m.sharpe_method || 'fallback';
+                            var _n   = Number(m.sharpe_samples || 0);
+                            var _tips = {
+                                monthly:    'Monthly returns, RFR=2%/yr — TV-parity',
+                                weekly:     'Weekly returns, RFR=2%/yr — window <12 mo',
+                                'per-trade':'Trade-by-trade mean/std, non-annualized',
+                                fallback:   'Hourly-annualized fallback — not TV-parity'
+                            };
+                            _sel.title = 'Method: ' + _mth + ' (N=' + _n + ')\n' + (_tips[_mth] || _tips.fallback);
+                        })();
                         setVal('metricSortino', m.sortino_ratio, 'num');
                         setVal('metricRecoveryFactor', m.recovery_factor, 'num');
                         setVal('metricTrades', m.total_trades);

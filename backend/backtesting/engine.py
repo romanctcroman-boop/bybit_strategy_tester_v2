@@ -327,6 +327,7 @@ def _build_performance_metrics(
         initial_capital=initial_capital,
         years=years,
         frequency=TimeFrequency.HOURLY,  # Default for crypto
+        risk_free_rate=getattr(config, "risk_free_rate", 0.02),
     )
 
     # ─── TV-parity CAGR override ─────────────────────────────────────────────────
@@ -341,27 +342,43 @@ def _build_performance_metrics(
 
     calc_metrics["cagr"] = calculate_cagr(initial_capital, _closed_final, years)
 
-    # ─── TV-parity Sharpe & Sortino: trade-close monthly equity ─────────────────
-    # TV includes ALL trades (including end-of-backtest open position) in the
-    # monthly equity series used for Sharpe/Sortino calculation.
-    # Verified: with open trade #44 included → Sharpe 0.944 vs TV 0.942 (+0.2%).
-    #           without open trade            → Sharpe 0.917 vs TV 0.942 (-2.6%).
-    # Steps:
-    #   1. Build equity series at each trade exit timestamp (ALL trades incl. open).
-    #   2. Prepend initial_capital as month-0 anchor (MonthEnd before first trade).
-    #   3. Resample to month-end (last trade equity in that month, or carry forward).
-    #   4. Compute monthly returns via pct_change().
-    # Sharpe: (mean - rfr) / std(ddof=0)   — population std, RFR=2%/yr
-    # Sortino: (mean - rfr) / sqrt(sum(min(0,r-rfr)^2) / N)  — N denominator, RFR=2%/yr
+    # ─── Adaptive TV-parity Sharpe & Sortino ─────────────────────────────────────
+    # TV doc'd methodology = monthly returns, (mean - rfr) / std(ddof=0), non-annualized.
+    # Problem: on short windows (<12 months) monthly yields too few samples — std is
+    # unreliable, Sharpe becomes noise. Sampling theory → need ≥12 samples for std.
+    #
+    # Strategy (prefers longer period for TV-parity, falls through to shorter on short windows):
+    #   1. Monthly  (N_monthly  >= 12, RFR=2%/yr → monthly 2%/12) — TV-parity
+    #   2. Weekly   (N_weekly   >= 12, RFR=2%/yr → weekly  2%/52) — TV-philosophy, not annualized
+    #   3. Per-trade (N_trades  >= 10, no RFR, simple mean/std)   — matches TV's documented
+    #      "trade-by-trade non-annualized Mean/Std" fallback for aperiodic samples
+    #   4. Else: MetricsCalculator value (labelled "fallback" — not TV-parity)
+    #
+    # All methods: ddof=0 (population std) + Sortino uses N denominator (not N-1).
+    # Verified (monthly): Sharpe 0.944 vs TV 0.942 (+0.2% delta) with open trade included.
     sortino_tv = calc_metrics.get("sortino_ratio", 0.0)
     sharpe_tv = calc_metrics.get("sharpe_ratio", 0.0)
+    sharpe_method = "fallback"
+    sharpe_samples = 0
+
+    def _sharpe_sortino_from_returns(returns: np.ndarray, period_rfr: float) -> tuple[float, float]:
+        """Sharpe + Sortino from periodic returns, non-annualized, ddof=0, Sortino N-denom."""
+        N = len(returns)
+        if N < 3:
+            return 0.0, 0.0
+        mean = float(np.mean(returns))
+        std0 = float(np.std(returns, ddof=0))
+        sharpe = float(np.clip((mean - period_rfr) / std0, -100, 100)) if std0 > 1e-10 else 0.0
+        neg = np.minimum(0.0, returns - period_rfr)
+        sdd = float(np.sqrt(np.sum(neg**2) / N))
+        sortino = float(np.clip((mean - period_rfr) / sdd, -100, 100)) if sdd > 1e-10 else 0.0
+        return sharpe, sortino
+
     try:
-        # TV includes open trades in monthly equity for Sharpe/Sortino
         _all_trades_for_sharpe = list(trades)
         if len(_all_trades_for_sharpe) >= 3:
-            # Build trade-exit equity series (all trades including open)
-            _tc_times = []
-            _tc_equity = []
+            _tc_times: list[pd.Timestamp] = []
+            _tc_equity: list[float] = []
             _cum_pnl = 0.0
             for _t in _all_trades_for_sharpe:
                 _cum_pnl += float(getattr(_t, "pnl", 0.0))
@@ -372,32 +389,49 @@ def _build_performance_metrics(
 
             if len(_tc_times) >= 3:
                 _tc_series = pd.Series(_tc_equity, index=pd.DatetimeIndex(_tc_times))
-                # Normalize timezone to tz-naive
                 if _tc_series.index.tz is not None:
                     _tc_series.index = _tc_series.index.tz_localize(None)
-                # Prepend initial capital as month-0 anchor
                 _first_tc = _tc_series.index[0]
-                _anchor_tc = pd.Series(
+                _rfr_annual = float(getattr(config, "risk_free_rate", 0.02))
+
+                # --- 1) Monthly (TV-parity) ---
+                _anchor_m = pd.Series(
                     [initial_capital],
                     index=[_first_tc - pd.offsets.MonthEnd(1)],
                 )
-                _monthly_eq = pd.concat([_anchor_tc, _tc_series]).resample("ME").last().ffill()
+                _monthly_eq = pd.concat([_anchor_m, _tc_series]).resample("ME").last().ffill()
                 _monthly_r = _monthly_eq.pct_change().dropna().values
-                _rfr_m = 0.02 / 12  # 2% annual risk-free rate
-                _N = len(_monthly_r)
-                _mean = float(np.mean(_monthly_r))
 
-                if _N >= 3:
-                    # Sharpe: population std (ddof=0)
-                    _std0 = float(np.std(_monthly_r, ddof=0))
-                    if _std0 > 1e-10:
-                        sharpe_tv = float(np.clip((_mean - _rfr_m) / _std0, -100, 100))
+                if len(_monthly_r) >= 12:
+                    _sh, _so = _sharpe_sortino_from_returns(_monthly_r, _rfr_annual / 12.0)
+                    sharpe_tv, sortino_tv = _sh, _so
+                    sharpe_method, sharpe_samples = "monthly", len(_monthly_r)
+                else:
+                    # --- 2) Weekly ---
+                    _anchor_w = pd.Series(
+                        [initial_capital],
+                        index=[_first_tc - pd.Timedelta(weeks=1)],
+                    )
+                    _weekly_eq = pd.concat([_anchor_w, _tc_series]).resample("W").last().ffill()
+                    _weekly_r = _weekly_eq.pct_change().dropna().values
 
-                    # Sortino: N denominator (not N-1)
-                    _sneg = np.minimum(0.0, _monthly_r - _rfr_m)
-                    _sdd = float(np.sqrt(np.sum(_sneg**2) / _N))
-                    if _sdd > 1e-10:
-                        sortino_tv = float(np.clip((_mean - _rfr_m) / _sdd, -100, 100))
+                    if len(_weekly_r) >= 12:
+                        _sh, _so = _sharpe_sortino_from_returns(_weekly_r, _rfr_annual / 52.0)
+                        sharpe_tv, sortino_tv = _sh, _so
+                        sharpe_method, sharpe_samples = "weekly", len(_weekly_r)
+                    else:
+                        # --- 3) Per-trade (TV non-annualized mean/std) ---
+                        _eq_arr = np.concatenate([[float(initial_capital)], np.asarray(_tc_equity, dtype=float)])
+                        with np.errstate(divide="ignore", invalid="ignore"):
+                            _trade_r = np.diff(_eq_arr) / np.where(_eq_arr[:-1] != 0, _eq_arr[:-1], 1.0)
+                        _trade_r = _trade_r[np.isfinite(_trade_r)]
+
+                        if len(_trade_r) >= 10:
+                            # Aperiodic — no RFR subtraction (per TV doc for trade-by-trade mode)
+                            _sh, _so = _sharpe_sortino_from_returns(_trade_r, 0.0)
+                            sharpe_tv, sortino_tv = _sh, _so
+                            sharpe_method, sharpe_samples = "per-trade", len(_trade_r)
+                        # else: keep MetricsCalculator fallback, method stays "fallback"
     except Exception:
         pass  # Fall back to MetricsCalculator Sharpe/Sortino
 
@@ -1003,6 +1037,8 @@ def _build_performance_metrics(
         # Risk ratios
         sharpe_ratio=sharpe_tv,
         sortino_ratio=sortino_tv,
+        sharpe_method=sharpe_method,
+        sharpe_samples=sharpe_samples,
         calmar_ratio=calc_metrics["calmar_ratio"],
         # Drawdown
         max_drawdown=calc_metrics["max_drawdown"],

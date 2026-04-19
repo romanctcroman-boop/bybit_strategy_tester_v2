@@ -294,59 +294,6 @@ async def create_backtest(request: BacktestCreateRequest):
             )
 
             # Normalize trades into dicts suitable for DB storage
-            trades_list: list[dict[str, Any]] = []
-            for t in (trades_source or [])[:500]:
-                if hasattr(t, "__dict__") and not isinstance(t, dict):
-                    # object-like trade
-                    entry_time = getattr(t, "entry_time", None)
-                    exit_time = getattr(t, "exit_time", None)
-                    side = getattr(t, "side", None)
-                    trades_list.append(
-                        {
-                            "entry_time": entry_time.isoformat() if entry_time else None,
-                            "exit_time": exit_time.isoformat() if exit_time else None,
-                            "side": _get_side_value(side),
-                            "entry_price": float(getattr(t, "entry_price", 0) or 0),
-                            "exit_price": float(getattr(t, "exit_price", 0) or 0),
-                            "size": float(getattr(t, "size", 1.0) or 1.0),
-                            "pnl": float(getattr(t, "pnl", 0) or 0),
-                            "pnl_pct": float(getattr(t, "pnl_pct", 0) or 0),
-                            "fees": float(getattr(t, "fees", 0) or 0),
-                            "duration_bars": int(getattr(t, "duration_bars", 0) or 0),
-                            "mfe": float(getattr(t, "mfe", 0) or 0),
-                            "mae": float(getattr(t, "mae", 0) or 0),
-                        }
-                    )
-                elif isinstance(t, dict):
-                    trades_list.append(
-                        {
-                            "entry_time": t.get("entry_time"),
-                            "exit_time": t.get("exit_time"),
-                            "side": t.get("side", "long"),
-                            "entry_price": float(t.get("entry_price", 0) or 0),
-                            "exit_price": float(t.get("exit_price", 0) or 0),
-                            "size": float(t.get("size", 1.0) or 1.0),
-                            "pnl": float(t.get("pnl", 0) or 0),
-                            "pnl_pct": float(t.get("pnl_pct", 0) or 0),
-                            "fees": float(t.get("fees", 0) or 0),
-                            "duration_bars": int(t.get("duration_bars", 0) or 0),
-                            "mfe": float(t.get("mfe", 0) or 0),
-                            "mae": float(t.get("mae", 0) or 0),
-                        }
-                    )
-
-            # Build equity curve payload for DB
-            equity_payload = None
-            ec_source = result.equity_curve or getattr(result, "equity", None)
-            if ec_source:
-                equity_payload = build_equity_curve_response(ec_source, trades_list)
-
-            # Normalize trades source: engines may return trades under different names
-            trades_source = (
-                result.trades or getattr(result, "all_trades", None) or getattr(result, "trade_list", None) or []
-            )
-
-            # Normalize trades into dicts suitable for DB storage
             trades_list = []
             for t in (trades_source or [])[:500]:
                 if hasattr(t, "__dict__") and not isinstance(t, dict):
@@ -472,6 +419,7 @@ async def create_backtest(request: BacktestCreateRequest):
             logger.info(f"Saved backtest {result.id} to database")
         except Exception as e:
             logger.error(f"Failed to save backtest to database: {e}")
+            db.rollback()  # Clean up broken transaction state
             # Notify client that the result was NOT persisted (silent 200 OK is misleading)
             if hasattr(result, "analysis_warnings"):
                 result.analysis_warnings.append(
@@ -963,18 +911,38 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         if end_dt and end_dt.tzinfo is None:
             end_dt = end_dt.replace(tzinfo=UTC)
 
-        config = BacktestConfig(
+        # Reconstruct full config from DB + parameters dict.
+        # Builder strategy backtests store position_size/commission/slippage/direction/market_type
+        # under "_"-prefixed keys in bt.parameters (see strategy_builder/router.py db_backtest = Backtest(...)).
+        # Reading them back ensures the API response matches the actual config used during execution —
+        # critical for optimizer → clone parity (single-click row open reads this config).
+        _params = bt.parameters or {}
+        _cfg_kwargs: dict[str, Any] = dict(
             symbol=str(bt.symbol or "BTCUSDT"),
             interval=str(bt.timeframe or "30"),
             start_date=cast(datetime, start_dt) if start_dt else datetime.now(UTC),
             end_date=cast(datetime, end_dt) if end_dt else datetime.now(UTC),
             initial_capital=float(bt.initial_capital or 10000.0),
             strategy_type=StrategyType(str(bt.strategy_type or "rsi")),
-            strategy_params=bt.parameters.get("strategy_params", {}) if bt.parameters else {},
-            stop_loss=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
-            take_profit=bt.parameters.get("take_profit_pct") if bt.parameters else None,
-            leverage=bt.parameters.get("leverage", 10) if bt.parameters else 10,
+            strategy_params=_params.get("strategy_params", {}),
+            stop_loss=_params.get("stop_loss_pct"),
+            take_profit=_params.get("take_profit_pct"),
+            leverage=_params.get("leverage", 10),
         )
+        # Propagate real execution values when persisted (avoids defaulting to 1.0 / 0.00055 / 'both').
+        if "_position_size" in _params and _params["_position_size"] is not None:
+            _cfg_kwargs["position_size"] = float(_params["_position_size"])
+        if "_commission" in _params and _params["_commission"] is not None:
+            _cfg_kwargs["commission_value"] = float(_params["_commission"])
+        if "_slippage" in _params and _params["_slippage"] is not None:
+            _cfg_kwargs["slippage"] = float(_params["_slippage"])
+        if _params.get("_direction"):
+            _cfg_kwargs["direction"] = str(_params["_direction"])
+        if _params.get("_market_type"):
+            _cfg_kwargs["market_type"] = str(_params["_market_type"])
+        if "_pyramiding" in _params and _params["_pyramiding"] is not None:
+            _cfg_kwargs["pyramiding"] = int(_params["_pyramiding"])
+        config = BacktestConfig(**_cfg_kwargs)
 
         # Build PerformanceMetrics from DB fields + stored optimization_metrics
         net_profit = bt.final_capital - bt.initial_capital if bt.final_capital and bt.initial_capital else 0

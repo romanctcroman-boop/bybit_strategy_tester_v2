@@ -739,6 +739,8 @@ class BacktestMetrics:
     sharpe_ratio: float = 0.0
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0
+    sharpe_method: str = "fallback"  # monthly | weekly | per-trade | fallback
+    sharpe_samples: int = 0  # N samples used for Sharpe/Sortino
 
     # === СТАТИСТИКА СДЕЛОК ===
     total_trades: int = 0

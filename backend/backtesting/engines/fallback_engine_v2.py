@@ -882,6 +882,14 @@ class FallbackEngineV2(BaseBacktestEngine):
         # Sharpe / Sortino (TradingView monthly formula — trade PnL bucketed by entry month)
         metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
         metrics.sortino_ratio = calc_sortino_monthly_tv(equity_curve, candles_index, initial_capital, trades=trades)
+        try:
+            from backend.backtesting.formulas import _aggregate_monthly_equity_returns_from_trades as _agg_m
+
+            _m_samples = len(_agg_m(trades, initial_capital)) if trades else 0
+        except Exception:
+            _m_samples = 0
+        metrics.sharpe_samples = int(_m_samples)
+        metrics.sharpe_method = "monthly" if _m_samples >= 2 else "fallback"
 
         # Calmar Ratio
         if metrics.max_drawdown > 0:

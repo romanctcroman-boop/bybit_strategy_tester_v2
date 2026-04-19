@@ -84,6 +84,7 @@ def build_backtest_input(
         use_bar_magnifier=False,
         max_drawdown_limit=0.0,
         pyramiding=request_params.get("pyramiding", 1),
+        no_trade_days=request_params.get("no_trade_days", ()),
         max_bars_in_trade=max_bars_in_trade,
         market_regime_enabled=request_params.get("market_regime_enabled", False),
         market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
@@ -390,6 +391,8 @@ def extract_metrics_from_output(bt_output, win_rate_as_pct: bool = True) -> dict
     result = {
         "total_return": metrics.total_return or 0,
         "sharpe_ratio": metrics.sharpe_ratio or 0,
+        "sharpe_method": str(getattr(metrics, "sharpe_method", "fallback") or "fallback"),
+        "sharpe_samples": int(getattr(metrics, "sharpe_samples", 0) or 0),
         "max_drawdown": metrics.max_drawdown or 0,
         "win_rate": win_rate or 0,
         "total_trades": metrics.total_trades or 0,
@@ -412,30 +415,44 @@ def extract_metrics_from_output(bt_output, win_rate_as_pct: bool = True) -> dict
         "expectancy": metrics.expectancy or 0,
         "sortino_ratio": metrics.sortino_ratio or 0,
         "calmar_ratio": metrics.calmar_ratio or 0,
-        "max_drawdown_value": 0,
+        "max_drawdown_value": getattr(metrics, "max_drawdown_usdt", 0) or 0,
         # Long/Short breakdown
         "long_trades": metrics.long_trades or 0,
         "long_winning_trades": getattr(metrics, "long_winning_trades", 0) or 0,
         "long_losing_trades": getattr(metrics, "long_losing_trades", 0) or 0,
-        "long_win_rate": (metrics.long_win_rate * 100 if win_rate_as_pct else metrics.long_win_rate)
+        # Apply same guard as main win_rate: only multiply if value is in FRACTION form (≤1.0)
+        # MetricsCalculator always returns win_rate as PERCENT (0-100), so the guard is a safety net
+        "long_win_rate": (
+            (metrics.long_win_rate * 100 if metrics.long_win_rate <= 1.0 else metrics.long_win_rate)
+            if win_rate_as_pct
+            else metrics.long_win_rate
+        )
         if metrics.long_win_rate
         else 0,
         "long_gross_profit": getattr(metrics, "long_gross_profit", 0) or 0,
         "long_gross_loss": getattr(metrics, "long_gross_loss", 0) or 0,
         "long_net_profit": metrics.long_profit or 0,
-        "long_profit_factor": getattr(metrics, "long_profit_factor", 0) or 0,
+        "long_profit_factor": (lambda v: 100.0 if (v is not None and np.isinf(v)) else (v or 0))(
+            getattr(metrics, "long_profit_factor", 0)
+        ),
         "long_avg_win": getattr(metrics, "long_avg_win", 0) or 0,
         "long_avg_loss": getattr(metrics, "long_avg_loss", 0) or 0,
         "short_trades": metrics.short_trades or 0,
         "short_winning_trades": getattr(metrics, "short_winning_trades", 0) or 0,
         "short_losing_trades": getattr(metrics, "short_losing_trades", 0) or 0,
-        "short_win_rate": (metrics.short_win_rate * 100 if win_rate_as_pct else metrics.short_win_rate)
+        "short_win_rate": (
+            (metrics.short_win_rate * 100 if metrics.short_win_rate <= 1.0 else metrics.short_win_rate)
+            if win_rate_as_pct
+            else metrics.short_win_rate
+        )
         if metrics.short_win_rate
         else 0,
         "short_gross_profit": getattr(metrics, "short_gross_profit", 0) or 0,
         "short_gross_loss": getattr(metrics, "short_gross_loss", 0) or 0,
         "short_net_profit": metrics.short_profit or 0,
-        "short_profit_factor": getattr(metrics, "short_profit_factor", 0) or 0,
+        "short_profit_factor": (lambda v: 100.0 if (v is not None and np.isinf(v)) else (v or 0))(
+            getattr(metrics, "short_profit_factor", 0)
+        ),
         "short_avg_win": getattr(metrics, "short_avg_win", 0) or 0,
         "short_avg_loss": getattr(metrics, "short_avg_loss", 0) or 0,
         # Duration
