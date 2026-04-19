@@ -19,10 +19,11 @@ Usage:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 
@@ -82,13 +83,13 @@ class BacktestConfig:
     taker_fee: float = 0.0006  # 0.06%
     funding_rate: float = 0.0001  # Per 8 hours
     apply_funding: bool = True
-    funding_interval_minutes: Optional[int] = 480  # default 8h
-    funding_interval_candles: Optional[int] = None  # override minutes when provided
-    funding_rate_by_symbol: Optional[dict[str, float]] = None
+    funding_interval_minutes: int | None = 480  # default 8h
+    funding_interval_candles: int | None = None  # override minutes when provided
+    funding_rate_by_symbol: dict[str, float] | None = None
     funding_rate_field: str = "funding_rate"
 
     # Execution
-    slippage_model: Optional[SlippageModel] = None
+    slippage_model: SlippageModel | None = None
     fill_model: str = "realistic"  # 'instant', 'realistic', 'pessimistic'
     partial_fills: bool = True
     order_latency_ms: int = 50  # Simulated latency
@@ -102,13 +103,13 @@ class BacktestConfig:
     margin_type: str = "cross"  # 'cross' or 'isolated'
     maintenance_margin: float = 0.005  # 0.5%
     liquidation_penalty_pct: float = 0.002  # 0.2% notional penalty when liquidated
-    maintenance_margin_by_symbol: Optional[dict[str, float]] = None
+    maintenance_margin_by_symbol: dict[str, float] | None = None
     maintenance_vol_multiplier: float = 0.0  # adds vol * multiplier to base margin
 
     # Time
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    trading_hours: Optional[tuple[int, int]] = None  # (start_hour, end_hour) UTC
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    trading_hours: tuple[int, int] | None = None  # (start_hour, end_hour) UTC
 
     def __post_init__(self):
         if self.slippage_model is None:
@@ -124,25 +125,25 @@ class Order:
     side: OrderSide
     order_type: OrderType
     quantity: float
-    price: Optional[float] = None  # For limit orders
-    stop_price: Optional[float] = None  # For stop orders
+    price: float | None = None  # For limit orders
+    stop_price: float | None = None  # For stop orders
 
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0
     average_fill_price: float = 0.0
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: Optional[datetime] = None
-    filled_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime | None = None
+    filled_at: datetime | None = None
 
     # Execution details
     commission: float = 0.0
     slippage: float = 0.0
 
     # Risk management
-    take_profit: Optional[float] = None
-    stop_loss: Optional[float] = None
-    trailing_stop_pct: Optional[float] = None
+    take_profit: float | None = None
+    stop_loss: float | None = None
+    trailing_stop_pct: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -176,11 +177,11 @@ class Position:
     unrealized_pnl: float = 0.0
     realized_pnl: float = 0.0
 
-    entry_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_update: Optional[datetime] = None
+    entry_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_update: datetime | None = None
 
     # Risk
-    liquidation_price: Optional[float] = None
+    liquidation_price: float | None = None
     margin_used: float = 0.0
     leverage: float = 1.0
 
@@ -188,14 +189,14 @@ class Position:
     funding_paid: float = 0.0
 
     # Orders
-    take_profit_price: Optional[float] = None
-    stop_loss_price: Optional[float] = None
-    trailing_stop_pct: Optional[float] = None  # e.g. 0.01 = 1%
-    trail_anchor: Optional[float] = None  # highest (long) / lowest (short) price seen
+    take_profit_price: float | None = None
+    stop_loss_price: float | None = None
+    trailing_stop_pct: float | None = None  # e.g. 0.01 = 1%
+    trail_anchor: float | None = None  # highest (long) / lowest (short) price seen
 
     # MAE/MFE tracking (TradingView compatible)
-    peak_price: Optional[float] = None  # highest price seen (for MFE long / MAE short)
-    trough_price: Optional[float] = None  # lowest price seen (for MAE long / MFE short)
+    peak_price: float | None = None  # highest price seen (for MFE long / MAE short)
+    trough_price: float | None = None  # lowest price seen (for MAE long / MFE short)
 
     def update_pnl(self, current_price: float):
         """Update unrealized PnL."""
@@ -283,8 +284,8 @@ class Trade:
     pnl: float = 0.0
     pnl_pct: float = 0.0
 
-    entry_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    exit_time: Optional[datetime] = None
+    entry_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    exit_time: datetime | None = None
     duration_seconds: int = 0
 
     # Costs
@@ -297,7 +298,7 @@ class Trade:
     # Analytics
     max_favorable_excursion: float = 0.0  # MFE
     max_adverse_excursion: float = 0.0  # MAE
-    r_multiple: Optional[float] = None  # Risk multiple
+    r_multiple: float | None = None  # Risk multiple
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -468,9 +469,9 @@ class RealisticFillModel:
         if order.price:
             current = candle["close"]
             distance = abs(order.price - current) / current
-            if order.side == OrderSide.BUY and order.price < current:
-                prob *= max(0.1, 1 - distance * 10)
-            elif order.side == OrderSide.SELL and order.price > current:
+            if (order.side == OrderSide.BUY and order.price < current) or (
+                order.side == OrderSide.SELL and order.price > current
+            ):
                 prob *= max(0.1, 1 - distance * 10)
 
         return max(0.0, min(1.0, prob))
@@ -488,7 +489,7 @@ class AdvancedBacktestEngine:
     - Detailed analytics
     """
 
-    def __init__(self, config: Optional[BacktestConfig] = None):
+    def __init__(self, config: BacktestConfig | None = None):
         """
         Initialize backtest engine.
 
@@ -518,7 +519,7 @@ class AdvancedBacktestEngine:
         self._trade_counter = 0
         self._funding_candle_counter = 0
         self._funding_minutes_accum = 0.0
-        self._prev_candle_time: Optional[datetime] = None
+        self._prev_candle_time: datetime | None = None
         self.total_funding_fees = 0.0
         self.liquidations = 0
         self.bars_in_market = 0
@@ -526,9 +527,7 @@ class AdvancedBacktestEngine:
         self.current_dd_duration = 0
         self.max_dd_duration = 0
 
-        logger.info(
-            f"AdvancedBacktestEngine initialized with capital=${self.config.initial_capital}"
-        )
+        logger.info(f"AdvancedBacktestEngine initialized with capital=${self.config.initial_capital}")
 
     def reset(self):
         """Reset engine state."""
@@ -557,8 +556,8 @@ class AdvancedBacktestEngine:
     def run(
         self,
         data: list[dict],
-        strategy_func: Callable[[dict, dict], Optional[dict]],
-        strategy_params: Optional[dict] = None,
+        strategy_func: Callable[[dict, dict], dict | None],
+        strategy_params: dict | None = None,
     ) -> dict[str, Any]:
         """
         Run backtest.
@@ -584,7 +583,7 @@ class AdvancedBacktestEngine:
             "equity": self.equity,
         }
 
-        for i, candle in enumerate(data):
+        for _i, candle in enumerate(data):
             # timestamp available in candle for debugging if needed
             open_time = candle.get("open_time")
             interval_minutes = self._infer_interval_minutes(candle, open_time)
@@ -614,9 +613,7 @@ class AdvancedBacktestEngine:
             # Get strategy signal
             market_state.update(
                 {
-                    "position": self._get_current_position(
-                        candle.get("symbol", "UNKNOWN")
-                    ),
+                    "position": self._get_current_position(candle.get("symbol", "UNKNOWN")),
                     "capital": self.capital,
                     "equity": self.equity,
                     "drawdown": self.current_drawdown,
@@ -736,9 +733,7 @@ class AdvancedBacktestEngine:
 
         self._fill_order(order, slippage.execution_price, qty, candle, slippage)
 
-        logger.info(
-            f"Auto-exit {symbol} via {trigger_reason} at {trigger_price:.4f}, pos_side={pos.side.value}"
-        )
+        logger.info(f"Auto-exit {symbol} via {trigger_reason} at {trigger_price:.4f}, pos_side={pos.side.value}")
 
     def _process_orders(self, candle: dict):
         """Process pending orders."""
@@ -755,9 +750,7 @@ class AdvancedBacktestEngine:
             )
 
             # Try to fill
-            filled, fill_price, fill_qty = self.execution_sim.simulate_fill(
-                order, candle, slippage_result
-            )
+            filled, fill_price, fill_qty = self.execution_sim.simulate_fill(order, candle, slippage_result)
 
             if filled:
                 self._fill_order(order, fill_price, fill_qty, candle, slippage_result)
@@ -775,11 +768,7 @@ class AdvancedBacktestEngine:
         """Execute order fill."""
         # Calculate commission
         fill_value = fill_price * fill_qty
-        fee_rate = (
-            self.config.taker_fee
-            if order.order_type == OrderType.MARKET
-            else self.config.maker_fee
-        )
+        fee_rate = self.config.taker_fee if order.order_type == OrderType.MARKET else self.config.maker_fee
         commission = fill_value * fee_rate
 
         # Update order
@@ -788,7 +777,7 @@ class AdvancedBacktestEngine:
         order.commission = commission
         order.slippage = slippage.slippage_amount * fill_qty
         order.status = OrderStatus.FILLED
-        order.filled_at = datetime.now(timezone.utc)
+        order.filled_at = datetime.now(UTC)
 
         # Update positions
         symbol = order.symbol
@@ -796,22 +785,14 @@ class AdvancedBacktestEngine:
 
         if order.side == OrderSide.BUY:
             if existing and existing.side == PositionSide.SHORT:
-                self._close_or_reduce_position(
-                    symbol, fill_price, fill_qty, candle, order, reason, extra_cost
-                )
+                self._close_or_reduce_position(symbol, fill_price, fill_qty, candle, order, reason, extra_cost)
             else:
-                self._open_or_add_position(
-                    symbol, PositionSide.LONG, fill_price, fill_qty, order
-                )
+                self._open_or_add_position(symbol, PositionSide.LONG, fill_price, fill_qty, order)
         else:  # SELL
             if existing and existing.side == PositionSide.LONG:
-                self._close_or_reduce_position(
-                    symbol, fill_price, fill_qty, candle, order, reason, extra_cost
-                )
+                self._close_or_reduce_position(symbol, fill_price, fill_qty, candle, order, reason, extra_cost)
             else:
-                self._open_or_add_position(
-                    symbol, PositionSide.SHORT, fill_price, fill_qty, order
-                )
+                self._open_or_add_position(symbol, PositionSide.SHORT, fill_price, fill_qty, order)
 
     def _open_or_add_position(
         self,
@@ -832,9 +813,7 @@ class AdvancedBacktestEngine:
             pos = self.positions[symbol]
             # Average into position
             total_qty = pos.quantity + quantity
-            pos.entry_price = (
-                pos.entry_price * pos.quantity + price * quantity
-            ) / total_qty
+            pos.entry_price = (pos.entry_price * pos.quantity + price * quantity) / total_qty
             pos.quantity = total_qty
             pos.margin_used += required_margin
             pos.entry_commission_total += order.commission
@@ -892,16 +871,10 @@ class AdvancedBacktestEngine:
             entry_price=pos.entry_price,
             exit_price=price,
             quantity=close_qty,
-            pnl=pnl
-            - order.commission
-            - released_entry_commission
-            - allocated_funding
-            - extra_cost,
-            pnl_pct=(price / pos.entry_price - 1)
-            if pos.side == PositionSide.LONG
-            else (1 - price / pos.entry_price),
+            pnl=pnl - order.commission - released_entry_commission - allocated_funding - extra_cost,
+            pnl_pct=(price / pos.entry_price - 1) if pos.side == PositionSide.LONG else (1 - price / pos.entry_price),
             entry_time=pos.entry_time,
-            exit_time=datetime.now(timezone.utc),
+            exit_time=datetime.now(UTC),
             commission=order.commission + released_entry_commission,
             slippage=order.slippage,
             funding_fees=allocated_funding,
@@ -911,9 +884,7 @@ class AdvancedBacktestEngine:
             max_favorable_excursion=pos.calculate_mfe(),
             max_adverse_excursion=pos.calculate_mae(),
         )
-        trade.duration_seconds = int(
-            (trade.exit_time - trade.entry_time).total_seconds()
-        )
+        trade.duration_seconds = int((trade.exit_time - trade.entry_time).total_seconds())
         self.trades.append(trade)
 
         # Capital update on exit: return margin + realized PnL - exit commission
@@ -921,9 +892,7 @@ class AdvancedBacktestEngine:
 
         # Update or remove position
         pos.quantity -= close_qty
-        pos.realized_pnl += (
-            pnl - released_entry_commission - order.commission - extra_cost
-        )
+        pos.realized_pnl += pnl - released_entry_commission - order.commission - extra_cost
         pos.margin_used -= released_margin
         pos.entry_commission_total -= released_entry_commission
         pos.funding_paid -= allocated_funding
@@ -952,39 +921,27 @@ class AdvancedBacktestEngine:
                 side=order.side.value,
             )
 
-            self._fill_order(
-                order, slippage.execution_price, pos.quantity, last_candle, slippage
-            )
+            self._fill_order(order, slippage.execution_price, pos.quantity, last_candle, slippage)
 
     def _process_signal(self, signal: dict, candle: dict):
         """Process strategy signal."""
         action = signal.get("action")
         symbol = signal.get("symbol", candle.get("symbol", "UNKNOWN"))
-        price_for_margin = signal.get("price", candle.get("close", 0)) or candle.get(
-            "close", 0
-        )
+        price_for_margin = signal.get("price", candle.get("close", 0)) or candle.get("close", 0)
 
         if action in ["buy", "long"]:
             if self._can_open_new_position():
                 # Margin check
-                proposed_qty = signal.get(
-                    "quantity", self._calculate_position_size(candle)
-                )
-                required_margin = (
-                    price_for_margin * proposed_qty
-                ) / self.config.leverage
-                if (
-                    self.capital < required_margin + price_for_margin * 0 + 0
-                ):  # commission handled later
+                proposed_qty = signal.get("quantity", self._calculate_position_size(candle))
+                required_margin = (price_for_margin * proposed_qty) / self.config.leverage
+                if self.capital < required_margin + price_for_margin * 0 + 0:  # commission handled later
                     logger.warning("Open blocked: insufficient margin (long)")
                     return
                 self._create_order(
                     symbol=symbol,
                     side=OrderSide.BUY,
                     order_type=OrderType(signal.get("order_type", "market")),
-                    quantity=signal.get(
-                        "quantity", self._calculate_position_size(candle)
-                    ),
+                    quantity=signal.get("quantity", self._calculate_position_size(candle)),
                     price=signal.get("price"),
                     stop_price=signal.get("stop_price"),
                     take_profit=signal.get("take_profit"),
@@ -1009,9 +966,7 @@ class AdvancedBacktestEngine:
                 return
 
             if is_opening_short:
-                required_margin = (
-                    price_for_margin * inferred_qty
-                ) / self.config.leverage
+                required_margin = (price_for_margin * inferred_qty) / self.config.leverage
                 if self.capital < required_margin:
                     logger.warning("Open blocked: insufficient margin (short)")
                     return
@@ -1031,9 +986,7 @@ class AdvancedBacktestEngine:
             pos = self._get_position(symbol)
             if not pos:
                 return
-            exit_side = (
-                OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
-            )
+            exit_side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
             qty = signal.get("quantity", pos.quantity)
             self._create_order(
                 symbol=symbol,
@@ -1053,11 +1006,11 @@ class AdvancedBacktestEngine:
         side: OrderSide,
         order_type: OrderType,
         quantity: float,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        trailing_stop_pct: Optional[float] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
+        take_profit: float | None = None,
+        stop_loss: float | None = None,
+        trailing_stop_pct: float | None = None,
     ):
         """Create and queue order."""
         self._order_counter += 1
@@ -1095,17 +1048,11 @@ class AdvancedBacktestEngine:
 
         # Daily loss limit approximation: use equity vs initial
         if self.config.daily_loss_limit > 0:
-            loss_frac = (
-                max(0.0, (self.config.initial_capital - self.equity))
-                / self.config.initial_capital
-            )
+            loss_frac = max(0.0, (self.config.initial_capital - self.equity)) / self.config.initial_capital
             if loss_frac >= self.config.daily_loss_limit:
                 return False
 
-        if len(self.positions) >= self.config.position_limit:
-            return False
-
-        return True
+        return not len(self.positions) >= self.config.position_limit
 
     def _update_equity_tracking(self):
         """Update equity curve and drawdown."""
@@ -1144,10 +1091,10 @@ class AdvancedBacktestEngine:
             return self.positions[symbol].quantity
         return 0.0
 
-    def _get_position(self, symbol: str) -> Optional[Position]:
+    def _get_position(self, symbol: str) -> Position | None:
         return self.positions.get(symbol)
 
-    def _get_current_position(self, symbol: str) -> Optional[dict]:
+    def _get_current_position(self, symbol: str) -> dict | None:
         """Get current position as dict."""
         if symbol in self.positions:
             return self.positions[symbol].to_dict()
@@ -1157,10 +1104,7 @@ class AdvancedBacktestEngine:
         """Resolve maintenance margin rate with overrides and vol adjustment."""
 
         # Symbol-specific override
-        if (
-            self.config.maintenance_margin_by_symbol
-            and symbol in self.config.maintenance_margin_by_symbol
-        ):
+        if self.config.maintenance_margin_by_symbol and symbol in self.config.maintenance_margin_by_symbol:
             base = self.config.maintenance_margin_by_symbol[symbol]
         else:
             base = candle.get("maintenance_margin", self.config.maintenance_margin)
@@ -1175,17 +1119,12 @@ class AdvancedBacktestEngine:
         if self.config.funding_rate_field and self.config.funding_rate_field in candle:
             return float(candle[self.config.funding_rate_field])
 
-        if (
-            self.config.funding_rate_by_symbol
-            and symbol in self.config.funding_rate_by_symbol
-        ):
+        if self.config.funding_rate_by_symbol and symbol in self.config.funding_rate_by_symbol:
             return self.config.funding_rate_by_symbol[symbol]
 
         return self.config.funding_rate
 
-    def _infer_interval_minutes(
-        self, candle: dict, open_time: Optional[datetime]
-    ) -> Optional[float]:
+    def _infer_interval_minutes(self, candle: dict, open_time: datetime | None) -> float | None:
         """Infer candle interval in minutes using provided metadata."""
 
         if candle.get("interval_minutes"):
@@ -1202,9 +1141,7 @@ class AdvancedBacktestEngine:
 
         return None
 
-    def _maybe_apply_funding(
-        self, candle: dict, interval_minutes: Optional[float]
-    ) -> None:
+    def _maybe_apply_funding(self, candle: dict, interval_minutes: float | None) -> None:
         """Apply funding payments/credits when due."""
 
         if not self.config.apply_funding or not self.positions:
@@ -1281,9 +1218,7 @@ class AdvancedBacktestEngine:
         penalty_rate = self.config.liquidation_penalty_pct
 
         for symbol, pos in list(self.positions.items()):
-            opposite_side = (
-                OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
-            )
+            opposite_side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
             order = Order(
                 id=f"LIQ_{symbol}_{self._trade_counter:06d}",
                 symbol=symbol,
@@ -1336,14 +1271,8 @@ class AdvancedBacktestEngine:
     def _calculate_results(self, data: list[dict], duration: float) -> dict[str, Any]:
         """Calculate final backtest results."""
         if not self.trades:
-            total_return = (
-                self.equity - self.config.initial_capital
-            ) / self.config.initial_capital
-            time_in_market_pct = (
-                (self.bars_in_market / len(self.equity_curve) * 100)
-                if self.equity_curve
-                else 0
-            )
+            total_return = (self.equity - self.config.initial_capital) / self.config.initial_capital
+            time_in_market_pct = (self.bars_in_market / len(self.equity_curve) * 100) if self.equity_curve else 0
             return {
                 "status": "no_trades",
                 "config": {
@@ -1365,9 +1294,7 @@ class AdvancedBacktestEngine:
                 },
                 "events": {
                     "liquidations": self.liquidations,
-                    "funding_events": len(
-                        [e for e in self.events_log if e["type"] == "funding"]
-                    ),
+                    "funding_events": len([e for e in self.events_log if e["type"] == "funding"]),
                     "log": self.events_log,
                 },
                 "trades": {
@@ -1393,9 +1320,7 @@ class AdvancedBacktestEngine:
             }
 
         # Basic metrics
-        total_return = (
-            self.equity - self.config.initial_capital
-        ) / self.config.initial_capital
+        total_return = (self.equity - self.config.initial_capital) / self.config.initial_capital
         winning_trades = [t for t in self.trades if t.pnl > 0]
         losing_trades = [t for t in self.trades if t.pnl <= 0]
 
@@ -1403,23 +1328,15 @@ class AdvancedBacktestEngine:
 
         # Calculate Sharpe with strong guards against instability
         if len(self.equity_curve) > 1:
-            returns = np.diff(self.equity_curve) / np.maximum(
-                np.array(self.equity_curve[:-1]), 1e-12
-            )
+            returns = np.diff(self.equity_curve) / np.maximum(np.array(self.equity_curve[:-1]), 1e-12)
             returns = returns[np.isfinite(returns)]
             if returns.size > 1:
                 std = np.std(returns)
                 # TradingView Sortino: DD = sqrt(sum(min(0, Xi))^2 / N)
                 downside_sq = np.minimum(0, returns) ** 2
                 downside_dev = np.sqrt(downside_sq.sum() / len(returns))
-                if std < 1e-9:
-                    sharpe = 0
-                else:
-                    sharpe = np.mean(returns) / std * np.sqrt(365 * 24)
-                if downside_dev < 1e-9:
-                    sortino = 0
-                else:
-                    sortino = np.mean(returns) / downside_dev * np.sqrt(365 * 24)
+                sharpe = 0 if std < 1e-09 else np.mean(returns) / std * np.sqrt(365 * 24)
+                sortino = 0 if downside_dev < 1e-09 else np.mean(returns) / downside_dev * np.sqrt(365 * 24)
             else:
                 sharpe = 0
                 sortino = 0
@@ -1441,9 +1358,7 @@ class AdvancedBacktestEngine:
         gross_loss = abs(sum(t.pnl + getattr(t, "fees", 0) for t in losing_trades))
         total_commission = sum(getattr(t, "fees", 0) for t in self.trades)
         net_profit = sum(t.pnl for t in self.trades)
-        profit_factor_raw = (
-            gross_profit / gross_loss if gross_loss > 0 else float("inf")
-        )
+        profit_factor_raw = gross_profit / gross_loss if gross_loss > 0 else float("inf")
         # Cap profit factor to avoid inf/overflow in reporting
         profit_factor = min(profit_factor_raw, 100.0)
 
@@ -1460,18 +1375,12 @@ class AdvancedBacktestEngine:
         # Expectancy
         expectancy = win_rate * avg_win - (1 - win_rate) * abs(avg_loss)
 
-        time_in_market_pct = (
-            (self.bars_in_market / len(self.equity_curve) * 100)
-            if self.equity_curve
-            else 0
-        )
+        time_in_market_pct = (self.bars_in_market / len(self.equity_curve) * 100) if self.equity_curve else 0
 
         # Total costs
         total_commission = sum(t.commission for t in self.trades)
         total_slippage = sum(t.slippage for t in self.trades)
-        total_funding = (
-            sum(t.funding_fees for t in self.trades) or self.total_funding_fees
-        )
+        total_funding = sum(t.funding_fees for t in self.trades) or self.total_funding_fees
 
         return {
             "status": "completed",
@@ -1497,9 +1406,7 @@ class AdvancedBacktestEngine:
             },
             "events": {
                 "liquidations": self.liquidations,
-                "funding_events": len(
-                    [e for e in self.events_log if e["type"] == "funding"]
-                ),
+                "funding_events": len([e for e in self.events_log if e["type"] == "funding"]),
                 "log": self.events_log,
             },
             "trades": {
@@ -1517,9 +1424,7 @@ class AdvancedBacktestEngine:
                 "total_slippage": round(total_slippage, 4),
                 "total_funding": round(total_funding, 4),
                 "cost_ratio": round(
-                    (total_commission + total_slippage + abs(total_funding))
-                    / self.config.initial_capital
-                    * 100,
+                    (total_commission + total_slippage + abs(total_funding)) / self.config.initial_capital * 100,
                     2,
                 ),
             },

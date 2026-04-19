@@ -25,12 +25,14 @@ Usage:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import redis.asyncio as redis
 import websockets
@@ -38,6 +40,9 @@ import websockets
 from backend.core.metrics import get_metrics
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
 
 
 @dataclass
@@ -82,30 +87,30 @@ class RedisTradeBroadcaster:
     def __init__(
         self,
         redis_url: str = "redis://localhost:6379",
-        symbols: List[str] = None,
+        symbols: list[str] | None = None,
     ):
         self.redis_url = redis_url
         self.symbols = symbols or ["BTCUSDT", "ETHUSDT"]
 
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
         self._running = False
-        self._ws = None
+        self._ws: Any | None = None
 
         # Stats
-        self._stats = {
+        self._stats: dict[str, Any] = {
             "trades_broadcast": 0,
             "reconnects": 0,
             "started_at": None,
         }
 
         # Reconnect settings
-        self._reconnect_delay = 5
-        self._max_reconnect_delay = 60
+        self._reconnect_delay: float = 5.0
+        self._max_reconnect_delay: float = 60.0
 
     async def start(self):
         """Start broadcaster."""
         self._running = True
-        self._stats["started_at"] = datetime.now(timezone.utc).isoformat()
+        self._stats["started_at"] = datetime.now(UTC).isoformat()
 
         # Connect to Redis
         self.redis_client = await redis.from_url(
@@ -126,9 +131,7 @@ class RedisTradeBroadcaster:
                 self._stats["reconnects"] += 1
 
                 # Exponential backoff
-                self._reconnect_delay = min(
-                    self._max_reconnect_delay, self._reconnect_delay * 1.5
-                )
+                self._reconnect_delay = min(self._max_reconnect_delay, self._reconnect_delay * 1.5)
 
             if self._running:
                 logger.info(f"Reconnecting in {self._reconnect_delay:.1f}s...")
@@ -167,7 +170,7 @@ class RedisTradeBroadcaster:
 
             # Listen and broadcast
             async for message in ws:
-                await self._handle_message(message)
+                await self._handle_message(message if isinstance(message, str) else message.decode())
 
     async def _handle_message(self, message: str):
         """Handle Bybit message and broadcast to Redis."""
@@ -181,6 +184,7 @@ class RedisTradeBroadcaster:
 
                 # Batch publish for efficiency
                 if trades_data:
+                    assert self.redis_client is not None
                     pipe = self.redis_client.pipeline()
                     metrics = get_metrics()
 
@@ -195,9 +199,7 @@ class RedisTradeBroadcaster:
 
                     # Log periodically
                     if self._stats["trades_broadcast"] % 1000 == 0:
-                        logger.info(
-                            f"Broadcast {self._stats['trades_broadcast']} trades"
-                        )
+                        logger.info(f"Broadcast {self._stats['trades_broadcast']} trades")
 
         except Exception as e:
             logger.error(f"Error handling message: {e}")
@@ -221,19 +223,19 @@ class RedisTickSubscriber:
     def __init__(
         self,
         redis_url: str = "redis://localhost:6379",
-        symbols: List[str] = None,
+        symbols: list[str] | None = None,
     ):
         self.redis_url = redis_url
         self.symbols = symbols or ["BTCUSDT"]
 
-        self.redis_client: Optional[redis.Redis] = None
-        self.pubsub = None
+        self.redis_client: redis.Redis | None = None
+        self.pubsub: Any | None = None
 
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
         # Callbacks
-        self._trade_callbacks: List[Callable[[str, Trade], None]] = []
+        self._trade_callbacks: list[Callable[[str, Trade], None]] = []
 
         # Stats
         self._stats = {
@@ -254,6 +256,7 @@ class RedisTickSubscriber:
             decode_responses=True,
         )
 
+        assert self.redis_client is not None
         self.pubsub = self.redis_client.pubsub()
 
         # Subscribe to channels
@@ -272,10 +275,8 @@ class RedisTickSubscriber:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         if self.pubsub:
             await self.pubsub.unsubscribe()
@@ -288,7 +289,9 @@ class RedisTickSubscriber:
 
     async def _listen_loop(self):
         """Listen to Redis and invoke callbacks."""
-        try:
+        if self.pubsub is None:
+            return
+        with contextlib.suppress(asyncio.CancelledError):
             async for message in self.pubsub.listen():
                 if message["type"] == "message":
                     channel = message["channel"]
@@ -311,16 +314,11 @@ class RedisTickSubscriber:
 
                         # Invoke callbacks
                         for callback in self._trade_callbacks:
-                            try:
+                            with contextlib.suppress(Exception):
                                 callback(symbol, trade)
-                            except Exception:
-                                pass  # Isolate callback errors
 
                     except Exception as e:
                         logger.error(f"Error parsing trade: {e}")
-
-        except asyncio.CancelledError:
-            pass
 
     def add_trade_callback(self, callback: Callable[[str, Trade], None]):
         """Register callback for trades."""
@@ -328,10 +326,8 @@ class RedisTickSubscriber:
 
     def remove_trade_callback(self, callback: Callable[[str, Trade], None]):
         """Remove callback."""
-        try:
+        with contextlib.suppress(ValueError):
             self._trade_callbacks.remove(callback)
-        except ValueError:
-            pass
 
     def get_stats(self) -> dict:
         """Get subscriber statistics."""
@@ -364,7 +360,9 @@ async def main():
     loop = asyncio.get_running_loop()
 
     def shutdown():
-        asyncio.create_task(broadcaster.stop())
+        task = asyncio.create_task(broadcaster.stop())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
     # Note: signal handling differs on Windows
     try:

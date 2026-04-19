@@ -7,14 +7,13 @@ Provides REST endpoints and WebSocket for real-time updates.
 
 from __future__ import annotations
 
-import asyncio
-import json
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from contextlib import suppress
+from datetime import UTC, datetime
+from typing import Any, cast
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, WebSocket
 from loguru import logger
+from pydantic import BaseModel
 
 
 # Pydantic models for API
@@ -22,10 +21,10 @@ class MetricQuery(BaseModel):
     """Metric query parameters"""
 
     metric_name: str
-    time_from: Optional[str] = "now-1h"
-    time_to: Optional[str] = "now"
-    aggregation: Optional[str] = "avg"
-    labels: Optional[Dict[str, str]] = None
+    time_from: str | None = "now-1h"
+    time_to: str | None = "now"
+    aggregation: str | None = "avg"
+    labels: dict[str, str] | None = None
 
 
 class AlertCreate(BaseModel):
@@ -36,7 +35,7 @@ class AlertCreate(BaseModel):
     condition: str  # "gt", "lt", "eq"
     threshold: float
     severity: str = "warning"
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class DashboardWidget(BaseModel):
@@ -46,8 +45,8 @@ class DashboardWidget(BaseModel):
     type: str  # "stat", "chart", "table", "gauge"
     title: str
     metric_name: str
-    position: Dict[str, int]  # x, y, w, h
-    options: Optional[Dict[str, Any]] = None
+    position: dict[str, int]  # x, y, w, h
+    options: dict[str, Any] | None = None
 
 
 class DashboardLayout(BaseModel):
@@ -55,7 +54,7 @@ class DashboardLayout(BaseModel):
 
     id: str
     name: str
-    widgets: List[DashboardWidget]
+    widgets: list[DashboardWidget]
 
 
 # Create router
@@ -63,10 +62,13 @@ router = APIRouter(prefix="/api/agents", tags=["AI Agents"])
 
 
 # In-memory state (replace with actual collectors in production)
-_dashboard_state = {
-    "connected_clients": set(),
-    "last_update": None,
-}
+_dashboard_state = cast(
+    "dict[str, Any]",
+    {
+        "connected_clients": set(),
+        "last_update": None,
+    },
+)
 
 
 @router.get("/health")
@@ -74,7 +76,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ai-agent-dashboard",
     }
 
@@ -85,7 +87,7 @@ async def list_metrics():
     try:
         from backend.agents.monitoring.metrics_collector import MetricsCollector
 
-        collector = MetricsCollector()
+        MetricsCollector()  # Verify import works
 
         return {
             "metrics": [
@@ -130,12 +132,12 @@ async def query_metrics(query: MetricQuery):
         collector = MetricsCollector()
 
         # Get metric data
-        data = collector.get_metric(query.metric_name)
+        data = collector.get(query.metric_name)
 
         return {
             "metric_name": query.metric_name,
             "data": data,
-            "query": query.dict(),
+            "query": query.model_dump(),
         }
     except Exception as e:
         logger.error(f"Error querying metrics: {e}")
@@ -240,9 +242,9 @@ async def list_alerts():
                     "id": alert.id,
                     "name": alert.rule_name,
                     "severity": alert.severity.value,
-                    "value": alert.current_value,
+                    "value": alert.value,
                     "message": alert.message,
-                    "fired_at": alert.fired_at.isoformat(),
+                    "fired_at": alert.started_at.isoformat(),
                 }
                 for alert in manager.get_active_alerts()
             ]
@@ -260,17 +262,18 @@ async def create_alert(alert: AlertCreate):
             AlertManager,
             AlertRule,
             AlertSeverity,
+            ComparisonOperator,
         )
 
         manager = AlertManager()
 
         rule = AlertRule(
             name=alert.name,
+            description=alert.message or "",
             metric_name=alert.metric_name,
-            condition=alert.condition,
+            operator=ComparisonOperator(alert.condition),
             threshold=alert.threshold,
             severity=AlertSeverity(alert.severity),
-            message=alert.message,
         )
 
         manager.add_rule(rule)
@@ -296,18 +299,25 @@ async def list_traces(limit: int = 50):
 
         tracer = DistributedTracer()
 
-        spans = list(tracer._completed_spans.values())[-limit:]
+        traces = tracer.get_recent_traces(limit=limit)
 
         return {
             "traces": [
                 {
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "name": span.name,
-                    "duration_ms": span.duration_ms,
-                    "status": span.status.value if hasattr(span, "status") else "ok",
+                    "trace_id": trace.trace_id,
+                    "span_count": len(trace.spans),
+                    "duration_ms": trace.duration_ms,
+                    "spans": [
+                        {
+                            "span_id": span.context.span_id,
+                            "name": span.name,
+                            "duration_ms": span.duration_ms,
+                            "status": span.status.value if hasattr(span, "status") else "ok",
+                        }
+                        for span in trace.spans
+                    ],
                 }
-                for span in spans
+                for trace in traces
             ]
         }
     except Exception as e:
@@ -316,7 +326,7 @@ async def list_traces(limit: int = 50):
 
 
 @router.get("/anomalies")
-async def list_anomalies(metric_name: Optional[str] = None, limit: int = 100):
+async def list_anomalies(metric_name: str | None = None, limit: int = 100):
     """List detected anomalies"""
     try:
         from backend.agents.monitoring.ml_anomaly import get_anomaly_detector
@@ -406,7 +416,7 @@ class ConnectionManager:
     """WebSocket connection manager"""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -415,89 +425,10 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, message: Dict[str, Any]):
+    async def broadcast(self, message: dict[str, Any]):
         for connection in self.active_connections:
-            try:
+            with suppress(Exception):
                 await connection.send_json(message)
-            except Exception:
-                pass
 
 
 manager = ConnectionManager()
-
-
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time updates"""
-    await manager.connect(websocket)
-
-    try:
-        # Send initial state
-        await websocket.send_json(
-            {
-                "type": "connected",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-
-        # Keep connection alive and push updates
-        while True:
-            try:
-                # Wait for client message or timeout
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-
-                # Handle client messages
-                msg = json.loads(data)
-
-                if msg.get("type") == "subscribe":
-                    # Client subscribing to specific metrics
-                    await websocket.send_json(
-                        {
-                            "type": "subscribed",
-                            "metrics": msg.get("metrics", []),
-                        }
-                    )
-                elif msg.get("type") == "ping":
-                    await websocket.send_json({"type": "pong"})
-
-            except asyncio.TimeoutError:
-                # Send heartbeat
-                await websocket.send_json(
-                    {
-                        "type": "heartbeat",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-
-async def broadcast_metric_update(metric_name: str, value: Any):
-    """Broadcast metric update to all connected clients"""
-    await manager.broadcast(
-        {
-            "type": "metric_update",
-            "metric_name": metric_name,
-            "value": value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-
-
-async def broadcast_alert(alert: Dict[str, Any]):
-    """Broadcast alert to all connected clients"""
-    await manager.broadcast(
-        {
-            "type": "alert",
-            "alert": alert,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-
-
-__all__ = [
-    "router",
-    "broadcast_metric_update",
-    "broadcast_alert",
-]

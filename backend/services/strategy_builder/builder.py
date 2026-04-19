@@ -16,9 +16,9 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ class BlockType(Enum):
 
     # Risk Management
     RISK_POSITION_SIZE = "risk_position_size"
+    RISK_STATIC_SLTP = "risk_static_sltp"
     RISK_MAX_DRAWDOWN = "risk_max_drawdown"
     RISK_DAILY_LIMIT = "risk_daily_limit"
     RISK_CORRELATION = "risk_correlation"
@@ -117,10 +118,10 @@ class BlockParameter:
     param_type: str  # "int", "float", "bool", "string", "choice"
     default: Any
     description: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    choices: Optional[List[Any]] = None
-    step: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    choices: list[Any] | None = None
+    step: float | None = None
 
 
 @dataclass
@@ -141,14 +142,14 @@ class StrategyBlock:
     position_y: float = 0
 
     # Configuration
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
     # Ports (defined by block type)
-    inputs: List[BlockInput] = field(default_factory=list)
-    outputs: List[BlockOutput] = field(default_factory=list)
+    inputs: list[BlockInput] = field(default_factory=list)
+    outputs: list[BlockOutput] = field(default_factory=list)
 
     # Custom code (for custom blocks)
-    custom_code: Optional[str] = None
+    custom_code: str | None = None
 
     # Metadata
     color: str = "#4CAF50"
@@ -158,9 +159,9 @@ class StrategyBlock:
 
     # Validation
     is_valid: bool = True
-    validation_errors: List[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -169,13 +170,8 @@ class StrategyBlock:
             "position_x": self.position_x,
             "position_y": self.position_y,
             "parameters": self.parameters,
-            "inputs": [
-                {"name": i.name, "data_type": i.data_type, "required": i.required}
-                for i in self.inputs
-            ],
-            "outputs": [
-                {"name": o.name, "data_type": o.data_type} for o in self.outputs
-            ],
+            "inputs": [{"name": i.name, "data_type": i.data_type, "required": i.required} for i in self.inputs],
+            "outputs": [{"name": o.name, "data_type": o.data_type} for o in self.outputs],
             "custom_code": self.custom_code,
             "color": self.color,
             "icon": self.icon,
@@ -184,7 +180,7 @@ class StrategyBlock:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StrategyBlock":
+    def from_dict(cls, data: dict[str, Any]) -> "StrategyBlock":
         """Create from dictionary"""
         inputs = [BlockInput(**i) for i in data.get("inputs", [])]
         outputs = [BlockOutput(**o) for o in data.get("outputs", [])]
@@ -217,7 +213,7 @@ class BlockConnection:
     target_input: str
     connection_type: ConnectionType = ConnectionType.DATA_FLOW
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -242,24 +238,24 @@ class StrategyGraph:
     description: str = ""
 
     # Graph structure
-    blocks: Dict[str, StrategyBlock] = field(default_factory=dict)
-    connections: List[BlockConnection] = field(default_factory=list)
+    blocks: dict[str, StrategyBlock] = field(default_factory=dict)
+    connections: list[BlockConnection] = field(default_factory=list)
 
     # Metadata
     version: str = "1.0"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     author: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     # Settings
     timeframe: str = "1h"
-    symbols: List[str] = field(default_factory=list)
+    symbols: list[str] = field(default_factory=list)
 
     def add_block(self, block: StrategyBlock) -> None:
         """Add a block to the graph"""
         self.blocks[block.id] = block
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def remove_block(self, block_id: str) -> bool:
         """Remove a block and its connections"""
@@ -270,12 +266,10 @@ class StrategyGraph:
 
         # Remove connections to/from this block
         self.connections = [
-            c
-            for c in self.connections
-            if c.source_block_id != block_id and c.target_block_id != block_id
+            c for c in self.connections if c.source_block_id != block_id and c.target_block_id != block_id
         ]
 
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
         return True
 
     def connect(
@@ -296,7 +290,7 @@ class StrategyGraph:
             connection_type=connection_type,
         )
         self.connections.append(connection)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
         return connection
 
     def disconnect(self, connection_id: str) -> bool:
@@ -304,15 +298,15 @@ class StrategyGraph:
         for i, conn in enumerate(self.connections):
             if conn.id == connection_id:
                 del self.connections[i]
-                self.updated_at = datetime.now(timezone.utc)
+                self.updated_at = datetime.now(UTC)
                 return True
         return False
 
-    def get_execution_order(self) -> List[str]:
+    def get_execution_order(self) -> list[str]:
         """Get topologically sorted execution order"""
         # Build adjacency list
-        graph: Dict[str, Set[str]] = {block_id: set() for block_id in self.blocks}
-        in_degree: Dict[str, int] = {block_id: 0 for block_id in self.blocks}
+        graph: dict[str, set[str]] = {block_id: set() for block_id in self.blocks}
+        in_degree: dict[str, int] = dict.fromkeys(self.blocks, 0)
 
         for conn in self.connections:
             if conn.source_block_id in graph and conn.target_block_id in graph:
@@ -337,7 +331,7 @@ class StrategyGraph:
 
         return order
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -355,12 +349,9 @@ class StrategyGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StrategyGraph":
+    def from_dict(cls, data: dict[str, Any]) -> "StrategyGraph":
         """Create from dictionary"""
-        blocks = {
-            bid: StrategyBlock.from_dict(bdata)
-            for bid, bdata in data.get("blocks", {}).items()
-        }
+        blocks = {bid: StrategyBlock.from_dict(bdata) for bid, bdata in data.get("blocks", {}).items()}
 
         connections = [
             BlockConnection(
@@ -381,12 +372,8 @@ class StrategyGraph:
             blocks=blocks,
             connections=connections,
             version=data.get("version", "1.0"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(timezone.utc),
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if "updated_at" in data
-            else datetime.now(timezone.utc),
+            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(UTC),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if "updated_at" in data else datetime.now(UTC),
             author=data.get("author", ""),
             tags=data.get("tags", []),
             timeframe=data.get("timeframe", "1h"),
@@ -395,7 +382,7 @@ class StrategyGraph:
 
 
 # Block Factory - Creates blocks with proper inputs/outputs
-BLOCK_DEFINITIONS: Dict[BlockType, Dict[str, Any]] = {
+BLOCK_DEFINITIONS: dict[BlockType, dict[str, Any]] = {
     # Data Sources
     BlockType.CANDLE_DATA: {
         "name": "Candle Data",
@@ -815,14 +802,14 @@ class StrategyBuilder:
     """
 
     def __init__(self):
-        self.strategies: Dict[str, StrategyGraph] = {}
+        self.strategies: dict[str, StrategyGraph] = {}
 
     def create_strategy(
         self,
         name: str,
         description: str = "",
         timeframe: str = "1h",
-        symbols: Optional[List[str]] = None,
+        symbols: list[str] | None = None,
     ) -> StrategyGraph:
         """Create a new strategy"""
         strategy = StrategyGraph(
@@ -841,7 +828,7 @@ class StrategyBuilder:
         block_type: BlockType,
         x: float = 0,
         y: float = 0,
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any] | None = None,
     ) -> StrategyBlock:
         """Add a block to the strategy"""
         definition = BLOCK_DEFINITIONS.get(block_type, {})
@@ -866,9 +853,7 @@ class StrategyBuilder:
         ]
 
         # Default parameters
-        default_params = {
-            p["name"]: p["default"] for p in definition.get("parameters", [])
-        }
+        default_params = {p["name"]: p["default"] for p in definition.get("parameters", [])}
         if parameters:
             default_params.update(parameters)
 
@@ -903,7 +888,7 @@ class StrategyBuilder:
         """Set a block parameter"""
         block.parameters[name] = value
 
-    def validate(self, graph: StrategyGraph) -> List[str]:
+    def validate(self, graph: StrategyGraph) -> list[str]:
         """Validate strategy graph"""
         errors = []
 
@@ -914,35 +899,29 @@ class StrategyBuilder:
 
         # Check for data source
         has_data_source = any(
-            b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA]
-            for b in graph.blocks.values()
+            b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA] for b in graph.blocks.values()
         )
         if not has_data_source:
             errors.append("Strategy needs a data source block")
 
         # Check for output
         has_output = any(
-            b.block_type
-            in [BlockType.OUTPUT_SIGNAL, BlockType.ACTION_BUY, BlockType.ACTION_SELL]
+            b.block_type in [BlockType.OUTPUT_SIGNAL, BlockType.ACTION_BUY, BlockType.ACTION_SELL]
             for b in graph.blocks.values()
         )
         if not has_output:
             errors.append("Strategy needs an action or output block")
 
         # Check connections
-        connected_inputs: Set[Tuple[str, str]] = set()
+        connected_inputs: set[tuple[str, str]] = set()
         for conn in graph.connections:
             # Check source exists
             if conn.source_block_id not in graph.blocks:
-                errors.append(
-                    f"Connection references non-existent source block: {conn.source_block_id}"
-                )
+                errors.append(f"Connection references non-existent source block: {conn.source_block_id}")
 
             # Check target exists
             if conn.target_block_id not in graph.blocks:
-                errors.append(
-                    f"Connection references non-existent target block: {conn.target_block_id}"
-                )
+                errors.append(f"Connection references non-existent target block: {conn.target_block_id}")
 
             connected_inputs.add((conn.target_block_id, conn.target_input))
 
@@ -950,9 +929,7 @@ class StrategyBuilder:
         for block_id, block in graph.blocks.items():
             for inp in block.inputs:
                 if inp.required and (block_id, inp.name) not in connected_inputs:
-                    errors.append(
-                        f"Block '{block.name}' has unconnected required input: {inp.name}"
-                    )
+                    errors.append(f"Block '{block.name}' has unconnected required input: {inp.name}")
 
         # Check for cycles
         try:
@@ -962,7 +939,7 @@ class StrategyBuilder:
 
         return errors
 
-    def get_available_blocks(self) -> List[Dict[str, Any]]:
+    def get_available_blocks(self) -> list[dict[str, Any]]:
         """Get list of available block types"""
         result = []
         for block_type, definition in BLOCK_DEFINITIONS.items():
@@ -987,7 +964,7 @@ class StrategyBuilder:
 
     def load_strategy(self, path: str) -> StrategyGraph:
         """Load strategy from file"""
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
         graph = StrategyGraph.from_dict(data)
@@ -999,13 +976,13 @@ class StrategyBuilder:
         data = graph.to_dict()
         data["id"] = str(uuid.uuid4())
         data["name"] = f"{graph.name} (Copy)"
-        data["created_at"] = datetime.now(timezone.utc).isoformat()
-        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        data["created_at"] = datetime.now(UTC).isoformat()
+        data["updated_at"] = datetime.now(UTC).isoformat()
 
         new_graph = StrategyGraph.from_dict(data)
         self.strategies[new_graph.id] = new_graph
         return new_graph
 
-    def get_block_definition(self, block_type: BlockType) -> Dict[str, Any]:
+    def get_block_definition(self, block_type: BlockType) -> dict[str, Any]:
         """Get block definition"""
         return BLOCK_DEFINITIONS.get(block_type, {})

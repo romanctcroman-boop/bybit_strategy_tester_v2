@@ -16,7 +16,7 @@ User: "I want to predict BTC price for next 4 hours"
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from backend.agents.unified_agent_interface import UnifiedAgentInterface
 from backend.core.logging_config import get_logger
@@ -33,7 +33,7 @@ class AIFeatureEngineer:
 
     def __init__(self):
         self.agent = UnifiedAgentInterface()
-        self.feature_history: List[Dict[str, Any]] = []
+        self.feature_history: list[dict[str, Any]] = []
 
     async def suggest_features(
         self,
@@ -41,7 +41,7 @@ class AIFeatureEngineer:
         asset: str = "BTC/USDT",
         timeframe: str = "1h",
         max_features: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to suggest technical indicators for trading strategy
 
@@ -54,9 +54,7 @@ class AIFeatureEngineer:
         Returns:
             Dict with suggested features, explanations, and code snippets
         """
-        logger.info(
-            f"🧠 Asking AI to suggest features for {objective} on {asset} ({timeframe})"
-        )
+        logger.info(f"🧠 Asking AI to suggest features for {objective} on {asset} ({timeframe})")
 
         prompt = f"""You are a quantitative trading expert. I need technical indicators for a trading strategy.
 
@@ -128,16 +126,14 @@ Respond ONLY with valid JSON, no additional text."""
             # Store in history
             self.feature_history.append(suggestions)
 
-            logger.info(
-                f"✅ AI suggested {len(suggestions.get('features', []))} features"
-            )
+            logger.info(f"✅ AI suggested {len(suggestions.get('features', []))} features")
             return suggestions
 
         except Exception as e:
             logger.error(f"❌ Error getting feature suggestions: {e}")
             return self._fallback_suggestions(objective)
 
-    def _fallback_suggestions(self, objective: str) -> Dict[str, Any]:
+    def _fallback_suggestions(self, objective: str) -> dict[str, Any]:
         """Fallback suggestions if AI fails"""
         return {
             "features": [
@@ -176,9 +172,9 @@ Respond ONLY with valid JSON, no additional text."""
     async def generate_feature_code(
         self,
         feature_name: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         data_format: str = "pandas DataFrame with OHLCV columns",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to generate Python code for calculating a feature
 
@@ -242,9 +238,9 @@ Return ONLY Python code, ready to execute. Start with imports."""
 
     async def validate_features(
         self,
-        features: List[str],
-        performance_metrics: Dict[str, float],
-    ) -> Dict[str, Any]:
+        features: list[str],
+        performance_metrics: dict[str, float],
+    ) -> dict[str, Any]:
         """
         Ask AI to analyze which features are most valuable
 
@@ -258,9 +254,7 @@ Return ONLY Python code, ready to execute. Start with imports."""
         logger.info(f"🔍 Asking AI to validate {len(features)} features")
 
         # Sort features by performance
-        sorted_features = sorted(
-            performance_metrics.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_features = sorted(performance_metrics.items(), key=lambda x: x[1], reverse=True)
 
         prompt = f"""Analyze the performance of these technical indicators in a trading strategy:
 
@@ -316,7 +310,7 @@ Provide analysis in JSON format:
         asset: str = "BTC/USDT",
         timeframe: str = "1h",
         risk_tolerance: str = "medium",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to design a complete trading strategy
 
@@ -386,9 +380,7 @@ Return as JSON:
                 "generated_at": result.get("latency_ms"),
             }
 
-            logger.info(
-                f"✅ Strategy '{strategy.get('strategy_name', 'Unknown')}' generated"
-            )
+            logger.info(f"✅ Strategy '{strategy.get('strategy_name', 'Unknown')}' generated")
             return strategy
 
         except Exception as e:
@@ -401,7 +393,7 @@ async def ask_ai_for_features(
     objective: str,
     asset: str = "BTC/USDT",
     timeframe: str = "1h",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Quick helper to get AI feature suggestions"""
     engineer = AIFeatureEngineer()
     return await engineer.suggest_features(objective, asset, timeframe)

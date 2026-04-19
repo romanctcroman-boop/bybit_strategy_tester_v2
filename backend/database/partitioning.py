@@ -21,8 +21,8 @@ Usage:
 import logging
 import sqlite3
 import zlib
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class KlineArchiver:
         """
         self.db_path = db_path
         self.compress = compress
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
@@ -115,7 +115,7 @@ class KlineArchiver:
         conn.commit()
         logger.info(f"Created archive table: {table_name}")
 
-    def get_archive_tables(self) -> List[str]:
+    def get_archive_tables(self) -> list[str]:
         """Get list of existing archive tables."""
         conn = self._get_connection()
         cursor = conn.execute("""
@@ -125,7 +125,7 @@ class KlineArchiver:
         """)
         return [row[0] for row in cursor.fetchall()]
 
-    def get_data_date_range(self) -> Optional[Tuple[datetime, datetime]]:
+    def get_data_date_range(self) -> tuple[datetime, datetime] | None:
         """Get date range of data in main table."""
         conn = self._get_connection()
         cursor = conn.execute("""
@@ -135,14 +135,14 @@ class KlineArchiver:
         row = cursor.fetchone()
 
         if row and row[0]:
-            oldest = datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc)
-            newest = datetime.fromtimestamp(row[1] / 1000, tz=timezone.utc)
+            oldest = datetime.fromtimestamp(row[0] / 1000, tz=UTC)
+            newest = datetime.fromtimestamp(row[1] / 1000, tz=UTC)
             return (oldest, newest)
         return None
 
     def archive_old_data(
         self, months_to_keep: int = 6, batch_size: int = 10000, dry_run: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Archive data older than specified months.
 
@@ -159,18 +159,14 @@ class KlineArchiver:
         conn = self._get_connection()
 
         # Calculate cutoff date
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(days=months_to_keep * 30)
         cutoff_ms = int(cutoff.timestamp() * 1000)
 
-        logger.info(
-            f"Archiving data older than {cutoff.date()} ({months_to_keep} months)"
-        )
+        logger.info(f"Archiving data older than {cutoff.date()} ({months_to_keep} months)")
 
         # Get count of records to archive
-        cursor = conn.execute(
-            "SELECT COUNT(*) FROM bybit_kline_audit WHERE open_time < ?", (cutoff_ms,)
-        )
+        cursor = conn.execute("SELECT COUNT(*) FROM bybit_kline_audit WHERE open_time < ?", (cutoff_ms,))
         total_to_archive = cursor.fetchone()[0]
 
         if total_to_archive == 0:
@@ -215,11 +211,11 @@ class KlineArchiver:
                 tables_created.append(table_name)
 
             # Calculate month boundaries
-            month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+            month_start = datetime(year, month, 1, tzinfo=UTC)
             if month == 12:
-                month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                month_end = datetime(year + 1, 1, 1, tzinfo=UTC)
             else:
-                month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+                month_end = datetime(year, month + 1, 1, tzinfo=UTC)
 
             start_ms = int(month_start.timestamp() * 1000)
             end_ms = int(month_end.timestamp() * 1000)
@@ -277,9 +273,7 @@ class KlineArchiver:
                 # Delete from main table
                 ids = [row["id"] for row in rows]
                 placeholders = ",".join("?" * len(ids))
-                conn.execute(
-                    f"DELETE FROM bybit_kline_audit WHERE id IN ({placeholders})", ids
-                )
+                conn.execute(f"DELETE FROM bybit_kline_audit WHERE id IN ({placeholders})", ids)
 
                 conn.commit()
                 archived_this_month += len(rows)
@@ -310,7 +304,7 @@ class KlineArchiver:
         start_time: int,
         end_time: int,
         limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Query data from archive tables.
 
@@ -319,8 +313,8 @@ class KlineArchiver:
         conn = self._get_connection()
 
         # Determine which archive tables to query
-        start_dt = datetime.fromtimestamp(start_time / 1000, tz=timezone.utc)
-        end_dt = datetime.fromtimestamp(end_time / 1000, tz=timezone.utc)
+        start_dt = datetime.fromtimestamp(start_time / 1000, tz=UTC)
+        end_dt = datetime.fromtimestamp(end_time / 1000, tz=UTC)
 
         # Get relevant archive tables
         archive_tables = self.get_archive_tables()
@@ -332,18 +326,13 @@ class KlineArchiver:
                 ym = table.replace("bybit_kline_archive_", "")
                 year = int(ym[:4])
                 month = int(ym[4:6])
-                table_date = datetime(year, month, 1, tzinfo=timezone.utc)
+                table_date = datetime(year, month, 1, tzinfo=UTC)
 
                 # Check if table overlaps with query range
-                if (
-                    table_date.year * 12 + table_date.month
-                    >= start_dt.year * 12 + start_dt.month
+                if (table_date.year * 12 + table_date.month >= start_dt.year * 12 + start_dt.month) and (
+                    table_date.year * 12 + table_date.month <= end_dt.year * 12 + end_dt.month
                 ):
-                    if (
-                        table_date.year * 12 + table_date.month
-                        <= end_dt.year * 12 + end_dt.month
-                    ):
-                        relevant_tables.append(table)
+                    relevant_tables.append(table)
             except ValueError:
                 continue
 
@@ -375,11 +364,7 @@ class KlineArchiver:
                     try:
                         raw_data = zlib.decompress(raw_data).decode("utf-8")
                     except zlib.error:
-                        raw_data = (
-                            raw_data.decode("utf-8")
-                            if isinstance(raw_data, bytes)
-                            else raw_data
-                        )
+                        raw_data = raw_data.decode("utf-8") if isinstance(raw_data, bytes) else raw_data
 
                 results.append(
                     {
@@ -402,7 +387,7 @@ class KlineArchiver:
 
         return results
 
-    def get_archive_stats(self) -> Dict[str, Any]:
+    def get_archive_stats(self) -> dict[str, Any]:
         """Get statistics about archived data."""
         conn = self._get_connection()
 
@@ -430,16 +415,8 @@ class KlineArchiver:
             table_stat = {
                 "name": table,
                 "count": count,
-                "oldest": datetime.fromtimestamp(
-                    row[0] / 1000, tz=timezone.utc
-                ).isoformat()
-                if row[0]
-                else None,
-                "newest": datetime.fromtimestamp(
-                    row[1] / 1000, tz=timezone.utc
-                ).isoformat()
-                if row[1]
-                else None,
+                "oldest": datetime.fromtimestamp(row[0] / 1000, tz=UTC).isoformat() if row[0] else None,
+                "newest": datetime.fromtimestamp(row[1] / 1000, tz=UTC).isoformat() if row[1] else None,
             }
 
             stats["archive_tables"].append(table_stat)
@@ -464,10 +441,10 @@ class UnifiedKlineQuery:
         self,
         symbol: str,
         interval: str,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 1000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get klines from both main and archive tables.
 
@@ -515,9 +492,7 @@ class UnifiedKlineQuery:
 
         # If we need more data and have time range, query archives
         if remaining > 0 and start_time and end_time:
-            archive_results = self.archiver.query_archive(
-                symbol, interval, start_time, end_time, remaining
-            )
+            archive_results = self.archiver.query_archive(symbol, interval, start_time, end_time, remaining)
 
             # Merge and deduplicate
             existing_times = {r["open_time"] for r in results}
@@ -530,7 +505,7 @@ class UnifiedKlineQuery:
 
         return results[:limit]
 
-    def get_full_coverage(self, symbol: str, interval: str) -> Dict[str, Any]:
+    def get_full_coverage(self, symbol: str, interval: str) -> dict[str, Any]:
         """Get coverage including archived data."""
         conn = self.archiver._get_connection()
 
@@ -569,16 +544,8 @@ class UnifiedKlineQuery:
                 archive_count += row[2]
 
         # Combine
-        oldest = (
-            min(filter(None, [main_row[0], archive_min]))
-            if main_row[0] or archive_min
-            else None
-        )
-        newest = (
-            max(filter(None, [main_row[1], archive_max]))
-            if main_row[1] or archive_max
-            else None
-        )
+        oldest = min(filter(None, [main_row[0], archive_min])) if main_row[0] or archive_min else None
+        newest = max(filter(None, [main_row[1], archive_max])) if main_row[1] or archive_max else None
         total_count = (main_row[2] or 0) + archive_count
 
         return {
@@ -589,19 +556,13 @@ class UnifiedKlineQuery:
             "total_count": total_count,
             "main_count": main_row[2] or 0,
             "archive_count": archive_count,
-            "oldest_dt": datetime.fromtimestamp(oldest / 1000, tz=timezone.utc)
-            if oldest
-            else None,
-            "newest_dt": datetime.fromtimestamp(newest / 1000, tz=timezone.utc)
-            if newest
-            else None,
+            "oldest_dt": datetime.fromtimestamp(oldest / 1000, tz=UTC) if oldest else None,
+            "newest_dt": datetime.fromtimestamp(newest / 1000, tz=UTC) if newest else None,
         }
 
 
 # Convenience function
-def archive_old_klines(
-    db_path: str = "data.sqlite3", months_to_keep: int = 6, dry_run: bool = False
-) -> Dict[str, Any]:
+def archive_old_klines(db_path: str = "data.sqlite3", months_to_keep: int = 6, dry_run: bool = False) -> dict[str, Any]:
     """
     Archive old kline data.
 

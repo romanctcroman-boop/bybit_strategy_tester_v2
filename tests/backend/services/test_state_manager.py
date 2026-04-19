@@ -5,7 +5,7 @@ Tests the unified state management service that coordinates state
 between Redis (fast access) and PostgreSQL (persistence).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -205,7 +205,7 @@ class TestStateEvent:
             event_type=EventType.ORDER_CREATED,
             entity_type="order",
             entity_id="order-123",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data={"symbol": "BTCUSDT"},
             source=StateSource.REDIS,
         )
@@ -224,7 +224,7 @@ class TestStateEvent:
             event_type=EventType.POSITION_OPENED,
             entity_type="position",
             entity_id="pos-456",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data={"symbol": "ETHUSDT"},
             source=StateSource.POSTGRES,
         )
@@ -280,7 +280,7 @@ class TestEventQueue:
             event_type=EventType.ORDER_CREATED,
             entity_type="order",
             entity_id="order-1",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data={},
             source=StateSource.REDIS,
         )
@@ -309,7 +309,7 @@ class TestEventQueue:
                 event_type=EventType.ORDER_CREATED,
                 entity_type="order",
                 entity_id=f"order-{i}",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 data={},
                 source=StateSource.REDIS,
             )

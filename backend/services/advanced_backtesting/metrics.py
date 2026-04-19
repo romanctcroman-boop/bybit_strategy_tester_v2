@@ -22,8 +22,8 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -171,22 +171,14 @@ class RollingMetrics:
                 "return_consistency": round(self.return_consistency, 3),
             },
             "current_values": {
-                "rolling_return": round(self.rolling_returns[-1] * 100, 2)
-                if self.rolling_returns
-                else 0,
-                "rolling_volatility": round(self.rolling_volatility[-1] * 100, 2)
-                if self.rolling_volatility
-                else 0,
-                "rolling_sharpe": round(self.rolling_sharpe[-1], 3)
-                if self.rolling_sharpe
-                else 0,
+                "rolling_return": round(self.rolling_returns[-1] * 100, 2) if self.rolling_returns else 0,
+                "rolling_volatility": round(self.rolling_volatility[-1] * 100, 2) if self.rolling_volatility else 0,
+                "rolling_sharpe": round(self.rolling_sharpe[-1], 3) if self.rolling_sharpe else 0,
             },
             # Truncate series for API response
             "series": {
                 "returns": [round(r * 100, 2) for r in self.rolling_returns[-100:]],
-                "volatility": [
-                    round(v * 100, 2) for v in self.rolling_volatility[-100:]
-                ],
+                "volatility": [round(v * 100, 2) for v in self.rolling_volatility[-100:]],
                 "sharpe": [round(s, 3) for s in self.rolling_sharpe[-100:]],
             },
         }
@@ -206,7 +198,7 @@ class CustomMetrics:
     def __init__(
         self,
         equity_curve: list[float],
-        trades: Optional[list[dict]] = None,
+        trades: list[dict] | None = None,
         risk_free_rate: float = 0.0,
         periods_per_year: int = 365,
     ):
@@ -251,27 +243,19 @@ class CustomMetrics:
 
         # Sharpe Ratio
         if std_return > 0:
-            metrics.sharpe_ratio = (
-                (mean_return - rf_period) / std_return * np.sqrt(self.periods_per_year)
-            )
+            metrics.sharpe_ratio = (mean_return - rf_period) / std_return * np.sqrt(self.periods_per_year)
 
         # Sortino Ratio - TradingView formula: DD = sqrt(sum(min(0, Xi - T))^2 / N)
         downside_sq = np.minimum(0, returns - rf_period) ** 2
         downside_dev = np.sqrt(downside_sq.sum() / len(returns))
         metrics.downside_deviation = downside_dev
         if downside_dev > 0:
-            metrics.sortino_ratio = (
-                (mean_return - rf_period)
-                / downside_dev
-                * np.sqrt(self.periods_per_year)
-            )
+            metrics.sortino_ratio = (mean_return - rf_period) / downside_dev * np.sqrt(self.periods_per_year)
 
         # Calmar Ratio
         max_dd = self._calculate_max_drawdown()
         total_return = (self.equity_curve[-1] / self.equity_curve[0]) - 1
-        annualized_return = (1 + total_return) ** (
-            self.periods_per_year / len(returns)
-        ) - 1
+        annualized_return = (1 + total_return) ** (self.periods_per_year / len(returns)) - 1
         if max_dd > 0:
             metrics.calmar_ratio = annualized_return / max_dd
 
@@ -289,12 +273,8 @@ class CustomMetrics:
         var_95_idx = int(0.05 * n)
         var_99_idx = int(0.01 * n)
 
-        metrics.var_95 = (
-            sorted_returns[var_95_idx] if var_95_idx < n else sorted_returns[0]
-        )
-        metrics.var_99 = (
-            sorted_returns[var_99_idx] if var_99_idx < n else sorted_returns[0]
-        )
+        metrics.var_95 = sorted_returns[var_95_idx] if var_95_idx < n else sorted_returns[0]
+        metrics.var_99 = sorted_returns[var_99_idx] if var_99_idx < n else sorted_returns[0]
         metrics.cvar_95 = np.mean(sorted_returns[: max(1, var_95_idx)])
         metrics.cvar_99 = np.mean(sorted_returns[: max(1, var_99_idx)])
 
@@ -307,12 +287,8 @@ class CustomMetrics:
 
         # Skewness and Kurtosis
         if std_return > 0:
-            metrics.skewness = float(
-                np.mean(((returns - mean_return) / std_return) ** 3)
-            )
-            metrics.kurtosis = float(
-                np.mean(((returns - mean_return) / std_return) ** 4) - 3
-            )
+            metrics.skewness = float(np.mean(((returns - mean_return) / std_return) ** 3))
+            metrics.kurtosis = float(np.mean(((returns - mean_return) / std_return) ** 4) - 3)
 
         # Tail Ratio (right tail / left tail)
         right_tail = np.percentile(returns, 95)
@@ -369,29 +345,19 @@ class CustomMetrics:
                 comparison.beta = covariance[0, 1] / variance
 
         rf = self.risk_free_rate / self.periods_per_year
-        comparison.alpha = (
-            np.mean(strategy_returns)
-            - rf
-            - comparison.beta * (np.mean(bench_returns) - rf)
-        )
+        comparison.alpha = np.mean(strategy_returns) - rf - comparison.beta * (np.mean(bench_returns) - rf)
 
         # Correlation
         if np.std(strategy_returns) > 0 and np.std(bench_returns) > 0:
-            comparison.correlation = float(
-                np.corrcoef(strategy_returns, bench_returns)[0, 1]
-            )
+            comparison.correlation = float(np.corrcoef(strategy_returns, bench_returns)[0, 1])
 
         # Tracking Error
         tracking_diff = strategy_returns - bench_returns
-        comparison.tracking_error = float(
-            np.std(tracking_diff) * np.sqrt(self.periods_per_year)
-        )
+        comparison.tracking_error = float(np.std(tracking_diff) * np.sqrt(self.periods_per_year))
 
         # Information Ratio
         if comparison.tracking_error > 0:
-            comparison.information_ratio = (
-                comparison.excess_return / comparison.tracking_error
-            )
+            comparison.information_ratio = comparison.excess_return / comparison.tracking_error
 
         # Win rate vs benchmark
         outperforming = strategy_returns > bench_returns
@@ -452,10 +418,7 @@ class CustomMetrics:
             # Rolling Sharpe
             mean_ret = np.mean(window_returns)
             std_ret = np.std(window_returns)
-            if std_ret > 0:
-                sharpe = mean_ret / std_ret * np.sqrt(self.periods_per_year)
-            else:
-                sharpe = 0.0
+            sharpe = mean_ret / std_ret * np.sqrt(self.periods_per_year) if std_ret > 0 else 0.0
             rolling.rolling_sharpe.append(float(sharpe))
 
         # Calculate stability metrics
@@ -491,21 +454,17 @@ class CustomMetrics:
         # Profit factor
         gross_profit = sum(winning)
         gross_loss = abs(sum(losing))
-        metrics["profit_factor"] = (
-            gross_profit / gross_loss if gross_loss > 0 else float("inf")
-        )
+        metrics["profit_factor"] = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         # Expectancy
-        metrics["expectancy"] = metrics["win_rate"] * metrics["avg_win"] - (
-            1 - metrics["win_rate"]
-        ) * abs(metrics["avg_loss"])
+        metrics["expectancy"] = metrics["win_rate"] * metrics["avg_win"] - (1 - metrics["win_rate"]) * abs(
+            metrics["avg_loss"]
+        )
 
         # Kelly Criterion
         if metrics["avg_loss"] != 0:
             win_loss_ratio = metrics["avg_win"] / abs(metrics["avg_loss"])
-            metrics["kelly_fraction"] = (
-                metrics["win_rate"] - (1 - metrics["win_rate"]) / win_loss_ratio
-            )
+            metrics["kelly_fraction"] = metrics["win_rate"] - (1 - metrics["win_rate"]) / win_loss_ratio
         else:
             metrics["kelly_fraction"] = 0
 
@@ -517,14 +476,14 @@ class CustomMetrics:
             "risk_adjusted": self.calculate_risk_adjusted().to_dict(),
             "rolling": self.calculate_rolling().to_dict(),
             "trade_metrics": self.calculate_trade_metrics(),
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
+            "calculated_at": datetime.now(UTC).isoformat(),
         }
 
 
 def calculate_metrics(
     equity_curve: list[float],
-    trades: Optional[list[dict]] = None,
-    benchmark_returns: Optional[list[float]] = None,
+    trades: list[dict] | None = None,
+    benchmark_returns: list[float] | None = None,
     benchmark_name: str = "Benchmark",
 ) -> dict[str, Any]:
     """

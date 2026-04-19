@@ -4,25 +4,73 @@
  * Page-specific scripts for analytics.html
  * Extracted during Phase 1 Week 3: JS Extraction
  *
- * @version 1.0.0
- * @date 2025-12-21
+ * @version 2.0.0
+ * @date 2026-02-27
+ *
+ * @migration StateManager v2.0 - P0-3
+ * - Replaced global variables with StateManager
+ * - Legacy shim variables kept for backward compatibility
  */
 
 // Import shared utilities
 import { apiClient as _apiClient, API_CONFIG as _API_CONFIG } from '../api.js';
 import { formatNumber as _formatNumber, formatCurrency, formatDate as _formatDate, debounce as _debounce } from '../utils.js';
+import { getStore, initStore } from '../core/StateManager.js';
 
 // Configuration
 const API_BASE = window.location.origin;
 const RISK_API = `${API_BASE}/api/v1/risk`;
+
+// Get or initialize store instance (initStore is safe to call multiple times — singleton)
+const store = getStore() || initStore();
+
+// ==========================================
+// STATE INITIALIZATION
+// ==========================================
+
+/**
+ * Initialize analytics page state in StateManager.
+ * Called once on DOMContentLoaded.
+ */
+function initializeAnalyticsState() {
+    if (!store) {
+        console.error('[Analytics] StateManager not initialized');
+        return;
+    }
+
+    store.merge('analytics', {
+        charts: {
+            equityChart: null,
+            riskDistributionChart: null
+        },
+        refreshInterval: null,
+        currentPeriod: '1M',
+        riskData: {},
+        equityData: {}
+    });
+
+    // Shim-sync: keep legacy vars in sync with store
+    store.subscribe('analytics.charts.equityChart', (v) => { equityChart = v; });
+    store.subscribe('analytics.charts.riskDistributionChart', (v) => { riskDistributionChart = v; });
+    store.subscribe('analytics.refreshInterval', (v) => { refreshInterval = v; });
+}
+
+// ==========================================
+// LEGACY STATE VARIABLES (shim — kept for compatibility)
+// ==========================================
 
 let equityChart = null;
 let riskDistributionChart = null;
 // eslint-disable-next-line no-unused-vars
 let refreshInterval = null;
 
+// Demo mode flag - set to true to show sample data when no real positions exist
+// Access via window.DEMO_MODE for global access
+window.DEMO_MODE = false;
+
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
+    initializeAnalyticsState();
     initCharts();
     refreshData();
 
@@ -135,6 +183,15 @@ async function refreshData() {
         const summaryResponse = await fetch(`${RISK_API}/summary`);
         if (summaryResponse.ok) {
             const summary = await summaryResponse.json();
+
+            // If demo mode enabled or no real data, show mock data
+            const hasRealData = summary.risk_score > 0 || summary.positions_count > 0;
+            if (window.DEMO_MODE || !hasRealData) {
+                console.log('[Analytics] No real data detected, showing demo data');
+                showMockData();
+                return;
+            }
+
             updateRiskSummary(summary);
         }
 
@@ -161,7 +218,7 @@ async function refreshData() {
 
         // Update timestamp
         document.getElementById('lastUpdate').textContent =
-                    `Last update: ${new Date().toLocaleTimeString()}`;
+            `Last update: ${new Date().toLocaleTimeString()}`;
 
     } catch (error) {
         console.error('Failed to refresh data:', error);
@@ -216,11 +273,11 @@ function updatePortfolioMetrics(portfolio) {
 
     document.getElementById('sharpeRatio').textContent = sharpe.toFixed(2);
     document.getElementById('sharpeRatio').className =
-                `metric-value ${sharpe > 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}`;
+        `metric-value ${sharpe > 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}`;
 
     document.getElementById('sortinoRatio').textContent = sortino.toFixed(2);
     document.getElementById('sortinoRatio').className =
-                `metric-value ${sortino > 1 ? 'positive' : sortino < 0 ? 'negative' : ''}`;
+        `metric-value ${sortino > 1 ? 'positive' : sortino < 0 ? 'negative' : ''}`;
 
     // Table values
     document.getElementById('totalEquity').textContent = formatCurrency(portfolio.total_equity || 0);
@@ -229,14 +286,14 @@ function updatePortfolioMetrics(portfolio) {
     const pnl = portfolio.unrealized_pnl || 0;
     document.getElementById('unrealizedPnl').textContent = formatCurrency(pnl);
     document.getElementById('unrealizedPnl').style.color =
-                pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
     document.getElementById('maxDrawdown').textContent =
-                formatPercent(portfolio.max_drawdown || 0);
+        formatPercent(portfolio.max_drawdown || 0);
     document.getElementById('currentDrawdown').textContent =
-                formatPercent(portfolio.current_drawdown || 0);
+        formatPercent(portfolio.current_drawdown || 0);
     document.getElementById('winRate').textContent =
-                formatPercent(portfolio.win_rate || 0);
+        formatPercent(portfolio.win_rate || 0);
 }
 
 function updatePositionHeatmap(positions) {
@@ -369,6 +426,18 @@ function exportReport() {
     alert('Generating PDF report...\n\nThis feature will export a comprehensive risk report.');
 }
 
+// eslint-disable-next-line no-unused-vars
+function toggleDemoMode() {
+    window.DEMO_MODE = !window.DEMO_MODE;
+    const btn = document.getElementById('btnDemoMode');
+    if (btn) {
+        btn.textContent = `🎭 Demo: ${window.DEMO_MODE ? 'ON' : 'OFF'}`;
+        btn.className = window.DEMO_MODE ? 'btn btn-warning' : 'btn btn-outline-secondary';
+    }
+    console.log('[Analytics] Demo mode:', window.DEMO_MODE ? 'ON' : 'OFF');
+    refreshData();
+}
+
 // Utility functions - using imported versions from utils.js
 // formatCurrency, formatNumber, formatDate imported at top
 
@@ -398,6 +467,10 @@ function formatTime(timestamp) {
 // Attach to window for backwards compatibility
 if (typeof window !== 'undefined') {
     window.analyticsPage = {
-        // Add public methods here
+        refreshData,
+        exportReport
     };
+    // Required for inline onclick handlers in analytics.html
+    window.refreshData = refreshData;
+    window.exportReport = exportReport;
 }

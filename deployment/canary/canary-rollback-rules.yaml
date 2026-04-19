@@ -1,0 +1,47 @@
+# Canary Rollback Policy (Prometheus-based)
+#
+# Automatically rolls back canary if error rate > 5% or p99 latency > 2s.
+# Requires Prometheus + Alertmanager.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: bybit-canary-rollback
+  namespace: bybit
+  labels:
+    role: canary-rollback
+spec:
+  groups:
+    - name: canary-rollback
+      interval: 30s
+      rules:
+        # Alert if canary error rate exceeds 5%
+        - alert: CanaryHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{track="canary", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{track="canary"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+            action: rollback
+          annotations:
+            summary: "Canary error rate above 5%"
+            description: "Canary deployment has {{ $value | humanizePercentage }} error rate. Triggering automatic rollback."
+            runbook_url: "https://github.com/romanctcroman-boop/bybit_strategy_tester_v2/blob/main/docs/canary-rollback.md"
+
+        # Alert if canary p99 latency exceeds 2 seconds
+        - alert: CanaryHighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_request_duration_seconds_bucket{track="canary"}[5m])) by (le)
+            ) > 2.0
+          for: 3m
+          labels:
+            severity: warning
+            action: pause
+          annotations:
+            summary: "Canary p99 latency above 2s"
+            description: "Canary deployment p99 latency is {{ $value }}s. Pausing canary rollout."

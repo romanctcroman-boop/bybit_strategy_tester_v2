@@ -12,12 +12,14 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 from backend.services.live_trading.bybit_websocket import (
     BybitWebSocketClient,
@@ -50,12 +52,12 @@ class TradingSignal:
     signal_type: SignalType
     symbol: str
     price: float = 0.0
-    qty: Optional[float] = None  # None = use position sizing rules
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    qty: float | None = None  # None = use position sizing rules
+    stop_loss: float | None = None
+    take_profit: float | None = None
     confidence: float = 1.0  # 0.0 - 1.0
     reason: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict = field(default_factory=dict)
 
 
@@ -73,8 +75,8 @@ class StrategyConfig:
     leverage: float = 1.0
 
     # Risk management
-    stop_loss_percent: Optional[float] = 2.0  # % below entry
-    take_profit_percent: Optional[float] = 4.0  # % above entry
+    stop_loss_percent: float | None = 2.0  # % below entry
+    take_profit_percent: float | None = 4.0  # % above entry
     max_daily_loss: float = 100.0  # Max daily loss in quote currency
     max_open_trades: int = 1
 
@@ -91,8 +93,8 @@ class StrategyState:
     """Runtime state of a strategy."""
 
     is_running: bool = False
-    last_signal_time: Optional[datetime] = None
-    last_trade_time: Optional[datetime] = None
+    last_signal_time: datetime | None = None
+    last_trade_time: datetime | None = None
     signals_generated: int = 0
     trades_executed: int = 0
     daily_pnl: float = 0.0
@@ -128,7 +130,7 @@ class BaseStrategy(ABC):
         self._indicators: dict[str, Any] = {}
 
     @abstractmethod
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """
         Called on each new candle. Return a signal or None.
 
@@ -140,7 +142,7 @@ class BaseStrategy(ABC):
         """
         pass
 
-    def on_trade(self, trade: dict) -> Optional[TradingSignal]:
+    def on_trade(self, trade: dict) -> TradingSignal | None:
         """
         Called on each public trade tick. Override for tick-based strategies.
 
@@ -152,13 +154,11 @@ class BaseStrategy(ABC):
         """
         return None
 
-    def on_start(self):
+    def on_start(self) -> None:  # noqa: B027
         """Called when strategy starts. Override to initialize."""
-        pass
 
-    def on_stop(self):
+    def on_stop(self) -> None:  # noqa: B027
         """Called when strategy stops. Override to cleanup."""
-        pass
 
     def add_candle(self, candle: dict):
         """Add a candle to history."""
@@ -196,14 +196,14 @@ class BaseStrategy(ABC):
     # Common Indicators
     # ==========================================================================
 
-    def sma(self, period: int, prices: Optional[list[float]] = None) -> float:
+    def sma(self, period: int, prices: list[float] | None = None) -> float:
         """Simple Moving Average."""
         prices = prices or self.get_closes(period)
         if len(prices) < period:
             return 0.0
         return sum(prices[-period:]) / period
 
-    def ema(self, period: int, prices: Optional[list[float]] = None) -> float:
+    def ema(self, period: int, prices: list[float] | None = None) -> float:
         """Exponential Moving Average."""
         prices = prices or self.get_closes()
         if len(prices) < period:
@@ -217,7 +217,7 @@ class BaseStrategy(ABC):
 
         return ema_value
 
-    def rsi(self, period: int = 14, prices: Optional[list[float]] = None) -> float:
+    def rsi(self, period: int = 14, prices: list[float] | None = None) -> float:
         """Relative Strength Index."""
         prices = prices or self.get_closes()
         if len(prices) < period + 1:
@@ -243,7 +243,7 @@ class BaseStrategy(ABC):
         self,
         period: int = 20,
         std_dev: float = 2.0,
-        prices: Optional[list[float]] = None,
+        prices: list[float] | None = None,
     ) -> tuple[float, float, float]:
         """Bollinger Bands. Returns (upper, middle, lower)."""
         prices = prices or self.get_closes(period)
@@ -282,7 +282,7 @@ class BaseStrategy(ABC):
         fast: int = 12,
         slow: int = 26,
         signal: int = 9,
-        prices: Optional[list[float]] = None,
+        prices: list[float] | None = None,
     ) -> tuple[float, float, float]:
         """MACD. Returns (macd_line, signal_line, histogram)."""
         prices = prices or self.get_closes()
@@ -371,9 +371,7 @@ class LiveStrategyRunner:
         self._paper_positions: dict[str, dict] = {}
         self._paper_balance: float = 10000.0  # Starting balance
 
-        logger.info(
-            f"LiveStrategyRunner initialized (testnet={testnet}, paper={paper_trading})"
-        )
+        logger.info(f"LiveStrategyRunner initialized (testnet={testnet}, paper={paper_trading})")
 
     def add_strategy(self, strategy: BaseStrategy):
         """Add a strategy to run."""
@@ -425,26 +423,22 @@ class LiveStrategyRunner:
         # Start processing loop
         self._tasks.append(asyncio.create_task(self._process_market_data()))
 
-        logger.info(
-            f"✅ LiveStrategyRunner started with {len(self._strategies)} strategies"
-        )
+        logger.info(f"✅ LiveStrategyRunner started with {len(self._strategies)} strategies")
 
     async def stop(self):
         """Stop all strategies."""
         self._running = False
 
         # Stop strategies
-        for key, strategy in self._strategies.items():
+        for _key, strategy in self._strategies.items():
             strategy.on_stop()
             strategy.state.is_running = False
 
         # Cancel tasks
         for task in self._tasks:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
         self._tasks.clear()
 
         # Disconnect
@@ -502,11 +496,8 @@ class LiveStrategyRunner:
             }
 
             # Run matching strategies
-            for key, strategy in self._strategies.items():
-                if (
-                    strategy.config.symbol == symbol
-                    and strategy.config.timeframe == interval
-                ):
+            for _key, strategy in self._strategies.items():
+                if strategy.config.symbol == symbol and strategy.config.timeframe == interval:
                     # Add candle to history
                     strategy.add_candle(candle)
 
@@ -535,7 +526,7 @@ class LiveStrategyRunner:
             }
 
             # Run matching strategies
-            for key, strategy in self._strategies.items():
+            for _key, strategy in self._strategies.items():
                 if strategy.config.symbol == symbol:
                     signal = strategy.on_trade(trade)
 
@@ -548,7 +539,7 @@ class LiveStrategyRunner:
         state = strategy.state
 
         state.signals_generated += 1
-        state.last_signal_time = datetime.now(timezone.utc)
+        state.last_signal_time = datetime.now(UTC)
 
         logger.info(
             f"📊 Signal: {signal.signal_type.value} {signal.symbol} "
@@ -568,9 +559,7 @@ class LiveStrategyRunner:
 
         # Check cooldown
         if state.last_trade_time:
-            elapsed = (
-                datetime.now(timezone.utc) - state.last_trade_time
-            ).total_seconds()
+            elapsed = (datetime.now(UTC) - state.last_trade_time).total_seconds()
             if elapsed < config.cooldown_seconds:
                 logger.debug("Cooldown active, skipping signal")
                 return
@@ -614,12 +603,10 @@ class LiveStrategyRunner:
                 "side": "long",
                 "entry_price": signal.price,
                 "qty": qty,
-                "sl": signal.stop_loss
-                or (signal.price * (1 - config.stop_loss_percent / 100))
+                "sl": signal.stop_loss or (signal.price * (1 - config.stop_loss_percent / 100))
                 if config.stop_loss_percent
                 else None,
-                "tp": signal.take_profit
-                or (signal.price * (1 + config.take_profit_percent / 100))
+                "tp": signal.take_profit or (signal.price * (1 + config.take_profit_percent / 100))
                 if config.take_profit_percent
                 else None,
             }
@@ -640,12 +627,10 @@ class LiveStrategyRunner:
                 "side": "short",
                 "entry_price": signal.price,
                 "qty": qty,
-                "sl": signal.stop_loss
-                or (signal.price * (1 + config.stop_loss_percent / 100))
+                "sl": signal.stop_loss or (signal.price * (1 + config.stop_loss_percent / 100))
                 if config.stop_loss_percent
                 else None,
-                "tp": signal.take_profit
-                or (signal.price * (1 - config.take_profit_percent / 100))
+                "tp": signal.take_profit or (signal.price * (1 - config.take_profit_percent / 100))
                 if config.take_profit_percent
                 else None,
             }
@@ -679,15 +664,12 @@ class LiveStrategyRunner:
             else:
                 state.loss_count += 1
 
-            logger.info(
-                f"📝 Paper CLOSE: {symbol} PnL: {pnl:+.2f} "
-                f"(Balance: {self._paper_balance:.2f})"
-            )
+            logger.info(f"📝 Paper CLOSE: {symbol} PnL: {pnl:+.2f} (Balance: {self._paper_balance:.2f})")
 
             del self._paper_positions[symbol]
 
         state.trades_executed += 1
-        state.last_trade_time = datetime.now(timezone.utc)
+        state.last_trade_time = datetime.now(UTC)
 
         # Notify callbacks
         for callback in self._trade_callbacks:
@@ -783,16 +765,11 @@ class LiveStrategyRunner:
 
         if result and result.success:
             state.trades_executed += 1
-            state.last_trade_time = datetime.now(timezone.utc)
+            state.last_trade_time = datetime.now(UTC)
 
-            logger.info(
-                f"✅ Trade executed: {signal.signal_type.value} {symbol} "
-                f"{qty:.4f} @ {signal.price:.2f}"
-            )
+            logger.info(f"✅ Trade executed: {signal.signal_type.value} {symbol} {qty:.4f} @ {signal.price:.2f}")
         elif result:
-            logger.error(
-                f"❌ Trade failed: {getattr(result, 'error_message', 'Unknown error')}"
-            )
+            logger.error(f"❌ Trade failed: {getattr(result, 'error_message', 'Unknown error')}")
 
     # ==========================================================================
     # Callbacks
@@ -821,12 +798,8 @@ class LiveStrategyRunner:
                 "daily_pnl": strategy.state.daily_pnl,
                 "total_pnl": strategy.state.total_pnl,
                 "win_rate": strategy.state.win_rate,
-                "last_signal": strategy.state.last_signal_time.isoformat()
-                if strategy.state.last_signal_time
-                else None,
-                "last_trade": strategy.state.last_trade_time.isoformat()
-                if strategy.state.last_trade_time
-                else None,
+                "last_signal": strategy.state.last_signal_time.isoformat() if strategy.state.last_signal_time else None,
+                "last_trade": strategy.state.last_trade_time.isoformat() if strategy.state.last_trade_time else None,
             }
 
         return {

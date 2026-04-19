@@ -7,7 +7,18 @@ Custom errors for Model Context Protocol operations.
 class MCPError(Exception):
     """Base class for MCP errors"""
 
-    pass
+    @property
+    def error_type(self) -> str:
+        """Return the error class name as the error type."""
+        return type(self).__name__
+
+    def to_dict(self) -> dict:
+        """Serialize the error to a dict for MCP responses."""
+        return {
+            "success": False,
+            "error": str(self),
+            "error_type": self.error_type,
+        }
 
 
 class MCPConnectionError(MCPError):
@@ -62,10 +73,10 @@ def exception_to_mcp_error(exc: Exception) -> MCPError:
 
 
 __all__ = [
-    "MCPError",
+    "AgentUnavailableError",
     "MCPConnectionError",
+    "MCPError",
     "MCPTimeoutError",
     "MCPValidationError",
-    "AgentUnavailableError",
     "exception_to_mcp_error",
 ]

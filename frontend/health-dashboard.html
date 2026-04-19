@@ -1,395 +1,473 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Health Dashboard - Bybit Strategy Tester</title>
-    <!-- Auto-refresh is handled by JavaScript (setInterval) -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <title>Health Dashboard - Bybit Strategy Tester v2</title>
+    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="./css/variables.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/common.css" />
     <style>
-      :root {
-        --bg-primary: #0f0f1a;
-        --bg-card: #1a1a2e;
-        --bg-card-hover: #252540;
-        --text-primary: #e4e4e7;
-        --text-secondary: #a1a1aa;
-        --accent-green: #22c55e;
-        --accent-red: #ef4444;
-        --accent-yellow: #eab308;
-        --accent-blue: #3b82f6;
-        --border-color: #27272a;
-      }
-
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family:
-          "Inter",
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        background: var(--bg-primary);
-        color: var(--text-primary);
-        min-height: 100vh;
+      .health-page {
+        max-width: 1200px;
+        margin: 0 auto;
         padding: 2rem;
       }
-
-      .container {
-        max-width: 1400px;
-        margin: 0 auto;
+      .health-page h1 {
+        margin-bottom: 0.5rem;
+      }
+      .health-page .subtitle {
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+      }
+      .home-link {
+        display: inline-block;
+        color: var(--accent);
+        text-decoration: none;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+      }
+      .home-link:hover {
+        text-decoration: underline;
       }
 
-      header {
+      .status-banner {
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+      .status-banner.healthy {
+        background: rgba(46, 160, 67, 0.15);
+        border: 1px solid #2ea043;
+        color: #3fb950;
+      }
+      .status-banner.degraded {
+        background: rgba(210, 153, 34, 0.15);
+        border: 1px solid #d29922;
+        color: #e3b341;
+      }
+      .status-banner.unhealthy {
+        background: rgba(248, 81, 73, 0.15);
+        border: 1px solid #f85149;
+        color: #f85149;
+      }
+
+      .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      .summary-card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 1.25rem;
+        text-align: center;
+      }
+      .summary-card .value {
+        font-size: 2rem;
+        font-weight: bold;
+      }
+      .summary-card .label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+      }
+      .summary-card.healthy .value {
+        color: #3fb950;
+      }
+      .summary-card.degraded .value {
+        color: #e3b341;
+      }
+      .summary-card.unhealthy .value {
+        color: #f85149;
+      }
+
+      .components-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      .component-card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 1.25rem;
+        border-left: 4px solid var(--border);
+      }
+      .component-card.healthy {
+        border-left-color: #3fb950;
+      }
+      .component-card.degraded {
+        border-left-color: #e3b341;
+      }
+      .component-card.unhealthy {
+        border-left-color: #f85149;
+      }
+      .component-card .comp-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 2rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0.75rem;
+      }
+      .component-card .comp-name {
+        font-weight: 600;
+        font-size: 1.05rem;
+        text-transform: capitalize;
+      }
+      .component-card .comp-status {
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .comp-status.healthy {
+        background: rgba(46, 160, 67, 0.2);
+        color: #3fb950;
+      }
+      .comp-status.degraded {
+        background: rgba(210, 153, 34, 0.2);
+        color: #e3b341;
+      }
+      .comp-status.unhealthy {
+        background: rgba(248, 81, 73, 0.2);
+        color: #f85149;
+      }
+      .component-card .comp-detail {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+      }
+      .component-card .comp-latency {
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
       }
 
-      h1 {
-        font-size: 1.75rem;
-        font-weight: 600;
+      .alerts-section {
+        margin-bottom: 2rem;
+      }
+      .alerts-section h2 {
+        margin-bottom: 1rem;
+      }
+      .alert-item {
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+      }
+      .alert-item.critical {
+        background: rgba(248, 81, 73, 0.12);
+        border-left: 3px solid #f85149;
+        color: #f85149;
+      }
+      .alert-item.warning {
+        background: rgba(210, 153, 34, 0.12);
+        border-left: 3px solid #d29922;
+        color: #e3b341;
+      }
+
+      .breakers-section h2 {
+        margin-bottom: 1rem;
+      }
+      .breakers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.75rem;
+      }
+      .breaker-card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 1rem;
         display: flex;
         align-items: center;
         gap: 0.75rem;
       }
-
-      .status-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-      }
-
-      .status-healthy {
-        background: rgba(34, 197, 94, 0.2);
-        color: var(--accent-green);
-      }
-      .status-degraded {
-        background: rgba(234, 179, 8, 0.2);
-        color: var(--accent-yellow);
-      }
-      .status-unhealthy {
-        background: rgba(239, 68, 68, 0.2);
-        color: var(--accent-red);
-      }
-
-      .last-update {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-      }
-
-      .card {
-        background: var(--bg-card);
-        border-radius: 12px;
-        padding: 1.5rem;
-        border: 1px solid var(--border-color);
-        transition: all 0.2s ease;
-      }
-
-      .card:hover {
-        background: var(--bg-card-hover);
-        transform: translateY(-2px);
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-      }
-
-      .card-title {
-        font-size: 1rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .card-icon {
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        font-size: 14px;
-      }
-
-      .metric-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid var(--border-color);
-      }
-
-      .metric-row:last-child {
-        border-bottom: none;
-      }
-
-      .metric-label {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-      }
-      .metric-value {
-        font-weight: 600;
-        font-size: 0.875rem;
-      }
-
-      .status-dot {
-        width: 8px;
-        height: 8px;
+      .breaker-dot {
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
-        display: inline-block;
-        margin-right: 0.5rem;
+        flex-shrink: 0;
       }
-
-      .dot-green {
-        background: var(--accent-green);
-        box-shadow: 0 0 8px var(--accent-green);
+      .breaker-dot.closed {
+        background: #3fb950;
       }
-      .dot-red {
-        background: var(--accent-red);
-        box-shadow: 0 0 8px var(--accent-red);
+      .breaker-dot.open {
+        background: #f85149;
       }
-      .dot-yellow {
-        background: var(--accent-yellow);
-        box-shadow: 0 0 8px var(--accent-yellow);
+      .breaker-dot.half-open {
+        background: #e3b341;
       }
-
-      .loading {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100px;
+      .breaker-name {
+        font-size: 0.9rem;
+      }
+      .breaker-detail {
+        font-size: 0.75rem;
         color: var(--text-secondary);
       }
 
-      .error-message {
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid var(--accent-red);
-        border-radius: 8px;
-        padding: 1rem;
-        color: var(--accent-red);
+      .toolbar {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        align-items: center;
+      }
+      .toolbar .last-update {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-left: auto;
+      }
+      .btn-refresh {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      .btn-refresh:hover {
+        opacity: 0.9;
+      }
+      .btn-refresh:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .loading-text {
         text-align: center;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-
-      .pulse {
-        animation: pulse 2s infinite;
+        padding: 3rem;
+        color: var(--text-secondary);
       }
     </style>
+    <!-- Production Init (must load before all other scripts) -->
+    <script src="js/init-production.js"></script>
+    <script src="js/core/auto-event-binding.js"></script>
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>
-          <span>🏥</span>
-          Health Dashboard
-          <span id="overall-status" class="status-badge status-healthy"
-            >Loading...</span
-          >
-        </h1>
-        <div class="last-update">
-          Last updated: <span id="last-update">--</span>
-        </div>
-      </header>
+    <div class="health-page">
+      <a href="dashboard.html" class="home-link">🏠 Dashboard</a>
+      <h1>🏥 Health Dashboard</h1>
+      <p class="subtitle">Real-time system health monitoring</p>
 
-      <div class="grid" id="services-grid">
-        <div class="loading pulse">Loading services...</div>
+      <div class="toolbar">
+        <button class="btn-refresh" id="refreshBtn" onclick="refreshHealth()">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+        <span class="last-update" id="lastUpdate">Loading...</span>
+      </div>
+
+      <div id="statusBanner" class="status-banner degraded">
+        <i class="bi bi-hourglass-split"></i> Loading health data...
+      </div>
+
+      <div class="summary-cards" id="summaryCards">
+        <div class="summary-card healthy">
+          <div class="value" id="healthyCount">-</div>
+          <div class="label">Healthy</div>
+        </div>
+        <div class="summary-card degraded">
+          <div class="value" id="degradedCount">-</div>
+          <div class="label">Degraded</div>
+        </div>
+        <div class="summary-card unhealthy">
+          <div class="value" id="unhealthyCount">-</div>
+          <div class="label">Unhealthy</div>
+        </div>
+      </div>
+
+      <h2>📦 Components</h2>
+      <div class="components-grid" id="componentsGrid">
+        <div class="loading-text">Loading components...</div>
+      </div>
+
+      <div class="alerts-section">
+        <h2>🚨 Alerts</h2>
+        <div id="alertsList">
+          <div class="loading-text">Loading alerts...</div>
+        </div>
+      </div>
+
+      <div class="breakers-section">
+        <h2>⚡ Circuit Breakers</h2>
+        <div class="breakers-grid" id="breakersGrid">
+          <div class="loading-text">Loading breakers...</div>
+        </div>
       </div>
     </div>
 
-    <script>
-      const API_BASE = "";
+    <script type="module">
+      const API_URL = "/api/v1/health/dashboard";
+      let autoRefreshTimer = null;
 
-      async function fetchHealth() {
+      async function loadHealth() {
+        const btn = document.getElementById("refreshBtn");
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Loading...';
+
         try {
-          const response = await fetch(`${API_BASE}/api/v1/health`);
-          const data = await response.json();
-          return data;
-        } catch (error) {
-          console.error("Failed to fetch health:", error);
-          return null;
-        }
-      }
-
-      async function fetchMcpHealth() {
-        try {
-          const response = await fetch(`${API_BASE}/mcp/health`);
-          const data = await response.json();
-          return data;
-        } catch (error) {
-          return null;
-        }
-      }
-
-      function getStatusClass(status) {
-        if (status === "healthy" || status === "ok" || status === true)
-          return "healthy";
-        if (status === "degraded" || status === "warning") return "degraded";
-        return "unhealthy";
-      }
-
-      function createServiceCard(name, icon, status, metrics) {
-        const statusClass = getStatusClass(status);
-        const dotClass =
-          statusClass === "healthy"
-            ? "dot-green"
-            : statusClass === "degraded"
-              ? "dot-yellow"
-              : "dot-red";
-
-        let metricsHtml = "";
-        if (metrics && typeof metrics === "object") {
-          for (const [key, value] of Object.entries(metrics)) {
-            if (key !== "status" && key !== "error") {
-              const displayValue =
-                typeof value === "object" ? JSON.stringify(value) : value;
-              metricsHtml += `
-                            <div class="metric-row">
-                                <span class="metric-label">${key}</span>
-                                <span class="metric-value">${displayValue}</span>
-                            </div>
-                        `;
-            }
+          const response = await fetch(API_URL);
+          const body = await response.json();
+          // API returns 200 with data directly, or 503 with data inside {detail: {...}}
+          let data;
+          if (response.ok) {
+            data = body;
+          } else if (body.detail && typeof body.detail === "object") {
+            data = body.detail;
+          } else if (body.detail && typeof body.detail === "string") {
+            data = JSON.parse(body.detail);
+          } else {
+            data = body;
           }
+          renderHealth(data);
+        } catch (err) {
+          console.error("Health API error:", err);
+          document.getElementById("statusBanner").className =
+            "status-banner unhealthy";
+          document.getElementById("statusBanner").innerHTML =
+            '<i class="bi bi-exclamation-triangle"></i> Cannot connect to API';
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
         }
-
-        return `
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-icon">${icon}</div>
-                            ${name}
-                        </div>
-                        <span class="status-badge status-${statusClass}">
-                            <span class="status-dot ${dotClass}"></span>
-                            ${statusClass}
-                        </span>
-                    </div>
-                    ${metricsHtml || '<div class="metric-row"><span class="metric-label">No metrics</span></div>'}
-                </div>
-            `;
       }
 
-      async function updateDashboard() {
-        const grid = document.getElementById("services-grid");
-        const overallStatus = document.getElementById("overall-status");
-        const lastUpdate = document.getElementById("last-update");
+      function renderHealth(data) {
+        // Status banner
+        const status = data.overall_status || "unknown";
+        const banner = document.getElementById("statusBanner");
+        const icons = {
+          healthy: "bi-check-circle-fill",
+          degraded: "bi-exclamation-triangle-fill",
+          unhealthy: "bi-x-circle-fill",
+        };
+        banner.className = `status-banner ${status}`;
+        banner.innerHTML = `<i class="bi ${icons[status] || "bi-question-circle"}"></i> System Status: ${status.toUpperCase()}`;
 
-        const health = await fetchHealth();
-        const mcpHealth = await fetchMcpHealth();
+        // Summary
+        const summary = data.summary || {};
+        document.getElementById("healthyCount").textContent =
+          summary.healthy || 0;
+        document.getElementById("degradedCount").textContent =
+          summary.degraded || 0;
+        document.getElementById("unhealthyCount").textContent =
+          summary.unhealthy || 0;
 
-        if (!health) {
+        // Components
+        const components = data.components || [];
+        const grid = document.getElementById("componentsGrid");
+        if (components.length === 0) {
           grid.innerHTML =
-            '<div class="error-message">Failed to fetch health data. Is the server running?</div>';
-          overallStatus.className = "status-badge status-unhealthy";
-          overallStatus.textContent = "Offline";
-          return;
+            '<div class="loading-text">No components reported</div>';
+        } else {
+          grid.innerHTML = components
+            .map((c) => {
+              const details = c.details || {};
+              const detailStr = Object.entries(details)
+                .filter(
+                  ([k]) => k !== "error" && k !== "error_type" && k !== "note",
+                )
+                .map(
+                  ([k, v]) =>
+                    `${k}: ${typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(2)) : v}`,
+                )
+                .join(" | ");
+              const errorStr = details.error
+                ? `<div class="comp-detail" style="color:#f85149">⚠ ${details.error}</div>`
+                : "";
+              return `
+                        <div class="component-card ${c.status}">
+                            <div class="comp-header">
+                                <span class="comp-name">${c.name}</span>
+                                <span class="comp-status ${c.status}">${c.status}</span>
+                            </div>
+                            <div class="comp-latency">Response: ${(c.response_time_ms || 0).toFixed(2)} ms</div>
+                            ${detailStr ? `<div class="comp-detail">${detailStr}</div>` : ""}
+                            ${errorStr}
+                        </div>`;
+            })
+            .join("");
         }
 
-        // Update overall status
-        const overallClass = getStatusClass(health.status);
-        overallStatus.className = `status-badge status-${overallClass}`;
-        overallStatus.textContent = health.status || "Unknown";
-
-        // Build cards
-        let cards = "";
-
-        // Main service
-        cards += createServiceCard("API Server", "🖥️", health.status, {
-          Uptime: health.uptime || "N/A",
-          Version: health.version || "2.0.0",
-          Environment: health.environment || "development",
-        });
-
-        // Database
-        if (health.database) {
-          cards += createServiceCard(
-            "Database",
-            "🗄️",
-            health.database.status,
-            health.database,
-          );
+        // Alerts
+        const alerts = data.alerts || [];
+        const alertsList = document.getElementById("alertsList");
+        if (alerts.length === 0) {
+          alertsList.innerHTML =
+            '<div class="loading-text" style="color:#3fb950">✅ No alerts</div>';
+        } else {
+          alertsList.innerHTML = alerts
+            .map((a) => {
+              const isCritical = a.startsWith("CRITICAL");
+              return `<div class="alert-item ${isCritical ? "critical" : "warning"}">${a}</div>`;
+            })
+            .join("");
         }
 
-        // Redis
-        if (health.redis) {
-          cards += createServiceCard(
-            "Redis",
-            "📦",
-            health.redis.status,
-            health.redis,
-          );
+        // Circuit breakers
+        const telemetry = data.agent_telemetry || {};
+        const breakers = telemetry.breakers || {};
+        const breakersGrid = document.getElementById("breakersGrid");
+        const breakerEntries = Object.entries(breakers);
+        if (breakerEntries.length === 0) {
+          breakersGrid.innerHTML =
+            '<div class="loading-text">No circuit breakers</div>';
+        } else {
+          breakersGrid.innerHTML = breakerEntries
+            .map(([name, info]) => {
+              const displayName = name
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+              return `
+                        <div class="breaker-card">
+                            <div class="breaker-dot ${info.state}"></div>
+                            <div>
+                                <div class="breaker-name">${displayName}</div>
+                                <div class="breaker-detail">${info.state} | fail: ${info.failure_count} | ok: ${info.success_count}</div>
+                            </div>
+                        </div>`;
+            })
+            .join("");
         }
 
-        // Bybit API
-        if (health.bybit_api) {
-          cards += createServiceCard(
-            "Bybit API",
-            "📈",
-            health.bybit_api.status,
-            health.bybit_api,
-          );
-        }
-
-        // MCP Server
-        if (mcpHealth) {
-          cards += createServiceCard(
-            "MCP Server",
-            "🤖",
-            mcpHealth.status,
-            mcpHealth,
-          );
-        }
-
-        // Circuit Breakers
-        if (health.circuit_breakers) {
-          cards += createServiceCard(
-            "Circuit Breakers",
-            "⚡",
-            Object.values(health.circuit_breakers).every(
-              (cb) => cb.state === "closed",
-            )
-              ? "healthy"
-              : "degraded",
-            health.circuit_breakers,
-          );
-        }
-
-        grid.innerHTML = cards;
-        lastUpdate.textContent = new Date().toLocaleTimeString();
+        // Timestamp
+        const ts = data.timestamp
+          ? new Date(data.timestamp).toLocaleString()
+          : "N/A";
+        document.getElementById("lastUpdate").textContent =
+          `Last update: ${ts}`;
       }
 
-      // Initial load
-      updateDashboard();
+      function refreshHealth() {
+        loadHealth();
+      }
 
-      // Auto-refresh every 30 seconds
-      setInterval(updateDashboard, 30000);
+      // Expose to window for onclick
+      window.refreshHealth = refreshHealth;
+
+      // Auto-refresh every 30s
+      document.addEventListener("DOMContentLoaded", () => {
+        loadHealth();
+        autoRefreshTimer = setInterval(loadHealth, 30000);
+      });
     </script>
   </body>
 </html>

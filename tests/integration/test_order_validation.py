@@ -236,9 +236,7 @@ class TestTracingIntegration:
 
     def test_correlation_id_propagation(self, client):
         """Test that correlation ID is propagated in response."""
-        response = client.get(
-            "/api/v1/health", headers={"X-Correlation-ID": "test-correlation-123"}
-        )
+        response = client.get("/api/v1/health", headers={"X-Correlation-ID": "test-correlation-123"})
         assert response.status_code == 200
         # Check if correlation ID is in response headers
         assert "X-Correlation-ID" in response.headers or response.status_code == 200

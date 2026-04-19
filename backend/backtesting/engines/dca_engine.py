@@ -1,0 +1,2829 @@
+"""
+🎯 DCA ENGINE - Dollar Cost Averaging / Grid Trading Engine
+
+Specialized engine for DCA and Grid trading strategies based on
+TradingView Multi DCA Strategy [Dimkud] parameters.
+
+Features:
+- Grid order placement with configurable levels (3-15 orders)
+- Martingale position sizing (1.0-1.8 coefficient)
+- Logarithmic step distribution (0.8-1.4 coefficient)
+- Dynamic Take Profit adjustment based on active orders
+- Multiple Take Profits (TP1-TP4)
+- Safety close on drawdown
+- Signal memory system
+
+Speed: ~1x (reference implementation, extends FallbackEngineV4)
+"""
+
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+from datetime import UTC
+
+import pandas as pd
+
+from backend.backtesting.interfaces import (
+    BacktestInput,
+    BacktestMetrics,
+    BacktestOutput,
+    BaseBacktestEngine,
+    ExitReason,
+    TradeDirection,
+)
+
+
+@dataclass
+class DCAGridConfig:
+    """Configuration for DCA Grid strategy."""
+
+    # Grid settings
+    enabled: bool = False
+    direction: str = "long"  # long, short, both
+    deposit: float = 10000.0  # Total deposit for the grid
+    leverage: int = 1
+    grid_size_percent: float = 10.0  # Total grid size as % of price
+    order_count: int = 5  # Number of orders (2-20)
+
+    # Order distribution
+    first_order_percent: float = 10.0  # First order as % of deposit
+    step_type: str = "linear"  # linear, logarithmic, custom
+
+    # Manual Grid (custom orders) - list of {offset: %, volume: %}
+    # When custom_orders is set, use these instead of calculated orders
+    custom_orders: list[dict[str, Any]] | None = None  # [{"offset": 0.5, "volume": 25}, ...]
+    grid_trailing_percent: float = 0.0  # Grid trailing/cancel percent (0 = disabled)
+
+    # Partial grid placement: place only first N orders initially, add more as each fills
+    # 1 = place all orders at once (default), 2-4 = place N orders at a time
+    partial_grid_orders: int = 1
+
+    # Grid pullback: if price moves this % away from grid base without any fill, shift the grid
+    # 0.0 = disabled, >0 = shift grid when price moves X% without fills
+    grid_pullback_percent: float = 0.0
+
+    # Martingale
+    use_martingale: bool = True
+    martingale_coefficient: float = 1.3  # 1.0-1.8
+    martingale_mode: str = "multiply_each"  # multiply_each, multiply_total, progressive
+    max_order_size: float = 0.0  # Max single order size (0 = no limit)
+    max_total_position: float = 0.0  # Max total position (0 = no limit)
+
+    # Logarithmic steps
+    use_log_steps: bool = False
+    log_coefficient: float = 1.1  # 0.8-1.4
+
+    # Safety
+    close_on_drawdown: bool = False
+    drawdown_threshold_percent: float = 50.0
+    drawdown_threshold_amount: float = 0.0
+
+    # Dynamic TP
+    dynamic_tp_enabled: bool = False
+    dynamic_tp_trigger_orders: int = 3
+    dynamic_tp_new_percent: float = 0.5
+    dynamic_tp_decrease_per_order: float = 0.1
+    dynamic_tp_min_percent: float = 0.2
+
+    # Alerts
+    first_order_alert_only: bool = True
+
+
+@dataclass
+class MultipleTakeProfit:
+    """Configuration for multiple take profit levels."""
+
+    enabled: bool = False
+    tp_count: int = 4  # Number of TP levels (1-4)
+
+    # TP levels (percent from average entry)
+    tp1_percent: float = 1.0
+    tp1_close_percent: float = 25.0  # Close 25% at TP1
+
+    tp2_percent: float = 2.0
+    tp2_close_percent: float = 25.0
+
+    tp3_percent: float = 3.0
+    tp3_close_percent: float = 25.0
+
+    tp4_percent: float = 5.0
+    tp4_close_percent: float = 25.0  # Close remaining
+
+    close_remaining_at_last: bool = True
+
+
+@dataclass
+class CloseConditionsConfig:
+    """Configuration for advanced close conditions (DCA Session 5.5)."""
+
+    # RSI Close
+    rsi_close_enable: bool = False
+    rsi_close_length: int = 14
+    rsi_close_only_profit: bool = True
+    rsi_close_min_profit: float = 0.5
+    rsi_close_reach_enable: bool = False
+    rsi_close_reach_long_more: float = 70
+    rsi_close_reach_long_less: float = 0
+    rsi_close_reach_short_more: float = 100
+    rsi_close_reach_short_less: float = 30
+    rsi_close_cross_enable: bool = False
+    rsi_close_cross_long_level: float = 70
+    rsi_close_cross_short_level: float = 30
+
+    # Stochastic Close
+    stoch_close_enable: bool = False
+    stoch_close_k_length: int = 14
+    stoch_close_k_smooth: int = 1
+    stoch_close_d_smooth: int = 3
+    stoch_close_only_profit: bool = True
+    stoch_close_min_profit: float = 0.5
+    stoch_close_reach_enable: bool = False
+    stoch_close_reach_long_more: float = 80
+    stoch_close_reach_short_less: float = 20
+
+    # Channel Close (Keltner/Bollinger)
+    channel_close_enable: bool = False
+    channel_close_type: str = "Keltner"  # Keltner, Bollinger
+    channel_close_band: str = "Breakout"  # Breakout, Rebound
+    channel_close_keltner_length: int = 20
+    channel_close_keltner_mult: float = 2.0
+    channel_close_bb_length: int = 20
+    channel_close_bb_deviation: float = 2.0
+
+    # Two MAs Close
+    ma_close_enable: bool = False
+    ma_close_only_profit: bool = True
+    ma_close_min_profit: float = 0.5
+    ma_close_ma1_length: int = 9
+    ma_close_ma1_type: str = "EMA"
+    ma_close_ma2_length: int = 21
+    ma_close_ma2_type: str = "EMA"
+
+    # PSAR Close
+    psar_close_enable: bool = False
+    psar_close_only_profit: bool = True
+    psar_close_min_profit: float = 0.5
+    psar_close_start: float = 0.02
+    psar_close_increment: float = 0.02
+    psar_close_maximum: float = 0.2
+
+    # Time/Bars Close
+    time_bars_close_enable: bool = False
+    close_after_bars: int = 20
+    close_only_profit: bool = True
+    close_min_profit: float = 0.5
+    close_max_bars: int = 100
+
+
+@dataclass
+class IndentOrderConfig:
+    """Configuration for Indent Order (Limit Entry with Offset)."""
+
+    enabled: bool = False
+    show_lines: bool = True
+    indent_percent: float = 0.1  # Entry offset as % of price
+    cancel_after_bars: int = 10  # Cancel pending indent if not filled
+
+
+@dataclass
+class PendingIndentOrder:
+    """Represents a pending indent (limit) order."""
+
+    direction: str  # "long" or "short"
+    signal_bar: int  # Bar when signal was generated
+    signal_price: float  # Price at signal
+    entry_price: float  # Limit price for entry
+    expires_bar: int  # Bar when order expires
+    filled: bool = False
+
+
+@dataclass
+class DCAOrder:
+    """Represents a single DCA order in the grid."""
+
+    level: int  # Order level (0 = first/base order)
+    price: float  # Trigger price
+    size_percent: float  # Size as % of deposit
+    size_usd: float  # Size in USD
+    size_coins: float  # Size in coins
+    filled: bool = False
+    fill_time: int | None = None  # Bar index when filled
+    fill_price: float = 0.0
+    # Whether this order is currently active (visible) in the partial grid scheme
+    # When partial_grid_orders < order_count, only the first N orders are active at a time
+    active_in_grid: bool = True
+    # Human-readable order number: 1 = first (market entry), 2 = first DCA, ..., up to 10
+    order_number: int = 1
+
+
+@dataclass
+class DCAPosition:
+    """Represents the aggregate DCA position."""
+
+    direction: str = ""  # "long" or "short"
+    is_open: bool = False
+
+    # Orders
+    orders: list[DCAOrder] = field(default_factory=list)
+    active_orders_count: int = 0
+
+    # Position aggregates
+    total_size_coins: float = 0.0
+    total_cost_usd: float = 0.0  # Margin (un-leveraged capital spent)
+    total_notional_usd: float = 0.0  # Notional value = size_coins × fill_price (leveraged)
+    average_entry_price: float = 0.0
+
+    # Current state
+    unrealized_pnl: float = 0.0
+    unrealized_pnl_percent: float = 0.0
+    max_favorable_excursion: float = 0.0  # MFE
+    max_adverse_excursion: float = 0.0  # MAE
+
+    # TP state
+    tp_hit: list[bool] = field(default_factory=lambda: [False, False, False, False])
+    remaining_size_percent: float = 100.0
+
+    # Timing
+    entry_bar: int = 0
+    last_order_bar: int = 0
+
+    # DCA order tracking: how many grid orders have been filled (1 = only entry order)
+    orders_filled_count: int = 1
+
+
+@dataclass
+class DCATradeRecord:
+    """Internal trade record for DCA engine with DCA-specific fields.
+
+    This is separate from interfaces.TradeRecord which has a different field set.
+    Converted to models.TradeRecord in _convert_trades_to_model().
+    """
+
+    entry_bar_idx: int = 0
+    exit_bar_idx: int = 0
+    entry_price: float = 0.0
+    exit_price: float = 0.0
+    direction: TradeDirection = TradeDirection.LONG
+    position_size: float = 0.0  # in coins
+    pnl: float = 0.0
+    pnl_pct: float = 0.0
+    commission: float = 0.0
+    exit_reason: ExitReason = ExitReason.UNKNOWN
+    mfe: float = 0.0  # Maximum Favorable Excursion ($)
+    mae: float = 0.0  # Maximum Adverse Excursion ($)
+    mfe_pct: float = 0.0  # MFE as percent
+    mae_pct: float = 0.0  # MAE as percent
+    bars_held: int = 0
+    # How many DCA grid orders were filled during this position (1 = only entry, 2 = entry + 1 DCA, etc.)
+    orders_filled_count: int = 1
+    # DCA-specific metrics
+    avg_entry_price: float = 0.0  # Weighted average across all DCA orders
+    total_size_usd: float = 0.0  # Total USD across all DCA orders
+    total_size_coins: float = 0.0  # Total coins across all DCA orders
+    grid_levels: list[float] = field(default_factory=list)  # DCA grid trigger prices (legacy)
+    # Per-order fill details for chart rendering: [{level, bar_idx, price, size_usd}, ...]
+    # level=1 = initial entry (G1), level=2 = first DCA order (G2), etc.
+    order_fills: list[dict] = field(default_factory=list)
+    # Planned (unfilled) grid prices for G2..GN — used to draw pending grid lines on chart
+    planned_grid_prices: list[float] = field(default_factory=list)
+    # TP / SL price levels for chart line drawing (None if not configured)
+    tp_price: float | None = None
+    sl_price: float | None = None
+
+
+class DCAGridCalculator:
+    """Calculator for DCA grid order placement."""
+
+    @staticmethod
+    def calculate_grid_orders(config: DCAGridConfig, base_price: float, direction: str) -> list[DCAOrder]:
+        """
+        Calculate DCA grid order levels and sizes.
+
+        Args:
+            config: DCA configuration
+            base_price: Current price (base for grid calculation)
+            direction: "long" or "short"
+
+        Returns:
+            List of DCAOrder objects
+        """
+        orders = []
+
+        # Check if using custom orders (Manual Grid mode)
+        if config.custom_orders and len(config.custom_orders) > 0:
+            return DCAGridCalculator._calculate_custom_orders(config, base_price, direction)
+
+        # Steps define spacing between G2..GN — N-1 intervals for N orders.
+        # G1 is always a market entry at base_price; only N-1 intervals need spacing.
+        _grid_intervals = max(config.order_count - 1, 1)
+        if config.use_log_steps:
+            grid_steps = DCAGridCalculator._calculate_log_steps(_grid_intervals, config.log_coefficient)
+        else:
+            grid_steps = DCAGridCalculator._calculate_linear_steps(_grid_intervals)
+
+        # Calculate order sizes with martingale
+        sizes = DCAGridCalculator._calculate_order_sizes(
+            config.order_count,
+            config.first_order_percent,
+            config.martingale_coefficient if config.use_martingale else 1.0,
+            config.martingale_mode,
+        )
+
+        # Normalize sizes to sum to 100%
+        total_size = sum(sizes)
+        sizes = [s * 100 / total_size for s in sizes]
+
+        # Create orders
+        # G1 (i=0): market entry at base_price (filled immediately at signal bar close).
+        # G2..GN (i=1..N-1): limit orders below/above base_price by cumulative grid steps.
+        # grid_steps[0] = first interval (G1→G2), grid_steps[1] = G2→G3, etc.
+        cumulative_step = 0.0
+        for i in range(config.order_count):
+            if i == 0:
+                # G1: market entry — always at signal price
+                trigger_price = base_price
+            else:
+                # G2..GN: accumulate from the (i-1)-th interval step
+                step_percent = grid_steps[i - 1] * (config.grid_size_percent / 100)
+                cumulative_step += step_percent
+                if direction == "long":
+                    trigger_price = base_price * (1 - cumulative_step)
+                else:
+                    trigger_price = base_price * (1 + cumulative_step)
+
+            # Calculate USD size
+            size_usd = config.deposit * (sizes[i] / 100)
+            if config.max_order_size > 0:
+                size_usd = min(size_usd, config.max_order_size)
+
+            # Apply leverage
+            size_usd_leveraged = size_usd * config.leverage
+
+            # Calculate coins
+            size_coins = size_usd_leveraged / trigger_price if trigger_price > 0 else 0
+
+            orders.append(
+                DCAOrder(
+                    level=i,
+                    price=trigger_price,
+                    size_percent=sizes[i],
+                    size_usd=size_usd,
+                    size_coins=size_coins,
+                    order_number=i + 1,
+                )
+            )
+
+        return orders
+
+    @staticmethod
+    def _calculate_custom_orders(config: DCAGridConfig, base_price: float, direction: str) -> list[DCAOrder]:
+        """
+        Calculate orders from custom (Manual Grid) configuration.
+
+        Each custom order has:
+        - offset: % distance from entry price
+        - volume: % of total deposit for this order
+
+        Args:
+            config: DCA configuration with custom_orders
+            base_price: Current price (base for grid calculation)
+            direction: "long" or "short"
+
+        Returns:
+            List of DCAOrder objects
+        """
+        orders = []
+        custom_orders = config.custom_orders if config.custom_orders is not None else []
+
+        for i, order_config in enumerate(custom_orders):
+            offset_percent = order_config.get("offset", 0)
+            volume_percent = order_config.get("volume", 0)
+
+            if offset_percent <= 0 or volume_percent <= 0:
+                continue
+
+            # Calculate trigger price based on offset
+            if direction == "long":
+                # Long grid: orders below base price
+                trigger_price = base_price * (1 - offset_percent / 100)
+            else:
+                # Short grid: orders above base price
+                trigger_price = base_price * (1 + offset_percent / 100)
+
+            # Calculate USD size from volume percent
+            size_usd = config.deposit * (volume_percent / 100)
+            if config.max_order_size > 0:
+                size_usd = min(size_usd, config.max_order_size)
+
+            # Apply leverage
+            size_usd_leveraged = size_usd * config.leverage
+
+            # Calculate coins
+            size_coins = size_usd_leveraged / trigger_price if trigger_price > 0 else 0
+
+            orders.append(
+                DCAOrder(
+                    level=i,
+                    price=trigger_price,
+                    size_percent=volume_percent,
+                    size_usd=size_usd,
+                    size_coins=size_coins,
+                    order_number=i + 1,
+                )
+            )
+
+        return orders
+
+    @staticmethod
+    def _calculate_linear_steps(order_count: int) -> list[float]:
+        """Calculate linear step distribution."""
+        if order_count <= 1:
+            return [1.0]
+        return [1.0 / order_count] * order_count
+
+    @staticmethod
+    def _calculate_log_steps(order_count: int, coefficient: float) -> list[float]:
+        """
+        Calculate logarithmic step distribution.
+
+        coefficient < 1.0: Orders closer to entry (front-loaded)
+        coefficient > 1.0: Orders more spread out (back-loaded)
+        """
+        if order_count <= 1:
+            return [1.0]
+
+        steps = []
+        total = 0.0
+
+        for i in range(order_count):
+            step = coefficient**i
+            steps.append(step)
+            total += step
+
+        # Normalize
+        return [s / total for s in steps]
+
+    @staticmethod
+    def _calculate_order_sizes(
+        order_count: int, first_order_percent: float, martingale_coef: float, mode: str
+    ) -> list[float]:
+        """
+        Calculate order sizes with martingale.
+
+        Modes:
+        - multiply_each: Each order is coef times the previous
+        - multiply_total: Each order is coef times the sum of previous
+        - progressive: Linear increase
+        """
+        sizes = []
+
+        if mode == "multiply_each":
+            current = first_order_percent
+            for _ in range(order_count):
+                sizes.append(current)
+                current *= martingale_coef
+
+        elif mode == "multiply_total":
+            current = first_order_percent
+            total = 0.0
+            for _ in range(order_count):
+                sizes.append(current)
+                total += current
+                current = total * (martingale_coef - 1)
+                if current < first_order_percent:
+                    current = first_order_percent
+
+        else:  # progressive
+            for i in range(order_count):
+                sizes.append(first_order_percent * (1 + i * (martingale_coef - 1)))
+
+        return sizes
+
+
+@dataclass
+class TrailingStopState:
+    """Trailing stop state for a DCA position."""
+
+    activated: bool = False
+    highest_price: float = 0.0
+    lowest_price: float = float("inf")
+    trailing_stop_price: float = 0.0
+
+    def reset(self) -> None:
+        self.activated = False
+        self.highest_price = 0.0
+        self.lowest_price = float("inf")
+        self.trailing_stop_price = 0.0
+
+    def update_long(
+        self, high_price: float, entry_price: float, activation_pct: float, distance_pct: float
+    ) -> float | None:
+        profit_pct = (high_price - entry_price) / entry_price
+        if profit_pct >= activation_pct:
+            self.activated = True
+        if not self.activated:
+            return None
+        if high_price > self.highest_price:
+            self.highest_price = high_price
+            self.trailing_stop_price = self.highest_price * (1 - distance_pct)
+        return self.trailing_stop_price
+
+    def update_short(
+        self, low_price: float, entry_price: float, activation_pct: float, distance_pct: float
+    ) -> float | None:
+        profit_pct = (entry_price - low_price) / entry_price
+        if profit_pct >= activation_pct:
+            self.activated = True
+        if not self.activated:
+            return None
+        if low_price < self.lowest_price:
+            self.lowest_price = low_price
+            self.trailing_stop_price = self.lowest_price * (1 + distance_pct)
+        return self.trailing_stop_price
+
+
+class DCAEngine(BaseBacktestEngine):
+    """
+    DCA/Grid Trading Backtest Engine.
+
+    Implements sophisticated DCA and grid trading with:
+    - Multiple grid levels
+    - Martingale position sizing
+    - Logarithmic step distribution
+    - Dynamic take profit adjustment
+    - Multiple TP levels with partial closes
+
+    Supports two modes:
+    1. run(BacktestInput) - Interface compliant method
+    2. run_from_config(BacktestConfig, pd.DataFrame) - Direct config method
+    """
+
+    def __init__(self):
+        self._name = "DCA Engine v1"
+        self.version = "1.0.0"
+
+        # Configuration
+        self.grid_config = DCAGridConfig()
+        self.multi_tp = MultipleTakeProfit()
+        self.close_conditions = CloseConditionsConfig()
+        self.indent_order = IndentOrderConfig()
+
+        # Pending indent orders
+        self.pending_indent: PendingIndentOrder | None = None
+
+        # State
+        self.position = DCAPosition()
+        self.equity_curve: list[float] = []
+        self.trades: list[DCATradeRecord] = []
+
+        # Indicator caches for close conditions
+        self._rsi_cache: np.ndarray | None = None
+        self._stoch_k_cache: np.ndarray | None = None
+        self._stoch_d_cache: np.ndarray | None = None
+        self._ma1_cache: np.ndarray | None = None
+        self._ma2_cache: np.ndarray | None = None
+        self._psar_cache: np.ndarray | None = None
+        self._bb_upper_cache: np.ndarray | None = None
+        self._bb_lower_cache: np.ndarray | None = None
+        self._keltner_upper_cache: np.ndarray | None = None
+        self._keltner_lower_cache: np.ndarray | None = None
+
+        # Statistics
+        self.total_signals = 0
+        self.total_orders_filled = 0
+
+        # Fee / TP / SL from config (set by _configure_from_config)
+        self._taker_fee: float = 0.0007  # default 0.07%
+        self._take_profit_pct: float | None = None  # None = use DCA multi-tp only
+        self._stop_loss_pct: float | None = None  # None = use drawdown safety close
+        # SL reference price mode: "average_price" (default) or "last_order"
+        # "last_order" → SL is measured from the last filled DCA order price
+        self._sl_type: str = "average_price"
+        # Breakeven: move SL to entry+offset when profit reaches activation threshold
+        self._breakeven_enabled: bool = False
+        self._breakeven_activation_pct: float = 0.005  # 0.5% default
+        self._breakeven_offset: float = 0.0  # decimal, e.g. 0.001 = +0.1%
+        self._breakeven_active: bool = False  # per-position, reset on new entry
+        self._breakeven_sl_price: float = 0.0  # when active
+        # Realized equity for correct equity curve (unrealized PnL is NOT accumulated)
+        self._realized_equity: float = 0.0
+        # Grid pullback tracking: price at which the grid was last placed/shifted
+        self._pullback_base_price: float = 0.0
+        # Grid trailing tracking: independent base price (used only when grid_trailing_percent > 0)
+        self._trailing_grid_base_price: float = 0.0
+        # Trailing stop (per-position, reset on new entry)
+        self._trailing_state: TrailingStopState = TrailingStopState()
+        self._trailing_activation_pct: float = 0.0  # 0 = disabled
+        self._trailing_distance_pct: float = 0.0
+        # ATR TP/SL
+        self._atr_enabled: bool = False
+        self._atr_period: int = 14
+        self._atr_tp_multiplier: float = 2.0
+        self._atr_sl_multiplier: float = 1.5
+        self._atr_values: np.ndarray | None = None  # pre-calculated per run
+        # Per-position ATR prices (set at entry, None = not in ATR mode)
+        self._atr_tp_price: float | None = None
+        self._atr_sl_price: float | None = None
+
+    # ===== Abstract method implementations =====
+
+    @property
+    def name(self) -> str:
+        """Engine name"""
+        return self._name
+
+    @property
+    def supports_bar_magnifier(self) -> bool:
+        """DCAEngine supports bar magnifier for more accurate fills"""
+        return True
+
+    @property
+    def supports_parallel(self) -> bool:
+        """DCAEngine supports parallel optimization"""
+        return True
+
+    def optimize(
+        self,
+        input_data: BacktestInput,
+        param_ranges: dict[str, list[Any]],
+        metric: str = "sharpe_ratio",
+        top_n: int = 10,
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
+        """
+        Optimize DCA parameters using grid search.
+
+        Args:
+            input_data: Base backtest input
+            param_ranges: Parameter ranges to optimize
+            metric: Metric to optimize (sharpe_ratio, profit_factor, etc.)
+            top_n: Number of top results to return
+
+        Returns:
+            List of (params, result) tuples sorted by metric
+        """
+        import itertools
+
+        results = []
+
+        # Generate all parameter combinations
+        param_names = list(param_ranges.keys())
+        param_values = list(param_ranges.values())
+
+        for combo in itertools.product(*param_values):
+            params = dict(zip(param_names, combo, strict=False))
+
+            # Update input_data with new params
+            test_input = BacktestInput(
+                candles=input_data.candles,
+                initial_capital=input_data.initial_capital,
+                leverage=input_data.leverage,
+                taker_fee=input_data.taker_fee,
+            )
+
+            # Run backtest
+            output = self.run(test_input)
+
+            # Get metric value
+            metric_value = getattr(output.metrics, metric, 0.0) if output.metrics else 0.0
+
+            results.append((params, output, metric_value))
+
+        # Sort by metric (descending) and return top_n
+        results.sort(key=lambda x: x[2], reverse=True)
+        return [(r[0], r[1]) for r in results[:top_n]]
+
+    def run(self, input_data: Any) -> Any:
+        """
+        Execute the DCA backtest.
+
+        Supports both:
+        - BacktestInput (interface) -> BacktestOutput
+        - Tuple of (BacktestConfig, pd.DataFrame) -> BacktestResult
+        """
+        # Guard: run() accepts BacktestInput (interface), NOT BacktestConfig.
+        # BacktestConfig has dca_enabled attribute — detect and give clear error.
+        # All production callers (BacktestService, router, optimizer) use run_from_config().
+        if hasattr(input_data, "dca_enabled"):
+            raise TypeError(
+                "DCAEngine.run() expects a BacktestInput object, not BacktestConfig. "
+                "Use run_from_config(config, ohlcv) instead."
+            )
+
+        start_time = time.time()
+
+        # Extract parameters
+        self._configure_from_input(input_data)
+
+        # Get data
+        df = input_data.market_data
+        if df is None or df.empty:
+            return self._empty_result("No market data")
+
+        # Initialize
+        initial_capital = input_data.initial_capital
+        equity = initial_capital
+        self._realized_equity = initial_capital
+        self.equity_curve = [equity]
+        self.trades = []
+        self.position = DCAPosition()
+
+        # Pre-calculate indicator caches for close conditions
+        self._precompute_close_condition_indicators(df)
+
+        # Generate signals if strategy is provided
+        signals = self._generate_signals(input_data, df)
+
+        # Main loop
+        for i in range(1, len(df)):
+            current_bar = df.iloc[i]
+
+            high = float(current_bar.get("high", current_bar.get("close", 0)))
+            low = float(current_bar.get("low", current_bar.get("close", 0)))
+            close = float(current_bar.get("close", 0))
+
+            # Check for DCA order fills
+            if self.position.is_open:
+                self._process_open_position(i, high, low, close, equity)
+
+            # Check pending indent order fill
+            elif self.pending_indent is not None:
+                self._check_indent_order_fill(i, high, low, close, equity)
+
+            # Check for new entry signal
+            elif signals[i] != 0:
+                direction = "long" if signals[i] > 0 else "short"
+
+                if self.indent_order.enabled:
+                    # Create pending indent order instead of immediate entry
+                    self._create_indent_order(i, close, direction)
+                else:
+                    # Immediate entry
+                    self._open_dca_position(i, close, direction)
+
+                self.total_signals += 1
+
+            # Equity curve: realized + current unrealized
+            if self.position.is_open:
+                self.equity_curve.append(self._realized_equity + self.position.unrealized_pnl)
+            else:
+                self.equity_curve.append(self._realized_equity)
+
+        # Close any remaining position
+        if self.position.is_open:
+            self._close_position(len(df) - 1, float(df.iloc[-1]["close"]), ExitReason.END_OF_DATA)
+
+        # Final equity after all trades closed
+        equity = self._realized_equity
+
+        # Calculate metrics
+        execution_time = time.time() - start_time
+        metrics = self._calculate_metrics(initial_capital, equity)
+
+        return BacktestOutput(
+            trades=self.trades,  # type: ignore[arg-type]  # DCATradeRecord → TradeRecord
+            metrics=metrics,
+            equity_curve=np.array(self.equity_curve),
+            execution_time=execution_time,
+            engine_name=self.name,
+        )
+
+    def _configure_from_input(self, input_data: BacktestInput) -> None:
+        """Configure engine from input parameters."""
+        params: dict[str, Any] = getattr(input_data, "strategy_params", None) or {}
+
+        # Grid settings
+        grid = params.get("dca_grid", {})
+        if grid:
+            self.grid_config.enabled = grid.get("enabled", False)
+            self.grid_config.direction = grid.get("direction", "long")
+            _pos_size = float(getattr(input_data, "position_size", 1.0) or 1.0)
+            _pos_size = max(0.01, min(1.0, _pos_size))
+            self.grid_config.deposit = input_data.initial_capital * _pos_size
+            self.grid_config.leverage = input_data.leverage or 1
+            self.grid_config.grid_size_percent = grid.get("grid_size_percent", 10.0)
+            self.grid_config.order_count = grid.get("order_count", 5)
+            self.grid_config.use_martingale = grid.get("use_martingale", True)
+            self.grid_config.martingale_coefficient = grid.get("martingale_coefficient", 1.3)
+            self.grid_config.use_log_steps = grid.get("use_log_steps", False)
+            self.grid_config.log_coefficient = grid.get("log_coefficient", 1.1)
+
+        # Multi-TP settings
+        multi_tp = params.get("multi_tp", {})
+        if multi_tp:
+            self.multi_tp.enabled = multi_tp.get("enabled", False)
+            self.multi_tp.tp1_percent = multi_tp.get("tp1_percent", 1.0)
+            self.multi_tp.tp1_close_percent = multi_tp.get("tp1_close_percent", 25.0)
+            self.multi_tp.tp2_percent = multi_tp.get("tp2_percent", 2.0)
+            self.multi_tp.tp2_close_percent = multi_tp.get("tp2_close_percent", 25.0)
+            self.multi_tp.tp3_percent = multi_tp.get("tp3_percent", 3.0)
+            self.multi_tp.tp3_close_percent = multi_tp.get("tp3_close_percent", 25.0)
+            self.multi_tp.tp4_percent = multi_tp.get("tp4_percent", 5.0)
+            self.multi_tp.tp4_close_percent = multi_tp.get("tp4_close_percent", 25.0)
+
+    def _configure_from_config(self, config: Any) -> None:
+        """
+        Configure engine from BacktestConfig (Pydantic model).
+
+        Args:
+            config: BacktestConfig with DCA-specific fields
+        """
+        # Grid settings from BacktestConfig
+        self.grid_config.enabled = getattr(config, "dca_enabled", False)
+        self.grid_config.direction = getattr(config, "dca_direction", "long")
+        # position_size (0.01-1.0) controls what fraction of capital is allocated to the
+        # DCA grid.  Without this the engine always deploys 100% of initial_capital which,
+        # combined with leverage and martingale, easily exceeds account equity.
+        _initial_capital = getattr(config, "initial_capital", 10000.0)
+        _position_size = float(getattr(config, "position_size", 1.0) or 1.0)
+        _position_size = max(0.01, min(1.0, _position_size))  # clamp to valid range
+        self.grid_config.deposit = _initial_capital * _position_size
+        self.grid_config.leverage = getattr(config, "leverage", 1)
+        self.grid_config.grid_size_percent = getattr(config, "dca_grid_size_percent", 10.0)
+        self.grid_config.order_count = getattr(config, "dca_order_count", 5)
+        self.grid_config.use_martingale = getattr(config, "dca_martingale_coef", 1.0) > 1.0
+        self.grid_config.martingale_coefficient = getattr(config, "dca_martingale_coef", 1.0)
+        self.grid_config.martingale_mode = getattr(config, "dca_martingale_mode", "multiply_each")
+        self.grid_config.use_log_steps = getattr(config, "dca_log_step_enabled", False)
+        self.grid_config.log_coefficient = getattr(config, "dca_log_step_coef", 1.1)
+        self.grid_config.close_on_drawdown = getattr(config, "dca_safety_close_enabled", True)
+        self.grid_config.drawdown_threshold_percent = getattr(config, "dca_drawdown_threshold", 30.0)
+
+        # Manual Grid (custom orders) from BacktestConfig
+        self.grid_config.custom_orders = getattr(config, "dca_custom_orders", None)
+        self.grid_config.grid_trailing_percent = getattr(config, "dca_grid_trailing_percent", 0.0)
+        # Partial grid placement (1 = all at once, 2-4 = place N at a time)
+        self.grid_config.partial_grid_orders = int(getattr(config, "partial_grid_orders", 1) or 1)
+        # Grid pullback percent (0 = disabled)
+        self.grid_config.grid_pullback_percent = float(getattr(config, "grid_pullback_percent", 0.0) or 0.0)
+
+        # Multi-TP settings from BacktestConfig
+        self.multi_tp.enabled = getattr(config, "dca_multi_tp_enabled", False)
+        self.multi_tp.tp1_percent = getattr(config, "dca_tp1_percent", 0.5)
+        self.multi_tp.tp1_close_percent = getattr(config, "dca_tp1_close_percent", 25.0)
+        self.multi_tp.tp2_percent = getattr(config, "dca_tp2_percent", 1.0)
+        self.multi_tp.tp2_close_percent = getattr(config, "dca_tp2_close_percent", 25.0)
+        self.multi_tp.tp3_percent = getattr(config, "dca_tp3_percent", 2.0)
+        self.multi_tp.tp3_close_percent = getattr(config, "dca_tp3_close_percent", 25.0)
+        self.multi_tp.tp4_percent = getattr(config, "dca_tp4_percent", 3.0)
+        self.multi_tp.tp4_close_percent = getattr(config, "dca_tp4_close_percent", 25.0)
+
+        # Close Conditions and Indent Order from strategy_params (Strategy Builder graph)
+        params = getattr(config, "strategy_params", None) or {}
+        close_conditions_params = params.get("close_conditions", {})
+        if close_conditions_params:
+            cc = self.close_conditions
+            for key, value in close_conditions_params.items():
+                if hasattr(cc, key):
+                    setattr(cc, key, value)
+
+        indent_order_params = params.get("indent_order", {})
+        if indent_order_params:
+            io = self.indent_order
+            for key, value in indent_order_params.items():
+                if hasattr(io, key):
+                    setattr(io, key, value)
+
+        # Fee / TP / SL from BacktestConfig
+        raw_fee = getattr(config, "taker_fee", None) or getattr(config, "maker_fee", None) or 0.0007
+        self._taker_fee = float(raw_fee)
+        raw_tp = getattr(config, "take_profit", None)
+        self._take_profit_pct = float(raw_tp) if raw_tp is not None and raw_tp > 0 else None
+        raw_sl = getattr(config, "stop_loss", None)
+        self._stop_loss_pct = float(raw_sl) if raw_sl is not None and raw_sl > 0 else None
+        # SL reference price mode: "average_price" (default) or "last_order"
+        raw_sl_type = getattr(config, "sl_type", "average_price") or "average_price"
+        self._sl_type = raw_sl_type if raw_sl_type in ("average_price", "last_order") else "average_price"
+        # Breakeven from Static SL/TP block (breakeven_enabled, breakeven_activation_pct, breakeven_offset)
+        self._breakeven_enabled = bool(getattr(config, "breakeven_enabled", False))
+        self._breakeven_activation_pct = float(getattr(config, "breakeven_activation_pct", 0.005))
+        self._breakeven_offset = float(getattr(config, "breakeven_offset", 0.0))
+        # Trailing stop
+        raw_ts_act = getattr(config, "trailing_stop_activation", None)
+        self._trailing_activation_pct = float(raw_ts_act) if raw_ts_act is not None and float(raw_ts_act) > 0 else 0.0
+        raw_ts_off = getattr(config, "trailing_stop_offset", None)
+        self._trailing_distance_pct = float(raw_ts_off) if raw_ts_off is not None and float(raw_ts_off) > 0 else 0.0
+        # ATR TP/SL
+        self._atr_enabled = bool(getattr(config, "atr_enabled", False))
+        self._atr_period = int(getattr(config, "atr_period", 14))
+        self._atr_tp_multiplier = float(getattr(config, "atr_tp_multiplier", 2.0))
+        self._atr_sl_multiplier = float(getattr(config, "atr_sl_multiplier", 1.5))
+
+    def run_from_config(self, config: Any, ohlcv: pd.DataFrame, custom_strategy: Any = None) -> Any:
+        """
+        Run DCA backtest from BacktestConfig (Pydantic model).
+
+        This is the primary method when called from BacktestService.
+
+        Args:
+            config: BacktestConfig with DCA-specific fields
+            ohlcv: DataFrame with OHLCV data
+            custom_strategy: Optional StrategyBuilderAdapter for generating signals
+                            from Strategy Builder graph
+
+        Returns:
+            BacktestResult compatible object
+        """
+        # Store custom_strategy for signal generation
+        self._custom_strategy = custom_strategy
+        import uuid
+        from datetime import datetime
+
+        from backend.backtesting.models import (
+            BacktestResult,
+            BacktestStatus,
+            EquityCurve,
+        )
+
+        start_time = time.time()
+        backtest_id = str(uuid.uuid4())
+
+        # Configure from BacktestConfig
+        self._configure_from_config(config)
+
+        # Get data
+        if ohlcv is None or ohlcv.empty:
+            return BacktestResult(
+                id=backtest_id,
+                status=BacktestStatus.FAILED,
+                created_at=datetime.now(UTC),
+                config=config,
+                error_message="No market data for DCA backtest",
+            )
+
+        # Initialize
+        initial_capital = getattr(config, "initial_capital", 10000.0)
+        equity = initial_capital
+        self._realized_equity = initial_capital  # tracks equity after each closed trade
+        self.equity_curve = [equity]
+        self.trades = []
+        self.position = DCAPosition()
+        self._ohlcv_index = ohlcv.index  # used by _build_performance_metrics for Sharpe/Sortino
+        self._first_close = float(ohlcv.iloc[0]["close"]) if len(ohlcv) > 0 else 0.0
+        self._last_close = float(ohlcv.iloc[-1]["close"]) if len(ohlcv) > 0 else 0.0
+
+        # Pre-calculate indicator caches for close conditions
+        self._precompute_close_condition_indicators(ohlcv)
+
+        # Pre-calculate ATR values if ATR TP/SL mode is enabled
+        if self._atr_enabled:
+            from backend.backtesting.atr_calculator import calculate_atr_fast
+
+            self._atr_values = calculate_atr_fast(
+                ohlcv["high"].to_numpy(np.float64),
+                ohlcv["low"].to_numpy(np.float64),
+                ohlcv["close"].to_numpy(np.float64),
+                self._atr_period,
+            )
+        else:
+            self._atr_values = None
+
+        # Generate signals using strategy from config
+        signals = self._generate_signals_from_config(config, ohlcv)
+
+        # Log signal statistics (debug level to avoid flooding during optimization)
+        long_signals = int(np.sum(signals > 0))
+        short_signals = int(np.sum(signals < 0))
+        logger.debug(f"DCAEngine: Generated {long_signals} long signals, {short_signals} short signals")
+
+        # Fast path: no signals → no trades possible. Skip the entire bar loop.
+        # This is critical for optimization where many parameter combos produce 0 signals.
+        if long_signals == 0 and short_signals == 0:
+            empty_metrics = self._build_performance_metrics(initial_capital, initial_capital, [])
+            return BacktestResult(
+                id=backtest_id,
+                status=BacktestStatus.COMPLETED,
+                created_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+                config=config,
+                trades=[],
+                metrics=empty_metrics,
+                equity_curve=EquityCurve(timestamps=[], equity=[initial_capital]),
+                final_equity=initial_capital,
+                final_pnl=0.0,
+                final_pnl_pct=0.0,
+            )
+
+        # Main loop
+        for i in range(1, len(ohlcv)):
+            current_bar = ohlcv.iloc[i]
+
+            high = float(current_bar.get("high", current_bar.get("close", 0)))
+            low = float(current_bar.get("low", current_bar.get("close", 0)))
+            close = float(current_bar.get("close", 0))
+
+            # Check for DCA order fills
+            if self.position.is_open:
+                equity = self._process_open_position(i, high, low, close, equity)
+
+            # Check pending indent order fill (when using run_from_config)
+            elif self.pending_indent is not None:
+                equity = self._check_indent_order_fill(i, high, low, close, equity)
+
+            # Check for new entry signal
+            elif signals[i] != 0:
+                direction = "long" if signals[i] > 0 else "short"
+
+                # Respect dca_direction setting
+                dca_direction = self.grid_config.direction
+                if dca_direction == "both" or dca_direction == direction:
+                    if self.indent_order.enabled:
+                        self._create_indent_order(i, close, direction)
+                    else:
+                        self._open_dca_position(i, close, direction)
+                    self.total_signals += 1
+
+            # Equity curve: realized + current unrealized (no position → just realized)
+            if self.position.is_open:
+                bar_equity = self._realized_equity + self.position.unrealized_pnl
+            else:
+                bar_equity = self._realized_equity
+            self.equity_curve.append(bar_equity)
+
+        # Close any remaining position
+        if self.position.is_open:
+            equity = self._close_position(len(ohlcv) - 1, float(ohlcv.iloc[-1]["close"]), ExitReason.END_OF_DATA)
+
+        # Final equity is realized equity after all trades are closed
+        equity = self._realized_equity
+
+        # Calculate metrics (execution_time kept for future use)
+        _ = time.time() - start_time
+
+        # Convert trades to model format
+        model_trades = self._convert_trades_to_model(ohlcv)
+
+        # Build result
+        metrics = self._build_performance_metrics(initial_capital, equity, model_trades)
+
+        return BacktestResult(
+            id=backtest_id,
+            status=BacktestStatus.COMPLETED,
+            created_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            config=config,
+            trades=model_trades,
+            metrics=metrics,
+            equity_curve=EquityCurve(
+                timestamps=[
+                    ohlcv.index[i].to_pydatetime() for i in range(min(len(ohlcv.index), len(self.equity_curve)))
+                ],
+                equity=self.equity_curve,
+            ),
+            final_equity=equity,
+            final_pnl=equity - initial_capital,
+            final_pnl_pct=(equity - initial_capital) / initial_capital * 100,
+        )
+
+    def _generate_signals_from_config(self, config: Any, df: pd.DataFrame) -> np.ndarray:
+        """Generate trading signals based on strategy from BacktestConfig.
+
+        Returns:
+            np.ndarray: Signal array where:
+                - 1 = long entry
+                - -1 = short entry
+                - 0 = no signal
+        """
+        signals = np.zeros(len(df))
+
+        # Fast path: pre-computed signals injected by optimizer (bypass adapter entirely)
+        if hasattr(self, "_precomputed_signals") and self._precomputed_signals is not None:
+            precomp = self._precomputed_signals
+            if len(precomp) == len(df):
+                return precomp if isinstance(precomp, np.ndarray) else np.asarray(precomp)
+            else:
+                logger.warning(
+                    f"Pre-computed signals length mismatch: {len(precomp)} vs {len(df)}, "
+                    "falling back to standard signal generation"
+                )
+
+        # If custom_strategy (StrategyBuilderAdapter) is provided, use it for signals
+        if hasattr(self, "_custom_strategy") and self._custom_strategy is not None:
+            try:
+                adapter = self._custom_strategy
+                logger.info(f"DCAEngine: Using custom strategy adapter: {type(adapter).__name__}")
+                # Generate signals from Strategy Builder graph
+                result = adapter.generate_signals(df)
+                logger.info(f"DCAEngine: Adapter returned result type: {type(result)}")
+                if result is not None:
+                    if hasattr(result, "entries") and hasattr(result, "short_entries"):
+                        # SignalResult object
+                        entries_count = int(result.entries.sum())
+                        short_count = int(result.short_entries.sum()) if result.short_entries is not None else 0
+                        logger.info(f"DCAEngine: SignalResult entries={entries_count}, short_entries={short_count}")
+                        for i in range(len(df)):
+                            if i < len(result.entries) and result.entries.iloc[i]:
+                                signals[i] = 1
+                            elif (
+                                result.short_entries is not None
+                                and i < len(result.short_entries)
+                                and result.short_entries.iloc[i]
+                            ):
+                                signals[i] = -1
+                        return signals
+                    elif isinstance(result, np.ndarray):
+                        return result
+                    elif isinstance(result, pd.Series):
+                        return result.values
+                    elif isinstance(result, pd.DataFrame) and "signal" in result.columns:
+                        return result["signal"].values
+            except Exception as e:
+                logger.warning(f"Custom strategy signal generation failed: {e}, falling back to config")
+
+        strategy_type = getattr(config, "strategy_type", "rsi")
+        strategy_params = getattr(config, "strategy_params", {}) or {}
+
+        # Try to use registered strategy
+        try:
+            from backend.backtesting.strategies import SignalResult, get_strategy
+
+            strategy = get_strategy(strategy_type, strategy_params)
+            result = strategy.generate_signals(df)
+
+            # Handle SignalResult object
+            if isinstance(result, SignalResult):
+                # Convert SignalResult to signal array
+                # 1 for long entry, -1 for short entry, 0 for no signal
+                for i in range(len(df)):
+                    if result.entries.iloc[i]:
+                        signals[i] = 1
+                    elif result.short_entries is not None and result.short_entries.iloc[i]:
+                        signals[i] = -1
+                return signals
+            elif isinstance(result, np.ndarray):
+                return result
+            else:
+                # Fallback - try to use as-is
+                return np.asarray(result)
+        except Exception as e:
+            logger.debug("Universal engine signal conversion failed, using fallback: %s", e)
+
+        # Fallback to built-in RSI
+        if strategy_type == "rsi":
+            signals = self._generate_rsi_signals(df, strategy_params)
+
+        return signals
+
+    @staticmethod
+    def _ts_to_utc(ts: "pd.Timestamp") -> "pd.Timestamp":
+        """Ensure a pandas Timestamp is UTC-aware (localize if tz-naive).
+
+        Python isoformat() on tz-naive timestamps omits the timezone suffix,
+        causing browsers to interpret them as LOCAL time and shifting markers
+        by the user's UTC offset (e.g. -3h for UTC+3).
+        """
+        if ts.tzinfo is None:
+            return ts.tz_localize("UTC")
+        return ts
+
+    def _convert_trades_to_model(self, ohlcv: pd.DataFrame) -> list:
+        """Convert internal trades to BacktestModel TradeRecord format."""
+        from backend.backtesting.models import TradeRecord as ModelTradeRecord
+
+        model_trades = []
+        for i, trade in enumerate(self.trades):
+            # Get timestamps from bar indices; localize to UTC so isoformat()
+            # emits "+00:00" suffix (prevents browser LOCAL-time misinterpretation).
+            entry_time = self._ts_to_utc(ohlcv.index[min(trade.entry_bar_idx, len(ohlcv) - 1)])
+            exit_time = self._ts_to_utc(ohlcv.index[min(trade.exit_bar_idx, len(ohlcv) - 1)])
+
+            model_trades.append(
+                ModelTradeRecord(
+                    id=f"dca_{i + 1}",
+                    entry_time=entry_time,
+                    exit_time=exit_time,
+                    side=trade.direction.value if hasattr(trade.direction, "value") else str(trade.direction),
+                    entry_price=trade.entry_price,
+                    exit_price=trade.exit_price,
+                    size=trade.position_size,
+                    pnl=trade.pnl,
+                    pnl_pct=trade.pnl_pct,
+                    commission=trade.commission,
+                    mfe=trade.mfe,
+                    mae=trade.mae,
+                    mfe_pct=trade.mfe_pct,
+                    mae_pct=trade.mae_pct,
+                    bars_in_trade=trade.bars_held,
+                    trade_number=i + 1,
+                    entry_bar_index=trade.entry_bar_idx,
+                    exit_bar_index=trade.exit_bar_idx,
+                    exit_comment=trade.exit_reason.value if hasattr(trade.exit_reason, "value") else "close",
+                    dca_orders_filled=trade.orders_filled_count,
+                    dca_avg_entry_price=trade.avg_entry_price,
+                    dca_total_size_usd=trade.total_size_usd,
+                    dca_total_size_coins=trade.total_size_coins,
+                    dca_grid_levels=trade.grid_levels,
+                    # Per-order fill details: convert bar_idx → UTC ISO timestamp for frontend
+                    dca_levels=[
+                        {
+                            "level": f["level"],
+                            "time": self._ts_to_utc(ohlcv.index[min(f["bar_idx"], len(ohlcv) - 1)]).isoformat()
+                            if f.get("bar_idx") is not None
+                            else None,
+                            "price": f["price"],
+                            "size_usd": f["size_usd"],
+                        }
+                        for f in trade.order_fills
+                    ],
+                    # Planned unfilled grid prices (G2..GN pending lines)
+                    dca_grid_prices=trade.planned_grid_prices,
+                    # TP / SL price levels for chart horizontal lines
+                    tp_price=trade.tp_price,
+                    sl_price=trade.sl_price,
+                )
+            )
+
+        return model_trades
+
+    def _build_performance_metrics(self, initial_capital: float, final_equity: float, trades: list) -> Any:
+        """Build PerformanceMetrics (models.py) using TV-parity logic from FallbackEngineV4.
+
+        Delegates to FallbackEngineV4._calculate_metrics (which returns BacktestMetrics from
+        interfaces.py), then converts to PerformanceMetrics (models.py) as required by
+        BacktestResult. This ensures DCA results include Sharpe, Sortino, CAGR, long/short
+        breakdown etc. identical to all other engines.
+        """
+        from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
+        from backend.backtesting.interfaces import TradeRecord as IfaceTradeRecord
+        from backend.backtesting.models import PerformanceMetrics
+
+        if not trades:
+            return PerformanceMetrics()
+
+        # Convert ModelTradeRecord → interfaces.TradeRecord for metric calculation
+        iface_trades: list[IfaceTradeRecord] = []
+        for t in trades:
+            # side field: "long"/"short" string (already set in _convert_trades_to_model)
+            direction = str(getattr(t, "side", getattr(t, "direction", "long"))).lower()
+            fees = float(getattr(t, "commission", 0.0) or 0.0)
+            bars = int(getattr(t, "bars_in_trade", getattr(t, "duration_bars", 0)) or 0)
+            iface_trades.append(
+                IfaceTradeRecord(
+                    entry_time=getattr(t, "entry_time", None),
+                    exit_time=getattr(t, "exit_time", None),
+                    direction=direction,
+                    entry_price=float(getattr(t, "entry_price", 0.0)),
+                    exit_price=float(getattr(t, "exit_price", 0.0)),
+                    size=float(getattr(t, "size", 0.0)),
+                    pnl=float(getattr(t, "pnl", 0.0)),
+                    pnl_pct=float(getattr(t, "pnl_pct", 0.0)),
+                    fees=fees,
+                    exit_reason=getattr(t, "exit_reason", None),
+                    duration_bars=bars,
+                    mfe=float(getattr(t, "mfe", 0.0)),
+                    mae=float(getattr(t, "mae", 0.0)),
+                    mfe_pct=float(getattr(t, "mfe_pct", 0.0)),
+                    mae_pct=float(getattr(t, "mae_pct", 0.0)),
+                )
+            )
+
+        # Build equity curve array for Sharpe/Sortino (bar-by-bar)
+        equity_arr = list(self.equity_curve) if self.equity_curve else [initial_capital, final_equity]
+
+        # Use FallbackEngineV4._calculate_metrics (static-like: no self state needed).
+        # Returns BacktestMetrics (interfaces.py) with win_rate as fraction 0–1.
+        engine_v4 = FallbackEngineV4.__new__(FallbackEngineV4)
+        bm = engine_v4._calculate_metrics(
+            trades=iface_trades,
+            equity_curve=equity_arr,
+            initial_capital=initial_capital,
+            candles_index=self._ohlcv_index,
+        )
+
+        # Convert BacktestMetrics → PerformanceMetrics.
+        # Key difference: PerformanceMetrics.win_rate stores percent (0–100),
+        # BacktestMetrics.win_rate stores fraction (0–1).
+        # PerformanceMetrics field naming convention (matching MetricsCalculator):
+        #   avg_win        = per-trade return % (pct)       avg_win_value  = USD absolute
+        #   largest_win    = per-trade return % (pct)       largest_win_value = USD absolute
+        long_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "long"]
+        short_trades_list = [t for t in trades if str(getattr(t, "side", "long")).lower() == "short"]
+
+        def _pnl(t: object) -> float:
+            return float(getattr(t, "pnl", 0.0))
+
+        def _pnl_pct(t: object) -> float:
+            return float(getattr(t, "pnl_pct", 0.0))
+
+        def _bars(t: object) -> int:
+            return int(getattr(t, "bars_in_trade", getattr(t, "duration_bars", 0)) or 0)
+
+        def _comm(t: object) -> float:
+            return float(getattr(t, "commission", 0.0) or 0.0)
+
+        def _safe_wr_pct(win: int, total: int) -> float:
+            return (win / total * 100.0) if total > 0 else 0.0
+
+        def _safe_mean(lst: list) -> float:
+            return float(np.mean(lst)) if lst else 0.0
+
+        def _consec(pnls: list) -> tuple[int, int]:
+            max_w = max_l = cur_w = cur_l = 0
+            for p in pnls:
+                if p > 0:
+                    cur_w += 1
+                    cur_l = 0
+                elif p < 0:
+                    cur_l += 1
+                    cur_w = 0
+                else:
+                    cur_w = cur_l = 0
+                if cur_w > max_w:
+                    max_w = cur_w
+                if cur_l > max_l:
+                    max_l = cur_l
+            return max_w, max_l
+
+        # ── All-trades vectors ────────────────────────────────────────────────────────
+        all_pnls = [_pnl(t) for t in trades]
+        all_pnl_pcts = [_pnl_pct(t) for t in trades]
+        all_bars_list = [_bars(t) for t in trades]  # noqa: F841 — kept for symmetry with long/short vectors
+
+        win_pnls = [p for p in all_pnls if p > 0]
+        loss_pnls = [p for p in all_pnls if p < 0]
+        win_pnl_pcts = [_pnl_pct(t) for t in trades if _pnl(t) > 0]
+        loss_pnl_pcts = [_pnl_pct(t) for t in trades if _pnl(t) < 0]
+        win_bars = [_bars(t) for t in trades if _pnl(t) > 0]
+        loss_bars = [_bars(t) for t in trades if _pnl(t) < 0]
+
+        # ── Long vectors ─────────────────────────────────────────────────────────────
+        long_pnls = [_pnl(t) for t in long_trades_list]
+        long_pnl_pcts = [_pnl_pct(t) for t in long_trades_list]
+        long_bars_list = [_bars(t) for t in long_trades_list]
+
+        long_win_pnls = [p for p in long_pnls if p > 0]
+        long_loss_pnls = [p for p in long_pnls if p < 0]
+        long_win_pnl_pcts = [_pnl_pct(t) for t in long_trades_list if _pnl(t) > 0]
+        long_loss_pnl_pcts = [_pnl_pct(t) for t in long_trades_list if _pnl(t) < 0]
+        long_win_bars = [_bars(t) for t in long_trades_list if _pnl(t) > 0]
+        long_loss_bars = [_bars(t) for t in long_trades_list if _pnl(t) < 0]
+
+        # ── Short vectors ────────────────────────────────────────────────────────────
+        short_pnls = [_pnl(t) for t in short_trades_list]
+        short_pnl_pcts = [_pnl_pct(t) for t in short_trades_list]  # noqa: F841 — reserved for future short metrics
+        short_bars_list = [_bars(t) for t in short_trades_list]
+
+        short_win_pnls = [p for p in short_pnls if p > 0]
+        short_loss_pnls = [p for p in short_pnls if p < 0]
+        short_win_pnl_pcts = [_pnl_pct(t) for t in short_trades_list if _pnl(t) > 0]
+        short_win_bars = [_bars(t) for t in short_trades_list if _pnl(t) > 0]
+        short_loss_bars = [_bars(t) for t in short_trades_list if _pnl(t) < 0]
+
+        # ── Consecutive win/loss counts ───────────────────────────────────────────
+        long_max_cw, long_max_cl = _consec(long_pnls)
+        short_max_cw, short_max_cl = _consec(short_pnls)
+
+        # ── Expectancy helpers ────────────────────────────────────────────────────
+        def _expectancy(pnl_list: list) -> float:
+            if not pnl_list:
+                return 0.0
+            w = [p for p in pnl_list if p > 0]
+            losses = [p for p in pnl_list if p < 0]
+            wr = len(w) / len(pnl_list)
+            lr = 1.0 - wr
+            avg_w = float(np.mean(w)) if w else 0.0
+            avg_l = float(np.mean(losses)) if losses else 0.0
+            return (wr * avg_w) - (lr * abs(avg_l))
+
+        # ── Commission sums by side ───────────────────────────────────────────────
+        long_comm_sum = sum(_comm(t) for t in long_trades_list)
+        short_comm_sum = sum(_comm(t) for t in short_trades_list)
+
+        # ── Profit factor helper ──────────────────────────────────────────────────
+        def _pf(gp: float, gl: float) -> float:
+            return gp / gl if gl > 0 else (float("inf") if gp > 0 else 0.0)
+
+        long_gp = sum(long_win_pnls)
+        long_gl = abs(sum(long_loss_pnls))
+        short_gp = sum(short_win_pnls)
+        short_gl = abs(sum(short_loss_pnls))
+
+        # ── CAGR (computed from OHLCV date range) ────────────────────────────────
+        _cagr = 0.0
+        if self._ohlcv_index is not None and len(self._ohlcv_index) >= 2:
+            try:
+                _years = float((self._ohlcv_index[-1] - self._ohlcv_index[0]).total_seconds()) / (365.25 * 86400)
+                if _years > 0 and initial_capital > 0 and final_equity > 0:
+                    _cagr = (((final_equity / initial_capital) ** (1.0 / _years)) - 1.0) * 100.0
+            except Exception:
+                pass
+
+        # ── Calmar ratio = CAGR / max_drawdown ────────────────────────────────────
+        _max_dd = float(getattr(bm, "max_drawdown", 0.0))
+        _calmar = _cagr / _max_dd if _max_dd > 0 else 0.0
+
+        # ── Kelly Criterion (fraction 0–1, stored as fraction; MetricsPanels * 100) ─
+        _kelly = 0.0
+        if win_pnls and loss_pnls:
+            _avg_w = abs(_safe_mean(win_pnls))
+            _avg_l = abs(_safe_mean(loss_pnls))
+            _wr = len(win_pnls) / len(all_pnls)
+            if _avg_l > 0:
+                _b = _avg_w / _avg_l
+                _kelly = max(0.0, (_wr * _b - (1.0 - _wr)) / _b)
+
+        # ── Payoff ratios (avg_win_usd / avg_loss_usd per direction) ─────────────
+        _payoff_all = (
+            abs(_safe_mean(win_pnls)) / abs(_safe_mean(loss_pnls)) if loss_pnls and _safe_mean(loss_pnls) != 0 else 0.0
+        )
+        _payoff_long = (
+            abs(_safe_mean(long_win_pnls)) / abs(_safe_mean(long_loss_pnls))
+            if long_loss_pnls and _safe_mean(long_loss_pnls) != 0
+            else 0.0
+        )
+        _payoff_short = (
+            abs(_safe_mean(short_win_pnls)) / abs(_safe_mean(short_loss_pnls))
+            if short_loss_pnls and _safe_mean(short_loss_pnls) != 0
+            else 0.0
+        )
+
+        # ── Pure-direction flags (Long-only or Short-only) ────────────────────────
+        _is_pure_long = not short_trades_list
+        _is_pure_short = not long_trades_list
+
+        # ── Max drawdown USD value ────────────────────────────────────────────────
+        _max_dd_value = _max_dd * initial_capital / 100.0
+
+        # ── Buy & Hold return ─────────────────────────────────────────────────────
+        _bh_return = 0.0
+        _bh_return_pct = 0.0
+        _first_c = getattr(self, "_first_close", 0.0)
+        _last_c = getattr(self, "_last_close", 0.0)
+        if _first_c > 0 and initial_capital > 0:
+            _bh_return = initial_capital * (_last_c / _first_c - 1.0)
+            _bh_return_pct = (_last_c / _first_c - 1.0) * 100.0
+
+        # ── SQN (System Quality Number) ────────────────────────────────────────────
+        _sqn = 0.0
+        if len(all_pnls) >= 2:
+            _std_pnl = float(np.std(all_pnls, ddof=0))
+            if _std_pnl > 0:
+                _sqn = float(np.sqrt(len(all_pnls))) * float(np.mean(all_pnls)) / _std_pnl
+
+        # ── Ulcer Index (from equity curve) ───────────────────────────────────────
+        _ulcer = 0.0
+        _eq_arr = np.asarray(self.equity_curve, dtype=np.float64)
+        if len(_eq_arr) >= 2:
+            _peaks = np.maximum.accumulate(_eq_arr)
+            _safe_peaks = np.where(_peaks > 0, _peaks, 1.0)
+            _dd_pct = (_eq_arr - _peaks) / _safe_peaks * 100.0
+            _ulcer = float(np.sqrt(np.mean(_dd_pct**2)))
+
+        # ── Stability R² (linear regression of equity curve) ──────────────────────
+        _stability = 0.0
+        if len(_eq_arr) >= 3:
+            _x = np.arange(len(_eq_arr), dtype=np.float64)
+            _x_mean = _x.mean()
+            _y_mean = _eq_arr.mean()
+            _ss_tot = float(np.sum((_eq_arr - _y_mean) ** 2))
+            if _ss_tot > 0:
+                _cov = float(np.sum((_x - _x_mean) * (_eq_arr - _y_mean)))
+                _ss_x = float(np.sum((_x - _x_mean) ** 2))
+                _slope = _cov / _ss_x if _ss_x > 0 else 0.0
+                _intercept = _y_mean - _slope * _x_mean
+                _y_pred = _slope * _x + _intercept
+                _ss_res = float(np.sum((_eq_arr - _y_pred) ** 2))
+                _stability = max(0.0, 1.0 - _ss_res / _ss_tot)
+
+        # ── Breakeven trades ──────────────────────────────────────────────────────
+        _breakeven = sum(1 for p in all_pnls if abs(p) < 0.001)
+        _breakeven_long = sum(1 for p in long_pnls if abs(p) < 0.001)
+        _breakeven_short = sum(1 for p in short_pnls if abs(p) < 0.001)
+
+        _sharpe = float(getattr(bm, "sharpe_ratio", 0.0))
+        _sortino = float(getattr(bm, "sortino_ratio", 0.0))
+        _recov = float(getattr(bm, "recovery_factor", 0.0))
+        _gp = float(getattr(bm, "gross_profit", 0.0))
+        _gl = float(getattr(bm, "gross_loss", 0.0))
+
+        return PerformanceMetrics(
+            # ── P&L ──────────────────────────────────────────────────────────────────
+            net_profit=float(getattr(bm, "net_profit", 0.0)),
+            net_profit_pct=float(getattr(bm, "total_return", 0.0)),
+            gross_profit=_gp,
+            gross_loss=_gl,
+            gross_profit_pct=_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            gross_loss_pct=_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            total_commission=float(getattr(bm, "commission_paid", 0.0)),
+            buy_hold_return=_bh_return,
+            buy_hold_return_pct=_bh_return_pct,
+            # ── Returns ──────────────────────────────────────────────────────────────
+            total_return=float(getattr(bm, "total_return", 0.0)),
+            annual_return=float(getattr(bm, "annual_return", 0.0)),
+            cagr=_cagr,
+            cagr_long=_cagr if _is_pure_long else 0.0,
+            # ── Risk ratios ───────────────────────────────────────────────────────────
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+            calmar_ratio=_calmar,
+            sharpe_long=_sharpe if _is_pure_long else 0.0,
+            sortino_long=_sortino if _is_pure_long else 0.0,
+            calmar_long=_calmar if _is_pure_long else 0.0,
+            # ── Drawdown ─────────────────────────────────────────────────────────────
+            max_drawdown=float(getattr(bm, "max_drawdown", 0.0)),
+            max_drawdown_value=_max_dd_value,
+            # ── Trade stats (win_rate as percent 0-100) ───────────────────────────────
+            total_trades=int(getattr(bm, "total_trades", len(trades))),
+            winning_trades=int(getattr(bm, "winning_trades", 0)),
+            losing_trades=int(getattr(bm, "losing_trades", 0)),
+            win_rate=float(getattr(bm, "win_rate", 0.0)) * 100.0,
+            profit_factor=float(getattr(bm, "profit_factor", 0.0)),
+            # avg_win/loss: pct field = per-trade return %, value field = USD absolute
+            avg_win=_safe_mean(win_pnl_pcts),
+            avg_win_value=float(getattr(bm, "avg_win", 0.0)),
+            avg_loss=_safe_mean(loss_pnl_pcts),
+            avg_loss_value=float(getattr(bm, "avg_loss", 0.0)),
+            avg_trade=float(getattr(bm, "avg_trade", 0.0)),
+            avg_trade_value=float(getattr(bm, "avg_trade", 0.0)),
+            avg_trade_pct=_safe_mean(all_pnl_pcts),
+            # largest: pct field = per-trade return %, value field = USD absolute
+            largest_win=max(win_pnl_pcts) if win_pnl_pcts else 0.0,
+            largest_win_value=max(win_pnls) if win_pnls else 0.0,
+            largest_loss=min(loss_pnl_pcts) if loss_pnl_pcts else 0.0,
+            largest_loss_value=min(loss_pnls) if loss_pnls else 0.0,
+            payoff_ratio=_payoff_all,
+            expectancy=float(getattr(bm, "expectancy", 0.0)),
+            sqn=_sqn,
+            ulcer_index=_ulcer,
+            stability=_stability,
+            breakeven_trades=_breakeven,
+            long_breakeven_trades=_breakeven_long,
+            short_breakeven_trades=_breakeven_short,
+            recovery_factor=_recov,
+            recovery_long=_recov if _is_pure_long else 0.0,
+            recovery_short=_recov if _is_pure_short else 0.0,
+            kelly_percent=_kelly,
+            kelly_percent_long=_kelly if _is_pure_long else 0.0,
+            kelly_percent_short=_kelly if _is_pure_short else 0.0,
+            max_consecutive_wins=int(getattr(bm, "max_consecutive_wins", 0)),
+            max_consecutive_losses=int(getattr(bm, "max_consecutive_losses", 0)),
+            # avg bars (all trades, winning, losing)
+            avg_bars_in_trade=float(getattr(bm, "avg_trade_duration", 0.0)),
+            avg_bars_in_winning=float(getattr(bm, "avg_winning_duration", 0.0)) or _safe_mean(win_bars),
+            avg_bars_in_losing=float(getattr(bm, "avg_losing_duration", 0.0)) or _safe_mean(loss_bars),
+            # ── Long breakdown ────────────────────────────────────────────────────────
+            long_trades=len(long_trades_list),
+            long_pnl=sum(long_pnls),
+            long_pnl_pct=sum(long_pnls) / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_winning_trades=len(long_win_pnls),
+            long_losing_trades=len(long_loss_pnls),
+            long_net_profit=sum(long_pnls),
+            long_win_rate=_safe_wr_pct(len(long_win_pnls), len(long_trades_list)),
+            long_gross_profit=long_gp,
+            long_gross_loss=long_gl,
+            long_gross_profit_pct=long_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_gross_loss_pct=long_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            long_profit_factor=_pf(long_gp, long_gl),
+            long_avg_win=_safe_mean(long_win_pnls),
+            long_avg_win_value=_safe_mean(long_win_pnls),
+            long_avg_win_pct=_safe_mean(long_win_pnl_pcts),
+            long_avg_loss=_safe_mean(long_loss_pnls),
+            long_avg_loss_value=_safe_mean(long_loss_pnls),
+            long_avg_loss_pct=_safe_mean(long_loss_pnl_pcts),
+            long_avg_trade=_safe_mean(long_pnls),
+            long_avg_trade_value=_safe_mean(long_pnls),
+            long_avg_trade_pct=_safe_mean(long_pnl_pcts),
+            long_largest_win=max(long_win_pnl_pcts) if long_win_pnl_pcts else 0.0,
+            long_largest_win_value=max(long_win_pnls) if long_win_pnls else 0.0,
+            long_largest_loss=min(long_loss_pnl_pcts) if long_loss_pnl_pcts else 0.0,
+            long_largest_loss_value=min(long_loss_pnls) if long_loss_pnls else 0.0,
+            long_commission=long_comm_sum,
+            long_payoff_ratio=_payoff_long,
+            long_expectancy=_expectancy(long_pnls),
+            long_max_consec_wins=long_max_cw,
+            long_max_consec_losses=long_max_cl,
+            avg_bars_in_long=_safe_mean(long_bars_list),
+            avg_bars_in_winning_long=_safe_mean(long_win_bars),
+            avg_bars_in_losing_long=_safe_mean(long_loss_bars),
+            # ── Short breakdown ───────────────────────────────────────────────────────
+            short_trades=len(short_trades_list),
+            short_pnl=sum(short_pnls),
+            short_pnl_pct=sum(short_pnls) / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_winning_trades=len(short_win_pnls),
+            short_losing_trades=len([p for p in short_pnls if p < 0]),
+            short_net_profit=sum(short_pnls),
+            short_win_rate=_safe_wr_pct(len(short_win_pnls), len(short_trades_list)),
+            short_gross_profit=short_gp,
+            short_gross_loss=short_gl,
+            short_gross_profit_pct=short_gp / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_gross_loss_pct=short_gl / initial_capital * 100.0 if initial_capital > 0 else 0.0,
+            short_profit_factor=_pf(short_gp, short_gl),
+            short_avg_win=_safe_mean(short_win_pnls),
+            short_avg_win_value=_safe_mean(short_win_pnls),
+            short_avg_win_pct=_safe_mean(short_win_pnl_pcts),
+            short_avg_loss=_safe_mean([p for p in short_pnls if p < 0]),
+            short_avg_loss_value=_safe_mean([p for p in short_pnls if p < 0]),
+            short_commission=short_comm_sum,
+            short_payoff_ratio=_payoff_short,
+            short_expectancy=_expectancy(short_pnls),
+            short_max_consec_wins=short_max_cw,
+            short_max_consec_losses=short_max_cl,
+            avg_bars_in_short=_safe_mean(short_bars_list),
+            avg_bars_in_winning_short=_safe_mean(short_win_bars),
+            avg_bars_in_losing_short=_safe_mean(short_loss_bars),
+        )
+
+    def _generate_signals(self, input_data: BacktestInput, df: pd.DataFrame) -> np.ndarray:
+        """Generate trading signals based on strategy."""
+        signals = np.zeros(len(df))
+
+        # Use strategy signals if provided
+        if hasattr(input_data, "signals") and input_data.signals is not None:
+            return input_data.signals
+
+        # Default: Simple RSI strategy for demonstration
+        params: dict[str, Any] = getattr(input_data, "strategy_params", None) or {}
+        strategy_type = params.get("strategy_type", "rsi")
+
+        if strategy_type == "rsi":
+            signals = self._generate_rsi_signals(df, params)
+
+        return signals
+
+    def _generate_rsi_signals(self, df: pd.DataFrame, params: dict) -> np.ndarray:
+        """Generate RSI-based signals."""
+        signals = np.zeros(len(df))
+
+        period = params.get("period", 14)
+        overbought = params.get("overbought", 70)
+        oversold = params.get("oversold", 30)
+
+        close = df["close"].values
+
+        # Calculate RSI
+        delta = np.diff(close, prepend=close[0])
+        gain = np.where(delta > 0, delta, 0)
+        loss = np.where(delta < 0, -delta, 0)
+
+        # Use EMA for smoothing
+        alpha = 1.0 / period
+        avg_gain = np.zeros(len(close))
+        avg_loss = np.zeros(len(close))
+
+        avg_gain[period] = np.mean(gain[1 : period + 1])
+        avg_loss[period] = np.mean(loss[1 : period + 1])
+
+        for i in range(period + 1, len(close)):
+            avg_gain[i] = alpha * gain[i] + (1 - alpha) * avg_gain[i - 1]
+            avg_loss[i] = alpha * loss[i] + (1 - alpha) * avg_loss[i - 1]
+
+        rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
+        rsi = 100 - (100 / (1 + rs))
+
+        # Generate signals
+        for i in range(period + 1, len(df)):
+            if rsi[i - 1] < oversold and rsi[i] >= oversold:
+                signals[i] = 1  # Long signal
+            elif rsi[i - 1] > overbought and rsi[i] <= overbought:
+                signals[i] = -1  # Short signal
+
+        return signals
+
+    def _open_dca_position(self, bar_index: int, price: float, direction: str) -> None:
+        """Open a new DCA position with grid orders."""
+        # Calculate grid orders
+        orders = DCAGridCalculator.calculate_grid_orders(self.grid_config, price, direction)
+
+        # Partial grid logic:
+        #   partial=1  → place ALL grid orders immediately (classic DCA: all levels visible)
+        #   partial=2+ → place only N unfilled orders at a time (activate more after each fill)
+        partial = max(1, self.grid_config.partial_grid_orders)
+        if partial == 1:
+            # All orders active at once
+            for order in orders:
+                order.active_in_grid = True
+        else:
+            # Only mark first `partial` unfilled orders as active.
+            # Order 0 will be immediately filled, so we need partial+1 active
+            # to ensure `partial` orders remain visible in the grid after entry.
+            for i, order in enumerate(orders):
+                order.active_in_grid = i < (partial + 1)
+
+        # Fill the first order immediately (market entry)
+        orders[0].filled = True
+        orders[0].fill_time = bar_index
+        orders[0].fill_price = price
+
+        # Initialize grid pullback and grid trailing tracking from current price
+        self._pullback_base_price = price
+        self._trailing_grid_base_price = price
+
+        # Initialize position
+        self.position = DCAPosition(
+            direction=direction,
+            is_open=True,
+            orders=orders,
+            active_orders_count=1,
+            total_size_coins=orders[0].size_coins,
+            total_cost_usd=orders[0].size_usd,
+            # Notional = coins × fill_price (leveraged volume)
+            total_notional_usd=orders[0].size_coins * price,
+            average_entry_price=price,
+            entry_bar=bar_index,
+            last_order_bar=bar_index,
+        )
+
+        # Reset breakeven state for new position
+        self._breakeven_active = False
+        self._breakeven_sl_price = 0.0
+
+        # Reset trailing stop for new position
+        self._trailing_state.reset()
+
+        # Set ATR-based TP/SL prices at entry
+        self._atr_tp_price = None
+        self._atr_sl_price = None
+        if self._atr_enabled and self._atr_values is not None and bar_index < len(self._atr_values):
+            atr = float(self._atr_values[bar_index])
+            if atr > 0:
+                if direction == "long":
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = price + atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = price - atr * self._atr_sl_multiplier
+                else:
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = price - atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = price + atr * self._atr_sl_multiplier
+
+        # Reset multi-TP state for new position
+        self.position.tp_hit = [False, False, False, False]
+        self.position.remaining_size_percent = 100.0
+
+        self.total_orders_filled += 1
+
+    def _process_open_position(self, bar_index: int, high: float, low: float, close: float, equity: float) -> float:
+        """Process open position: check for DCA fills, TPs, SL."""
+
+        any_active_unfilled = any(not o.filled and o.active_in_grid for o in self.position.orders)
+
+        # Grid trailing (priority over pullback when enabled):
+        # if price moves in the FAVORABLE direction by grid_trailing_percent%,
+        # shift unfilled orders to trail the price.
+        if self.grid_config.grid_trailing_percent > 0 and self._trailing_grid_base_price > 0:
+            trailing_threshold = self.grid_config.grid_trailing_percent / 100.0
+            if any_active_unfilled:
+                if self.position.direction == "long":
+                    favorable_move = (close - self._trailing_grid_base_price) / self._trailing_grid_base_price
+                else:
+                    favorable_move = (self._trailing_grid_base_price - close) / self._trailing_grid_base_price
+                if favorable_move >= trailing_threshold:
+                    self._shift_grid_to_price(close)
+                    self._trailing_grid_base_price = close
+                    self._pullback_base_price = close  # sync so pullback also resets
+
+        # Grid pullback (only when grid trailing is NOT active):
+        # if price moves away from base in any direction by grid_pullback_percent%, shift grid.
+        elif self.grid_config.grid_pullback_percent > 0 and self._pullback_base_price > 0:
+            pullback_threshold = self.grid_config.grid_pullback_percent / 100.0
+            price_move = abs(close - self._pullback_base_price) / self._pullback_base_price
+            if price_move >= pullback_threshold and any_active_unfilled:
+                self._shift_grid_to_price(close)
+                self._pullback_base_price = close
+
+        # Check for new DCA order fills
+        for order in self.position.orders:
+            if not order.filled and self._should_fill_order(order, high, low):
+                self._fill_dca_order(order, bar_index)
+
+        # Update position state
+        self._update_position_state(close)
+
+        # Check safety close (drawdown)
+        if self._should_safety_close():
+            return self._close_position(bar_index, close, ExitReason.STOP_LOSS)
+
+        # Check Close Conditions (Session 5.5)
+        close_reason = self._check_close_conditions(bar_index, close)
+        if close_reason is not None:
+            return self._close_position(bar_index, close, close_reason)
+
+        # Check Take Profits
+        if self.multi_tp.enabled:
+            result = self._check_multi_tp(bar_index, high, low, close)
+            if result is not None:
+                return result
+        else:
+            # ATR TP check (takes precedence over fixed TP when ATR mode enabled)
+            if self._atr_tp_price is not None:
+                if (self.position.direction == "long" and high >= self._atr_tp_price) or (
+                    self.position.direction == "short" and low <= self._atr_tp_price
+                ):
+                    return self._close_position(bar_index, self._atr_tp_price, ExitReason.ATR_TP)
+            elif self._check_single_tp(high, low):
+                # Single fixed TP check (only when not in ATR mode)
+                return self._close_position(bar_index, close, ExitReason.TAKE_PROFIT)
+
+        # Breakeven: activate when profit reaches threshold (use best price in bar)
+        if self._breakeven_enabled and not self._breakeven_active:
+            sl_base = self._get_sl_base_price()
+            if sl_base > 0:
+                if self.position.direction == "long":
+                    profit_pct = (high - sl_base) / sl_base
+                else:
+                    profit_pct = (sl_base - low) / sl_base
+                if profit_pct >= self._breakeven_activation_pct:
+                    self._breakeven_active = True
+                    if self.position.direction == "long":
+                        self._breakeven_sl_price = sl_base * (1.0 + self._breakeven_offset)
+                    else:
+                        self._breakeven_sl_price = sl_base * (1.0 - self._breakeven_offset)
+
+        # Trailing stop (checked before fixed SL, after breakeven activation)
+        if self._trailing_activation_pct > 0 and self._trailing_distance_pct > 0:
+            sl_base = self._get_sl_base_price()
+            if sl_base > 0:
+                if self.position.direction == "long":
+                    ts_price = self._trailing_state.update_long(
+                        high, sl_base, self._trailing_activation_pct, self._trailing_distance_pct
+                    )
+                    if ts_price is not None and low <= ts_price:
+                        exit_price = max(low, min(high, ts_price))
+                        return self._close_position(bar_index, exit_price, ExitReason.TRAILING_STOP)
+                else:
+                    ts_price = self._trailing_state.update_short(
+                        low, sl_base, self._trailing_activation_pct, self._trailing_distance_pct
+                    )
+                    if ts_price is not None and high >= ts_price:
+                        exit_price = max(low, min(high, ts_price))
+                        return self._close_position(bar_index, exit_price, ExitReason.TRAILING_STOP)
+
+        # Check SL: breakeven SL takes precedence when active, else ATR SL, else config SL
+        if self._breakeven_active and self._breakeven_sl_price > 0:
+            if self.position.direction == "long" and low <= self._breakeven_sl_price:
+                exit_price = max(low, min(high, self._breakeven_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.BREAKEVEN_SL)
+            if self.position.direction == "short" and high >= self._breakeven_sl_price:
+                exit_price = max(low, min(high, self._breakeven_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.BREAKEVEN_SL)
+        elif self._atr_sl_price is not None:
+            # ATR-based SL
+            if (self.position.direction == "long" and low <= self._atr_sl_price) or (
+                self.position.direction == "short" and high >= self._atr_sl_price
+            ):
+                exit_price = max(low, min(high, self._atr_sl_price))
+                return self._close_position(bar_index, exit_price, ExitReason.ATR_SL)
+        elif self._stop_loss_pct is not None and self._stop_loss_pct > 0 and self._check_config_stop_loss(high, low):
+            return self._close_position(bar_index, close, ExitReason.STOP_LOSS)
+
+        # Return current realized equity; unrealized PnL will be added in the main loop
+        return self._realized_equity
+
+    def _should_fill_order(self, order: DCAOrder, high: float, low: float) -> bool:
+        """Check if a DCA order should be filled (must be active in grid)."""
+        if not order.active_in_grid:
+            return False
+        if self.position.direction == "long":
+            return low <= order.price
+        else:
+            return high >= order.price
+
+    def _fill_dca_order(self, order: DCAOrder, bar_index: int) -> None:
+        """Fill a DCA order and update position."""
+        order.filled = True
+        order.fill_time = bar_index
+        order.fill_price = order.price
+
+        # Update position
+        self.position.total_cost_usd += order.size_usd
+        self.position.total_size_coins += order.size_coins
+        # Notional = coins × fill_price for this order
+        self.position.total_notional_usd += order.size_coins * order.price
+        self.position.active_orders_count += 1
+        self.position.last_order_bar = bar_index
+
+        # Recalculate average entry price: total_notional / total_coins
+        if self.position.total_size_coins > 0:
+            self.position.average_entry_price = self.position.total_notional_usd / self.position.total_size_coins
+
+        self.total_orders_filled += 1
+        # Track how many grid orders have been filled in this position (entry=1, first DCA=2, ...)
+        self.position.orders_filled_count += 1
+
+        # Recalculate ATR-based TP/SL prices based on updated average entry price
+        if self._atr_enabled and self._atr_values is not None and self.position.total_size_coins > 0:
+            atr_bar = min(bar_index, len(self._atr_values) - 1)
+            atr = float(self._atr_values[atr_bar])
+            if atr > 0:
+                avg = self.position.average_entry_price
+                if self.position.direction == "long":
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = avg + atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = avg - atr * self._atr_sl_multiplier
+                else:
+                    if self._atr_tp_multiplier > 0:
+                        self._atr_tp_price = avg - atr * self._atr_tp_multiplier
+                    if self._atr_sl_multiplier > 0:
+                        self._atr_sl_price = avg + atr * self._atr_sl_multiplier
+
+        # Partial grid: after filling an order, activate the next unfilled N orders
+        partial = max(1, self.grid_config.partial_grid_orders)
+        if partial > 1:
+            # Count currently active (unfilled) orders
+            currently_active = sum(1 for o in self.position.orders if not o.filled and o.active_in_grid)
+            # Activate more orders to keep `partial` active unfilled orders in grid
+            needed = partial - currently_active
+            if needed > 0:
+                for o in self.position.orders:
+                    if needed <= 0:
+                        break
+                    if not o.filled and not o.active_in_grid:
+                        o.active_in_grid = True
+                        needed -= 1
+
+    def _shift_grid_to_price(self, new_base_price: float) -> None:
+        """Shift all unfilled grid orders to a new base price (grid pullback).
+
+        Recalculates the price levels of all unfilled orders relative to the
+        new base price, preserving the original step distribution.
+        """
+        if not self.position.is_open:
+            return
+
+        direction = self.position.direction
+        unfilled_orders = [o for o in self.position.orders if not o.filled]
+        if not unfilled_orders:
+            return
+
+        # Re-calculate prices for unfilled orders preserving relative step distribution
+        # Collect original relative offsets (as fraction of grid_size_percent)
+        total_grid_fraction = self.grid_config.grid_size_percent / 100.0
+        step = total_grid_fraction / max(len(self.position.orders) - 1, 1)
+        for i, order in enumerate(unfilled_orders, start=1):
+            if direction == "long":
+                order.price = new_base_price * (1.0 - step * i)
+            else:
+                order.price = new_base_price * (1.0 + step * i)
+
+    def _update_position_state(self, current_price: float) -> None:
+        """Update position PnL and statistics."""
+        if not self.position.is_open:
+            return
+
+        # Calculate unrealized PnL
+        if self.position.direction == "long":
+            price_diff = current_price - self.position.average_entry_price
+        else:
+            price_diff = self.position.average_entry_price - current_price
+
+        self.position.unrealized_pnl = price_diff * self.position.total_size_coins
+
+        if self.position.total_cost_usd > 0:
+            self.position.unrealized_pnl_percent = self.position.unrealized_pnl / self.position.total_cost_usd * 100
+
+        # Update MFE/MAE
+        if self.position.unrealized_pnl > self.position.max_favorable_excursion:
+            self.position.max_favorable_excursion = self.position.unrealized_pnl
+        if self.position.unrealized_pnl < -self.position.max_adverse_excursion:
+            self.position.max_adverse_excursion = abs(self.position.unrealized_pnl)
+
+    def _should_safety_close(self) -> bool:
+        """Check if we should close due to drawdown."""
+        if not self.grid_config.close_on_drawdown:
+            return False
+
+        drawdown = -self.position.unrealized_pnl
+
+        # Check percentage threshold
+        if self.grid_config.drawdown_threshold_percent > 0:
+            drawdown_percent = drawdown / self.position.total_cost_usd * 100
+            if drawdown_percent >= self.grid_config.drawdown_threshold_percent:
+                return True
+
+        # Check absolute threshold
+        return self.grid_config.drawdown_threshold_amount > 0 and drawdown >= self.grid_config.drawdown_threshold_amount
+
+    def _check_single_tp(self, high: float, low: float) -> bool:
+        """Check single take profit from BacktestConfig (take_profit field)."""
+        # Only close if a TP percent was explicitly configured
+        if self._take_profit_pct is None or self._take_profit_pct <= 0:
+            return False
+        if self.multi_tp.enabled:
+            # multi_tp path handles its own checks; single check not needed
+            return False
+
+        tp_percent = self._take_profit_pct
+
+        if self.position.direction == "long":
+            tp_price = self.position.average_entry_price * (1 + tp_percent)
+            return high >= tp_price
+        else:
+            tp_price = self.position.average_entry_price * (1 - tp_percent)
+            return low <= tp_price
+
+    def _get_sl_base_price(self) -> float:
+        """Return the price to use as SL base depending on _sl_type.
+
+        - "average_price" (default): use weighted average entry price of all filled orders.
+        - "last_order": use the fill_price of the most-recently filled DCA order.
+          Falls back to average_entry_price if no filled orders are found.
+        """
+        if self._sl_type == "last_order":
+            filled = [o for o in self.position.orders if o.filled]
+            if filled:
+                # Sort by fill_time (ascending), take the last one
+                last = max(
+                    filled,
+                    key=lambda o: (
+                        o.fill_time if o.fill_time is not None else 0,
+                        o.level,
+                    ),
+                )
+                p = last.fill_price if last.fill_price and last.fill_price > 0 else last.price
+                if p > 0:
+                    return p
+        return self.position.average_entry_price
+
+    def _check_config_stop_loss(self, high: float, low: float) -> bool:
+        """Check stop loss from BacktestConfig (stop_loss field, fraction e.g. 0.015)."""
+        if self._stop_loss_pct is None or self._stop_loss_pct <= 0:
+            return False
+        sl_base = self._get_sl_base_price()
+        if self.position.direction == "long":
+            sl_price = sl_base * (1 - self._stop_loss_pct)
+            return low <= sl_price
+        else:
+            sl_price = sl_base * (1 + self._stop_loss_pct)
+            return high >= sl_price
+
+    def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> float | None:
+        """Check multi-level take profits and execute partial closes.
+
+        Returns realized equity after last partial/full close, or None if no TP triggered.
+        """
+        mtp = self.multi_tp
+        pos = self.position
+        direction = pos.direction
+
+        # Build TP levels: (tp_pct_decimal, tp_close_pct_of_original, level_index)
+        tp_levels = [
+            (mtp.tp1_percent / 100.0, mtp.tp1_close_percent),
+            (mtp.tp2_percent / 100.0, mtp.tp2_close_percent),
+            (mtp.tp3_percent / 100.0, mtp.tp3_close_percent),
+            (mtp.tp4_percent / 100.0, mtp.tp4_close_percent),
+        ]
+        n_levels = min(mtp.tp_count, 4)
+
+        any_triggered = False
+        for idx in range(n_levels):
+            if pos.tp_hit[idx]:
+                continue  # already hit
+
+            tp_pct, close_pct_of_original = tp_levels[idx]
+            avg = pos.average_entry_price
+            if avg <= 0:
+                continue
+
+            # Calculate TP price
+            if direction == "long":
+                tp_price = avg * (1 + tp_pct)
+                tp_hit = high >= tp_price
+            else:
+                tp_price = avg * (1 - tp_pct)
+                tp_hit = low <= tp_price
+
+            if not tp_hit:
+                continue
+
+            pos.tp_hit[idx] = True
+            any_triggered = True
+
+            # Determine if this is the last level (or close_remaining_at_last applies)
+            is_last = idx == n_levels - 1
+            remaining_after = pos.remaining_size_percent - close_pct_of_original
+            is_last_or_empty = is_last or (mtp.close_remaining_at_last and remaining_after <= 0.0)
+
+            if is_last_or_empty:
+                # Full close of remaining position
+                return self._close_position(bar_index, tp_price, ExitReason.TAKE_PROFIT)
+            else:
+                # Partial close: close_pct_of_original% of the original position
+                # fraction of CURRENT remaining = close_pct_of_original / remaining_size_percent
+                if pos.remaining_size_percent > 0:
+                    fraction = min(close_pct_of_original / pos.remaining_size_percent, 1.0)
+                    self._partial_close_position(bar_index, tp_price, fraction)
+                    pos.remaining_size_percent = max(0.0, remaining_after)
+
+        return self._realized_equity if any_triggered else None
+
+    def _partial_close_position(self, bar_index: int, exit_price: float, fraction: float) -> None:
+        """Close a fraction of the current position and record a partial trade.
+
+        Args:
+            bar_index: Current bar index
+            exit_price: Price at which to close the partial position
+            fraction: Fraction of the CURRENT remaining position to close (0.0–1.0)
+        """
+        if not self.position.is_open or fraction <= 0:
+            return
+
+        fraction = min(fraction, 1.0)
+        pos = self.position
+
+        # Coins and notional being closed
+        coins_to_close = pos.total_size_coins * fraction
+        notional_to_close = pos.total_notional_usd * fraction  # entry notional fraction
+        cost_to_close = pos.total_cost_usd * fraction  # margin fraction
+
+        # Gross PnL for this portion
+        if pos.direction == "long":
+            pnl_gross = (exit_price - pos.average_entry_price) * coins_to_close
+        else:
+            pnl_gross = (pos.average_entry_price - exit_price) * coins_to_close
+
+        # Commission: entry + exit (both as taker fee on notional)
+        entry_commission = notional_to_close * self._taker_fee
+        exit_commission = exit_price * coins_to_close * self._taker_fee
+        total_commission = entry_commission + exit_commission
+        pnl_net = pnl_gross - total_commission
+
+        # Record partial trade
+        trade = DCATradeRecord(
+            entry_bar_idx=pos.entry_bar,
+            exit_bar_idx=bar_index,
+            entry_price=pos.average_entry_price,
+            exit_price=exit_price,
+            direction=TradeDirection.LONG if pos.direction == "long" else TradeDirection.SHORT,
+            position_size=coins_to_close,
+            pnl=pnl_net,
+            pnl_pct=(pnl_net / cost_to_close * 100) if cost_to_close > 0 else 0.0,
+            exit_reason=ExitReason.TAKE_PROFIT,
+            commission=total_commission,
+            mfe=pos.max_favorable_excursion,
+            mae=pos.max_adverse_excursion,
+            bars_held=bar_index - pos.entry_bar,
+            orders_filled_count=pos.orders_filled_count,
+            avg_entry_price=pos.average_entry_price,
+            total_size_usd=notional_to_close,
+            total_size_coins=coins_to_close,
+        )
+        self.trades.append(trade)
+
+        # Update realized equity
+        self._realized_equity += pnl_net
+
+        # Reduce position size (remaining fraction stays open)
+        pos.total_size_coins *= 1.0 - fraction
+        pos.total_cost_usd *= 1.0 - fraction
+        pos.total_notional_usd *= 1.0 - fraction
+
+    # =========================================================================
+    # CLOSE CONDITIONS (Session 5.5)
+    # =========================================================================
+
+    def _check_close_conditions(self, bar_index: int, close: float) -> ExitReason | None:
+        """
+        Check all enabled close conditions.
+
+        Returns ExitReason if any condition triggers, None otherwise.
+        """
+        cc = self.close_conditions
+
+        # Check profit filter
+        profit_percent = self.position.unrealized_pnl_percent
+
+        # Time/Bars Close
+        if cc.time_bars_close_enable:
+            bars_in_trade = bar_index - self.position.entry_bar
+            if bars_in_trade >= cc.close_after_bars and (
+                not cc.close_only_profit or profit_percent >= cc.close_min_profit
+            ):
+                return ExitReason.TIME_EXIT
+            # Force close at max bars
+            if bars_in_trade >= cc.close_max_bars:
+                return ExitReason.TIME_EXIT
+
+        # RSI Close
+        if cc.rsi_close_enable and self._rsi_cache is not None and self._check_rsi_close(bar_index, profit_percent):
+            return ExitReason.RSI_CLOSE
+
+        # Stochastic Close
+        if (
+            cc.stoch_close_enable
+            and self._stoch_k_cache is not None
+            and self._check_stoch_close(bar_index, profit_percent)
+        ):
+            return ExitReason.STOCH_CLOSE
+
+        # Channel Close
+        if cc.channel_close_enable and self._check_channel_close(bar_index, close, profit_percent):
+            return ExitReason.CHANNEL_CLOSE
+
+        # MA Close
+        if (
+            cc.ma_close_enable
+            and self._ma1_cache is not None
+            and self._ma2_cache is not None
+            and self._check_ma_close(bar_index, profit_percent)
+        ):
+            return ExitReason.MA_CLOSE
+
+        # PSAR Close
+        if (
+            cc.psar_close_enable
+            and self._psar_cache is not None
+            and self._check_psar_close(bar_index, close, profit_percent)
+        ):
+            return ExitReason.PSAR_CLOSE
+
+        return None
+
+    def _check_rsi_close(self, bar_index: int, profit_percent: float) -> bool:
+        """Check RSI close conditions."""
+        assert self._rsi_cache is not None  # Caller guarantees this
+        cc = self.close_conditions
+
+        # Profit filter
+        if cc.rsi_close_only_profit and profit_percent < cc.rsi_close_min_profit:
+            return False
+
+        rsi = self._rsi_cache[bar_index] if bar_index < len(self._rsi_cache) else 50
+        prev_rsi = self._rsi_cache[bar_index - 1] if bar_index > 0 and bar_index - 1 < len(self._rsi_cache) else 50
+
+        if self.position.direction == "long":
+            # Reach mode
+            if cc.rsi_close_reach_enable and (rsi > cc.rsi_close_reach_long_more or rsi < cc.rsi_close_reach_long_less):
+                return True
+            # Cross mode
+            if (
+                cc.rsi_close_cross_enable
+                and prev_rsi >= cc.rsi_close_cross_long_level
+                and rsi < cc.rsi_close_cross_long_level
+            ):
+                return True
+        else:  # short
+            if cc.rsi_close_reach_enable and (
+                rsi > cc.rsi_close_reach_short_more or rsi < cc.rsi_close_reach_short_less
+            ):
+                return True
+            if (
+                cc.rsi_close_cross_enable
+                and prev_rsi <= cc.rsi_close_cross_short_level
+                and rsi > cc.rsi_close_cross_short_level
+            ):
+                return True
+
+        return False
+
+    def _check_stoch_close(self, bar_index: int, profit_percent: float) -> bool:
+        """Check Stochastic close conditions."""
+        assert self._stoch_k_cache is not None  # Caller guarantees this
+        cc = self.close_conditions
+
+        if cc.stoch_close_only_profit and profit_percent < cc.stoch_close_min_profit:
+            return False
+
+        stoch_k = self._stoch_k_cache[bar_index] if bar_index < len(self._stoch_k_cache) else 50
+
+        if self.position.direction == "long":
+            if cc.stoch_close_reach_enable and stoch_k > cc.stoch_close_reach_long_more:
+                return True
+        else:
+            if cc.stoch_close_reach_enable and stoch_k < cc.stoch_close_reach_short_less:
+                return True
+
+        return False
+
+    def _check_channel_close(self, bar_index: int, close: float, profit_percent: float) -> bool:
+        """Check Keltner/Bollinger channel close conditions."""
+        cc = self.close_conditions
+
+        if cc.channel_close_type == "Keltner":
+            upper = (
+                self._keltner_upper_cache[bar_index]
+                if self._keltner_upper_cache is not None and bar_index < len(self._keltner_upper_cache)
+                else float("inf")
+            )
+            lower = (
+                self._keltner_lower_cache[bar_index]
+                if self._keltner_lower_cache is not None and bar_index < len(self._keltner_lower_cache)
+                else 0
+            )
+        else:  # Bollinger
+            upper = (
+                self._bb_upper_cache[bar_index]
+                if self._bb_upper_cache is not None and bar_index < len(self._bb_upper_cache)
+                else float("inf")
+            )
+            lower = (
+                self._bb_lower_cache[bar_index]
+                if self._bb_lower_cache is not None and bar_index < len(self._bb_lower_cache)
+                else 0
+            )
+
+        if cc.channel_close_band == "Breakout":
+            if self.position.direction == "long":
+                return close >= upper
+            else:
+                return close <= lower
+        else:  # Rebound
+            if self.position.direction == "long":
+                return close <= lower
+            else:
+                return close >= upper
+
+    def _check_ma_close(self, bar_index: int, profit_percent: float) -> bool:
+        """Check Two MAs cross close conditions."""
+        assert self._ma1_cache is not None  # Caller guarantees this
+        assert self._ma2_cache is not None  # Caller guarantees this
+        cc = self.close_conditions
+
+        if cc.ma_close_only_profit and profit_percent < cc.ma_close_min_profit:
+            return False
+
+        ma1 = self._ma1_cache[bar_index] if bar_index < len(self._ma1_cache) else 0
+        ma2 = self._ma2_cache[bar_index] if bar_index < len(self._ma2_cache) else 0
+        prev_ma1 = self._ma1_cache[bar_index - 1] if bar_index > 0 and bar_index - 1 < len(self._ma1_cache) else 0
+        prev_ma2 = self._ma2_cache[bar_index - 1] if bar_index > 0 and bar_index - 1 < len(self._ma2_cache) else 0
+
+        if self.position.direction == "long":
+            # Close long when fast MA crosses below slow MA
+            if prev_ma1 >= prev_ma2 and ma1 < ma2:
+                return True
+        else:
+            # Close short when fast MA crosses above slow MA
+            if prev_ma1 <= prev_ma2 and ma1 > ma2:
+                return True
+
+        return False
+
+    def _check_psar_close(self, bar_index: int, close: float, profit_percent: float) -> bool:
+        """Check Parabolic SAR close conditions."""
+        assert self._psar_cache is not None  # Caller guarantees this
+        cc = self.close_conditions
+
+        if cc.psar_close_only_profit and profit_percent < cc.psar_close_min_profit:
+            return False
+
+        psar = self._psar_cache[bar_index] if bar_index < len(self._psar_cache) else 0
+
+        if self.position.direction == "long":
+            # Close long when price crosses below PSAR
+            return close < psar
+        else:
+            # Close short when price crosses above PSAR
+            return close > psar
+
+    def _extract_close_indicator_cache(self) -> dict:
+        """Extract current close-condition indicator caches as a plain dict.
+
+        Call this *after* ``_precompute_close_condition_indicators`` to snapshot
+        the computed arrays so they can be re-injected into other DCAEngine
+        instances (e.g. during grid-search where OHLCV never changes).
+
+        Returns:
+            Dict with cache arrays (values may be None if indicator is disabled).
+        """
+        return {
+            "_rsi_cache": self._rsi_cache,
+            "_stoch_k_cache": self._stoch_k_cache,
+            "_stoch_d_cache": self._stoch_d_cache,
+            "_ma1_cache": self._ma1_cache,
+            "_ma2_cache": self._ma2_cache,
+            "_psar_cache": self._psar_cache,
+            "_bb_upper_cache": self._bb_upper_cache,
+            "_bb_lower_cache": self._bb_lower_cache,
+            "_keltner_upper_cache": self._keltner_upper_cache,
+            "_keltner_lower_cache": self._keltner_lower_cache,
+        }
+
+    def _inject_close_indicator_cache(self, cache: dict) -> None:
+        """Inject pre-computed close-condition indicator caches.
+
+        Allows the optimization loop to compute indicators once and reuse
+        them across all trials that share the same OHLCV and close_conditions.
+        When this is called, ``_precompute_close_condition_indicators`` will be
+        skipped inside ``run_from_config`` (the flag is set here).
+
+        Args:
+            cache: Dict returned by ``_extract_close_indicator_cache``.
+        """
+        for attr, value in cache.items():
+            setattr(self, attr, value)
+        # Signal that pre-computation is already done — skip it in run_from_config
+        self._close_indicators_precomputed = True
+
+    def _precompute_close_condition_indicators(self, df: pd.DataFrame) -> None:
+        """Pre-compute all indicators needed for close conditions."""
+        # Fast path: already injected from cache (optimization loop)
+        if getattr(self, "_close_indicators_precomputed", False):
+            return
+
+        cc = self.close_conditions
+        close = df["close"].values
+        high = df["high"].values
+        low = df["low"].values
+
+        # RSI
+        if cc.rsi_close_enable:
+            self._rsi_cache = self._calculate_rsi(close, cc.rsi_close_length)
+
+        # Stochastic
+        if cc.stoch_close_enable:
+            self._stoch_k_cache, self._stoch_d_cache = self._calculate_stochastic(
+                high, low, close, cc.stoch_close_k_length, cc.stoch_close_k_smooth, cc.stoch_close_d_smooth
+            )
+
+        # Moving Averages
+        if cc.ma_close_enable:
+            self._ma1_cache = self._calculate_ma(close, cc.ma_close_ma1_length, cc.ma_close_ma1_type)
+            self._ma2_cache = self._calculate_ma(close, cc.ma_close_ma2_length, cc.ma_close_ma2_type)
+
+        # Channels
+        if cc.channel_close_enable:
+            if cc.channel_close_type == "Keltner":
+                self._keltner_upper_cache, self._keltner_lower_cache = self._calculate_keltner(
+                    high, low, close, cc.channel_close_keltner_length, cc.channel_close_keltner_mult
+                )
+            else:
+                self._bb_upper_cache, self._bb_lower_cache = self._calculate_bollinger(
+                    close, cc.channel_close_bb_length, cc.channel_close_bb_deviation
+                )
+
+        # PSAR
+        if cc.psar_close_enable:
+            self._psar_cache = self._calculate_psar(
+                high, low, cc.psar_close_start, cc.psar_close_increment, cc.psar_close_maximum
+            )
+
+    def _calculate_rsi(self, close: np.ndarray, period: int) -> np.ndarray:
+        """Calculate RSI indicator."""
+        delta = np.diff(close, prepend=close[0])
+        gains = np.where(delta > 0, delta, 0)
+        losses = np.where(delta < 0, -delta, 0)
+
+        avg_gain = np.zeros_like(close)
+        avg_loss = np.zeros_like(close)
+
+        # Initial SMA
+        if len(close) > period:
+            avg_gain[period] = np.mean(gains[1 : period + 1])
+            avg_loss[period] = np.mean(losses[1 : period + 1])
+
+            # EMA-style smoothing
+            for i in range(period + 1, len(close)):
+                avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i]) / period
+                avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i]) / period
+
+        rs = np.where(avg_loss != 0, avg_gain / avg_loss, 0)
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+    def _calculate_stochastic(
+        self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int, k_smooth: int, d_smooth: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate Stochastic %K and %D."""
+        stoch_k = np.zeros_like(close)
+        for i in range(k_period - 1, len(close)):
+            highest_high = np.max(high[i - k_period + 1 : i + 1])
+            lowest_low = np.min(low[i - k_period + 1 : i + 1])
+            if highest_high != lowest_low:
+                stoch_k[i] = 100 * (close[i] - lowest_low) / (highest_high - lowest_low)
+            else:
+                stoch_k[i] = 50
+
+        # Smooth %K
+        if k_smooth > 1:
+            stoch_k = self._sma(stoch_k, k_smooth)
+
+        # %D is SMA of %K
+        stoch_d = self._sma(stoch_k, d_smooth)
+
+        return stoch_k, stoch_d
+
+    def _calculate_ma(self, data: np.ndarray, period: int, ma_type: str) -> np.ndarray:
+        """Calculate moving average of specified type."""
+        if ma_type == "SMA":
+            return self._sma(data, period)
+        elif ma_type == "EMA":
+            return self._ema(data, period)
+        elif ma_type == "WMA":
+            return self._wma(data, period)
+        else:
+            return self._ema(data, period)  # Default to EMA
+
+    def _calculate_keltner(
+        self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int, mult: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate Keltner Channel."""
+        basis = self._ema(close, period)
+        tr = np.maximum(high - low, np.maximum(np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))))
+        atr = self._ema(tr, period)
+        upper = basis + mult * atr
+        lower = basis - mult * atr
+        return upper, lower
+
+    def _calculate_bollinger(self, close: np.ndarray, period: int, deviation: float) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate Bollinger Bands."""
+        basis = self._sma(close, period)
+        std = np.zeros_like(close)
+        for i in range(period - 1, len(close)):
+            std[i] = np.std(close[i - period + 1 : i + 1])
+        upper = basis + deviation * std
+        lower = basis - deviation * std
+        return upper, lower
+
+    def _calculate_psar(
+        self, high: np.ndarray, low: np.ndarray, start: float, increment: float, maximum: float
+    ) -> np.ndarray:
+        """Calculate Parabolic SAR."""
+        length = len(high)
+        psar = np.zeros(length)
+        af = start
+        ep = low[0]
+        is_long = True
+        psar[0] = high[0]
+
+        for i in range(1, length):
+            if is_long:
+                psar[i] = psar[i - 1] + af * (ep - psar[i - 1])
+                psar[i] = min(psar[i], low[i - 1])
+                if i > 1:
+                    psar[i] = min(psar[i], low[i - 2])
+
+                if low[i] < psar[i]:
+                    is_long = False
+                    psar[i] = ep
+                    ep = low[i]
+                    af = start
+                else:
+                    if high[i] > ep:
+                        ep = high[i]
+                        af = min(af + increment, maximum)
+            else:
+                psar[i] = psar[i - 1] + af * (ep - psar[i - 1])
+                psar[i] = max(psar[i], high[i - 1])
+                if i > 1:
+                    psar[i] = max(psar[i], high[i - 2])
+
+                if high[i] > psar[i]:
+                    is_long = True
+                    psar[i] = ep
+                    ep = high[i]
+                    af = start
+                else:
+                    if low[i] < ep:
+                        ep = low[i]
+                        af = min(af + increment, maximum)
+
+        return psar
+
+    def _sma(self, data: np.ndarray, period: int) -> np.ndarray:
+        """Simple Moving Average."""
+        result = np.zeros_like(data)
+        for i in range(period - 1, len(data)):
+            result[i] = np.mean(data[i - period + 1 : i + 1])
+        return result
+
+    def _ema(self, data: np.ndarray, period: int) -> np.ndarray:
+        """Exponential Moving Average."""
+        result = np.zeros_like(data)
+        multiplier = 2 / (period + 1)
+        result[0] = data[0]
+        for i in range(1, len(data)):
+            result[i] = (data[i] - result[i - 1]) * multiplier + result[i - 1]
+        return result
+
+    def _wma(self, data: np.ndarray, period: int) -> np.ndarray:
+        """Weighted Moving Average."""
+        result = np.zeros_like(data)
+        weights = np.arange(1, period + 1)
+        weight_sum = weights.sum()
+        for i in range(period - 1, len(data)):
+            result[i] = np.sum(data[i - period + 1 : i + 1] * weights) / weight_sum
+        return result
+
+    # =========================================================================
+    # INDENT ORDER (Session 5.5)
+    # =========================================================================
+
+    def _create_indent_order(self, bar_index: int, price: float, direction: str) -> None:
+        """
+        Create a pending indent (limit) order.
+
+        Args:
+            bar_index: Current bar index
+            price: Current price (signal price)
+            direction: "long" or "short"
+        """
+        indent_pct = self.indent_order.indent_percent / 100
+        entry_price = price * (1 - indent_pct) if direction == "long" else price * (1 + indent_pct)
+
+        self.pending_indent = PendingIndentOrder(
+            direction=direction,
+            signal_bar=bar_index,
+            signal_price=price,
+            entry_price=entry_price,
+            expires_bar=bar_index + self.indent_order.cancel_after_bars,
+            filled=False,
+        )
+
+    def _check_indent_order_fill(self, bar_index: int, high: float, low: float, close: float, equity: float) -> float:
+        """
+        Check if pending indent order should be filled or cancelled.
+
+        Returns updated equity.
+        """
+        if self.pending_indent is None:
+            return equity
+
+        indent = self.pending_indent
+
+        # Check expiration
+        if bar_index >= indent.expires_bar:
+            self.pending_indent = None
+            return equity
+
+        # Check fill
+        filled = False
+        if indent.direction == "long":
+            # Long indent fills when low reaches entry price
+            if low <= indent.entry_price:
+                filled = True
+        else:
+            # Short indent fills when high reaches entry price
+            if high >= indent.entry_price:
+                filled = True
+
+        if filled:
+            indent.filled = True
+            self._open_dca_position(bar_index, indent.entry_price, indent.direction)
+            self.pending_indent = None
+
+        return equity
+
+    def _close_position(self, bar_index: int, close_price: float, reason: ExitReason) -> float:
+        """Close position and record trade."""
+        if not self.position.is_open:
+            return self._realized_equity
+
+        # Calculate gross PnL (price difference × size)
+        if self.position.direction == "long":
+            pnl_gross = (close_price - self.position.average_entry_price) * self.position.total_size_coins
+        else:
+            pnl_gross = (self.position.average_entry_price - close_price) * self.position.total_size_coins
+
+        # Calculate commission: entry cost + exit cost, both as taker fee on notional
+        # Entry notional = total_notional_usd (sum of size_coins × fill_price for all filled orders)
+        # Exit notional  = close_price × total_size_coins
+        entry_commission = self.position.total_notional_usd * self._taker_fee
+        exit_commission = close_price * self.position.total_size_coins * self._taker_fee
+        total_commission = entry_commission + exit_commission
+        pnl_net = pnl_gross - total_commission
+
+        # Collect filled DCA grid levels
+        filled_grid_levels = [order.price for order in self.position.orders if order.filled and order.active_in_grid]
+
+        # Build per-order fill details for chart rendering (G1=entry, G2..GN=DCA fills)
+        _order_fills: list[dict] = []
+        _fill_level = 1
+        for _o in self.position.orders:
+            if _o.filled:
+                _order_fills.append(
+                    {
+                        "level": _fill_level,
+                        "bar_idx": _o.fill_time if _o.fill_time is not None else self.position.entry_bar,
+                        "price": _o.fill_price if _o.fill_price > 0 else _o.price,
+                        "size_usd": _o.size_usd,
+                    }
+                )
+                _fill_level += 1
+
+        # Planned grid prices for all UNFILLED orders (G2..GN pending lines)
+        _planned_prices: list[float] = [_o.price for _o in self.position.orders if not _o.filled]
+
+        # All G2..GN planned trigger prices (filled + unfilled) for frontend grid line rendering
+        # Index 0 = G2, index 1 = G3, ... (G1 = entry, never included here)
+        _all_grid_prices: list[float] = [_o.price for _o in self.position.orders if _o.order_number >= 2]
+
+        # TP / SL prices based on final avg entry price (for chart horizontal lines)
+        _avg_p = self.position.average_entry_price
+        _is_long = self.position.direction == "long"
+        _tp_price: float | None = None
+        _sl_price: float | None = None
+        if self._take_profit_pct and self._take_profit_pct > 0 and _avg_p > 0:
+            _tp_price = _avg_p * (1 + self._take_profit_pct) if _is_long else _avg_p * (1 - self._take_profit_pct)
+        if self._breakeven_active and self._breakeven_sl_price > 0:
+            _sl_price = self._breakeven_sl_price
+        elif self._stop_loss_pct and self._stop_loss_pct > 0 and _avg_p > 0:
+            # SL reference price depends on _sl_type: average_entry_price or last filled order
+            _sl_base = self._get_sl_base_price()
+            _sl_price = _sl_base * (1 - self._stop_loss_pct) if _is_long else _sl_base * (1 + self._stop_loss_pct)
+
+        # Record trade
+        trade = DCATradeRecord(
+            entry_bar_idx=self.position.entry_bar,
+            exit_bar_idx=bar_index,
+            entry_price=self.position.average_entry_price,
+            exit_price=close_price,
+            direction=TradeDirection.LONG if self.position.direction == "long" else TradeDirection.SHORT,
+            position_size=self.position.total_size_coins,
+            pnl=pnl_net,
+            pnl_pct=(pnl_net / self.position.total_cost_usd * 100) if self.position.total_cost_usd > 0 else 0,
+            exit_reason=reason,
+            commission=total_commission,
+            mfe=self.position.max_favorable_excursion,
+            mae=self.position.max_adverse_excursion,
+            bars_held=bar_index - self.position.entry_bar,
+            orders_filled_count=self.position.orders_filled_count,
+            avg_entry_price=self.position.average_entry_price,
+            total_size_usd=self.position.total_notional_usd,
+            total_size_coins=self.position.total_size_coins,
+            grid_levels=filled_grid_levels,
+            order_fills=_order_fills,
+            planned_grid_prices=_all_grid_prices,
+            tp_price=_tp_price,
+            sl_price=_sl_price,
+        )
+        self.trades.append(trade)
+
+        # Update realized equity: add net PnL (commission already deducted)
+        self._realized_equity += pnl_net
+
+        # Reset position and per-position state
+        self.position = DCAPosition()
+        self._trailing_state.reset()
+        self._atr_tp_price = None
+        self._atr_sl_price = None
+
+        return self._realized_equity
+
+    def _calculate_metrics(self, initial_capital: float, final_equity: float) -> BacktestMetrics:
+        """Calculate backtest performance metrics."""
+        if not self.trades:
+            return BacktestMetrics(
+                total_trades=0,
+                win_rate=0.0,
+                profit_factor=1.0,
+                total_return=0.0,
+                max_drawdown=0.0,
+                sharpe_ratio=0.0,
+                avg_trade=0.0,
+            )
+
+        # Calculate basic metrics
+        total_trades = len(self.trades)
+        winning_trades = [t for t in self.trades if t.pnl > 0]
+        losing_trades = [t for t in self.trades if t.pnl <= 0]
+
+        win_rate = len(winning_trades) / total_trades * 100 if total_trades > 0 else 0
+
+        gross_profit = sum(t.pnl for t in winning_trades)
+        gross_loss = abs(sum(t.pnl for t in losing_trades))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 999.0
+
+        total_return = (final_equity - initial_capital) / initial_capital * 100
+
+        # Calculate drawdown from equity curve
+        equity_array = np.array(self.equity_curve)
+        running_max = np.maximum.accumulate(equity_array)
+        drawdowns = (running_max - equity_array) / running_max
+        max_drawdown = np.max(drawdowns) * 100
+
+        # Simple Sharpe approximation
+        if len(self.equity_curve) > 1:
+            returns = np.diff(self.equity_curve) / self.equity_curve[:-1]
+            if len(returns) > 0 and np.std(returns) > 0:
+                sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
+            else:
+                sharpe = 0.0
+        else:
+            sharpe = 0.0
+
+        avg_pnl = np.mean([t.pnl for t in self.trades])
+
+        return BacktestMetrics(
+            total_trades=total_trades,
+            win_rate=win_rate,
+            profit_factor=profit_factor,
+            total_return=total_return,
+            max_drawdown=max_drawdown,
+            sharpe_ratio=sharpe,
+            avg_trade=float(avg_pnl),
+        )
+
+    def _empty_result(self, reason: str) -> BacktestOutput:
+        """Return empty result with error message."""
+        return BacktestOutput(
+            trades=[],
+            metrics=BacktestMetrics(
+                total_trades=0,
+                win_rate=0.0,
+                profit_factor=1.0,
+                total_return=0.0,
+                max_drawdown=0.0,
+                sharpe_ratio=0.0,
+                avg_trade=0.0,
+            ),
+            equity_curve=np.array([]),
+            execution_time=0.0,
+            engine_name=self.name,
+            is_valid=False,
+            validation_errors=[reason],
+        )

@@ -5,7 +5,7 @@ SQLAlchemy model for storing individual trades from backtests.
 """
 
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -14,6 +14,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -54,9 +55,9 @@ class Trade(Base):
     # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # Foreign key to backtest
+    # Foreign key to backtest (String(36) matches Backtest.id UUID type)
     backtest_id = Column(
-        Integer,
+        String(36),
         ForeignKey("backtests.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -67,18 +68,18 @@ class Trade(Base):
     symbol = Column(String(32), nullable=False, index=True)
 
     # Trade direction and status
-    side = Column(Enum(TradeSide), nullable=False)
-    status = Column(Enum(TradeStatus), default=TradeStatus.CLOSED, nullable=False)
+    side = Column(Enum(TradeSide), nullable=False)  # type: ignore[var-annotated]
+    status = Column(Enum(TradeStatus), default=TradeStatus.CLOSED, nullable=False)  # type: ignore[var-annotated]
 
     # Entry details
     entry_price = Column(Float, nullable=False)
-    entry_time = Column(DateTime(timezone=True), nullable=False)
+    entry_time = Column(DateTime(timezone=True), nullable=False, index=True)
     entry_size = Column(Float, nullable=False)  # Position size in base currency
     entry_value = Column(Float, nullable=True)  # Position value in quote currency
 
     # Exit details
     exit_price = Column(Float, nullable=True)
-    exit_time = Column(DateTime(timezone=True), nullable=True)
+    exit_time = Column(DateTime(timezone=True), nullable=True, index=True)
     exit_size = Column(Float, nullable=True)
     exit_value = Column(Float, nullable=True)
 
@@ -97,7 +98,8 @@ class Trade(Base):
     leverage = Column(Float, default=1.0)
 
     # Trade metrics
-    duration_seconds = Column(Integer, nullable=True)  # Trade duration in seconds
+    # duration_seconds: 0 = trade still open or instant fill; never NULL (default=0)
+    duration_seconds = Column(Integer, nullable=False, default=0)  # Trade duration in seconds
     max_favorable_excursion = Column(Float, nullable=True)  # MFE
     max_adverse_excursion = Column(Float, nullable=True)  # MAE
 
@@ -112,18 +114,20 @@ class Trade(Base):
     # Timestamps
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
+        index=True,
+    )
+
+    __table_args__ = (
+        Index("ix_trades_backtest_created", "backtest_id", "created_at"),
     )
 
     # Relationships
     backtest = relationship("Backtest", back_populates="trade_records")
 
     def __repr__(self) -> str:
-        return (
-            f"<Trade(id={self.id}, symbol={self.symbol}, side={self.side.value}, "
-            f"pnl={self.pnl})>"
-        )
+        return f"<Trade(id={self.id}, symbol={self.symbol}, side={self.side.value}, pnl={self.pnl})>"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses."""
@@ -133,11 +137,7 @@ class Trade(Base):
             "trade_id": self.trade_id,
             "symbol": self.symbol,
             "side": self.side.value if isinstance(self.side, TradeSide) else self.side,
-            "status": (
-                self.status.value
-                if isinstance(self.status, TradeStatus)
-                else self.status
-            ),
+            "status": (self.status.value if isinstance(self.status, TradeStatus) else self.status),
             "entry_price": self.entry_price,
             "entry_time": self.entry_time.isoformat() if self.entry_time else None,
             "entry_size": self.entry_size,
@@ -168,37 +168,35 @@ class Trade(Base):
         """Calculate trade duration in seconds."""
         if self.entry_time and self.exit_time:
             delta = self.exit_time - self.entry_time
-            self.duration_seconds = int(delta.total_seconds())
-            return self.duration_seconds
+            self.duration_seconds = int(delta.total_seconds())  # type: ignore[assignment]
+            return self.duration_seconds  # type: ignore[return-value]
         return None
 
     def calculate_pnl(self) -> float | None:
         """Calculate PnL based on entry/exit prices."""
         if self.entry_price and self.exit_price and self.entry_size:
             if self.side in (TradeSide.BUY, TradeSide.LONG):
-                self.pnl = (self.exit_price - self.entry_price) * self.entry_size
+                self.pnl = (self.exit_price - self.entry_price) * self.entry_size  # type: ignore[assignment]
             else:
-                self.pnl = (self.entry_price - self.exit_price) * self.entry_size
+                self.pnl = (self.entry_price - self.exit_price) * self.entry_size  # type: ignore[assignment]
 
             # Subtract fees
-            self.realized_pnl = self.pnl - (self.fees or 0) - (self.commission or 0)
+            self.realized_pnl = self.pnl - (self.fees or 0) - (self.commission or 0)  # type: ignore[assignment]
 
             # Calculate percentage
             if self.entry_value and self.entry_value > 0:
-                self.pnl_percent = (self.pnl / self.entry_value) * 100
+                self.pnl_percent = (self.pnl / self.entry_value) * 100  # type: ignore[assignment]
 
-            return self.pnl
+            return self.pnl  # type: ignore[return-value]
         return None
 
-    def close(
-        self, exit_price: float, exit_time: datetime, exit_signal: str | None = None
-    ) -> None:
+    def close(self, exit_price: float, exit_time: datetime, exit_signal: str | None = None) -> None:
         """Close the trade."""
-        self.exit_price = exit_price
-        self.exit_time = exit_time
+        self.exit_price = exit_price  # type: ignore[assignment]
+        self.exit_time = exit_time  # type: ignore[assignment]
         self.exit_size = self.entry_size
-        self.exit_value = exit_price * self.entry_size
-        self.exit_signal = exit_signal
-        self.status = TradeStatus.CLOSED
+        self.exit_value = exit_price * self.entry_size  # type: ignore[assignment]
+        self.exit_signal = exit_signal  # type: ignore[assignment]
+        self.status = TradeStatus.CLOSED  # type: ignore[assignment]
         self.calculate_pnl()
         self.calculate_duration()

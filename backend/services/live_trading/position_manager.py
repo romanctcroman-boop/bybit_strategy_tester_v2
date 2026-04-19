@@ -12,11 +12,12 @@ Features:
 """
 
 import asyncio
+import contextlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Callable, Optional
 
 from backend.services.live_trading.bybit_websocket import (
     BybitWebSocketClient,
@@ -51,12 +52,12 @@ class PositionSnapshot:
     realized_pnl: float
     leverage: float
     margin: float
-    liquidation_price: Optional[float]
-    take_profit: Optional[float]
-    stop_loss: Optional[float]
+    liquidation_price: float | None
+    take_profit: float | None
+    stop_loss: float | None
     roe_percent: float = 0.0  # Return on equity
     position_value: float = 0.0
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -89,7 +90,7 @@ class WalletSnapshot:
     used_margin: float
     unrealized_pnl: float
     realized_pnl: float
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def equity(self) -> float:
@@ -202,11 +203,9 @@ class PositionManager:
 
         # State
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
-        logger.info(
-            f"PositionManager initialized (testnet={testnet}, quote={quote_currency})"
-        )
+        logger.info(f"PositionManager initialized (testnet={testnet}, quote={quote_currency})")
 
     async def start(self):
         """Start position tracking."""
@@ -244,10 +243,8 @@ class PositionManager:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         await self._ws_client.disconnect()
         await self._executor.close()
@@ -265,10 +262,7 @@ class PositionManager:
         wallet = await self._executor.get_wallet_balance()
         self._update_wallet_from_api(wallet)
 
-        logger.info(
-            f"Loaded {len(self._positions)} positions, "
-            f"{len(self._wallets)} wallet entries"
-        )
+        logger.info(f"Loaded {len(self._positions)} positions, {len(self._wallets)} wallet entries")
 
     async def _process_messages(self):
         """Process incoming WebSocket messages."""
@@ -325,9 +319,7 @@ class PositionManager:
 
                 # Calculate ROE
                 if snapshot.margin > 0:
-                    snapshot.roe_percent = (
-                        snapshot.unrealized_pnl / snapshot.margin * 100
-                    )
+                    snapshot.roe_percent = snapshot.unrealized_pnl / snapshot.margin * 100
 
                 self._positions[symbol] = snapshot
 
@@ -363,15 +355,9 @@ class PositionManager:
             realized_pnl=float(data.get("cumRealisedPnl", 0) or 0),
             leverage=float(data.get("leverage", 1) or 1),
             margin=float(data.get("positionIM", 0) or 0),
-            liquidation_price=float(data.get("liqPrice", 0) or 0)
-            if data.get("liqPrice")
-            else None,
-            take_profit=float(data.get("takeProfit", 0) or 0)
-            if data.get("takeProfit")
-            else None,
-            stop_loss=float(data.get("stopLoss", 0) or 0)
-            if data.get("stopLoss")
-            else None,
+            liquidation_price=float(data.get("liqPrice", 0) or 0) if data.get("liqPrice") else None,
+            take_profit=float(data.get("takeProfit", 0) or 0) if data.get("takeProfit") else None,
+            stop_loss=float(data.get("stopLoss", 0) or 0) if data.get("stopLoss") else None,
             position_value=float(data.get("positionValue", 0) or 0),
         )
 
@@ -449,9 +435,7 @@ class PositionManager:
                 value=exec_data["exec_value"],
                 fee=exec_data["exec_fee"],
                 is_maker=exec_data["is_maker"],
-                exec_time=datetime.fromtimestamp(
-                    exec_data["exec_time"] / 1000, tz=timezone.utc
-                ),
+                exec_time=datetime.fromtimestamp(exec_data["exec_time"] / 1000, tz=UTC),
             )
 
             self._executions.append(execution)
@@ -476,7 +460,7 @@ class PositionManager:
     async def close_position(
         self,
         symbol: str,
-        qty: Optional[float] = None,
+        qty: float | None = None,
     ) -> bool:
         """
         Close a position (fully or partially).
@@ -495,9 +479,7 @@ class PositionManager:
         # Determine side for closing
         from backend.services.trading_engine_interface import OrderSide
 
-        close_side = (
-            OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
-        )
+        close_side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
 
         result = await self._executor.place_market_order(
             symbol=symbol,
@@ -525,8 +507,8 @@ class PositionManager:
     async def set_position_sl_tp(
         self,
         symbol: str,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
     ) -> bool:
         """Set stop loss and/or take profit for a position."""
         position = self._positions.get(symbol)
@@ -545,9 +527,7 @@ class PositionManager:
         if take_profit is not None:
             params["takeProfit"] = str(take_profit)
 
-        response = await self._executor._signed_request(
-            "POST", "/v5/position/trading-stop", params
-        )
+        response = await self._executor._signed_request("POST", "/v5/position/trading-stop", params)
 
         success = response.get("retCode") == 0
         if success:
@@ -561,7 +541,7 @@ class PositionManager:
     # Getters
     # ==========================================================================
 
-    def get_position(self, symbol: str) -> Optional[PositionSnapshot]:
+    def get_position(self, symbol: str) -> PositionSnapshot | None:
         """Get position for a symbol."""
         return self._positions.get(symbol)
 
@@ -569,7 +549,7 @@ class PositionManager:
         """Get all open positions."""
         return list(self._positions.values())
 
-    def get_wallet(self, coin: str = "USDT") -> Optional[WalletSnapshot]:
+    def get_wallet(self, coin: str = "USDT") -> WalletSnapshot | None:
         """Get wallet balance for a coin."""
         return self._wallets.get(coin)
 

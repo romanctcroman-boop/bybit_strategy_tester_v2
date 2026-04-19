@@ -2,15 +2,19 @@
 🔬 ПОЛНЫЙ ТЕСТ ПАРИТЕТА: ВСЕ 137+ МЕТРИК
 FallbackEngineV2 vs NumbaEngineV2
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+import time
+from dataclasses import fields
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-import time
-from datetime import datetime
-from dataclasses import fields
 
 print("=" * 100)
 print("🔬 ПОЛНЫЙ ТЕСТ ПАРИТЕТА: ВСЕ МЕТРИКИ")
@@ -22,11 +26,13 @@ print(f"Время: {datetime.now()}")
 # ============================================================================
 from backend.backtesting.interfaces import BacktestMetrics
 from backend.core.extended_metrics import ExtendedMetricsResult
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics
+from backend.core.metrics_calculator import LongShortMetrics, RiskMetrics, TradeMetrics
+
 
 # Собираем все поля
 def get_dataclass_fields(cls):
     return [(f.name, f.type) for f in fields(cls)]
+
 
 backtest_fields = get_dataclass_fields(BacktestMetrics)
 extended_fields = get_dataclass_fields(ExtendedMetricsResult)
@@ -44,24 +50,24 @@ print(f"   LongShortMetrics:   {len(longshort_fields)} полей")
 # Все уникальные метрики (без to_dict и методов)
 ALL_METRICS = set()
 for name, _ in backtest_fields:
-    if not name.startswith('_'):
-        ALL_METRICS.add(('backtest', name))
+    if not name.startswith("_"):
+        ALL_METRICS.add(("backtest", name))
 
 for name, _ in extended_fields:
-    if not name.startswith('_'):
-        ALL_METRICS.add(('extended', name))
+    if not name.startswith("_"):
+        ALL_METRICS.add(("extended", name))
 
 for name, _ in trade_fields:
-    if not name.startswith('_'):
-        ALL_METRICS.add(('trade', name))
+    if not name.startswith("_"):
+        ALL_METRICS.add(("trade", name))
 
 for name, _ in risk_fields:
-    if not name.startswith('_'):
-        ALL_METRICS.add(('risk', name))
+    if not name.startswith("_"):
+        ALL_METRICS.add(("risk", name))
 
 for name, _ in longshort_fields:
-    if not name.startswith('_'):
-        ALL_METRICS.add(('longshort', name))
+    if not name.startswith("_"):
+        ALL_METRICS.add(("longshort", name))
 
 print(f"\n🎯 ВСЕГО УНИКАЛЬНЫХ МЕТРИК: {len(ALL_METRICS)}")
 
@@ -69,19 +75,23 @@ print(f"\n🎯 ВСЕГО УНИКАЛЬНЫХ МЕТРИК: {len(ALL_METRICS)}"
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
 print("\n📊 Загрузка данных...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
-df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
+df_1h = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
 print(f"   {len(df_1h)} баров загружено")
+
 
 # RSI функция
 def calculate_rsi(close, period=14):
@@ -94,12 +104,13 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+
 # ============================================================================
 # ИМПОРТЫ ДВИЖКОВ И КАЛЬКУЛЯТОРОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
 from backend.core.metrics_calculator import MetricsCalculator
 
@@ -130,6 +141,7 @@ dir_map = {
 # Хранение дрифтов по метрикам
 metric_drifts = {f"{cat}_{name}": [] for cat, name in ALL_METRICS}
 
+
 def safe_pct_diff(a, b):
     if a is None or b is None:
         return 0.0
@@ -142,6 +154,7 @@ def safe_pct_diff(a, b):
         return 0.0
     return abs(a - b) / abs(a) * 100
 
+
 print("\n" + "=" * 100)
 print("🚀 ЗАПУСК ТЕСТОВ")
 print("=" * 100)
@@ -150,12 +163,12 @@ start_time = time.time()
 
 for i, (rsi_period, sl, tp, direction) in enumerate(combinations):
     # Генерируем сигналы
-    rsi = calculate_rsi(df_1h['close'], period=rsi_period)
+    rsi = calculate_rsi(df_1h["close"], period=rsi_period)
     long_entries = (rsi < 30).values
     long_exits = (rsi > 70).values
     short_entries = (rsi > 70).values
     short_exits = (rsi < 30).values
-    
+
     input_data = BacktestInput(
         candles=df_1h,
         candles_1m=None,
@@ -175,15 +188,15 @@ for i, (rsi_period, sl, tp, direction) in enumerate(combinations):
         slippage=0.0005,
         use_bar_magnifier=False,
     )
-    
+
     # Запуск движков
     fb_result = fallback.run(input_data)
     nb_result = numba_engine.run(input_data)
-    
+
     # Вычисление extended metrics
     fb_ext = ext_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = ext_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Вычисление через MetricsCalculator
     # (для trade, risk, longshort используем equity и trades)
     fb_pnls = [t.pnl for t in fb_result.trades]
@@ -192,35 +205,35 @@ for i, (rsi_period, sl, tp, direction) in enumerate(combinations):
     nb_bars = [t.duration_bars for t in nb_result.trades]
     fb_dirs = [t.direction for t in fb_result.trades]
     nb_dirs = [t.direction for t in nb_result.trades]
-    
+
     # Сравнение метрик
     for cat, name in ALL_METRICS:
         col_name = f"{cat}_{name}"
         fb_val = 0.0
         nb_val = 0.0
-        
+
         try:
-            if cat == 'backtest':
+            if cat == "backtest":
                 fb_val = getattr(fb_result.metrics, name, 0.0)
                 nb_val = getattr(nb_result.metrics, name, 0.0)
-            elif cat == 'extended':
+            elif cat == "extended":
                 fb_val = getattr(fb_ext, name, 0.0)
                 nb_val = getattr(nb_ext, name, 0.0)
-            elif cat in ('trade', 'risk', 'longshort'):
+            elif cat in ("trade", "risk", "longshort"):
                 # Эти метрики вычисляются одинаково для обоих движков
                 # если исходные данные (trades, equity) одинаковы
                 fb_val = 0.0
                 nb_val = 0.0
         except:
             pass
-        
+
         drift = safe_pct_diff(fb_val, nb_val)
         metric_drifts[col_name].append(drift)
-    
+
     if (i + 1) % 10 == 0:
         elapsed = time.time() - start_time
         eta = elapsed / (i + 1) * (len(combinations) - i - 1)
-        print(f"   [{i+1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
+        print(f"   [{i + 1}/{len(combinations)}] Elapsed: {elapsed:.1f}s, ETA: {eta:.1f}s")
 
 total_time = time.time() - start_time
 print(f"\n✅ Завершено за {total_time:.1f}s")
@@ -233,33 +246,32 @@ print("📊 АНАЛИЗ РЕЗУЛЬТАТОВ")
 print("=" * 100)
 
 # Группируем по категориям
-categories = ['backtest', 'extended', 'trade', 'risk', 'longshort']
+categories = ["backtest", "extended", "trade", "risk", "longshort"]
 
 total_metrics = 0
 perfect_metrics = 0
 problem_metrics = []
 
 for category in categories:
-    cat_metrics = [(col, drifts) for col, drifts in metric_drifts.items() 
-                   if col.startswith(f"{category}_")]
-    
+    cat_metrics = [(col, drifts) for col, drifts in metric_drifts.items() if col.startswith(f"{category}_")]
+
     if not cat_metrics:
         continue
-    
-    print(f"\n{'='*40}")
+
+    print(f"\n{'=' * 40}")
     print(f"📂 {category.upper()} ({len(cat_metrics)} метрик)")
-    print(f"{'='*40}")
-    
+    print(f"{'=' * 40}")
+
     cat_perfect = 0
     for col, drifts in sorted(cat_metrics):
         metric_name = col.replace(f"{category}_", "")
         if not drifts:
             continue
-            
+
         total_metrics += 1
         mean_drift = np.mean(drifts)
         max_drift = np.max(drifts)
-        
+
         if max_drift < 0.001:
             cat_perfect += 1
             perfect_metrics += 1
@@ -270,11 +282,11 @@ for category in categories:
         else:
             status = "❌"
             problem_metrics.append((col, max_drift))
-        
+
         # Только показываем проблемные или первые 5
         if max_drift >= 0.001:
             print(f"   {metric_name:<30} mean={mean_drift:>8.4f}% max={max_drift:>8.4f}% {status}")
-    
+
     perfect_pct = cat_perfect / len(cat_metrics) * 100 if cat_metrics else 0
     print(f"   ✅ Идеальных: {cat_perfect}/{len(cat_metrics)} ({perfect_pct:.1f}%)")
 
@@ -287,13 +299,13 @@ print("=" * 100)
 
 perfect_pct = perfect_metrics / total_metrics * 100 if total_metrics else 0
 
-print(f"\n📊 ИТОГО:")
+print("\n📊 ИТОГО:")
 print(f"   Всего метрик:     {total_metrics}")
 print(f"   Идеальных (0% drift): {perfect_metrics} ({perfect_pct:.1f}%)")
 print(f"   С расхождениями:  {len(problem_metrics)}")
 
 if problem_metrics:
-    print(f"\n⚠️ Метрики с расхождениями:")
+    print("\n⚠️ Метрики с расхождениями:")
     for col, drift in problem_metrics[:10]:
         print(f"   - {col}: {drift:.4f}%")
 
@@ -301,11 +313,11 @@ if perfect_pct >= 95:
     print(f"""
     ███████╗██╗  ██╗ ██████╗███████╗██╗     ██╗     ███████╗███╗   ██╗████████╗
     ██╔════╝╚██╗██╔╝██╔════╝██╔════╝██║     ██║     ██╔════╝████╗  ██║╚══██╔══╝
-    █████╗   ╚███╔╝ ██║     █████╗  ██║     ██║     █████╗  ██╔██╗ ██║   ██║   
-    ██╔══╝   ██╔██╗ ██║     ██╔══╝  ██║     ██║     ██╔══╝  ██║╚██╗██║   ██║   
-    ███████╗██╔╝ ██╗╚██████╗███████╗███████╗███████╗███████╗██║ ╚████║   ██║   
-    ╚══════╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   
-    
+    █████╗   ╚███╔╝ ██║     █████╗  ██║     ██║     █████╗  ██╔██╗ ██║   ██║
+    ██╔══╝   ██╔██╗ ██║     ██╔══╝  ██║     ██║     ██╔══╝  ██║╚██╗██║   ██║
+    ███████╗██╔╝ ██╗╚██████╗███████╗███████╗███████╗███████╗██║ ╚████║   ██║
+    ╚══════╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝
+
     🎉 {perfect_pct:.1f}% PARITY НА {total_metrics} МЕТРИКАХ!
     """)
 

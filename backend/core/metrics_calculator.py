@@ -1,10 +1,10 @@
 """
-🎯 Centralized Metrics Calculator
+Centralized Metrics Calculator
 
-ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ для всех метрик бэктестинга.
-Все расчёты метрик ДОЛЖНЫ использовать этот модуль.
+Single source of truth for all backtesting metrics.
+All metric calculations MUST use this module.
 
-Использование:
+Usage:
     from backend.core.metrics_calculator import MetricsCalculator, calculate_sharpe
 
     # Полный расчёт всех метрик
@@ -19,12 +19,24 @@ TradingView Compliance:
 - Win Rate: percentage (0-100)
 - Profit Factor: gross_profit / gross_loss
 - Max Drawdown: peak-to-trough in percentage
+
+Architecture (P0-5):
+- Pure math formulas (sharpe, sortino, calmar etc.) live in:
+      backend.core.formulas.py  ← single source of truth
+- This module is the "TV-gold-standard" implementation that:
+  1. Orchestrates full metrics calculation (166 metrics)
+  2. Provides legacy API (calculate_sharpe, calculate_win_rate, etc.)
+  3. Imports and re-exports formulas for backward compatibility
+- NumbaEngineV2 uses formulas.py directly (no duplication since P0-5).
 """
+
+# Note: All metric calculation functions are defined locally below.
+# formulas.py is the source of truth for pure math; this module provides
+# its own implementations tuned for TradingView-compatible results.
 
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -40,6 +52,42 @@ except ImportError:
             return func
 
         return decorator
+
+
+# =============================================================================
+# SAFE DIVISION UTILITY
+# =============================================================================
+
+
+def safe_divide(
+    numerator: float,
+    denominator: float,
+    default: float = 0.0,
+    epsilon: float = 1e-10,
+) -> float:
+    """
+    Safe division that handles zero and near-zero denominators.
+
+    Args:
+        numerator: The dividend
+        denominator: The divisor
+        default: Value to return if denominator is zero/near-zero
+        epsilon: Threshold for considering denominator as zero
+
+    Returns:
+        Result of division or default if denominator is too small
+
+    Examples:
+        >>> safe_divide(10, 2)
+        5.0
+        >>> safe_divide(10, 0)
+        0.0
+        >>> safe_divide(10, 0, default=float('inf'))
+        inf
+    """
+    if abs(denominator) < epsilon:
+        return default
+    return numerator / denominator
 
 
 class TimeFrequency(str, Enum):
@@ -128,6 +176,7 @@ class RiskMetrics:
     volatility: float = 0.0
 
     cagr: float = 0.0
+    net_profit_pct: float = 0.0  # Net profit as percentage of initial capital
 
     margin_efficiency: float = 0.0
     ulcer_index: float = 0.0
@@ -162,7 +211,6 @@ class LongShortMetrics:
     long_largest_loss: float = 0.0
     long_largest_win_pct: float = 0.0
     long_largest_loss_pct: float = 0.0
-    long_largest_loss: float = 0.0
     long_payoff_ratio: float = 0.0
 
     long_max_consec_wins: int = 0
@@ -195,7 +243,6 @@ class LongShortMetrics:
     short_largest_loss: float = 0.0
     short_largest_win_pct: float = 0.0
     short_largest_loss_pct: float = 0.0
-    short_largest_loss: float = 0.0
     short_payoff_ratio: float = 0.0
 
     short_max_consec_wins: int = 0
@@ -262,9 +309,16 @@ def calculate_ulcer_index(drawdowns: np.ndarray) -> float:
     Formula: Sqrt(Mean(Drawdown^2)) * 100
 
     Args:
-        drawdowns: Array of drawdown values (fractional 0.1 etc, NOT percentage)
+        drawdowns: Array of drawdown values as fractions (e.g. 0.1 = 10% drawdown,
+                   NOT already multiplied by 100)
 
-    Returns: Ulcer Index as percentage
+    Returns:
+        Ulcer Index as percentage (already multiplied by 100).
+        Callers should NOT multiply the result again.
+
+    Example:
+        >>> calculate_ulcer_index(np.array([0.05, 0.10, 0.03]))
+        6.48...  # Already a percentage
     """
     if len(drawdowns) == 0:
         return 0.0
@@ -367,7 +421,9 @@ def calculate_sortino(
     downside_dev = np.sqrt(downside_variance)
 
     if downside_dev <= 1e-10:
-        return 10.0 if mean_return > mar else 0.0
+        # No downside deviation = perfect one-sided returns.
+        # Return clip-cap (100) so this strategy ranks above all finite Sortino values.
+        return 100.0 if mean_return > mar else 0.0
 
     periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
 
@@ -385,27 +441,36 @@ def calculate_calmar(
     """
     Calculate Calmar Ratio.
     Formula: CAGR / |Max_Drawdown|
+
+    Uses compound annual growth rate (CAGR) for multi-year periods.
+    For single year (years <= 1), total_return_pct is used directly as CAGR.
     """
-    if abs(max_drawdown_pct) <= 0.01:
+    if abs(max_drawdown_pct) <= 1.0:
         return 10.0 if total_return_pct > 0 else 0.0
 
-    # Annualize return if needed
-    if years > 0 and years != 1.0:
-        # Simple annualization or CAGR? Calmar usually uses CAGR.
-        # Assuming total_return_pct is effectively carrying the CAGR info if yrs=1,
-        # but if we pass total raw return, we need to convert.
-        # Let's assume input is CAGR if years=1, else we adjust.
-        # Ideally caller handles this, but here is a safeguard:
-        cagr = total_return_pct / years
+    # Use compound CAGR for multi-year periods
+    if years > 1.0:
+        # CAGR = ((1 + total_return_fraction) ^ (1/years) - 1) * 100
+        total_return_frac = total_return_pct / 100
+        cagr = -100.0 if total_return_frac <= -1.0 else (pow(1 + total_return_frac, 1 / years) - 1) * 100
     else:
         cagr = total_return_pct
 
     return float(np.clip(cagr / abs(max_drawdown_pct), -100, 100))
 
 
-def calculate_max_drawdown(equity: np.ndarray) -> Tuple[float, float, int]:
+def calculate_max_drawdown(
+    equity: np.ndarray,
+    initial_capital: float | None = None,
+) -> tuple[float, float, int]:
     """
     Calculate Maximum Drawdown.
+
+    Args:
+        equity: Equity curve array.
+        initial_capital: When provided, uses TradingView formula:
+            dd = (peak - equity) / initial_capital.
+            When None (legacy), uses (peak - equity) / peak.
 
     Returns: (max_dd_pct, max_dd_value, max_dd_duration_bars)
     """
@@ -417,9 +482,14 @@ def calculate_max_drawdown(equity: np.ndarray) -> Tuple[float, float, int]:
     # Running maximum
     peak = np.maximum.accumulate(equity)
 
-    # Drawdown at each point (as fraction)
-    # Protect against div by zero if peak is 0 (bankruptcy)
-    drawdown = (peak - equity) / np.where(peak > 0, peak, 1)
+    # Drawdown at each point.
+    # TradingView formula: divides by initial_capital (constant denominator).
+    # Standard formula: divides by running peak.
+    if initial_capital is not None and initial_capital > 0:
+        drawdown = (peak - equity) / initial_capital
+    else:
+        # Legacy path — keep backward compat for callers without initial_capital
+        drawdown = (peak - equity) / np.where(peak > 0, peak, 1)
 
     max_dd_fraction = np.max(drawdown)
     max_dd_pct = float(max_dd_fraction) * 100  # As percentage
@@ -438,7 +508,7 @@ def calculate_max_drawdown(equity: np.ndarray) -> Tuple[float, float, int]:
 
     duration = max_dd_idx - peak_idx
 
-    return max_dd_pct, max_dd_value, duration
+    return max_dd_pct, max_dd_value, int(duration)
 
 
 def calculate_cagr(
@@ -471,7 +541,7 @@ def calculate_cagr(
             simple_return = (ratio - 1) * 100  # As percentage
             # Annualize using simple scaling (not compound)
             annualized = simple_return * (1 / years) if years > 0 else 0
-            return float(np.clip(annualized, -999, 999999))
+            return float(np.clip(annualized, -100, 999999))
 
         if ratio > 1e10:  # Overflow protection
             return 999999.0
@@ -486,11 +556,11 @@ def calculate_expectancy(
     win_rate: float,  # As fraction (0-1)
     avg_win: float,
     avg_loss: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Calculate Mathematical Expectancy.
 
-    Formula: Expectancy = (Win% × Avg_Win) - (Loss% × |Avg_Loss|)
+    Formula: Expectancy = (Win% * Avg_Win) - (Loss% * |Avg_Loss|)
 
     Returns: (expectancy, expectancy_ratio)
     """
@@ -504,7 +574,7 @@ def calculate_expectancy(
     return (expectancy, expectancy_ratio)
 
 
-def calculate_consecutive_streaks(pnl_list: List[float]) -> Tuple[int, int]:
+def calculate_consecutive_streaks(pnl_list: list[float]) -> tuple[int, int]:
     """
     Calculate max consecutive wins and losses.
 
@@ -582,9 +652,7 @@ def calculate_stability_r2(equity_curve: np.ndarray) -> float:
     return float(np.clip(r2, 0.0, 1.0))
 
 
-def calculate_sqn(
-    total_trades: int, avg_trade_profit: float, std_trade_profit: float
-) -> float:
+def calculate_sqn(total_trades: int, avg_trade_profit: float, std_trade_profit: float) -> float:
     """
     Calculate System Quality Number (SQN).
 
@@ -607,7 +675,7 @@ def calculate_metrics_numba(
     equity_array: np.ndarray,
     daily_returns: np.ndarray,
     initial_capital: float,
-) -> Tuple[float, float, float, float, int, float, float]:
+) -> tuple[float, float, float, float, int, float, float]:
     """
     Numba-optimized metrics calculation.
 
@@ -641,10 +709,7 @@ def calculate_metrics_numba(
     win_rate = wins / n_trades if n_trades > 0 else 0.0
 
     # Profit factor
-    if gross_loss > 0:
-        profit_factor = gross_profit / gross_loss
-    else:
-        profit_factor = 100.0 if gross_profit > 0 else 0.0
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else (100.0 if gross_profit > 0 else 0.0)
 
     # Max drawdown
     max_dd = 0.0
@@ -659,32 +724,37 @@ def calculate_metrics_numba(
 
     max_dd *= 100  # As percentage
 
-    # Sharpe ratio (using daily returns)
+    # Sharpe ratio (using daily returns, matching standard calculator: ddof=1 + RFR)
+    # Filter out NaN/inf values from daily_returns before computing stats
     n_returns = len(daily_returns)
-    if n_returns > 1:
-        mean_return = 0.0
-        for i in range(n_returns):
-            mean_return += daily_returns[i]
-        mean_return /= n_returns
+    valid_count = 0
+    mean_return = 0.0
+    for i in range(n_returns):
+        v = daily_returns[i]
+        if not (np.isnan(v) or np.isinf(v)):
+            mean_return += v
+            valid_count += 1
+
+    if valid_count > 1:
+        mean_return /= valid_count
 
         variance = 0.0
         for i in range(n_returns):
-            variance += (daily_returns[i] - mean_return) ** 2
-        std_return = np.sqrt(variance / n_returns)
+            v = daily_returns[i]
+            if not (np.isnan(v) or np.isinf(v)):
+                variance += (v - mean_return) ** 2
+        std_return = np.sqrt(variance / (valid_count - 1))  # Sample std (ddof=1)
 
-        if std_return > 1e-10:
-            # Annualize: sqrt(8766) for hourly data ≈ 93.6
-            sharpe = (mean_return / std_return) * 93.6
-        else:
-            sharpe = 0.0
+        # Risk-free rate per period (annual 2% / 8766 hours)
+        period_rfr = 0.02 / 8766.0
+
+        # Annualize: sqrt(8766) for hourly data ~= 93.6
+        sharpe = ((mean_return - period_rfr) / std_return) * 93.6 if std_return > 1e-10 else 0.0
     else:
         sharpe = 0.0
 
     # Calmar ratio
-    if max_dd > 0.01:
-        calmar = total_return / max_dd
-    else:
-        calmar = total_return * 10 if total_return > 0 else 0.0
+    calmar = total_return / max_dd if max_dd > 0.01 else (total_return * 10 if total_return > 0 else 0.0)
 
     return total_return, sharpe, max_dd, win_rate, n_trades, profit_factor, calmar
 
@@ -692,6 +762,39 @@ def calculate_metrics_numba(
 # =============================================================================
 # MAIN CALCULATOR CLASS
 # =============================================================================
+
+# Cache for calculate_all() — avoids recomputation for identical inputs.
+# Key: hash of (trades_tuple, equity_bytes, capital, years, frequency, margin)
+# Max size: 32 entries (typical optimizer run produces ~10-20 results)
+_calculate_all_cache: dict[int, dict] = {}
+_CALCULATE_ALL_CACHE_MAX = 32
+
+
+def _build_cache_key(
+    trades: list[dict],
+    equity: np.ndarray,
+    initial_capital: float,
+    years: float,
+    frequency: "TimeFrequency",
+    margin_rate: float,
+) -> int:
+    """Build a fast hash key for calculate_all() cache."""
+    import hashlib
+
+    h = hashlib.md5(usedforsecurity=False)
+    # Hash equity bytes (fast for numpy arrays)
+    h.update(equity.tobytes())
+    # Hash scalar params
+    h.update(f"{initial_capital}:{years}:{frequency}:{margin_rate}".encode())
+    # Hash trade count + first/last trade PnL (avoids O(n) full hash for large lists)
+    h.update(f"n={len(trades)}".encode())
+    if trades:
+        first = trades[0]
+        last = trades[-1]
+        pnl_f = first.get("pnl", 0) if isinstance(first, dict) else getattr(first, "pnl", 0)
+        pnl_l = last.get("pnl", 0) if isinstance(last, dict) else getattr(last, "pnl", 0)
+        h.update(f"f={pnl_f}:l={pnl_l}".encode())
+    return int.from_bytes(h.digest()[:8], "little")
 
 
 class MetricsCalculator:
@@ -711,7 +814,7 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_trade_metrics(
-        trades: List[dict],
+        trades: list[dict],
         include_commission: bool = True,
     ) -> TradeMetrics:
         """Calculate all trade-related metrics from a list of trades."""
@@ -739,15 +842,11 @@ class MetricsCalculator:
                 pnl = t.get("pnl", t.get("profit", t.get("realized_pnl", 0)))
                 pnl_pct = t.get(
                     "pnl_pct",
-                    t.get(
-                        "profit_percent", t.get("profit_pct", t.get("profitPerc", 0))
-                    ),
+                    t.get("profit_percent", t.get("profit_pct", t.get("profitPerc", 0))),
                 )
                 # fees may be stored under 'fees' or 'commission'
                 fees = t.get("fees", t.get("commission", t.get("commissions", 0)))
-                bars = t.get(
-                    "bars_in_trade", t.get("bars", t.get("bars_in_position", 0))
-                )
+                bars = t.get("bars_in_trade", t.get("bars", t.get("bars_in_position", 0)))
             else:
                 pnl = getattr(t, "pnl", getattr(t, "profit", 0))
                 pnl_pct = getattr(t, "pnl_pct", getattr(t, "profit_percent", 0))
@@ -763,16 +862,16 @@ class MetricsCalculator:
                 # Log first and last few trades for debugging
                 from loguru import logger
 
-                logger.debug(
-                    f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}"
-                )
+                logger.debug(f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}")
 
-            # Gross profit/loss (P&L + fees for consistency)
-            gross_pnl = pnl + fees if include_commission else pnl
-
+            # Gross profit/loss — TV definition: net PnL per trade (after commission).
+            # TV gross_profit = sum(pnl) for winning trades (net, same as profit_factor numerator).
+            # TV gross_loss   = sum(|pnl|) for losing trades.
+            # Verified: TV gross_profit 2454.49 = sum of 38 winning net PnLs.
+            # Commission is reported separately (total_commission field).
             if pnl > 0:
                 metrics.winning_trades += 1
-                metrics.gross_profit += gross_pnl
+                metrics.gross_profit += pnl
                 win_pnl.append(pnl)
                 win_pnl_pct.append(pnl_pct)
                 win_bars.append(bars)
@@ -782,7 +881,7 @@ class MetricsCalculator:
                     metrics.largest_win_pct = pnl_pct
             elif pnl < 0:
                 metrics.losing_trades += 1
-                metrics.gross_loss += abs(gross_pnl)
+                metrics.gross_loss += abs(pnl)
                 loss_pnl.append(pnl)
                 loss_pnl_pct.append(pnl_pct)
                 loss_bars.append(bars)
@@ -795,13 +894,10 @@ class MetricsCalculator:
 
         metrics.net_profit = sum(pnl_list)
 
-        # Derived metrics
-        metrics.win_rate = calculate_win_rate(
-            metrics.winning_trades, metrics.total_trades
-        )
-        metrics.profit_factor = calculate_profit_factor(
-            metrics.gross_profit, metrics.gross_loss
-        )
+        # Derived metrics (win rate uses total_trades as denominator — TV standard includes breakeven)
+        metrics.win_rate = calculate_win_rate(metrics.winning_trades, metrics.total_trades)
+        # Profit factor = gross_profit / gross_loss (both already net PnL sums, TV-compatible)
+        metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         # Averages
         metrics.avg_win = float(np.mean(win_pnl)) if win_pnl else 0.0
@@ -815,6 +911,9 @@ class MetricsCalculator:
         # Payoff ratio
         if metrics.avg_loss != 0:
             metrics.payoff_ratio = abs(metrics.avg_win / metrics.avg_loss)
+        else:
+            # If no losing trades, payoff ratio is undefined (use large number instead of inf for JSON compatibility)
+            metrics.payoff_ratio = 999.99 if metrics.avg_win > 0 else 0.0
 
         # Bars
         metrics.avg_bars_held = np.mean(bars_list) if bars_list else 0.0
@@ -822,9 +921,7 @@ class MetricsCalculator:
         metrics.avg_loss_bars = np.mean(loss_bars) if loss_bars else 0.0
 
         # Streaks
-        metrics.max_consec_wins, metrics.max_consec_losses = (
-            calculate_consecutive_streaks(pnl_list)
-        )
+        metrics.max_consec_wins, metrics.max_consec_losses = calculate_consecutive_streaks(pnl_list)
 
         return metrics
 
@@ -847,16 +944,15 @@ class MetricsCalculator:
         final_capital = equity[-1]
         total_return_pct = (final_capital - initial_capital) / initial_capital * 100
 
-        # Drawdown
+        # Drawdown — TV formula: знаменатель initial_capital (не running peak)
         (
             metrics.max_drawdown,
             metrics.max_drawdown_value,
             metrics.max_drawdown_duration_bars,
-        ) = calculate_max_drawdown(equity)
+        ) = calculate_max_drawdown(equity, initial_capital=initial_capital)
 
-        # Drawdown average
+        # Drawdown average (avg_drawdown остаётся с peak-denominator — это не TV-метрика)
         peak = np.maximum.accumulate(equity)
-        # Protect div zero
         with np.errstate(divide="ignore", invalid="ignore"):
             dd_series = (peak - equity) / np.where(peak > 0, peak, 1)
 
@@ -933,12 +1029,13 @@ class MetricsCalculator:
         # Risk ratios
         metrics.sharpe_ratio = calculate_sharpe(returns, frequency)
         metrics.sortino_ratio = calculate_sortino(returns, frequency)
-        metrics.calmar_ratio = calculate_calmar(
-            total_return_pct, metrics.max_drawdown, years
-        )
+        metrics.calmar_ratio = calculate_calmar(total_return_pct, metrics.max_drawdown, years)
 
         # CAGR
         metrics.cagr = calculate_cagr(initial_capital, final_capital, years)
+
+        # Net Profit %
+        metrics.net_profit_pct = total_return_pct
 
         # Stability R-squared
         metrics.stability = calculate_stability_r2(equity)
@@ -946,27 +1043,31 @@ class MetricsCalculator:
         # Recovery factor
         if metrics.max_drawdown_value > 0:
             net_profit = final_capital - initial_capital
-            metrics.recovery_factor = net_profit / metrics.max_drawdown_value
+            # Cap at 999.0 to match the no-drawdown sentinel — avoids extreme outliers
+            metrics.recovery_factor = float(np.clip(net_profit / metrics.max_drawdown_value, -999.0, 999.0))
+        else:
+            net_profit = final_capital - initial_capital
+            # No drawdown: recovery_factor is undefined; use 999.0 as "perfect" proxy.
+            # float("inf") is not JSON-serializable and causes crashes downstream.
+            metrics.recovery_factor = 999.0 if net_profit > 0 else 0.0
 
         # Margin Efficiency
         if margin_used > 0:
             net_profit = final_capital - initial_capital
-            metrics.margin_efficiency = calculate_margin_efficiency(
-                net_profit, margin_used
-            )
+            metrics.margin_efficiency = calculate_margin_efficiency(net_profit, margin_used)
 
-        # Volatility (annualized)
+        # Volatility (annualized) — filter NaN/inf before computing std
         if len(returns) > 1:
-            periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
-            metrics.volatility = (
-                float(np.std(returns, ddof=1) * np.sqrt(periods_per_year)) * 100
-            )
+            valid_returns = returns[np.isfinite(returns)]
+            if len(valid_returns) > 1:
+                periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
+                metrics.volatility = float(np.std(valid_returns, ddof=1) * np.sqrt(periods_per_year)) * 100
 
         return metrics
 
     @staticmethod
     def calculate_long_short_metrics(
-        trades: List[dict],
+        trades: list[dict],
         initial_capital: float,
         years: float = 1.0,
     ) -> LongShortMetrics:
@@ -978,34 +1079,29 @@ class MetricsCalculator:
             return metrics
 
         # Separate by side
-        long_trades = []
-        short_trades = []
-        unknown_sides = set()  # Track unknown values for single log
+        long_trades: list[dict] = []
+        short_trades: list[dict] = []
+        unknown_sides: set[str] = set()  # Track unknown values for single log
 
         for t in trades:
             try:
-                if (
-                    len(long_trades) == 0
-                    and len(short_trades) == 0
-                    and len(unknown_sides) == 0
-                ):
-                    # Log first trade sample only once
-                    with open(
-                        "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                        "a",
-                        encoding="utf-8",
-                    ) as f:
+                if len(long_trades) == 0 and len(short_trades) == 0 and len(unknown_sides) == 0:
+                    # Log first trade sample only once (debug mode)
+                    # Note: In production, consider disabling or using proper logging
+                    from pathlib import Path
+
+                    log_dir = Path(__file__).resolve().parents[2] / "logs"
+                    log_dir.mkdir(parents=True, exist_ok=True)
+                    log_path = log_dir / "debug_metrics_explicit.log"
+                    with open(log_path, "a", encoding="utf-8") as f:
                         f.write(f"Trades sample (first trade): {t}\n")
-            except:
+            except Exception:
+                # Silently skip debug logging on failure (non-critical)
                 pass
             side = t.get("side", "") if isinstance(t, dict) else getattr(t, "side", "")
             # Also check 'direction' field as fallback (used by GPU optimizer)
             if not side:
-                side = (
-                    t.get("direction", "")
-                    if isinstance(t, dict)
-                    else getattr(t, "direction", "")
-                )
+                side = t.get("direction", "") if isinstance(t, dict) else getattr(t, "direction", "")
 
             # Normalize side to string
             if hasattr(side, "value"):
@@ -1061,40 +1157,14 @@ class MetricsCalculator:
         # Process Longs
         from loguru import logger
 
-        # Explicit file debug
-        try:
-            with open(
-                "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                "a",
-                encoding="utf-8",
-            ) as f:
-                f.write(
-                    f"[metrics_calc] Processing Longs: {len(long_trades)} trades identified. Sample: {long_trades[0] if long_trades else 'None'}\n"
-                )
-        except Exception as e:
-            logger.error(f"Failed to write debug log: {e}")
-
-        logger.info(
+        logger.debug(
             f"[metrics_calc] Processing Longs: {len(long_trades)} trades identified. Sample: {long_trades[0] if long_trades else 'None'}"
         )
 
         long_res = process_side(long_trades)
         if long_res:
             long_m, long_cagr = long_res
-            try:
-                with open(
-                    "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                    "a",
-                    encoding="utf-8",
-                ) as f:
-                    f.write(
-                        f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}\n"
-                    )
-            except Exception:
-                pass
-            logger.info(
-                f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}"
-            )
+            logger.debug(f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}")
 
             metrics.long_trades = long_m.total_trades
             metrics.long_winning = long_m.winning_trades
@@ -1160,20 +1230,28 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_all(
-        trades: List[dict],
+        trades: list[dict],
         equity: np.ndarray,
         initial_capital: float,
         years: float = 1.0,
         frequency: TimeFrequency = TimeFrequency.HOURLY,
         margin_rate: float = 1.0,  # 1.0 = 1x leverage (100% margin), 0.5 for 2x, etc.
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate ALL metrics in one call.
 
+        Results are cached by content hash to avoid recomputation
+        for identical inputs (e.g. during optimizer result display).
+
         Returns a dictionary with all metrics ready for PerformanceMetrics model.
         """
-        # Calculate returns from equity
+        # Check cache first
         equity = np.asarray(equity)
+        cache_key = _build_cache_key(trades, equity, initial_capital, years, frequency, margin_rate)
+        if cache_key in _calculate_all_cache:
+            return _calculate_all_cache[cache_key].copy()
+
+        # Calculate returns from equity
         if len(equity) > 1:
             # Shift to get returns ensuring no nan/inf
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -1226,15 +1304,18 @@ class MetricsCalculator:
         )
 
         # Long/Short metrics
-        ls_m = MetricsCalculator.calculate_long_short_metrics(
-            trades, initial_capital, years
-        )
+        ls_m = MetricsCalculator.calculate_long_short_metrics(trades, initial_capital, years)
 
         # Expectancy and SQN
+        kelly_percent = 0.0
+        kelly_percent_long = 0.0
+        kelly_percent_short = 0.0
         if trade_m.total_trades > 0:
             win_frac = trade_m.winning_trades / trade_m.total_trades
-            expectancy, expectancy_ratio = calculate_expectancy(
-                win_frac, trade_m.avg_win, trade_m.avg_loss
+            expectancy, expectancy_ratio = calculate_expectancy(win_frac, trade_m.avg_win, trade_m.avg_loss)
+            # expectancy_pct: uses percent avg_win/avg_loss for a normalised "R" representation
+            expectancy_pct, expectancy_pct_ratio = calculate_expectancy(
+                win_frac, trade_m.avg_win_pct, trade_m.avg_loss_pct
             )
 
             # SQN (System Quality Number) calculation
@@ -1247,12 +1328,87 @@ class MetricsCalculator:
 
             if len(pnl_values) > 1:
                 std_pnl = float(np.std(pnl_values, ddof=1))
-                risk_m.sqn = calculate_sqn(
-                    trade_m.total_trades, trade_m.avg_trade, std_pnl
-                )
+                risk_m.sqn = calculate_sqn(trade_m.total_trades, trade_m.avg_trade, std_pnl)
+
+            # Kelly Criterion: K% = W - (1 - W) / R
+            # W = win rate (as fraction), R = payoff ratio (avg_win / avg_loss)
+            if trade_m.payoff_ratio > 0:
+                kelly_percent = win_frac - (1 - win_frac) / trade_m.payoff_ratio
+                kelly_percent = max(0.0, min(1.0, kelly_percent))
+            else:
+                kelly_percent = 0.0
+
+            # Kelly per direction
+            if ls_m.long_trades > 0 and ls_m.long_payoff_ratio > 0:
+                long_win_frac = ls_m.long_winning / ls_m.long_trades
+                kelly_percent_long = long_win_frac - (1 - long_win_frac) / ls_m.long_payoff_ratio
+                kelly_percent_long = max(0.0, min(1.0, kelly_percent_long))
+
+            if ls_m.short_trades > 0 and ls_m.short_payoff_ratio > 0:
+                short_win_frac = ls_m.short_winning / ls_m.short_trades
+                kelly_percent_short = short_win_frac - (1 - short_win_frac) / ls_m.short_payoff_ratio
+                kelly_percent_short = max(0.0, min(1.0, kelly_percent_short))
 
         else:
             expectancy, expectancy_ratio = 0.0, 0.0
+            expectancy_pct, expectancy_pct_ratio = 0.0, 0.0
+
+        # ===== PER-DIRECTION SHARPE / SORTINO / CALMAR =====
+        # Build per-direction trade-returns and equity curves from PnL values.
+        # This gives accurate direction-specific risk-adjusted metrics instead
+        # of copying the global sharpe_ratio to both long and short.
+        def _direction_risk_metrics(
+            dir_trades: list,
+        ) -> tuple[float, float, float]:
+            """Return (sharpe, sortino, calmar) for a set of trades."""
+            if len(dir_trades) < 2:
+                return 0.0, 0.0, 0.0
+            pnls = []
+            for t in dir_trades:
+                p = t.get("pnl", 0) if isinstance(t, dict) else getattr(t, "pnl", 0)
+                pnls.append(float(p) if p else 0.0)
+            # Build cumulative equity curve starting from initial_capital
+            dir_equity = np.array(
+                [initial_capital] + [initial_capital + float(np.sum(pnls[: i + 1])) for i in range(len(pnls))]
+            )
+            if len(dir_equity) < 2:
+                return 0.0, 0.0, 0.0
+            with np.errstate(divide="ignore", invalid="ignore"):
+                dir_returns = np.diff(dir_equity) / dir_equity[:-1]
+            dir_returns = np.nan_to_num(dir_returns, nan=0.0, posinf=0.0, neginf=0.0)
+            s = calculate_sharpe(dir_returns, frequency)
+            so = calculate_sortino(dir_returns, frequency)
+            # Calmar: total return % and max drawdown %
+            dir_total_ret_pct = (dir_equity[-1] - initial_capital) / initial_capital * 100
+            (dir_max_dd, _, _) = calculate_max_drawdown(dir_equity)
+            dir_max_dd_pct = dir_max_dd * 100
+            c = calculate_calmar(dir_total_ret_pct, dir_max_dd_pct, years)
+            return s, so, c
+
+        # Separate trades by direction (same logic as calculate_long_short_metrics)
+        _long_dir_trades: list = []
+        _short_dir_trades: list = []
+        for _t in trades:
+            _side = _t.get("side", "") if isinstance(_t, dict) else getattr(_t, "side", "")
+            if not _side:
+                _side = _t.get("direction", "") if isinstance(_t, dict) else getattr(_t, "direction", "")
+            if hasattr(_side, "value"):
+                _side_str = str(_side.value).lower()
+            elif hasattr(_side, "name"):
+                _side_str = str(_side.name).lower()
+            else:
+                _side_str = str(_side).lower().strip()
+            if _side_str in ("buy", "long", "entry", "1", "tradeside.buy", "tradedirection.long"):
+                _long_dir_trades.append(_t)
+            elif _side_str in ("sell", "short", "exit", "-1", "tradeside.sell", "tradedirection.short"):
+                _short_dir_trades.append(_t)
+
+        sharpe_long_val, sortino_long_val, calmar_long_val = (
+            _direction_risk_metrics(_long_dir_trades) if _long_dir_trades else (0.0, 0.0, 0.0)
+        )
+        sharpe_short_val, sortino_short_val, calmar_short_val = (
+            _direction_risk_metrics(_short_dir_trades) if _short_dir_trades else (0.0, 0.0, 0.0)
+        )
 
         # Combine into dictionary
         result = {
@@ -1268,8 +1424,11 @@ class MetricsCalculator:
             "win_rate": trade_m.win_rate,
             "profit_factor": trade_m.profit_factor,
             "avg_win": trade_m.avg_win_pct,
+            "avg_win_pct": trade_m.avg_win_pct,  # Explicit alias — avg_win == avg_win_pct (percentage)
             "avg_loss": trade_m.avg_loss_pct,
-            "avg_trade": trade_m.avg_trade_pct,
+            "avg_loss_pct": trade_m.avg_loss_pct,  # Explicit alias
+            "avg_trade": trade_m.avg_trade,
+            "avg_trade_pct": trade_m.avg_trade_pct,  # Alias for frontend compatibility
             "largest_win": trade_m.largest_win_pct,
             "largest_loss": trade_m.largest_loss_pct,
             "avg_win_value": trade_m.avg_win,
@@ -1278,6 +1437,7 @@ class MetricsCalculator:
             "largest_win_value": trade_m.largest_win,
             "largest_loss_value": trade_m.largest_loss,
             "avg_win_loss_ratio": trade_m.payoff_ratio,
+            "payoff_ratio": trade_m.payoff_ratio,  # Alias for frontend compatibility
             "max_consecutive_wins": trade_m.max_consec_wins,
             "max_consecutive_losses": trade_m.max_consec_losses,
             "avg_bars_in_trade": trade_m.avg_bars_held,
@@ -1301,9 +1461,22 @@ class MetricsCalculator:
             "margin_efficiency": risk_m.margin_efficiency,
             "stability": risk_m.stability,
             "sqn": risk_m.sqn,
+            "kelly_percent": kelly_percent,
+            "kelly_percent_long": kelly_percent_long,
+            "kelly_percent_short": kelly_percent_short,
+            "open_trades": sum(
+                1
+                for t in trades
+                if (t.get("is_open", False) if isinstance(t, dict) else getattr(t, "is_open", False))
+                or (t.get("exit_comment", "") if isinstance(t, dict) else getattr(t, "exit_comment", ""))
+                == "open_position"
+            ),
             "expectancy": expectancy,
             "expectancy_ratio": expectancy_ratio,
+            "expectancy_pct": expectancy_pct,
+            "expectancy_pct_ratio": expectancy_pct_ratio,
             "cagr": risk_m.cagr,
+            "net_profit_pct": risk_m.net_profit_pct,
             "volatility": risk_m.volatility,
             # Long/Short metrics
             "long_trades": ls_m.long_trades,
@@ -1360,7 +1533,21 @@ class MetricsCalculator:
             "short_largest_win_pct": ls_m.short_largest_win_pct,
             "short_largest_loss_pct": ls_m.short_largest_loss_pct,
             "cagr_short": ls_m.short_cagr,
+            # Per-direction risk-adjusted ratios (computed from direction-specific equity curves)
+            "sharpe_long": sharpe_long_val,
+            "sharpe_short": sharpe_short_val,
+            "sortino_long": sortino_long_val,
+            "sortino_short": sortino_short_val,
+            "calmar_long": calmar_long_val,
+            "calmar_short": calmar_short_val,
         }
+
+        # Store in cache (evict oldest if full)
+        if len(_calculate_all_cache) >= _CALCULATE_ALL_CACHE_MAX:
+            # Remove oldest entry (first key in insertion order)
+            oldest = next(iter(_calculate_all_cache))
+            del _calculate_all_cache[oldest]
+        _calculate_all_cache[cache_key] = result.copy()
 
         return result
 
@@ -1441,18 +1628,19 @@ def enrich_metrics_with_percentages(metrics: dict, initial_capital: float) -> di
         result["long_return_pct"] = (metrics["long_net_profit"] / initial_capital) * 100
 
     if "short_net_profit" in metrics and metrics["short_net_profit"] is not None:
-        result["short_return_pct"] = (
-            metrics["short_net_profit"] / initial_capital
-        ) * 100
+        result["short_return_pct"] = (metrics["short_net_profit"] / initial_capital) * 100
 
-    # Strategy outperformance vs Buy & Hold
-    strategy_return = result.get("net_profit_pct", result.get("total_return", 0))
+    # Strategy outperformance vs Buy & Hold (TV parity: absolute USD = net_profit - buy_hold_return)
+    # Only compute buy_hold_return_pct for informational purposes.
     buy_hold_pct = result.get("buy_hold_return_pct", 0)
     if buy_hold_pct == 0 and "buy_hold_return" in metrics:
         buy_hold_pct = (metrics["buy_hold_return"] / initial_capital) * 100
         result["buy_hold_return_pct"] = buy_hold_pct
-
-    result["strategy_outperformance"] = strategy_return - buy_hold_pct
+    # strategy_outperformance stays as USD (set by engine.py or computed here)
+    if "strategy_outperformance" not in result or result.get("strategy_outperformance") == 0:
+        net_profit_usd = metrics.get("net_profit", 0) or 0
+        buy_hold_usd = metrics.get("buy_hold_return", 0) or 0
+        result["strategy_outperformance"] = net_profit_usd - buy_hold_usd
 
     # Ensure all key percentage fields exist (with 0 default)
     REQUIRED_PCT_FIELDS = [

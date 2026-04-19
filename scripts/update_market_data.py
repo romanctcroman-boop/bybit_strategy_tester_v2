@@ -13,8 +13,9 @@ import argparse
 import sqlite3
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -26,20 +27,52 @@ def get_db_path() -> Path:
     return PROJECT_ROOT / "data.sqlite3"
 
 
+def get_blocked_symbols() -> set:
+    """Load blocked symbols (skip auto-reload at startup)."""
+    try:
+        blocked_path = PROJECT_ROOT / "data" / "blocked_tickers.json"
+        if blocked_path.exists():
+            import json
+
+            with open(blocked_path, encoding="utf-8") as f:
+                data = json.load(f)
+            return {s.upper() for s in data.get("symbols", []) if s}
+    except Exception:
+        pass
+    return set()
+
+
 def get_all_symbols_intervals(conn: sqlite3.Connection) -> list:
-    """Get all unique symbol/interval pairs from database."""
+    """Get all unique symbol/interval pairs from database (excluding blocked).
+
+    Filters out:
+    - Blocked symbols (from blocked_tickers.json)
+    - Invalid/UNKNOWN intervals (test data leakage)
+    - Test symbols (e.g. TESTUSD)
+    """
+    # Only valid Bybit timeframes
+    VALID_INTERVALS = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+    # Known test symbols that should never be updated
+    TEST_SYMBOLS = {"TESTUSD", "TESTUSDT", "TEST", "FAKE", "FAKEUSD"}
+
     cursor = conn.cursor()
     cursor.execute("""
         SELECT DISTINCT symbol, interval
         FROM bybit_kline_audit
         ORDER BY symbol, interval
     """)
-    return cursor.fetchall()
+    pairs = cursor.fetchall()
+
+    # Filter out invalid intervals and test symbols
+    pairs = [(s, i) for s, i in pairs if i in VALID_INTERVALS and s.upper() not in TEST_SYMBOLS]
+
+    blocked = get_blocked_symbols()
+    if blocked:
+        pairs = [(s, i) for s, i in pairs if s.upper() not in blocked]
+    return pairs
 
 
-def get_newest_candle_time(
-    conn: sqlite3.Connection, symbol: str, interval: str
-) -> int | None:
+def get_newest_candle_time(conn: sqlite3.Connection, symbol: str, interval: str) -> int | None:
     """Get timestamp of newest candle for symbol/interval."""
     cursor = conn.cursor()
     cursor.execute(
@@ -57,24 +90,25 @@ def interval_to_ms(interval: str) -> int:
     """Convert interval string to milliseconds."""
     mapping = {
         "1": 60_000,
-        "3": 180_000,
         "5": 300_000,
         "15": 900_000,
         "30": 1_800_000,
         "60": 3_600_000,
-        "120": 7_200_000,
         "240": 14_400_000,
-        "360": 21_600_000,
-        "720": 43_200_000,
         "D": 86_400_000,
         "W": 604_800_000,
+        "M": 30 * 86_400_000,
     }
     return mapping.get(interval, 3_600_000)
 
 
-def fetch_candles_from_api(
-    symbol: str, interval: str, start_ts: int, end_ts: int, max_retries: int = 3
-) -> list:
+def overlap_candles(interval: str) -> int:
+    """Нахлёст свечей при догрузке: 5 для малых TF, меньше для D/W/M."""
+    mapping = {"1": 5, "5": 5, "15": 5, "30": 5, "60": 5, "240": 4, "D": 3, "W": 2, "M": 2}
+    return mapping.get(interval, 3)
+
+
+def fetch_candles_from_api(symbol: str, interval: str, start_ts: int, end_ts: int, max_retries: int = 3) -> list:
     """Fetch candles from Bybit API using direct REST calls with retry logic."""
     import requests
 
@@ -86,11 +120,11 @@ def fetch_candles_from_api(
         interval_norm = str(int(interval[:-1]) * 60)
 
     url = "https://api.bybit.com/v5/market/kline"
-    all_candles = []
+    all_candles: list[dict[str, Any]] = []
     current_start = start_ts
 
     while current_start < end_ts:
-        params = {
+        params: dict[str, str | int] = {
             "category": "linear",
             "symbol": symbol.upper(),
             "interval": interval_norm,
@@ -102,15 +136,17 @@ def fetch_candles_from_api(
         # Retry logic for transient network errors
         for attempt in range(max_retries):
             try:
-                r = requests.get(url, params=params, timeout=15)
+                r = requests.get(url, params=params, timeout=15)  # type: ignore[arg-type]
                 r.raise_for_status()
                 data = r.json()
                 break
-            except (requests.exceptions.ConnectionError, 
-                    requests.exceptions.Timeout,
-                    requests.exceptions.RequestException) as e:
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.RequestException,
+            ) as e:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
                     time.sleep(wait_time)
                     continue
                 else:
@@ -155,9 +191,7 @@ def fetch_candles_from_api(
     return all_candles
 
 
-def insert_candles(
-    conn: sqlite3.Connection, symbol: str, interval: str, candles: list
-) -> int:
+def insert_candles(conn: sqlite3.Connection, symbol: str, interval: str, candles: list) -> int:
     """Insert candles into database."""
     if not candles:
         return 0
@@ -224,7 +258,7 @@ def update_symbol_interval(
         "gap_minutes": 0,
     }
 
-    now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    now_ts = int(datetime.now(UTC).timestamp() * 1000)
     newest_ts = get_newest_candle_time(conn, symbol, interval)
 
     if not newest_ts:
@@ -251,8 +285,9 @@ def update_symbol_interval(
         result["status"] = "would_update"
         return result
 
-    # Fetch and insert new candles
-    start_ts = newest_ts + interval_ms
+    # Fetch with overlap (нахлёст N свечей — избегаем gaps на границе)
+    overlap = overlap_candles(interval)
+    start_ts = newest_ts - (overlap * interval_ms)
     candles = fetch_candles_from_api(symbol, interval, start_ts, now_ts)
 
     if candles:
@@ -318,9 +353,7 @@ def main():
     start_time = time.time()
 
     for symbol, interval in pairs:
-        result = update_symbol_interval(
-            conn, symbol, interval, args.verbose, args.dry_run
-        )
+        result = update_symbol_interval(conn, symbol, interval, args.verbose, args.dry_run)
 
         if result["status"] == "fresh":
             results["fresh"] += 1

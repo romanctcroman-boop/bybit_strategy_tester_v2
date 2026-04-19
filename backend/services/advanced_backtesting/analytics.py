@@ -21,8 +21,8 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -207,8 +207,8 @@ class DrawdownAnalysis:
     # Maximum
     max_drawdown: float = 0.0
     max_drawdown_duration: int = 0
-    max_drawdown_start: Optional[datetime] = None
-    max_drawdown_end: Optional[datetime] = None
+    max_drawdown_start: datetime | None = None
+    max_drawdown_end: datetime | None = None
     recovery_time: int = 0  # bars to recover
 
     # Statistics
@@ -232,12 +232,8 @@ class DrawdownAnalysis:
             "maximum": {
                 "drawdown_pct": round(self.max_drawdown * 100, 2),
                 "duration_bars": self.max_drawdown_duration,
-                "start": self.max_drawdown_start.isoformat()
-                if self.max_drawdown_start
-                else None,
-                "end": self.max_drawdown_end.isoformat()
-                if self.max_drawdown_end
-                else None,
+                "start": self.max_drawdown_start.isoformat() if self.max_drawdown_start else None,
+                "end": self.max_drawdown_end.isoformat() if self.max_drawdown_end else None,
                 "recovery_bars": self.recovery_time,
             },
             "statistics": {
@@ -324,16 +320,11 @@ class BacktestAnalytics:
         if analysis.avg_loss != 0:
             analysis.avg_risk_reward = abs(analysis.avg_win / analysis.avg_loss)
 
-        analysis.expectancy = (
-            analysis.win_rate * analysis.avg_win
-            - analysis.loss_rate * abs(analysis.avg_loss)
-        )
+        analysis.expectancy = analysis.win_rate * analysis.avg_win - analysis.loss_rate * abs(analysis.avg_loss)
 
         gross_profit = sum(t["pnl"] for t in winning) if winning else 0
         gross_loss = abs(sum(t["pnl"] for t in losing)) if losing else 0
-        analysis.profit_factor = (
-            gross_profit / gross_loss if gross_loss > 0 else float("inf")
-        )
+        analysis.profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         # Time analysis
         self._analyze_timing(analysis)
@@ -396,9 +387,7 @@ class BacktestAnalytics:
 
             try:
                 if isinstance(entry_time_str, str):
-                    entry_time = datetime.fromisoformat(
-                        entry_time_str.replace("Z", "+00:00")
-                    )
+                    entry_time = datetime.fromisoformat(entry_time_str.replace("Z", "+00:00"))
                 else:
                     entry_time = entry_time_str
 
@@ -436,9 +425,7 @@ class BacktestAnalytics:
         total_slippage = sum(t.get("slippage", 0) for t in self.trades)
 
         attr.total_return = total_pnl / self.initial_capital
-        attr.gross_return = (
-            total_pnl + total_commission + total_slippage
-        ) / self.initial_capital
+        attr.gross_return = (total_pnl + total_commission + total_slippage) / self.initial_capital
         attr.commission_drag = total_commission / self.initial_capital
         attr.slippage_drag = total_slippage / self.initial_capital
 
@@ -448,12 +435,8 @@ class BacktestAnalytics:
 
         attr.long_trades = len(long_trades)
         attr.short_trades = len(short_trades)
-        attr.long_return = (
-            sum(t.get("pnl", 0) for t in long_trades) / self.initial_capital
-        )
-        attr.short_return = (
-            sum(t.get("pnl", 0) for t in short_trades) / self.initial_capital
-        )
+        attr.long_return = sum(t.get("pnl", 0) for t in long_trades) / self.initial_capital
+        attr.short_return = sum(t.get("pnl", 0) for t in short_trades) / self.initial_capital
 
         # By time
         morning_trades = []
@@ -467,9 +450,7 @@ class BacktestAnalytics:
 
             try:
                 if isinstance(entry_time_str, str):
-                    entry_time = datetime.fromisoformat(
-                        entry_time_str.replace("Z", "+00:00")
-                    )
+                    entry_time = datetime.fromisoformat(entry_time_str.replace("Z", "+00:00"))
                 else:
                     entry_time = entry_time_str
 
@@ -483,15 +464,9 @@ class BacktestAnalytics:
             except (ValueError, AttributeError):
                 continue
 
-        attr.morning_return = (
-            sum(t.get("pnl", 0) for t in morning_trades) / self.initial_capital
-        )
-        attr.day_return = (
-            sum(t.get("pnl", 0) for t in day_trades) / self.initial_capital
-        )
-        attr.evening_return = (
-            sum(t.get("pnl", 0) for t in evening_trades) / self.initial_capital
-        )
+        attr.morning_return = sum(t.get("pnl", 0) for t in morning_trades) / self.initial_capital
+        attr.day_return = sum(t.get("pnl", 0) for t in day_trades) / self.initial_capital
+        attr.evening_return = sum(t.get("pnl", 0) for t in evening_trades) / self.initial_capital
 
         return attr
 
@@ -556,9 +531,7 @@ class BacktestAnalytics:
 
         return analysis
 
-    def analyze_regimes(
-        self, price_data: Optional[list[float]] = None
-    ) -> RegimeAnalysis:
+    def analyze_regimes(self, price_data: list[float] | None = None) -> RegimeAnalysis:
         """Analyze performance by market regime."""
         analysis = RegimeAnalysis()
 
@@ -574,9 +547,7 @@ class BacktestAnalytics:
         window = 20
         rolling_vol = np.array(
             [
-                np.std(returns[max(0, i - window) : i])
-                if i >= window
-                else np.std(returns[: i + 1])
+                np.std(returns[max(0, i - window) : i]) if i >= window else np.std(returns[: i + 1])
                 for i in range(len(returns))
             ]
         )
@@ -632,7 +603,7 @@ class BacktestAnalytics:
             "trade_analysis": trade_analysis.to_dict(),
             "performance_attribution": attribution.to_dict(),
             "drawdown_analysis": drawdown_analysis.to_dict(),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
 

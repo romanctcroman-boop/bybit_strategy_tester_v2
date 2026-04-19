@@ -24,8 +24,8 @@ Usage:
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -49,8 +49,8 @@ class Trade:
     def from_dict(cls, d: dict) -> "Trade":
         """Create Trade from dictionary."""
         return cls(
-            entry_time=d.get("entry_time", datetime.now(timezone.utc)),
-            exit_time=d.get("exit_time", datetime.now(timezone.utc)),
+            entry_time=d.get("entry_time", datetime.now(UTC)),
+            exit_time=d.get("exit_time", datetime.now(UTC)),
             entry_price=float(d.get("entry_price", 0)),
             exit_price=float(d.get("exit_price", 0)),
             size=float(d.get("size", 0)),
@@ -181,7 +181,7 @@ class MonteCarloSimulator:
     def __init__(
         self,
         n_simulations: int = 10000,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
         block_size: int = 10,
     ):
         """
@@ -231,12 +231,8 @@ class MonteCarloSimulator:
             returns = backtest_results.get("daily_returns", [])
             if not returns:
                 # Generate synthetic trades from summary stats
-                return self._analyze_from_summary(
-                    backtest_results, initial_capital, benchmark_return
-                )
-            return self._analyze_from_returns(
-                returns, initial_capital, benchmark_return, method
-            )
+                return self._analyze_from_summary(backtest_results, initial_capital, benchmark_return)
+            return self._analyze_from_returns(returns, initial_capital, benchmark_return, method)
 
         # Convert to Trade objects
         trades = [Trade.from_dict(t) if isinstance(t, dict) else t for t in trades_data]
@@ -248,9 +244,7 @@ class MonteCarloSimulator:
         # Calculate original metrics
         original_return = float(np.sum(pnl_values) / initial_capital)
         original_sharpe = self._calculate_sharpe(pnl_pct_values)
-        original_max_dd = self._calculate_max_drawdown_from_pnl(
-            pnl_values, initial_capital
-        )
+        original_max_dd = self._calculate_max_drawdown_from_pnl(pnl_values, initial_capital)
 
         # Run simulations
         simulated_returns = np.zeros(self.n_simulations)
@@ -263,9 +257,7 @@ class MonteCarloSimulator:
                 sim_pnl = np.random.permutation(pnl_values)
                 sim_pnl_pct = np.random.permutation(pnl_pct_values)
             elif method == "bootstrap":
-                indices = np.random.choice(
-                    len(pnl_values), size=len(pnl_values), replace=True
-                )
+                indices = np.random.choice(len(pnl_values), size=len(pnl_values), replace=True)
                 sim_pnl = pnl_values[indices]
                 sim_pnl_pct = pnl_pct_values[indices]
             elif method == "block_bootstrap":
@@ -276,9 +268,7 @@ class MonteCarloSimulator:
             simulated_returns[i] = np.sum(sim_pnl) / initial_capital
             simulated_finals[i] = initial_capital + np.sum(sim_pnl)
             simulated_sharpes[i] = self._calculate_sharpe(sim_pnl_pct)
-            simulated_max_dds[i] = self._calculate_max_drawdown_from_pnl(
-                sim_pnl, initial_capital
-            )
+            simulated_max_dds[i] = self._calculate_max_drawdown_from_pnl(sim_pnl, initial_capital)
 
         # Calculate statistics
         elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -299,13 +289,7 @@ class MonteCarloSimulator:
             mean_max_drawdown=float(np.mean(simulated_max_dds)),
             var_95=float(np.percentile(simulated_returns, 5)),
             var_99=float(np.percentile(simulated_returns, 1)),
-            cvar_95=float(
-                np.mean(
-                    simulated_returns[
-                        simulated_returns <= np.percentile(simulated_returns, 5)
-                    ]
-                )
-            ),
+            cvar_95=float(np.mean(simulated_returns[simulated_returns <= np.percentile(simulated_returns, 5)])),
             prob_positive_return=float(np.mean(simulated_returns > 0)),
             prob_beat_benchmark=float(np.mean(simulated_returns > benchmark_return)),
             return_ci_95=(
@@ -352,9 +336,7 @@ class MonteCarloSimulator:
             if method == "permutation":
                 sim_ret = np.random.permutation(returns_arr)
             else:
-                indices = np.random.choice(
-                    len(returns_arr), size=len(returns_arr), replace=True
-                )
+                indices = np.random.choice(len(returns_arr), size=len(returns_arr), replace=True)
                 sim_ret = returns_arr[indices]
 
             simulated_returns[i] = np.prod(1 + sim_ret) - 1
@@ -476,19 +458,8 @@ class MonteCarloSimulator:
             mean_max_drawdown=float(np.mean(simulated_max_dds)),
             var_95=float(np.percentile(simulated_returns, 5)),
             var_99=float(np.percentile(simulated_returns, 1)),
-            cvar_95=float(
-                np.mean(
-                    simulated_returns[
-                        simulated_returns <= np.percentile(simulated_returns, 5)
-                    ]
-                )
-            )
-            if len(
-                simulated_returns[
-                    simulated_returns <= np.percentile(simulated_returns, 5)
-                ]
-            )
-            > 0
+            cvar_95=float(np.mean(simulated_returns[simulated_returns <= np.percentile(simulated_returns, 5)]))
+            if len(simulated_returns[simulated_returns <= np.percentile(simulated_returns, 5)]) > 0
             else 0,
             prob_positive_return=float(np.mean(simulated_returns > 0)),
             prob_beat_benchmark=float(np.mean(simulated_returns > benchmark_return)),
@@ -540,9 +511,7 @@ class MonteCarloSimulator:
         return float(np.mean(excess_returns) / np.std(excess_returns) * np.sqrt(252))
 
     @staticmethod
-    def _calculate_max_drawdown_from_pnl(
-        pnl_values: np.ndarray, initial_capital: float
-    ) -> float:
+    def _calculate_max_drawdown_from_pnl(pnl_values: np.ndarray, initial_capital: float) -> float:
         """Calculate max drawdown from PnL sequence."""
         equity = initial_capital + np.cumsum(pnl_values)
         peak = np.maximum.accumulate(equity)
@@ -559,7 +528,7 @@ class MonteCarloSimulator:
 
 
 # Global instance
-_monte_carlo_simulator: Optional[MonteCarloSimulator] = None
+_monte_carlo_simulator: MonteCarloSimulator | None = None
 
 
 def get_monte_carlo_simulator() -> MonteCarloSimulator:

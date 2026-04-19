@@ -16,6 +16,7 @@ Notes:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 import urllib.parse
@@ -42,9 +43,7 @@ def main() -> int:
         "limit": str(limit),
         "source": "db",
     }
-    url = (
-        f"{BASE}/api/v1/marketdata/bybit/klines/smart?{urllib.parse.urlencode(params)}"
-    )
+    url = f"{BASE}/api/v1/marketdata/bybit/klines/smart?{urllib.parse.urlencode(params)}"
 
     duration_s = 90
     every_s = 3
@@ -65,10 +64,8 @@ def main() -> int:
             status, body = fetch_json(url, timeout_s=15.0)
             size = len(body)
             # basic sanity parse (don’t print huge body)
-            try:
+            with contextlib.suppress(Exception):
                 json.loads(body)
-            except Exception:
-                pass
         except Exception as e:
             err = repr(e)
         dt_ms = (time.perf_counter() - t0) * 1000.0

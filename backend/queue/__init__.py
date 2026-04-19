@@ -5,13 +5,17 @@ Provides asynchronous task queue functionality using Redis.
 Supports task scheduling, priority queues, and result tracking.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Callable
+from contextlib import suppress
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +47,8 @@ class Task:
         self,
         func_name: str,
         args: tuple = (),
-        kwargs: dict = None,
-        task_id: str = None,
+        kwargs: dict | None = None,  # Fixed to explicitly declare as Optional
+        task_id: str | None = None,  # Fixed to explicitly declare as Optional
         priority: TaskPriority = TaskPriority.NORMAL,
         max_retries: int = 3,
         timeout: int = 300,
@@ -58,13 +62,13 @@ class Task:
         self.timeout = timeout
         self.retry_count = 0
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.now(timezone.utc)
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
+        self.created_at = datetime.now(UTC)
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
         self.result: Any = None
-        self.error: Optional[str] = None
+        self.error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize task to dictionary."""
         return {
             "task_id": self.task_id,
@@ -78,15 +82,13 @@ class Task:
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "result": self.result,
             "error": self.error,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> Task:
         """Deserialize task from dictionary."""
         task = cls(
             func_name=data["func_name"],
@@ -133,10 +135,10 @@ class QueueAdapter:
         self.redis_url = redis_url
         self.queue_name = queue_name
         self.result_ttl = result_ttl
-        self._redis = None
+        self._redis: Any = None
         self._connected = False
-        self._handlers: Dict[str, Callable] = {}
-        self._worker_task: Optional[asyncio.Task] = None
+        self._handlers: dict[str, Callable] = {}
+        self._worker_task: asyncio.Task | asyncio.Future | None = None
         self._stats = {
             "tasks_submitted": 0,
             "tasks_completed": 0,
@@ -234,7 +236,7 @@ class QueueAdapter:
 
         return task.task_id
 
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def get_task(self, task_id: str) -> Task | None:
         """Get task by ID."""
         if not await self._ensure_connected():
             return None
@@ -244,7 +246,7 @@ class QueueAdapter:
             return Task.from_dict(json.loads(data))
         return None
 
-    async def get_result(self, task_id: str) -> Optional[Any]:
+    async def get_result(self, task_id: str) -> Any | None:
         """Get task result."""
         task = await self.get_task(task_id)
         if task:
@@ -252,9 +254,7 @@ class QueueAdapter:
                 "status": task.status.value,
                 "result": task.result,
                 "error": task.error,
-                "completed_at": task.completed_at.isoformat()
-                if task.completed_at
-                else None,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
             }
         return None
 
@@ -277,7 +277,7 @@ class QueueAdapter:
             return True
         return False
 
-    async def get_queue_stats(self) -> Dict[str, Any]:
+    async def get_queue_stats(self) -> dict[str, Any]:
         """Get queue statistics."""
         if not await self._ensure_connected():
             return {"connected": False, **self._stats}
@@ -302,9 +302,7 @@ class QueueAdapter:
             while True:
                 try:
                     # Get highest priority task
-                    result = await self._redis.zpopmax(
-                        f"{self.queue_name}:pending", count=1
-                    )
+                    result = await self._redis.zpopmax(f"{self.queue_name}:pending", count=1)
 
                     if not result:
                         await asyncio.sleep(0.1)
@@ -322,7 +320,7 @@ class QueueAdapter:
 
                     # Execute task
                     task.status = TaskStatus.RUNNING
-                    task.started_at = datetime.now(timezone.utc)
+                    task.started_at = datetime.now(UTC)
                     await self._update_task(task)
 
                     try:
@@ -341,7 +339,7 @@ class QueueAdapter:
 
                         task.status = TaskStatus.COMPLETED
                         task.result = result
-                        task.completed_at = datetime.now(timezone.utc)
+                        task.completed_at = datetime.now(UTC)
                         self._stats["tasks_completed"] += 1
 
                     except Exception as e:
@@ -384,10 +382,8 @@ class QueueAdapter:
         """Stop the worker."""
         if self._worker_task:
             self._worker_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):  # Use contextlib.suppress instead of try-except-pass
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
             logger.info("Queue workers stopped")
 
     async def _update_task(self, task: Task):
@@ -405,7 +401,7 @@ queue_adapter = QueueAdapter()
 __all__ = [
     "QueueAdapter",
     "Task",
-    "TaskStatus",
     "TaskPriority",
+    "TaskStatus",
     "queue_adapter",
 ]

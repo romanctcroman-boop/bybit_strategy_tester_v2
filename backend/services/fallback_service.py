@@ -13,15 +13,16 @@ Phase 5: Reliability & Resilience
 import hashlib
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, TypeVar
 
 
 def _utc_now() -> datetime:
     """Return timezone-aware UTC datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 logger = logging.getLogger(__name__)
@@ -54,9 +55,9 @@ class FallbackResponse:
     content: str
     fallback_type: FallbackType
     original_prompt: str
-    cached_at: Optional[datetime] = None
+    cached_at: datetime | None = None
     ttl_seconds: int = 3600
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_expired(self) -> bool:
@@ -64,7 +65,7 @@ class FallbackResponse:
             return True
         return _utc_now() > self.cached_at + timedelta(seconds=self.ttl_seconds)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "fallback_type": self.fallback_type.value,
@@ -88,7 +89,7 @@ class ServiceStatus:
     latency_p95_ms: float = 0.0
     error_rate: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "health": self.health.value,
@@ -107,8 +108,8 @@ class ResponseCache:
     def __init__(self, max_size: int = 1000, default_ttl: int = 3600):
         self.max_size = max_size
         self.default_ttl = default_ttl
-        self._cache: Dict[str, FallbackResponse] = {}
-        self._access_order: List[str] = []
+        self._cache: dict[str, FallbackResponse] = {}
+        self._access_order: list[str] = []
 
     def _hash_prompt(self, prompt: str, agent_type: str) -> str:
         """Create cache key from prompt"""
@@ -116,7 +117,7 @@ class ResponseCache:
         content = f"{agent_type}:{normalized}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
-    def get(self, prompt: str, agent_type: str) -> Optional[FallbackResponse]:
+    def get(self, prompt: str, agent_type: str) -> FallbackResponse | None:
         """Get cached response if available and not expired"""
         key = self._hash_prompt(prompt, agent_type)
 
@@ -142,8 +143,8 @@ class ResponseCache:
         prompt: str,
         agent_type: str,
         content: str,
-        ttl: Optional[int] = None,
-        metadata: Optional[Dict] = None,
+        ttl: int | None = None,
+        metadata: dict | None = None,
     ) -> None:
         """Cache a response"""
         key = self._hash_prompt(prompt, agent_type)
@@ -171,7 +172,7 @@ class ResponseCache:
         self._access_order.clear()
         return count
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         expired = sum(1 for r in self._cache.values() if r.is_expired)
         return {
@@ -200,9 +201,9 @@ class FallbackService:
             default_ttl=int(os.getenv("FALLBACK_CACHE_TTL", "3600")),
         )
 
-        self._services: Dict[str, ServiceStatus] = {}
-        self._static_responses: Dict[str, str] = {}
-        self._degraded_handlers: Dict[str, Callable] = {}
+        self._services: dict[str, ServiceStatus] = {}
+        self._static_responses: dict[str, str] = {}
+        self._degraded_handlers: dict[str, Callable] = {}
 
         # Initialize static responses
         self._init_static_responses()
@@ -338,7 +339,7 @@ Please retry when services are restored for personalized risk analysis.
             self.register_service(name)
         return self._services[name]
 
-    def get_all_services_health(self) -> Dict[str, ServiceStatus]:
+    def get_all_services_health(self) -> dict[str, ServiceStatus]:
         """Get health status for all services"""
         return self._services.copy()
 
@@ -357,9 +358,7 @@ Please retry when services are restored for personalized risk analysis.
             return ServiceHealth.DEGRADED
         return ServiceHealth.UNKNOWN
 
-    def register_degraded_handler(
-        self, pattern: str, handler: Callable[[str], str]
-    ) -> None:
+    def register_degraded_handler(self, pattern: str, handler: Callable[[str], str]) -> None:
         """Register a degraded mode handler for a pattern"""
         self._degraded_handlers[pattern] = handler
         logger.debug(f"Registered degraded handler for pattern: {pattern}")
@@ -368,8 +367,8 @@ Please retry when services are restored for personalized risk analysis.
         self,
         prompt: str,
         agent_type: str,
-        task_type: Optional[str] = None,
-    ) -> Optional[FallbackResponse]:
+        task_type: str | None = None,
+    ) -> FallbackResponse | None:
         """
         Get fallback response with priority:
         1. Cached response (if valid)
@@ -411,9 +410,7 @@ Please retry when services are restored for personalized risk analysis.
 
         return None
 
-    def _match_static_key(
-        self, prompt: str, agent_type: str, task_type: Optional[str]
-    ) -> Optional[str]:
+    def _match_static_key(self, prompt: str, agent_type: str, task_type: str | None) -> str | None:
         """Match prompt to static response key"""
         prompt_lower = prompt.lower()
 
@@ -429,11 +426,12 @@ Please retry when services are restored for personalized risk analysis.
                 return "strategy:mean_reversion"
 
         # Market research patterns
-        if agent_type == "perplexity":
-            if "market" in prompt_lower and (
-                "overview" in prompt_lower or "analysis" in prompt_lower
-            ):
-                return "research:market_overview"
+        if (
+            agent_type == "perplexity"
+            and "market" in prompt_lower
+            and ("overview" in prompt_lower or "analysis" in prompt_lower)
+        ):
+            return "research:market_overview"
 
         # Risk analysis patterns
         if "risk" in prompt_lower and "portfolio" in prompt_lower:
@@ -446,15 +444,13 @@ Please retry when services are restored for personalized risk analysis.
         prompt: str,
         agent_type: str,
         content: str,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> None:
         """Cache a successful response for future fallback use"""
         self.cache.set(prompt, agent_type, content, ttl)
         logger.debug(f"Cached response for {agent_type} (TTL: {ttl or 'default'}s)")
 
-    def get_degraded_response(
-        self, prompt: str, agent_type: str, error: Optional[str] = None
-    ) -> FallbackResponse:
+    def get_degraded_response(self, prompt: str, agent_type: str, error: str | None = None) -> FallbackResponse:
         """
         Generate a degraded mode response when all else fails.
         This is the last resort before returning an error.
@@ -485,13 +481,11 @@ This is a degraded response. The system will automatically recover when the serv
             metadata={"agent_type": agent_type, "error": error},
         )
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Get fallback service statistics"""
         return {
             "cache": self.cache.stats(),
-            "services": {
-                name: status.to_dict() for name, status in self._services.items()
-            },
+            "services": {name: status.to_dict() for name, status in self._services.items()},
             "overall_health": self.get_overall_health().value,
             "static_responses_count": len(self._static_responses),
             "degraded_handlers_count": len(self._degraded_handlers),
@@ -499,7 +493,7 @@ This is a degraded response. The system will automatically recover when the serv
 
 
 # Global singleton
-_fallback_service: Optional[FallbackService] = None
+_fallback_service: FallbackService | None = None
 
 
 def get_fallback_service() -> FallbackService:
@@ -540,9 +534,7 @@ def with_fallback(
 
                 # Cache successful response
                 if cache_successful and result:
-                    fallback_svc.cache_response(
-                        prompt, agent_type, result, ttl=cache_ttl
-                    )
+                    fallback_svc.cache_response(prompt, agent_type, result, ttl=cache_ttl)
 
                 return result
 
@@ -556,9 +548,7 @@ def with_fallback(
                     return fallback.content
 
                 # Last resort: degraded response
-                degraded = fallback_svc.get_degraded_response(
-                    prompt, agent_type, str(e)
-                )
+                degraded = fallback_svc.get_degraded_response(prompt, agent_type, str(e))
                 return degraded.content
 
         return wrapper
@@ -566,7 +556,7 @@ def with_fallback(
     return decorator
 
 
-def graceful_degradation(
+def graceful_degradation[T](
     fallback_value: T,
     log_level: str = "warning",
 ):

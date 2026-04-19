@@ -36,9 +36,7 @@ class ArchiveConfig:
 
 class ArchivalService:
     def __init__(self, output_dir: str | None = None):
-        self.output_dir = Path(
-            output_dir or os.environ.get("ARCHIVE_DIR", "archives")
-        ).resolve()
+        self.output_dir = Path(output_dir or os.environ.get("ARCHIVE_DIR", "archives")).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _iter_rows(self, s: Session, cfg: ArchiveConfig):
@@ -62,20 +60,11 @@ class ArchivalService:
             yield chunk
             offset += len(chunk)
 
-    def _write_parquet_partition(
-        self, symbol: str, interval: str, date_str: str, rows: list[BybitKlineAudit]
-    ):
-        part_dir = (
-            self.output_dir
-            / f"symbol={symbol}"
-            / f"interval={interval}"
-            / f"date={date_str}"
-        )
+    def _write_parquet_partition(self, symbol: str, interval: str, date_str: str, rows: list[BybitKlineAudit]):
+        part_dir = self.output_dir / f"symbol={symbol}" / f"interval={interval}" / f"date={date_str}"
         part_dir.mkdir(parents=True, exist_ok=True)
         # One file per write to keep simple; compaction can merge later
-        file_path = (
-            part_dir / f"klines_{rows[0].open_time}_{rows[-1].open_time}.parquet"
-        )
+        file_path = part_dir / f"klines_{rows[0].open_time}_{rows[-1].open_time}.parquet"
         data = {
             "symbol": [r.symbol for r in rows],
             "interval": [r.interval for r in rows],
@@ -109,9 +98,7 @@ class ArchivalService:
                 ) from e2
         return str(file_path)
 
-    def archive(
-        self, cfg: ArchiveConfig, *, interval_for_partition: str | None = None
-    ) -> int:
+    def archive(self, cfg: ArchiveConfig, *, interval_for_partition: str | None = None) -> int:
         """Archive rows to Parquet partitions. Returns number of rows written.
 
         interval_for_partition is retained for backward compatibility; when not
@@ -130,20 +117,13 @@ class ArchivalService:
                 groups = {}
                 for r in chunk:
                     date_str = ms_to_date(r.open_time)
-                    interval = (
-                        r.interval
-                        or interval_for_partition
-                        or cfg.interval
-                        or "UNKNOWN"
-                    )
+                    interval = r.interval or interval_for_partition or cfg.interval or "UNKNOWN"
                     key = (r.symbol, interval, date_str)
                     groups.setdefault(key, []).append(r)
                 # write each group
                 for (symbol, interval_value, date_str), rows in groups.items():
                     rows.sort(key=lambda r: r.open_time)
-                    self._write_parquet_partition(
-                        symbol, interval_value, date_str, rows
-                    )
+                    self._write_parquet_partition(symbol, interval_value, date_str, rows)
                     total += len(rows)
         finally:
             s.close()
@@ -216,6 +196,10 @@ class ArchivalService:
                             break
                 except Exception:
                     interval = None
-            adapter._persist_klines_to_db(symbol, rows, interval=interval or "UNKNOWN")
+            # Inject interval into each row dict so _persist_klines_to_db can read it
+            resolved_interval = interval or "UNKNOWN"
+            for row in rows:
+                row.setdefault("interval", resolved_interval)
+            adapter._persist_klines_to_db(symbol, rows)
             count += len(rows)
         return count

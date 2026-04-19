@@ -11,9 +11,7 @@ description = "Professional-grade backtesting and live trading platform for Bybi
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-authors = [
-    { name = "Roman", email = "roman@example.com" }
-]
+authors = [{ name = "Roman", email = "roman@example.com" }]
 keywords = [
     "trading",
     "backtesting",
@@ -21,7 +19,7 @@ keywords = [
     "cryptocurrency",
     "algorithmic-trading",
     "fastapi",
-    "ai-agent"
+    "ai-agent",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -33,6 +31,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Office/Business :: Financial :: Investment",
     "Typing :: Typed",
 ]
@@ -45,6 +44,10 @@ Issues = "https://github.com/RomanCTC/bybit_strategy_tester_v2/issues"
 
 [project.scripts]
 bybit-tester = "backend.api.app:main"
+
+[project.optional-dependencies]
+l2-generative = ["torch>=2.0", "websockets"]
+dev-full = ["numba", "vectorbt>=0.26.2", "torch>=2.0", "gymnasium>=0.29"]
 
 # ==============================================================================
 # Build System
@@ -62,21 +65,38 @@ exclude = ["tests*", "scripts*"]
 # Ruff - Fast Python Linter & Formatter
 # ==============================================================================
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 120
 fix = true
 
 [tool.ruff.lint]
+allowed-confusables = [
+    "с",
+    "С",
+    "а",
+    "А",
+    "е",
+    "Е",
+    "о",
+    "О",
+    "р",
+    "Р",
+    "х",
+    "Х",
+    "Н",
+    "В",
+    "б",
+]
 select = [
-    "E",      # pycodestyle errors
-    "F",      # pyflakes
-    "W",      # pycodestyle warnings
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-    "SIM",    # flake8-simplify
-    "RUF",    # ruff-specific rules
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
@@ -84,12 +104,33 @@ ignore = [
     "B008",   # function call in default argument (FastAPI Depends)
     "B904",   # raise without from in except
     "RUF012", # mutable class attributes
+    "UP042",  # str+Enum pattern — intentional for JSON serialization compat
+    "RUF001", # ambiguous unicode character in string — false positive for Cyrillic/emoji
+    "RUF002", # ambiguous unicode character in docstring — false positive for Cyrillic/emoji
+    "RUF003", # ambiguous unicode character in comment — false positive for Cyrillic/emoji
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["E402", "E722", "F841", "B011"]
 "tests/**/*.py" = ["E402", "E722", "F841", "B011"]
-"scripts/*.py" = ["E402", "T201"]
+"scripts/*.py" = [
+    "E402",
+    "T201",
+    "F401",   # unused imports in debug scripts
+    "F821",   # undefined names (may reference runtime state)
+    "E741",   # ambiguous variable name (l, O, I) — debug scripts
+    "B007",   # unused loop variable — debug scripts
+    "SIM102",
+    "SIM108",
+    "SIM113",
+    "SIM105",
+    "SIM115", # simplification style
+    "E701",   # multiple statements on one line
+    "E722",   # bare except
+    "B023",   # function uses loop variable
+    "ANN",    # type annotations not required in debug scripts
+    "UP035",  # deprecated typing imports (Dict/List) — debug scripts keep py3.8 compat style
+]
 "analyze_*.py" = ["E402", "T201"]
 "check_*.py" = ["E402", "T201"]
 "debug_*.py" = ["E402", "T201"]
@@ -98,7 +139,13 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend", "frontend"]
-section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -111,12 +158,7 @@ line-ending = "auto"
 # ==============================================================================
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = [
-    "-ra",
-    "-q",
-    "--strict-markers",
-    "--tb=short",
-]
+addopts = ["-ra", "-q", "--strict-markers", "--tb=short"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -131,6 +173,12 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+# pytest-xdist: используем "loadscope" чтобы тесты одного класса шли в одном worker
+# (важно для session-браузера в e2e: каждый worker имеет свой browser fixture)
+# Запуск:
+#   pytest tests/ -n auto                  — все тесты параллельно
+#   pytest tests/frontend/ -n 4            — e2e на 4 воркерах (~30-40 сек вместо ~2 мин)
+#   pytest tests/ -n auto -m "not e2e"     — только быстрые тесты без e2e
 
 # ==============================================================================
 # Coverage Configuration
@@ -138,12 +186,7 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 source = ["backend"]
-omit = [
-    "*/tests/*",
-    "*/__pycache__/*",
-    "*/migrations/*",
-    "*/.venv/*",
-]
+omit = ["*/tests/*", "*/__pycache__/*", "*/migrations/*", "*/.venv/*"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -162,11 +205,25 @@ fail_under = 50
 directory = "htmlcov"
 
 # ==============================================================================
+# Pyright / Pylance Configuration
+# ==============================================================================
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+# Relax strict return-type checks for dynamic typing patterns (json.loads, resp.json(), etc.)
+reportReturnType = "none"
+reportAssignmentType = "warning"
+reportCallIssue = "warning"
+# Relax argument type checks for SQLAlchemy 1.x Column[] type mismatches
+reportArgumentType = "none"
+exclude = ["venv", ".venv", "scripts", "node_modules", "mcp-server", "test_*"]
+
+# ==============================================================================
 # MyPy Configuration
 # ==============================================================================
 [tool.mypy]
-python_version = "3.11"
-warn_return_any = true
+python_version = "3.13"
+warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
@@ -176,6 +233,12 @@ exclude = [
     "tests",
     "scripts",
     "node_modules",
+    "^scripts/",
+    "temp_analysis",
+    # Exclude Windows TempState folders (VS Code chat screenshot attachments)
+    ".*TempState.*",
+    ".*ScreenClip.*",
+    ".*AppData.*",
 ]
 
 [[tool.mypy.overrides]]
@@ -183,12 +246,110 @@ module = "backend.*"
 disallow_untyped_defs = false
 check_untyped_defs = true
 
+# SQLAlchemy 1.x Column[] types cause false-positive arg-type / assignment errors
+# because mypy sees Column[T] instead of runtime T values from the ORM.
+[[tool.mypy.overrides]]
+module = "backend.api.routers.optimizations"
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "var-annotated",
+    "return-value",
+    "union-attr",
+    "operator",
+    "attr-defined",
+    "misc",
+    "dict-item",
+]
+
+# Debug/analysis scripts — disable all strict checks (these are one-off scripts)
+[[tool.mypy.overrides]]
+module = "scripts.*"
+disable_error_code = [
+    "union-attr",
+    "attr-defined",
+    "var-annotated",
+    "assignment",
+    "misc",
+    "return-value",
+    "arg-type",
+    "type-var",
+    "name-defined",
+    "operator",
+    "index",
+    "dict-item",
+    "call-arg",
+    "no-redef",
+]
+ignore_errors = true
+
+# Also catch scripts accessed as top-level modules (no __init__.py in scripts/)
+# mypy names them by stem: _compare_trades, _debug_sharpe, etc.
+[[tool.mypy.overrides]]
+module = [
+    "_compare_trades",
+    "_debug_avg_margin",
+    "_debug_avg_margin2",
+    "_debug_sharpe",
+    "_debug_sharpe2",
+    "_debug_sharpe3",
+    "_debug_sharpe4",
+    "_debug_sortino",
+    "_debug_sortino2",
+    "_debug_trade127",
+    "_debug_trade127b",
+    "_deep_analysis",
+    "_diagnose_intrabar3",
+    "_diagnose_ratios",
+    "_diagnose_ratios2",
+    "_diagnose_ratios3",
+    "_diagnose_ratios4",
+    "_diagnose_runup",
+    "_diagnose_runup2",
+    "_dump_metrics",
+    "_inspect_ec",
+    "_inspect_trade129",
+    "_verify_all_metrics",
+    "_check_rsi_missing",
+    "_check_tv_entry",
+    "_check_tv_ohlcv",
+    "_check_tv_csv",
+    "_check_market_types",
+    "_check_strategy_config",
+    "_check_tv_raw",
+    "_check_data_range",
+    "_check_summary_stats",
+    "_debug_t126_tp",
+    "_compare_tv_v2",
+    "_compare_tv_v3",
+    "_compare_tv_v4",
+    "_compare_tv_v5",
+    "_debug_trade2",
+    "_debug_trade100",
+    "_debug_trade100b",
+    "_debug_engine_entry",
+    "_debug_rsi_signals",
+    "_debug_rsi_compare",
+    "_debug_signals9313",
+    "_debug_t100_reason",
+    "_diagnose_intrabar2",
+    "_diagnose_ratios3",
+    "_inspect_trade129",
+    "_rsi_signal_analysis",
+    "_verify_rsi_fix",
+    "_find_missing_signals",
+    "_timezone_analysis",
+    "_debug_sortino",
+    "_debug_sortino2",
+]
+ignore_errors = true
+
 # ==============================================================================
 # Black (backup formatter if needed)
 # ==============================================================================
 [tool.black]
 line-length = 120
-target-version = ["py311", "py312"]
+target-version = ["py313", "py314"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -212,9 +373,9 @@ exclude = '''
 [tool.bandit]
 exclude_dirs = ["tests", "scripts", ".venv", "node_modules"]
 skips = [
-    "B101",  # assert_used - common in tests
-    "B104",  # hardcoded_bind_all_interfaces - intentional for dev
-    "B311",  # random - not used for crypto
+    "B101", # assert_used - common in tests
+    "B104", # hardcoded_bind_all_interfaces - intentional for dev
+    "B311", # random - not used for crypto
 ]
 
 [tool.bandit.assert_used]

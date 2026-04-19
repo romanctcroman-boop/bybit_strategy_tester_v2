@@ -55,10 +55,10 @@ if sys.platform == "win32":
         pass
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -113,13 +113,13 @@ class ScheduledTask:
     task_type: TaskType
     interval_seconds: int
     enabled: bool = True
-    last_run: Optional[datetime] = None
-    next_run: Optional[datetime] = None
+    last_run: datetime | None = None
+    next_run: datetime | None = None
     run_count: int = 0
     error_count: int = 0
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -138,8 +138,8 @@ class ScheduledTask:
 class ActionLog:
     """Log entry for an action."""
 
-    id: Optional[int] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    id: int | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     task_id: str = ""
     task_type: str = ""
     action: str = ""
@@ -148,7 +148,7 @@ class ActionLog:
     duration_ms: int = 0
     affected_rows: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "timestamp": self.timestamp.isoformat(),
@@ -254,20 +254,16 @@ class MaintenanceDB:
             )
             conn.commit()
 
-    def get_tasks(self) -> List[ScheduledTask]:
+    def get_tasks(self) -> list[ScheduledTask]:
         """Get all scheduled tasks."""
         with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM scheduled_tasks ORDER BY name"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM scheduled_tasks ORDER BY name").fetchall()
             return [self._row_to_task(row) for row in rows]
 
-    def get_task(self, task_id: str) -> Optional[ScheduledTask]:
+    def get_task(self, task_id: str) -> ScheduledTask | None:
         """Get a specific task by ID."""
         with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM scheduled_tasks WHERE id = ?", (task_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM scheduled_tasks WHERE id = ?", (task_id,)).fetchone()
             return self._row_to_task(row) if row else None
 
     def _row_to_task(self, row: sqlite3.Row) -> ScheduledTask:
@@ -278,12 +274,8 @@ class MaintenanceDB:
             task_type=TaskType(row["task_type"]),
             interval_seconds=row["interval_seconds"],
             enabled=bool(row["enabled"]),
-            last_run=datetime.fromisoformat(row["last_run"])
-            if row["last_run"]
-            else None,
-            next_run=datetime.fromisoformat(row["next_run"])
-            if row["next_run"]
-            else None,
+            last_run=datetime.fromisoformat(row["last_run"]) if row["last_run"] else None,
+            next_run=datetime.fromisoformat(row["next_run"]) if row["next_run"] else None,
             run_count=row["run_count"],
             error_count=row["error_count"],
             config=json.loads(row["config"]) if row["config"] else {},
@@ -315,9 +307,9 @@ class MaintenanceDB:
     def get_history(
         self,
         limit: int = 100,
-        task_id: Optional[str] = None,
-        since: Optional[datetime] = None,
-    ) -> List[ActionLog]:
+        task_id: str | None = None,
+        since: datetime | None = None,
+    ) -> list[ActionLog]:
         """Get action history with optional filters."""
         with self._get_connection() as conn:
             query = "SELECT * FROM action_history WHERE 1=1"
@@ -353,11 +345,9 @@ class MaintenanceDB:
 
     def cleanup_old_history(self, days: int = 30) -> int:
         """Delete history older than N days."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM action_history WHERE timestamp < ?", (cutoff.isoformat(),)
-            )
+            cursor = conn.execute("DELETE FROM action_history WHERE timestamp < ?", (cutoff.isoformat(),))
             conn.commit()
             return cursor.rowcount
 
@@ -389,25 +379,27 @@ class TaskExecutors:
         """Get interval duration in milliseconds."""
         mapping = {
             "1": 60_000,
-            "3": 180_000,
             "5": 300_000,
             "15": 900_000,
             "30": 1_800_000,
             "60": 3_600_000,
-            "120": 7_200_000,
             "240": 14_400_000,
             "D": 86_400_000,
             "W": 604_800_000,
+            "M": 30 * 86_400_000,
         }
         return mapping.get(interval, 60_000)
 
-    def freshness_check(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_overlap_candles(self, interval: str) -> int:
+        """Нахлёст свечей при догрузке: 5 для малых TF, меньше для D/W/M."""
+        mapping = {"1": 5, "5": 5, "15": 5, "30": 5, "60": 5, "240": 4, "D": 3, "W": 2, "M": 2}
+        return mapping.get(interval, 3)
+
+    def freshness_check(self, config: dict[str, Any]) -> dict[str, Any]:
         """Check data freshness and AUTO-UPDATE stale data."""
         symbols = config.get("symbols", ["BTCUSDT", "ETHUSDT"])
-        intervals = config.get("intervals", ["1", "5", "15", "30", "60", "240", "D"])
-        max_age_minutes = config.get(
-            "max_age_minutes", {"1": 5, "5": 10, "15": 20, "default": 60}
-        )
+        intervals = config.get("intervals", ["1", "5", "15", "30", "60", "240", "D", "W", "M"])
+        max_age_minutes = config.get("max_age_minutes", {"1": 5, "5": 10, "15": 20, "default": 60})
 
         results = {
             "checked": 0,
@@ -426,10 +418,20 @@ class TaskExecutors:
         try:
             conn = sqlite3.connect(str(self.data_db_path))
             c = conn.cursor()
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             now_ts = int(now.timestamp() * 1000)
 
+            blocked = set()
+            try:
+                from backend.services.blocked_tickers import get_blocked
+
+                blocked = get_blocked()
+            except Exception:
+                pass
+
             for symbol in symbols:
+                if symbol.upper() in blocked:
+                    continue
                 for interval in intervals:
                     try:
                         # Get newest candle
@@ -450,9 +452,7 @@ class TaskExecutors:
                         age_minutes = (now_ts - newest_ts) / 60000
 
                         # Get max age for this interval
-                        max_age = max_age_minutes.get(
-                            interval, max_age_minutes.get("default", 60)
-                        )
+                        max_age = max_age_minutes.get(interval, max_age_minutes.get("default", 60))
 
                         if age_minutes > max_age:
                             results["stale"] += 1
@@ -492,9 +492,7 @@ class TaskExecutors:
                                     )
                             except Exception as e:
                                 results["errors"] += 1
-                                logger.warning(
-                                    f"Auto-update failed for {symbol}:{interval}: {e}"
-                                )
+                                logger.warning(f"Auto-update failed for {symbol}:{interval}: {e}")
                                 results["details"].append(
                                     {
                                         "symbol": symbol,
@@ -507,9 +505,7 @@ class TaskExecutors:
 
                     except Exception as e:
                         results["errors"] += 1
-                        logger.warning(
-                            f"Freshness check failed for {symbol}:{interval}: {e}"
-                        )
+                        logger.warning(f"Freshness check failed for {symbol}:{interval}: {e}")
 
             conn.close()
 
@@ -518,9 +514,7 @@ class TaskExecutors:
             logger.error(f"Freshness check failed: {e}")
 
         if results["candles_added"] > 0:
-            logger.info(
-                f"✅ Auto-updated {results['updated']} intervals, added {results['candles_added']} candles"
-            )
+            logger.info(f"✅ Auto-updated {results['updated']} intervals, added {results['candles_added']} candles")
 
         return results
 
@@ -534,11 +528,14 @@ class TaskExecutors:
         last_ts: int,
         now_ts: int,
     ) -> int:
-        """Fetch and insert missing candles."""
+        """Fetch and insert missing candles. С нахлёстом — перезаписываем граничные свечи."""
         all_candles = []
         end_ts = now_ts
+        interval_ms = self._get_interval_ms(interval)
+        overlap = self._get_overlap_candles(interval)
+        cutoff_ts = last_ts - (overlap * interval_ms)
 
-        # Fetch in batches until we reach last_ts
+        # Fetch in batches until we reach last_ts - overlap (включаем нахлёст)
         max_iterations = 10  # Safety limit
         for _ in range(max_iterations):
             try:
@@ -552,13 +549,12 @@ class TaskExecutors:
                 if not candles:
                     break
 
-                # Filter only new candles
-                new_candles = [c for c in candles if c["open_time"] > last_ts]
+                # Берём свечи от cutoff (включая нахлёст) до now — перезапишем границу
+                new_candles = [c for c in candles if c["open_time"] >= cutoff_ts]
                 all_candles.extend(new_candles)
 
-                # If we got older candles than last_ts, we're done
                 oldest = min(c["open_time"] for c in candles)
-                if oldest <= last_ts:
+                if oldest <= cutoff_ts:
                     break
 
                 end_ts = oldest
@@ -571,23 +567,23 @@ class TaskExecutors:
         if not all_candles:
             return 0
 
-        # Insert candles
+        # Insert candles (REPLACE для нахлёста — перезаписываем граничные свечи)
         inserted = 0
+        market_type = "linear"
         for candle in all_candles:
             try:
-                open_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=timezone.utc
-                )
+                open_dt = datetime.fromtimestamp(candle["open_time"] / 1000, tz=UTC)
                 cursor.execute(
                     """
-                    INSERT OR IGNORE INTO bybit_kline_audit
-                    (symbol, interval, open_time, open_time_dt, open_price, high_price,
+                    INSERT OR REPLACE INTO bybit_kline_audit
+                    (symbol, interval, market_type, open_time, open_time_dt, open_price, high_price,
                      low_price, close_price, volume, turnover, raw)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         symbol,
                         interval,
+                        market_type,
                         candle["open_time"],
                         open_dt.isoformat(),
                         candle["open"],
@@ -596,12 +592,7 @@ class TaskExecutors:
                         candle["close"],
                         candle["volume"],
                         candle["turnover"],
-                        json.dumps(
-                            {
-                                k: (v.isoformat() if isinstance(v, datetime) else v)
-                                for k, v in candle.items()
-                            }
-                        ),
+                        json.dumps({k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in candle.items()}),
                     ),
                 )
                 inserted += cursor.rowcount
@@ -612,7 +603,7 @@ class TaskExecutors:
         logger.debug(f"Inserted {inserted} candles for {symbol}:{interval}")
         return inserted
 
-    def gap_repair(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def gap_repair(self, config: dict[str, Any]) -> dict[str, Any]:
         """Detect and repair data gaps."""
         symbols = config.get("symbols", ["BTCUSDT", "ETHUSDT"])
         intervals = config.get("intervals", ["5", "15", "30", "60", "240", "D"])
@@ -635,9 +626,7 @@ class TaskExecutors:
                             results["gaps_found"] += gaps
 
                             # Attempt repair
-                            repaired = repair_service.repair_all_gaps(
-                                symbol, interval, max_gaps=max_gaps_per_run
-                            )
+                            repaired = repair_service.repair_all_gaps(symbol, interval, max_gaps=max_gaps_per_run)
                             results["gaps_repaired"] += repaired
 
                             results["details"].append(
@@ -651,9 +640,7 @@ class TaskExecutors:
 
                     except Exception as e:
                         results["errors"] += 1
-                        logger.warning(
-                            f"Gap repair failed for {symbol}:{interval}: {e}"
-                        )
+                        logger.warning(f"Gap repair failed for {symbol}:{interval}: {e}")
 
         except ImportError:
             results["errors"] += 1
@@ -664,16 +651,19 @@ class TaskExecutors:
 
         return results
 
-    def retention_cleanup(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Enforce retention policy - delete old data."""
-        retention_years = config.get("retention_years", 2)
+    def retention_cleanup(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Enforce retention policy - delete candles older than retention_years."""
+        try:
+            from backend.config.database_policy import RETENTION_YEARS
+        except ImportError:
+            RETENTION_YEARS = 2
+        retention_years = config.get("retention_years", RETENTION_YEARS)
 
         results = {"deleted": 0, "errors": 0, "cutoff_date": None}
 
         try:
-            now = datetime.now(timezone.utc)
-            cutoff_year = now.year - retention_years + 1
-            cutoff_date = datetime(cutoff_year, 1, 1, tzinfo=timezone.utc)
+            now = datetime.now(UTC)
+            cutoff_date = now - timedelta(days=retention_years * 365)
             cutoff_ts = int(cutoff_date.timestamp() * 1000)
 
             results["cutoff_date"] = cutoff_date.strftime("%Y-%m-%d")
@@ -723,7 +713,7 @@ class TaskExecutors:
 
         return results
 
-    def db_optimize(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def db_optimize(self, config: dict[str, Any]) -> dict[str, Any]:
         """Run database optimization: VACUUM and ANALYZE."""
         results = {
             "vacuum": False,
@@ -736,9 +726,7 @@ class TaskExecutors:
 
         try:
             # Get size before
-            results["size_before_mb"] = round(
-                self.data_db_path.stat().st_size / (1024 * 1024), 2
-            )
+            results["size_before_mb"] = round(self.data_db_path.stat().st_size / (1024 * 1024), 2)
 
             conn = sqlite3.connect(str(self.data_db_path))
             c = conn.cursor()
@@ -765,17 +753,10 @@ class TaskExecutors:
             conn.close()
 
             # Get size after
-            results["size_after_mb"] = round(
-                self.data_db_path.stat().st_size / (1024 * 1024), 2
-            )
-            results["space_freed_mb"] = round(
-                results["size_before_mb"] - results["size_after_mb"], 2
-            )
+            results["size_after_mb"] = round(self.data_db_path.stat().st_size / (1024 * 1024), 2)
+            results["space_freed_mb"] = round(results["size_before_mb"] - results["size_after_mb"], 2)
 
-            logger.info(
-                f"DB optimization complete: VACUUM={results['vacuum']}, "
-                f"freed {results['space_freed_mb']} MB"
-            )
+            logger.info(f"DB optimization complete: VACUUM={results['vacuum']}, freed {results['space_freed_mb']} MB")
 
         except Exception as e:
             results["errors"] += 1
@@ -796,7 +777,7 @@ class TaskScheduler:
         self.db = db
         self.executors = executors
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     def start(self):
@@ -831,7 +812,7 @@ class TaskScheduler:
 
     def _check_and_run_tasks(self):
         """Check for due tasks and run them."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tasks = self.db.get_tasks()
 
         for task in tasks:
@@ -848,7 +829,7 @@ class TaskScheduler:
     def _execute_task(self, task: ScheduledTask):
         """Execute a single task."""
         start_time = time.time()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Log start
         log = ActionLog(
@@ -906,7 +887,7 @@ class TaskScheduler:
         # Save updated task state
         self.db.save_task(task)
 
-    def run_task_now(self, task_id: str) -> Optional[Dict]:
+    def run_task_now(self, task_id: str) -> dict | None:
         """Run a specific task immediately."""
         task = self.db.get_task(task_id)
         if not task:
@@ -981,7 +962,7 @@ def create_api(server: "DBMaintenanceServer"):
         return {"message": "Task disabled", "task": task.to_dict()}
 
     @app.get("/history")
-    def get_history(limit: int = 100, task_id: Optional[str] = None):
+    def get_history(limit: int = 100, task_id: str | None = None):
         history = server.db.get_history(limit=limit, task_id=task_id)
         return {"history": [h.to_dict() for h in history]}
 
@@ -989,7 +970,7 @@ def create_api(server: "DBMaintenanceServer"):
     def health_check():
         return {
             "status": "healthy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     return app
@@ -1011,7 +992,7 @@ class DBMaintenanceServer:
             interval_seconds=300,  # 5 minutes
             config={
                 "symbols": ["BTCUSDT", "ETHUSDT"],
-                "intervals": ["1", "5", "15", "30", "60", "240", "D"],
+                "intervals": ["1", "5", "15", "30", "60", "240", "D", "W", "M"],
                 "max_age_minutes": {"1": 5, "5": 10, "15": 20, "default": 60},
             },
         ),
@@ -1022,7 +1003,7 @@ class DBMaintenanceServer:
             interval_seconds=21600,  # 6 hours
             config={
                 "symbols": ["BTCUSDT", "ETHUSDT"],
-                "intervals": ["5", "15", "30", "60", "240", "D"],
+                "intervals": ["5", "15", "30", "60", "240", "D", "W", "M"],
                 "max_gaps": 10,
             },
         ),
@@ -1044,13 +1025,11 @@ class DBMaintenanceServer:
 
     def __init__(
         self,
-        maintenance_db_path: Optional[Path] = None,
-        data_db_path: Optional[Path] = None,
+        maintenance_db_path: Path | None = None,
+        data_db_path: Path | None = None,
         api_port: int = 8001,
     ):
-        self.maintenance_db_path = (
-            maintenance_db_path or PROJECT_ROOT / "data" / "maintenance.sqlite3"
-        )
+        self.maintenance_db_path = maintenance_db_path or PROJECT_ROOT / "data" / "maintenance.sqlite3"
         self.data_db_path = data_db_path or PROJECT_ROOT / "data.sqlite3"
         self.api_port = api_port
 
@@ -1063,7 +1042,7 @@ class DBMaintenanceServer:
         self.scheduler = TaskScheduler(self.db, self.executors)
 
         self._running = False
-        self._api_thread: Optional[threading.Thread] = None
+        self._api_thread: threading.Thread | None = None
 
         # Initialize default tasks if not exist
         self._init_default_tasks()
@@ -1075,11 +1054,11 @@ class DBMaintenanceServer:
         for task in self.DEFAULT_TASKS:
             if task.id not in existing_tasks:
                 # Set initial next_run to now
-                task.next_run = datetime.now(timezone.utc)
+                task.next_run = datetime.now(UTC)
                 self.db.save_task(task)
                 logger.info(f"Initialized default task: {task.name}")
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get server status."""
         tasks = self.db.get_tasks()
         recent_history = self.db.get_history(limit=10)
@@ -1096,7 +1075,7 @@ class DBMaintenanceServer:
                 "list": [t.to_dict() for t in tasks],
             },
             "recent_actions": [h.to_dict() for h in recent_history],
-            "uptime": datetime.now(timezone.utc).isoformat(),
+            "uptime": datetime.now(UTC).isoformat(),
         }
 
     def start(self):
@@ -1141,9 +1120,7 @@ class DBMaintenanceServer:
             try:
                 import uvicorn
 
-                uvicorn.run(
-                    app, host="0.0.0.0", port=self.api_port, log_level="warning"
-                )
+                uvicorn.run(app, host="0.0.0.0", port=self.api_port, log_level="warning")
             except Exception as e:
                 logger.error(f"API server error: {e}")
 
@@ -1205,13 +1182,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="DB Maintenance Server")
-    parser.add_argument(
-        "--port", type=int, default=8001, help="API port (default: 8001)"
-    )
+    parser.add_argument("--port", type=int, default=8001, help="API port (default: 8001)")
     parser.add_argument("--data-db", type=str, help="Path to data database")
-    parser.add_argument(
-        "--maintenance-db", type=str, help="Path to maintenance database"
-    )
+    parser.add_argument("--maintenance-db", type=str, help="Path to maintenance database")
 
     args = parser.parse_args()
 

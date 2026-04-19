@@ -10,10 +10,11 @@ using Hypothesis library for testing trading strategies with:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class PropertyDefinition:
     description: str
     property_type: PropertyType
     validator: Callable[..., bool]
-    generator: Optional[Callable[[], Any]] = None
+    generator: Callable[[], Any] | None = None
     min_examples: int = 100
     max_examples: int = 1000
     shrink_enabled: bool = True
@@ -60,11 +61,11 @@ class PropertyTestResult:
     property_name: str
     result: TestResult
     examples_tested: int
-    failing_example: Optional[Any] = None
-    error_message: Optional[str] = None
+    failing_example: Any | None = None
+    error_message: str | None = None
     duration_ms: float = 0.0
-    shrunk_example: Optional[Any] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    shrunk_example: Any | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -78,7 +79,7 @@ class TestReport:
     errors: int
     results: list[PropertyTestResult]
     duration_ms: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def success_rate(self) -> float:
@@ -197,17 +198,13 @@ class PropertyTestingService:
         )
 
         self._initialized = True
-        logger.info(
-            f"✅ Registered {len(self._properties)} trading properties for testing"
-        )
+        logger.info(f"✅ Registered {len(self._properties)} trading properties for testing")
 
     # ============================================================
     # Property Validators
     # ============================================================
 
-    def _validate_equity_non_negative(
-        self, initial_equity: float, trades: list[dict]
-    ) -> bool:
+    def _validate_equity_non_negative(self, initial_equity: float, trades: list[dict]) -> bool:
         """Validate that equity never goes negative during trades."""
         equity = initial_equity
         for trade in trades:
@@ -228,9 +225,7 @@ class PropertyTestingService:
             return True  # No position is valid
         return min_size <= abs(position_size) <= max_size
 
-    def _validate_pnl_consistency(
-        self, realized_pnl: float, unrealized_pnl: float, total_pnl: float
-    ) -> bool:
+    def _validate_pnl_consistency(self, realized_pnl: float, unrealized_pnl: float, total_pnl: float) -> bool:
         """Validate PnL calculation consistency."""
         epsilon = 1e-8
         return abs((realized_pnl + unrealized_pnl) - total_pnl) < epsilon
@@ -239,10 +234,7 @@ class PropertyTestingService:
         """Validate that cumulative fills are monotonically increasing."""
         if len(fill_history) < 2:
             return True
-        for i in range(1, len(fill_history)):
-            if fill_history[i] < fill_history[i - 1]:
-                return False
-        return True
+        return all(fill_history[i] >= fill_history[i - 1] for i in range(1, len(fill_history)))
 
     def _validate_risk_compliance(
         self,
@@ -268,15 +260,11 @@ class PropertyTestingService:
         drawdown = (peak_equity - current_equity) / peak_equity
         return drawdown <= max_drawdown_pct
 
-    def _validate_execution_latency(
-        self, latency_ms: float, max_latency_ms: float = 1000.0
-    ) -> bool:
+    def _validate_execution_latency(self, latency_ms: float, max_latency_ms: float = 1000.0) -> bool:
         """Validate execution latency is within bounds."""
         return 0 <= latency_ms <= max_latency_ms
 
-    def _validate_spread_validity(
-        self, bid: float, ask: float, max_spread_pct: float = 0.01
-    ) -> bool:
+    def _validate_spread_validity(self, bid: float, ask: float, max_spread_pct: float = 0.01) -> bool:
         """Validate bid-ask spread is valid."""
         if bid <= 0 or ask <= 0:
             return False
@@ -323,7 +311,7 @@ class PropertyTestingService:
         self,
         property_name: str,
         test_data: Any,
-        num_examples: Optional[int] = None,
+        num_examples: int | None = None,
     ) -> PropertyTestResult:
         """
         Run a single property test.
@@ -345,7 +333,7 @@ class PropertyTestingService:
             )
 
         prop = self._properties[property_name]
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
             # Run the validator
@@ -356,7 +344,7 @@ class PropertyTestingService:
             else:
                 passed = prop.validator(test_data)
 
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+            duration = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
             result = PropertyTestResult(
                 property_name=property_name,
@@ -367,7 +355,7 @@ class PropertyTestingService:
             )
 
         except Exception as e:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+            duration = (datetime.now(UTC) - start_time).total_seconds() * 1000
             result = PropertyTestResult(
                 property_name=property_name,
                 result=TestResult.ERROR,
@@ -381,7 +369,7 @@ class PropertyTestingService:
 
     def run_all_tests(
         self,
-        test_data_generator: Optional[Callable[[], dict]] = None,
+        test_data_generator: Callable[[], dict] | None = None,
         num_examples: int = 100,
     ) -> TestReport:
         """
@@ -394,14 +382,14 @@ class PropertyTestingService:
         Returns:
             TestReport with all results
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         results: list[PropertyTestResult] = []
         passed = 0
         failed = 0
         skipped = 0
         errors = 0
 
-        for prop_name, prop in self._properties.items():
+        for prop_name, _prop in self._properties.items():
             try:
                 # Generate test data
                 if test_data_generator:
@@ -433,7 +421,7 @@ class PropertyTestingService:
                     )
                 )
 
-        duration = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        duration = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
         report = TestReport(
             total_properties=len(self._properties),
@@ -446,10 +434,7 @@ class PropertyTestingService:
         )
 
         self._test_history.append(report)
-        logger.info(
-            f"✅ Property tests complete: {passed}/{len(self._properties)} passed "
-            f"({report.success_rate:.1f}%)"
-        )
+        logger.info(f"✅ Property tests complete: {passed}/{len(self._properties)} passed ({report.success_rate:.1f}%)")
 
         return report
 
@@ -500,7 +485,7 @@ class PropertyTestingService:
             TestReport with strategy test results
         """
         results: list[PropertyTestResult] = []
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         # Test equity invariant with strategy
         equity = strategy_config.get("initial_equity", 10000.0)
@@ -541,7 +526,7 @@ class PropertyTestingService:
         )
         results.append(dd_result)
 
-        duration = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        duration = (datetime.now(UTC) - start_time).total_seconds() * 1000
         passed = sum(1 for r in results if r.result == TestResult.PASSED)
 
         return TestReport(
@@ -606,7 +591,7 @@ class PropertyTestingService:
     def get_test_history(
         self,
         limit: int = 10,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
     ) -> list[dict]:
         """Get test execution history."""
         history = self._test_history
@@ -637,9 +622,7 @@ class PropertyTestingService:
             "recent_failures": [
                 {
                     "property": f.property_name,
-                    "example": str(f.failing_example)[:100]
-                    if f.failing_example
-                    else None,
+                    "example": str(f.failing_example)[:100] if f.failing_example else None,
                     "timestamp": f.timestamp.isoformat(),
                 }
                 for f in failures[-10:]
@@ -652,23 +635,15 @@ class PropertyTestingService:
             "initialized": self._initialized,
             "registered_properties": len(self._properties),
             "total_tests_run": len(self._results),
-            "tests_passed": sum(
-                1 for r in self._results if r.result == TestResult.PASSED
-            ),
-            "tests_failed": sum(
-                1 for r in self._results if r.result == TestResult.FAILED
-            ),
+            "tests_passed": sum(1 for r in self._results if r.result == TestResult.PASSED),
+            "tests_failed": sum(1 for r in self._results if r.result == TestResult.FAILED),
             "test_reports": len(self._test_history),
-            "last_test": (
-                self._test_history[-1].timestamp.isoformat()
-                if self._test_history
-                else None
-            ),
+            "last_test": (self._test_history[-1].timestamp.isoformat() if self._test_history else None),
         }
 
 
 # Singleton instance
-_property_testing_service: Optional[PropertyTestingService] = None
+_property_testing_service: PropertyTestingService | None = None
 
 
 def get_property_testing_service() -> PropertyTestingService:

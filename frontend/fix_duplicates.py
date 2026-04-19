@@ -26,9 +26,7 @@ def find_and_remove_duplicates(content, filename):
     changes = []
 
     # Check what's imported
-    import_match = re.search(
-        r"import\s+\{([^}]+)\}\s+from\s+'\.\.\/utils\.js'", content
-    )
+    import_match = re.search(r"import\s+\{([^}]+)\}\s+from\s+'\.\.\/utils\.js'", content)
     if not import_match:
         return content, changes
 
@@ -70,9 +68,7 @@ def find_and_remove_duplicates(content, filename):
                 open_braces = preceding.count("{") - preceding.count("}")
 
                 # Only remove if it looks like a module-level duplicate
-                changes.append(
-                    f"  Found duplicate: {func_name} (brace level: {open_braces})"
-                )
+                changes.append(f"  Found duplicate: {func_name} (brace level: {open_braces})")
 
                 # Remove the function and any preceding comment
                 # Look back for comment
@@ -88,9 +84,7 @@ def find_and_remove_duplicates(content, filename):
                     actual_start = search_start + comment_match.start()
 
                 # Replace with a comment noting the removal
-                replacement = (
-                    f"\n        // {func_name} - using imported version from utils.js\n"
-                )
+                replacement = f"\n        // {func_name} - using imported version from utils.js\n"
 
                 content = content[:actual_start] + replacement + content[pos:]
                 changes.append(f"  Removed duplicate function: {func_name}")
@@ -102,13 +96,11 @@ def process_file(filepath):
     """Process a single JS file"""
     print(f"\n📄 Processing: {filepath.name}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
 
     # Simple approach: remove duplicate function declarations
-    import_match = re.search(
-        r"import\s+\{([^}]+)\}\s+from\s+'\.\.\/utils\.js'", content
-    )
+    import_match = re.search(r"import\s+\{([^}]+)\}\s+from\s+'\.\.\/utils\.js'", content)
     if not import_match:
         print("  No utils.js imports found, skipping")
         return False
@@ -151,16 +143,10 @@ def process_file(filepath):
                 removed_text = content[full_match_start:full_match_end]
 
                 # Replace with comment
-                replacement = (
-                    f"\n        // {func_name} - using imported version from utils.js"
-                )
-                content = (
-                    content[:full_match_start] + replacement + content[full_match_end:]
-                )
+                replacement = f"\n        // {func_name} - using imported version from utils.js"
+                content = content[:full_match_start] + replacement + content[full_match_end:]
 
-                print(
-                    f"  ✅ Removed duplicate: {func_name} ({len(removed_text)} chars)"
-                )
+                print(f"  ✅ Removed duplicate: {func_name} ({len(removed_text)} chars)")
                 changes_made = True
                 break  # Move to next function
 

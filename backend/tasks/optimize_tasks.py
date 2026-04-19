@@ -4,14 +4,15 @@ Optimization Tasks
 Celery задачи для оптимизации стратегий (grid search, walk-forward, Bayesian).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from backend.celery_app import celery_app
 from celery import Task
 from loguru import logger
 
+from backend.celery_app import celery_app
+from backend.config.constants import COMMISSION_TV
 from backend.core.engine_adapter import get_engine
 from backend.database import SessionLocal
 from backend.models import Optimization
@@ -29,15 +30,11 @@ class OptimizationTask(Task):
         if optimization_id:
             try:
                 db = SessionLocal()
-                opt = (
-                    db.query(Optimization)
-                    .filter(Optimization.id == optimization_id)
-                    .first()
-                )
+                opt = db.query(Optimization).filter(Optimization.id == optimization_id).first()
                 if opt:
                     opt.status = "failed"
                     opt.error_message = str(exc)
-                    opt.updated_at = datetime.now(timezone.utc)
+                    opt.updated_at = datetime.now(UTC)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -57,14 +54,14 @@ class OptimizationTask(Task):
 def grid_search_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
     end_date: str,
     metric: str = "sharpe_ratio",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Grid Search оптимизация
 
@@ -93,9 +90,7 @@ def grid_search_task(
         if not opt:
             raise ValueError(f"Optimization {optimization_id} not found")
 
-        data_service.update_optimization(
-            optimization_id, status="running", started_at=datetime.now(timezone.utc)
-        )
+        data_service.update_optimization(optimization_id, status="running", started_at=datetime.now(UTC))
 
         # Загрузить данные
         logger.info("📥 Loading market data...")
@@ -118,9 +113,7 @@ def grid_search_task(
         logger.info(f"🔢 Testing {total_combinations} parameter combinations")
 
         # Прогресс
-        self.update_state(
-            state="PROGRESS", meta={"current": 0, "total": total_combinations}
-        )
+        self.update_state(state="PROGRESS", meta={"current": 0, "total": total_combinations})
 
         # Запуск бэктестов для каждой комбинации
         results = []
@@ -128,12 +121,12 @@ def grid_search_task(
         best_params = None
         best_result = None
 
-        engine = get_engine(None, initial_capital=10000.0, commission=0.0006)
+        engine = get_engine(None, initial_capital=10000.0, commission=0.0007)  # 0.07% TradingView parity
 
         for idx, params in enumerate(combinations, 1):
             # Обновить конфигурацию стратегии
             test_config = strategy_config.copy()
-            for param_name, param_value in zip(param_names, params):
+            for param_name, param_value in zip(param_names, params, strict=False):
                 test_config[param_name] = param_value
 
             # Запустить бэктест
@@ -143,7 +136,7 @@ def grid_search_task(
 
                 results.append(
                     {
-                        "params": dict(zip(param_names, params)),
+                        "params": dict(zip(param_names, params, strict=False)),
                         "score": score,
                         "metrics": {
                             "total_return": result.get("total_return"),
@@ -158,14 +151,12 @@ def grid_search_task(
                 # Обновить лучший результат
                 if score > best_score:
                     best_score = score
-                    best_params = dict(zip(param_names, params))
+                    best_params = dict(zip(param_names, params, strict=False))
                     best_result = result
 
                 # Обновить прогресс
                 if idx % 10 == 0 or idx == total_combinations:
-                    logger.info(
-                        f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)"
-                    )
+                    logger.info(f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)")
                     self.update_state(
                         state="PROGRESS",
                         meta={
@@ -189,7 +180,7 @@ def grid_search_task(
         data_service.update_optimization(
             optimization_id,
             status="completed",
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
             best_params=best_params,
             best_score=best_score,
             results={
@@ -222,7 +213,7 @@ def grid_search_task(
                 optimization_id,
                 status="failed",
                 error_message=str(e),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
         except Exception as db_error:
             logger.error(f"Failed to update optimization status: {db_error}")
@@ -236,14 +227,12 @@ def grid_search_task(
         db.close()
 
 
-@celery_app.task(
-    bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.walk_forward"
-)
+@celery_app.task(bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.walk_forward")
 def walk_forward_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
@@ -252,7 +241,7 @@ def walk_forward_task(
     test_size: int = 60,  # Testing days (OOS window)
     step_size: int = 30,  # Step size for rolling window
     metric: str = "sharpe_ratio",  # Optimization metric
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Walk-Forward оптимизация
 
@@ -279,7 +268,6 @@ def walk_forward_task(
     from datetime import datetime
 
     from backend.core.walkforward import WalkForwardAnalyzer
-
     from backend.services.data_service import DataService
 
     logger.info(f"🚶 Starting walk-forward optimization: {optimization_id}")
@@ -299,9 +287,7 @@ def walk_forward_task(
         )
 
         data_service = DataService()
-        data = data_service.get_candles(
-            symbol=symbol, interval=interval, start_date=start_date, end_date=end_date
-        )
+        data = data_service.get_candles(symbol=symbol, interval=interval, start_date=start_date, end_date=end_date)
 
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -321,7 +307,7 @@ def walk_forward_task(
         analyzer = WalkForwardAnalyzer(
             data=data,
             initial_capital=strategy_config.get("initial_capital", 10000.0),
-            commission=strategy_config.get("commission", 0.001),
+            commission=strategy_config.get("commission", COMMISSION_TV),
             is_window_days=train_size,
             oos_window_days=test_size,
             step_days=step_size,
@@ -348,9 +334,7 @@ def walk_forward_task(
             asyncio.set_event_loop(loop)
 
         results = loop.run_until_complete(
-            analyzer.run_async(
-                strategy_config=strategy_config, param_space=param_space, metric=metric
-            )
+            analyzer.run_async(strategy_config=strategy_config, param_space=param_space, metric=metric)
         )
 
         # 4. Формируем результат
@@ -364,8 +348,7 @@ def walk_forward_task(
         )
 
         logger.success(
-            f"✅ Walk-forward completed: {optimization_id}, "
-            f"processed {len(results['windows'])}/{num_windows} windows"
+            f"✅ Walk-forward completed: {optimization_id}, processed {len(results['windows'])}/{num_windows} windows"
         )
 
         return {
@@ -383,7 +366,7 @@ def walk_forward_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -406,8 +389,8 @@ def walk_forward_task(
 def bayesian_optimization_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, Dict[str, Any]],  # {param: {type, low, high}}
+    strategy_config: dict[str, Any],
+    param_space: dict[str, dict[str, Any]],  # {param: {type, low, high}}
     symbol: str,
     interval: str,
     start_date: str,
@@ -416,8 +399,8 @@ def bayesian_optimization_task(
     metric: str = "sharpe_ratio",
     direction: str = "maximize",
     n_jobs: int = 1,
-    random_state: Optional[int] = None,
-) -> Dict[str, Any]:
+    random_state: int | None = None,
+) -> dict[str, Any]:
     """
     Bayesian Optimization используя Optuna
 
@@ -447,7 +430,6 @@ def bayesian_optimization_task(
     from datetime import datetime
 
     from backend.core.bayesian import BayesianOptimizer
-
     from backend.services.data_service import DataService
 
     logger.info(f"🧠 Starting Bayesian optimization: {optimization_id}")
@@ -466,9 +448,7 @@ def bayesian_optimization_task(
         )
 
         data_service = DataService()
-        data = data_service.get_candles(
-            symbol=symbol, interval=interval, start_date=start_date, end_date=end_date
-        )
+        data = data_service.get_candles(symbol=symbol, interval=interval, start_date=start_date, end_date=end_date)
 
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -488,7 +468,7 @@ def bayesian_optimization_task(
         optimizer = BayesianOptimizer(
             data=data,
             initial_capital=strategy_config.get("initial_capital", 10000.0),
-            commission=strategy_config.get("commission", 0.001),
+            commission=strategy_config.get("commission", COMMISSION_TV),
             n_trials=n_trials,
             n_jobs=n_jobs,
             random_state=random_state,
@@ -562,7 +542,7 @@ def bayesian_optimization_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:

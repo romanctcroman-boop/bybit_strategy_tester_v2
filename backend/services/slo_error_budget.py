@@ -13,9 +13,9 @@ Provides burn rate alerts when error budget is being consumed too fast.
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class ErrorBudgetState:
     burn_rate_6h: float
     burn_rate_24h: float
     status: BudgetStatus
-    time_until_exhausted: Optional[timedelta]
+    time_until_exhausted: timedelta | None
     window_start: datetime
     window_end: datetime
 
@@ -186,7 +186,7 @@ class SLOErrorBudgetService:
         slo_name: str,
         latency_ms: float,
         endpoint: str = "",
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> bool:
         """
         Record a latency metric for an SLO.
@@ -201,7 +201,7 @@ class SLOErrorBudgetService:
         is_good = latency_ms <= slo.target
 
         metric = SLOMetric(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             value=latency_ms,
             is_good=is_good,
             endpoint=endpoint,
@@ -213,15 +213,13 @@ class SLOErrorBudgetService:
 
         return is_good
 
-    def record_success(
-        self, slo_name: str, endpoint: str = "", metadata: Optional[dict] = None
-    ) -> None:
+    def record_success(self, slo_name: str, endpoint: str = "", metadata: dict | None = None) -> None:
         """Record a successful event (for availability/error rate SLOs)."""
         if slo_name not in self._slos:
             return
 
         metric = SLOMetric(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             value=1.0,
             is_good=True,
             endpoint=endpoint,
@@ -235,7 +233,7 @@ class SLOErrorBudgetService:
         slo_name: str,
         endpoint: str = "",
         error: str = "",
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> None:
         """Record a failed event (for availability/error rate SLOs)."""
         if slo_name not in self._slos:
@@ -245,7 +243,7 @@ class SLOErrorBudgetService:
         meta["error"] = error
 
         metric = SLOMetric(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             value=0.0,
             is_good=False,
             endpoint=endpoint,
@@ -255,7 +253,7 @@ class SLOErrorBudgetService:
         self._metrics[slo_name].append(metric)
         self._check_burn_rate_alerts(slo_name)
 
-    def get_error_budget_state(self, slo_name: str) -> Optional[ErrorBudgetState]:
+    def get_error_budget_state(self, slo_name: str) -> ErrorBudgetState | None:
         """Get current error budget state for an SLO."""
         if slo_name not in self._slos:
             return None
@@ -280,12 +278,12 @@ class SLOErrorBudgetService:
                 burn_rate_24h=0.0,
                 status=BudgetStatus.HEALTHY,
                 time_until_exhausted=None,
-                window_start=datetime.now(timezone.utc),
-                window_end=datetime.now(timezone.utc),
+                window_start=datetime.now(UTC),
+                window_end=datetime.now(UTC),
             )
 
         # Filter metrics within window
-        window_start = datetime.now(timezone.utc) - timedelta(hours=slo.window_hours)
+        window_start = datetime.now(UTC) - timedelta(hours=slo.window_hours)
         window_metrics = [m for m in metrics if m.timestamp >= window_start]
 
         total_events = len(window_metrics)
@@ -294,9 +292,7 @@ class SLOErrorBudgetService:
 
         # Calculate SLI (Service Level Indicator)
         if slo.slo_type == SLOType.AVAILABILITY:
-            current_sli = (
-                (good_events / total_events * 100) if total_events > 0 else 100.0
-            )
+            current_sli = (good_events / total_events * 100) if total_events > 0 else 100.0
             # Error budget = allowed bad events
             error_budget_total = total_events * (1 - slo.target / 100)
         elif slo.slo_type == SLOType.ERROR_RATE:
@@ -304,17 +300,13 @@ class SLOErrorBudgetService:
             error_budget_total = total_events * (slo.target / 100)
         else:
             # Latency SLOs
-            current_sli = (
-                (good_events / total_events * 100) if total_events > 0 else 100.0
-            )
+            current_sli = (good_events / total_events * 100) if total_events > 0 else 100.0
             # Assume 99.9% SLO for latency metrics
             error_budget_total = total_events * 0.001
 
         error_budget_remaining = max(0, error_budget_total - bad_events)
         error_budget_remaining_pct = (
-            (error_budget_remaining / error_budget_total * 100)
-            if error_budget_total > 0
-            else 100.0
+            (error_budget_remaining / error_budget_total * 100) if error_budget_total > 0 else 100.0
         )
 
         # Calculate burn rates
@@ -354,7 +346,7 @@ class SLOErrorBudgetService:
             status=status,
             time_until_exhausted=time_until_exhausted,
             window_start=window_start,
-            window_end=datetime.now(timezone.utc),
+            window_end=datetime.now(UTC),
         )
 
     def _calculate_burn_rate(self, slo_name: str, hours: int) -> float:
@@ -373,7 +365,7 @@ class SLOErrorBudgetService:
         if not metrics:
             return 0.0
 
-        window_start = datetime.now(timezone.utc) - timedelta(hours=hours)
+        window_start = datetime.now(UTC) - timedelta(hours=hours)
         window_metrics = [m for m in metrics if m.timestamp >= window_start]
 
         if not window_metrics:
@@ -403,7 +395,7 @@ class SLOErrorBudgetService:
         if not state:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         last_alert = self._last_alert_time.get(slo_name)
 
         if last_alert and (now - last_alert) < self._alert_cooldown:
@@ -455,9 +447,7 @@ class SLOErrorBudgetService:
         healthy = sum(1 for s in states.values() if s.status == BudgetStatus.HEALTHY)
         warning = sum(1 for s in states.values() if s.status == BudgetStatus.WARNING)
         critical = sum(1 for s in states.values() if s.status == BudgetStatus.CRITICAL)
-        exhausted = sum(
-            1 for s in states.values() if s.status == BudgetStatus.EXHAUSTED
-        )
+        exhausted = sum(1 for s in states.values() if s.status == BudgetStatus.EXHAUSTED)
 
         # Find most critical SLOs
         critical_slos = [
@@ -472,7 +462,7 @@ class SLOErrorBudgetService:
         ]
 
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "total_slos": len(states),
             "summary": {
                 "healthy": healthy,
@@ -481,11 +471,7 @@ class SLOErrorBudgetService:
                 "exhausted": exhausted,
             },
             "overall_health": (
-                "critical"
-                if exhausted > 0 or critical > 0
-                else "warning"
-                if warning > 0
-                else "healthy"
+                "critical" if exhausted > 0 or critical > 0 else "warning" if warning > 0 else "healthy"
             ),
             "critical_slos": critical_slos,
             "recent_alerts": [
@@ -495,9 +481,7 @@ class SLOErrorBudgetService:
                     "message": a.message,
                     "timestamp": a.timestamp.isoformat(),
                 }
-                for a in sorted(self._alerts, key=lambda x: x.timestamp, reverse=True)[
-                    :10
-                ]
+                for a in sorted(self._alerts, key=lambda x: x.timestamp, reverse=True)[:10]
             ],
         }
 
@@ -523,7 +507,7 @@ class SLOErrorBudgetService:
 
 
 # Global instance
-_slo_service: Optional[SLOErrorBudgetService] = None
+_slo_service: SLOErrorBudgetService | None = None
 
 
 def get_slo_service() -> SLOErrorBudgetService:

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /d/bybit_strategy_tester_v2 log --oneline -10 frontend/)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "mcp__ide__executeCode",
+      "Bash(cmd.exe:*)",
+      "Bash(py:*)",
+      "WebSearch"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "context7",
+    "playwright",
+    "sequential-thinking",
+    "fetch",
+    "github"
+  ]
+}

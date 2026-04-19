@@ -23,8 +23,9 @@ except ImportError:
     psutil = None
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from backend.utils.time import utc_now
+
 from backend.monitoring.breaker_telemetry import get_agent_breaker_snapshot
+from backend.utils.time import utc_now
 
 router = APIRouter(prefix="/health", tags=["health-monitoring"])
 
@@ -34,12 +35,8 @@ class ComponentHealth(BaseModel):
 
     name: str = Field(..., description="Component name")
     status: str = Field(..., description="Status: healthy, degraded, unhealthy")
-    response_time_ms: float = Field(
-        ..., description="Component response time in milliseconds"
-    )
-    details: dict[str, Any] = Field(
-        default_factory=dict, description="Additional details"
-    )
+    response_time_ms: float = Field(..., description="Component response time in milliseconds")
+    details: dict[str, Any] = Field(default_factory=dict, description="Additional details")
     last_check: str = Field(..., description="ISO timestamp of last check")
 
 
@@ -48,9 +45,7 @@ class HealthDashboard(BaseModel):
 
     overall_status: str = Field(..., description="Overall system status")
     timestamp: str = Field(..., description="ISO timestamp")
-    components: list[ComponentHealth] = Field(
-        ..., description="Individual component health"
-    )
+    components: list[ComponentHealth] = Field(..., description="Individual component health")
     summary: dict[str, int] = Field(..., description="Summary counts by status")
     alerts: list[str] = Field(default_factory=list, description="Active alerts")
     agent_telemetry: dict[str, Any] | None = Field(
@@ -77,14 +72,12 @@ async def check_database_health() -> ComponentHealth:
             session.execute(text("SELECT 1"))
             from backend.database import engine
 
-            pool = engine.pool
-            pool_size = pool.size()
-            checked_out = pool.checkedout()
-            overflow = pool.overflow()
+            pool: Any = engine.pool
+            pool_size: int = getattr(pool, "size", lambda: 5)()
+            checked_out: int = getattr(pool, "checkedout", lambda: 0)()
+            overflow: int = getattr(pool, "overflow", lambda: 0)()
             total_capacity = pool_size + overflow
-            utilization = (
-                (checked_out / total_capacity * 100) if total_capacity > 0 else 0
-            )
+            utilization = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
             response_time = (time.time() - start) * 1000
             if utilization > 90:
                 status = "degraded"
@@ -268,7 +261,7 @@ async def enhanced_health_check():
     response = {
         "overall_status": overall_status,
         "timestamp": utc_now().isoformat().replace("+00:00", "Z"),
-        "components": [c.dict() for c in components],
+        "components": [c.model_dump() for c in components],
         "summary": {
             "healthy": statuses.count("healthy"),
             "degraded": statuses.count("degraded"),
@@ -284,12 +277,14 @@ async def enhanced_health_check():
 
 @router.get("/dashboard", response_model=HealthDashboard)
 async def health_dashboard():
-    components = await asyncio.gather(
-        check_database_health(),
-        check_redis_health(),
-        check_celery_health(),
-        check_disk_health(),
-        check_api_health(),
+    components = list(
+        await asyncio.gather(
+            check_database_health(),
+            check_redis_health(),
+            check_celery_health(),
+            check_disk_health(),
+            check_api_health(),
+        )
     )
     statuses = [c.status for c in components]
     if "unhealthy" in statuses:
@@ -302,9 +297,7 @@ async def health_dashboard():
     for component in components:
         if component.status == "unhealthy":
             error_msg = component.details.get("error", "Component unhealthy")
-            alerts.append(
-                f"CRITICAL: {component.name.upper()} is unhealthy - {error_msg}"
-            )
+            alerts.append(f"CRITICAL: {component.name.upper()} is unhealthy - {error_msg}")
         elif component.status == "degraded":
             if component.name == "database":
                 util = component.details.get("utilization_pct", 0)
@@ -328,7 +321,7 @@ async def health_dashboard():
         agent_telemetry=get_agent_breaker_snapshot(),
     )
     if overall_status == "unhealthy":
-        raise HTTPException(status_code=503, detail=dashboard.dict())
+        raise HTTPException(status_code=503, detail=dashboard.model_dump())
     return dashboard
 
 

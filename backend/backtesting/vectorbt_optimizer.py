@@ -20,7 +20,7 @@ Uses:
 import warnings
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,7 @@ except ImportError:
     logger.warning("vectorbt not available for optimization")
 
 try:
-    from numba import jit  # noqa: F401
+    from numba import jit
 
     NUMBA_AVAILABLE = True
 except ImportError:
@@ -74,7 +74,7 @@ else:
 class OptimizationResult:
     """Result of a single parameter combination"""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     total_return: float
     sharpe_ratio: float
     max_drawdown: float
@@ -93,11 +93,11 @@ class VectorbtOptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
 
 
 class VectorbtGridOptimizer:
@@ -135,18 +135,18 @@ class VectorbtGridOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",
-        weights: Optional[Dict[str, float]] = None,
-        filters: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
+        filters: dict[str, float] | None = None,
     ) -> VectorbtOptimizationResult:
         """
         Run high-performance grid search optimization.
@@ -223,9 +223,7 @@ class VectorbtGridOptimizer:
             all_results.extend(results)
         else:
             # Chunked processing for large parameter spaces
-            logger.info(
-                f"📦 Running chunked optimization ({total_combinations:,} combinations)"
-            )
+            logger.info(f"📦 Running chunked optimization ({total_combinations:,} combinations)")
 
             # Generate all parameter combinations
             all_combinations = list(
@@ -239,27 +237,21 @@ class VectorbtGridOptimizer:
             )
 
             # Process in chunks
-            num_chunks = (
-                len(all_combinations) + self.MAX_CHUNK_SIZE - 1
-            ) // self.MAX_CHUNK_SIZE
+            num_chunks = (len(all_combinations) + self.MAX_CHUNK_SIZE - 1) // self.MAX_CHUNK_SIZE
 
             for chunk_idx in range(num_chunks):
                 chunk_start = chunk_idx * self.MAX_CHUNK_SIZE
-                chunk_end = min(
-                    chunk_start + self.MAX_CHUNK_SIZE, len(all_combinations)
-                )
+                chunk_end = min(chunk_start + self.MAX_CHUNK_SIZE, len(all_combinations))
                 chunk = all_combinations[chunk_start:chunk_end]
 
-                logger.info(
-                    f"   Chunk {chunk_idx + 1}/{num_chunks}: {len(chunk):,} combinations"
-                )
+                logger.info(f"   Chunk {chunk_idx + 1}/{num_chunks}: {len(chunk):,} combinations")
 
                 # Extract unique values for this chunk
-                periods = sorted(set(c[0] for c in chunk))
-                overboughts = sorted(set(c[1] for c in chunk))
-                oversolds = sorted(set(c[2] for c in chunk))
-                stop_losses = sorted(set(c[3] for c in chunk))
-                take_profits = sorted(set(c[4] for c in chunk))
+                periods = sorted({c[0] for c in chunk})
+                overboughts = sorted({c[1] for c in chunk})
+                oversolds = sorted({c[2] for c in chunk})
+                stop_losses = sorted({c[3] for c in chunk})
+                take_profits = sorted({c[4] for c in chunk})
 
                 chunk_results = self._run_batch(
                     close_series=close_series,
@@ -292,9 +284,7 @@ class VectorbtGridOptimizer:
         execution_time = time.time() - start_time
 
         # Performance stats
-        combinations_per_second = (
-            total_combinations / execution_time if execution_time > 0 else 0
-        )
+        combinations_per_second = total_combinations / execution_time if execution_time > 0 else 0
 
         logger.info(f"✅ Optimization completed in {execution_time:.2f}s")
         logger.info(f"   Speed: {combinations_per_second:,.0f} combinations/second")
@@ -334,20 +324,20 @@ class VectorbtGridOptimizer:
     def _run_batch(
         self,
         close_series: pd.Series,
-        high_series: Optional[pd.Series],
-        low_series: Optional[pd.Series],
+        high_series: pd.Series | None,
+        low_series: pd.Series | None,
         close_array: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
         freq: str,
         direction: str,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Run a batch of backtests using TRUE vectorbt broadcasting.
 
@@ -361,10 +351,7 @@ class VectorbtGridOptimizer:
         if CUPY_AVAILABLE:
             logger.debug("Using GPU (CuPy) for RSI calculation")
             rsi_cache_raw = _batch_calculate_rsi_gpu(close_array, rsi_periods)
-            rsi_cache = {
-                p: pd.Series(v, index=close_series.index)
-                for p, v in rsi_cache_raw.items()
-            }
+            rsi_cache = {p: pd.Series(v, index=close_series.index) for p, v in rsi_cache_raw.items()}
         elif NUMBA_AVAILABLE:
             logger.debug("Using CPU (Numba JIT) for RSI calculation")
             rsi_cache = {}
@@ -380,12 +367,8 @@ class VectorbtGridOptimizer:
 
         # Convert SL/TP to numpy arrays for vectorbt broadcasting
         # VectorBT accepts arrays and tests all combinations automatically
-        sl_array = np.array(
-            [sl / 100.0 if sl else np.nan for sl in stop_losses], dtype=np.float64
-        )
-        tp_array = np.array(
-            [tp / 100.0 if tp else np.nan for tp in take_profits], dtype=np.float64
-        )
+        sl_array = np.array([sl / 100.0 if sl else np.nan for sl in stop_losses], dtype=np.float64)
+        tp_array = np.array([tp / 100.0 if tp else np.nan for tp in take_profits], dtype=np.float64)
 
         # Test RSI parameter combinations (outer loop - fewer iterations)
         for period in rsi_periods:
@@ -469,14 +452,10 @@ class VectorbtGridOptimizer:
                                             else float(total_returns.iloc[i])
                                         )
                                         sharpe = (
-                                            float(sharpes.iloc[i, j])
-                                            if sharpes.ndim > 1
-                                            else float(sharpes.iloc[i])
+                                            float(sharpes.iloc[i, j]) if sharpes.ndim > 1 else float(sharpes.iloc[i])
                                         )
                                         max_dd = (
-                                            float(max_dds.iloc[i, j])
-                                            if max_dds.ndim > 1
-                                            else float(max_dds.iloc[i])
+                                            float(max_dds.iloc[i, j]) if max_dds.ndim > 1 else float(max_dds.iloc[i])
                                         )
                                         win_rate = (
                                             float(win_rates.iloc[i, j])
@@ -492,20 +471,11 @@ class VectorbtGridOptimizer:
                                         # NumPy array result
                                         if total_returns.ndim == 2:
                                             total_return = float(total_returns[i, j])
-                                            sharpe = (
-                                                float(sharpes[i, j])
-                                                if sharpes.ndim > 1
-                                                else float(sharpes[i])
-                                            )
-                                            max_dd = (
-                                                float(max_dds[i, j])
-                                                if max_dds.ndim > 1
-                                                else float(max_dds[i])
-                                            )
+                                            sharpe = float(sharpes[i, j]) if sharpes.ndim > 1 else float(sharpes[i])
+                                            max_dd = float(max_dds[i, j]) if max_dds.ndim > 1 else float(max_dds[i])
                                             win_rate = (
                                                 float(win_rates[i, j])
-                                                if hasattr(win_rates, "ndim")
-                                                and win_rates.ndim > 1
+                                                if hasattr(win_rates, "ndim") and win_rates.ndim > 1
                                                 else float(win_rates)
                                                 if np.isscalar(win_rates)
                                                 else float(win_rates[i])
@@ -524,19 +494,14 @@ class VectorbtGridOptimizer:
                                                 else float(total_returns[i])
                                             )
                                             sharpe = (
-                                                float(sharpes.flat[idx])
-                                                if idx < sharpes.size
-                                                else float(sharpes[i])
+                                                float(sharpes.flat[idx]) if idx < sharpes.size else float(sharpes[i])
                                             )
                                             max_dd = (
-                                                float(max_dds.flat[idx])
-                                                if idx < max_dds.size
-                                                else float(max_dds[i])
+                                                float(max_dds.flat[idx]) if idx < max_dds.size else float(max_dds[i])
                                             )
                                             win_rate = (
                                                 float(win_rates.flat[idx])
-                                                if hasattr(win_rates, "flat")
-                                                and idx < win_rates.size
+                                                if hasattr(win_rates, "flat") and idx < win_rates.size
                                                 else 0.0
                                             )
                                             n_trades = (
@@ -549,11 +514,7 @@ class VectorbtGridOptimizer:
                                         total_return = float(total_returns)
                                         sharpe = float(sharpes)
                                         max_dd = float(max_dds)
-                                        win_rate = (
-                                            float(win_rates)
-                                            if not pd.isna(win_rates)
-                                            else 0.0
-                                        )
+                                        win_rate = float(win_rates) if not pd.isna(win_rates) else 0.0
                                         n_trades = int(total_trades_arr)
 
                                     # Handle NaN values
@@ -573,16 +534,10 @@ class VectorbtGridOptimizer:
                                         avg_win = tp if tp else 2.0
                                         avg_loss = sl if sl else 1.0
                                         if win_rate > 0 and (1 - win_rate) > 0:
-                                            profit_factor = (win_rate * avg_win) / (
-                                                (1 - win_rate) * avg_loss
-                                            )
+                                            profit_factor = (win_rate * avg_win) / ((1 - win_rate) * avg_loss)
 
                                     # Calmar ratio
-                                    calmar = (
-                                        total_return / max_dd
-                                        if max_dd > 0.01
-                                        else total_return * 10
-                                    )
+                                    calmar = total_return / max_dd if max_dd > 0.01 else total_return * 10
 
                                     # Scale return for leverage
                                     total_return = total_return / leverage
@@ -613,9 +568,7 @@ class VectorbtGridOptimizer:
                                     continue
 
                     except Exception as e:
-                        logger.warning(
-                            f"Vectorized batch failed for RSI({period}, {overbought}, {oversold}): {e}"
-                        )
+                        logger.warning(f"Vectorized batch failed for RSI({period}, {overbought}, {oversold}): {e}")
                         # Fallback to individual calls for this RSI config
                         for sl in stop_losses:
                             for tp in take_profits:
@@ -644,18 +597,11 @@ class VectorbtGridOptimizer:
                                     if low_series is not None:
                                         pf_kwargs_single["low"] = low_series
 
-                                    pf_single = vbt.Portfolio.from_signals(
-                                        **pf_kwargs_single
-                                    )
+                                    pf_single = vbt.Portfolio.from_signals(**pf_kwargs_single)
                                     stats = pf_single.stats()
-                                    total_return = (
-                                        float(stats.get("Total Return [%]", 0))
-                                        / leverage
-                                    )
+                                    total_return = float(stats.get("Total Return [%]", 0)) / leverage
                                     sharpe = float(stats.get("Sharpe Ratio", 0))
-                                    max_dd = abs(
-                                        float(stats.get("Max Drawdown [%]", 0))
-                                    )
+                                    max_dd = abs(float(stats.get("Max Drawdown [%]", 0)))
                                     win_rate = float(stats.get("Win Rate [%]", 0)) / 100
                                     n_trades = int(stats.get("Total Trades", 0))
 
@@ -674,9 +620,7 @@ class VectorbtGridOptimizer:
                                             "win_rate": win_rate,
                                             "total_trades": n_trades,
                                             "profit_factor": 0.0,
-                                            "calmar_ratio": total_return / max_dd
-                                            if max_dd > 0.01
-                                            else 0,
+                                            "calmar_ratio": total_return / max_dd if max_dd > 0.01 else 0,
                                             "trades": [],
                                             "equity_curve": None,
                                         }
@@ -705,9 +649,7 @@ class VectorbtGridOptimizer:
             avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gain[i]) / period
             avg_loss[i] = (avg_loss[i - 1] * (period - 1) + loss[i]) / period
 
-        rs = np.divide(
-            avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0
-        )
+        rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
         rsi = 100 - (100 / (1 + rs))
         rsi[:period] = 50  # Fill initial values
 
@@ -738,9 +680,7 @@ class VectorbtGridOptimizer:
 
         return freq_map.get(int(diff), "1H")
 
-    def _apply_filters(
-        self, results: List[Dict], filters: Dict[str, float]
-    ) -> List[Dict]:
+    def _apply_filters(self, results: list[dict], filters: dict[str, float]) -> list[dict]:
         """Apply minimum threshold filters"""
         filtered = []
 
@@ -764,10 +704,10 @@ class VectorbtGridOptimizer:
 
     def _calculate_scores(
         self,
-        results: List[Dict],
+        results: list[dict],
         metric: str,
-        weights: Optional[Dict[str, float]] = None,
-    ) -> List[Dict]:
+        weights: dict[str, float] | None = None,
+    ) -> list[dict]:
         """Calculate optimization scores for each result"""
         for r in results:
             if metric == "sharpe_ratio":
@@ -894,9 +834,7 @@ else:
                 avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gain[i]) / period
                 avg_loss[i] = (avg_loss[i - 1] * (period - 1) + loss[i]) / period
 
-        rs = np.divide(
-            avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0
-        )
+        rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
         rsi = 100 - (100 / (1 + rs))
         rsi[:period] = 50
 
@@ -956,18 +894,14 @@ if CUPY_AVAILABLE:
             losses_ema[i] = alpha * losses[i] + (1 - alpha) * losses_ema[i - 1]
 
         # Calculate RS and RSI
-        rs = cp.divide(
-            gains_ema, losses_ema, out=cp.zeros_like(gains_ema), where=losses_ema != 0
-        )
+        rs = cp.divide(gains_ema, losses_ema, out=cp.zeros_like(gains_ema), where=losses_ema != 0)
         rsi_gpu = 100 - (100 / (1 + rs))
         rsi_gpu[:period] = 50
 
         # Transfer back to CPU
         return cp.asnumpy(rsi_gpu)
 
-    def _batch_calculate_rsi_gpu(
-        close: np.ndarray, periods: List[int]
-    ) -> Dict[int, np.ndarray]:
+    def _batch_calculate_rsi_gpu(close: np.ndarray, periods: list[int]) -> dict[int, np.ndarray]:
         """
         Calculate RSI for multiple periods in a single GPU batch.
 
@@ -1003,9 +937,7 @@ if CUPY_AVAILABLE:
             alpha = 1.0 / period
             for i in range(period + 1, n):
                 gains_ema[i] = alpha * float(gains[i]) + (1 - alpha) * gains_ema[i - 1]
-                losses_ema[i] = (
-                    alpha * float(losses[i]) + (1 - alpha) * losses_ema[i - 1]
-                )
+                losses_ema[i] = alpha * float(losses[i]) + (1 - alpha) * losses_ema[i - 1]
 
             # RSI
             rs = cp.divide(
@@ -1027,8 +959,6 @@ else:
         """Fallback to Numba when GPU not available"""
         return _calculate_rsi_numba(close, period)
 
-    def _batch_calculate_rsi_gpu(
-        close: np.ndarray, periods: List[int]
-    ) -> Dict[int, np.ndarray]:
+    def _batch_calculate_rsi_gpu(close: np.ndarray, periods: list[int]) -> dict[int, np.ndarray]:
         """Fallback batch calculation"""
         return {p: _calculate_rsi_numba(close, p) for p in periods}

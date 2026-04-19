@@ -1,0 +1,27 @@
+---
+description: Синхронизация правил Cursor и GitHub Copilot; таблица путей; скрипт sync-ai-rules.py.
+alwaysApply: false
+---
+
+# Cursor и GitHub Copilot: пути и синхронизация
+
+## Пути к правилам
+
+| Назначение | Cursor | Copilot |
+|------------|--------|---------|
+| Основные правила | `.cursor/rules/*.mdc` (нативные) и `.cursor/rules/*.md` (из .ai/) | `.github/copilot-instructions.md` (генерируется из `.ai/rules/`) |
+| Path-specific | `.cursor/rules/path-*.md` (из .ai/) или globs в .mdc | `.github/instructions/*.instructions.md` |
+| Промпты / runbooks | `.cursor/commands/*.md` | `.github/prompts/*.prompt.md` |
+| Единый источник | — | `.ai/rules/`, `.ai/path-specific/`, `.ai/prompts/` |
+
+## Синхронизация
+
+- **Источник истины для обоих IDE:** `.ai/` (см. `.ai/README.md`).
+- **Скрипт:** `python scripts/sync-ai-rules.py` — копирует `.ai/rules/` и path-specific в `.cursor/rules/`, собирает `.github/copilot-instructions.md` и раскладывает инструкции/промпты в `.github/`.
+- **Только Cursor (не в .ai/):** правила в `.cursor/rules/*.mdc` (project.mdc, task-decomposition.mdc, planning.mdc, cursor-features.mdc и т.д.) — в Copilot не попадают; при необходимости дублировать смысл в `.ai/rules/` и пересинхронизировать.
+
+## Когда правило куда писать
+
+- **Общее для Cursor и Copilot** (стиль, переменные, workflow, архитектура) → `.ai/rules/*.md`, затем `python scripts/sync-ai-rules.py`.
+- **Только Cursor** (Composer, Agent, @mentions, MCP, PROJECT_JOURNAL, .cursor/plans/) → `.cursor/rules/*.mdc`.
+- **Подробное сравнение и фичи Copilot 2026:** `docs/ai/CURSOR_COPILOT_SYNC.md`.

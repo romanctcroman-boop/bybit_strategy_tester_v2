@@ -15,9 +15,9 @@ from backend.api.app import app
 from backend.database import Base, engine
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def ensure_chat_tables():
-    """Ensure chat history tables exist before tests run."""
+    """Ensure chat history tables exist before each test (other tests may drop_all)."""
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -32,7 +32,7 @@ class TestChatHistoryAPI:
     """Tests for chat history endpoints"""
 
     @pytest.fixture(autouse=True)
-    def setup(self, client):
+    def setup(self, client, ensure_chat_tables):
         """Clear test data before each test"""
         self.client = client
         self.client.delete("/api/v1/chat/history/clear")
@@ -370,9 +370,7 @@ class TestChatHistoryValidation:
         conv_id = create_response.json()["id"]
 
         # Try to update with too long title
-        update_response = self.client.put(
-            f"/api/v1/chat/history/{conv_id}", json={"title": "x" * 201}
-        )
+        update_response = self.client.put(f"/api/v1/chat/history/{conv_id}", json={"title": "x" * 201})
 
         assert update_response.status_code == 422
 

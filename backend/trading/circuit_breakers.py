@@ -10,13 +10,17 @@ Features:
 - Emergency halt mechanism (полная остановка торговли)
 """
 
+import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
 
 
 class CircuitBreakerState(str, Enum):
@@ -63,8 +67,8 @@ class TradingMetrics:
     volume_last_hour: float = 0.0
 
     # Timestamps
-    last_trade_time: Optional[datetime] = None
-    circuit_opened_at: Optional[datetime] = None
+    last_trade_time: datetime | None = None
+    circuit_opened_at: datetime | None = None
 
 
 class TradingCircuitBreaker:
@@ -74,7 +78,7 @@ class TradingCircuitBreaker:
     Monitors trading activity and halts operations if limits exceeded
     """
 
-    def __init__(self, config: CircuitBreakerConfig = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         """Initialize circuit breaker"""
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitBreakerState.CLOSED
@@ -85,9 +89,7 @@ class TradingCircuitBreaker:
 
     def _calculate_loss_percent(self) -> float:
         """Calculate current loss percentage"""
-        current_value = (
-            self.metrics.initial_portfolio_value + self.metrics.total_profit_loss
-        )
+        current_value = self.metrics.initial_portfolio_value + self.metrics.total_profit_loss
         loss = self.metrics.initial_portfolio_value - current_value
         return (loss / self.metrics.initial_portfolio_value) * 100
 
@@ -148,10 +150,12 @@ class TradingCircuitBreaker:
         """
         if self.state == CircuitBreakerState.OPEN:
             if not self._check_cooldown():
-                remaining = (
-                    self.config.cooldown_seconds
-                    - (datetime.now() - self.metrics.circuit_opened_at).total_seconds()
+                elapsed = (
+                    (datetime.now() - self.metrics.circuit_opened_at).total_seconds()
+                    if self.metrics.circuit_opened_at is not None
+                    else 0.0
                 )
+                remaining = self.config.cooldown_seconds - elapsed
                 return (
                     False,
                     f"Circuit breaker OPEN - cooldown {remaining:.0f}s remaining",
@@ -167,9 +171,7 @@ class TradingCircuitBreaker:
                 self.state = CircuitBreakerState.CLOSED
                 logger.info("Circuit breaker CLOSED - recovery successful")
             else:
-                logger.info(
-                    f"Recovery test: {self.recovery_test_count}/{self.config.recovery_test_trades}"
-                )
+                logger.info(f"Recovery test: {self.recovery_test_count}/{self.config.recovery_test_trades}")
 
         # Check limits
         loss_ok, loss_reason = self._check_loss_limits()
@@ -199,38 +201,44 @@ class TradingCircuitBreaker:
         try:
             from backend.services.alerting import (
                 Alert,
-                AlertSeverity,
-                get_alert_service,
+                AlertLevel,
+                get_alerting_service,
             )
 
-            alert_service = get_alert_service()
+            alert_service = get_alerting_service()
             severity_map = {
-                "info": AlertSeverity.INFO,
-                "warning": AlertSeverity.WARNING,
-                "critical": AlertSeverity.CRITICAL,
+                "info": AlertLevel.INFO,
+                "warning": AlertLevel.WARNING,
+                "critical": AlertLevel.CRITICAL,
             }
 
             alert = Alert(
                 title=f"Trading Circuit Breaker {severity.upper()}",
                 message=reason,
-                severity=severity_map.get(severity, AlertSeverity.WARNING),
+                level=severity_map.get(severity, AlertLevel.WARNING),
                 source="trading_circuit_breaker",
                 metadata={
                     "state": self.state.value,
                     "total_trades": self.metrics.total_trades,
                     "total_profit_loss": self.metrics.total_profit_loss,
-                    "opened_at": self.metrics.circuit_opened_at.isoformat()
-                    if self.metrics.circuit_opened_at
-                    else None,
+                    "opened_at": self.metrics.circuit_opened_at.isoformat() if self.metrics.circuit_opened_at else None,
                 },
             )
 
             # Fire and forget async alert
-            import asyncio
-
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(alert_service.send_alert(alert))
+                task = loop.create_task(
+                    alert_service.send_alert(
+                        level=alert.level,
+                        title=alert.title,
+                        message=alert.message,
+                        source=alert.source,
+                        metadata=alert.metadata,
+                    )
+                )
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
             except RuntimeError:
                 # No event loop - log only
                 logger.info(f"Alert would be sent: {alert.title} - {alert.message}")
@@ -245,7 +253,7 @@ class TradingCircuitBreaker:
         success: bool,
         profit_loss: float,
         volume: float,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ):
         """
         Record trade execution
@@ -273,8 +281,7 @@ class TradingCircuitBreaker:
         self.metrics.volume_last_hour += abs(volume)
 
         logger.info(
-            f"Trade recorded: success={success}, P/L=${profit_loss:.2f}, "
-            f"volume=${volume:.2f}, state={self.state}",
+            f"Trade recorded: success={success}, P/L=${profit_loss:.2f}, volume=${volume:.2f}, state={self.state}",
             extra={"correlation_id": correlation_id or "N/A"},
         )
 
@@ -293,7 +300,7 @@ class TradingCircuitBreaker:
         # Send critical alerts
         self._send_alert(reason, severity="critical")
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Get current circuit breaker status"""
         loss_percent = self._calculate_loss_percent()
 
@@ -322,7 +329,7 @@ class TradingCircuitBreaker:
 
 
 # Global circuit breaker instance
-_circuit_breaker: Optional[TradingCircuitBreaker] = None
+_circuit_breaker: TradingCircuitBreaker | None = None
 
 
 def get_trading_circuit_breaker() -> TradingCircuitBreaker:

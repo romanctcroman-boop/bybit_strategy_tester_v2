@@ -29,10 +29,11 @@ Usage:
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,9 @@ class CircuitBreakerStats:
     successful_calls: int = 0
     failed_calls: int = 0
     rejected_calls: int = 0
-    state_changes: List[Dict[str, Any]] = field(default_factory=list)
-    last_failure_time: Optional[float] = None
-    last_success_time: Optional[float] = None
+    state_changes: list[dict[str, Any]] = field(default_factory=list)
+    last_failure_time: float | None = None
+    last_success_time: float | None = None
     consecutive_failures: int = 0
     consecutive_successes: int = 0
 
@@ -86,9 +87,7 @@ class CircuitBreakerOpenError(Exception):
     def __init__(self, circuit_name: str, recovery_in: float):
         self.circuit_name = circuit_name
         self.recovery_in = recovery_in
-        super().__init__(
-            f"Circuit '{circuit_name}' is OPEN. Recovery in {recovery_in:.1f}s"
-        )
+        super().__init__(f"Circuit '{circuit_name}' is OPEN. Recovery in {recovery_in:.1f}s")
 
 
 class CircuitBreaker:
@@ -116,7 +115,7 @@ class CircuitBreaker:
         result = cb.execute(lambda: cursor.execute("SELECT ..."))
     """
 
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         self.config = config or CircuitBreakerConfig()
         self._state = CircuitState.CLOSED
         self._stats = CircuitBreakerStats()
@@ -177,9 +176,7 @@ class CircuitBreaker:
         if len(self._stats.state_changes) > 100:
             self._stats.state_changes = self._stats.state_changes[-100:]
 
-        logger.warning(
-            f"CircuitBreaker '{self.config.name}': {old_state.value} -> {new_state.value}"
-        )
+        logger.warning(f"CircuitBreaker '{self.config.name}': {old_state.value} -> {new_state.value}")
 
     def _record_success(self) -> None:
         """Record a successful call."""
@@ -191,9 +188,11 @@ class CircuitBreaker:
             self._stats.consecutive_successes += 1
 
             # In HALF_OPEN, check if we can close the circuit
-            if self._state == CircuitState.HALF_OPEN:
-                if self._stats.consecutive_successes >= self.config.success_threshold:
-                    self._transition_to(CircuitState.CLOSED)
+            if (
+                self._state == CircuitState.HALF_OPEN
+                and self._stats.consecutive_successes >= self.config.success_threshold
+            ):
+                self._transition_to(CircuitState.CLOSED)
 
     def _record_failure(self, error: Exception) -> None:
         """Record a failed call."""
@@ -282,7 +281,7 @@ class CircuitBreaker:
             self._stats.consecutive_successes = 0
             logger.info(f"CircuitBreaker '{self.config.name}' manually reset")
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get metrics for monitoring."""
         with self._lock:
             return {
@@ -352,7 +351,7 @@ def circuit_breaker(func: Callable) -> Callable:
     return db_circuit_breaker(func)
 
 
-def get_circuit_breaker_metrics() -> Dict[str, Any]:
+def get_circuit_breaker_metrics() -> dict[str, Any]:
     """Get metrics from the default circuit breaker."""
     return db_circuit_breaker.get_metrics()
 

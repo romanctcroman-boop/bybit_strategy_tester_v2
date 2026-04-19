@@ -8,9 +8,11 @@ Endpoints for AI-powered trading strategy generation:
 - Manage generated strategies
 """
 
+import asyncio
+import contextlib
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,9 +46,7 @@ class GenerateStrategyRequest(BaseModel):
     """Request to generate a new trading strategy."""
 
     name: str = Field(..., min_length=1, max_length=100, description="Strategy name")
-    description: str = Field(
-        default="", max_length=1000, description="Strategy description"
-    )
+    description: str = Field(default="", max_length=1000, description="Strategy description")
 
     # Pattern
     pattern_type: str = Field(
@@ -60,38 +60,22 @@ class GenerateStrategyRequest(BaseModel):
     )
 
     # Indicators
-    indicators: List[str] = Field(
+    indicators: list[str] = Field(
         default_factory=lambda: ["rsi", "atr"],
         description="List of indicators to use",
     )
-    custom_conditions: str = Field(
-        default="", max_length=2000, description="Additional custom conditions"
-    )
+    custom_conditions: str = Field(default="", max_length=2000, description="Additional custom conditions")
 
     # Risk parameters
-    max_drawdown: float = Field(
-        default=0.15, ge=0.01, le=0.50, description="Max drawdown target (0.01-0.50)"
-    )
-    risk_per_trade: float = Field(
-        default=0.02, ge=0.005, le=0.10, description="Risk per trade (0.5%-10%)"
-    )
-    target_win_rate: float = Field(
-        default=0.50, ge=0.30, le=0.80, description="Target win rate (30%-80%)"
-    )
-    target_risk_reward: float = Field(
-        default=2.0, ge=1.0, le=5.0, description="Risk/reward ratio"
-    )
+    max_drawdown: float = Field(default=0.15, ge=0.01, le=0.50, description="Max drawdown target (0.01-0.50)")
+    risk_per_trade: float = Field(default=0.02, ge=0.005, le=0.10, description="Risk per trade (0.5%-10%)")
+    target_win_rate: float = Field(default=0.50, ge=0.30, le=0.80, description="Target win rate (30%-80%)")
+    target_risk_reward: float = Field(default=2.0, ge=1.0, le=5.0, description="Risk/reward ratio")
 
     # Backtesting
-    symbols: List[str] = Field(
-        default_factory=lambda: ["BTCUSDT"], description="Symbols to backtest"
-    )
-    timeframes: List[str] = Field(
-        default_factory=lambda: ["60", "240"], description="Timeframes to use"
-    )
-    min_backtest_period_days: int = Field(
-        default=30, ge=7, le=365, description="Backtest period in days"
-    )
+    symbols: list[str] = Field(default_factory=lambda: ["BTCUSDT"], description="Symbols to backtest")
+    timeframes: list[str] = Field(default_factory=lambda: ["60", "240"], description="Timeframes to use")
+    min_backtest_period_days: int = Field(default=30, ge=7, le=365, description="Backtest period in days")
 
     # Advanced
     use_ml_features: bool = Field(default=False, description="Use ML features")
@@ -124,31 +108,31 @@ class GeneratedStrategyResponse(BaseModel):
     status: str
 
     # Code
-    code: Optional[str] = None
-    class_name: Optional[str] = None
+    code: str | None = None
+    class_name: str | None = None
 
     # Metadata
     description: str = ""
     pattern_type: str = ""
-    indicators_used: List[str] = Field(default_factory=list)
+    indicators_used: list[str] = Field(default_factory=list)
 
     # Parameters
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    default_params: Dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    default_params: dict[str, Any] = Field(default_factory=dict)
 
     # Validation
     is_valid: bool = False
-    validation_errors: List[str] = Field(default_factory=list)
+    validation_errors: list[str] = Field(default_factory=list)
 
     # Backtest results
-    backtest_results: Optional[Dict[str, Any]] = None
+    backtest_results: dict[str, Any] | None = None
 
     # Timestamps
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     # Error
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     @classmethod
     def from_strategy(cls, strategy: GeneratedStrategy) -> "GeneratedStrategyResponse":
@@ -178,36 +162,34 @@ class StrategyListResponse(BaseModel):
     """Response containing list of strategies."""
 
     total: int
-    strategies: List[GeneratedStrategyResponse]
+    strategies: list[GeneratedStrategyResponse]
 
 
 class PatternTypesResponse(BaseModel):
     """Available pattern types."""
 
-    pattern_types: List[Dict[str, str]]
+    pattern_types: list[dict[str, str]]
 
 
 class IndicatorsResponse(BaseModel):
     """Available indicators."""
 
-    indicators: List[Dict[str, str]]
+    indicators: list[dict[str, str]]
 
 
 class ValidationRequest(BaseModel):
     """Request to validate strategy code."""
 
-    code: str = Field(
-        ..., min_length=100, description="Python strategy code to validate"
-    )
+    code: str = Field(..., min_length=100, description="Python strategy code to validate")
 
 
 class ValidationResponse(BaseModel):
     """Code validation response."""
 
     is_valid: bool
-    errors: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -222,10 +204,7 @@ async def get_pattern_types():
 
     Returns list of pattern types with descriptions.
     """
-    patterns = [
-        {"id": pt.value, "name": pt.value.replace("_", " ").title()}
-        for pt in PatternType
-    ]
+    patterns = [{"id": pt.value, "name": pt.value.replace("_", " ").title()} for pt in PatternType]
     return PatternTypesResponse(pattern_types=patterns)
 
 
@@ -236,10 +215,7 @@ async def get_indicators():
 
     Returns list of indicators that can be used in strategies.
     """
-    indicators = [
-        {"id": ind.value, "name": ind.value.replace("_", " ").upper()}
-        for ind in IndicatorType
-    ]
+    indicators = [{"id": ind.value, "name": ind.value.replace("_", " ").upper()} for ind in IndicatorType]
     return IndicatorsResponse(indicators=indicators)
 
 
@@ -281,10 +257,8 @@ async def generate_strategy(
 
     indicators = []
     for ind_str in request.indicators:
-        try:
+        with contextlib.suppress(ValueError):
             indicators.append(IndicatorType(ind_str.lower()))
-        except ValueError:
-            pass  # Skip unknown indicators
 
     gen_request = GenerationRequest(
         name=request.name,
@@ -307,9 +281,7 @@ async def generate_strategy(
 
     # Start generation in background
     async def run_generation():
-        await generator.generate_strategy(
-            gen_request, auto_backtest=request.auto_backtest
-        )
+        await generator.generate_strategy(gen_request, auto_backtest=request.auto_backtest)
 
     background_tasks.add_task(run_generation)
 
@@ -348,13 +320,9 @@ async def get_strategy(strategy_id: str):
 
 @router.get("/", response_model=StrategyListResponse)
 async def list_strategies(
-    limit: int = Query(
-        default=50, ge=1, le=200, description="Maximum strategies to return"
-    ),
-    status_filter: Optional[str] = Query(default=None, description="Filter by status"),
-    pattern_filter: Optional[str] = Query(
-        default=None, description="Filter by pattern type"
-    ),
+    limit: int = Query(default=50, ge=1, le=200, description="Maximum strategies to return"),
+    status_filter: str | None = Query(default=None, description="Filter by status"),
+    pattern_filter: str | None = Query(default=None, description="Filter by pattern type"),
 ):
     """
     List all generated strategies.
@@ -423,9 +391,7 @@ async def validate_strategy_code(request: ValidationRequest):
 
     if "@register_strategy" not in request.code:
         warnings.append("Strategy not registered with @register_strategy decorator")
-        suggestions.append(
-            "Add @register_strategy decorator for automatic registration"
-        )
+        suggestions.append("Add @register_strategy decorator for automatic registration")
 
     return ValidationResponse(
         is_valid=True,
@@ -490,9 +456,7 @@ async def save_strategy_to_library(strategy_id: str):
     filename = f"ai_{safe_name}_{strategy.id[:8]}.py"
 
     # Save to generated strategies folder
-    generated_dir = os.path.join(
-        os.path.dirname(__file__), "..", "..", "services", "strategies", "generated"
-    )
+    generated_dir = os.path.join(os.path.dirname(__file__), "..", "..", "services", "strategies", "generated")
     os.makedirs(generated_dir, exist_ok=True)
 
     filepath = os.path.join(generated_dir, filename)
@@ -561,4 +525,166 @@ async def run_strategy_backtest(
         "symbol": symbol,
         "timeframe": timeframe,
         "days": days,
+    }
+
+
+# ============================================================================
+# Multi-Agent Strategy Builder Pipeline
+# ============================================================================
+
+
+class GenerateAndBuildRequest(BaseModel):
+    """Request for full AI pipeline: LLM strategy generation → graph → backtest."""
+
+    symbol: str = Field(default="BTCUSDT", description="Trading pair")
+    timeframe: str = Field(default="15", description="Candle interval (1/5/15/30/60/240/D)")
+    days: int = Field(default=90, ge=7, le=730, description="Historical data period in days")
+    agents: list[str] = Field(
+        default_factory=lambda: ["deepseek"],
+        description="LLM agents to use: deepseek, qwen, perplexity",
+    )
+    run_backtest: bool = Field(default=True, description="Backtest the generated strategy")
+    run_debate: bool = Field(default=True, description="Enable MAD multi-agent debate")
+    initial_capital: float = Field(default=10000.0, ge=100.0, description="Starting capital")
+    leverage: int = Field(default=1, ge=1, le=125, description="Trading leverage")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "days": 90,
+                "agents": ["deepseek", "qwen"],
+                "run_backtest": True,
+                "run_debate": True,
+            }
+        }
+    )
+
+
+@router.post(
+    "/generate-and-build",
+    summary="Full AI pipeline: generate strategy → build graph → backtest",
+    tags=["AI Strategy Generator"],
+)
+async def generate_and_build(request: GenerateAndBuildRequest):
+    """
+    Run the full multi-agent trading strategy pipeline:
+
+    1. **AnalyzeMarket** — build MarketContext from OHLCV data
+    2. **[MAD Debate]** — multi-agent deliberation on market conditions (optional)
+    3. **GenerateStrategies** — Self-MoA: 3× DeepSeek + QWEN critic synthesis
+    4. **ParseResponses** — parse LLM JSON into StrategyDefinition
+    5. **ConsensusNode** — select best strategy via weighted voting
+    6. **BuildGraph** — convert StrategyDefinition → strategy_graph (40+ block types)
+    7. **BacktestNode** — run via StrategyBuilderAdapter + FallbackEngineV4
+    8. **MemoryUpdate** — persist to HierarchicalMemory + Strategy ORM
+
+    Returns the generated strategy graph, backtest metrics, and saved strategy id.
+    """
+    import sqlite3
+    from datetime import UTC, datetime, timedelta
+    from pathlib import Path
+
+    import pandas as pd
+
+    from backend.agents.trading_strategy_graph import run_strategy_pipeline
+
+    # Load OHLCV from local SQLite (same pattern as BacktestEngine)
+    end_dt = datetime.now(UTC)
+    start_dt = end_dt - timedelta(days=request.days)
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000)
+    db_path = Path(__file__).parent.parent.parent.parent / "data.sqlite3"
+
+    def _load_ohlcv() -> pd.DataFrame:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            df = pd.read_sql(
+                """
+                SELECT open_time,
+                       open_price  AS open,
+                       high_price  AS high,
+                       low_price   AS low,
+                       close_price AS close,
+                       volume
+                FROM bybit_kline_audit
+                WHERE symbol   = ?
+                  AND interval = ?
+                  AND open_time >= ?
+                  AND open_time <= ?
+                ORDER BY open_time ASC
+                """,
+                conn,
+                params=[
+                    request.symbol.upper(),
+                    request.timeframe,
+                    start_ms,
+                    end_ms,
+                ],
+            )
+        finally:
+            conn.close()
+        if df.empty:
+            return df
+        df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
+        df.set_index("open_time", inplace=True)
+        for col in ("open", "high", "low", "close", "volume"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+
+    try:
+        df: pd.DataFrame = await asyncio.to_thread(_load_ohlcv)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to load OHLCV data: {exc}",
+        ) from exc
+
+    if df is None or df.empty:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No OHLCV data for {request.symbol}/{request.timeframe} in local DB",
+        )
+
+    # Run pipeline
+    try:
+        state = await run_strategy_pipeline(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            df=df,
+            agents=request.agents,
+            run_backtest=request.run_backtest,
+            run_debate=request.run_debate,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+        )
+    except Exception as exc:
+        logger.error(f"[generate-and-build] Pipeline failed: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Strategy pipeline failed: {exc}",
+        ) from exc
+
+    report = state.get_result("report") or {}
+    select_result = state.get_result("select_best") or {}
+    backtest_result = state.get_result("backtest") or {}
+    strategy_graph = state.context.get("strategy_graph")
+    graph_warnings = state.context.get("graph_warnings", [])
+    saved_strategy_id = state.context.get("saved_strategy_id")
+
+    selected = select_result.get("selected_strategy")
+    strategy_name = getattr(selected, "strategy_name", None) or "AI Strategy"
+
+    return {
+        "strategy_name": strategy_name,
+        "strategy_graph": strategy_graph,
+        "graph_warnings": graph_warnings,
+        "backtest_metrics": backtest_result.get("metrics", {}),
+        "saved_strategy_id": saved_strategy_id,
+        "proposals_count": report.get("proposals_count", 0),
+        "execution_path": state.execution_path,
+        "errors": state.errors,
+        "symbol": request.symbol,
+        "timeframe": request.timeframe,
     }

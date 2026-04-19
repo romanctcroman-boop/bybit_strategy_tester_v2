@@ -6,15 +6,17 @@ Supports Redis-based distributed events and local in-memory events.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +59,10 @@ class Event:
     event_type: str
     payload: dict[str, Any]
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     category: EventCategory = EventCategory.SYSTEM
     priority: EventPriority = EventPriority.NORMAL
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     source_service: str = "main"
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -87,7 +89,7 @@ class Event:
             payload=data["payload"],
             timestamp=datetime.fromisoformat(data["timestamp"])
             if isinstance(data.get("timestamp"), str)
-            else datetime.now(timezone.utc),
+            else datetime.now(UTC),
             category=EventCategory(data.get("category", "system")),
             priority=EventPriority(data.get("priority", 5)),
             correlation_id=data.get("correlation_id"),
@@ -112,11 +114,11 @@ class EventSubscription:
     subscription_id: str
     event_pattern: str  # Supports wildcards: "trading.*", "*.created"
     handler: Callable[[Event], Coroutine[Any, Any, None]]
-    filter_fn: Optional[Callable[[Event], bool]] = None
+    filter_fn: Callable[[Event], bool] | None = None
     priority: EventPriority = EventPriority.NORMAL
     max_retries: int = 3
     timeout_seconds: float = 30.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ============================================================================
@@ -133,9 +135,7 @@ class EventBusBackend(ABC):
         pass
 
     @abstractmethod
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to event pattern, returns subscription ID."""
         pass
 
@@ -214,18 +214,12 @@ class InMemoryEventBus(EventBusBackend):
             try:
                 await asyncio.wait_for(sub.handler(event), timeout=sub.timeout_seconds)
                 return
-            except asyncio.TimeoutError:
-                last_error = TimeoutError(
-                    f"Handler timeout after {sub.timeout_seconds}s"
-                )
-                logger.warning(
-                    f"Handler timeout, attempt {attempt + 1}/{sub.max_retries}"
-                )
+            except TimeoutError:
+                last_error = TimeoutError(f"Handler timeout after {sub.timeout_seconds}s")
+                logger.warning(f"Handler timeout, attempt {attempt + 1}/{sub.max_retries}")
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Handler error: {e}, attempt {attempt + 1}/{sub.max_retries}"
-                )
+                logger.warning(f"Handler error: {e}, attempt {attempt + 1}/{sub.max_retries}")
             await asyncio.sleep(0.1 * (attempt + 1))  # Backoff
 
         raise last_error or Exception("Unknown delivery error")
@@ -243,9 +237,7 @@ class InMemoryEventBus(EventBusBackend):
 
         return matching
 
-    def _pattern_matches(
-        self, pattern_parts: list[str], channel_parts: list[str]
-    ) -> bool:
+    def _pattern_matches(self, pattern_parts: list[str], channel_parts: list[str]) -> bool:
         """Check if pattern matches channel (supports * and ** wildcards)."""
         if len(pattern_parts) == 0 and len(channel_parts) == 0:
             return True
@@ -270,9 +262,7 @@ class InMemoryEventBus(EventBusBackend):
 
         return False
 
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to event pattern."""
         sub_id = str(uuid.uuid4())
         subscription = EventSubscription(
@@ -324,10 +314,10 @@ class RedisEventBus(EventBusBackend):
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0"):
         self.redis_url = redis_url
-        self._redis: Optional[Any] = None
-        self._pubsub: Optional[Any] = None
+        self._redis: Any | None = None
+        self._pubsub: Any | None = None
         self._subscriptions: dict[str, EventSubscription] = {}
-        self._listener_task: Optional[asyncio.Task[None]] = None
+        self._listener_task: asyncio.Task[None] | None = None
         self._running = False
         self._stats = {
             "events_published": 0,
@@ -372,9 +362,7 @@ class RedisEventBus(EventBusBackend):
             logger.error(f"Failed to publish event: {e}")
             return False
 
-    async def subscribe(
-        self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]
-    ) -> str:
+    async def subscribe(self, pattern: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> str:
         """Subscribe to Redis channel pattern."""
         sub_id = str(uuid.uuid4())
         subscription = EventSubscription(
@@ -402,9 +390,7 @@ class RedisEventBus(EventBusBackend):
 
         while self._running:
             try:
-                message = await self._pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                message = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if message and message["type"] == "pmessage":
                     self._stats["events_received"] += 1
                     await self._handle_message(message)
@@ -423,13 +409,9 @@ class RedisEventBus(EventBusBackend):
 
             # Find matching subscriptions
             for sub in self._subscriptions.values():
-                if sub.event_pattern == pattern or self._pattern_matches(
-                    sub.event_pattern, channel
-                ):
+                if sub.event_pattern == pattern or self._pattern_matches(sub.event_pattern, channel):
                     try:
-                        await asyncio.wait_for(
-                            sub.handler(event), timeout=sub.timeout_seconds
-                        )
+                        await asyncio.wait_for(sub.handler(event), timeout=sub.timeout_seconds)
                     except Exception as e:
                         logger.error(f"Handler error: {e}")
 
@@ -458,10 +440,8 @@ class RedisEventBus(EventBusBackend):
         self._running = False
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
 
         if self._pubsub:
             await self._pubsub.close()
@@ -490,11 +470,9 @@ class EventBusService:
     Automatically selects backend based on configuration.
     """
 
-    def __init__(self, backend: Optional[EventBusBackend] = None):
+    def __init__(self, backend: EventBusBackend | None = None):
         self._backend = backend or InMemoryEventBus()
-        self._event_handlers: dict[
-            str, list[Callable[[Event], Coroutine[Any, Any, None]]]
-        ] = defaultdict(list)
+        self._event_handlers: dict[str, list[Callable[[Event], Coroutine[Any, Any, None]]]] = defaultdict(list)
         self._middleware: list[Callable[[Event], Event]] = []
         self._dead_letter_queue: list[Event] = []
         self._started = False
@@ -522,7 +500,7 @@ class EventBusService:
         payload: dict[str, Any],
         category: EventCategory = EventCategory.SYSTEM,
         priority: EventPriority = EventPriority.NORMAL,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> Event:
         """Publish an event."""
         event = Event(
@@ -641,7 +619,7 @@ class TradingEvents:
 # ============================================================================
 
 # Singleton event bus instance
-_event_bus: Optional[EventBusService] = None
+_event_bus: EventBusService | None = None
 
 
 def get_event_bus() -> EventBusService:
@@ -652,7 +630,7 @@ def get_event_bus() -> EventBusService:
     return _event_bus
 
 
-async def init_event_bus(redis_url: Optional[str] = None) -> EventBusService:
+async def init_event_bus(redis_url: str | None = None) -> EventBusService:
     """Initialize the global event bus with optional Redis backend."""
     global _event_bus
     if redis_url:

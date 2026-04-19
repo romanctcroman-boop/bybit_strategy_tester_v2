@@ -115,9 +115,7 @@ class ResilientClient:
                 return TransientError(f"Server error: {status}")
         return error
 
-    @with_retry(
-        max_attempts=3, retry_on=(RetryableError, CBTimeoutError, TransientError)
-    )
+    @with_retry(max_attempts=3, retry_on=(RetryableError, CBTimeoutError, TransientError))
     async def _make_request(
         self,
         method: str,
@@ -189,9 +187,7 @@ class ResilientClient:
         response = await self.get(url, **kwargs)
         return response.json()
 
-    async def post_json(
-        self, url: str, json_data: dict[str, Any], **kwargs: Any
-    ) -> dict[str, Any]:
+    async def post_json(self, url: str, json_data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         """Make POST request with JSON body and return JSON."""
         response = await self.post(url, json=json_data, **kwargs)
         return response.json()
@@ -280,8 +276,8 @@ async def close_all_clients() -> None:
 
 __all__ = [
     "ResilientClient",
+    "close_all_clients",
     "get_bybit_client",
     "get_deepseek_client",
     "get_perplexity_client",
-    "close_all_clients",
 ]

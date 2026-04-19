@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Rate Limit Dashboard API
 
@@ -160,14 +159,17 @@ async def reset_key_cooling(agent_name: str, key_index: int | None = None):
         agent_type = AgentType(agent_name.lower())
         agent = UnifiedAgentInterface()
 
-        pool = agent.key_manager._key_pools.get(agent_type, [])
+        pool = agent.key_manager._key_pools.get(agent_type, [])  # type: ignore[attr-defined]
         reset_count = 0
 
         for key in pool:
-            if key_index is None or key.index == key_index:
-                if key.cooling_until and key.cooling_until > datetime.now().timestamp():
-                    key.cooling_until = None
-                    reset_count += 1
+            if (
+                (key_index is None or key.index == key_index)
+                and key.cooling_until
+                and key.cooling_until > datetime.now().timestamp()
+            ):
+                key.cooling_until = None
+                reset_count += 1
 
         logger.info(f"Reset cooling for {reset_count} keys ({agent_name})")
 
@@ -202,15 +204,12 @@ async def get_rate_limit_events(
         agent_interface = UnifiedAgentInterface()
 
         # Get rate limit events from stats
-        events = []
+        events: list[Any] = []
 
         # Access internal rate limit tracking if available
         if hasattr(agent_interface, "_rate_limit_events"):
             all_events = agent_interface._rate_limit_events
-            if agent:
-                events = [e for e in all_events if e.get("agent") == agent]
-            else:
-                events = all_events
+            events = [e for e in all_events if e.get("agent") == agent] if agent else all_events
 
         return {
             "events": events[-limit:],
@@ -242,10 +241,10 @@ async def rate_limit_health_check():
         }
 
         for agent_type in [AgentType.DEEPSEEK, AgentType.PERPLEXITY]:
-            pool = agent.key_manager._key_pools.get(agent_type, [])
+            pool = agent.key_manager._key_pools.get(agent_type, [])  # type: ignore[attr-defined]
             usable = sum(1 for k in pool if _is_key_usable(k))
 
-            health["agents"][agent_type.value] = {
+            health["agents"][agent_type.value] = {  # type: ignore[index]
                 "total": len(pool),
                 "usable": usable,
                 "status": "ok" if usable > 0 else "degraded",
@@ -303,9 +302,7 @@ async def _get_agent_pool_status(agent, agent_type) -> AgentPoolStatus:
                 success_count=key.success_count,
                 error_count=key.error_count,
                 rate_limit_count=key.rate_limit_count,
-                last_used=datetime.fromtimestamp(key.last_used).isoformat()
-                if key.last_used
-                else None,
+                last_used=datetime.fromtimestamp(key.last_used).isoformat() if key.last_used else None,
                 cooling_until=cooling_until_str,
                 weight=key.get_weight() if hasattr(key, "get_weight") else 1.0,
                 usable=is_usable,
@@ -335,6 +332,4 @@ def _is_key_usable(key) -> bool:
     """Check if a key is currently usable"""
     if key.disabled:
         return False
-    if key.cooling_until and key.cooling_until > datetime.now().timestamp():
-        return False
-    return True
+    return not (key.cooling_until and key.cooling_until > datetime.now().timestamp())

@@ -16,28 +16,60 @@
         "bootstrap": "readonly"
     },
     "rules": {
-        "no-unused-vars": ["warn", { 
-            "argsIgnorePattern": "^_",
-            "varsIgnorePattern": "^_"
-        }],
+        "no-unused-vars": [
+            "warn",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_"
+            }
+        ],
         "no-console": "off",
-        "semi": ["error", "always"],
-        "quotes": ["warn", "single", { "avoidEscape": true }],
-        "indent": ["warn", 4],
-        "comma-dangle": ["warn", "never"],
-        "no-multiple-empty-lines": ["warn", { "max": 2 }],
-        "eol-last": ["warn", "always"],
+        "semi": [
+            "error",
+            "always"
+        ],
+        "quotes": [
+            "warn",
+            "single",
+            {
+                "avoidEscape": true
+            }
+        ],
+        "indent": "off",
+        "comma-dangle": [
+            "warn",
+            "never"
+        ],
+        "no-multiple-empty-lines": [
+            "warn",
+            {
+                "max": 2
+            }
+        ],
+        "eol-last": [
+            "warn",
+            "always"
+        ],
         "no-trailing-spaces": "warn",
         "prefer-const": "warn",
         "no-var": "error",
         "arrow-spacing": "warn",
-        "object-curly-spacing": ["warn", "always"],
-        "array-bracket-spacing": ["warn", "never"],
-        "space-before-function-paren": ["warn", {
-            "anonymous": "always",
-            "named": "never",
-            "asyncArrow": "always"
-        }]
+        "object-curly-spacing": [
+            "warn",
+            "always"
+        ],
+        "array-bracket-spacing": [
+            "warn",
+            "never"
+        ],
+        "space-before-function-paren": [
+            "warn",
+            {
+                "anonymous": "always",
+                "named": "never",
+                "asyncArrow": "always"
+            }
+        ]
     },
     "ignorePatterns": [
         "dist/",

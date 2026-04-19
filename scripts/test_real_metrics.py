@@ -2,14 +2,17 @@
 🔬 РЕАЛЬНЫЙ ТЕСТ: 147 МЕТРИК НА ИСТОРИЧЕСКИХ ДАННЫХ
 Использует реальные настройки стратегии и полные исторические данные
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
-from dataclasses import fields, asdict
 
 print("=" * 100)
 print("🔬 РЕАЛЬНЫЙ ТЕСТ: 147 МЕТРИК НА ИСТОРИЧЕСКИХ ДАННЫХ")
@@ -20,18 +23,21 @@ print(f"Время: {datetime.now()}")
 # ЗАГРУЗКА ПОЛНЫХ ИСТОРИЧЕСКИХ ДАННЫХ
 # ============================================================================
 print("\n📊 Загрузка исторических данных...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Загружаем максимум данных
-df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+df_1h = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 
 print(f"   📅 Период: {df_1h.index[0]} - {df_1h.index[-1]}")
 print(f"   📊 Баров: {len(df_1h):,}")
@@ -51,6 +57,7 @@ print("   🎯 Take Profit: 4%")
 print("   💰 Position Size: 10%")
 print("   📊 Leverage: 10x")
 
+
 # RSI
 def calculate_rsi(close, period=14):
     delta = close.diff()
@@ -61,10 +68,11 @@ def calculate_rsi(close, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+
 # EMA
-ema_50 = df_1h['close'].ewm(span=50).mean()
-ema_200 = df_1h['close'].ewm(span=200).mean()
-rsi = calculate_rsi(df_1h['close'], period=14)
+ema_50 = df_1h["close"].ewm(span=50).mean()
+ema_200 = df_1h["close"].ewm(span=200).mean()
+rsi = calculate_rsi(df_1h["close"], period=14)
 
 # Сигналы с EMA фильтром
 bullish_trend = ema_50 > ema_200
@@ -75,18 +83,17 @@ long_exits = (rsi > 70).values
 short_entries = ((rsi > 70) & bearish_trend).values
 short_exits = (rsi < 30).values
 
-print(f"\n📊 СИГНАЛЫ:")
+print("\n📊 СИГНАЛЫ:")
 print(f"   Long entries:  {long_entries.sum()}")
 print(f"   Short entries: {short_entries.sum()}")
 
 # ============================================================================
 # ЗАПУСК ДВИЖКОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics, MetricsCalculator
 
 input_data = BacktestInput(
     candles=df_1h,
@@ -140,6 +147,7 @@ print("\n" + "=" * 100)
 print("📊 ВСЕ 147 МЕТРИК - СРАВНЕНИЕ ДВИЖКОВ")
 print("=" * 100)
 
+
 def format_value(val):
     if val is None:
         return "N/A"
@@ -153,6 +161,7 @@ def format_value(val):
         else:
             return f"{val:.6f}"
     return str(val)
+
 
 def check_match(fb_val, nb_val):
     if fb_val is None and nb_val is None:
@@ -169,6 +178,7 @@ def check_match(fb_val, nb_val):
         if pct_diff < 0.01:
             return "✅"
     return "❌"
+
 
 # === BACKTEST METRICS ===
 print("\n" + "=" * 50)
@@ -254,37 +264,37 @@ print("=" * 100)
 print(f"""
 📈 РЕЗУЛЬТАТЫ БЭКТЕСТА НА РЕАЛЬНЫХ ДАННЫХ
 
-   📅 Период тестирования:  {df_1h.index[0].strftime('%Y-%m-%d')} - {df_1h.index[-1].strftime('%Y-%m-%d')}
+   📅 Период тестирования:  {df_1h.index[0].strftime("%Y-%m-%d")} - {df_1h.index[-1].strftime("%Y-%m-%d")}
    📊 Количество баров:     {len(df_1h):,}
    💰 Начальный капитал:    $10,000
 
    ────────────────────────────────────────
-   
+
    📈 Net Profit:           ${fb_m.net_profit:,.2f}
    📊 Total Return:         {fb_m.total_return:.2f}%
    📉 Max Drawdown:         {fb_m.max_drawdown:.2f}%
-   
+
    🎯 Total Trades:         {fb_m.total_trades}
-   ✅ Win Rate:             {fb_m.win_rate*100:.1f}%
+   ✅ Win Rate:             {fb_m.win_rate * 100:.1f}%
    📊 Profit Factor:        {fb_m.profit_factor:.2f}
-   
+
    📈 Sharpe Ratio:         {fb_m.sharpe_ratio:.2f}
    📈 Sortino Ratio:        {fb_m.sortino_ratio:.2f}
    📈 Calmar Ratio:         {fb_m.calmar_ratio:.2f}
-   
+
    💵 Avg Win:              ${fb_m.avg_win:.2f}
    💸 Avg Loss:             ${fb_m.avg_loss:.2f}
    📊 Payoff Ratio:         {fb_m.payoff_ratio:.2f}
-   
+
    🔄 Recovery Factor:      {fb_m.recovery_factor:.2f}
    📊 Expectancy:           ${fb_m.expectancy:.2f}
-   
+
    ────────────────────────────────────────
-   
+
    ⏱️ FallbackEngineV2:     {fb_time:.3f}s
    ⚡ NumbaEngineV2:        {nb_time:.3f}s
-   🚀 Speedup:              {fb_time/nb_time:.1f}x
-   
+   🚀 Speedup:              {fb_time / nb_time:.1f}x
+
    ✅ Движки дают ИДЕНТИЧНЫЕ результаты!
 """)
 

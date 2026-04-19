@@ -172,8 +172,8 @@ def check_docstring_quality(docstring: str) -> dict:
 
 
 __all__ = [
-    "FUNCTION_DOCSTRING_TEMPLATE",
     "CLASS_DOCSTRING_TEMPLATE",
+    "FUNCTION_DOCSTRING_TEMPLATE",
     "MODULE_DOCSTRING_TEMPLATE",
     "check_docstring_quality",
 ]

@@ -16,14 +16,15 @@ References:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
-import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -57,31 +58,62 @@ class MemoryTier:
 
 @dataclass
 class MemoryItem:
-    """A single memory item"""
+    """
+    Unified memory item — single dataclass for the entire memory subsystem.
+
+    Replaces the former dual-dataclass anti-pattern (MemoryItem + PersistentMemoryItem)
+    identified in Phase 13 architecture audit (3/3 agents, HIGH severity).
+
+    Fields:
+        id:               Unique identifier (content hash + timestamp)
+        content:          Text content of the memory
+        memory_type:      Tier enum (WORKING / EPISODIC / SEMANTIC / PROCEDURAL)
+        agent_namespace:  Per-agent isolation key ("shared" for cross-agent data)
+        created_at:       UTC datetime of creation
+        accessed_at:      UTC datetime of last access
+        access_count:     Number of times recalled
+        importance:       Relevance score 0.0-1.0
+        ttl_seconds:      Optional per-item TTL override (None = use tier default)
+        embedding:        Optional vector (384-dim MiniLM) for semantic search
+        metadata:         Arbitrary key-value metadata
+        tags:             Categorization tags (normalized by TagNormalizer)
+        source:           Origin identifier (agent name, "deliberation", etc.)
+        related_ids:      Links to related memory items
+    """
 
     id: str
     content: str
     memory_type: MemoryType
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    accessed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    agent_namespace: str = "shared"
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    accessed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0
     importance: float = 0.5  # 0.0 to 1.0
-    embedding: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
-    source: Optional[str] = None
-    related_ids: List[str] = field(default_factory=list)
+    ttl_seconds: float | None = None  # None = use tier default
+    embedding: list[float] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    source: str | None = None
+    related_ids: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+    def __post_init__(self) -> None:
+        """Validate fields after initialization."""
+        self.importance = max(0.0, min(1.0, self.importance))
+        if isinstance(self.memory_type, str):
+            self.memory_type = MemoryType(self.memory_type)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization (lossless roundtrip)."""
         return {
             "id": self.id,
             "content": self.content,
             "memory_type": self.memory_type.value,
+            "agent_namespace": self.agent_namespace,
             "created_at": self.created_at.isoformat(),
             "accessed_at": self.accessed_at.isoformat(),
             "access_count": self.access_count,
             "importance": self.importance,
+            "ttl_seconds": self.ttl_seconds,
             "metadata": self.metadata,
             "tags": self.tags,
             "source": self.source,
@@ -89,16 +121,51 @@ class MemoryItem:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MemoryItem":
-        """Create from dictionary"""
+    def from_dict(cls, data: dict[str, Any]) -> MemoryItem:
+        """Create from dictionary (lossless roundtrip with to_dict)."""
+        created_at = data.get("created_at")
+        accessed_at = data.get("accessed_at")
+
+        # Handle both datetime ISO strings and float timestamps (legacy)
+        if isinstance(created_at, (int, float)):
+            created_at = datetime.fromtimestamp(created_at, tz=UTC)
+        elif isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+            # SQLite stores timestamps without timezone (e.g. "2026-03-27 20:15:00").
+            # Assume UTC when tzinfo is missing to avoid naive/aware subtraction errors.
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=UTC)
+        else:
+            created_at = datetime.now(UTC)
+
+        if isinstance(accessed_at, (int, float)):
+            accessed_at = datetime.fromtimestamp(accessed_at, tz=UTC)
+        elif isinstance(accessed_at, str):
+            accessed_at = datetime.fromisoformat(accessed_at)
+            if accessed_at.tzinfo is None:
+                accessed_at = accessed_at.replace(tzinfo=UTC)
+        else:
+            accessed_at = datetime.now(UTC)
+
+        # Handle memory_type as string or enum
+        memory_type_raw = data.get("memory_type", "working")
+        if isinstance(memory_type_raw, str):
+            # Strip legacy "hierarchical." prefix if present
+            memory_type_raw = memory_type_raw.replace("hierarchical.", "")
+            memory_type = MemoryType(memory_type_raw)
+        else:
+            memory_type = memory_type_raw
+
         return cls(
             id=data["id"],
             content=data["content"],
-            memory_type=MemoryType(data["memory_type"]),
-            created_at=datetime.fromisoformat(data["created_at"]),
-            accessed_at=datetime.fromisoformat(data["accessed_at"]),
+            memory_type=memory_type,
+            agent_namespace=data.get("agent_namespace", "shared"),
+            created_at=created_at,
+            accessed_at=accessed_at,
             access_count=data.get("access_count", 0),
             importance=data.get("importance", 0.5),
+            ttl_seconds=data.get("ttl_seconds"),
             metadata=data.get("metadata", {}),
             tags=data.get("tags", []),
             source=data.get("source"),
@@ -106,16 +173,22 @@ class MemoryItem:
         )
 
     def is_expired(self, ttl: timedelta) -> bool:
-        """Check if memory has expired based on TTL"""
-        now = datetime.now(timezone.utc)
-        return (now - self.created_at) > ttl
+        """Check if memory has expired based on TTL."""
+        # Per-item TTL override takes priority
+        if self.ttl_seconds is not None:
+            return (datetime.now(UTC) - self.created_at).total_seconds() > self.ttl_seconds
+        return (datetime.now(UTC) - self.created_at) > ttl
 
     def update_access(self) -> None:
-        """Update access time and count"""
-        self.accessed_at = datetime.now(timezone.utc)
+        """Update access time and count."""
+        self.accessed_at = datetime.now(UTC)
         self.access_count += 1
         # Slightly increase importance based on access
         self.importance = min(1.0, self.importance + 0.01)
+
+
+# Backward compatibility alias (TZ P1.4 — memory evolution plan)
+UnifiedMemoryItem = MemoryItem
 
 
 class HierarchicalMemory:
@@ -153,8 +226,9 @@ class HierarchicalMemory:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
-        embedding_fn: Optional[Callable[[str], List[float]]] = None,
+        persist_path: str | None = None,
+        embedding_fn: Callable[[str], list[float]] | None = None,
+        backend: Any | None = None,
     ):
         """
         Initialize hierarchical memory
@@ -162,12 +236,23 @@ class HierarchicalMemory:
         Args:
             persist_path: Path for persistent storage (None = in-memory only)
             embedding_fn: Function to generate embeddings for semantic search
+            backend: Optional MemoryBackend instance (overrides persist_path).
+                     Use SQLiteBackendAdapter for SQLite persistence or
+                     JsonFileBackend for legacy file-per-item storage.
         """
         self.persist_path = Path(persist_path) if persist_path else None
         self.embedding_fn = embedding_fn
 
+        # Backend for persistence (ABC-compliant)
+        self._backend: Any | None = backend
+        if self._backend is None and self.persist_path:
+            # Default: use legacy JsonFileBackend for backward compatibility
+            from backend.agents.memory.backend_interface import JsonFileBackend
+
+            self._backend = JsonFileBackend(self.persist_path)
+
         # Define memory tiers
-        self.tiers: Dict[MemoryType, MemoryTier] = {
+        self.tiers: dict[MemoryType, MemoryTier] = {
             MemoryType.WORKING: MemoryTier(
                 name="Working Memory",
                 memory_type=MemoryType.WORKING,
@@ -203,9 +288,12 @@ class HierarchicalMemory:
         }
 
         # Memory stores
-        self.stores: Dict[MemoryType, Dict[str, MemoryItem]] = {
-            tier: {} for tier in MemoryType
-        }
+        self.stores: dict[MemoryType, dict[str, MemoryItem]] = {tier: {} for tier in MemoryType}
+
+        # BM25 keyword ranker (P4: Hybrid Retrieval)
+        from backend.agents.memory.bm25_ranker import BM25Ranker
+
+        self._bm25 = BM25Ranker()
 
         # Statistics
         self.stats = {
@@ -216,12 +304,12 @@ class HierarchicalMemory:
         }
 
         # Load persisted memories if available
-        if self.persist_path:
+        if self._backend:
             self._load_from_disk()
 
         logger.info(
             f"🧠 HierarchicalMemory initialized "
-            f"(persist={self.persist_path is not None}, "
+            f"(backend={type(self._backend).__name__ if self._backend else 'None'}, "
             f"embedding={self.embedding_fn is not None})"
         )
 
@@ -230,9 +318,10 @@ class HierarchicalMemory:
         content: str,
         memory_type: MemoryType = MemoryType.WORKING,
         importance: float = 0.5,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        source: Optional[str] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        source: str | None = None,
+        agent_namespace: str = "shared",
     ) -> MemoryItem:
         """
         Store content in specified memory tier
@@ -244,10 +333,17 @@ class HierarchicalMemory:
             tags: Optional tags for categorization
             metadata: Optional metadata dict
             source: Optional source identifier
+            agent_namespace: Per-agent isolation key ("shared" for cross-agent)
 
         Returns:
             Created MemoryItem
         """
+        if agent_namespace == "shared":
+            logger.debug(
+                "[HierarchicalMemory] store() called with agent_namespace='shared' (default). "
+                "Memory will be visible to ALL agents — pass an explicit namespace for isolation."
+            )
+
         # Generate ID based on content hash
         content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
         item_id = f"{memory_type.value}_{content_hash}_{int(time.time())}"
@@ -265,12 +361,35 @@ class HierarchicalMemory:
             id=item_id,
             content=content,
             memory_type=memory_type,
+            agent_namespace=agent_namespace,
             importance=max(0.0, min(1.0, importance)),
             embedding=embedding,
             tags=tags or [],
             metadata=metadata or {},
             source=source,
         )
+
+        # P3: Auto-tag and normalize tags
+        try:
+            from backend.agents.memory.auto_tagger import get_auto_tagger
+            from backend.agents.memory.tag_normalizer import get_tag_normalizer
+
+            tagger = get_auto_tagger()
+            item.tags = tagger.generate_tags(
+                content=content,
+                metadata=metadata,
+                source=source,
+                agent_namespace=agent_namespace,
+                existing_tags=item.tags,
+            )
+        except Exception as e:
+            # Fallback: just normalize existing tags
+            try:
+                normalizer = get_tag_normalizer()
+                item.tags = normalizer.normalize_list(item.tags)
+            except Exception:
+                pass
+            logger.debug(f"AutoTagger unavailable, using basic normalization: {e}")
 
         # Add to store
         tier = self.tiers[memory_type]
@@ -283,26 +402,27 @@ class HierarchicalMemory:
         store[item.id] = item
         self.stats["total_stored"] += 1
 
+        # Index in BM25 for hybrid recall (P4)
+        self._bm25.add_document(item.id, content)
+
         # Persist if enabled
-        if self.persist_path:
+        if self._backend:
             await self._persist_item(item)
 
-        logger.debug(
-            f"📝 Stored memory [{memory_type.value}]: {content[:50]}... "
-            f"(importance={importance:.2f})"
-        )
+        logger.debug(f"📝 Stored memory [{memory_type.value}]: {content[:50]}... (importance={importance:.2f})")
 
         return item
 
     async def recall(
         self,
         query: str,
-        memory_type: Optional[MemoryType] = None,
+        memory_type: MemoryType | None = None,
         top_k: int = 5,
         min_importance: float = 0.0,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
         use_semantic: bool = True,
-    ) -> List[MemoryItem]:
+        agent_namespace: str | None = None,
+    ) -> list[MemoryItem]:
         """
         Recall memories matching query
 
@@ -313,11 +433,12 @@ class HierarchicalMemory:
             min_importance: Minimum importance threshold
             tags: Filter by tags
             use_semantic: Use embedding similarity if available
+            agent_namespace: Filter by namespace (None = all namespaces)
 
         Returns:
             List of matching MemoryItems
         """
-        results: List[tuple[float, MemoryItem]] = []
+        results: list[tuple[float, MemoryItem]] = []
 
         # Determine which tiers to search
         tiers_to_search = [memory_type] if memory_type else list(MemoryType)
@@ -330,27 +451,25 @@ class HierarchicalMemory:
             except Exception as e:
                 logger.warning(f"Failed to get query embedding: {e}")
 
-        for tier_type in tiers_to_search:
-            store = self.stores[tier_type]
-            tier = self.tiers[tier_type]
+        # P4.3: Warn on degraded mode (no vector embeddings)
+        if query_embedding is None and use_semantic:
+            logger.debug(
+                "⚠️ Recall running in degraded mode (no embeddings). "
+                "BM25-only scoring active — semantic similarity disabled."
+            )
 
-            for item in store.values():
-                # Skip expired items
-                if item.is_expired(tier.ttl):
-                    continue
+        # P4.1: Structured filter stage — collect candidates
+        candidates = self._structured_filter(
+            tiers=tiers_to_search,
+            min_importance=min_importance,
+            tags=tags,
+            agent_namespace=agent_namespace,
+        )
 
-                # Filter by importance
-                if item.importance < min_importance:
-                    continue
-
-                # Filter by tags
-                if tags and not any(t in item.tags for t in tags):
-                    continue
-
-                # Calculate relevance score
-                score = self._calculate_relevance(item, query, query_embedding)
-
-                results.append((score, item))
+        # Score each candidate
+        for item in candidates:
+            score = self._calculate_relevance(item, query, query_embedding)
+            results.append((score, item))
 
         # Sort by score and take top_k
         results.sort(key=lambda x: x[0], reverse=True)
@@ -362,13 +481,11 @@ class HierarchicalMemory:
 
         self.stats["total_recalled"] += len(top_results)
 
-        logger.debug(
-            f"🔍 Recalled {len(top_results)} memories for query: {query[:30]}..."
-        )
+        logger.debug(f"🔍 Recalled {len(top_results)} memories for query: {query[:30]}...")
 
         return top_results
 
-    async def get(self, item_id: str) -> Optional[MemoryItem]:
+    async def get(self, item_id: str) -> MemoryItem | None:
         """Get specific memory by ID"""
         for store in self.stores.values():
             if item_id in store:
@@ -382,12 +499,12 @@ class HierarchicalMemory:
         for memory_type, store in self.stores.items():
             if item_id in store:
                 del store[item_id]
-                if self.persist_path:
+                if self._backend:
                     await self._delete_persisted(item_id, memory_type)
                 return True
         return False
 
-    async def consolidate(self) -> Dict[str, int]:
+    async def consolidate(self) -> dict[str, int]:
         """
         Consolidate memories between tiers (like sleep consolidation)
 
@@ -405,14 +522,12 @@ class HierarchicalMemory:
             "to_procedural": 0,
         }
 
-        now = datetime.now(timezone.utc)
-
         # Working → Episodic: Important short-term memories
         working_store = self.stores[MemoryType.WORKING]
         working_tier = self.tiers[MemoryType.WORKING]
 
         items_to_consolidate = []
-        for item_id, item in list(working_store.items()):
+        for _item_id, item in list(working_store.items()):
             # Check if item should be consolidated based on importance
             if item.importance >= working_tier.consolidation_threshold:
                 items_to_consolidate.append(item)
@@ -423,7 +538,7 @@ class HierarchicalMemory:
                 content=item.content,
                 memory_type=MemoryType.EPISODIC,
                 importance=item.importance,
-                tags=item.tags + ["consolidated_from_working"],
+                tags=[*item.tags, "consolidated_from_working"],
                 metadata={**item.metadata, "original_id": item.id},
                 source=item.source,
             )
@@ -438,9 +553,19 @@ class HierarchicalMemory:
         episodic_tier = self.tiers[MemoryType.EPISODIC]
 
         # Group episodic memories by tags for pattern extraction
-        tag_groups: Dict[str, List[MemoryItem]] = {}
+        # P3: Use canonical (normalized) tags for grouping to unblock
+        # consolidation when agents use different tag forms.
+        try:
+            from backend.agents.memory.tag_normalizer import get_tag_normalizer
+
+            normalizer = get_tag_normalizer()
+        except Exception:
+            normalizer = None
+
+        tag_groups: dict[str, list[MemoryItem]] = {}
         for item in episodic_store.values():
-            for tag in item.tags:
+            tags = normalizer.normalize_list(item.tags) if normalizer else item.tags
+            for tag in tags:
                 if tag not in tag_groups:
                     tag_groups[tag] = []
                 tag_groups[tag].append(item)
@@ -470,7 +595,7 @@ class HierarchicalMemory:
         logger.info(f"🧬 Consolidated memories: {consolidated}")
         return consolidated
 
-    async def forget(self) -> Dict[str, int]:
+    async def forget(self) -> dict[str, int]:
         """
         Intelligent forgetting - remove low-relevance and expired items
 
@@ -484,7 +609,7 @@ class HierarchicalMemory:
         """
         forgotten = {tier.value: 0 for tier in MemoryType}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for memory_type, store in self.stores.items():
             tier = self.tiers[memory_type]
@@ -509,7 +634,8 @@ class HierarchicalMemory:
 
             for item_id in items_to_forget:
                 del store[item_id]
-                if self.persist_path:
+                self._bm25.remove_document(item_id)
+                if self._backend:
                     await self._delete_persisted(item_id, memory_type)
                 forgotten[memory_type.value] += 1
 
@@ -530,48 +656,116 @@ class HierarchicalMemory:
         lowest_item = min(store.values(), key=lambda x: (x.importance, -x.access_count))
 
         del store[lowest_item.id]
+        self._bm25.remove_document(lowest_item.id)
         logger.debug(f"⏏️ Evicted low-importance memory: {lowest_item.id}")
+
+    def _structured_filter(
+        self,
+        tiers: list[MemoryType],
+        min_importance: float = 0.0,
+        tags: list[str] | None = None,
+        agent_namespace: str | None = None,
+    ) -> list[MemoryItem]:
+        """P4.1: Structured filter stage — pre-filter candidates before scoring.
+
+        Applies deterministic, zero-cost filters before the expensive
+        BM25 / cosine scoring pass:
+          1. TTL expiration check
+          2. Agent namespace isolation (pass-through for "shared")
+          3. Minimum importance threshold
+          4. Tag intersection
+
+        Args:
+            tiers: Which memory tiers to search.
+            min_importance: Minimum importance value.
+            tags: If set, item must contain at least one matching tag.
+            agent_namespace: If set, restrict to this namespace + "shared".
+
+        Returns:
+            Flat list of candidate MemoryItems that survived all filters.
+        """
+        candidates: list[MemoryItem] = []
+
+        for tier_type in tiers:
+            store = self.stores[tier_type]
+            tier = self.tiers[tier_type]
+
+            for item in store.values():
+                # 1. TTL expiration
+                if item.is_expired(tier.ttl):
+                    continue
+
+                # 2. Namespace isolation
+                if agent_namespace and item.agent_namespace != agent_namespace and item.agent_namespace != "shared":
+                    continue
+
+                # 3. Importance threshold
+                if item.importance < min_importance:
+                    continue
+
+                # 4. Tag intersection
+                if tags and not any(t in item.tags for t in tags):
+                    continue
+
+                candidates.append(item)
+
+        return candidates
 
     def _calculate_relevance(
         self,
         item: MemoryItem,
         query: str,
-        query_embedding: Optional[List[float]],
+        query_embedding: list[float] | None,
     ) -> float:
-        """Calculate relevance score for an item"""
-        score = 0.0
+        """Calculate hybrid relevance score for an item.
 
-        # Text-based matching (simple keyword overlap)
-        query_words = set(query.lower().split())
-        content_words = set(item.content.lower().split())
-        overlap = len(query_words & content_words) / max(len(query_words), 1)
-        score += overlap * 0.3
+        P4 Hybrid Retrieval — combines four signals with configurable weights:
 
-        # Embedding similarity if available
-        if query_embedding and item.embedding:
-            similarity = self._cosine_similarity(query_embedding, item.embedding)
-            score += similarity * 0.5
+        Normal mode (embeddings available):
+            0.35 * BM25 + 0.40 * cosine + 0.15 * importance + 0.10 * recency
 
-        # Importance boost
-        score += item.importance * 0.1
+        Degraded mode (no embeddings):
+            0.65 * BM25 + 0.00 * cosine + 0.20 * importance + 0.15 * recency
+        """
+        # --- Determine mode (normal vs degraded) ---
+        has_vectors = query_embedding is not None and item.embedding is not None
 
-        # Recency boost (more recent = higher score)
-        now = datetime.now(timezone.utc)
+        if has_vectors:
+            w_bm25, w_cosine, w_importance, w_recency = 0.35, 0.40, 0.15, 0.10
+        else:
+            w_bm25, w_cosine, w_importance, w_recency = 0.65, 0.00, 0.20, 0.15
+
+        # --- BM25 keyword score ---
+        bm25_score = self._bm25.score(query, item.id)
+        # Normalize BM25 into [0, 1] via sigmoid-like squash
+        bm25_norm = bm25_score / (1.0 + bm25_score) if bm25_score > 0 else 0.0
+
+        # --- Cosine similarity ---
+        cosine_score = 0.0
+        if has_vectors:
+            cosine_score = self._cosine_similarity(query_embedding, item.embedding)  # type: ignore[arg-type]
+
+        # --- Importance ---
+        importance_score = item.importance  # already in [0, 1]
+
+        # --- Recency ---
+        now = datetime.now(UTC)
         age_hours = (now - item.accessed_at).total_seconds() / 3600
         recency_score = 1.0 / (1.0 + age_hours / 24)  # Decay over days
-        score += recency_score * 0.1
 
-        return score
+        return (
+            w_bm25 * bm25_norm + w_cosine * cosine_score + w_importance * importance_score + w_recency * recency_score
+        )
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Calculate cosine similarity between two vectors"""
         import math
 
         if len(a) != len(b):
             return 0.0
 
-        dot_product = sum(x * y for x, y in zip(a, b))
+        dot_product = sum(x * y for x, y in zip(a, b, strict=True))
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(x * x for x in b))
 
@@ -582,9 +776,9 @@ class HierarchicalMemory:
 
     async def _create_semantic_summary(
         self,
-        items: List[MemoryItem],
+        items: list[MemoryItem],
         topic: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Create semantic summary from multiple episodic memories"""
         # Simple summary - could be enhanced with AI
         contents = [item.content for item in items]
@@ -604,62 +798,119 @@ class HierarchicalMemory:
         return f"[{topic}] " + ". ".join(unique_sentences)
 
     def _load_from_disk(self) -> None:
-        """Load persisted memories from disk"""
-        if not self.persist_path:
+        """Load persisted memories from backend (sync bootstrap).
+
+        Supports both JsonFileBackend (file-per-item) and SQLiteBackendAdapter.
+        Delegates to backend.load_all() for a uniform persistence interface,
+        so HierarchicalMemory boots with full state from any backend.
+
+        For JsonFileBackend, file I/O is cheap and synchronous — we call
+        load_all() directly via a new event loop even if one is running.
+        For SQLiteBackendAdapter (asyncio.to_thread), we defer to async_load().
+        """
+        if not self._backend:
             return
 
-        for memory_type in MemoryType:
-            tier_path = self.persist_path / memory_type.value
-            if not tier_path.exists():
-                tier_path.mkdir(parents=True, exist_ok=True)
-                continue
+        try:
+            import asyncio
 
-            for file_path in tier_path.glob("*.json"):
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        item = MemoryItem.from_dict(data)
-                        self.stores[memory_type][item.id] = item
-                except Exception as e:
-                    logger.warning(f"Failed to load memory {file_path}: {e}")
+            # Check if an event loop is already running
+            loop_running = False
+            try:
+                asyncio.get_running_loop()
+                loop_running = True
+            except RuntimeError:
+                pass
+
+            if loop_running:
+                # For JsonFileBackend: file I/O is sync, safe to call in a nested loop
+                from backend.agents.memory.backend_interface import JsonFileBackend
+
+                if isinstance(self._backend, JsonFileBackend):
+                    # JsonFileBackend.load_all() is sync (file I/O), wrap in new thread
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        backend = self._backend
+                        assert backend is not None  # guaranteed by isinstance check above
+                        items = pool.submit(lambda: asyncio.run(backend.load_all(tier=None))).result(timeout=10)  # type: ignore[union-attr]
+                    self._hydrate_items(items)
+                else:
+                    # For async backends, defer to async_load()
+                    logger.debug("_load_from_disk: event loop running, deferring to async_load")
+                    return
+            else:
+                # No running loop — safe to use asyncio.run()
+                items = asyncio.run(self._backend.load_all(tier=None))
+                self._hydrate_items(items)
+        except Exception as e:
+            logger.warning(f"Failed to load memories from backend: {e}")
 
         total = sum(len(store) for store in self.stores.values())
-        logger.info(f"📂 Loaded {total} persisted memories")
+        logger.info(f"📂 Loaded {total} persisted memories from {type(self._backend).__name__}")
+
+    def _hydrate_items(self, items: list[dict]) -> None:
+        """Hydrate in-memory stores from backend-loaded dicts."""
+        for data in items:
+            try:
+                item = MemoryItem.from_dict(data)
+                if item.memory_type in self.stores:
+                    self.stores[item.memory_type][item.id] = item
+                    self._bm25.add_document(item.id, item.content)
+            except Exception as e:
+                logger.warning(f"Failed to hydrate memory item: {e}")
+
+    async def async_load(self) -> int:
+        """Async bootstrap: load all persisted memories into in-memory stores.
+
+        Call this after construction if running inside an existing event loop
+        (e.g., FastAPI lifespan). Returns the number of items loaded.
+        """
+        if not self._backend:
+            return 0
+
+        loaded = 0
+        try:
+            items = await self._backend.load_all(tier=None)
+            for data in items:
+                try:
+                    item = MemoryItem.from_dict(data)
+                    if item.memory_type in self.stores:
+                        self.stores[item.memory_type][item.id] = item
+                        self._bm25.add_document(item.id, item.content)
+                        loaded += 1
+                except Exception as e:
+                    logger.warning(f"Failed to hydrate memory item: {e}")
+        except Exception as e:
+            logger.warning(f"async_load failed: {e}")
+
+        logger.info(f"📂 async_load: hydrated {loaded} memories from {type(self._backend).__name__}")
+        return loaded
 
     async def _persist_item(self, item: MemoryItem) -> None:
-        """Persist single memory item to disk"""
-        if not self.persist_path:
+        """Persist single memory item via backend."""
+        if not self._backend:
             return
-
-        tier_path = self.persist_path / item.memory_type.value
-        tier_path.mkdir(parents=True, exist_ok=True)
-
-        file_path = tier_path / f"{item.id}.json"
 
         try:
             data = item.to_dict()
             # Don't persist embeddings to save space
             data.pop("embedding", None)
-
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            await self._backend.save_item(item.id, item.memory_type.value, data)
         except Exception as e:
             logger.warning(f"Failed to persist memory {item.id}: {e}")
 
     async def _delete_persisted(self, item_id: str, memory_type: MemoryType) -> None:
-        """Delete persisted memory file"""
-        if not self.persist_path:
+        """Delete persisted memory item via backend."""
+        if not self._backend:
             return
 
-        file_path = self.persist_path / memory_type.value / f"{item_id}.json"
-
         try:
-            if file_path.exists():
-                file_path.unlink()
+            await self._backend.delete_item(item_id, memory_type.value)
         except Exception as e:
             logger.warning(f"Failed to delete persisted memory {item_id}: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get memory system statistics"""
         tier_stats = {}
         for memory_type, store in self.stores.items():
@@ -673,6 +924,9 @@ class HierarchicalMemory:
         return {
             **self.stats,
             "tiers": tier_stats,
+            "bm25_documents": self._bm25.document_count,
+            "bm25_vocabulary": self._bm25.vocabulary_size,
+            "vector_degraded": self.embedding_fn is None,
         }
 
 
@@ -696,7 +950,7 @@ class MemoryConsolidator:
         self.consolidation_interval = consolidation_interval
         self.forgetting_interval = forgetting_interval
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start background consolidation"""
@@ -712,19 +966,17 @@ class MemoryConsolidator:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         logger.info("⏹️ Memory consolidator stopped")
 
     async def _run_loop(self) -> None:
         """Main consolidation loop"""
-        last_consolidation = datetime.now(timezone.utc)
-        last_forgetting = datetime.now(timezone.utc)
+        last_consolidation = datetime.now(UTC)
+        last_forgetting = datetime.now(UTC)
 
         while self._running:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             # Check if it's time to consolidate
             if (now - last_consolidation) >= self.consolidation_interval:
@@ -748,8 +1000,9 @@ class MemoryConsolidator:
 
 __all__ = [
     "HierarchicalMemory",
-    "MemoryItem",
-    "MemoryType",
-    "MemoryTier",
     "MemoryConsolidator",
+    "MemoryItem",
+    "MemoryTier",
+    "MemoryType",
+    "UnifiedMemoryItem",
 ]

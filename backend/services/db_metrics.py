@@ -13,9 +13,9 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +49,15 @@ class QueryMetric:
 
     query_id: str
     query_type: QueryType
-    table: Optional[str]
+    table: str | None
     duration_ms: float
     status: QueryStatus
     timestamp: datetime
     rows_affected: int = 0
     rows_returned: int = 0
-    error_message: Optional[str] = None
-    query_hash: Optional[str] = None
-    caller: Optional[str] = None
+    error_message: str | None = None
+    query_hash: str | None = None
+    caller: str | None = None
 
 
 @dataclass
@@ -67,14 +67,14 @@ class QueryPattern:
     query_hash: str
     sample_query: str
     query_type: QueryType
-    table: Optional[str]
+    table: str | None
     execution_count: int = 0
     total_duration_ms: float = 0.0
     min_duration_ms: float = float("inf")
     max_duration_ms: float = 0.0
     avg_duration_ms: float = 0.0
     error_count: int = 0
-    last_executed: Optional[datetime] = None
+    last_executed: datetime | None = None
 
 
 @dataclass
@@ -114,7 +114,7 @@ class DatabaseMetricsService:
     - Performance recommendations
     """
 
-    def __init__(self, config: Optional[SlowQueryConfig] = None):
+    def __init__(self, config: SlowQueryConfig | None = None):
         self._config = config or SlowQueryConfig()
         self._query_metrics: list[QueryMetric] = []
         self._query_patterns: dict[str, QueryPattern] = {}
@@ -152,14 +152,14 @@ class DatabaseMetricsService:
         self,
         start_time: float,
         query_type: QueryType,
-        table: Optional[str] = None,
+        table: str | None = None,
         status: QueryStatus = QueryStatus.SUCCESS,
         rows_affected: int = 0,
         rows_returned: int = 0,
-        error_message: Optional[str] = None,
-        query_hash: Optional[str] = None,
-        caller: Optional[str] = None,
-        sample_query: Optional[str] = None,
+        error_message: str | None = None,
+        query_hash: str | None = None,
+        caller: str | None = None,
+        sample_query: str | None = None,
     ) -> QueryMetric:
         """
         Record query execution metrics.
@@ -188,7 +188,7 @@ class DatabaseMetricsService:
             table=table,
             duration_ms=duration_ms,
             status=status,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             rows_affected=rows_affected,
             rows_returned=rows_returned,
             error_message=error_message,
@@ -217,15 +217,10 @@ class DatabaseMetricsService:
 
             # Trim slow queries list
             if len(self._slow_queries) > self._config.max_slow_queries_stored:
-                self._slow_queries = self._slow_queries[
-                    -self._config.max_slow_queries_stored :
-                ]
+                self._slow_queries = self._slow_queries[-self._config.max_slow_queries_stored :]
 
             if self._config.log_slow_queries:
-                log_msg = (
-                    f"🐢 Slow query detected: {query_type.value} on {table or 'unknown'} "
-                    f"took {duration_ms:.2f}ms"
-                )
+                log_msg = f"🐢 Slow query detected: {query_type.value} on {table or 'unknown'} took {duration_ms:.2f}ms"
                 if is_very_slow:
                     logger.warning(log_msg)
                     self._stats["very_slow_queries"] += 1
@@ -255,7 +250,7 @@ class DatabaseMetricsService:
         query_hash: str,
         sample_query: str,
         query_type: QueryType,
-        table: Optional[str],
+        table: str | None,
         duration_ms: float,
         is_error: bool,
     ) -> None:
@@ -274,7 +269,7 @@ class DatabaseMetricsService:
         pattern.min_duration_ms = min(pattern.min_duration_ms, duration_ms)
         pattern.max_duration_ms = max(pattern.max_duration_ms, duration_ms)
         pattern.avg_duration_ms = pattern.total_duration_ms / pattern.execution_count
-        pattern.last_executed = datetime.now(timezone.utc)
+        pattern.last_executed = datetime.now(UTC)
 
         if is_error:
             pattern.error_count += 1
@@ -290,10 +285,10 @@ class DatabaseMetricsService:
             self,
             service: "DatabaseMetricsService",
             query_type: QueryType,
-            table: Optional[str] = None,
-            query_hash: Optional[str] = None,
-            sample_query: Optional[str] = None,
-            caller: Optional[str] = None,
+            table: str | None = None,
+            query_hash: str | None = None,
+            sample_query: str | None = None,
+            caller: str | None = None,
         ):
             self.service = service
             self.query_type = query_type
@@ -305,7 +300,7 @@ class DatabaseMetricsService:
             self.rows_affected = 0
             self.rows_returned = 0
             self.status = QueryStatus.SUCCESS
-            self.error_message: Optional[str] = None
+            self.error_message: str | None = None
 
         def __enter__(self) -> "DatabaseMetricsService.QueryTimer":
             self.start_time = time.time()
@@ -332,10 +327,10 @@ class DatabaseMetricsService:
     def time_query(
         self,
         query_type: QueryType,
-        table: Optional[str] = None,
-        query_hash: Optional[str] = None,
-        sample_query: Optional[str] = None,
-        caller: Optional[str] = None,
+        table: str | None = None,
+        query_hash: str | None = None,
+        sample_query: str | None = None,
+        caller: str | None = None,
     ) -> "DatabaseMetricsService.QueryTimer":
         """
         Get a context manager for timing a query.
@@ -360,11 +355,11 @@ class DatabaseMetricsService:
 
     def update_pool_metrics(
         self,
-        pool_size: Optional[int] = None,
-        active_connections: Optional[int] = None,
-        idle_connections: Optional[int] = None,
-        waiting_requests: Optional[int] = None,
-        max_connections: Optional[int] = None,
+        pool_size: int | None = None,
+        active_connections: int | None = None,
+        idle_connections: int | None = None,
+        waiting_requests: int | None = None,
+        max_connections: int | None = None,
     ) -> None:
         """Update connection pool metrics."""
         if pool_size is not None:
@@ -399,11 +394,7 @@ class DatabaseMetricsService:
             "waiting_requests": self._pool_metrics.waiting_requests,
             "max_connections": self._pool_metrics.max_connections,
             "utilization_pct": (
-                (
-                    self._pool_metrics.active_connections
-                    / self._pool_metrics.max_connections
-                )
-                * 100
+                (self._pool_metrics.active_connections / self._pool_metrics.max_connections) * 100
                 if self._pool_metrics.max_connections > 0
                 else 0
             ),
@@ -419,7 +410,7 @@ class DatabaseMetricsService:
     def get_slow_queries(
         self,
         limit: int = 50,
-        min_duration_ms: Optional[float] = None,
+        min_duration_ms: float | None = None,
     ) -> list[dict]:
         """Get recent slow queries."""
         queries = self._slow_queries
@@ -469,14 +460,10 @@ class DatabaseMetricsService:
                 "total_duration_ms": round(p.total_duration_ms, 2),
                 "error_count": p.error_count,
                 "error_rate_pct": round(
-                    (p.error_count / p.execution_count) * 100
-                    if p.execution_count > 0
-                    else 0,
+                    (p.error_count / p.execution_count) * 100 if p.execution_count > 0 else 0,
                     2,
                 ),
-                "last_executed": p.last_executed.isoformat()
-                if p.last_executed
-                else None,
+                "last_executed": p.last_executed.isoformat() if p.last_executed else None,
             }
             for p in patterns[:limit]
         ]
@@ -499,9 +486,7 @@ class DatabaseMetricsService:
 
         # Check for high slow query rate
         if self._stats["total_queries"] > 100:
-            slow_rate = (
-                self._stats["slow_queries"] / self._stats["total_queries"]
-            ) * 100
+            slow_rate = (self._stats["slow_queries"] / self._stats["total_queries"]) * 100
             if slow_rate > 10:
                 recommendations.append(
                     {
@@ -550,9 +535,7 @@ class DatabaseMetricsService:
 
         # Check for high error rate
         if self._stats["total_queries"] > 50:
-            error_rate = (
-                self._stats["failed_queries"] / self._stats["total_queries"]
-            ) * 100
+            error_rate = (self._stats["failed_queries"] / self._stats["total_queries"]) * 100
             if error_rate > 5:
                 recommendations.append(
                     {
@@ -567,8 +550,7 @@ class DatabaseMetricsService:
         slow_patterns = [
             p
             for p in self._query_patterns.values()
-            if p.avg_duration_ms > self._config.slow_query_threshold_ms
-            and p.execution_count > 10
+            if p.avg_duration_ms > self._config.slow_query_threshold_ms and p.execution_count > 10
         ]
         if slow_patterns:
             recommendations.append(
@@ -590,9 +572,7 @@ class DatabaseMetricsService:
         """Get query statistics."""
         avg_duration = 0.0
         if self._query_metrics:
-            avg_duration = sum(q.duration_ms for q in self._query_metrics) / len(
-                self._query_metrics
-            )
+            avg_duration = sum(q.duration_ms for q in self._query_metrics) / len(self._query_metrics)
 
         return {
             "total_queries": self._stats["total_queries"],
@@ -651,7 +631,7 @@ class DatabaseMetricsService:
 
 
 # Singleton instance
-_db_metrics_service: Optional[DatabaseMetricsService] = None
+_db_metrics_service: DatabaseMetricsService | None = None
 
 
 def get_db_metrics_service() -> DatabaseMetricsService:

@@ -4,7 +4,7 @@ Provides API endpoints for chaos engineering experiments.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -51,12 +51,12 @@ class ExperimentResponse(BaseModel):
     experiment_id: str
     name: str
     status: str
-    fault_config: Dict[str, Any]
-    started_at: Optional[str] = None
-    ended_at: Optional[str] = None
+    fault_config: dict[str, Any]
+    started_at: str | None = None
+    ended_at: str | None = None
     affected_requests: int = 0
     errors_injected: int = 0
-    observations: List[str] = []
+    observations: list[str] = []
 
 
 class ChaosStatusResponse(BaseModel):
@@ -67,7 +67,7 @@ class ChaosStatusResponse(BaseModel):
     total_experiments: int
     completed_experiments: int
     failed_experiments: int
-    available_templates: List[str]
+    available_templates: list[str]
     pending_experiments: int
 
 
@@ -223,7 +223,7 @@ async def create_experiment(request: ExperimentRequest):
 @router.post("/experiments/from-template/{template_name}")
 async def create_from_template(
     template_name: str,
-    experiment_name: Optional[str] = Query(None),
+    experiment_name: str | None = Query(None),
 ):
     """
     Create an experiment from a pre-defined template.
@@ -377,7 +377,7 @@ async def clear_all_faults():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/history", response_model=List[ExperimentResponse])
+@router.get("/history", response_model=list[ExperimentResponse])
 async def get_experiment_history(limit: int = Query(50, ge=1, le=100)):
     """
     Get experiment history.

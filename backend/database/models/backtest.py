@@ -5,9 +5,9 @@ Defines the Backtest table for storing backtest results.
 
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
@@ -38,22 +38,20 @@ class Backtest(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # Strategy reference
-    strategy_id = Column(
-        String(36), ForeignKey("strategies.id"), nullable=True, index=True
-    )
+    strategy_id = Column(String(36), ForeignKey("strategies.id"), nullable=True, index=True)
     strategy_type = Column(String(50), nullable=False)  # Strategy type used
 
     # Execution status
-    status = Column(
-        SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING
+    status: Column[BacktestStatus] = Column(
+        SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING, index=True
     )
     error_message = Column(Text, nullable=True)
 
     # Configuration
-    symbol = Column(String(20), nullable=False)
-    timeframe = Column(String(10), nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
+    timeframe = Column(String(10), nullable=False, index=True)
+    start_date = Column(DateTime, nullable=False, index=True)
+    end_date = Column(DateTime, nullable=False, index=True)
     initial_capital = Column(Float, nullable=False, default=10000.0)
 
     # Strategy parameters used
@@ -135,14 +133,12 @@ class Backtest(Base):
     execution_time_ms = Column(Integer, nullable=True)
 
     # Timestamps
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     # User/ownership
@@ -151,13 +147,17 @@ class Backtest(Base):
     # Notes
     notes = Column(Text, nullable=True)
 
+    # --- Extend Backtest to Now (P2) ---
+    # True when this backtest was created by extending an earlier one
+    is_extended = Column(Boolean, nullable=False, default=False)
+    # Soft FK to the original backtest (no DB constraint — SQLite compat)
+    source_backtest_id = Column(String(36), nullable=True)
+    # Market type context for this backtest (spot / linear)
+    market_type = Column(String(16), nullable=True, default="linear")
+
     # Relationships
-    strategy = relationship(
-        "Strategy", back_populates="backtests", foreign_keys=[strategy_id]
-    )
-    trade_records = relationship(
-        "Trade", back_populates="backtest", cascade="all, delete-orphan"
-    )
+    strategy = relationship("Strategy", back_populates="backtests", foreign_keys=[strategy_id])
+    trade_records = relationship("Trade", back_populates="backtest", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Backtest(id={self.id}, strategy_type='{self.strategy_type}', status={self.status})>"
@@ -219,13 +219,15 @@ class Backtest(Base):
             "exposure_time": self.exposure_time,
             # Timestamps
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "execution_time_ms": self.execution_time_ms,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "notes": self.notes,
+            # Extend Backtest to Now fields
+            "is_extended": bool(self.is_extended) if self.is_extended is not None else False,
+            "source_backtest_id": self.source_backtest_id,
+            "market_type": self.market_type or "linear",
         }
         # Merge full metrics if available
         if self.metrics_json:

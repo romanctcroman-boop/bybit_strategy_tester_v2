@@ -2,13 +2,17 @@
 🔬 Engine Parity Audit Script
 Compares our implementation with industry best practices
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
 
 print("=" * 80)
 print("🔬 ENGINE PARITY AUDIT REPORT")
@@ -21,33 +25,36 @@ print()
 # ============================================================================
 print("📊 Loading data and running engines...")
 
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
-df = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
+df = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     AND open_time >= 1735689600000
     AND open_time < 1737504000000
     ORDER BY open_time ASC
-""", conn)
+""",
+    conn,
+)
 conn.close()
 
-df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-df.set_index('open_time', inplace=True)
+df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+df.set_index("open_time", inplace=True)
 
-from backend.backtesting.strategies import RSIStrategy
-from backend.backtesting.numba_engine import simulate_trades_numba
 from backend.backtesting.engine import get_engine
 from backend.backtesting.models import BacktestConfig
+from backend.backtesting.numba_engine import simulate_trades_numba
+from backend.backtesting.strategies import RSIStrategy
 
 strategy = RSIStrategy(params={"period": 14, "overbought": 70, "oversold": 30})
 signals = strategy.generate_signals(df)
 
 # Run Numba
-close = df['close'].values.astype(np.float64)
-high = df['high'].values.astype(np.float64)
-low = df['low'].values.astype(np.float64)
+close = df["close"].values.astype(np.float64)
+high = df["high"].values.astype(np.float64)
+low = df["low"].values.astype(np.float64)
 
 long_entries = signals.entries.values.astype(np.bool_)
 long_exits = signals.exits.values.astype(np.bool_)
@@ -55,20 +62,39 @@ short_entries = signals.short_entries.values.astype(np.bool_)
 short_exits = signals.short_exits.values.astype(np.bool_)
 
 trades_numba, equity_numba, _, n_trades_numba = simulate_trades_numba(
-    close, high, low,
-    long_entries, long_exits,
-    short_entries, short_exits,
-    10000.0, 1.0, 0.0004, 0.0001,
-    0.03, 0.06, 1.0, 2
+    close,
+    high,
+    low,
+    long_entries,
+    long_exits,
+    short_entries,
+    short_exits,
+    10000.0,
+    1.0,
+    0.0004,
+    0.0001,
+    0.03,
+    0.06,
+    1.0,
+    2,
 )
 
 # Run Fallback
 engine = get_engine()
 config = BacktestConfig(
-    symbol="BTCUSDT", interval="60", start_date="2025-01-01", end_date="2025-01-22",
-    initial_capital=10000.0, leverage=1, taker_fee=0.0004, slippage=0.0001,
-    stop_loss=0.03, take_profit=0.06, direction="both",
-    strategy_type="rsi", strategy_params={"period": 14, "overbought": 70, "oversold": 30},
+    symbol="BTCUSDT",
+    interval="60",
+    start_date="2025-01-01",
+    end_date="2025-01-22",
+    initial_capital=10000.0,
+    leverage=1,
+    taker_fee=0.0004,
+    slippage=0.0001,
+    stop_loss=0.03,
+    take_profit=0.06,
+    direction="both",
+    strategy_type="rsi",
+    strategy_params={"period": 14, "overbought": 70, "oversold": 30},
     use_bar_magnifier=False,
 )
 result_fb = engine._run_fallback(config, df, signals)
@@ -87,7 +113,7 @@ sharpe_fb = result_fb.metrics.sharpe_ratio
 
 # Calculate Sharpe for Numba (using same methodology as Fallback)
 equity_fb = np.array(result_fb.equity_curve.equity)
-with np.errstate(divide='ignore', invalid='ignore'):
+with np.errstate(divide="ignore", invalid="ignore"):
     returns_numba = np.diff(equity_numba) / equity_numba[:-1]
 returns_numba = np.nan_to_num(returns_numba, nan=0.0, posinf=0.0, neginf=0.0)
 
@@ -147,13 +173,13 @@ checks = [
 
 print(f"\n{'Standard':<25} {'Description':<30} {'Status':>10}")
 print("-" * 70)
-for name, desc, compliant, note in checks:
+for name, desc, compliant, _note in checks:
     status = "✅ PASS" if compliant else "❌ FAIL"
     print(f"{name:<25} {desc:<30} {status:>10}")
 
 passed = sum(1 for c in checks if c[2])
 total = len(checks)
-print(f"\nCompliance: {passed}/{total} ({passed/total*100:.0f}%)")
+print(f"\nCompliance: {passed}/{total} ({passed / total * 100:.0f}%)")
 
 # ============================================================================
 # 4. TRADE-BY-TRADE VERIFICATION
@@ -173,7 +199,7 @@ for i in range(min(5, n_trades_numba)):
     status = "✅" if diff < 0.01 else "❌"
     if diff >= 0.01:
         all_match = False
-    print(f"{i+1:<6} ${fb_pnl:>11.2f} ${numba_pnl:>11.2f} ${diff:>9.2f} {status:>8}")
+    print(f"{i + 1:<6} ${fb_pnl:>11.2f} ${numba_pnl:>11.2f} ${diff:>9.2f} {status:>8}")
 
 print("...")
 print(f"{'...':<6} {'...':>12} {'...':>12} {'...':>10} {'...':>8}")
@@ -184,7 +210,7 @@ fb_pnl = result_fb.trades[i].pnl
 numba_pnl = trades_numba[i, 5]
 diff = abs(fb_pnl - numba_pnl)
 status = "✅" if diff < 0.01 else "❌"
-print(f"{i+1:<6} ${fb_pnl:>11.2f} ${numba_pnl:>11.2f} ${diff:>9.2f} {status:>8}")
+print(f"{i + 1:<6} ${fb_pnl:>11.2f} ${numba_pnl:>11.2f} ${diff:>9.2f} {status:>8}")
 
 if all_match:
     print("\n✅ All trades match within tolerance!")
@@ -198,13 +224,7 @@ print("\n" + "=" * 80)
 print("📊 AUDIT SUMMARY")
 print("=" * 80)
 
-all_pass = (
-    trades_diff == 0 and
-    pnl_pct_diff < 0.1 and
-    sharpe_diff < 0.1 and
-    eq_diff < 1.0 and
-    passed == total
-)
+all_pass = trades_diff == 0 and pnl_pct_diff < 0.1 and sharpe_diff < 0.1 and eq_diff < 1.0 and passed == total
 
 if all_pass:
     print("""

@@ -1,0 +1,34 @@
+---
+description: FastAPI: роутеры в backend/api/routers, app.py, JSON через json.dumps, не дублировать security, CONFIG в lifespan.
+globs: backend/api/**/*.py
+alwaysApply: false
+---
+
+# Скил: Backend API (FastAPI)
+
+## Структура
+
+- `backend/api/app.py` — FastAPI app, lifespan, `include_router`.
+- `backend/api/routers/` — роутеры по доменам: `backtests`, `optimizations`, `alerts`, `security`, `csv_export`, `monte_carlo`, `market_regime`, `marketplace`, `paper_trading` и др.
+
+## JSON-ответы
+
+- **Не:** `content={...}.__str__()` — даёт невалидный JSON (`'key'` вместо `"key"`).
+- **Нужно:** `import json` и `content=json.dumps({...})` в `Response(..., media_type="application/json")`.
+
+## Регистрация роутеров
+
+- Роутер `security` включать **один раз** (напр. с `prefix="/api/v1"`). Двойной `include_router` для `security` — дублирование путей, удалить лишний.
+
+## Конфиг и lifespan
+
+- `CONFIG` должен быть доступен в `lifespan` до использования (напр. `CONFIG.ws_enabled`). Импорт `from backend.config import CONFIG` — в начале `lifespan` или на уровне модуля, не только внутри `try` в Circuit Breaker.
+
+## Конфиги проекта
+
+- `backend/config` (пакет), `backend/config.py` (реэкспорт), `backend/core/config.py` (BybitConfig) — разные сущности. Для приложения — `from backend.config import CONFIG`.
+
+## Отладка и production
+
+- Не писать в файл при каждом вызове `/metrics` (нагрузка при scrape). Использовать `logger.debug()` и отключать в production.
+- Тестовые эндпоинты (`/api/test-simple`, `/metrics-test-endpoint`) — отключить за флагом или удалить в production.

@@ -58,7 +58,7 @@ EXTERNAL_CSS_IMPORTS = """    <!-- External CSS (Phase 1) -->
 def load_sri_hashes() -> dict:
     """Load SRI hashes from JSON file."""
     if SRI_HASHES_FILE.exists():
-        with open(SRI_HASHES_FILE, "r", encoding="utf-8") as f:
+        with open(SRI_HASHES_FILE, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -88,9 +88,7 @@ def add_sri_to_script(html: str, sri_hashes: dict) -> str:
         # If script already has integrity, skip
         if "integrity=" in html and url in html:
             # Check if this specific URL already has integrity
-            check_pattern = (
-                r'<script[^>]*src=["\']' + re.escape(url) + r'["\'][^>]*integrity='
-            )
+            check_pattern = r'<script[^>]*src=["\']' + re.escape(url) + r'["\'][^>]*integrity='
             if re.search(check_pattern, html):
                 continue
 
@@ -118,16 +116,12 @@ def add_sri_to_link(html: str, sri_hashes: dict) -> str:
 
         # If link already has integrity, skip
         if "integrity=" in html and url in html:
-            check_pattern = (
-                r'<link[^>]*href=["\']' + re.escape(url) + r'["\'][^>]*integrity='
-            )
+            check_pattern = r'<link[^>]*href=["\']' + re.escape(url) + r'["\'][^>]*integrity='
             if re.search(check_pattern, html):
                 continue
 
         # Simple replacement - add integrity and crossorigin
-        old_pattern = (
-            r'<link\s+rel=["\']stylesheet["\']\s+href=["\']' + re.escape(url) + r'["\']'
-        )
+        old_pattern = r'<link\s+rel=["\']stylesheet["\']\s+href=["\']' + re.escape(url) + r'["\']'
         new_tag = f'<link rel="stylesheet" href="{url}"\n      integrity="{integrity}"\n      crossorigin="anonymous"'
 
         html = re.sub(old_pattern, new_tag, html, count=1)
@@ -194,7 +188,7 @@ def update_html_file(filepath: Path, sri_hashes: dict, dry_run: bool = False) ->
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         original_html = f.read()
 
     html = original_html
@@ -235,12 +229,8 @@ def update_html_file(filepath: Path, sri_hashes: dict, dry_run: bool = False) ->
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Update HTML files with security improvements"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show changes without applying"
-    )
+    parser = argparse.ArgumentParser(description="Update HTML files with security improvements")
+    parser.add_argument("--dry-run", action="store_true", help="Show changes without applying")
     parser.add_argument("--file", type=str, help="Process single file")
     args = parser.parse_args()
 

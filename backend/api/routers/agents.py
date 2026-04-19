@@ -3,10 +3,11 @@ AI Agents Router
 Endpoints for interacting with AI agents (DeepSeek and Perplexity).
 """
 
+import functools
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.agents.circuit_breaker_manager import CircuitBreakerManager
@@ -15,25 +16,17 @@ from backend.agents.unified_agent_interface import UnifiedAgentInterface
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Initialize global instances
-_agent_interface: Optional[UnifiedAgentInterface] = None
-_circuit_breaker_manager: Optional[CircuitBreakerManager] = None
 
-
+@functools.lru_cache(maxsize=1)
 def get_agent_interface() -> UnifiedAgentInterface:
-    """Get or create UnifiedAgentInterface singleton"""
-    global _agent_interface
-    if _agent_interface is None:
-        _agent_interface = UnifiedAgentInterface()
-    return _agent_interface
+    """Get or create UnifiedAgentInterface singleton (thread-safe via lru_cache)."""
+    return UnifiedAgentInterface()
 
 
+@functools.lru_cache(maxsize=1)
 def get_circuit_breaker_manager() -> CircuitBreakerManager:
-    """Get or create CircuitBreakerManager singleton"""
-    global _circuit_breaker_manager
-    if _circuit_breaker_manager is None:
-        _circuit_breaker_manager = CircuitBreakerManager()
-    return _circuit_breaker_manager
+    """Get or create CircuitBreakerManager singleton (thread-safe via lru_cache)."""
+    return CircuitBreakerManager()
 
 
 # Request/Response Models
@@ -41,13 +34,9 @@ class AgentQueryRequest(BaseModel):
     """Agent query request"""
 
     prompt: str = Field(..., description="The prompt/question for the AI agent")
-    model: Optional[str] = Field(None, description="Specific model to use (optional)")
-    temperature: Optional[float] = Field(
-        0.7, ge=0.0, le=2.0, description="Temperature for response generation"
-    )
-    max_tokens: Optional[int] = Field(
-        2000, ge=1, le=32000, description="Maximum tokens in response"
-    )
+    model: str | None = Field(None, description="Specific model to use (optional)")
+    temperature: float | None = Field(0.7, ge=0.0, le=2.0, description="Temperature for response generation")
+    max_tokens: int | None = Field(2000, ge=1, le=32000, description="Maximum tokens in response")
 
     model_config = {
         "json_schema_extra": {
@@ -66,18 +55,10 @@ class AgentQueryResponse(BaseModel):
 
     response: str = Field(..., description="The AI agent's response")
     model_used: str = Field(..., description="The model that was used")
-    tokens_used: Optional[int] = Field(
-        None, description="Number of tokens used (if available)"
-    )
-    latency_ms: Optional[float] = Field(
-        None, description="Response latency in milliseconds"
-    )
-    api_key_id: Optional[str] = Field(
-        None, description="API key ID used (for debugging)"
-    )
-    from_cache: Optional[bool] = Field(
-        False, description="Whether the response came from cache"
-    )
+    tokens_used: int | None = Field(None, description="Number of tokens used (if available)")
+    latency_ms: float | None = Field(None, description="Response latency in milliseconds")
+    api_key_id: str | None = Field(None, description="API key ID used (for debugging)")
+    from_cache: bool | None = Field(False, description="Whether the response came from cache")
 
     model_config = {
         "json_schema_extra": {
@@ -95,9 +76,9 @@ class AgentQueryResponse(BaseModel):
 class AgentStatsResponse(BaseModel):
     """Agent statistics response"""
 
-    deepseek: Dict[str, Any] = Field(..., description="DeepSeek agent statistics")
-    perplexity: Dict[str, Any] = Field(..., description="Perplexity agent statistics")
-    circuit_breakers: Dict[str, Any] = Field(..., description="Circuit breaker status")
+    deepseek: dict[str, Any] = Field(..., description="DeepSeek agent statistics")
+    perplexity: dict[str, Any] = Field(..., description="Perplexity agent statistics")
+    circuit_breakers: dict[str, Any] = Field(..., description="Circuit breaker status")
 
     model_config = {
         "json_schema_extra": {
@@ -156,9 +137,7 @@ async def get_agent_stats() -> AgentStatsResponse:
 
     except Exception as e:
         logger.error(f"Error getting agent stats: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent stats: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to get agent stats")
 
 
 @router.post("/query/deepseek", response_model=AgentQueryResponse)
@@ -180,8 +159,8 @@ async def query_deepseek(request: AgentQueryRequest) -> AgentQueryResponse:
         result = await agent_interface.query_deepseek(
             prompt=request.prompt,
             model=request.model or "deepseek-chat",
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            temperature=request.temperature or 0.7,
+            max_tokens=request.max_tokens or 4096,
         )
 
         return AgentQueryResponse(
@@ -195,9 +174,7 @@ async def query_deepseek(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error querying DeepSeek: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to query DeepSeek: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to query DeepSeek")
 
 
 @router.post("/query/perplexity", response_model=AgentQueryResponse)
@@ -219,8 +196,8 @@ async def query_perplexity(request: AgentQueryRequest) -> AgentQueryResponse:
         result = await agent_interface.query_perplexity(
             prompt=request.prompt,
             model=request.model or "llama-3.1-sonar-small-128k-online",
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            temperature=request.temperature or 0.7,
+            max_tokens=request.max_tokens or 4096,
         )
 
         return AgentQueryResponse(
@@ -234,9 +211,7 @@ async def query_perplexity(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error querying Perplexity: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to query Perplexity: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to query Perplexity")
 
 
 @router.post("/query/auto", response_model=AgentQueryResponse)
@@ -259,8 +234,8 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
             result = await agent_interface.query_deepseek(
                 prompt=request.prompt,
                 model=request.model or "deepseek-chat",
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                temperature=request.temperature or 0.7,
+                max_tokens=request.max_tokens or 4096,
             )
 
             return AgentQueryResponse(
@@ -279,8 +254,8 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
             result = await agent_interface.query_perplexity(
                 prompt=request.prompt,
                 model=request.model or "llama-3.1-sonar-small-128k-online",
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                temperature=request.temperature or 0.7,
+                max_tokens=request.max_tokens or 4096,
             )
 
             return AgentQueryResponse(
@@ -294,11 +269,11 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error in auto query: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"All agents failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="All agents failed")
 
 
-@router.get("/cache/stats", response_model=Dict[str, Any])
-async def get_cache_stats() -> Dict[str, Any]:
+@router.get("/cache/stats", response_model=dict[str, Any])
+async def get_cache_stats() -> dict[str, Any]:
     """
     Get AI cache statistics
 
@@ -320,13 +295,11 @@ async def get_cache_stats() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get cache stats: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to get cache stats")
 
 
 @router.post("/cache/clear")
-async def clear_cache() -> Dict[str, Any]:
+async def clear_cache() -> dict[str, Any]:
     """
     Clear all cached AI responses
 
@@ -347,7 +320,7 @@ async def clear_cache() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error clearing cache: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to clear cache")
 
 
 # ============================================================================
@@ -361,16 +334,14 @@ class FeatureSuggestionRequest(BaseModel):
     objective: str = Field(..., description="What to predict (e.g., 'price direction')")
     asset: str = Field("BTC/USDT", description="Trading pair")
     timeframe: str = Field("1h", description="Candle timeframe")
-    max_features: int = Field(
-        10, ge=1, le=50, description="Maximum features to suggest"
-    )
+    max_features: int = Field(10, ge=1, le=50, description="Maximum features to suggest")
 
 
 class FeatureCodeRequest(BaseModel):
     """Request for feature code generation"""
 
     feature_name: str = Field(..., description="Indicator name (e.g., 'RSI')")
-    parameters: Dict[str, Any] = Field(..., description="Indicator parameters")
+    parameters: dict[str, Any] = Field(..., description="Indicator parameters")
     data_format: str = Field(
         "pandas DataFrame with OHLCV columns",
         description="Input data format description",
@@ -409,9 +380,7 @@ async def suggest_features(request: FeatureSuggestionRequest):
 
     except Exception as e:
         logger.error(f"Error suggesting features: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to suggest features: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to suggest features")
 
 
 @router.post("/ml/generate-code", summary="AI Code Generation")
@@ -436,9 +405,7 @@ async def generate_feature_code(request: FeatureCodeRequest):
 
     except Exception as e:
         logger.error(f"Error generating code: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate code: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to generate code")
 
 
 @router.post("/ml/design-strategy", summary="AI Strategy Design")
@@ -464,9 +431,7 @@ async def design_strategy(request: StrategyRequest):
 
     except Exception as e:
         logger.error(f"Error designing strategy: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to design strategy: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to design strategy")
 
 
 # ============================================================================
@@ -484,9 +449,7 @@ class BacktestExecutorRequest(BaseModel):
     start_date: str = Field(..., description="Backtest start date (YYYY-MM-DD)")
     end_date: str = Field(..., description="Backtest end date (YYYY-MM-DD)")
     initial_capital: float = Field(10000.0, ge=100, description="Initial capital")
-    num_variations: int = Field(
-        1, ge=1, le=5, description="Number of strategy variations"
-    )
+    num_variations: int = Field(1, ge=1, le=5, description="Number of strategy variations")
 
 
 @router.post("/backtest/ai-generate-strategy", summary="AI Generate Backtest Strategy")
@@ -520,9 +483,7 @@ async def generate_backtest_strategy(request: StrategyRequest):
 
     except Exception as e:
         logger.error(f"Error generating backtest strategy: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate strategy: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to generate strategy")
 
 
 @router.post("/backtest/ai-execute-series", summary="AI Execute Backtest Series")
@@ -556,32 +517,735 @@ async def execute_backtest_series(request: BacktestExecutorRequest):
 
     except Exception as e:
         logger.error(f"Error executing backtest series: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to execute backtest series: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Failed to execute backtest series")
 
 
 @router.post("/backtest/ai-analyze", summary="AI Analyze Backtest Results")
-async def analyze_backtest_results_endpoint(results: List[Dict[str, Any]] = []):
+async def analyze_backtest_results_endpoint(raw_request: Request):
     """
-    Ask AI to analyze backtest results and recommend best strategy
+    Ask AI to analyze backtest results and recommend best strategy.
 
-    Evaluates multiple backtest results and provides AI-driven recommendations.
+    Supports two modes:
+    - **single** (default): Fast analysis using one agent (default: qwen).
+      Pass `agent` = 'qwen' | 'deepseek' | 'perplexity'.
+    - **multi**: Full consensus analysis using all 3 agents (DeepSeek + Qwen + Perplexity).
+      Results are merged via majority-vote for grade/overfitting/regime.
+
+    Body accepts two formats:
+        # New format with mode/agent selection:
+        { "results": [...], "mode": "single", "agent": "qwen" }
+
+        # Legacy format (raw list) — backward compat:
+        [{ ...backtest_dict... }]
     """
-    try:
-        from backend.ml.ai_backtest_executor import AIBacktestExecutor
+    body = await raw_request.json()
 
-        executor = AIBacktestExecutor()
+    # Normalise body: accept both raw-list and new object format
+    if isinstance(body, list):
+        results = body
+        mode = "single"
+        agent = "qwen"
+    else:
+        results = body.get("results") or []
+        mode = body.get("mode", "single")
+        agent = body.get("agent", "qwen")
 
-        analysis = await executor.analyze_backtest_results(results)
+    # Determine agent list
+    valid_agents = {"qwen", "deepseek", "perplexity"}
+    agents = ["deepseek", "qwen", "perplexity"] if mode == "multi" else [agent if agent in valid_agents else "qwen"]
 
+    if not results:
         return {
-            "analysis": analysis,
-            "results_analyzed": len(results),
+            "analysis": {"error": "No backtest results provided"},
+            "results_analyzed": 0,
+            "mode": mode,
+            "agents": agents,
         }
+
+    try:
+        from backend.agents.integration.ai_backtest_integration import (
+            AIBacktestAnalyzer,
+        )
+
+        analyzer = AIBacktestAnalyzer()
+
+        # Build unified metrics dict from backtest result(s)
+        # Support both full backtest objects and metrics-only dicts
+        bt = results[0]
+        metrics = bt.get("metrics") or bt  # if already wrapped under "metrics" key
+
+        strategy_name = bt.get("strategy_name") or bt.get("name") or metrics.get("strategy_name", "Unknown Strategy")
+        symbol = bt.get("symbol") or metrics.get("symbol", "BTCUSDT")
+        timeframe = str(bt.get("timeframe") or metrics.get("timeframe", ""))
+        start = bt.get("start_date") or ""
+        end = bt.get("end_date") or ""
+        period = f"{start} – {end}" if start and end else "Unknown"
+
+        logger.info(f"AI analyze: mode={mode} agents={agents} strategy={strategy_name} symbol={symbol}")
+
+        ai_result = await analyzer.analyze_backtest(
+            metrics=metrics,
+            strategy_name=strategy_name,
+            symbol=symbol,
+            timeframe=timeframe,
+            period=period,
+            agents=agents,
+        )
+
+        ai_dict = ai_result.to_dict()
+
+        # Flatten the response to match the shape the JS already expects
+        flat = {
+            **ai_dict.get("ai_analysis", {}),
+            "metrics": ai_dict.get("metrics", {}),
+            "metadata": ai_dict.get("metadata", {}),
+            "results_analyzed": len(results),
+            "mode": mode,
+            "agents": agents,
+        }
+        return flat
 
     except Exception as e:
         logger.error(f"Error analyzing results: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Failed to analyze results: {str(e)}"
+        raise HTTPException(status_code=500, detail=f"Failed to analyze results: {e}")
+
+    if not results:
+        return {
+            "analysis": {"error": "No backtest results provided"},
+            "results_analyzed": 0,
+            "mode": mode,
+            "agents": agents,
+        }
+
+    try:
+        from backend.agents.integration.ai_backtest_integration import (
+            AIBacktestAnalyzer,
         )
+
+        analyzer = AIBacktestAnalyzer()
+
+        # Build unified metrics dict from backtest result(s)
+        # Support both a list of full backtest objects and metrics-only dicts
+        bt = results[0]
+        metrics = bt.get("metrics") or bt  # if already wrapped under "metrics" key
+
+        strategy_name = bt.get("strategy_name") or bt.get("name") or metrics.get("strategy_name", "Unknown Strategy")
+        symbol = bt.get("symbol") or metrics.get("symbol", "BTCUSDT")
+        timeframe = str(bt.get("timeframe") or metrics.get("timeframe", ""))
+        start = bt.get("start_date") or ""
+        end = bt.get("end_date") or ""
+        period = f"{start} – {end}" if start and end else "Unknown"
+
+        logger.info(f"AI analyze: mode={mode} agents={agents} strategy={strategy_name} symbol={symbol}")
+
+        ai_result = await analyzer.analyze_backtest(
+            metrics=metrics,
+            strategy_name=strategy_name,
+            symbol=symbol,
+            timeframe=timeframe,
+            period=period,
+            agents=agents,
+        )
+
+        ai_dict = ai_result.to_dict()
+
+        # Flatten the response to match the shape the JS already expects
+        flat = {
+            **ai_dict.get("ai_analysis", {}),
+            "metrics": ai_dict.get("metrics", {}),
+            "metadata": ai_dict.get("metadata", {}),
+            "results_analyzed": len(results),
+            "mode": mode,
+            "agents": agents,
+        }
+        return flat
+
+    except Exception as e:
+        logger.error(f"Error analyzing results: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to analyze results: {e}")
+
+
+# ============================================================================
+# AGENT DASHBOARD ENDPOINTS
+# Added 2026-02-12 per Agent Ecosystem Audit — Dashboard Integration
+# ============================================================================
+
+
+class WorkflowStartRequest(BaseModel):
+    """Request model for starting an autonomous workflow."""
+
+    symbol: str = Field("BTCUSDT", description="Trading pair")
+    interval: str = Field("15", description="Timeframe")
+    strategy_type: str = Field("rsi", description="Fallback strategy")
+    strategy_params: dict[str, Any] = Field(default_factory=dict)
+    start_date: str = Field("2025-06-01", description="Start date YYYY-MM-DD")
+    end_date: str = Field("2025-07-01", description="End date YYYY-MM-DD")
+    initial_capital: float = Field(10000.0, ge=100, le=100_000_000)
+    leverage: float = Field(10.0, ge=1, le=125)
+    direction: str = Field("both")
+    evolution_enabled: bool = Field(True, description="Run AI evolution phase")
+    max_generations: int = Field(3, ge=1, le=10)
+    save_to_memory: bool = Field(True)
+
+
+@router.post(
+    "/dashboard/workflow/start",
+    summary="Start Autonomous Backtesting Workflow",
+)
+async def dashboard_start_workflow(request: WorkflowStartRequest) -> dict[str, Any]:
+    """
+    Launch an autonomous backtesting pipeline.
+
+    Steps: fetch data → evolve strategy → backtest → report → learn.
+    Returns immediately with a workflow_id for status polling.
+    """
+    import asyncio
+
+    try:
+        from backend.agents.workflows.autonomous_backtesting import (
+            AutonomousBacktestingWorkflow,
+            WorkflowConfig,
+        )
+
+        config = WorkflowConfig(
+            symbol=request.symbol,
+            interval=request.interval,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            direction=request.direction,
+            evolution_enabled=request.evolution_enabled,
+            max_generations=request.max_generations,
+            fallback_strategy_type=request.strategy_type,
+            fallback_strategy_params=request.strategy_params,
+            save_to_memory=request.save_to_memory,
+        )
+
+        workflow = AutonomousBacktestingWorkflow()
+
+        # Start the workflow in the background (non-blocking)
+        _bg_task = asyncio.create_task(workflow.run(config))
+        _bg_task.add_done_callback(lambda t: None)  # prevent GC
+
+        # Wait briefly for the workflow_id to be assigned
+        await asyncio.sleep(0.1)
+
+        return {
+            "success": True,
+            "workflow_id": workflow._workflow_id,
+            "message": "Workflow started — poll /dashboard/workflow/status for updates",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to start workflow: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get(
+    "/dashboard/workflow/status/{workflow_id}",
+    summary="Get Workflow Status",
+)
+async def dashboard_workflow_status(workflow_id: str) -> dict[str, Any]:
+    """Get real-time status of an active workflow."""
+    from backend.agents.workflows.autonomous_backtesting import (
+        AutonomousBacktestingWorkflow,
+    )
+
+    status = AutonomousBacktestingWorkflow.get_status(workflow_id)
+    if not status:
+        raise HTTPException(status_code=404, detail=f"Workflow {workflow_id} not found")
+
+    return {"success": True, **status.to_dict()}
+
+
+@router.get(
+    "/dashboard/workflow/active",
+    summary="List Active Workflows",
+)
+async def dashboard_active_workflows() -> dict[str, Any]:
+    """List all currently active autonomous workflows."""
+    from backend.agents.workflows.autonomous_backtesting import (
+        AutonomousBacktestingWorkflow,
+    )
+
+    return {
+        "success": True,
+        "workflows": AutonomousBacktestingWorkflow.list_active(),
+    }
+
+
+@router.get(
+    "/dashboard/patterns",
+    summary="Get Strategy Patterns",
+)
+async def dashboard_patterns(
+    limit: int = 500,
+    profitable_only: bool = False,
+    min_samples: int = 3,
+) -> dict[str, Any]:
+    """
+    Extract strategy patterns from backtest history.
+
+    Returns winning strategy types, optimal timeframes, and insights.
+    """
+    try:
+        from backend.agents.self_improvement.pattern_extractor import PatternExtractor
+
+        extractor = PatternExtractor(
+            min_samples=min_samples,
+            profitable_only=profitable_only,
+        )
+        result = await extractor.extract(limit=limit)
+
+        return {"success": True, **result.to_dict()}
+
+    except Exception as e:
+        logger.error(f"Pattern extraction failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get(
+    "/dashboard/scheduler/tasks",
+    summary="List Scheduler Tasks",
+)
+async def dashboard_scheduler_tasks() -> dict[str, Any]:
+    """List all scheduled tasks and their status."""
+    try:
+        return {
+            "success": True,
+            "message": "Scheduler API ready — start scheduler via /dashboard/scheduler/start",
+            "tasks": [],
+        }
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get(
+    "/dashboard/paper-trading/sessions",
+    summary="List Paper Trading Sessions",
+)
+async def dashboard_paper_sessions() -> dict[str, Any]:
+    """List all paper trading sessions (active and completed)."""
+    try:
+        from backend.agents.trading.paper_trader import AgentPaperTrader
+
+        return {
+            "success": True,
+            "sessions": AgentPaperTrader.list_sessions(),
+            "active_count": len(AgentPaperTrader.list_active()),
+        }
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class PaperTradingStartRequest(BaseModel):
+    """Request to start a paper trading session."""
+
+    symbol: str = Field("BTCUSDT")
+    strategy_type: str = Field("rsi")
+    strategy_params: dict[str, Any] = Field(default_factory=dict)
+    initial_balance: float = Field(10000.0, ge=100)
+    leverage: float = Field(1.0, ge=1, le=125)
+    duration_minutes: float = Field(60.0, ge=0)
+    position_size_pct: float = Field(5.0, ge=0.1, le=100)
+
+
+@router.post(
+    "/dashboard/paper-trading/start",
+    summary="Start Paper Trading Session",
+)
+async def dashboard_start_paper_trading(
+    request: PaperTradingStartRequest,
+) -> dict[str, Any]:
+    """
+    Start a paper-trading session with live Bybit data.
+
+    The session runs in the background and can be stopped via
+    /dashboard/paper-trading/stop/{session_id}.
+    """
+    try:
+        from backend.agents.trading.paper_trader import AgentPaperTrader
+
+        trader = AgentPaperTrader()
+        session = await trader.start_session(
+            symbol=request.symbol,
+            strategy_type=request.strategy_type,
+            strategy_params=request.strategy_params,
+            initial_balance=request.initial_balance,
+            leverage=request.leverage,
+            duration_minutes=request.duration_minutes,
+            position_size_pct=request.position_size_pct,
+        )
+
+        return {
+            "success": True,
+            "session_id": session.session_id,
+            "message": "Paper trading started",
+        }
+    except Exception as e:
+        logger.error(f"Failed to start paper trading: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post(
+    "/dashboard/paper-trading/stop/{session_id}",
+    summary="Stop Paper Trading Session",
+)
+async def dashboard_stop_paper_trading(session_id: str) -> dict[str, Any]:
+    """Stop an active paper trading session."""
+    try:
+        from backend.agents.trading.paper_trader import AgentPaperTrader
+
+        trader = AgentPaperTrader()
+        session = await trader.stop_session(session_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        return {"success": True, **session.to_dict()}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get(
+    "/dashboard/activity-log",
+    summary="Get Agent Activity Log",
+)
+async def dashboard_activity_log(
+    date: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """
+    Get agent activity log entries.
+
+    Args:
+        date: Date in YYYY-MM-DD format (default: today)
+        limit: Max entries to return
+    """
+    import json
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    try:
+        log_dir = Path(__file__).parent.parent.parent.parent / "logs" / "agent_activity"
+        if not log_dir.exists():
+            return {"success": True, "entries": [], "count": 0}
+
+        target_date = date or datetime.now(UTC).strftime("%Y-%m-%d")
+        log_file = log_dir / f"activity_{target_date}.jsonl"
+
+        if not log_file.exists():
+            return {"success": True, "entries": [], "count": 0, "date": target_date}
+
+        entries = []
+        with open(log_file, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+        # Most recent first, limit
+        entries.reverse()
+        entries = entries[:limit]
+
+        return {
+            "success": True,
+            "entries": entries,
+            "count": len(entries),
+            "date": target_date,
+        }
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ============================================================================
+# AGENT AUTONOMY ENDPOINTS
+# Added 2026-02-11 per Agent Ecosystem Audit (P0)
+# ============================================================================
+
+
+class AgentBacktestRequest(BaseModel):
+    """Request model for agent-driven backtest execution."""
+
+    symbol: str = Field("BTCUSDT", description="Trading pair (e.g. BTCUSDT)")
+    interval: str = Field("15", description="Timeframe: 1, 5, 15, 30, 60, 240, D, W, M")
+    strategy_type: str = Field(..., description="Strategy name (rsi, macd, sma_crossover, etc.)")
+    strategy_params: dict[str, Any] = Field(default_factory=dict, description="Strategy parameters")
+    start_date: str = Field("2025-06-01", description="Start date YYYY-MM-DD")
+    end_date: str = Field("2025-07-01", description="End date YYYY-MM-DD")
+    initial_capital: float = Field(10000.0, ge=100, le=100_000_000, description="Starting capital USDT")
+    leverage: float = Field(10.0, ge=1, le=125, description="Leverage multiplier")
+    direction: str = Field("both", description="Trade direction: long, short, both")
+    stop_loss: float | None = Field(None, ge=0.001, le=0.5, description="Stop loss fraction")
+    take_profit: float | None = Field(None, ge=0.001, le=1.0, description="Take profit fraction")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "symbol": "BTCUSDT",
+                "interval": "15",
+                "strategy_type": "rsi",
+                "strategy_params": {"period": 14, "overbought": 70, "oversold": 30},
+                "start_date": "2025-06-01",
+                "end_date": "2025-07-01",
+                "initial_capital": 10000,
+                "leverage": 10,
+                "direction": "both",
+            }
+        }
+    }
+
+
+class AgentBacktestResponse(BaseModel):
+    """Response model for agent backtest results."""
+
+    success: bool
+    status: str
+    symbol: str
+    strategy: str
+    total_trades: int = 0
+    win_rate: float = 0.0
+    total_return_pct: float = 0.0
+    sharpe_ratio: float = 0.0
+    max_drawdown_pct: float = 0.0
+    final_capital: float = 0.0
+    profit_factor: float = 0.0
+    engine: str = "FallbackEngineV4"
+    commission_rate: float = 0.0007
+    error: str | None = None
+
+
+class AgentToolListResponse(BaseModel):
+    """Response listing available agent tools."""
+
+    total_tools: int
+    categories: dict[str, int]
+    tools: list[dict[str, Any]]
+
+
+@router.post(
+    "/actions/run-backtest",
+    response_model=AgentBacktestResponse,
+    summary="Agent-Driven Backtest Execution",
+)
+async def agent_run_backtest(request: AgentBacktestRequest) -> AgentBacktestResponse:
+    """
+    Execute a backtest via the agent MCP tool pipeline.
+
+    This endpoint is designed for AI agents to programmatically trigger
+    backtests with full parameter control. Uses FallbackEngineV4 engine
+    and commission=0.0007 (TradingView parity).
+
+    - **symbol**: Trading pair
+    - **strategy_type**: Strategy name
+    - **strategy_params**: Strategy-specific parameters
+    """
+    try:
+        from backend.agents.mcp.trading_tools import run_backtest
+
+        result = await run_backtest(
+            symbol=request.symbol,
+            interval=request.interval,
+            strategy_type=request.strategy_type,
+            strategy_params=request.strategy_params,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            direction=request.direction,
+            stop_loss=request.stop_loss,
+            take_profit=request.take_profit,
+        )
+
+        if "error" in result:
+            return AgentBacktestResponse(
+                success=False,
+                status="error",
+                symbol=request.symbol,
+                strategy=request.strategy_type,
+                error=result["error"],
+            )
+
+        return AgentBacktestResponse(
+            success=True,
+            status=result.get("status", "completed"),
+            symbol=result.get("symbol", request.symbol),
+            strategy=result.get("strategy", request.strategy_type),
+            total_trades=result.get("total_trades", 0),
+            win_rate=result.get("win_rate", 0.0),
+            total_return_pct=result.get("total_return_pct", 0.0),
+            sharpe_ratio=result.get("sharpe_ratio", 0.0),
+            max_drawdown_pct=result.get("max_drawdown_pct", 0.0),
+            final_capital=result.get("final_capital", 0.0),
+            profit_factor=result.get("profit_factor", 0.0),
+            engine=result.get("engine", "FallbackEngineV4"),
+            commission_rate=result.get("commission_rate", 0.0007),
+        )
+
+    except Exception as e:
+        logger.error(f"Agent backtest failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Agent backtest failed")
+
+
+@router.get(
+    "/actions/backtest-history",
+    summary="Agent Backtest History",
+)
+async def agent_backtest_history(limit: int = 10) -> dict[str, Any]:
+    """
+    Retrieve recent backtest results for agent analysis.
+
+    - **limit**: Number of recent backtests to return (max 50)
+
+    Returns a list of recent backtests with their key metrics.
+    """
+    try:
+        from backend.agents.mcp.trading_tools import get_backtest_metrics
+
+        result = await get_backtest_metrics(backtest_id=None, limit=min(limit, 50))
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return {"success": True, **result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching backtest history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch backtest history")
+
+
+@router.get(
+    "/actions/strategies",
+    summary="List Available Strategies",
+)
+async def agent_list_strategies() -> dict[str, Any]:
+    """
+    List all available backtesting strategies with their default parameters.
+
+    Returns strategy names, descriptions, and default parameter sets.
+    """
+    try:
+        from backend.agents.mcp.trading_tools import list_strategies
+
+        result = await list_strategies()
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return {"success": True, **result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing strategies: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list strategies")
+
+
+@router.post(
+    "/actions/validate-strategy",
+    summary="Validate Strategy Parameters",
+)
+async def agent_validate_strategy(
+    strategy_type: str,
+    strategy_params: dict[str, Any] | None = None,
+    leverage: float = 1.0,
+    stop_loss: float | None = None,
+    take_profit: float | None = None,
+) -> dict[str, Any]:
+    """
+    Validate strategy parameters and risk settings before running a backtest.
+
+    Returns validation results with errors, warnings, and suggested fixes.
+    """
+    try:
+        from backend.agents.mcp.trading_tools import validate_strategy
+
+        result = await validate_strategy(
+            strategy_type=strategy_type,
+            strategy_params=strategy_params or {},
+            leverage=leverage,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+        )
+
+        return {"success": True, **result}
+
+    except Exception as e:
+        logger.error(f"Error validating strategy: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to validate strategy")
+
+
+@router.get(
+    "/actions/system-health",
+    summary="Agent System Health Check",
+)
+async def agent_system_health() -> dict[str, Any]:
+    """
+    Check system health for agent operations.
+
+    Verifies database, disk, memory, and data availability.
+    """
+    try:
+        from backend.agents.mcp.trading_tools import check_system_health
+
+        result = await check_system_health()
+
+        return {"success": True, **result}
+
+    except Exception as e:
+        logger.error(f"Error checking system health: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to check system health")
+
+
+@router.get(
+    "/actions/tools",
+    response_model=AgentToolListResponse,
+    summary="List Available Agent Tools",
+)
+async def agent_list_tools() -> AgentToolListResponse:
+    """
+    List all registered MCP tools available to agents.
+
+    Returns tool names, descriptions, categories, and parameter info.
+    """
+    try:
+        from backend.agents.mcp.tool_registry import get_tool_registry
+
+        registry = get_tool_registry()
+        all_tools = registry.list_tools()
+        categories: dict[str, int] = {}
+
+        tools_list = []
+        for tool in all_tools:
+            cat = getattr(tool, "category", "uncategorized")
+            categories[cat] = categories.get(cat, 0) + 1
+            tools_list.append(
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "category": cat,
+                    "parameters": [
+                        {"name": p.name, "type": str(p.type), "required": p.required}
+                        for p in getattr(tool, "parameters", [])
+                    ],
+                }
+            )
+
+        return AgentToolListResponse(
+            total_tools=len(tools_list),
+            categories=categories,
+            tools=tools_list,
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing tools: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list tools")

@@ -10,7 +10,7 @@ TradingView behavior:
 - Auto-selects appropriate LTF based on chart TF
 """
 
-from typing import Optional
+import asyncio
 
 import pandas as pd
 from loguru import logger
@@ -112,9 +112,7 @@ def calculate_bars_ratio(chart_tf: str, magnifier_tf: str) -> int:
     return chart_minutes // mag_minutes
 
 
-def get_intrabar_path(
-    ohlc_bar: dict, ltf_data: Optional[pd.DataFrame] = None
-) -> list[float]:
+def get_intrabar_path(ohlc_bar: dict, ltf_data: pd.DataFrame | None = None) -> list[float]:
     """
     Get the intrabar price path for precise order execution.
 
@@ -205,11 +203,10 @@ def check_order_fill_on_path(
                 fill_price = max(price, order_price) + slippage
                 return True, fill_price, i
 
-        elif order_type == "stop_short":
+        elif order_type == "stop_short" and price <= order_price:
             # Sell stop: fill when price drops below stop (breakdown)
-            if price <= order_price:
-                fill_price = min(price, order_price) - slippage
-                return True, fill_price, i
+            fill_price = min(price, order_price) - slippage
+            return True, fill_price, i
 
     return False, 0.0, -1
 
@@ -217,8 +214,8 @@ def check_order_fill_on_path(
 def check_sl_tp_on_path(
     position_side: str,  # 'long' or 'short'
     entry_price: float,
-    sl_price: Optional[float],
-    tp_price: Optional[float],
+    sl_price: float | None,
+    tp_price: float | None,
     intrabar_path: list[float],
     sl_priority: bool = True,
 ) -> tuple[str, float, int]:
@@ -296,9 +293,7 @@ class BarMagnifier:
     TradingView Premium feature simulation.
     """
 
-    def __init__(
-        self, chart_tf: str, magnifier_tf: Optional[str] = None, max_bars: int = 200000
-    ):
+    def __init__(self, chart_tf: str, magnifier_tf: str | None = None, max_bars: int = 200000):
         """
         Initialize Bar Magnifier.
 
@@ -311,12 +306,9 @@ class BarMagnifier:
         self.magnifier_tf = magnifier_tf or get_magnifier_timeframe(chart_tf)
         self.max_bars = max_bars
         self.bars_ratio = calculate_bars_ratio(chart_tf, self.magnifier_tf)
-        self.ltf_data: Optional[pd.DataFrame] = None
+        self.ltf_data: pd.DataFrame | None = None
 
-        logger.info(
-            f"Bar Magnifier initialized: {chart_tf} → {self.magnifier_tf} "
-            f"({self.bars_ratio}x resolution)"
-        )
+        logger.info(f"Bar Magnifier initialized: {chart_tf} → {self.magnifier_tf} ({self.bars_ratio}x resolution)")
 
     def load_ltf_data(self, ltf_data: pd.DataFrame) -> None:
         """
@@ -327,8 +319,7 @@ class BarMagnifier:
         """
         if len(ltf_data) > self.max_bars:
             logger.warning(
-                f"LTF data ({len(ltf_data)} bars) exceeds max ({self.max_bars}). "
-                f"Using last {self.max_bars} bars."
+                f"LTF data ({len(ltf_data)} bars) exceeds max ({self.max_bars}). Using last {self.max_bars} bars."
             )
             ltf_data = ltf_data.tail(self.max_bars)
 
@@ -351,9 +342,7 @@ class BarMagnifier:
 
         # Find LTF bars within this chart bar
         bar_end = bar_timestamp
-        bar_start = bar_timestamp - pd.Timedelta(
-            minutes=self._get_tf_minutes(self.chart_tf)
-        )
+        bar_start = bar_timestamp - pd.Timedelta(minutes=self._get_tf_minutes(self.chart_tf))
 
         ltf_mask = (self.ltf_data.index >= bar_start) & (self.ltf_data.index < bar_end)
         ltf_bars = self.ltf_data[ltf_mask]
@@ -391,3 +380,170 @@ class BarMagnifier:
             "1M": 43200,
         }
         return tf_map.get(tf, 60)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-2: Auto-fetch 1m data via SmartKlineService
+# ─────────────────────────────────────────────────────────────────────────────
+
+# How many 1m bars we need for a given interval window (conservative defaults)
+_INTERVAL_MINUTES: dict[str, int] = {
+    "1": 1,
+    "3": 3,
+    "5": 5,
+    "15": 15,
+    "30": 30,
+    "60": 60,
+    "1h": 60,
+    "120": 120,
+    "240": 240,
+    "4h": 240,
+    "360": 360,
+    "720": 720,
+    "D": 1440,
+    "W": 10080,
+    "M": 43200,
+}
+# Maximum 1m bars to load (≈7 days, stays within TradingView's 200 k limit)
+_MAX_M1_BARS = 10_080
+
+
+def _check_m1_coverage(symbol: str, start_ms: int, end_ms: int) -> tuple[bool, int, int]:
+    """
+    Check whether 1m data for *symbol* covers the requested [start_ms, end_ms]
+    window in the kline SQLite database.
+
+    Returns:
+        (covered, first_available_ms, last_available_ms)
+        ``covered`` is True when the DB gap is < 5 min.
+    """
+    try:
+        from backend.services.kline_db_service import KlineDBService
+
+        db_svc = KlineDBService.get_instance()
+        if not db_svc._running.is_set():
+            db_svc.start()
+
+        rows = db_svc.get_klines(
+            symbol=symbol,
+            interval="1",
+            start_time=start_ms,
+            end_time=end_ms,
+            limit=2,
+        )
+        if not rows:
+            return False, 0, 0
+        first_ms = rows[0].get("open_time", 0) if isinstance(rows[0], dict) else rows[0][0]
+        last_ms = rows[-1].get("open_time", 0) if isinstance(rows[-1], dict) else rows[-1][0]
+        gap_allowed_ms = 5 * 60 * 1_000  # 5 minutes tolerance
+        return (
+            first_ms <= start_ms + gap_allowed_ms and last_ms >= end_ms - gap_allowed_ms,
+            first_ms,
+            last_ms,
+        )
+    except Exception as exc:
+        logger.warning(f"[BarMagnifier] M1 coverage check failed: {exc}")
+        return False, 0, 0
+
+
+async def ensure_m1_data(
+    symbol: str,
+    start_ms: int,
+    end_ms: int,
+    *,
+    force_refresh: bool = False,
+) -> pd.DataFrame | None:
+    """
+    Ensure 1m OHLCV data for *symbol* is available in the kline SQLite DB for
+    the requested time window, fetching from Bybit API if necessary.
+
+    This implements the **P1-2** requirement for Bar Magnifier auto-fetch.
+
+    Args:
+        symbol:        Trading pair, e.g. ``"BTCUSDT"``
+        start_ms:      Window start — Unix timestamp in milliseconds
+        end_ms:        Window end   — Unix timestamp in milliseconds
+        force_refresh: Always re-fetch from the API even if DB data exists
+
+    Returns:
+        A DataFrame with columns ``open, high, low, close, volume`` indexed by
+        UTC ``pd.Timestamp``, or ``None`` if the fetch failed.
+    """
+    # --- 1. Check DB coverage ---
+    if not force_refresh:
+        covered, _, _ = _check_m1_coverage(symbol, start_ms, end_ms)
+        if covered:
+            logger.debug(f"[BarMagnifier] M1 data for {symbol} already in DB")
+            return _load_m1_from_db(symbol, start_ms, end_ms)
+
+    # --- 2. Fetch from Bybit via SmartKlineService ---
+    logger.info(f"[BarMagnifier] Fetching 1m data for {symbol} ({start_ms} – {end_ms}) from API")
+    try:
+        from backend.services.smart_kline_service import SMART_KLINE_SERVICE
+
+        needed_bars = min(
+            int((end_ms - start_ms) / 60_000) + 60,  # +60 bar buffer
+            _MAX_M1_BARS,
+        )
+        # SmartKlineService.get_candles is synchronous → run in thread pool
+        candles: list[dict] = await asyncio.to_thread(
+            SMART_KLINE_SERVICE.get_candles,
+            symbol,
+            "1",
+            needed_bars,
+        )
+        if not candles:
+            logger.warning(f"[BarMagnifier] No 1m candles returned for {symbol}")
+            return None
+
+        df = _candles_list_to_df(candles)
+        logger.info(f"[BarMagnifier] Got {len(df)} 1m bars for {symbol}")
+        return df
+
+    except Exception as exc:
+        logger.error(f"[BarMagnifier] ensure_m1_data failed for {symbol}: {exc}")
+        return None
+
+
+def _load_m1_from_db(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame | None:
+    """Load 1m data from the kline SQLite DB and return as DataFrame."""
+    try:
+        from backend.services.kline_db_service import KlineDBService
+
+        db_svc = KlineDBService.get_instance()
+        rows = db_svc.get_klines(
+            symbol=symbol,
+            interval="1",
+            start_time=start_ms,
+            end_time=end_ms,
+            limit=_MAX_M1_BARS,
+        )
+        if not rows:
+            return None
+        return _candles_list_to_df(rows)
+    except Exception as exc:
+        logger.warning(f"[BarMagnifier] _load_m1_from_db failed: {exc}")
+        return None
+
+
+def _candles_list_to_df(candles: list[dict]) -> pd.DataFrame:
+    """Convert a list of candle dicts to a typed OHLCV DataFrame."""
+    df = pd.DataFrame(candles)
+
+    # Normalise column names (kline DB uses 'open_price', API uses 'open', etc.)
+    rename_map = {
+        "open_price": "open",
+        "high_price": "high",
+        "low_price": "low",
+        "close_price": "close",
+        "open_time": "timestamp",
+    }
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
+
+    ts_col = "timestamp" if "timestamp" in df.columns else df.columns[0]
+    df[ts_col] = pd.to_datetime(df[ts_col], unit="ms", utc=True)
+    df.set_index(ts_col, inplace=True)
+    df.sort_index(inplace=True)
+
+    keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
+    return df[keep].astype(float)

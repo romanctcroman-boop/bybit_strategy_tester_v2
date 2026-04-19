@@ -24,7 +24,7 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class Histogram:
     # Bucket thresholds in milliseconds
     BUCKET_THRESHOLDS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
 
-    buckets: List[HistogramBucket] = field(default_factory=list)
+    buckets: list[HistogramBucket] = field(default_factory=list)
     count: int = 0
     sum: float = 0.0
 
@@ -71,7 +71,7 @@ class Histogram:
 class CounterWithLabels:
     """Counter metric with label support."""
 
-    values: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    values: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     def inc(self, labels: str, value: int = 1) -> None:
         """Increment counter for given labels."""
@@ -93,17 +93,17 @@ class MetricsCollector:
         self._lock = threading.Lock()
 
         # Query duration histograms: {(operation, table): Histogram}
-        self._query_histograms: Dict[tuple, Histogram] = defaultdict(Histogram)
+        self._query_histograms: dict[tuple, Histogram] = defaultdict(Histogram)
 
         # Connection pool wait time histogram
         self._connection_wait_histogram = Histogram()
 
         # Archive table sizes: {table_name: size_bytes}
-        self._archive_sizes: Dict[str, int] = {}
+        self._archive_sizes: dict[str, int] = {}
 
         # Operation counters: {(operation, table): count}
-        self._operation_counts: Dict[tuple, int] = defaultdict(int)
-        self._error_counts: Dict[tuple, int] = defaultdict(int)
+        self._operation_counts: dict[tuple, int] = defaultdict(int)
+        self._error_counts: dict[tuple, int] = defaultdict(int)
 
         # Last update timestamps
         self._archive_sizes_updated: float = 0
@@ -168,13 +168,13 @@ class MetricsCollector:
         with self._lock:
             self._error_counts[key] += 1
 
-    def update_archive_sizes(self, sizes: Dict[str, int]) -> None:
+    def update_archive_sizes(self, sizes: dict[str, int]) -> None:
         """Update archive table sizes."""
         with self._lock:
             self._archive_sizes = sizes.copy()
             self._archive_sizes_updated = time.time()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get all metrics as dictionary."""
         with self._lock:
             # Aggregate query stats
@@ -184,9 +184,7 @@ class MetricsCollector:
                 query_stats[key] = {
                     "count": histogram.count,
                     "sum_ms": histogram.sum,
-                    "avg_ms": histogram.sum / histogram.count
-                    if histogram.count > 0
-                    else 0,
+                    "avg_ms": histogram.sum / histogram.count if histogram.count > 0 else 0,
                 }
 
             return {
@@ -197,8 +195,7 @@ class MetricsCollector:
                     "count": self._connection_wait_histogram.count,
                     "sum_ms": self._connection_wait_histogram.sum,
                     "avg_ms": (
-                        self._connection_wait_histogram.sum
-                        / self._connection_wait_histogram.count
+                        self._connection_wait_histogram.sum / self._connection_wait_histogram.count
                         if self._connection_wait_histogram.count > 0
                         else 0
                     ),
@@ -213,9 +210,7 @@ class MetricsCollector:
 
         with self._lock:
             # Query duration histograms
-            lines.append(
-                "# HELP db_query_duration_seconds Database query duration in seconds"
-            )
+            lines.append("# HELP db_query_duration_seconds Database query duration in seconds")
             lines.append("# TYPE db_query_duration_seconds histogram")
 
             for (op, table), histogram in self._query_histograms.items():
@@ -224,28 +219,16 @@ class MetricsCollector:
                 cumulative = 0
                 for bucket in histogram.buckets:
                     cumulative += bucket.count
-                    le = (
-                        "+Inf"
-                        if bucket.le == float("inf")
-                        else f"{bucket.le / 1000:.3f}"
-                    )
-                    lines.append(
-                        f'db_query_duration_seconds_bucket{{{labels},le="{le}"}} {cumulative}'
-                    )
+                    le = "+Inf" if bucket.le == float("inf") else f"{bucket.le / 1000:.3f}"
+                    lines.append(f'db_query_duration_seconds_bucket{{{labels},le="{le}"}} {cumulative}')
 
-                lines.append(
-                    f"db_query_duration_seconds_sum{{{labels}}} {histogram.sum / 1000:.6f}"
-                )
-                lines.append(
-                    f"db_query_duration_seconds_count{{{labels}}} {histogram.count}"
-                )
+                lines.append(f"db_query_duration_seconds_sum{{{labels}}} {histogram.sum / 1000:.6f}")
+                lines.append(f"db_query_duration_seconds_count{{{labels}}} {histogram.count}")
 
             lines.append("")
 
             # Connection wait histogram
-            lines.append(
-                "# HELP db_connection_wait_seconds Time spent waiting for database connection"
-            )
+            lines.append("# HELP db_connection_wait_seconds Time spent waiting for database connection")
             lines.append("# TYPE db_connection_wait_seconds histogram")
 
             hist = self._connection_wait_histogram
@@ -253,9 +236,7 @@ class MetricsCollector:
             for bucket in hist.buckets:
                 cumulative += bucket.count
                 le = "+Inf" if bucket.le == float("inf") else f"{bucket.le / 1000:.3f}"
-                lines.append(
-                    f'db_connection_wait_seconds_bucket{{le="{le}"}} {cumulative}'
-                )
+                lines.append(f'db_connection_wait_seconds_bucket{{le="{le}"}} {cumulative}')
 
             lines.append(f"db_connection_wait_seconds_sum {hist.sum / 1000:.6f}")
             lines.append(f"db_connection_wait_seconds_count {hist.count}")
@@ -265,9 +246,7 @@ class MetricsCollector:
             lines.append("# HELP db_operations_total Total database operations by type")
             lines.append("# TYPE db_operations_total counter")
             for (op, table), count in self._operation_counts.items():
-                lines.append(
-                    f'db_operations_total{{operation="{op}",table="{table}"}} {count}'
-                )
+                lines.append(f'db_operations_total{{operation="{op}",table="{table}"}} {count}')
             lines.append("")
 
             # Error counts
@@ -275,15 +254,11 @@ class MetricsCollector:
             lines.append("# TYPE db_errors_total counter")
             for (op, table), count in self._error_counts.items():
                 if count > 0:
-                    lines.append(
-                        f'db_errors_total{{operation="{op}",table="{table}"}} {count}'
-                    )
+                    lines.append(f'db_errors_total{{operation="{op}",table="{table}"}} {count}')
             lines.append("")
 
             # Archive sizes
-            lines.append(
-                "# HELP db_archive_table_size_bytes Size of archive tables in bytes"
-            )
+            lines.append("# HELP db_archive_table_size_bytes Size of archive tables in bytes")
             lines.append("# TYPE db_archive_table_size_bytes gauge")
             for table, size in self._archive_sizes.items():
                 lines.append(f'db_archive_table_size_bytes{{table="{table}"}} {size}')
@@ -307,7 +282,7 @@ class MetricsCollector:
 metrics_collector = MetricsCollector()
 
 
-def get_extended_metrics() -> Dict[str, Any]:
+def get_extended_metrics() -> dict[str, Any]:
     """Get extended metrics as dictionary."""
     return metrics_collector.get_stats()
 

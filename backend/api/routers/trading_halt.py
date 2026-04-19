@@ -4,8 +4,6 @@ Trading Halt API Router.
 Provides REST API for trading halt management and emergency stop.
 """
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -37,8 +35,8 @@ class HaltTradingRequest(BaseModel):
     reason: str  # HaltReason value
     level: str = "hard"  # HaltLevel value
     triggered_by: str = "api"
-    duration_minutes: Optional[int] = None
-    message: Optional[str] = None
+    duration_minutes: int | None = None
+    message: str | None = None
 
 
 class ResumeRequest(BaseModel):
@@ -59,16 +57,16 @@ class ValidateTradeRequest(BaseModel):
 class UpdateConfigRequest(BaseModel):
     """Request to update halt configuration."""
 
-    max_daily_loss_pct: Optional[float] = None
-    max_weekly_loss_pct: Optional[float] = None
-    max_trade_loss_pct: Optional[float] = None
-    max_drawdown_pct: Optional[float] = None
-    max_open_positions: Optional[int] = None
-    max_position_size_pct: Optional[float] = None
-    max_total_exposure_pct: Optional[float] = None
-    volatility_threshold: Optional[float] = None
-    auto_recovery_enabled: Optional[bool] = None
-    recovery_cooldown_minutes: Optional[int] = None
+    max_daily_loss_pct: float | None = None
+    max_weekly_loss_pct: float | None = None
+    max_trade_loss_pct: float | None = None
+    max_drawdown_pct: float | None = None
+    max_open_positions: int | None = None
+    max_position_size_pct: float | None = None
+    max_total_exposure_pct: float | None = None
+    volatility_threshold: float | None = None
+    auto_recovery_enabled: bool | None = None
+    recovery_cooldown_minutes: int | None = None
 
 
 class RiskMetricsRequest(BaseModel):
@@ -96,19 +94,19 @@ class HaltEventResponse(BaseModel):
     timestamp: str
     triggered_by: str
     details: dict
-    resolved_at: Optional[str] = None
-    resolved_by: Optional[str] = None
+    resolved_at: str | None = None
+    resolved_by: str | None = None
 
 
 class TradingStatusResponse(BaseModel):
     """Response for trading status."""
 
     trading_status: str
-    halt_level: Optional[str]
-    halt_reason: Optional[str]
-    halted_at: Optional[str]
-    halted_by: Optional[str]
-    resume_at: Optional[str]
+    halt_level: str | None
+    halt_reason: str | None
+    halted_at: str | None
+    halted_by: str | None
+    resume_at: str | None
     message: str
     can_open_positions: bool
     can_close_positions: bool
@@ -337,10 +335,7 @@ async def update_risk_metrics(request: RiskMetricsRequest):
 @router.get("/halt-reasons")
 async def list_halt_reasons():
     """List all available halt reasons."""
-    return [
-        {"value": r.value, "description": r.name.replace("_", " ").title()}
-        for r in HaltReason
-    ]
+    return [{"value": r.value, "description": r.name.replace("_", " ").title()} for r in HaltReason]
 
 
 @router.get("/halt-levels")

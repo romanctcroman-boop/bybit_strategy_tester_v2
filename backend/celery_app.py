@@ -53,15 +53,9 @@ celery_app.conf.update(
     task_eager_propagates=CELERY_EAGER,
     # Queues for different optimization types
     task_routes={
-        "backend.tasks.optimize_tasks.grid_search_task": {
-            "queue": "optimizations.grid"
-        },
-        "backend.tasks.optimize_tasks.walk_forward_task": {
-            "queue": "optimizations.walk"
-        },
-        "backend.tasks.optimize_tasks.bayesian_optimization_task": {
-            "queue": "optimizations.bayes"
-        },
+        "backend.tasks.optimize_tasks.grid_search_task": {"queue": "optimizations.grid"},
+        "backend.tasks.optimize_tasks.walk_forward_task": {"queue": "optimizations.walk"},
+        "backend.tasks.optimize_tasks.bayesian_optimization_task": {"queue": "optimizations.bayes"},
         "backend.tasks.backtest_tasks.*": {"queue": "backtests"},
     },
     # Default queue
@@ -78,10 +72,7 @@ celery_app.conf.beat_schedule = {
 }
 
 logger.info(
-    f"✅ Celery app configured | "
-    f"Broker: {CELERY_BROKER_URL} | "
-    f"Backend: {CELERY_RESULT_BACKEND} | "
-    f"Eager: {CELERY_EAGER}"
+    f"✅ Celery app configured | Broker: {CELERY_BROKER_URL} | Backend: {CELERY_RESULT_BACKEND} | Eager: {CELERY_EAGER}"
 )
 
 

@@ -2,9 +2,10 @@
 Deep debug: position size and fee calculation differences
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
 
-import numpy as np
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 # ============ PARAMETERS ============
 initial_capital = 10000.0

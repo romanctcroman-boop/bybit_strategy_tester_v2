@@ -35,9 +35,8 @@ const NAVIGATION_CONFIG = {
             dropdown: true,
             items: [
                 { id: 'market-chart', label: 'Market Chart', icon: 'bi-bar-chart-line', href: '/frontend/market-chart.html' },
-                { id: 'trading-panel', label: 'Trading Panel', icon: 'bi-lightning', href: '/frontend/trading-panel.html' },
-                { id: 'orders', label: 'Orders', icon: 'bi-list-task', href: '/frontend/orders.html' },
-                { id: 'positions', label: 'Positions', icon: 'bi-wallet2', href: '/frontend/positions.html' }
+                { id: 'trading-panel', label: 'Trading Panel', icon: 'bi-lightning', href: '/frontend/trading.html' },
+                { id: 'tick-chart', label: 'Tick Chart', icon: 'bi-activity', href: '/frontend/tick-chart.html' }
             ]
         },
         {
@@ -47,8 +46,8 @@ const NAVIGATION_CONFIG = {
             dropdown: true,
             items: [
                 { id: 'strategy-builder', label: 'Strategy Builder', icon: 'bi-tools', href: '/frontend/strategy-builder.html' },
-                { id: 'strategy-library', label: 'Strategy Library', icon: 'bi-collection', href: '/frontend/strategy-library.html' },
-                { id: 'backtesting', label: 'Backtesting', icon: 'bi-clock-history', href: '/frontend/backtesting.html' },
+                { id: 'marketplace', label: 'Marketplace', icon: 'bi-collection', href: '/frontend/marketplace.html' },
+                { id: 'backtest-results', label: 'Backtest Results', icon: 'bi-clock-history', href: '/frontend/backtest-results.html' },
                 { id: 'risk-management', label: 'Risk Management', icon: 'bi-shield-check', href: '/frontend/risk-management.html' }
             ]
         },
@@ -59,8 +58,8 @@ const NAVIGATION_CONFIG = {
             dropdown: true,
             items: [
                 { id: 'portfolio', label: 'Portfolio', icon: 'bi-briefcase', href: '/frontend/portfolio.html' },
-                { id: 'performance', label: 'Performance', icon: 'bi-trophy', href: '/frontend/performance.html' },
-                { id: 'reports', label: 'Reports', icon: 'bi-file-earmark-text', href: '/frontend/reports.html' }
+                { id: 'analytics', label: 'Analytics', icon: 'bi-bar-chart', href: '/frontend/analytics.html' },
+                { id: 'optimizations', label: 'Optimizations', icon: 'bi-sliders2', href: '/frontend/optimizations.html' }
             ]
         },
         {
@@ -149,21 +148,21 @@ class Navigation {
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
             <div class="container-fluid">
                 ${this.renderBrand()}
-                
-                <button class="navbar-toggler" type="button" 
-                        data-bs-toggle="collapse" 
+
+                <button class="navbar-toggler" type="button"
+                        data-bs-toggle="collapse"
                         data-bs-target="#navbarContent"
-                        aria-controls="navbarContent" 
-                        aria-expanded="false" 
+                        aria-controls="navbarContent"
+                        aria-expanded="false"
                         aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                
+
                 <div class="collapse navbar-collapse" id="navbarContent">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         ${this.renderMenuItems()}
                     </ul>
-                    
+
                     <div class="d-flex align-items-center gap-3">
                         ${this.renderRightItems()}
                     </div>
@@ -205,7 +204,7 @@ class Navigation {
         const activeClass = this.isActive(item) ? 'active' : '';
         return `
         <li class="nav-item">
-            <a class="nav-link ${activeClass}" href="${item.href}" 
+            <a class="nav-link ${activeClass}" href="${item.href}"
                ${item.description ? `title="${item.description}"` : ''}>
                 <i class="bi ${item.icon} me-1"></i>
                 ${item.label}
@@ -233,10 +232,10 @@ class Navigation {
 
         return `
         <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle ${activeClass}" href="#" 
-               id="nav-${item.id}" 
-               role="button" 
-               data-bs-toggle="dropdown" 
+            <a class="nav-link dropdown-toggle ${activeClass}" href="#"
+               id="nav-${item.id}"
+               role="button"
+               data-bs-toggle="dropdown"
                aria-expanded="false">
                 <i class="bi ${item.icon} me-1"></i>
                 ${item.label}
@@ -254,14 +253,14 @@ class Navigation {
     renderRightItems() {
         return this.config.rightItems.map(item => {
             switch (item.type) {
-            case 'status':
-                return this.renderStatusIndicator(item);
-            case 'button':
-                return this.renderIconButton(item);
-            case 'toggle':
-                return this.renderThemeToggle(item);
-            default:
-                return '';
+                case 'status':
+                    return this.renderStatusIndicator(item);
+                case 'button':
+                    return this.renderIconButton(item);
+                case 'toggle':
+                    return this.renderThemeToggle(item);
+                default:
+                    return '';
             }
         }).join('');
     }
@@ -283,7 +282,7 @@ class Navigation {
      */
     renderIconButton(item) {
         return `
-        <button class="btn btn-outline-light btn-sm position-relative" 
+        <button class="btn btn-outline-light btn-sm position-relative"
                 id="${item.id}"
                 title="${item.label || item.id}">
             <i class="bi ${item.icon}"></i>
@@ -297,7 +296,7 @@ class Navigation {
      */
     renderThemeToggle(item) {
         return `
-        <button class="btn btn-outline-light btn-sm" 
+        <button class="btn btn-outline-light btn-sm"
                 id="${item.id}"
                 title="Toggle theme">
             <i class="bi ${item.icon}" id="${item.id}-icon"></i>

@@ -44,10 +44,12 @@ services:
       dockerfile: deployment/Dockerfile.trade-publisher
     container_name: tick_trade_publisher
     restart: unless-stopped
+    env_file:
+      - .env.production
     environment:
-      - REDIS_URL=redis://redis:6379
-      - SYMBOLS=BTCUSDT,ETHUSDT
-      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379  # internal docker hostname — do not override via env_file
+      - SYMBOLS=${SYMBOLS:-BTCUSDT,ETHUSDT}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       redis:
         condition: service_healthy
@@ -180,12 +182,14 @@ services:
       dockerfile: deployment/Dockerfile.backend
     container_name: tick_backend_1
     restart: unless-stopped
+    env_file:
+      - .env.production
     environment:
-      - USE_REDIS_PUBSUB=true
-      - REDIS_URL=redis://redis:6379
-      - LOG_LEVEL=INFO
-      - PORT=8000
-      - WORKERS=1
+      - USE_REDIS_PUBSUB=${USE_REDIS_PUBSUB:-true}
+      - REDIS_URL=redis://redis:6379  # internal docker hostname — do not override via env_file
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PORT=${PORT:-8000}
+      - WORKERS=${WORKERS:-1}
     depends_on:
       redis:
         condition: service_healthy
@@ -215,12 +219,14 @@ services:
       dockerfile: deployment/Dockerfile.backend
     container_name: tick_backend_2
     restart: unless-stopped
+    env_file:
+      - .env.production
     environment:
-      - USE_REDIS_PUBSUB=true
-      - REDIS_URL=redis://redis:6379
-      - LOG_LEVEL=INFO
-      - PORT=8000
-      - WORKERS=1
+      - USE_REDIS_PUBSUB=${USE_REDIS_PUBSUB:-true}
+      - REDIS_URL=redis://redis:6379  # internal docker hostname — do not override via env_file
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PORT=${PORT:-8000}
+      - WORKERS=${WORKERS:-1}
     depends_on:
       redis:
         condition: service_healthy

@@ -4,13 +4,14 @@ Implements the "gold standard" in trading strategy validation
 Based on world best practices 2024-2026
 """
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, List, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 
@@ -34,7 +35,7 @@ class WalkForwardPeriod:
     out_of_sample_end: datetime
 
     # Optimized parameters
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
 
     # Performance metrics
     in_sample_sharpe: float
@@ -83,12 +84,12 @@ class WalkForwardResult:
     robustness_score: float  # 0-100 score
 
     # Individual periods
-    periods: List[WalkForwardPeriod] = field(default_factory=list)
+    periods: list[WalkForwardPeriod] = field(default_factory=list)
 
     # Best overall parameters (most frequent or highest scoring)
-    recommended_params: Dict[str, Any] = field(default_factory=dict)
+    recommended_params: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "strategy_name": self.strategy_name,
             "validation_status": self.validation_status.value,
@@ -153,7 +154,7 @@ class WalkForwardValidator:
         strategy_class,
         optimizer: Callable,
         backtest_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         strategy_name: str = "Strategy",
     ) -> WalkForwardResult:
         """
@@ -174,9 +175,7 @@ class WalkForwardValidator:
         total_window = self.in_sample_size + self.out_of_sample_size
 
         if n_bars < total_window:
-            logger.warning(
-                f"Insufficient data for walk-forward: {n_bars} < {total_window}"
-            )
+            logger.warning(f"Insufficient data for walk-forward: {n_bars} < {total_window}")
             return self._failed_result(strategy_name, "Insufficient data")
 
         periods = []
@@ -184,9 +183,7 @@ class WalkForwardValidator:
         start_idx = 0
 
         logger.info(f"Starting walk-forward validation for {strategy_name}")
-        logger.info(
-            f"Data: {n_bars} bars, IS: {self.in_sample_size}, OOS: {self.out_of_sample_size}"
-        )
+        logger.info(f"Data: {n_bars} bars, IS: {self.in_sample_size}, OOS: {self.out_of_sample_size}")
 
         while start_idx + total_window <= n_bars:
             # Define period boundaries
@@ -199,9 +196,7 @@ class WalkForwardValidator:
             is_data = data.iloc[is_start:is_end]
             oos_data = data.iloc[oos_start:oos_end]
 
-            logger.debug(
-                f"Period {period_number}: IS {is_start}-{is_end}, OOS {oos_start}-{oos_end}"
-            )
+            logger.debug(f"Period {period_number}: IS {is_start}-{is_end}, OOS {oos_start}-{oos_end}")
 
             try:
                 # Optimize on in-sample
@@ -224,20 +219,12 @@ class WalkForwardValidator:
 
                 # Calculate degradation
                 sharpe_deg = is_sharpe - oos_sharpe
-                return_deg = (
-                    ((is_return - oos_return) / is_return * 100)
-                    if is_return != 0
-                    else 0
-                )
+                return_deg = ((is_return - oos_return) / is_return * 100) if is_return != 0 else 0
 
                 period = WalkForwardPeriod(
                     period_number=period_number,
-                    in_sample_start=is_data.index[0]
-                    if hasattr(is_data.index[0], "to_pydatetime")
-                    else datetime.now(),
-                    in_sample_end=is_data.index[-1]
-                    if hasattr(is_data.index[-1], "to_pydatetime")
-                    else datetime.now(),
+                    in_sample_start=is_data.index[0] if hasattr(is_data.index[0], "to_pydatetime") else datetime.now(),
+                    in_sample_end=is_data.index[-1] if hasattr(is_data.index[-1], "to_pydatetime") else datetime.now(),
                     out_of_sample_start=oos_data.index[0]
                     if hasattr(oos_data.index[0], "to_pydatetime")
                     else datetime.now(),
@@ -270,9 +257,7 @@ class WalkForwardValidator:
         # Analyze results
         return self._analyze_results(periods, strategy_name)
 
-    def _analyze_results(
-        self, periods: List[WalkForwardPeriod], strategy_name: str
-    ) -> WalkForwardResult:
+    def _analyze_results(self, periods: list[WalkForwardPeriod], strategy_name: str) -> WalkForwardResult:
         """Analyze walk-forward results and determine robustness"""
 
         if not periods:
@@ -323,12 +308,8 @@ class WalkForwardValidator:
         recommended_params = self._find_recommended_params(periods)
 
         logger.info(f"Walk-Forward Validation Complete: {status.value}")
-        logger.info(
-            f"  Avg IS Sharpe: {avg_is_sharpe:.3f}, Avg OOS Sharpe: {avg_oos_sharpe:.3f}"
-        )
-        logger.info(
-            f"  Avg Degradation: {avg_degradation:.3f}, Retention: {retention:.2%}"
-        )
+        logger.info(f"  Avg IS Sharpe: {avg_is_sharpe:.3f}, Avg OOS Sharpe: {avg_oos_sharpe:.3f}")
+        logger.info(f"  Avg Degradation: {avg_degradation:.3f}, Retention: {retention:.2%}")
         logger.info(f"  Profitable periods: {profitable_pct:.1f}%")
         logger.info(f"  Robustness Score: {robustness_score:.1f}/100")
 
@@ -377,9 +358,7 @@ class WalkForwardValidator:
 
         return min(100, max(0, score))
 
-    def _find_recommended_params(
-        self, periods: List[WalkForwardPeriod]
-    ) -> Dict[str, Any]:
+    def _find_recommended_params(self, periods: list[WalkForwardPeriod]) -> dict[str, Any]:
         """Find recommended parameters from successful periods"""
         if not periods:
             return {}
@@ -407,12 +386,10 @@ class WalkForwardValidator:
             weights = [p.out_of_sample_sharpe for p in valid_periods]
 
             if isinstance(values[0], (int, float)):
-                weighted_avg = (
-                    sum(v * w for v, w in zip(values, weights)) / total_weight
-                )
+                weighted_avg = sum(v * w for v, w in zip(values, weights, strict=False)) / total_weight
                 # Round to same type as original
                 if isinstance(values[0], int):
-                    recommended[key] = int(round(weighted_avg))
+                    recommended[key] = round(weighted_avg)
                 else:
                     recommended[key] = round(weighted_avg, 4)
             else:
@@ -476,9 +453,7 @@ class MonteCarloValidator:
     def __init__(self, n_simulations: int = 1000):
         self.n_simulations = n_simulations
 
-    def validate_trade_order(
-        self, trades: List, initial_capital: float, confidence: float = 0.95
-    ) -> Dict[str, Any]:
+    def validate_trade_order(self, trades: list, initial_capital: float, confidence: float = 0.95) -> dict[str, Any]:
         """
         Test if strategy results are dependent on trade order.
 
@@ -502,9 +477,7 @@ class MonteCarloValidator:
             shuffled_pnls = np.random.permutation(pnls)
             simulated_equity = initial_capital + np.cumsum(shuffled_pnls)
             simulated_sharpes.append(self._quick_sharpe(simulated_equity))
-            simulated_returns.append(
-                (simulated_equity[-1] - initial_capital) / initial_capital
-            )
+            simulated_returns.append((simulated_equity[-1] - initial_capital) / initial_capital)
 
         # Calculate percentiles
         sharpe_percentile = np.percentile(simulated_sharpes, (1 - confidence) * 100)

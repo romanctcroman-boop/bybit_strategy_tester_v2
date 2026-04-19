@@ -11,10 +11,11 @@ Provides advanced stop loss strategies:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +56,10 @@ class StopLossOrder:
     entry_price: float
     position_size: float
     state: StopLossState = StopLossState.PENDING
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    triggered_at: Optional[datetime] = None
-    triggered_price: Optional[float] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    triggered_at: datetime | None = None
+    triggered_price: float | None = None
 
     # Trailing specific
     trail_distance: float = 0.0
@@ -72,14 +73,14 @@ class StopLossOrder:
     is_at_breakeven: bool = False
 
     # Time-based specific
-    time_limit: Optional[timedelta] = None
-    expire_at: Optional[datetime] = None
+    time_limit: timedelta | None = None
+    expire_at: datetime | None = None
 
     # ATR-based specific
     atr_multiplier: float = 2.0
     current_atr: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "symbol": self.symbol,
@@ -92,9 +93,7 @@ class StopLossOrder:
             "state": self.state.value,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "triggered_at": self.triggered_at.isoformat()
-            if self.triggered_at
-            else None,
+            "triggered_at": self.triggered_at.isoformat() if self.triggered_at else None,
             "triggered_price": self.triggered_price,
             "trail_distance": self.trail_distance,
             "trail_percent": self.trail_percent,
@@ -162,21 +161,21 @@ class StopLossManager:
             print(f"Stop triggered at {stop.triggered_price}")
     """
 
-    def __init__(self, config: Optional[StopLossConfig] = None):
+    def __init__(self, config: StopLossConfig | None = None):
         self.config = config or StopLossConfig()
-        self.stops: Dict[str, StopLossOrder] = {}
+        self.stops: dict[str, StopLossOrder] = {}
         self.stop_counter = 0
 
         # Callbacks
-        self.on_stop_triggered: Optional[Callable[[StopLossOrder], None]] = None
-        self.on_stop_moved: Optional[Callable[[StopLossOrder, float], None]] = None
+        self.on_stop_triggered: Callable[[StopLossOrder], None] | None = None
+        self.on_stop_moved: Callable[[StopLossOrder, float], None] | None = None
 
         logger.info("StopLossManager initialized")
 
     def _generate_id(self) -> str:
         """Generate unique stop ID."""
         self.stop_counter += 1
-        return f"SL_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{self.stop_counter}"
+        return f"SL_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{self.stop_counter}"
 
     def create_stop(
         self,
@@ -185,13 +184,13 @@ class StopLossManager:
         entry_price: float,
         position_size: float,
         stop_type: StopLossType = StopLossType.FIXED,
-        initial_stop: Optional[float] = None,
-        trail_distance: Optional[float] = None,
-        trail_percent: Optional[float] = None,
-        breakeven_trigger_pct: Optional[float] = None,
-        time_limit: Optional[timedelta] = None,
-        atr_value: Optional[float] = None,
-        atr_multiplier: Optional[float] = None,
+        initial_stop: float | None = None,
+        trail_distance: float | None = None,
+        trail_percent: float | None = None,
+        breakeven_trigger_pct: float | None = None,
+        time_limit: timedelta | None = None,
+        atr_value: float | None = None,
+        atr_multiplier: float | None = None,
     ) -> StopLossOrder:
         """
         Create a new stop loss order.
@@ -221,28 +220,16 @@ class StopLossManager:
         elif stop_type == StopLossType.ATR_BASED and atr_value:
             mult = atr_multiplier or self.config.atr_multiplier
             distance = atr_value * mult
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
         elif stop_type == StopLossType.TRAILING and trail_distance:
-            if side == "long":
-                stop_price = entry_price - trail_distance
-            else:
-                stop_price = entry_price + trail_distance
+            stop_price = entry_price - trail_distance if side == "long" else entry_price + trail_distance
         elif stop_type == StopLossType.TRAILING_PERCENT and trail_percent:
             distance = entry_price * (trail_percent / 100)
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
         else:
             # Default 2% stop
             distance = entry_price * 0.02
-            if side == "long":
-                stop_price = entry_price - distance
-            else:
-                stop_price = entry_price + distance
+            stop_price = entry_price - distance if side == "long" else entry_price + distance
 
         # Create stop order
         stop = StopLossOrder(
@@ -259,8 +246,7 @@ class StopLossManager:
             trail_percent=trail_percent or self.config.trail_percent,
             highest_price=entry_price,
             lowest_price=entry_price,
-            breakeven_trigger_pct=breakeven_trigger_pct
-            or self.config.breakeven_trigger_pct,
+            breakeven_trigger_pct=breakeven_trigger_pct or self.config.breakeven_trigger_pct,
             breakeven_offset=self.config.breakeven_offset,
             time_limit=time_limit or self.config.max_hold_time,
             atr_multiplier=atr_multiplier or self.config.atr_multiplier,
@@ -269,12 +255,11 @@ class StopLossManager:
 
         # Set expiry for time-based
         if stop_type == StopLossType.TIME_BASED and stop.time_limit:
-            stop.expire_at = datetime.now(timezone.utc) + stop.time_limit
+            stop.expire_at = datetime.now(UTC) + stop.time_limit
 
         self.stops[stop_id] = stop
         logger.info(
-            f"Created {stop_type.value} stop for {symbol} {side}: "
-            f"entry=${entry_price:.2f}, stop=${stop_price:.2f}"
+            f"Created {stop_type.value} stop for {symbol} {side}: entry=${entry_price:.2f}, stop=${stop_price:.2f}"
         )
 
         return stop
@@ -283,7 +268,7 @@ class StopLossManager:
         self,
         stop_id: str,
         current_price: float,
-        current_atr: Optional[float] = None,
+        current_atr: float | None = None,
     ) -> bool:
         """
         Update stop loss based on current price.
@@ -300,12 +285,11 @@ class StopLossManager:
         if not stop or stop.state != StopLossState.ACTIVE:
             return False
 
-        stop.updated_at = datetime.now(timezone.utc)
+        stop.updated_at = datetime.now(UTC)
 
         # Check time-based expiration
-        if stop.stop_type == StopLossType.TIME_BASED:
-            if stop.expire_at and datetime.now(timezone.utc) >= stop.expire_at:
-                return self._trigger_stop(stop, current_price, "time_expired")
+        if stop.stop_type == StopLossType.TIME_BASED and stop.expire_at and datetime.now(UTC) >= stop.expire_at:
+            return self._trigger_stop(stop, current_price, "time_expired")
 
         # Update highest/lowest
         if current_price > stop.highest_price:
@@ -325,8 +309,8 @@ class StopLossManager:
         elif stop.stop_type == StopLossType.ATR_BASED and current_atr:
             self._update_atr_stop(stop, current_price, current_atr)
 
-        # Check breakeven
-        if stop.stop_type == StopLossType.BREAKEVEN or not stop.is_at_breakeven:
+        # Check breakeven — only for BREAKEVEN stops that haven't moved yet
+        if stop.stop_type == StopLossType.BREAKEVEN and not stop.is_at_breakeven:
             self._check_breakeven(stop, current_price)
 
         return False
@@ -341,13 +325,11 @@ class StopLossManager:
     def _trigger_stop(self, stop: StopLossOrder, price: float, reason: str) -> bool:
         """Trigger stop loss."""
         stop.state = StopLossState.TRIGGERED
-        stop.triggered_at = datetime.now(timezone.utc)
+        stop.triggered_at = datetime.now(UTC)
         stop.triggered_price = price
 
         logger.warning(
-            f"Stop triggered for {stop.symbol}: "
-            f"reason={reason}, price=${price:.2f}, "
-            f"entry=${stop.entry_price:.2f}"
+            f"Stop triggered for {stop.symbol}: reason={reason}, price=${price:.2f}, entry=${stop.entry_price:.2f}"
         )
 
         # Callback
@@ -380,11 +362,8 @@ class StopLossManager:
                 stop.current_stop = new_stop
 
         if stop.current_stop != old_stop:
-            stop.updated_at = datetime.now(timezone.utc)
-            logger.debug(
-                f"Trailing stop moved: {stop.symbol} "
-                f"${old_stop:.2f} -> ${stop.current_stop:.2f}"
-            )
+            stop.updated_at = datetime.now(UTC)
+            logger.debug(f"Trailing stop moved: {stop.symbol} ${old_stop:.2f} -> ${stop.current_stop:.2f}")
             if self.on_stop_moved:
                 self.on_stop_moved(stop, old_stop)
 
@@ -392,7 +371,7 @@ class StopLossManager:
         self,
         stop: StopLossOrder,
         current_price: float,
-        current_atr: Optional[float],
+        current_atr: float | None,
     ):
         """Update Chandelier exit stop."""
         if not current_atr:
@@ -413,7 +392,7 @@ class StopLossManager:
                 stop.current_stop = new_stop
 
         if stop.current_stop != old_stop:
-            stop.updated_at = datetime.now(timezone.utc)
+            stop.updated_at = datetime.now(UTC)
             stop.current_atr = current_atr
 
     def _update_atr_stop(
@@ -438,7 +417,7 @@ class StopLossManager:
                 stop.current_stop = new_stop
 
         if stop.current_stop != old_stop:
-            stop.updated_at = datetime.now(timezone.utc)
+            stop.updated_at = datetime.now(UTC)
             stop.current_atr = current_atr
 
     def _check_breakeven(self, stop: StopLossOrder, current_price: float):
@@ -471,36 +450,29 @@ class StopLossManager:
 
             if stop.is_at_breakeven:
                 stop.state = StopLossState.MOVED_TO_BREAKEVEN
-                stop.updated_at = datetime.now(timezone.utc)
-                logger.info(
-                    f"Stop moved to breakeven for {stop.symbol}: "
-                    f"${old_stop:.2f} -> ${stop.current_stop:.2f}"
-                )
+                stop.updated_at = datetime.now(UTC)
+                logger.info(f"Stop moved to breakeven for {stop.symbol}: ${old_stop:.2f} -> ${stop.current_stop:.2f}")
                 if self.on_stop_moved:
                     self.on_stop_moved(stop, old_stop)
 
-    def get_stop(self, stop_id: str) -> Optional[StopLossOrder]:
+    def get_stop(self, stop_id: str) -> StopLossOrder | None:
         """Get stop order by ID."""
         return self.stops.get(stop_id)
 
-    def get_stops_for_symbol(self, symbol: str) -> List[StopLossOrder]:
+    def get_stops_for_symbol(self, symbol: str) -> list[StopLossOrder]:
         """Get all stops for a symbol."""
         return [s for s in self.stops.values() if s.symbol == symbol]
 
-    def get_active_stops(self) -> List[StopLossOrder]:
+    def get_active_stops(self) -> list[StopLossOrder]:
         """Get all active stops."""
-        return [
-            s
-            for s in self.stops.values()
-            if s.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN)
-        ]
+        return [s for s in self.stops.values() if s.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN)]
 
     def cancel_stop(self, stop_id: str) -> bool:
         """Cancel a stop order."""
         stop = self.stops.get(stop_id)
-        if stop and stop.state == StopLossState.ACTIVE:
+        if stop and stop.state in (StopLossState.ACTIVE, StopLossState.MOVED_TO_BREAKEVEN):
             stop.state = StopLossState.CANCELLED
-            stop.updated_at = datetime.now(timezone.utc)
+            stop.updated_at = datetime.now(UTC)
             logger.info(f"Stop cancelled: {stop_id}")
             return True
         return False
@@ -516,9 +488,9 @@ class StopLossManager:
     def modify_stop(
         self,
         stop_id: str,
-        new_stop_price: Optional[float] = None,
-        trail_percent: Optional[float] = None,
-        trail_distance: Optional[float] = None,
+        new_stop_price: float | None = None,
+        trail_percent: float | None = None,
+        trail_distance: float | None = None,
     ) -> bool:
         """Modify existing stop order."""
         stop = self.stops.get(stop_id)
@@ -532,15 +504,15 @@ class StopLossManager:
         if trail_distance:
             stop.trail_distance = trail_distance
 
-        stop.updated_at = datetime.now(timezone.utc)
+        stop.updated_at = datetime.now(UTC)
         logger.info(f"Stop modified: {stop_id}")
         return True
 
     def update_all(
         self,
-        prices: Dict[str, float],
-        atr_values: Optional[Dict[str, float]] = None,
-    ) -> List[StopLossOrder]:
+        prices: dict[str, float],
+        atr_values: dict[str, float] | None = None,
+    ) -> list[StopLossOrder]:
         """
         Update all stops with current prices.
 
@@ -562,19 +534,14 @@ class StopLossManager:
 
         return triggered
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get stop loss manager summary."""
         active = self.get_active_stops()
 
         return {
             "total_stops": len(self.stops),
             "active_stops": len(active),
-            "stops_by_type": {
-                t.value: len([s for s in active if s.stop_type == t])
-                for t in StopLossType
-            },
+            "stops_by_type": {t.value: len([s for s in active if s.stop_type == t]) for t in StopLossType},
             "at_breakeven": len([s for s in active if s.is_at_breakeven]),
-            "triggered_count": len(
-                [s for s in self.stops.values() if s.state == StopLossState.TRIGGERED]
-            ),
+            "triggered_count": len([s for s in self.stops.values() if s.state == StopLossState.TRIGGERED]),
         }

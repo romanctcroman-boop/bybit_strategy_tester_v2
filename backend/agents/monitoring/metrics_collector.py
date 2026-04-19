@@ -20,11 +20,12 @@ import json
 import statistics
 import threading
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -57,8 +58,8 @@ class MetricValue:
     """A single metric value with timestamp"""
 
     value: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    labels: Dict[str, str] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -69,8 +70,8 @@ class Metric:
     description: str
     type: MetricType
     unit: str = ""
-    labels: List[str] = field(default_factory=list)
-    buckets: List[float] = field(default_factory=list)  # For histograms
+    labels: list[str] = field(default_factory=list)
+    buckets: list[float] = field(default_factory=list)  # For histograms
 
     def __hash__(self):
         return hash(self.name)
@@ -81,12 +82,12 @@ class MetricSeries:
     """Time series data for a metric"""
 
     metric: Metric
-    values: List[MetricValue] = field(default_factory=list)
-    histogram_counts: Dict[float, int] = field(default_factory=dict)
+    values: list[MetricValue] = field(default_factory=list)
+    histogram_counts: dict[float, int] = field(default_factory=dict)
     sum_value: float = 0.0
     count: int = 0
 
-    def add_value(self, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+    def add_value(self, value: float, labels: dict[str, str] | None = None) -> None:
         """Add a value to the series"""
         self.values.append(MetricValue(value=value, labels=labels or {}))
         self.sum_value += value
@@ -96,9 +97,7 @@ class MetricSeries:
         if self.metric.type == MetricType.HISTOGRAM and self.metric.buckets:
             for bucket in self.metric.buckets:
                 if value <= bucket:
-                    self.histogram_counts[bucket] = (
-                        self.histogram_counts.get(bucket, 0) + 1
-                    )
+                    self.histogram_counts[bucket] = self.histogram_counts.get(bucket, 0) + 1
 
     def get_aggregated(
         self,
@@ -106,7 +105,7 @@ class MetricSeries:
         window_seconds: int = 60,
     ) -> float:
         """Get aggregated value over time window"""
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+        cutoff = datetime.now(UTC) - timedelta(seconds=window_seconds)
         recent = [v.value for v in self.values if v.timestamp >= cutoff]
 
         if not recent:
@@ -133,7 +132,7 @@ class MetricSeries:
         else:
             return sum(recent)
 
-    def _percentile(self, values: List[float], percentile: int) -> float:
+    def _percentile(self, values: list[float], percentile: int) -> float:
         """Calculate percentile"""
         if not values:
             return 0.0
@@ -166,7 +165,7 @@ class MetricsCollector:
         ))
 
         # Record metrics
-        collector.increment("agent_requests_total", labels={"agent_type": "deepseek", "status": "success"})
+        collector.increment("agent_requests_total", labels={"agent_type": "claude", "status": "success"})
         collector.observe("agent_latency_ms", 1234.5)
 
         # Query metrics
@@ -241,7 +240,7 @@ class MetricsCollector:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
+        persist_path: str | None = None,
         retention_hours: int = 24,
         auto_register_defaults: bool = True,
     ):
@@ -256,20 +255,18 @@ class MetricsCollector:
         self.persist_path = Path(persist_path) if persist_path else None
         self.retention = timedelta(hours=retention_hours)
 
-        self._metrics: Dict[str, Metric] = {}
-        self._series: Dict[str, Dict[str, MetricSeries]] = defaultdict(dict)
+        self._metrics: dict[str, Metric] = {}
+        self._series: dict[str, dict[str, MetricSeries]] = defaultdict(dict)
         self._lock = threading.RLock()
 
         # Callbacks for metric updates
-        self._callbacks: List[Callable[[str, float, Dict], None]] = []
+        self._callbacks: list[Callable[[str, float, dict], None]] = []
 
         if auto_register_defaults:
             for metric in self.AGENT_METRICS:
                 self.register(metric)
 
-        logger.info(
-            f"📊 MetricsCollector initialized with {len(self._metrics)} metrics"
-        )
+        logger.info(f"📊 MetricsCollector initialized with {len(self._metrics)} metrics")
 
     def register(self, metric: Metric) -> None:
         """Register a new metric"""
@@ -282,7 +279,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float = 1.0,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Increment a counter metric"""
         self._record(name, value, labels, is_increment=True)
@@ -291,7 +288,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Set a gauge metric value"""
         self._record(name, value, labels, is_set=True)
@@ -300,7 +297,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Observe a value for histogram/summary"""
         self._record(name, value, labels)
@@ -309,7 +306,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         is_increment: bool = False,
         is_set: bool = False,
     ) -> None:
@@ -344,7 +341,7 @@ class MetricsCollector:
             except Exception as e:
                 logger.warning(f"Metric callback error: {e}")
 
-    def _label_key(self, labels: Dict[str, str]) -> str:
+    def _label_key(self, labels: dict[str, str]) -> str:
         """Create consistent key from labels"""
         if not labels:
             return ""
@@ -353,7 +350,7 @@ class MetricsCollector:
     def get(
         self,
         name: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         aggregation: MetricAggregation = MetricAggregation.SUM,
         window_seconds: int = 60,
     ) -> float:
@@ -365,9 +362,7 @@ class MetricsCollector:
             label_key = self._label_key(labels or {})
 
             if label_key and label_key in self._series[name]:
-                return self._series[name][label_key].get_aggregated(
-                    aggregation, window_seconds
-                )
+                return self._series[name][label_key].get_aggregated(aggregation, window_seconds)
 
             # Aggregate across all label combinations
             total = 0.0
@@ -378,9 +373,9 @@ class MetricsCollector:
     def get_all(
         self,
         window_seconds: int = 60,
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Get all metrics with their values"""
-        result = {}
+        result: dict[str, dict[str, Any]] = {}
 
         with self._lock:
             for name, label_series in self._series.items():
@@ -396,10 +391,9 @@ class MetricsCollector:
                 }
 
                 for label_key, series in label_series.items():
+                    value: float | dict[str, float]
                     if metric.type == MetricType.COUNTER:
-                        value = series.get_aggregated(
-                            MetricAggregation.SUM, window_seconds
-                        )
+                        value = series.get_aggregated(MetricAggregation.SUM, window_seconds)
                     elif metric.type == MetricType.GAUGE:
                         # For gauges, get the latest value
                         value = series.values[-1].value if series.values else 0
@@ -408,28 +402,22 @@ class MetricsCollector:
                             "count": series.count,
                             "sum": series.sum_value,
                             "avg": series.sum_value / max(series.count, 1),
-                            "p50": series.get_aggregated(
-                                MetricAggregation.P50, window_seconds
-                            ),
-                            "p95": series.get_aggregated(
-                                MetricAggregation.P95, window_seconds
-                            ),
-                            "p99": series.get_aggregated(
-                                MetricAggregation.P99, window_seconds
-                            ),
+                            "p50": series.get_aggregated(MetricAggregation.P50, window_seconds),
+                            "p95": series.get_aggregated(MetricAggregation.P95, window_seconds),
+                            "p99": series.get_aggregated(MetricAggregation.P99, window_seconds),
                         }
 
                     result[name]["series"][label_key or "default"] = value
 
         return result
 
-    def add_callback(self, callback: Callable[[str, float, Dict], None]) -> None:
+    def add_callback(self, callback: Callable[[str, float, dict], None]) -> None:
         """Add callback for metric updates"""
         self._callbacks.append(callback)
 
     def cleanup(self) -> int:
         """Remove old metric values beyond retention"""
-        cutoff = datetime.now(timezone.utc) - self.retention
+        cutoff = datetime.now(UTC) - self.retention
         removed = 0
 
         with self._lock:
@@ -460,9 +448,7 @@ class MetricsCollector:
                     if metric.type == MetricType.HISTOGRAM:
                         # Export histogram buckets
                         for bucket, count in sorted(series.histogram_counts.items()):
-                            lines.append(
-                                f'{name}_bucket{{le="{bucket}"{label_key and "," + label_key}}} {count}'
-                            )
+                            lines.append(f'{name}_bucket{{le="{bucket}"{label_key and "," + label_key}}} {count}')
                         lines.append(f"{name}_sum{labels_str} {series.sum_value}")
                         lines.append(f"{name}_count{labels_str} {series.count}")
                     else:
@@ -475,7 +461,7 @@ class MetricsCollector:
         """Export metrics as JSON"""
         return json.dumps(self.get_all(), indent=2)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get collector statistics"""
         total_values = 0
         with self._lock:
@@ -492,7 +478,7 @@ class MetricsCollector:
 
 
 # Global collector instance
-_collector: Optional[MetricsCollector] = None
+_collector: MetricsCollector | None = None
 
 
 def get_metrics_collector() -> MetricsCollector:
@@ -504,11 +490,11 @@ def get_metrics_collector() -> MetricsCollector:
 
 
 __all__ = [
-    "MetricsCollector",
     "Metric",
-    "MetricType",
     "MetricAggregation",
-    "MetricValue",
     "MetricSeries",
+    "MetricType",
+    "MetricValue",
+    "MetricsCollector",
     "get_metrics_collector",
 ]

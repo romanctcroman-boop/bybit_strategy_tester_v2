@@ -6,7 +6,7 @@ Adds Cache-Control, ETag, and Last-Modified headers where appropriate.
 import hashlib
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -44,20 +44,14 @@ class CacheHeadersMiddleware(BaseHTTPMiddleware):
                 return response
 
             # Add Cache-Control header
-            response.headers.setdefault(
-                "Cache-Control", f"public, max-age={self.max_age}"
-            )
+            response.headers.setdefault("Cache-Control", f"public, max-age={self.max_age}")
 
             # Optionally add ETag (simple hash of body)
             if self.enable_etag and getattr(response, "body", None):
                 try:
                     # response.body may be bytes or str; ensure bytes
                     body = getattr(response, "body", None)
-                    body_bytes = (
-                        body
-                        if isinstance(body, (bytes, bytearray))
-                        else str(body).encode()
-                    )
+                    body_bytes = body if isinstance(body, (bytes, bytearray)) else str(body).encode()
                     etag = hashlib.sha1(body_bytes).hexdigest()
                     response.headers.setdefault("ETag", etag)
                 except Exception:

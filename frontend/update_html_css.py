@@ -121,7 +121,7 @@ def process_html_file(filepath: Path, dry_run: bool = False) -> dict:
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         original_html = f.read()
 
     html = original_html
@@ -173,9 +173,7 @@ def process_html_file(filepath: Path, dry_run: bool = False) -> dict:
     reduction = original_size - new_size
     reduction_pct = (reduction / original_size) * 100 if original_size > 0 else 0
 
-    print(
-        f"    📊 Size: {original_size:,} → {new_size:,} bytes (-{reduction:,}, -{reduction_pct:.1f}%)"
-    )
+    print(f"    📊 Size: {original_size:,} → {new_size:,} bytes (-{reduction:,}, -{reduction_pct:.1f}%)")
 
     return {
         "status": "updated",
@@ -187,12 +185,8 @@ def process_html_file(filepath: Path, dry_run: bool = False) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Update HTML files to use external CSS"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show changes without applying"
-    )
+    parser = argparse.ArgumentParser(description="Update HTML files to use external CSS")
+    parser.add_argument("--dry-run", action="store_true", help="Show changes without applying")
     parser.add_argument("--file", type=str, help="Process single file")
     args = parser.parse_args()
 
@@ -235,9 +229,7 @@ def main():
     print(f"⏭️  Unchanged: {unchanged} files")
 
     if total_reduction > 0:
-        print(
-            f"📉 Total size reduction: {total_reduction:,} bytes ({total_reduction / 1024:.1f} KB)"
-        )
+        print(f"📉 Total size reduction: {total_reduction:,} bytes ({total_reduction / 1024:.1f} KB)")
 
     if args.dry_run:
         print("\n💡 Run without --dry-run to apply changes")

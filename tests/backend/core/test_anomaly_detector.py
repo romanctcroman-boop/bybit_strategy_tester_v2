@@ -8,7 +8,7 @@ Tests anomaly detection functionality:
 - Trade result tracking
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -220,9 +220,7 @@ class TestAnomalyDetector:
         for _ in range(5):
             detector.record_trade_result("test", is_win=False)
 
-        critical_anomalies = detector.get_anomalies(
-            "test", severity=AnomalySeverity.CRITICAL
-        )
+        critical_anomalies = detector.get_anomalies("test", severity=AnomalySeverity.CRITICAL)
         assert all(a.severity == AnomalySeverity.CRITICAL for a in critical_anomalies)
 
     def test_acknowledge_anomaly(self, detector):
@@ -285,7 +283,7 @@ class TestAnomalyDetector:
         for a in anomalies:
             detector.acknowledge_anomaly(a.anomaly_id)
             # Backdate the anomaly
-            a.timestamp = datetime.now(timezone.utc) - timedelta(hours=25)
+            a.timestamp = datetime.now(UTC) - timedelta(hours=25)
 
         # Cleanup with 24 hour max age
         removed = detector.cleanup_old_anomalies(max_age_hours=24)

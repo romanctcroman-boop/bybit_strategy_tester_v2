@@ -1,0 +1,35 @@
+---
+description: Python: py -3.14, ruff, pytest, пути без хардкода d:\, не bare except, dev.ps1.
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Скил: Python и стандарты кода
+
+## Интерпретатор и команды
+
+- Python: `py -3.14` или интерпретатор из `pyproject.toml`/venv.
+- Линт: `ruff check backend/ --fix` или `.\dev.ps1 lint`.
+- Форматирование: `ruff format backend/` или `.\dev.ps1 format`.
+- Тесты: `pytest tests/ -v` или `.\dev.ps1 test` / `.\dev.ps1 test-cov`.
+
+## Пути — не хардкодить
+
+- **Запрещено:** `d:\bybit_strategy_tester_v2`, `d:/bybit_strategy_tester_v2`, `"d:\\bybit_strategy_tester_v2\\..."`.
+- **Нужно:**
+  - корень: `ROOT = Path(__file__).resolve().parents[1]` (или 2 для `backend/`, `scripts/`);
+  - БД: `os.environ.get("DATABASE_PATH")` / `DATABASE_URL` с дефолтом `str(ROOT / "data.sqlite3")`;
+  - кэш: `os.environ.get("CACHE_DIR", str(ROOT / ".cache"))`;
+  - логи: `ROOT / "logs"` или из конфига.
+- В скриптах: `sys.path.insert(0, str(ROOT))` вместо `sys.path.insert(0, "d:/...")`.
+
+## Исключения и отладка
+
+- **Не использовать** `except: pass` — перехватывает `KeyboardInterrupt`/`SystemExit`.
+- Использовать `except Exception as e:` и логировать: `logging.getLogger(__name__).debug("...", e)` или `loguru`.
+
+## Стиль
+
+- Ruff + black/isort по `pyproject.toml`/`ruff.toml`.
+- Docstrings — Google-style для публичных функций.
+- `backend/core/extended_metrics.py` — расчёты для бэктеста; `backend/monitoring/extended_metrics.py` — Prometheus; не путать и не дублировать формулы.

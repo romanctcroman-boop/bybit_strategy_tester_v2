@@ -12,9 +12,9 @@ Validation Categories:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from .builder import (
     BlockType,
@@ -39,11 +39,11 @@ class ValidationError:
     code: str
     message: str
     severity: ValidationSeverity
-    block_id: Optional[str] = None
-    block_name: Optional[str] = None
-    suggestion: Optional[str] = None
+    block_id: str | None = None
+    block_name: str | None = None
+    suggestion: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "code": self.code,
@@ -61,11 +61,11 @@ class ValidationWarning:
 
     code: str
     message: str
-    block_id: Optional[str] = None
-    block_name: Optional[str] = None
-    suggestion: Optional[str] = None
+    block_id: str | None = None
+    block_name: str | None = None
+    suggestion: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "code": self.code,
@@ -81,9 +81,9 @@ class ValidationResult:
     """Result of strategy validation"""
 
     is_valid: bool
-    errors: List[ValidationError] = field(default_factory=list)
-    warnings: List[ValidationWarning] = field(default_factory=list)
-    info: List[str] = field(default_factory=list)
+    errors: list[ValidationError] = field(default_factory=list)
+    warnings: list[ValidationWarning] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
 
     # Metrics
     block_count: int = 0
@@ -92,9 +92,9 @@ class ValidationResult:
     estimated_lookback: int = 0
 
     # Timestamp
-    validated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    validated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "is_valid": self.is_valid,
@@ -142,7 +142,7 @@ class StrategyValidator:
         }
 
         # Parameter validation rules
-        self.parameter_rules: Dict[str, Dict[str, Any]] = {
+        self.parameter_rules: dict[str, dict[str, Any]] = {
             "period": {"min": 1, "max": 1000, "type": int},
             "fast_period": {"min": 1, "max": 500, "type": int},
             "slow_period": {"min": 2, "max": 1000, "type": int},
@@ -156,14 +156,12 @@ class StrategyValidator:
         # Lookback requirements by indicator
         self.lookback_requirements = {
             BlockType.INDICATOR_RSI: lambda p: p.get("period", 14) + 1,
-            BlockType.INDICATOR_MACD: lambda p: p.get("slow_period", 26)
-            + p.get("signal_period", 9),
+            BlockType.INDICATOR_MACD: lambda p: p.get("slow_period", 26) + p.get("signal_period", 9),
             BlockType.INDICATOR_BOLLINGER: lambda p: p.get("period", 20),
             BlockType.INDICATOR_EMA: lambda p: p.get("period", 20) * 2,
             BlockType.INDICATOR_SMA: lambda p: p.get("period", 20),
             BlockType.INDICATOR_ATR: lambda p: p.get("period", 14) + 1,
-            BlockType.INDICATOR_STOCHASTIC: lambda p: p.get("k_period", 14)
-            + p.get("d_period", 3),
+            BlockType.INDICATOR_STOCHASTIC: lambda p: p.get("k_period", 14) + p.get("d_period", 3),
         }
 
     def validate(self, graph: StrategyGraph) -> ValidationResult:
@@ -176,9 +174,9 @@ class StrategyValidator:
         Returns:
             ValidationResult with errors, warnings, and metrics
         """
-        errors: List[ValidationError] = []
-        warnings: List[ValidationWarning] = []
-        info: List[str] = []
+        errors: list[ValidationError] = []
+        warnings: list[ValidationWarning] = []
+        info: list[str] = []
 
         # Structural validation
         errors.extend(self._validate_structure(graph))
@@ -208,9 +206,7 @@ class StrategyValidator:
         complexity = self._calculate_complexity(graph)
         lookback = self._estimate_lookback(graph)
 
-        is_valid = (
-            len([e for e in errors if e.severity == ValidationSeverity.ERROR]) == 0
-        )
+        is_valid = len([e for e in errors if e.severity == ValidationSeverity.ERROR]) == 0
 
         return ValidationResult(
             is_valid=is_valid,
@@ -223,7 +219,7 @@ class StrategyValidator:
             estimated_lookback=lookback,
         )
 
-    def _validate_structure(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _validate_structure(self, graph: StrategyGraph) -> list[ValidationError]:
         """Validate graph structure"""
         errors = []
 
@@ -240,9 +236,7 @@ class StrategyValidator:
             return errors
 
         # Check for data source
-        has_data_source = any(
-            b.block_type in self.data_sources for b in graph.blocks.values()
-        )
+        has_data_source = any(b.block_type in self.data_sources for b in graph.blocks.values())
         if not has_data_source:
             errors.append(
                 ValidationError(
@@ -254,9 +248,7 @@ class StrategyValidator:
             )
 
         # Check for action/output
-        has_action = any(
-            b.block_type in self.action_blocks for b in graph.blocks.values()
-        )
+        has_action = any(b.block_type in self.action_blocks for b in graph.blocks.values())
         if not has_action:
             errors.append(
                 ValidationError(
@@ -267,31 +259,78 @@ class StrategyValidator:
                 )
             )
 
+        # Check for main strategy node and entry signals
+        main_node = None
+        for block_id, block in graph.blocks.items():
+            if block.block_type == BlockType.OUTPUT_SIGNAL and (
+                block.name.lower() == "strategy" or getattr(block, "isMain", False)
+            ):
+                main_node = block_id
+                break
+
+        if main_node:
+            # Check if entry signals are connected to main node
+            # Frontend uses ports: entry_long, entry_short, exit_long, exit_short
+            # But OUTPUT_SIGNAL block definition only has "signal" input
+            # So we check for connections to main node regardless of input name
+            # OR check if main node has custom inputs (entry_long, etc.)
+            main_block = graph.blocks[main_node]
+            main_inputs = [inp.name for inp in main_block.inputs]
+
+            # Check for connections to main node
+            main_connections = [conn for conn in graph.connections if conn.target_block_id == main_node]
+
+            # If main node has entry_long/entry_short inputs, require them
+            if "entry_long" in main_inputs or "entry_short" in main_inputs:
+                entry_connections = [
+                    conn for conn in main_connections if conn.target_input in ["entry_long", "entry_short"]
+                ]
+                if not entry_connections:
+                    errors.append(
+                        ValidationError(
+                            code="NO_ENTRY_SIGNALS",
+                            message="Main strategy node has no entry signals connected",
+                            severity=ValidationSeverity.ERROR,
+                            block_id=main_node,
+                            suggestion="Connect at least one condition block to entry_long or entry_short port",
+                        )
+                    )
+            # Otherwise, just check that main node has some connections
+            elif not main_connections:
+                errors.append(
+                    ValidationError(
+                        code="NO_ENTRY_SIGNALS",
+                        message="Main strategy node has no signals connected",
+                        severity=ValidationSeverity.ERROR,
+                        block_id=main_node,
+                        suggestion="Connect at least one condition block to the main strategy node",
+                    )
+                )
+
         # Check for orphan blocks (not connected to anything)
         connected_blocks = self._get_connected_blocks(graph)
         for block_id, block in graph.blocks.items():
-            if block_id not in connected_blocks:
-                # Data sources don't need incoming connections
-                if block.block_type not in self.data_sources:
-                    errors.append(
-                        ValidationError(
-                            code="ORPHAN_BLOCK",
-                            message=f"Block '{block.name}' is not connected",
-                            severity=ValidationSeverity.WARNING,
-                            block_id=block_id,
-                            block_name=block.name,
-                            suggestion="Connect this block or remove it",
-                        )
+            if block_id not in connected_blocks and block.block_type not in self.data_sources:
+                # Orphan block: not connected to anything and not a data source
+                errors.append(
+                    ValidationError(
+                        code="ORPHAN_BLOCK",
+                        message=f"Block '{block.name}' is not connected",
+                        severity=ValidationSeverity.WARNING,
+                        block_id=block_id,
+                        block_name=block.name,
+                        suggestion="Connect this block or remove it",
                     )
+                )
 
         return errors
 
-    def _validate_connections(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _validate_connections(self, graph: StrategyGraph) -> list[ValidationError]:
         """Validate connections between blocks"""
         errors = []
 
         # Track connected inputs
-        connected_inputs: Dict[str, Set[str]] = {bid: set() for bid in graph.blocks}
+        connected_inputs: dict[str, set[str]] = {bid: set() for bid in graph.blocks}
 
         for conn in graph.connections:
             # Check source block exists
@@ -353,32 +392,25 @@ class StrategyValidator:
             connected_inputs[conn.target_block_id].add(conn.target_input)
 
             # Type compatibility check
-            output = next(
-                (o for o in source_block.outputs if o.name == conn.source_output), None
-            )
-            input_port = next(
-                (i for i in target_block.inputs if i.name == conn.target_input), None
-            )
+            output = next((o for o in source_block.outputs if o.name == conn.source_output), None)
+            input_port = next((i for i in target_block.inputs if i.name == conn.target_input), None)
 
-            if output and input_port:
-                if not self._types_compatible(output.data_type, input_port.data_type):
-                    errors.append(
-                        ValidationError(
-                            code="TYPE_MISMATCH",
-                            message=f"Type mismatch: '{output.data_type}' → '{input_port.data_type}'",
-                            severity=ValidationSeverity.WARNING,
-                            block_id=conn.target_block_id,
-                            block_name=target_block.name,
-                            suggestion="Ensure data types are compatible",
-                        )
+            if output and input_port and not self._types_compatible(output.data_type, input_port.data_type):
+                errors.append(
+                    ValidationError(
+                        code="TYPE_MISMATCH",
+                        message=f"Type mismatch: '{output.data_type}' → '{input_port.data_type}'",
+                        severity=ValidationSeverity.WARNING,
+                        block_id=conn.target_block_id,
+                        block_name=target_block.name,
+                        suggestion="Ensure data types are compatible",
                     )
+                )
 
         # Check required inputs
         for block_id, block in graph.blocks.items():
             for inp in block.inputs:
-                if inp.required and inp.name not in connected_inputs.get(
-                    block_id, set()
-                ):
+                if inp.required and inp.name not in connected_inputs.get(block_id, set()):
                     errors.append(
                         ValidationError(
                             code="MISSING_INPUT",
@@ -485,7 +517,7 @@ class StrategyValidator:
 
         return errors, warnings
 
-    def _detect_cycles(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _detect_cycles(self, graph: StrategyGraph) -> list[ValidationError]:
         """Detect cycles in the graph"""
         errors = []
 
@@ -503,23 +535,15 @@ class StrategyValidator:
 
         return errors
 
-    def _validate_risk(self, graph: StrategyGraph) -> List[ValidationWarning]:
+    def _validate_risk(self, graph: StrategyGraph) -> list[ValidationWarning]:
         """Validate risk management"""
         warnings = []
 
-        has_stop_loss = any(
-            b.block_type == BlockType.ACTION_SET_STOP_LOSS
-            for b in graph.blocks.values()
-        )
+        has_stop_loss = any(b.block_type == BlockType.ACTION_SET_STOP_LOSS for b in graph.blocks.values())
 
-        has_take_profit = any(
-            b.block_type == BlockType.ACTION_SET_TAKE_PROFIT
-            for b in graph.blocks.values()
-        )
+        has_take_profit = any(b.block_type == BlockType.ACTION_SET_TAKE_PROFIT for b in graph.blocks.values())
 
-        has_position_sizing = any(
-            b.block_type == BlockType.RISK_POSITION_SIZE for b in graph.blocks.values()
-        )
+        has_position_sizing = any(b.block_type == BlockType.RISK_POSITION_SIZE for b in graph.blocks.values())
 
         if not has_stop_loss:
             warnings.append(
@@ -549,12 +573,8 @@ class StrategyValidator:
             )
 
         # Check for multiple buy/sell without risk management
-        buy_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_BUY
-        )
-        sell_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_SELL
-        )
+        buy_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_BUY)
+        sell_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.ACTION_SELL)
 
         if buy_count > 0 and sell_count == 0:
             warnings.append(
@@ -573,11 +593,7 @@ class StrategyValidator:
         info = []
 
         # Count indicator blocks
-        indicator_count = sum(
-            1
-            for b in graph.blocks.values()
-            if b.block_type.value.startswith("indicator_")
-        )
+        indicator_count = sum(1 for b in graph.blocks.values() if b.block_type.value.startswith("indicator_"))
 
         if indicator_count > 5:
             warnings.append(
@@ -589,22 +605,14 @@ class StrategyValidator:
             )
 
         # Check for conflicting conditions
-        and_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_AND
-        )
-        or_count = sum(
-            1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_OR
-        )
+        and_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_AND)
+        or_count = sum(1 for b in graph.blocks.values() if b.block_type == BlockType.CONDITION_OR)
 
         if and_count > 3:
-            info.append(
-                f"Strategy uses {and_count} AND conditions - signals may be rare"
-            )
+            info.append(f"Strategy uses {and_count} AND conditions - signals may be rare")
 
         if or_count > 3:
-            info.append(
-                f"Strategy uses {or_count} OR conditions - signals may be frequent"
-            )
+            info.append(f"Strategy uses {or_count} OR conditions - signals may be frequent")
 
         # Timeframe hints
         has_scalping_indicators = any(
@@ -654,14 +662,7 @@ class StrategyValidator:
         indicator_score = min(indicator_score * 3, 30)
 
         # Condition complexity
-        condition_score = (
-            sum(
-                1
-                for b in graph.blocks.values()
-                if b.block_type.value.startswith("condition_")
-            )
-            * 2
-        )
+        condition_score = sum(1 for b in graph.blocks.values() if b.block_type.value.startswith("condition_")) * 2
         condition_score = min(condition_score, 20)
 
         return min(block_score + conn_score + indicator_score + condition_score, 100)
@@ -678,7 +679,7 @@ class StrategyValidator:
 
         return max_lookback
 
-    def _get_connected_blocks(self, graph: StrategyGraph) -> Set[str]:
+    def _get_connected_blocks(self, graph: StrategyGraph) -> set[str]:
         """Get all blocks that are connected"""
         connected = set()
 
@@ -725,10 +726,7 @@ class StrategyValidator:
         result = self.validate(graph)
 
         # Live trading requires risk management
-        has_stop = any(
-            b.block_type == BlockType.ACTION_SET_STOP_LOSS
-            for b in graph.blocks.values()
-        )
+        has_stop = any(b.block_type == BlockType.ACTION_SET_STOP_LOSS for b in graph.blocks.values())
 
         if not has_stop:
             result.errors.append(

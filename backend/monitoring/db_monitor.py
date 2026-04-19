@@ -18,10 +18,10 @@ import logging
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class ComponentHealth:
     status: HealthStatus
     latency_ms: float
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,10 +60,10 @@ class DatabaseHealth:
 
     status: HealthStatus
     timestamp: str
-    components: List[ComponentHealth]
-    summary: Dict[str, Any]
+    components: list[ComponentHealth]
+    summary: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "status": self.status.value,
@@ -98,9 +98,7 @@ class DatabaseMonitor:
     THRESHOLDS = {
         "query_latency": AlertThreshold(warning=50.0, critical=200.0, unit="ms"),
         "connection_time": AlertThreshold(warning=10.0, critical=50.0, unit="ms"),
-        "table_size": AlertThreshold(
-            warning=1_000_000, critical=10_000_000, unit="rows"
-        ),
+        "table_size": AlertThreshold(warning=1_000_000, critical=10_000_000, unit="rows"),
         "archive_age": AlertThreshold(warning=30, critical=90, unit="days"),
     }
 
@@ -112,8 +110,8 @@ class DatabaseMonitor:
             db_path: Path to SQLite database
         """
         self.db_path = Path(db_path)
-        self._last_health: Optional[DatabaseHealth] = None
-        self._metrics_cache: Dict[str, Any] = {}
+        self._last_health: DatabaseHealth | None = None
+        self._metrics_cache: dict[str, Any] = {}
         self._cache_time: float = 0
         self._cache_ttl: float = 5.0  # seconds
 
@@ -130,7 +128,7 @@ class DatabaseMonitor:
         Returns:
             DatabaseHealth with status of all components
         """
-        components: List[ComponentHealth] = []
+        components: list[ComponentHealth] = []
 
         # Check database connectivity
         components.append(self._check_connectivity())
@@ -158,19 +156,13 @@ class DatabaseMonitor:
 
         health = DatabaseHealth(
             status=overall_status,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             components=components,
             summary={
                 "total_components": len(components),
-                "healthy": sum(
-                    1 for c in components if c.status == HealthStatus.HEALTHY
-                ),
-                "degraded": sum(
-                    1 for c in components if c.status == HealthStatus.DEGRADED
-                ),
-                "unhealthy": sum(
-                    1 for c in components if c.status == HealthStatus.UNHEALTHY
-                ),
+                "healthy": sum(1 for c in components if c.status == HealthStatus.HEALTHY),
+                "degraded": sum(1 for c in components if c.status == HealthStatus.DEGRADED),
+                "unhealthy": sum(1 for c in components if c.status == HealthStatus.UNHEALTHY),
                 "db_path": str(self.db_path),
             },
         )
@@ -343,9 +335,7 @@ class DatabaseMonitor:
                 message = "No archive tables (archiving may not be configured)"
             else:
                 status = HealthStatus.HEALTHY
-                message = (
-                    f"{len(archive_tables)} archive tables, {total_archived:,} records"
-                )
+                message = f"{len(archive_tables)} archive tables, {total_archived:,} records"
 
             return ComponentHealth(
                 name="archive_status",
@@ -410,7 +400,7 @@ class DatabaseMonitor:
                 message=f"Size check failed: {e}",
             )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """
         Get current metrics.
 
@@ -463,16 +453,14 @@ class DatabaseMonitor:
 
             # Database size
             if self.db_path.exists():
-                metrics["database_size_mb"] = round(
-                    self.db_path.stat().st_size / (1024 * 1024), 2
-                )
+                metrics["database_size_mb"] = round(self.db_path.stat().st_size / (1024 * 1024), 2)
 
             conn.close()
 
         except Exception as e:
             metrics["error"] = str(e)
 
-        metrics["timestamp"] = datetime.now(timezone.utc).isoformat()
+        metrics["timestamp"] = datetime.now(UTC).isoformat()
 
         self._metrics_cache = metrics
         self._cache_time = now
@@ -493,18 +481,14 @@ class DatabaseMonitor:
         if "database_size_mb" in metrics:
             lines.append("# HELP database_size_mb Database file size in megabytes")
             lines.append("# TYPE database_size_mb gauge")
-            lines.append(
-                f'database_size_mb{{db="kline"}} {metrics["database_size_mb"]}'
-            )
+            lines.append(f'database_size_mb{{db="kline"}} {metrics["database_size_mb"]}')
 
         # Main table records
         if "main_table" in metrics:
             mt = metrics["main_table"]
             lines.append("# HELP kline_main_table_records Total records in main table")
             lines.append("# TYPE kline_main_table_records gauge")
-            lines.append(
-                f'kline_main_table_records{{table="bybit_kline_audit"}} {mt["total_records"]}'
-            )
+            lines.append(f'kline_main_table_records{{table="bybit_kline_audit"}} {mt["total_records"]}')
 
             lines.append("# HELP kline_unique_symbols Number of unique trading symbols")
             lines.append("# TYPE kline_unique_symbols gauge")
@@ -554,7 +538,7 @@ def create_health_router():
     async def liveness_check():
         """Kubernetes liveness probe."""
         # Simple check - just verify we can respond
-        return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"status": "alive", "timestamp": datetime.now(UTC).isoformat()}
 
     @router.get("/metrics")
     async def get_metrics():

@@ -37,10 +37,12 @@ from .metrics import (
     RollingMetrics,
 )
 from .portfolio import (
+    AllocationMethod,
     AssetAllocation,
     CorrelationAnalysis,
     PortfolioBacktester,
     RebalanceStrategy,
+    aggregate_multi_symbol_equity,
 )
 from .slippage import (
     OrderBookSlippage,
@@ -52,28 +54,30 @@ from .slippage import (
 __all__ = [
     # Engine
     "AdvancedBacktestEngine",
-    "BacktestConfig",
-    "ExecutionSimulator",
-    "RealisticFillModel",
-    # Slippage
-    "SlippageModel",
-    "VolumeImpactSlippage",
-    "VolatilitySlippage",
-    "OrderBookSlippage",
+    "AllocationMethod",
+    "AssetAllocation",
     # Analytics
     "BacktestAnalytics",
-    "TradeAnalysis",
-    "PerformanceAttribution",
-    "RegimeAnalysis",
-    "DrawdownAnalysis",
-    # Portfolio
-    "PortfolioBacktester",
-    "AssetAllocation",
+    "BacktestConfig",
+    "BenchmarkComparison",
     "CorrelationAnalysis",
-    "RebalanceStrategy",
     # Metrics
     "CustomMetrics",
+    "DrawdownAnalysis",
+    "ExecutionSimulator",
+    "OrderBookSlippage",
+    "PerformanceAttribution",
+    "PortfolioBacktester",
+    "RealisticFillModel",
+    "RebalanceStrategy",
+    "RegimeAnalysis",
     "RiskAdjustedMetrics",
-    "BenchmarkComparison",
     "RollingMetrics",
+    # Slippage
+    "SlippageModel",
+    "TradeAnalysis",
+    "VolatilitySlippage",
+    "VolumeImpactSlippage",
+    # Portfolio
+    "aggregate_multi_symbol_equity",
 ]

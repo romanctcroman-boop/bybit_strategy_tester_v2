@@ -10,12 +10,13 @@ Advanced market data endpoints from Bybit V5 API:
 Created: January 21, 2026
 """
 
-import requests
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from dataclasses import dataclass
-from enum import Enum
 import logging
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +95,10 @@ class MarketAnalyticsService:
         symbol: str,
         category: str = "linear",
         interval: str = "1h",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 50,
-    ) -> List[OpenInterestData]:
+    ) -> list[OpenInterestData]:
         """
         📊 Get Open Interest history.
 
@@ -155,9 +156,7 @@ class MarketAnalyticsService:
             logger.error(f"Failed to get Open Interest: {e}")
             return []
 
-    def get_open_interest_change(
-        self, symbol: str, category: str = "linear", hours: int = 24
-    ) -> Dict[str, Any]:
+    def get_open_interest_change(self, symbol: str, category: str = "linear", hours: int = 24) -> dict[str, Any]:
         """
         📊 Calculate Open Interest change over period.
 
@@ -219,7 +218,7 @@ class MarketAnalyticsService:
 
     def get_long_short_ratio(
         self, symbol: str, category: str = "linear", period: str = "1h", limit: int = 50
-    ) -> List[LongShortRatioData]:
+    ) -> list[LongShortRatioData]:
         """
         📈 Get Long/Short Ratio history.
 
@@ -270,9 +269,7 @@ class MarketAnalyticsService:
             logger.error(f"Failed to get Long/Short Ratio: {e}")
             return []
 
-    def get_contrarian_signal(
-        self, symbol: str, category: str = "linear"
-    ) -> Dict[str, Any]:
+    def get_contrarian_signal(self, symbol: str, category: str = "linear") -> dict[str, Any]:
         """
         📈 Get contrarian trading signal based on Long/Short ratio.
 
@@ -281,9 +278,7 @@ class MarketAnalyticsService:
         Returns:
             Dict with current ratio and contrarian signal
         """
-        data = self.get_long_short_ratio(
-            symbol=symbol, category=category, period="1h", limit=1
-        )
+        data = self.get_long_short_ratio(symbol=symbol, category=category, period="1h", limit=1)
 
         if not data:
             return {"error": "No data available"}
@@ -303,9 +298,7 @@ class MarketAnalyticsService:
         elif long_ratio <= 0.30:
             signal = "CONTRARIAN_LONG"
             strength = "STRONG"
-            reason = (
-                f"Extreme short bias ({long_ratio * 100:.1f}%) - crowd may be wrong"
-            )
+            reason = f"Extreme short bias ({long_ratio * 100:.1f}%) - crowd may be wrong"
         elif long_ratio <= 0.40:
             signal = "CONTRARIAN_LONG"
             strength = "MODERATE"
@@ -333,10 +326,10 @@ class MarketAnalyticsService:
         self,
         symbol: str,
         category: str = "linear",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 200,
-    ) -> List[FundingRateData]:
+    ) -> list[FundingRateData]:
         """
         💰 Get Funding Rate history.
 
@@ -392,9 +385,7 @@ class MarketAnalyticsService:
             logger.error(f"Failed to get Funding Rate: {e}")
             return []
 
-    def get_funding_analysis(
-        self, symbol: str, category: str = "linear", days: int = 7
-    ) -> Dict[str, Any]:
+    def get_funding_analysis(self, symbol: str, category: str = "linear", days: int = 7) -> dict[str, Any]:
         """
         💰 Analyze funding rates for trading signals.
 
@@ -456,9 +447,7 @@ class MarketAnalyticsService:
         if sentiment in ["VERY_BULLISH", "BULLISH"]:
             return f"Longs paying {abs(apr):.1f}% APR to shorts - crowded long position"
         elif sentiment in ["VERY_BEARISH", "BEARISH"]:
-            return (
-                f"Shorts paying {abs(apr):.1f}% APR to longs - crowded short position"
-            )
+            return f"Shorts paying {abs(apr):.1f}% APR to longs - crowded short position"
         else:
             return "Balanced funding - no strong directional bias"
 
@@ -466,9 +455,7 @@ class MarketAnalyticsService:
     # COMPOSITE MARKET ANALYSIS
     # =========================================================================
 
-    def get_full_market_analysis(
-        self, symbol: str, category: str = "linear"
-    ) -> Dict[str, Any]:
+    def get_full_market_analysis(self, symbol: str, category: str = "linear") -> dict[str, Any]:
         """
         🎯 Get comprehensive market analysis combining all indicators.
 
@@ -508,12 +495,10 @@ class MarketAnalyticsService:
             "open_interest": oi_analysis,
             "long_short_ratio": ls_signal,
             "funding_rate": funding,
-            "recommendations": self._generate_recommendations(
-                oi_analysis, ls_signal, funding
-            ),
+            "recommendations": self._generate_recommendations(oi_analysis, ls_signal, funding),
         }
 
-    def _generate_recommendations(self, oi: Dict, ls: Dict, fr: Dict) -> List[str]:
+    def _generate_recommendations(self, oi: dict, ls: dict, fr: dict) -> list[str]:
         """Generate trading recommendations"""
         recommendations = []
 

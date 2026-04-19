@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import json
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -33,21 +34,19 @@ class ReflectionResult:
     id: str
     task: str
     solution: str
-    outcome: Dict[str, Any]
-    reflections: Dict[str, str]
+    outcome: dict[str, Any]
+    reflections: dict[str, str]
     quality_score: float
-    lessons_learned: List[str]
-    improvement_actions: List[str]
-    knowledge_gaps: List[str]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    lessons_learned: list[str]
+    improvement_actions: list[str]
+    knowledge_gaps: list[str]
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "task": self.task,
-            "solution": self.solution[:500] + "..."
-            if len(self.solution) > 500
-            else self.solution,
+            "solution": self.solution[:500] + "..." if len(self.solution) > 500 else self.solution,
             "outcome": self.outcome,
             "reflections": self.reflections,
             "quality_score": self.quality_score,
@@ -66,10 +65,10 @@ class Pattern:
     description: str
     frequency: int
     success_rate: float
-    contexts: List[str]
-    recommendations: List[str]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    contexts: list[str]
+    recommendations: list[str]
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_seen: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SelfReflectionEngine:
@@ -102,38 +101,23 @@ class SelfReflectionEngine:
 
     # Structured reflection prompts
     REFLECTION_PROMPTS = {
-        "task_analysis": (
-            "Analyze the task: What was the main challenge? "
-            "What skills/knowledge did it require?"
-        ),
-        "solution_quality": (
-            "Rate the solution quality (1-10). What are its strengths and weaknesses?"
-        ),
-        "what_worked": (
-            "What approaches/strategies worked well in this task? "
-            "What should be repeated?"
-        ),
-        "what_didnt_work": (
-            "What didn't work as expected? What caused difficulties or errors?"
-        ),
-        "improvement": (
-            "What would I do differently next time? "
-            "What specific changes would improve the outcome?"
-        ),
+        "task_analysis": ("Analyze the task: What was the main challenge? What skills/knowledge did it require?"),
+        "solution_quality": ("Rate the solution quality (1-10). What are its strengths and weaknesses?"),
+        "what_worked": ("What approaches/strategies worked well in this task? What should be repeated?"),
+        "what_didnt_work": ("What didn't work as expected? What caused difficulties or errors?"),
+        "improvement": ("What would I do differently next time? What specific changes would improve the outcome?"),
         "knowledge_gap": (
-            "What knowledge or skills were missing that would have helped? "
-            "What should be learned or practiced?"
+            "What knowledge or skills were missing that would have helped? What should be learned or practiced?"
         ),
         "transferable_lessons": (
-            "What lessons from this task apply to other situations? "
-            "What patterns should be remembered?"
+            "What lessons from this task apply to other situations? What patterns should be remembered?"
         ),
     }
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
-        reflection_fn: Optional[Callable] = None,
+        persist_path: str | None = None,
+        reflection_fn: Callable | None = None,
     ):
         """
         Initialize self-reflection engine
@@ -146,8 +130,8 @@ class SelfReflectionEngine:
         self.persist_path = Path(persist_path) if persist_path else None
         self.reflection_fn = reflection_fn
 
-        self.reflection_history: List[ReflectionResult] = []
-        self.patterns: Dict[str, Pattern] = {}
+        self.reflection_history: list[ReflectionResult] = []
+        self.patterns: dict[str, Pattern] = {}
 
         # Statistics
         self.stats = {
@@ -167,8 +151,8 @@ class SelfReflectionEngine:
         self,
         task: str,
         solution: str,
-        outcome: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
+        outcome: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> ReflectionResult:
         """
         Perform structured reflection on a completed task
@@ -197,9 +181,7 @@ class SelfReflectionEngine:
             reflections[key] = reflection
 
         # Extract quality score from solution_quality reflection
-        quality_score = self._extract_quality_score(
-            reflections.get("solution_quality", "")
-        )
+        quality_score = self._extract_quality_score(reflections.get("solution_quality", ""))
 
         # Extract structured lessons
         lessons_learned = self._extract_lessons(reflections)
@@ -240,7 +222,7 @@ class SelfReflectionEngine:
 
         return result
 
-    async def extract_patterns(self, n_recent: int = 100) -> List[Pattern]:
+    async def extract_patterns(self, n_recent: int = 100) -> list[Pattern]:
         """
         Extract recurring patterns from recent reflections
 
@@ -257,8 +239,8 @@ class SelfReflectionEngine:
             return []
 
         # Collect all lessons and actions
-        all_lessons: Dict[str, List[Tuple[str, float]]] = {}
-        all_contexts: Dict[str, List[str]] = {}
+        all_lessons: dict[str, list[tuple[str, float]]] = {}
+        all_contexts: dict[str, list[str]] = {}
 
         for reflection in recent:
             for lesson in reflection.lessons_learned:
@@ -295,16 +277,14 @@ class SelfReflectionEngine:
 
         self.stats["patterns_extracted"] = len(self.patterns)
 
-        logger.info(
-            f"🔍 Extracted {len(new_patterns)} patterns from {len(recent)} reflections"
-        )
+        logger.info(f"🔍 Extracted {len(new_patterns)} patterns from {len(recent)} reflections")
         return new_patterns
 
     async def get_recommendations(
         self,
-        current_task: Optional[str] = None,
+        current_task: str | None = None,
         top_k: int = 5,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get improvement recommendations based on reflection history
 
@@ -315,7 +295,7 @@ class SelfReflectionEngine:
         recommendations = []
 
         # Most common improvement actions
-        action_counts: Dict[str, int] = {}
+        action_counts: dict[str, int] = {}
         for reflection in self.reflection_history[-50:]:
             for action in reflection.improvement_actions:
                 normalized = self._normalize_text(action)
@@ -339,9 +319,9 @@ class SelfReflectionEngine:
 
         return recommendations[:top_k]
 
-    async def get_knowledge_gaps_summary(self) -> Dict[str, int]:
+    async def get_knowledge_gaps_summary(self) -> dict[str, int]:
         """Get summary of identified knowledge gaps"""
-        gap_counts: Dict[str, int] = {}
+        gap_counts: dict[str, int] = {}
 
         for reflection in self.reflection_history:
             for gap in reflection.knowledge_gaps:
@@ -350,7 +330,7 @@ class SelfReflectionEngine:
 
         return dict(sorted(gap_counts.items(), key=lambda x: x[1], reverse=True)[:20])
 
-    async def generate_training_data(self, min_quality: float = 7.0) -> List[Dict]:
+    async def generate_training_data(self, min_quality: float = 7.0) -> list[dict]:
         """
         Generate training data from high-quality reflections
 
@@ -371,9 +351,7 @@ class SelfReflectionEngine:
                         "quality": reflection.quality_score,
                         "lessons": reflection.lessons_learned,
                         "context": {
-                            "what_worked": reflection.reflections.get(
-                                "what_worked", ""
-                            ),
+                            "what_worked": reflection.reflections.get("what_worked", ""),
                         },
                     }
                 )
@@ -386,7 +364,7 @@ class SelfReflectionEngine:
         prompt: str,
         task: str,
         solution: str,
-        outcome: Dict[str, Any],
+        outcome: dict[str, Any],
     ) -> str:
         """Generate reflection using custom function or heuristics"""
         if self.reflection_fn:
@@ -403,7 +381,7 @@ class SelfReflectionEngine:
         prompt: str,
         task: str,
         solution: str,
-        outcome: Dict[str, Any],
+        outcome: dict[str, Any],
     ) -> str:
         """Simple heuristic-based reflection"""
         success = outcome.get("success", True)
@@ -425,9 +403,7 @@ class SelfReflectionEngine:
 
         if "didnt" in prompt.lower() or "didn't" in prompt.lower():
             if errors:
-                return (
-                    f"Issues encountered: {', '.join(str(e)[:50] for e in errors[:3])}"
-                )
+                return f"Issues encountered: {', '.join(str(e)[:50] for e in errors[:3])}"
             return "No major issues identified."
 
         if "improvement" in prompt.lower():
@@ -471,7 +447,7 @@ class SelfReflectionEngine:
 
         return 6.0  # Default neutral score
 
-    def _extract_lessons(self, reflections: Dict[str, str]) -> List[str]:
+    def _extract_lessons(self, reflections: dict[str, str]) -> list[str]:
         """Extract lessons learned from reflections"""
         lessons = []
 
@@ -489,7 +465,7 @@ class SelfReflectionEngine:
 
         return list(set(lessons))[:5]  # Deduplicate and limit
 
-    def _extract_actions(self, text: str) -> List[str]:
+    def _extract_actions(self, text: str) -> list[str]:
         """Extract improvement actions from text"""
         if not text:
             return []
@@ -507,7 +483,7 @@ class SelfReflectionEngine:
 
         return actions[:5]
 
-    def _extract_gaps(self, text: str) -> List[str]:
+    def _extract_gaps(self, text: str) -> list[str]:
         """Extract knowledge gaps from text"""
         if not text:
             return []
@@ -545,8 +521,8 @@ class SelfReflectionEngine:
     def _generate_recommendations(
         self,
         pattern_key: str,
-        occurrences: List[Tuple[str, float]],
-    ) -> List[str]:
+        occurrences: list[tuple[str, float]],
+    ) -> list[str]:
         """Generate recommendations from pattern occurrences"""
         recommendations = []
 
@@ -570,7 +546,7 @@ class SelfReflectionEngine:
             for pattern in self.patterns.values():
                 if self._normalize_text(pattern.description) == key:
                     pattern.frequency += 1
-                    pattern.last_seen = datetime.now(timezone.utc)
+                    pattern.last_seen = datetime.now(UTC)
                     if reflection.task[:100] not in pattern.contexts:
                         pattern.contexts.append(reflection.task[:100])
                     break
@@ -583,9 +559,7 @@ class SelfReflectionEngine:
             scores = [r.quality_score for r in self.reflection_history]
             self.stats["avg_quality_score"] = statistics.mean(scores)
 
-        self.stats["lessons_accumulated"] = sum(
-            len(r.lessons_learned) for r in self.reflection_history
-        )
+        self.stats["lessons_accumulated"] = sum(len(r.lessons_learned) for r in self.reflection_history)
 
     def _persist_reflection(self, reflection: ReflectionResult) -> None:
         """Persist reflection to disk"""
@@ -611,7 +585,7 @@ class SelfReflectionEngine:
         count = len(list(self.persist_path.glob("*.json")))
         logger.info(f"📂 Found {count} persisted reflections")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get engine statistics"""
         return {
             **self.stats,
@@ -621,7 +595,7 @@ class SelfReflectionEngine:
 
 
 __all__ = [
-    "SelfReflectionEngine",
-    "ReflectionResult",
     "Pattern",
+    "ReflectionResult",
+    "SelfReflectionEngine",
 ]

@@ -2,12 +2,16 @@
 🔍 ДИАГНОСТИКА РАСХОЖДЕНИЯ EQUITY CURVE
 Fallback Sharpe=5.13 vs Numba Sharpe=-4.15
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
 
 import numpy as np
 import pandas as pd
-import sqlite3
 
 print("=" * 100)
 print("🔍 ДИАГНОСТИКА EQUITY CURVE")
@@ -16,18 +20,22 @@ print("=" * 100)
 # ============================================================================
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
-df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
+df_1h = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 1000
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 conn.close()
+
 
 # RSI сигналы
 def calculate_rsi(close, period=14):
@@ -40,7 +48,8 @@ def calculate_rsi(close, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-rsi = calculate_rsi(df_1h['close'], period=14)
+
+rsi = calculate_rsi(df_1h["close"], period=14)
 long_entries = (rsi < 30).values
 long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
@@ -49,9 +58,9 @@ short_exits = (rsi < 30).values
 # ============================================================================
 # ЗАПУСК ДВИЖКОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df_1h,
@@ -103,7 +112,7 @@ print(f"Numba NaN: {np.isnan(nb_eq).sum()}, Inf: {np.isinf(nb_eq).sum()}")
 
 # Сравнение
 diff = fb_eq - nb_eq
-print(f"\nРазница Equity:")
+print("\nРазница Equity:")
 print(f"  Mean: ${diff.mean():,.2f}")
 print(f"  Max:  ${diff.max():,.2f}")
 print(f"  Min:  ${diff.min():,.2f}")
@@ -122,6 +131,7 @@ print("\n" + "=" * 100)
 print("📊 ВЫЧИСЛЕНИЕ SHARPE ВРУЧНУЮ")
 print("=" * 100)
 
+
 def calc_sharpe(equity):
     returns = np.diff(equity) / equity[:-1]
     returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
@@ -130,15 +140,16 @@ def calc_sharpe(equity):
         return sharpe, returns
     return 0, returns
 
+
 fb_sharpe, fb_returns = calc_sharpe(fb_eq)
 nb_sharpe, nb_returns = calc_sharpe(nb_eq)
 
-print(f"\nFallback Returns:")
+print("\nFallback Returns:")
 print(f"  Mean: {fb_returns.mean():.6f}")
 print(f"  Std:  {fb_returns.std():.6f}")
 print(f"  Sharpe: {fb_sharpe:.2f}")
 
-print(f"\nNumba Returns:")
+print("\nNumba Returns:")
 print(f"  Mean: {nb_returns.mean():.6f}")
 print(f"  Std:  {nb_returns.std():.6f}")
 print(f"  Sharpe: {nb_sharpe:.2f}")

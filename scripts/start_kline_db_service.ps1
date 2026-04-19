@@ -16,8 +16,8 @@ param(
     [Parameter(Mandatory = $false)]
     [ValidateSet('start', 'stop', 'status')]
     [string]$Action = 'start',
-    
-    [string]$PidFile = '.kline_db.pid',
+
+    [string]$PidFile = '.run/kline_db.pid',
     [string]$LogFile = 'logs/kline_db_service.log'
 )
 
@@ -52,7 +52,7 @@ switch ($Action) {
         $existingPid = Get-ServicePid
         if ($existingPid) {
             Write-Host "[OK] Kline DB Service already running (PID: $existingPid)" -ForegroundColor Green
-            exit 0
+            return
         }
         
         Write-Host "[INFO] Starting Kline DB Service..." -ForegroundColor Cyan
@@ -75,7 +75,7 @@ switch ($Action) {
         }
         else {
             Write-Host "[ERROR] Failed to start Kline DB Service" -ForegroundColor Red
-            exit 1
+            return
         }
     }
     
@@ -83,7 +83,7 @@ switch ($Action) {
         $existingPid = Get-ServicePid
         if (-not $existingPid) {
             Write-Host "[INFO] Kline DB Service is not running" -ForegroundColor Yellow
-            exit 0
+            return
         }
         
         Write-Host "[INFO] Stopping Kline DB Service (PID: $existingPid)..." -ForegroundColor Cyan

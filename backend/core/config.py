@@ -6,7 +6,6 @@ Uses pydantic-settings for validation and type checking.
 """
 
 import os
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -40,7 +39,7 @@ class BybitConfig(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None
+    REDIS_PASSWORD: str | None = None
     REDIS_ENABLED: bool = False  # Включить Redis кэш
 
     # База данных
@@ -49,13 +48,13 @@ class BybitConfig(BaseSettings):
     DB_BATCH_SIZE: int = 1000
 
     # API ключи (опционально, для приватных запросов)
-    API_KEY: Optional[str] = None
-    API_SECRET: Optional[str] = None
+    API_KEY: str | None = None
+    API_SECRET: str | None = None
 
     # Мониторинг и логирование
     ENABLE_METRICS: bool = False
     LOG_LEVEL: str = "INFO"
-    LOG_FILE: Optional[str] = None
+    LOG_FILE: str | None = None
     LOG_JSON_FORMAT: bool = False
 
     # Детальное логирование (для отладки)
@@ -71,9 +70,7 @@ class BybitConfig(BaseSettings):
     AI_CACHE_TTL: int = 3600  # 1 hour default
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_prefix="BYBIT_", case_sensitive=False, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="BYBIT_", case_sensitive=False, extra="ignore")
 
     @property
     def persist_to_db(self) -> bool:

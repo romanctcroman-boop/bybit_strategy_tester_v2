@@ -5,13 +5,13 @@ Integrates BacktestEngine with Market Data sources (BybitAdapter, Cache, Local D
 """
 
 import time
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 import pandas as pd
 from loguru import logger
 
 from backend.backtesting.engine import BacktestEngine, get_engine
+from backend.backtesting.engine_selector import get_engine as select_engine
 from backend.backtesting.models import (
     BacktestConfig,
     BacktestResult,
@@ -20,6 +20,101 @@ from backend.backtesting.models import (
 from backend.database.repository.kline_repository import KlineRepository
 from backend.services.adapters.bybit import BybitAdapter
 from backend.utils.time import utc_now
+
+
+_INTERVAL_MS_SVC: dict[str, int] = {
+    "1": 60_000,
+    "3": 180_000,
+    "5": 300_000,
+    "15": 900_000,
+    "30": 1_800_000,
+    "60": 3_600_000,
+    "120": 7_200_000,
+    "240": 14_400_000,
+    "D": 86_400_000,
+    "W": 604_800_000,
+    "M": 2_592_000_000,
+}
+
+
+def _validate_data_completeness(
+    df: pd.DataFrame,
+    db_interval: str,
+    start_ts_ms: int,
+    end_ts_ms: int,
+) -> None:
+    """
+    Log a warning if the fetched candle count is significantly below the expected
+    count for the requested time range.
+
+    A completeness ratio below 70% suggests substantial data gaps that may
+    distort backtest results (e.g. indicator NaN regions, missed trades).
+
+    Args:
+        df: Fetched OHLCV DataFrame.
+        db_interval: Interval string ('1', '15', '60', 'D', etc.).
+        start_ts_ms: Requested start timestamp (ms).
+        end_ts_ms: Requested end timestamp (ms).
+    """
+    if df is None or len(df) < 2:
+        return
+
+    interval_ms = _INTERVAL_MS_SVC.get(db_interval, 60_000)
+    range_ms = max(end_ts_ms - start_ts_ms, 1)
+    expected = max(1, range_ms // interval_ms)
+    actual = len(df)
+    completeness = actual / expected
+
+    if completeness < 0.70:
+        logger.warning(
+            "[BacktestService] Data completeness warning: %d/%d candles (%.0f%%) "
+            "for interval=%s — backtest results may be unreliable due to gaps.",
+            actual,
+            expected,
+            completeness * 100,
+            db_interval,
+        )
+
+
+def _drop_incomplete_last_bar(df: pd.DataFrame, db_interval: str) -> pd.DataFrame:
+    """
+    Drop the last bar from the DataFrame if its candle period has not yet closed.
+
+    A candle is 'incomplete' when its open_time + interval_ms > now_utc_ms.
+    Without this guard, a backtest that includes today's date would include a
+    partially-formed candle, causing look-ahead bias (the future OHLCV of that
+    bar is not yet known, but the stored values reflect only part of the period).
+
+    Args:
+        df: OHLCV DataFrame with DatetimeIndex.
+        db_interval: Interval string ('1', '5', '15', '60', 'D', etc.).
+
+    Returns:
+        DataFrame with the last bar removed if still forming, otherwise unchanged.
+    """
+    if df is None or len(df) == 0:
+        return df
+
+    interval_ms = _INTERVAL_MS_SVC.get(db_interval, 60_000)
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+
+    last_ts = df.index[-1]
+    # Normalise to ms timestamp
+    if hasattr(last_ts, "timestamp"):
+        last_open_ms = int(last_ts.timestamp() * 1000)
+    else:
+        last_open_ms = int(last_ts)
+
+    if last_open_ms + interval_ms > now_ms:
+        logger.debug(
+            "[BacktestService] Dropping incomplete last bar at %s "
+            "(closes in ~%ds)",
+            last_ts,
+            (last_open_ms + interval_ms - now_ms) // 1000,
+        )
+        return df.iloc[:-1]
+
+    return df
 
 
 class BacktestService:
@@ -32,9 +127,9 @@ class BacktestService:
     - Caching and retrieving results
     """
 
-    def __init__(self, engine: Optional[BacktestEngine] = None):
-        self.engine = engine or get_engine()
-        self._adapter: Optional[BybitAdapter] = None
+    def __init__(self, engine: BacktestEngine | None = None):
+        self.engine: BacktestEngine = engine or get_engine()
+        self._adapter: BybitAdapter | None = None
 
     @property
     def adapter(self) -> BybitAdapter:
@@ -76,9 +171,7 @@ class BacktestService:
                 duration = time.perf_counter() - started_at
 
                 status_str = getattr(result.status, "value", str(result.status))
-                strategy_label = getattr(
-                    config.strategy_type, "value", str(config.strategy_type)
-                )
+                strategy_label = getattr(config.strategy_type, "value", str(config.strategy_type))
 
                 metrics = result.metrics
 
@@ -121,8 +214,40 @@ class BacktestService:
 
             logger.info(f"Fetched {len(ohlcv)} candles for backtest")
 
-            # Run backtest
-            result = self.engine.run(config, ohlcv)
+            # Dynamically select engine based on config.dca_enabled
+            # If dca_enabled=True, use DCAEngine; otherwise use default engine
+            dca_enabled = getattr(config, "dca_enabled", False)
+            if dca_enabled:
+                from backend.backtesting.engines.dca_engine import DCAEngine
+
+                _base_engine = select_engine(
+                    engine_type=getattr(config, "engine_type", "auto"),
+                    dca_enabled=True,
+                    pyramiding=getattr(config, "pyramiding", 1),
+                    strategy_type=getattr(config, "strategy_type", None),
+                )
+                logger.info("Using DCAEngine for DCA-enabled backtest")
+                # DCAEngine uses run_from_config method
+                assert isinstance(_base_engine, DCAEngine), (
+                    "Expected DCAEngine from select_engine with dca_enabled=True"
+                )
+                # For Strategy Builder strategies, build an adapter from strategy_params
+                # so the DCA engine uses the visual graph for signal generation instead
+                # of falling back to the built-in RSI generator.
+                custom_strategy = None
+                _strategy_type = getattr(config, "strategy_type", None)
+                _strategy_type_str = getattr(_strategy_type, "value", str(_strategy_type)) if _strategy_type else ""
+                if _strategy_type_str in ("builder", "advanced"):
+                    _strategy_params = getattr(config, "strategy_params", None) or {}
+                    if isinstance(_strategy_params, dict) and "blocks" in _strategy_params:
+                        from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
+
+                        custom_strategy = StrategyBuilderAdapter(_strategy_params)
+                        logger.info("DCAEngine: constructed StrategyBuilderAdapter from strategy_params")
+                result = _base_engine.run_from_config(config, ohlcv, custom_strategy=custom_strategy)
+            else:
+                # Standard engine (BacktestEngine) uses run(config, ohlcv)
+                result = self.engine.run(config, ohlcv)
 
             _record_metrics(result)
             return result
@@ -146,7 +271,7 @@ class BacktestService:
         start_date: datetime,
         end_date: datetime,
         market_type: str = "linear",
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Fetch historical OHLCV data, prioritizing local database.
 
@@ -183,8 +308,17 @@ class BacktestService:
         db_interval = interval_map.get(interval, interval)
 
         # Convert to timestamps (ms)
-        start_ts = int(start_date.timestamp() * 1000)
-        end_ts = int(end_date.timestamp() * 1000)
+        # Ensure timezone-aware UTC to avoid local-timezone offset on naive datetimes
+        import datetime as _dtmod
+
+        def _to_utc_ts(dt: "datetime") -> int:
+            if dt.tzinfo is None:
+                # Treat naive datetime as UTC (server may be in non-UTC timezone)
+                dt = dt.replace(tzinfo=_dtmod.UTC)
+            return int(dt.timestamp() * 1000)
+
+        start_ts = _to_utc_ts(start_date)
+        end_ts = _to_utc_ts(end_date)
 
         # ===== STEP 1: Try local database first =====
         try:
@@ -194,9 +328,7 @@ class BacktestService:
                 repo = KlineRepository(session)
 
                 # Get klines from local DB (filter by market_type for SPOT/LINEAR)
-                logger.info(
-                    f"Querying local DB for {symbol} {interval} market_type={market_type}"
-                )
+                logger.info(f"Querying local DB for {symbol} {interval} market_type={market_type}")
                 local_klines = repo.get_klines(
                     symbol=symbol,
                     interval=db_interval,
@@ -235,21 +367,97 @@ class BacktestService:
 
                     # Check if we have enough data (at least 50 candles)
                     if len(df) >= 50:
+                        # ── Gap-prefill: if local data starts significantly later than
+                        # requested start_date, attempt to fetch the missing warmup bars
+                        # from the Bybit API and prepend them.  This is critical for
+                        # indicators like Wilder's RSI that need warm-up history to
+                        # converge to TradingView-parity values (e.g. BTC RSI source
+                        # when the DB only has data from DATA_START_DATE = 2025-01-01).
+                        first_local_ts = df.index[0]
+                        # Use a 2-bar tolerance to avoid unnecessary API calls
+                        try:
+                            _interval_minutes_gap = int(db_interval)
+                        except ValueError:
+                            _interval_minutes_gap = 1440  # daily
+                        _tolerance = pd.Timedelta(minutes=_interval_minutes_gap * 2)
+                        start_date_tz = (
+                            pd.Timestamp(start_date).tz_localize("UTC")
+                            if start_date.tzinfo is None
+                            else pd.Timestamp(start_date)
+                        )
+                        if first_local_ts.tz is None:
+                            first_local_ts_tz = first_local_ts.tz_localize("UTC")
+                        else:
+                            first_local_ts_tz = first_local_ts
+                        gap = first_local_ts_tz - start_date_tz
+                        if gap > _tolerance:
+                            logger.info(
+                                f"Local DB starts at {first_local_ts} but requested from {start_date}; "
+                                f"fetching {gap} of warmup data from Bybit API"
+                            )
+                            try:
+                                warmup_candles = await self.adapter.get_historical_klines(
+                                    symbol=symbol,
+                                    interval=db_interval,
+                                    start_time=start_ts,
+                                    end_time=int(first_local_ts_tz.timestamp() * 1000) - 1,
+                                    market_type=market_type,
+                                )
+                                if warmup_candles:
+                                    warmup_df = pd.DataFrame(warmup_candles)
+                                    # Normalise columns
+                                    col_map = {
+                                        "startTime": "timestamp",
+                                        "openPrice": "open",
+                                        "highPrice": "high",
+                                        "lowPrice": "low",
+                                        "closePrice": "close",
+                                        "open_time": "timestamp",
+                                    }
+                                    for old_c, new_c in col_map.items():
+                                        if old_c in warmup_df.columns and new_c not in warmup_df.columns:
+                                            warmup_df = warmup_df.rename(columns={old_c: new_c})
+                                    for col in ["open", "high", "low", "close", "volume"]:
+                                        if col in warmup_df.columns:
+                                            warmup_df[col] = pd.to_numeric(warmup_df[col], errors="coerce")
+                                    if "timestamp" in warmup_df.columns:
+                                        if warmup_df["timestamp"].dtype in ["int64", "float64"]:
+                                            warmup_df["timestamp"] = pd.to_datetime(warmup_df["timestamp"], unit="ms")
+                                        else:
+                                            warmup_df["timestamp"] = pd.to_datetime(warmup_df["timestamp"])
+                                        warmup_df = warmup_df.set_index("timestamp")
+                                    warmup_df = warmup_df.sort_index()
+                                    # Drop any overlap
+                                    warmup_df = warmup_df[
+                                        warmup_df.index < first_local_ts_tz.tz_localize(None)
+                                        if first_local_ts.tz is None
+                                        else first_local_ts_tz
+                                    ]
+                                    if len(warmup_df) > 0:
+                                        df = pd.concat([warmup_df, df])
+                                        df = df[~df.index.duplicated(keep="last")]
+                                        df = df.sort_index()
+                                        logger.info(
+                                            f"Prepended {len(warmup_df)} warmup candles from API; total={len(df)}"
+                                        )
+                            except Exception as _gap_err:
+                                logger.warning(
+                                    f"Failed to fetch warmup gap from API: {_gap_err} — continuing without it"
+                                )
+
+                        df = _drop_incomplete_last_bar(df, db_interval)
+                        _validate_data_completeness(df, db_interval, start_ts, end_ts)
                         logger.info(f"Using {len(df)} candles from local database")
                         return df
                     else:
-                        logger.info(
-                            f"Local DB has only {len(df)} candles, need more data"
-                        )
+                        logger.info(f"Local DB has only {len(df)} candles, need more data")
 
         except Exception as e:
             logger.warning(f"Error reading from local DB: {e}, falling back to API")
 
         # ===== STEP 2: Fetch from Bybit API =====
         try:
-            logger.info(
-                f"Fetching data from Bybit API for {symbol} {interval} market_type={market_type}"
-            )
+            logger.info(f"Fetching data from Bybit API for {symbol} {interval} market_type={market_type}")
 
             # Fetch data via adapter (pass market_type for SPOT/LINEAR selection)
             candles = await self.adapter.get_historical_klines(
@@ -298,6 +506,8 @@ class BacktestService:
                 df = df.set_index("timestamp")
 
             df = df.sort_index()
+            df = _drop_incomplete_last_bar(df, db_interval)
+            _validate_data_completeness(df, db_interval, start_ts, end_ts)
 
             logger.info(f"Fetched {len(df)} candles from Bybit API")
             return df
@@ -306,7 +516,7 @@ class BacktestService:
             logger.error(f"Failed to fetch historical data: {e}")
             raise
 
-    def get_result(self, backtest_id: str) -> Optional[BacktestResult]:
+    def get_result(self, backtest_id: str) -> BacktestResult | None:
         """Get cached backtest result by ID"""
         return self.engine.get_result(backtest_id)
 
@@ -317,7 +527,7 @@ class BacktestService:
 
 
 # Global service instance
-_service: Optional[BacktestService] = None
+_service: BacktestService | None = None
 
 
 def get_backtest_service() -> BacktestService:

@@ -11,13 +11,13 @@ from pathlib import Path
 from types import ModuleType
 
 _pkg: ModuleType = importlib.import_module("backend.config.__init__")
-CONFIG = getattr(_pkg, "CONFIG")
+CONFIG = _pkg.CONFIG
 SETTINGS = getattr(_pkg, "SETTINGS", None)
-_ns = getattr(_pkg, "_ns")
-_build_config = getattr(_pkg, "_build_config")
+_ns = _pkg._ns
+_build_config = _pkg._build_config
 
 # Re-export for backwards compatibility
-__all__ = ["CONFIG", "SETTINGS", "_ns", "_build_config"]
+__all__ = ["CONFIG", "SETTINGS", "_build_config", "_ns"]
 
 # Advertise package path so "backend.config.*" imports resolve correctly
 __path__ = [str(Path(__file__).with_suffix(""))]

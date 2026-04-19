@@ -14,9 +14,9 @@ TradingView behavior:
 - process_orders_on_close affects when orders are queued vs executed
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
 
 from loguru import logger
 
@@ -81,9 +81,7 @@ class ExecutionController:
             f"process_on_close={process_orders_on_close}"
         )
 
-    def should_calculate(
-        self, is_bar_close: bool, is_tick: bool = False, is_order_fill: bool = False
-    ) -> bool:
+    def should_calculate(self, is_bar_close: bool, is_tick: bool = False, is_order_fill: bool = False) -> bool:
         """
         Determine if strategy should calculate based on current event.
 
@@ -218,9 +216,7 @@ class IntrabarSimulator:
         """
         self.ticks_per_bar = ticks_per_bar
 
-    def generate_ticks(
-        self, open_price: float, high_price: float, low_price: float, close_price: float
-    ) -> list[float]:
+    def generate_ticks(self, open_price: float, high_price: float, low_price: float, close_price: float) -> list[float]:
         """
         Generate synthetic ticks from OHLC.
 
@@ -261,9 +257,7 @@ class IntrabarSimulator:
             strategy_callback: Function to call on each tick (price, tick_id)
             controller: ExecutionController instance
         """
-        ticks = self.generate_ticks(
-            ohlc["open"], ohlc["high"], ohlc["low"], ohlc["close"]
-        )
+        ticks = self.generate_ticks(ohlc["open"], ohlc["high"], ohlc["low"], ohlc["close"])
 
         for i, price in enumerate(ticks):
             controller.advance_tick()

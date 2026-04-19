@@ -10,8 +10,8 @@ Exports all system metrics to Prometheus format:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from prometheus_client import (
     CollectorRegistry,
@@ -32,21 +32,15 @@ class PrometheusMetrics:
 
     # Cache metrics
     cache_hits: Counter = field(
-        default_factory=lambda: Counter(
-            "cache_hits_total", "Total cache hits", ["operation_type"]
-        )
+        default_factory=lambda: Counter("cache_hits_total", "Total cache hits", ["operation_type"])
     )
 
     cache_misses: Counter = field(
-        default_factory=lambda: Counter(
-            "cache_misses_total", "Total cache misses", ["operation_type"]
-        )
+        default_factory=lambda: Counter("cache_misses_total", "Total cache misses", ["operation_type"])
     )
 
     cache_hit_rate: Gauge = field(
-        default_factory=lambda: Gauge(
-            "cache_hit_rate", "Current cache hit rate", ["operation_type"]
-        )
+        default_factory=lambda: Gauge("cache_hit_rate", "Current cache hit rate", ["operation_type"])
     )
 
     cache_latency: Histogram = field(
@@ -77,9 +71,7 @@ class PrometheusMetrics:
     )
 
     ai_response_length: Gauge = field(
-        default_factory=lambda: Gauge(
-            "ai_response_length_bytes", "AI response size", ["model"]
-        )
+        default_factory=lambda: Gauge("ai_response_length_bytes", "AI response size", ["model"])
     )
 
     # Backtest metrics
@@ -93,33 +85,23 @@ class PrometheusMetrics:
     )
 
     backtest_total: Counter = field(
-        default_factory=lambda: Counter(
-            "backtests_total", "Total backtests executed", ["asset", "status"]
-        )
+        default_factory=lambda: Counter("backtests_total", "Total backtests executed", ["asset", "status"])
     )
 
     backtest_win_rate: Gauge = field(
-        default_factory=lambda: Gauge(
-            "backtest_win_rate", "Backtest win rate", ["strategy", "asset"]
-        )
+        default_factory=lambda: Gauge("backtest_win_rate", "Backtest win rate", ["strategy", "asset"])
     )
 
     backtest_profit_factor: Gauge = field(
-        default_factory=lambda: Gauge(
-            "backtest_profit_factor", "Backtest profit factor", ["strategy", "asset"]
-        )
+        default_factory=lambda: Gauge("backtest_profit_factor", "Backtest profit factor", ["strategy", "asset"])
     )
 
     backtest_max_drawdown: Gauge = field(
-        default_factory=lambda: Gauge(
-            "backtest_max_drawdown", "Backtest maximum drawdown", ["strategy", "asset"]
-        )
+        default_factory=lambda: Gauge("backtest_max_drawdown", "Backtest maximum drawdown", ["strategy", "asset"])
     )
 
     backtest_sharpe_ratio: Gauge = field(
-        default_factory=lambda: Gauge(
-            "backtest_sharpe_ratio", "Backtest Sharpe ratio", ["strategy", "asset"]
-        )
+        default_factory=lambda: Gauge("backtest_sharpe_ratio", "Backtest Sharpe ratio", ["strategy", "asset"])
     )
 
     # API endpoint metrics
@@ -133,9 +115,7 @@ class PrometheusMetrics:
     )
 
     api_requests_total: Counter = field(
-        default_factory=lambda: Counter(
-            "api_requests_total", "Total API requests", ["endpoint", "method", "status"]
-        )
+        default_factory=lambda: Counter("api_requests_total", "Total API requests", ["endpoint", "method", "status"])
     )
 
     # System health metrics
@@ -162,9 +142,7 @@ class PrometheusMetrics:
     )
 
     active_backtest_jobs: Gauge = field(
-        default_factory=lambda: Gauge(
-            "active_backtest_jobs", "Number of active backtest jobs"
-        )
+        default_factory=lambda: Gauge("active_backtest_jobs", "Number of active backtest jobs")
     )
 
 
@@ -284,9 +262,7 @@ class MetricsCollector:
                 ["component"],
                 registry=self.registry,
             ),
-            redis_connection_status=Gauge(
-                "redis_connected", "Redis connection status", registry=self.registry
-            ),
+            redis_connection_status=Gauge("redis_connected", "Redis connection status", registry=self.registry),
             database_connection_status=Gauge(
                 "database_connected",
                 "Database connection status",
@@ -307,9 +283,7 @@ class MetricsCollector:
     def record_cache_hit(self, operation_type: str, latency_ms: float):
         """Record cache hit"""
         self.metrics.cache_hits.labels(operation_type=operation_type).inc()
-        self.metrics.cache_latency.labels(operation_type=operation_type).observe(
-            latency_ms / 1000.0
-        )
+        self.metrics.cache_latency.labels(operation_type=operation_type).observe(latency_ms / 1000.0)
 
     def record_cache_miss(self, operation_type: str):
         """Record cache miss"""
@@ -328,12 +302,8 @@ class MetricsCollector:
         response_length: int = 0,
     ):
         """Record AI API request"""
-        self.metrics.ai_request_duration.labels(model=model, endpoint=endpoint).observe(
-            duration_seconds
-        )
-        self.metrics.ai_request_total.labels(
-            model=model, endpoint=endpoint, status=status
-        ).inc()
+        self.metrics.ai_request_duration.labels(model=model, endpoint=endpoint).observe(duration_seconds)
+        self.metrics.ai_request_total.labels(model=model, endpoint=endpoint, status=status).inc()
         if response_length > 0:
             self.metrics.ai_response_length.labels(model=model).set(response_length)
 
@@ -344,48 +314,34 @@ class MetricsCollector:
         duration_seconds: float,
         status: str,
         strategy: str = "",
-        win_rate: float = None,
-        profit_factor: float = None,
-        max_drawdown: float = None,
-        sharpe_ratio: float = None,
+        win_rate: float | None = None,
+        profit_factor: float | None = None,
+        max_drawdown: float | None = None,
+        sharpe_ratio: float | None = None,
     ):
         """Record backtest execution"""
-        self.metrics.backtest_duration.labels(asset=asset, timeframe=timeframe).observe(
-            duration_seconds
-        )
+        self.metrics.backtest_duration.labels(asset=asset, timeframe=timeframe).observe(duration_seconds)
         self.metrics.backtest_total.labels(asset=asset, status=status).inc()
 
         if strategy and win_rate is not None:
-            self.metrics.backtest_win_rate.labels(strategy=strategy, asset=asset).set(
-                win_rate
-            )
+            self.metrics.backtest_win_rate.labels(strategy=strategy, asset=asset).set(win_rate)
 
         if strategy and profit_factor is not None:
-            self.metrics.backtest_profit_factor.labels(
-                strategy=strategy, asset=asset
-            ).set(profit_factor)
+            self.metrics.backtest_profit_factor.labels(strategy=strategy, asset=asset).set(profit_factor)
 
         if strategy and max_drawdown is not None:
-            self.metrics.backtest_max_drawdown.labels(
-                strategy=strategy, asset=asset
-            ).set(max_drawdown)
+            self.metrics.backtest_max_drawdown.labels(strategy=strategy, asset=asset).set(max_drawdown)
 
         if strategy and sharpe_ratio is not None:
-            self.metrics.backtest_sharpe_ratio.labels(
-                strategy=strategy, asset=asset
-            ).set(sharpe_ratio)
+            self.metrics.backtest_sharpe_ratio.labels(strategy=strategy, asset=asset).set(sharpe_ratio)
 
-    def record_api_request(
-        self, endpoint: str, method: str, status: int, duration_seconds: float
-    ):
+    def record_api_request(self, endpoint: str, method: str, status: int, duration_seconds: float):
         """Record API request"""
         status_str = "success" if status < 400 else "error"
-        self.metrics.api_request_duration.labels(
-            endpoint=endpoint, method=method, status=status_str
-        ).observe(duration_seconds)
-        self.metrics.api_requests_total.labels(
-            endpoint=endpoint, method=method, status=status_str
-        ).inc()
+        self.metrics.api_request_duration.labels(endpoint=endpoint, method=method, status=status_str).observe(
+            duration_seconds
+        )
+        self.metrics.api_requests_total.labels(endpoint=endpoint, method=method, status=status_str).inc()
 
     def set_component_health(self, component: str, healthy: bool):
         """Set component health status"""
@@ -407,11 +363,11 @@ class MetricsCollector:
         """Export metrics in Prometheus text format"""
         return generate_latest(self.registry).decode("utf-8")
 
-    def get_metrics_dict(self) -> Dict[str, Any]:
+    def get_metrics_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary"""
         metrics_text = self.get_metrics_text()
 
-        result = {"timestamp": datetime.now(timezone.utc).isoformat(), "metrics": {}}
+        result = {"timestamp": datetime.now(UTC).isoformat(), "metrics": {}}
 
         for line in metrics_text.split("\n"):
             if line and not line.startswith("#"):

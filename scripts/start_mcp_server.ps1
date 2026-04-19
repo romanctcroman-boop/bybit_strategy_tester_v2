@@ -77,7 +77,7 @@ function Start-McpServer {
     [Environment]::SetEnvironmentVariable("PYTHONIOENCODING", "utf-8", "Process")
     [Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "Process")
 
-    # Start MCP Server in background
+    # Start MCP Server in background — redirect stdout+stderr to log file
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = $VenvPython
     $startInfo.Arguments = "`"$serverScript`""
@@ -91,25 +91,38 @@ function Start-McpServer {
 
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $startInfo
-    
+
+    # Register async event handlers to stream output to the log file
+    $null = Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action {
+        if ($EventArgs.Data) {
+            $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | $($EventArgs.Data)"
+            Add-Content -Path $Event.MessageData -Value $line -Encoding UTF8
+        }
+    } -MessageData $LogFile
+
+    $null = Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action {
+        if ($EventArgs.Data) {
+            $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | ERROR | $($EventArgs.Data)"
+            Add-Content -Path $Event.MessageData -Value $line -Encoding UTF8
+        }
+    } -MessageData $LogFile
+
     try {
         $process.Start() | Out-Null
+        $process.BeginOutputReadLine()
+        $process.BeginErrorReadLine()
         $process.Id | Out-File -FilePath $McpPidFile -Force
-        
+
         # Wait a moment to check if it started successfully
         Start-Sleep -Seconds 2
-        
+
         if (-not $process.HasExited) {
             Write-Host "[OK] MCP Server started (PID: $($process.Id))" -ForegroundColor Green
             Write-Host "     Log file: $LogFile" -ForegroundColor Gray
         }
         else {
             $exitCode = $process.ExitCode
-            $stderr = $process.StandardError.ReadToEnd()
             Write-Host "[ERROR] MCP Server failed to start (exit code: $exitCode)" -ForegroundColor Red
-            if ($stderr) {
-                Write-Host "[ERROR] $stderr" -ForegroundColor Red
-            }
             Remove-Item $McpPidFile -Force -ErrorAction SilentlyContinue
         }
     }

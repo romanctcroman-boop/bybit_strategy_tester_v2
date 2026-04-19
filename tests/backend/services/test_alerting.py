@@ -140,17 +140,12 @@ class TestAlertingService:
         """Test configured service."""
         assert configured_service.config.slack_enabled is True
         assert configured_service.config.email_enabled is True
-        assert (
-            configured_service.config.slack_webhook_url
-            == "https://hooks.slack.com/test"
-        )
+        assert configured_service.config.slack_webhook_url == "https://hooks.slack.com/test"
 
     @pytest.mark.asyncio
     async def test_send_alert_no_channels(self, service):
         """Test sending alert with no channels configured."""
-        result = await service.send_alert(
-            level=AlertLevel.INFO, title="Test", message="Test message", source="test"
-        )
+        result = await service.send_alert(level=AlertLevel.INFO, title="Test", message="Test message", source="test")
 
         # No channels enabled - returns False
         assert result is False

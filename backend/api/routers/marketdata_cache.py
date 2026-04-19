@@ -18,12 +18,8 @@ logger = logging.getLogger(__name__)
 @router.post("/bybit/prime")
 def prime_working_sets(
     symbol: str = Form(..., description="Instrument symbol, e.g. BTCUSDT"),
-    intervals: str = Form(
-        "1,5,15,60", description="Comma-separated list: e.g. '1,5,15,60,240,D'"
-    ),
-    load_limit: int = Form(
-        1000, description="Initial load size per interval (max 1000)"
-    ),
+    intervals: str = Form("1,5,15,60", description="Comma-separated list: e.g. '1,5,15,60,240,D'"),
+    load_limit: int = Form(1000, description="Initial load size per interval (max 1000)"),
 ):
     """Preload working sets for a symbol across multiple intervals.
 
@@ -40,9 +36,7 @@ def prime_working_sets(
         results: dict[str, int] = {}
         for itv in ivs:
             try:
-                data = CANDLE_CACHE.load_initial(
-                    symbol, itv, load_limit=load_limit, persist=True
-                )
+                data = CANDLE_CACHE.load_initial(symbol, itv, load_limit=load_limit, persist=True)
                 results[itv] = len(data or [])
             except Exception as exc:
                 results[itv] = -1
@@ -59,15 +53,9 @@ def prime_working_sets(
 @router.post("/bybit/reset")
 def reset_working_sets(
     symbol: str = Form(..., description="Instrument symbol, e.g. BTCUSDT"),
-    intervals: str = Form(
-        "1,5,15,60", description="Comma-separated list: e.g. '1,5,15,60,240,D'"
-    ),
-    reload: int = Form(
-        1, description="If 1, reload from remote after reset; if 0, just clear"
-    ),
-    load_limit: int = Form(
-        1000, description="Load size per interval when reload=1 (max 1000)"
-    ),
+    intervals: str = Form("1,5,15,60", description="Comma-separated list: e.g. '1,5,15,60,240,D'"),
+    reload: int = Form(1, description="If 1, reload from remote after reset; if 0, just clear"),
+    load_limit: int = Form(1000, description="Load size per interval when reload=1 (max 1000)"),
 ):
     """Reset in-memory candle bases (working sets) for the given symbol and intervals.
 
@@ -87,9 +75,7 @@ def reset_working_sets(
                 if reload:
                     data = CANDLE_CACHE.reset(symbol, itv, reload=True)
                     if load_limit and load_limit != CANDLE_CACHE.LOAD_LIMIT:
-                        data = CANDLE_CACHE.load_initial(
-                            symbol, itv, load_limit=load_limit, persist=True
-                        )
+                        data = CANDLE_CACHE.load_initial(symbol, itv, load_limit=load_limit, persist=True)
                     results[itv] = len(data or [])
                 else:
                     CANDLE_CACHE.reset(symbol, itv, reload=False)

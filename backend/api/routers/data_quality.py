@@ -6,7 +6,7 @@ Provides REST API endpoints for market data quality monitoring.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -54,7 +54,7 @@ class DataQualityIssueResponse(BaseModel):
     timestamp: datetime
     severity: float
     description: str
-    raw_data: Optional[dict[str, Any]]
+    raw_data: dict[str, Any] | None
     auto_corrected: bool
 
 
@@ -80,7 +80,7 @@ class DataQualityMetricsResponse(BaseModel):
     spikes_detected: int
     quality_score: float
     quality_level: str
-    last_update: Optional[datetime]
+    last_update: datetime | None
     staleness_seconds: float
 
 
@@ -181,9 +181,7 @@ async def validate_batch(request: BatchCandlesRequest):
     # Aggregate results
     valid_count = sum(1 for r in results if r.is_valid)
     total_issues = sum(len(r.issues) for r in results)
-    avg_quality = (
-        sum(r.quality_score for r in results) / len(results) if results else 100.0
-    )
+    avg_quality = sum(r.quality_score for r in results) / len(results) if results else 100.0
 
     return {
         "total_candles": len(results),
@@ -254,8 +252,8 @@ async def get_symbol_metrics(symbol: str, interval: str):
 @router.get("/issues", response_model=list[DataQualityIssueResponse])
 async def get_recent_issues(
     limit: int = 100,
-    symbol: Optional[str] = None,
-    issue_type: Optional[str] = None,
+    symbol: str | None = None,
+    issue_type: str | None = None,
 ):
     """Get recent data quality issues."""
     monitor = get_data_quality_monitor()

@@ -5,7 +5,6 @@ Handles fetching and aligning multi-timeframe candle data.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from backend.services.candle_cache import CANDLE_CACHE
 
@@ -17,8 +16,8 @@ class MtfResponse:
     """Multi-timeframe response data structure"""
 
     symbol: str
-    intervals: List[str]
-    data: Dict[str, List[Dict]]
+    intervals: list[str]
+    data: dict[str, list[dict]]
 
 
 class MtfManager:
@@ -35,9 +34,7 @@ class MtfManager:
         """Initialize MTF Manager"""
         logger.info("MTF Manager initialized")
 
-    def get_working_sets(
-        self, symbol: str, intervals: List[str], load_limit: int = 1000
-    ) -> MtfResponse:
+    def get_working_sets(self, symbol: str, intervals: list[str], load_limit: int = 1000) -> MtfResponse:
         """
         Get working sets for multiple intervals (raw, unaligned).
 
@@ -55,18 +52,12 @@ class MtfManager:
         for interval in intervals:
             try:
                 # Get working set for this interval
-                candles = CANDLE_CACHE.get_working_set(
-                    symbol, interval, ensure_loaded=False
-                )
+                candles = CANDLE_CACHE.get_working_set(symbol, interval, ensure_loaded=False)
                 if not candles:
-                    candles = CANDLE_CACHE.load_initial(
-                        symbol, interval, load_limit=load_limit, persist=True
-                    )
+                    candles = CANDLE_CACHE.load_initial(symbol, interval, load_limit=load_limit, persist=True)
                 data[interval] = candles or []
             except Exception as exc:
-                logger.warning(
-                    f"Failed to fetch interval {interval} for {symbol}: {exc}"
-                )
+                logger.warning(f"Failed to fetch interval {interval} for {symbol}: {exc}")
                 data[interval] = []
 
         return MtfResponse(symbol=symbol, intervals=intervals, data=data)
@@ -74,8 +65,8 @@ class MtfManager:
     def get_aligned(
         self,
         symbol: str,
-        intervals: List[str],
-        base_interval: Optional[str] = None,
+        intervals: list[str],
+        base_interval: str | None = None,
         load_limit: int = 1000,
     ) -> MtfResponse:
         """
@@ -98,19 +89,13 @@ class MtfManager:
         if not base_interval:
             base_interval = self._get_smallest_interval(intervals)
 
-        logger.debug(
-            f"Aligning data for {symbol}, base: {base_interval}, intervals: {intervals}"
-        )
+        logger.debug(f"Aligning data for {symbol}, base: {base_interval}, intervals: {intervals}")
 
         # Load base interval data
         try:
-            base_data = CANDLE_CACHE.get_working_set(
-                symbol, base_interval, ensure_loaded=False
-            )
+            base_data = CANDLE_CACHE.get_working_set(symbol, base_interval, ensure_loaded=False)
             if not base_data:
-                base_data = CANDLE_CACHE.load_initial(
-                    symbol, base_interval, load_limit=load_limit, persist=True
-                )
+                base_data = CANDLE_CACHE.load_initial(symbol, base_interval, load_limit=load_limit, persist=True)
         except Exception as exc:
             logger.error(f"Failed to load base interval {base_interval}: {exc}")
             base_data = []
@@ -129,7 +114,7 @@ class MtfManager:
 
         return MtfResponse(symbol=symbol, intervals=intervals, data=data)
 
-    def _get_smallest_interval(self, intervals: List[str]) -> str:
+    def _get_smallest_interval(self, intervals: list[str]) -> str:
         """
         Determine the smallest interval from a list.
 
@@ -151,7 +136,7 @@ class MtfManager:
 
         return min(interval_minutes, key=interval_minutes.get)
 
-    def _interval_to_minutes(self, interval: str) -> Optional[int]:
+    def _interval_to_minutes(self, interval: str) -> int | None:
         """
         Convert interval string to minutes.
 
@@ -176,9 +161,7 @@ class MtfManager:
         except Exception:
             return None
 
-    def _resample_candles(
-        self, base_candles: List[Dict], base_interval: str, target_interval: str
-    ) -> List[Dict]:
+    def _resample_candles(self, base_candles: list[dict], base_interval: str, target_interval: str) -> list[dict]:
         """
         Resample base candles to target interval.
 
@@ -197,9 +180,7 @@ class MtfManager:
         target_minutes = self._interval_to_minutes(target_interval)
 
         if not base_minutes or not target_minutes:
-            logger.warning(
-                f"Unable to resample from {base_interval} to {target_interval}"
-            )
+            logger.warning(f"Unable to resample from {base_interval} to {target_interval}")
             return []
 
         if target_minutes <= base_minutes:

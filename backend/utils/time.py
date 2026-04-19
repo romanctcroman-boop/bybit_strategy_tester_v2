@@ -3,8 +3,7 @@ Time utilities for backend
 Provides common time functions used across the application
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 
 def utc_now() -> datetime:
@@ -19,7 +18,7 @@ def utc_now() -> datetime:
         >>> now.isoformat()
         '2024-12-04T10:30:45.123456+00:00'
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def utc_timestamp() -> float:
@@ -37,7 +36,7 @@ def utc_timestamp() -> float:
     return utc_now().timestamp()
 
 
-def utc_isoformat(dt: Optional[datetime] = None, include_tz: bool = True) -> str:
+def utc_isoformat(dt: datetime | None = None, include_tz: bool = True) -> str:
     """
     Convert datetime to ISO format string
 
@@ -113,7 +112,7 @@ def timestamp_to_datetime(ts: float) -> datetime:
     Returns:
         datetime: Timezone-aware datetime in UTC
     """
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)
 
 
 def add_days(dt: datetime, days: int) -> datetime:
@@ -199,16 +198,16 @@ def seconds_until(target: datetime) -> float:
 
 
 __all__ = [
-    "utc_now",
-    "utc_timestamp",
-    "utc_isoformat",
-    "parse_iso_timestamp",
-    "datetime_to_timestamp",
-    "timestamp_to_datetime",
     "add_days",
     "add_hours",
     "add_minutes",
     "add_seconds",
-    "time_until",
+    "datetime_to_timestamp",
+    "parse_iso_timestamp",
     "seconds_until",
+    "time_until",
+    "timestamp_to_datetime",
+    "utc_isoformat",
+    "utc_now",
+    "utc_timestamp",
 ]

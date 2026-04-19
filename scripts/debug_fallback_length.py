@@ -2,20 +2,22 @@
 Check data length in Fallback
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import sqlite3
+
+import pandas as pd
 
 from backend.backtesting.engine import get_engine
 from backend.backtesting.models import BacktestConfig
 from backend.backtesting.strategies import RSIStrategy
 
 # Load data
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -61,7 +63,7 @@ print(f"Last equity: {result.equity_curve.equity[-1]:.2f}")
 
 # Check trade 20 details
 t20 = result.trades[-1]
-print(f"\nTrade 20:")
+print("\nTrade 20:")
 print(f"  entry_bar_index: {t20.entry_bar_index}")
 print(f"  exit_bar_index: {t20.exit_bar_index}")
 print(f"  exit_time: {t20.exit_time}")

@@ -24,9 +24,10 @@ Usage:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -216,9 +217,7 @@ class WalkForwardOptimizer:
         total_len = len(sorted_data)
 
         if total_len < self.n_splits * 10:
-            raise ValueError(
-                f"Insufficient data: {total_len} candles for {self.n_splits} splits"
-            )
+            raise ValueError(f"Insufficient data: {total_len} candles for {self.n_splits} splits")
 
         # Calculate window sizes
         window_size = total_len // self.n_splits
@@ -230,9 +229,7 @@ class WalkForwardOptimizer:
         param_values = list(param_grid.values())
         param_combinations = list(product(*param_values))
 
-        logger.info(
-            f"Walk-forward: {self.n_splits} splits, {len(param_combinations)} param combos"
-        )
+        logger.info(f"Walk-forward: {self.n_splits} splits, {len(param_combinations)} param combos")
 
         windows: list[WalkForwardWindow] = []
         all_best_params: list[dict] = []
@@ -261,7 +258,7 @@ class WalkForwardOptimizer:
             best_params = {}
 
             for combo in param_combinations:
-                params = dict(zip(param_names, combo))
+                params = dict(zip(param_names, combo, strict=False))
                 try:
                     result = strategy_runner(train_data, params, initial_capital)
                     metric_value = result.get(metric, result.get("return", 0))
@@ -344,12 +341,7 @@ class WalkForwardOptimizer:
         consistency_ratio = positive_windows / n if n > 0 else 0
 
         # Parameter stability: How often same params are selected
-        if all_best_params:
-            param_stability = self._calculate_param_stability(
-                all_best_params, param_names
-            )
-        else:
-            param_stability = 0
+        param_stability = self._calculate_param_stability(all_best_params, param_names) if all_best_params else 0
 
         # Average degradation
         avg_degradation = np.mean([w.return_degradation for w in windows])
@@ -359,16 +351,12 @@ class WalkForwardOptimizer:
             1.0,
             max(
                 0.0,
-                0.5 * (1 - consistency_ratio)
-                + 0.3 * min(1.0, abs(avg_degradation))
-                + 0.2 * (1 - param_stability),
+                0.5 * (1 - consistency_ratio) + 0.3 * min(1.0, abs(avg_degradation)) + 0.2 * (1 - param_stability),
             ),
         )
 
         # Recommended params: most frequent or median values
-        recommended_params = self._calculate_recommended_params(
-            all_best_params, param_names
-        )
+        recommended_params = self._calculate_recommended_params(all_best_params, param_names)
 
         # Confidence level
         if overfit_score < 0.2 and consistency_ratio >= 0.8:
@@ -465,8 +453,8 @@ class WalkForwardOptimizer:
             # Assume milliseconds if > 1e12
             if ts > 1e12:
                 ts = ts / 1000
-            return datetime.fromtimestamp(ts, tz=timezone.utc)
-        return datetime.now(timezone.utc)
+            return datetime.fromtimestamp(ts, tz=UTC)
+        return datetime.now(UTC)
 
 
 def simple_strategy_runner(
@@ -525,7 +513,7 @@ def simple_strategy_runner(
 
 
 # Global instance
-_walk_forward_optimizer: Optional[WalkForwardOptimizer] = None
+_walk_forward_optimizer: WalkForwardOptimizer | None = None
 
 
 def get_walk_forward_optimizer() -> WalkForwardOptimizer:

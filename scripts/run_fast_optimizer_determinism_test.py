@@ -1,9 +1,13 @@
 import json
+import sys
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.backtesting.fast_optimizer import FastGridOptimizer, load_candles_fast
 
-DB = r"d:/bybit_strategy_tester_v2/data.sqlite3"
+DB = str(Path(__file__).resolve().parents[1] / "data.sqlite3")
 SYMBOL = "BTCUSDT"
 INTERVAL = "15"
 START = datetime(2025, 1, 1)
@@ -24,9 +28,7 @@ if candles_arr is None:
 
 import pandas as pd
 
-candles = pd.DataFrame(
-    candles_arr, columns=["open_time", "open", "high", "low", "close", "volume"]
-)
+candles = pd.DataFrame(candles_arr, columns=["open_time", "open", "high", "low", "close", "volume"])
 print(f"Candles loaded: {len(candles)} rows")
 
 opt = FastGridOptimizer()
@@ -61,8 +63,7 @@ for run in range(1, 4):
     results_summary.append(best)
 
 all_equal = all(
-    results_summary[0]["best_params"] == r["best_params"]
-    and results_summary[0]["best_score"] == r["best_score"]
+    results_summary[0]["best_params"] == r["best_params"] and results_summary[0]["best_score"] == r["best_score"]
     for r in results_summary[1:]
 )
 print(

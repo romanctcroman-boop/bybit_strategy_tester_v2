@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Add project root to path
@@ -39,7 +39,7 @@ from backend.database.models.strategy import Strategy, StrategyStatus, StrategyT
 
 def utc_now() -> datetime:
     """Get current UTC time with timezone awareness."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # Realistic crypto symbols
@@ -193,9 +193,7 @@ def generate_strategies(db: Session, count: int = 8) -> list[Strategy]:
     return strategies
 
 
-def generate_backtests(
-    db: Session, strategies: list[Strategy], count: int = 50
-) -> list[Backtest]:
+def generate_backtests(db: Session, strategies: list[Strategy], count: int = 50) -> list[Backtest]:
     """Generate test backtests with realistic metrics."""
     print(f"📊 Generating {count} backtests...")
     backtests = []
@@ -237,11 +235,7 @@ def generate_backtests(
             # Calculate other metrics based on return
             is_profitable = total_return > 0
 
-            win_rate = (
-                random.uniform(0.45, 0.65)
-                if is_profitable
-                else random.uniform(0.30, 0.50)
-            )
+            win_rate = random.uniform(0.45, 0.65) if is_profitable else random.uniform(0.30, 0.50)
             total_trades = random.randint(20, 200)
             winning_trades = int(total_trades * win_rate)
             losing_trades = total_trades - winning_trades
@@ -249,11 +243,7 @@ def generate_backtests(
             sharpe_ratio = total_return / 20 + random.uniform(-0.5, 0.5)
             sortino_ratio = sharpe_ratio * random.uniform(1.1, 1.4)
             max_drawdown = random.uniform(5, 30)
-            profit_factor = (
-                (1 + total_return / 100) / (1 + max_drawdown / 100)
-                if max_drawdown > 0
-                else 1.5
-            )
+            profit_factor = (1 + total_return / 100) / (1 + max_drawdown / 100) if max_drawdown > 0 else 1.5
 
             initial_capital = 10000.0
             final_capital = initial_capital * (1 + total_return / 100)
@@ -263,11 +253,7 @@ def generate_backtests(
             started_at = created_at
             completed_at = created_at + timedelta(milliseconds=execution_time_ms)
 
-            avg_trade_pnl = (
-                (final_capital - initial_capital) / total_trades
-                if total_trades > 0
-                else 0
-            )
+            avg_trade_pnl = (final_capital - initial_capital) / total_trades if total_trades > 0 else 0
             best_trade = abs(avg_trade_pnl) * random.uniform(2, 5)
             worst_trade = -abs(avg_trade_pnl) * random.uniform(1.5, 4)
 
@@ -335,9 +321,7 @@ def generate_backtests(
             initial_capital=initial_capital,
             parameters=strategy.parameters,
             total_return=total_return,
-            annual_return=total_return * 2
-            if total_return
-            else None,  # Rough annualized
+            annual_return=total_return * 2 if total_return else None,  # Rough annualized
             sharpe_ratio=sharpe_ratio,
             sortino_ratio=sortino_ratio,
             max_drawdown=max_drawdown,
@@ -367,22 +351,18 @@ def generate_backtests(
     running = sum(1 for b in backtests if b.status == BacktestStatus.RUNNING)
     failed = sum(1 for b in backtests if b.status == BacktestStatus.FAILED)
 
-    print(
-        f"✅ Created {len(backtests)} backtests (completed: {completed}, running: {running}, failed: {failed})"
-    )
+    print(f"✅ Created {len(backtests)} backtests (completed: {completed}, running: {running}, failed: {failed})")
     return backtests
 
 
-def generate_optimizations(
-    db: Session, strategies: list[Strategy], count: int = 10
-) -> list[Optimization]:
+def generate_optimizations(db: Session, strategies: list[Strategy], count: int = 10) -> list[Optimization]:
     """Generate test optimization runs."""
     print(f"⚙️  Generating {count} optimizations...")
     optimizations = []
 
     now = utc_now()
 
-    for i in range(count):
+    for _i in range(count):
         strategy = random.choice(strategies)
 
         # Status distribution
@@ -394,15 +374,11 @@ def generate_optimizations(
         else:
             status = OptimizationStatus.QUEUED
 
-        created_at = now - timedelta(
-            days=random.randint(0, 7), hours=random.randint(0, 23)
-        )
+        created_at = now - timedelta(days=random.randint(0, 7), hours=random.randint(0, 23))
 
         total_combinations = random.randint(50, 200)
         evaluated = (
-            total_combinations
-            if status == OptimizationStatus.COMPLETED
-            else random.randint(0, total_combinations)
+            total_combinations if status == OptimizationStatus.COMPLETED else random.randint(0, total_combinations)
         )
 
         optimization = Optimization(
@@ -419,17 +395,11 @@ def generate_optimizations(
             metric="sharpe_ratio",
             initial_capital=10000.0,
             total_combinations=total_combinations,
-            evaluated_combinations=evaluated
-            if status != OptimizationStatus.QUEUED
-            else 0,
+            evaluated_combinations=evaluated if status != OptimizationStatus.QUEUED else 0,
             status=status,
             progress=evaluated / total_combinations if total_combinations > 0 else 0.0,
-            best_params=strategy.parameters
-            if status == OptimizationStatus.COMPLETED
-            else None,
-            best_score=random.uniform(1.0, 3.0)
-            if status == OptimizationStatus.COMPLETED
-            else None,
+            best_params=strategy.parameters if status == OptimizationStatus.COMPLETED else None,
+            best_score=random.uniform(1.0, 3.0) if status == OptimizationStatus.COMPLETED else None,
             created_at=created_at,
             updated_at=now,
         )
@@ -438,29 +408,21 @@ def generate_optimizations(
 
     db.commit()
 
-    completed = sum(
-        1 for o in optimizations if o.status == OptimizationStatus.COMPLETED
-    )
+    completed = sum(1 for o in optimizations if o.status == OptimizationStatus.COMPLETED)
     running = sum(1 for o in optimizations if o.status == OptimizationStatus.RUNNING)
 
-    print(
-        f"✅ Created {len(optimizations)} optimizations (completed: {completed}, running: {running})"
-    )
+    print(f"✅ Created {len(optimizations)} optimizations (completed: {completed}, running: {running})")
     return optimizations
 
 
-def update_strategy_stats(
-    db: Session, strategies: list[Strategy], backtests: list[Backtest]
-) -> None:
+def update_strategy_stats(db: Session, strategies: list[Strategy], backtests: list[Backtest]) -> None:
     """Update strategy statistics based on backtests."""
     print("📈 Updating strategy statistics...")
 
     for strategy in strategies:
         # Get completed backtests for this strategy
         strategy_backtests = [
-            b
-            for b in backtests
-            if b.strategy_id == strategy.id and b.status == BacktestStatus.COMPLETED
+            b for b in backtests if b.strategy_id == strategy.id and b.status == BacktestStatus.COMPLETED
         ]
 
         if strategy_backtests:
@@ -468,21 +430,15 @@ def update_strategy_stats(
             strategy.total_trades = sum(b.total_trades or 0 for b in strategy_backtests)
 
             # Average metrics
-            returns = [
-                b.total_return for b in strategy_backtests if b.total_return is not None
-            ]
+            returns = [b.total_return for b in strategy_backtests if b.total_return is not None]
             if returns:
                 strategy.total_return = sum(returns) / len(returns)
 
-            sharpes = [
-                b.sharpe_ratio for b in strategy_backtests if b.sharpe_ratio is not None
-            ]
+            sharpes = [b.sharpe_ratio for b in strategy_backtests if b.sharpe_ratio is not None]
             if sharpes:
                 strategy.sharpe_ratio = sum(sharpes) / len(sharpes)
 
-            win_rates = [
-                b.win_rate for b in strategy_backtests if b.win_rate is not None
-            ]
+            win_rates = [b.win_rate for b in strategy_backtests if b.win_rate is not None]
             if win_rates:
                 strategy.win_rate = sum(win_rates) / len(win_rates)
 
@@ -500,16 +456,10 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate test data for dashboard")
-    parser.add_argument(
-        "--clean", action="store_true", help="Clear existing data first"
-    )
-    parser.add_argument(
-        "--strategies", type=int, default=8, help="Number of strategies"
-    )
+    parser.add_argument("--clean", action="store_true", help="Clear existing data first")
+    parser.add_argument("--strategies", type=int, default=8, help="Number of strategies")
     parser.add_argument("--backtests", type=int, default=50, help="Number of backtests")
-    parser.add_argument(
-        "--optimizations", type=int, default=10, help="Number of optimizations"
-    )
+    parser.add_argument("--optimizations", type=int, default=10, help="Number of optimizations")
     args = parser.parse_args()
 
     print("=" * 60)

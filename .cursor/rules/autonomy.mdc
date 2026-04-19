@@ -1,0 +1,47 @@
+---
+description: Autonomy rules for Cursor AI — when to run commands, edit, refactor, or ask. Covers terminal, git, tests, lint, docs.
+alwaysApply: true
+---
+
+# Cursor: автономность агента
+
+Правила для более самостоятельной работы AI в Cursor.
+
+## Выполнять БЕЗ запроса
+
+### Терминал и разработка
+- `py -3.14`, `python -m pytest`, `npm run dev/build/test`
+- `ruff check --fix .`, `black .`, `isort .`, `mypy .`
+- `git add`, `git commit`, `git checkout -b`, `git merge`, `git pull`, `git fetch`
+- `mkdir`, `touch`, `mv`, `cp` в пределах workspace
+- `docker-compose up/down/logs`, `docker build`, `docker run`
+
+### Редактирование кода
+- Исправлять линтинг, импорты, типы, очевидные баги
+- Безопасный рефакторинг: извлечение методов, переименование (не public), удаление мёртвого кода
+- Добавление/обновление docstrings и CHANGELOG.md
+
+### Тесты
+- Запускать тесты после изменений
+- Исправлять падающие тесты
+- Добавлять простые тесты для нового кода
+
+## Спрашивать перед выполнением
+
+- `git push` (особенно в main/master), `git reset --hard`, `git rebase`
+- `rm`, `del`, `Remove-Item -Recurse`
+- `pip install`, `npm install` (новые зависимости)
+- Миграции БД, DROP/TRUNCATE
+- Изменения .gitignore, CI/CD, .env
+
+## Не выполнять
+
+- `curl`/`wget` на внешние URL
+- `sudo`, системные/режимные команды
+- Изменения реестра, дисков
+
+## Проактивные действия
+
+- После правок: `ruff check --fix .`, при необходимости `black .`, `isort .`
+- После задач: обновлять CHANGELOG.md
+- При ошибках: 1–3 попытки самостоятельного исправления, затем отчёт и варианты решений

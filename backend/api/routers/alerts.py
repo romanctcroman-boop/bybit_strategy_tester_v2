@@ -8,8 +8,8 @@ Provides endpoints for:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
@@ -34,9 +34,7 @@ class AlertRequest(BaseModel):
     title: str = Field(..., description="Alert title")
     message: str = Field(..., description="Alert message")
     source: str = Field(default="api", description="Source system/component")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class AlertResponse(BaseModel):
@@ -44,7 +42,7 @@ class AlertResponse(BaseModel):
 
     success: bool
     message: str
-    alert_id: Optional[str] = None
+    alert_id: str | None = None
     channels_notified: list[str] = []
 
 
@@ -54,6 +52,9 @@ class AlertConfigStatus(BaseModel):
     slack_enabled: bool
     slack_configured: bool
     slack_channel: str
+    telegram_enabled: bool
+    telegram_configured: bool
+    telegram_chat_count: int
     email_enabled: bool
     email_configured: bool
     email_recipients: int
@@ -64,8 +65,9 @@ class TestAlertResponse(BaseModel):
     """Response for test alert endpoint."""
 
     test_sent: bool
-    slack_result: Optional[bool] = None
-    email_result: Optional[bool] = None
+    slack_result: bool | None = None
+    telegram_result: bool | None = None
+    email_result: bool | None = None
     message: str
 
 
@@ -83,6 +85,9 @@ async def get_alerting_status() -> AlertConfigStatus:
         slack_enabled=config.slack_enabled,
         slack_configured=bool(config.slack_webhook_url),
         slack_channel=config.slack_channel,
+        telegram_enabled=config.telegram_enabled,
+        telegram_configured=bool(config.telegram_bot_token and config.telegram_chat_ids),
+        telegram_chat_count=len(config.telegram_chat_ids),
         email_enabled=config.email_enabled,
         email_configured=all(
             [
@@ -139,9 +144,7 @@ async def send_alert(
 
     return AlertResponse(
         success=success,
-        message="Alert sent successfully"
-        if success
-        else "Alert sending failed or was rate-limited",
+        message="Alert sent successfully" if success else "Alert sending failed or was rate-limited",
         channels_notified=channels if success else [],
     )
 
@@ -170,7 +173,7 @@ async def test_alerting() -> TestAlertResponse:
         source="alerting_api_test",
         metadata={
             "test": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "environment": "production",
         },
     )
@@ -193,9 +196,7 @@ async def test_alerting() -> TestAlertResponse:
     if results:
         message = f"Test alert sent successfully via: {', '.join(results)}"
     else:
-        message = (
-            "Test alert failed to send via any channel. Check configuration and logs."
-        )
+        message = "Test alert failed to send via any channel. Check configuration and logs."
 
     return TestAlertResponse(
         test_sent=bool(results),

@@ -15,9 +15,10 @@ import os
 import statistics
 import time
 from collections import deque
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class CircuitBreaker:
         recovery_timeout: int = 60,
         expected_exception: type = Exception,
         enable_adaptive: bool = True,
-        fallback_handler: Optional[Callable] = None,
+        fallback_handler: Callable | None = None,
     ):
         self.name = name
         self.base_failure_threshold = failure_threshold
@@ -135,7 +136,7 @@ class CircuitBreaker:
         self.failure_count = 0
         self.success_count = 0
         self.total_calls = 0
-        self.last_failure_time: Optional[datetime] = None
+        self.last_failure_time: datetime | None = None
         self.state = CircuitState.CLOSED
         self.consecutive_successes = 0
         self.trip_count = 0  # How many times circuit has tripped
@@ -251,28 +252,23 @@ class CircuitBreaker:
             if self.consecutive_successes >= required_successes:
                 self.state = CircuitState.CLOSED
                 # Reduce backoff on successful recovery
-                self._current_backoff_multiplier = max(
-                    1.0, self._current_backoff_multiplier / 2
-                )
+                self._current_backoff_multiplier = max(1.0, self._current_backoff_multiplier / 2)
                 logger.info(
-                    f"Circuit breaker '{self.name}' recovered and CLOSED "
-                    f"(after {self.consecutive_successes} successes)"
+                    f"Circuit breaker '{self.name}' recovered and CLOSED (after {self.consecutive_successes} successes)"
                 )
 
     def _on_failure(self):
         """Handle failed call"""
         self.failure_count += 1
         self.consecutive_successes = 0
-        self.last_failure_time = datetime.now(timezone.utc)
+        self.last_failure_time = datetime.now(UTC)
 
         current_threshold = self.failure_threshold
         if self.failure_count >= current_threshold:
             self.state = CircuitState.OPEN
             self.trip_count += 1
             # Increase backoff on each trip
-            self._current_backoff_multiplier = min(
-                self._current_backoff_multiplier * 1.5, self._max_backoff_multiplier
-            )
+            self._current_backoff_multiplier = min(self._current_backoff_multiplier * 1.5, self._max_backoff_multiplier)
             backoff = self._current_backoff_multiplier
             logger.warning(
                 f"Circuit breaker '{self.name}' is now OPEN "
@@ -285,9 +281,7 @@ class CircuitBreaker:
         if self.last_failure_time is None:
             return True
 
-        timeout_elapsed = (
-            datetime.now(timezone.utc) - self.last_failure_time
-        ).total_seconds() >= self.recovery_timeout
+        timeout_elapsed = (datetime.now(UTC) - self.last_failure_time).total_seconds() >= self.recovery_timeout
 
         return timeout_elapsed
 
@@ -295,7 +289,7 @@ class CircuitBreaker:
         """Set fallback handler for graceful degradation."""
         self.fallback_handler = handler
 
-    def get_health_info(self) -> Dict[str, Any]:
+    def get_health_info(self) -> dict[str, Any]:
         """Get detailed health information."""
         return {
             "name": self.name,
@@ -322,13 +316,13 @@ class CircuitBreakerManager:
     """Manager for multiple circuit breakers"""
 
     def __init__(self):
-        self.breakers: Dict[str, CircuitBreaker] = {}
-        self._last_adapt_time: Optional[datetime] = None
+        self.breakers: dict[str, CircuitBreaker] = {}
+        self._last_adapt_time: datetime | None = None
         self._persistence_enabled: bool = False
         self._persistence_redis = None
-        self._persistence_task: Optional[asyncio.Task] = None
+        self._persistence_task: asyncio.Task | None = None
         self._autosave_interval: int = 60  # default autosave interval
-        self._configs: Dict[str, Any] = {}  # configurations tracked
+        self._configs: dict[str, Any] = {}  # configurations tracked
 
     def get_breaker(
         self,
@@ -370,7 +364,7 @@ class CircuitBreakerManager:
             breaker.success_count = 0
             logger.info(f"Reset circuit breaker '{breaker.name}'")
 
-    def get_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all circuit breakers"""
         return {
             name: {
@@ -381,13 +375,11 @@ class CircuitBreakerManager:
             for name, breaker in self.breakers.items()
         }
 
-    def get_all_breakers(self) -> List[str]:
+    def get_all_breakers(self) -> list[str]:
         """Return a list of registered breaker names."""
         return list(self.breakers.keys())
 
-    async def enable_persistence(
-        self, redis_url: str, autosave_interval: int = 60
-    ) -> bool:
+    async def enable_persistence(self, redis_url: str, autosave_interval: int = 60) -> bool:
         """Attempt to enable persistence of circuit-breaker state into Redis.
 
         Returns True if persistence was successfully enabled, False otherwise.
@@ -430,9 +422,7 @@ class CircuitBreakerManager:
                     # schedule background autosave task
                     loop = _asyncio.get_event_loop()
                     if self._persistence_task is None or self._persistence_task.done():
-                        self._persistence_task = loop.create_task(
-                            self._autosave_loop(autosave_interval)
-                        )
+                        self._persistence_task = loop.create_task(self._autosave_loop(autosave_interval))
             except Exception:
                 # ignore background scheduling failures; persistence still enabled
                 pass
@@ -460,9 +450,7 @@ class CircuitBreakerManager:
                             "state": b.state.value,
                             "failure_count": b.failure_count,
                             "success_count": b.success_count,
-                            "last_failure_time": b.last_failure_time.isoformat()
-                            if b.last_failure_time
-                            else None,
+                            "last_failure_time": b.last_failure_time.isoformat() if b.last_failure_time else None,
                         }
                         for name, b in self.breakers.items()
                     }
@@ -473,9 +461,7 @@ class CircuitBreakerManager:
                         key = "circuit_breakers_state"
                         if hasattr(self._persistence_redis, "set"):
                             # aioredis or sync redis
-                            await self._persistence_redis.set(
-                                key, _json.dumps(snapshot)
-                            )
+                            await self._persistence_redis.set(key, _json.dumps(snapshot))
                     except Exception:
                         # ignore write errors
                         pass
@@ -486,12 +472,12 @@ class CircuitBreakerManager:
         except asyncio.CancelledError:
             return
 
-    def get_breaker_state(self, name: str) -> Optional[CircuitState]:
+    def get_breaker_state(self, name: str) -> CircuitState | None:
         """Return the CircuitState for a named breaker, or None if missing."""
         b = self.breakers.get(name)
         return b.state if b is not None else None
 
-    def get_breaker_metrics(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_breaker_metrics(self, name: str) -> dict[str, Any] | None:
         """Return detailed metrics for a specific circuit breaker by name.
 
         Args:
@@ -512,9 +498,7 @@ class CircuitBreakerManager:
             return None
 
         total_calls = breaker.success_count + breaker.failure_count
-        error_rate = (
-            (breaker.failure_count / total_calls * 100) if total_calls > 0 else 0.0
-        )
+        error_rate = (breaker.failure_count / total_calls * 100) if total_calls > 0 else 0.0
 
         return {
             "state": breaker.state.value,
@@ -561,11 +545,11 @@ class CircuitBreakerManager:
         """
 
         class _Metrics:
-            def __init__(self, data: Dict[str, Any], breakers_dict: Dict[str, Any]):
+            def __init__(self, data: dict[str, Any], breakers_dict: dict[str, Any]):
                 self._data = data
                 self.breakers = breakers_dict
 
-            def to_dict(self) -> Dict[str, Any]:
+            def to_dict(self) -> dict[str, Any]:
                 return self._data
 
         data = {
@@ -586,11 +570,7 @@ class CircuitBreakerManager:
                 "total_trips": getattr(breaker, "trip_count", 0),
                 "current_state": breaker.state.value,
                 "success_rate_24h": round(
-                    (
-                        breaker.success_count
-                        / (breaker.success_count + breaker.failure_count)
-                        * 100
-                    )
+                    (breaker.success_count / (breaker.success_count + breaker.failure_count) * 100)
                     if (breaker.success_count + breaker.failure_count) > 0
                     else 100.0,
                     2,
@@ -601,16 +581,14 @@ class CircuitBreakerManager:
 
         return _Metrics(data, breakers_dict)
 
-    def maybe_adapt_breakers(
-        self, force: bool = False, min_interval_seconds: int = 300
-    ) -> Dict[str, Any]:
+    def maybe_adapt_breakers(self, force: bool = False, min_interval_seconds: int = 300) -> dict[str, Any]:
         """Adaptive tuning hook.
 
         Currently a safe, idempotent no-op that records last adapt time and returns any
         adaptations performed (empty dict by default). Callers may use `force=True` to
         bypass the interval.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not force and self._last_adapt_time is not None:
             delta = (now - self._last_adapt_time).total_seconds()
             if delta < min_interval_seconds:
@@ -622,7 +600,7 @@ class CircuitBreakerManager:
 
 
 # Global circuit breaker manager instance
-_circuit_manager: Optional[CircuitBreakerManager] = None
+_circuit_manager: CircuitBreakerManager | None = None
 
 
 def get_circuit_manager() -> CircuitBreakerManager:
@@ -652,7 +630,7 @@ def on_config_change(config: Any) -> None:
             new_threshold = getattr(cb_config, "failure_threshold", 5)
             new_timeout = getattr(cb_config, "recovery_timeout", 60)
 
-            for name, breaker in manager._breakers.items():
+            for _name, breaker in manager._breakers.items():
                 breaker.failure_threshold = new_threshold
                 breaker.recovery_time = new_timeout
 
@@ -668,10 +646,10 @@ def on_config_change(config: Any) -> None:
 
 
 __all__ = [
-    "CircuitBreakerError",
-    "CircuitState",
     "CircuitBreaker",
+    "CircuitBreakerError",
     "CircuitBreakerManager",
+    "CircuitState",
     "get_circuit_manager",
     "on_config_change",
 ]

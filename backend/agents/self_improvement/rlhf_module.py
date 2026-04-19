@@ -20,13 +20,14 @@ References:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -61,11 +62,11 @@ class FeedbackSample:
     preference: int  # -1 = A better, 0 = tie, 1 = B better
     preference_type: PreferenceType
     confidence: float  # 0.0 to 1.0
-    reasoning: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    reasoning: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "prompt": self.prompt,
@@ -80,7 +81,7 @@ class FeedbackSample:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FeedbackSample":
+    def from_dict(cls, data: dict[str, Any]) -> FeedbackSample:
         return cls(
             id=data["id"],
             prompt=data["prompt"],
@@ -129,18 +130,30 @@ class RewardModel:
 
     Uses a Bradley-Terry style model to learn from pairwise preferences.
     In production, this could be replaced with a neural network.
+
+    Features (v2.0):
+    - Learning rate scheduler (cosine annealing)
+    - Early stopping with patience
+    - Cross-validation support
+    - Async batch training
     """
 
-    def __init__(self):
-        self.feature_weights: Dict[str, float] = {
+    def __init__(self, learning_rate: float = 0.1, patience: int = 3):
+        self.feature_weights: dict[str, float] = {
             "length_ratio": 0.0,
             "keyword_overlap": 0.0,
             "sentiment_score": 0.0,
+            "structure_score": 0.0,  # NEW: sentence structure quality
+            "specificity_score": 0.0,  # NEW: specific vs vague
         }
-        self.training_samples: List[FeedbackSample] = []
-        self.training_history: List[Dict[str, float]] = []
+        self.training_samples: list[FeedbackSample] = []
+        self.training_history: list[dict[str, float]] = []
+        self.initial_lr = learning_rate
+        self.patience = patience
+        self.best_weights: dict[str, float] = {}
+        self.best_loss: float = float("inf")
 
-    def extract_features(self, prompt: str, response: str) -> Dict[str, float]:
+    def extract_features(self, prompt: str, response: str) -> dict[str, float]:
         """Extract features from a response"""
         features = {}
 
@@ -150,25 +163,43 @@ class RewardModel:
         features["length_ratio"] = min(response_words / max(prompt_words, 1), 5.0) / 5.0
 
         # Keyword overlap
-        prompt_keywords = set(word.lower() for word in prompt.split() if len(word) > 3)
-        response_keywords = set(
-            word.lower() for word in response.split() if len(word) > 3
-        )
+        prompt_keywords = {word.lower() for word in prompt.split() if len(word) > 3}
+        response_keywords = {word.lower() for word in response.split() if len(word) > 3}
         if prompt_keywords:
-            features["keyword_overlap"] = len(
-                prompt_keywords & response_keywords
-            ) / len(prompt_keywords)
+            features["keyword_overlap"] = len(prompt_keywords & response_keywords) / len(prompt_keywords)
         else:
             features["keyword_overlap"] = 0.0
 
         # Simple sentiment (presence of positive/negative words)
-        positive_words = {"good", "great", "excellent", "helpful", "clear", "correct"}
-        negative_words = {"error", "wrong", "bad", "unclear", "incorrect", "fail"}
+        positive_words = {"good", "great", "excellent", "helpful", "clear", "correct", "accurate", "useful"}
+        negative_words = {"error", "wrong", "bad", "unclear", "incorrect", "fail", "confusing", "poor"}
 
         response_lower = response.lower()
         pos_count = sum(1 for w in positive_words if w in response_lower)
         neg_count = sum(1 for w in negative_words if w in response_lower)
         features["sentiment_score"] = (pos_count - neg_count + 5) / 10.0
+
+        # NEW: Structure score - good sentence structure
+        sentences = response.count(".") + response.count("!") + response.count("?")
+        if sentences > 0:
+            avg_sentence_len = response_words / sentences
+            # Ideal sentence length is 15-25 words
+            if 15 <= avg_sentence_len <= 25:
+                features["structure_score"] = 1.0
+            elif 10 <= avg_sentence_len <= 30:
+                features["structure_score"] = 0.7
+            else:
+                features["structure_score"] = 0.4
+        else:
+            features["structure_score"] = 0.3
+
+        # NEW: Specificity score - specific terms vs vague
+        specific_indicators = ["specifically", "exactly", "precisely", "for example", "such as", "%", "number"]
+        vague_indicators = ["maybe", "perhaps", "might", "could", "possibly", "some", "sometimes"]
+
+        specific_count = sum(1 for ind in specific_indicators if ind in response_lower)
+        vague_count = sum(1 for ind in vague_indicators if ind in response_lower)
+        features["specificity_score"] = min(1.0, (specific_count - vague_count * 0.5 + 3) / 6)
 
         return features
 
@@ -184,34 +215,69 @@ class RewardModel:
         # Normalize to 0-1
         return max(0.0, min(1.0, (reward + 1) / 2))
 
+    def _cosine_lr(self, epoch: int, total_epochs: int, initial_lr: float) -> float:
+        """Cosine annealing learning rate scheduler"""
+        import math
+
+        return initial_lr * (1 + math.cos(math.pi * epoch / total_epochs)) / 2
+
     def train(
-        self, samples: List[FeedbackSample], epochs: int = 10, lr: float = 0.1
-    ) -> Dict[str, float]:
-        """Train reward model on feedback samples"""
+        self,
+        samples: list[FeedbackSample],
+        epochs: int = 10,
+        lr: float = 0.1,
+        use_early_stopping: bool = True,
+        validation_split: float = 0.2,
+    ) -> dict[str, float]:
+        """
+        Train reward model on feedback samples with improvements.
+
+        Features:
+        - Cosine annealing learning rate
+        - Early stopping with patience
+        - Optional validation split for cross-validation
+        """
+        import math
+        import random
+
         self.training_samples.extend(samples)
+
+        # Split into train/validation if enabled
+        if use_early_stopping and len(samples) >= 5:
+            random.shuffle(samples)
+            split_idx = max(1, int(len(samples) * (1 - validation_split)))
+            train_samples = samples[:split_idx]
+            val_samples = samples[split_idx:]
+        else:
+            train_samples = samples
+            val_samples = []
 
         total_loss = 0.0
         correct = 0
+        no_improvement_count = 0
+
+        # Save initial weights for potential rollback
+        self.best_weights = dict(self.feature_weights)
 
         for epoch in range(epochs):
-            for sample in samples:
+            epoch_loss = 0.0
+            epoch_correct = 0
+
+            # Cosine annealing LR
+            current_lr = self._cosine_lr(epoch, epochs, lr)
+
+            for sample in train_samples:
                 # Extract features for both responses
                 features_a = self.extract_features(sample.prompt, sample.response_a)
                 features_b = self.extract_features(sample.prompt, sample.response_b)
 
                 # Compute rewards
-                reward_a = sum(
-                    self.feature_weights.get(k, 0) * v for k, v in features_a.items()
-                )
-                reward_b = sum(
-                    self.feature_weights.get(k, 0) * v for k, v in features_b.items()
-                )
+                reward_a = sum(self.feature_weights.get(k, 0) * v for k, v in features_a.items())
+                reward_b = sum(self.feature_weights.get(k, 0) * v for k, v in features_b.items())
 
                 # Predicted preference (sigmoid of difference)
-                import math
-
                 diff = reward_b - reward_a
-                pred_prob = 1 / (1 + math.exp(-diff))
+                pred_prob = 1 / (1 + math.exp(-min(max(diff, -20), 20)))  # Clip for stability
 
                 # Convert sample.preference to probability
                 if sample.preference == 1:
@@ -223,41 +289,135 @@ class RewardModel:
 
                 # Binary cross entropy loss
                 eps = 1e-10
-                loss = -(
-                    target * math.log(pred_prob + eps)
-                    + (1 - target) * math.log(1 - pred_prob + eps)
-                )
+                loss = -(target * math.log(pred_prob + eps) + (1 - target) * math.log(1 - pred_prob + eps))
+                epoch_loss += loss
                 total_loss += loss
 
-                # Gradient update
+                # Gradient update with L2 regularization
                 error = (pred_prob - target) * sample.confidence
                 for feature_name in self.feature_weights:
-                    grad = error * (
-                        features_b.get(feature_name, 0)
-                        - features_a.get(feature_name, 0)
-                    )
-                    self.feature_weights[feature_name] -= lr * grad
+                    grad = error * (features_b.get(feature_name, 0) - features_a.get(feature_name, 0))
+                    # L2 regularization
+                    grad += 0.01 * self.feature_weights[feature_name]
+                    self.feature_weights[feature_name] -= current_lr * grad
 
                 # Track accuracy
                 pred = 1 if reward_b > reward_a else (-1 if reward_a > reward_b else 0)
                 if pred == sample.preference:
+                    epoch_correct += 1
                     correct += 1
 
-        accuracy = correct / max(len(samples) * epochs, 1)
-        avg_loss = total_loss / max(len(samples) * epochs, 1)
+            # Validation and early stopping
+            if val_samples and use_early_stopping:
+                val_loss = self._compute_validation_loss(val_samples)
+                if val_loss < self.best_loss:
+                    self.best_loss = val_loss
+                    self.best_weights = dict(self.feature_weights)
+                    no_improvement_count = 0
+                else:
+                    no_improvement_count += 1
+
+                if no_improvement_count >= self.patience:
+                    logger.info(f"⏹️ Early stopping at epoch {epoch + 1}")
+                    # Restore best weights
+                    self.feature_weights = dict(self.best_weights)
+                    break
+
+        accuracy = correct / max(len(train_samples) * (epoch + 1), 1)
+        avg_loss = total_loss / max(len(train_samples) * (epoch + 1), 1)
 
         result = {
             "loss": avg_loss,
             "accuracy": accuracy,
             "samples": len(samples),
             "weights": dict(self.feature_weights),
+            "epochs_run": epoch + 1,
+            "early_stopped": no_improvement_count >= self.patience,
         }
         self.training_history.append(result)
 
-        logger.info(
-            f"🎓 Reward model trained: accuracy={accuracy:.2%}, loss={avg_loss:.4f}"
-        )
+        logger.info(f"🎓 Reward model trained: accuracy={accuracy:.2%}, loss={avg_loss:.4f}, epochs={epoch + 1}")
         return result
+
+    def _compute_validation_loss(self, val_samples: list[FeedbackSample]) -> float:
+        """Compute validation loss for early stopping"""
+        import math
+
+        total_loss = 0.0
+        for sample in val_samples:
+            features_a = self.extract_features(sample.prompt, sample.response_a)
+            features_b = self.extract_features(sample.prompt, sample.response_b)
+
+            reward_a = sum(self.feature_weights.get(k, 0) * v for k, v in features_a.items())
+            reward_b = sum(self.feature_weights.get(k, 0) * v for k, v in features_b.items())
+
+            diff = reward_b - reward_a
+            pred_prob = 1 / (1 + math.exp(-min(max(diff, -20), 20)))
+
+            if sample.preference == 1:
+                target = 1.0
+            elif sample.preference == -1:
+                target = 0.0
+            else:
+                target = 0.5
+
+            eps = 1e-10
+            loss = -(target * math.log(pred_prob + eps) + (1 - target) * math.log(1 - pred_prob + eps))
+            total_loss += loss
+
+        return total_loss / max(len(val_samples), 1)
+
+    def cross_validate(self, samples: list[FeedbackSample], k_folds: int = 5, epochs: int = 10) -> dict[str, float]:
+        """
+        Perform k-fold cross-validation on feedback samples.
+
+        Returns average metrics across folds.
+        """
+        import random
+
+        if len(samples) < k_folds:
+            logger.warning(f"Not enough samples for {k_folds}-fold CV, using {len(samples)} folds")
+            k_folds = len(samples)
+
+        random.shuffle(samples)
+        fold_size = len(samples) // k_folds
+
+        fold_results = []
+
+        for fold in range(k_folds):
+            # Split data
+            val_start = fold * fold_size
+            val_end = val_start + fold_size
+            val_samples = samples[val_start:val_end]
+            train_samples = samples[:val_start] + samples[val_end:]
+
+            # Reset weights
+            for key in self.feature_weights:
+                self.feature_weights[key] = 0.0
+
+            # Train on fold
+            result = self.train(train_samples, epochs=epochs, use_early_stopping=False)
+
+            # Evaluate on validation
+            val_loss = self._compute_validation_loss(val_samples)
+            fold_results.append(
+                {
+                    "train_loss": result["loss"],
+                    "train_accuracy": result["accuracy"],
+                    "val_loss": val_loss,
+                }
+            )
+
+        # Average results
+        avg_results = {
+            "avg_train_loss": sum(r["train_loss"] for r in fold_results) / k_folds,
+            "avg_train_accuracy": sum(r["train_accuracy"] for r in fold_results) / k_folds,
+            "avg_val_loss": sum(r["val_loss"] for r in fold_results) / k_folds,
+            "k_folds": k_folds,
+        }
+
+        logger.info(f"📊 Cross-validation: avg_val_loss={avg_results['avg_val_loss']:.4f}")
+        return avg_results
 
 
 class RLHFModule:
@@ -289,7 +449,7 @@ class RLHFModule:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
+        persist_path: str | None = None,
         min_samples_for_training: int = 10,
     ):
         """
@@ -302,7 +462,7 @@ class RLHFModule:
         self.persist_path = Path(persist_path) if persist_path else None
         self.min_samples_for_training = min_samples_for_training
 
-        self.feedback_buffer: List[FeedbackSample] = []
+        self.feedback_buffer: list[FeedbackSample] = []
         self.reward_model = RewardModel()
         self.evaluator_interface = None  # Will be set to AgentInterface
 
@@ -327,7 +487,7 @@ class RLHFModule:
         response_a: str,
         response_b: str,
         preference: int,
-        reasoning: Optional[str] = None,
+        reasoning: str | None = None,
     ) -> FeedbackSample:
         """
         Store human preference feedback
@@ -359,9 +519,9 @@ class RLHFModule:
     async def collect_ai_feedback(
         self,
         prompt: str,
-        responses: List[str],
-        evaluator_fn: Optional[Any] = None,
-    ) -> List[FeedbackSample]:
+        responses: list[str],
+        evaluator_fn: Any | None = None,
+    ) -> list[FeedbackSample]:
         """
         Collect AI feedback on responses (RLAIF)
 
@@ -387,17 +547,19 @@ class RLHFModule:
                 # Get AI evaluation
                 if evaluator_fn:
                     try:
-                        preference, confidence, reasoning = await evaluator_fn(
-                            prompt, response_a, response_b
+                        preference, confidence, reasoning = await asyncio.wait_for(
+                            evaluator_fn(prompt, response_a, response_b),
+                            timeout=60.0,
                         )
+                    except TimeoutError:
+                        logger.error(f"AI evaluation timed out for pair ({i}, {j})")
+                        continue
                     except Exception as e:
                         logger.error(f"AI evaluation failed: {e}")
                         continue
                 else:
                     # Default: use simple heuristics
-                    preference, confidence, reasoning = self._heuristic_evaluation(
-                        prompt, response_a, response_b
-                    )
+                    preference, confidence, reasoning = self._heuristic_evaluation(prompt, response_a, response_b)
 
                 sample = FeedbackSample(
                     id=f"ai_{uuid.uuid4().hex[:12]}",
@@ -426,7 +588,7 @@ class RLHFModule:
         self,
         prompt: str,
         response: str,
-        criteria: Optional[List[str]] = None,
+        criteria: list[str] | None = None,
     ) -> QualityScore:
         """
         Self-evaluate response quality
@@ -486,7 +648,7 @@ class RLHFModule:
         logger.debug(f"📊 Self-evaluation: overall={scores.overall:.2f}")
         return scores
 
-    def train_reward_model(self, force: bool = False) -> Optional[Dict[str, float]]:
+    def train_reward_model(self, force: bool = False) -> dict[str, float] | None:
         """
         Train reward model on collected feedback
 
@@ -497,10 +659,7 @@ class RLHFModule:
             Training metrics or None if not enough samples
         """
         if len(self.feedback_buffer) < self.min_samples_for_training and not force:
-            logger.info(
-                f"⏳ Need {self.min_samples_for_training - len(self.feedback_buffer)} "
-                f"more samples to train"
-            )
+            logger.info(f"⏳ Need {self.min_samples_for_training - len(self.feedback_buffer)} more samples to train")
             return None
 
         result = self.reward_model.train(self.feedback_buffer)
@@ -513,7 +672,7 @@ class RLHFModule:
         prompt: str,
         response_a: str,
         response_b: str,
-    ) -> Tuple[int, float]:
+    ) -> tuple[int, float]:
         """
         Predict which response is preferred
 
@@ -538,7 +697,7 @@ class RLHFModule:
         prompt: str,
         response_a: str,
         response_b: str,
-    ) -> Tuple[int, float, str]:
+    ) -> tuple[int, float, str]:
         """Simple heuristic-based evaluation"""
         # Length preference (moderate length is better)
         ideal_length = len(prompt) * 3
@@ -594,7 +753,7 @@ class RLHFModule:
 
         for file_path in self.persist_path.glob("*.json"):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
                     sample = FeedbackSample.from_dict(data)
                     self.feedback_buffer.append(sample)
@@ -603,7 +762,7 @@ class RLHFModule:
 
         logger.info(f"📂 Loaded {len(self.feedback_buffer)} feedback samples")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get module statistics"""
         return {
             **self.stats,
@@ -614,9 +773,9 @@ class RLHFModule:
 
 
 __all__ = [
-    "RLHFModule",
     "FeedbackSample",
     "PreferenceType",
     "QualityScore",
+    "RLHFModule",
     "RewardModel",
 ]

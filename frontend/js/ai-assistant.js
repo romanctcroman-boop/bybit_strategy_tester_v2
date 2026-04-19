@@ -20,6 +20,7 @@ class AIAnalysisResult {
         this.metrics = data.metrics || {};
         this.ai_analysis = data.ai_analysis || {};
         this.metadata = data.metadata || {};
+        this.latency_ms = data.latency_ms || 0;
     }
 
     get summary() { return this.ai_analysis.summary || ''; }
@@ -61,8 +62,8 @@ class AIAssistant {
                 <button class="ai-panel-close" id="aiPanelClose">×</button>
             </div>
             <div class="ai-panel-status">
-                <span class="ai-status-dot online"></span>
-                <span id="aiStatusText">DeepSeek + Perplexity Online</span>
+                <span class="ai-status-dot" id="aiSystemDot"></span>
+                <span id="aiStatusText">Проверка системы...</span>
             </div>
             <div class="ai-panel-messages" id="aiMessages">
                 <div class="ai-message assistant">
@@ -133,6 +134,30 @@ class AIAssistant {
         this.panel.classList.add('open');
         this.isOpen = true;
         document.getElementById('aiInput').focus();
+        this.checkSystemHealth();
+    }
+
+    async checkSystemHealth() {
+        const dot = document.getElementById('aiSystemDot');
+        const text = document.getElementById('aiStatusText');
+        try {
+            const res = await fetch(`${AI_API_BASE}/system/overview`);
+            if (res.ok) {
+                const data = await res.json();
+                const status = data.status || 'unknown';
+                dot.className = 'ai-status-dot ' + (status === 'operational' ? 'online' : 'warning');
+                const memCount = data.components?.memory?.total_memories ?? '?';
+                text.textContent = status === 'operational'
+                    ? `AI Online · Памяти: ${memCount}`
+                    : `AI Деградация · Статус: ${status}`;
+            } else {
+                dot.className = 'ai-status-dot offline';
+                text.textContent = 'AI Offline';
+            }
+        } catch {
+            dot.className = 'ai-status-dot offline';
+            text.textContent = 'AI Недоступен';
+        }
     }
 
     close() {
@@ -154,6 +179,7 @@ class AIAssistant {
         this.isLoading = true;
         const loadingId = this.addMessage('assistant', '🤔 Анализирую...', true);
 
+        const t0 = Date.now();
         try {
             const response = await fetch(`${AI_API_BASE}/deliberate`, {
                 method: 'POST',
@@ -167,6 +193,7 @@ class AIAssistant {
                 })
             });
 
+            const latency = Date.now() - t0;
             const data = await response.json();
 
             // Remove loading message
@@ -175,7 +202,7 @@ class AIAssistant {
             if (response.ok) {
                 const answer = data.decision || 'Не удалось получить ответ';
                 const confidence = (data.confidence * 100).toFixed(0);
-                this.addMessage('assistant', `${answer}\n\n📊 Уверенность: ${confidence}%`);
+                this.addMessage('assistant', `${answer}\n\n📊 Уверенность: ${confidence}% · ⚡ ${latency}мс`);
             } else {
                 this.addMessage('assistant', `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`);
             }
@@ -228,18 +255,33 @@ class AIBacktestAnalyzer {
                 net_pnl: metrics.net_pnl || metrics.netPnl || 0,
                 total_return_pct: metrics.total_return_pct || metrics.totalReturnPct || 0,
                 sharpe_ratio: metrics.sharpe_ratio || metrics.sharpeRatio || 0,
+                sortino_ratio: metrics.sortino_ratio || metrics.sortinoRatio || 0,
                 max_drawdown_pct: metrics.max_drawdown_pct || metrics.maxDrawdownPct || 0,
                 win_rate: metrics.win_rate || metrics.winRate || 0,
                 profit_factor: metrics.profit_factor || metrics.profitFactor || 1,
-                total_trades: metrics.total_trades || metrics.totalTrades || 0
+                total_trades: metrics.total_trades || metrics.totalTrades || 0,
+                calmar_ratio: metrics.calmar_ratio || metrics.calmarRatio || 0,
+                avg_win: metrics.avg_win || metrics.avgWin || 0,
+                avg_loss: metrics.avg_loss || metrics.avgLoss || 0,
+                max_consecutive_wins: metrics.max_consecutive_wins || metrics.maxConsecutiveWins || 0,
+                max_consecutive_losses: metrics.max_consecutive_losses || metrics.maxConsecutiveLosses || 0,
+                recovery_factor: metrics.recovery_factor || metrics.recoveryFactor || 0,
+                payoff_ratio: metrics.payoff_ratio || metrics.payoffRatio || 0,
+                avg_trade_duration: metrics.avg_trade_duration || metrics.avgTradeDuration || 'N/A',
+                best_trade: metrics.best_trade || metrics.bestTrade || 0,
+                worst_trade: metrics.worst_trade || metrics.worstTrade || 0,
+                avg_trade_pnl: metrics.avg_trade_pnl || metrics.avgTradePnl || 0,
+                winning_trades: metrics.winning_trades || metrics.winningTrades || 0,
+                losing_trades: metrics.losing_trades || metrics.losingTrades || 0
             },
             strategy_name: config.strategyName || config.strategy_name || 'Unknown',
             symbol: config.symbol || 'BTCUSDT',
             timeframe: config.timeframe || config.interval || '1h',
             period: config.period || 'Unknown',
-            agents: ['deepseek']
+            agents: ['deepseek', 'qwen', 'perplexity']
         };
 
+        const t0 = Date.now();
         try {
             const response = await fetch(`${AI_API_BASE}/analyze-backtest`, {
                 method: 'POST',
@@ -252,6 +294,7 @@ class AIBacktestAnalyzer {
             }
 
             const data = await response.json();
+            data.latency_ms = Date.now() - t0;
             this.currentAnalysis = new AIAnalysisResult(data);
             return this.currentAnalysis;
         } catch (error) {
@@ -307,6 +350,10 @@ class AIBacktestAnalyzer {
             'high': 'danger'
         }[result.overfittingRisk] || 'info';
 
+        const strengths = result.ai_analysis.strengths || [];
+        const weaknesses = result.ai_analysis.weaknesses || [];
+        const grade = result.ai_analysis.grade || '';
+
         const modal = document.createElement('div');
         modal.id = 'aiAnalysisModal';
         modal.className = 'ai-modal';
@@ -327,14 +374,31 @@ class AIBacktestAnalyzer {
                         <p>${result.riskAssessment || 'No risk assessment available'}</p>
                     </div>
 
+                    ${strengths.length > 0 ? `
+                    <div class="ai-section">
+                        <h3>✅ Strengths</h3>
+                        <ul>${strengths.map(s => '<li>' + s + '</li>').join('')}</ul>
+                    </div>` : ''}
+
+                    ${weaknesses.length > 0 ? `
+                    <div class="ai-section">
+                        <h3>❌ Weaknesses</h3>
+                        <ul>${weaknesses.map(w => '<li>' + w + '</li>').join('')}</ul>
+                    </div>` : ''}
+
                     <div class="ai-section">
                         <h3>💡 Recommendations</h3>
                         <ul>
-                            ${result.recommendations.map(r => `<li>${r}</li>`).join('') || '<li>No recommendations</li>'}
+                            ${result.recommendations.map(r => '<li>' + r + '</li>').join('') || '<li>No recommendations</li>'}
                         </ul>
                     </div>
 
                     <div class="ai-metrics-grid">
+                        ${grade ? `
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Grade</span>
+                            <span class="ai-metric-value badge bg-primary">${grade}</span>
+                        </div>` : ''}
                         <div class="ai-metric">
                             <span class="ai-metric-label">Overfitting Risk</span>
                             <span class="ai-metric-value badge ${overfitClass}">${result.overfittingRisk}</span>
@@ -347,6 +411,11 @@ class AIBacktestAnalyzer {
                             <span class="ai-metric-label">AI Confidence</span>
                             <span class="ai-metric-value">${(result.confidence * 100).toFixed(0)}%</span>
                         </div>
+                        ${result.latency_ms > 0 ? `
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Время анализа</span>
+                            <span class="ai-metric-value">⚡ ${result.latency_ms}мс</span>
+                        </div>` : ''}
                     </div>
                 </div>
             </div>

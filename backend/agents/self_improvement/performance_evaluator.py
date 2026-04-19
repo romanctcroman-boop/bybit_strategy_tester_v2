@@ -19,11 +19,12 @@ from __future__ import annotations
 import json
 import statistics
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -79,7 +80,7 @@ class PerformanceMetrics:
 
         return score * 100
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return {
             "accuracy": self.accuracy,
             "helpfulness": self.helpfulness,
@@ -104,9 +105,9 @@ class EvaluationResult:
     metrics: PerformanceMetrics
     prompt: str
     response: str
-    expected: Optional[str] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    expected: str | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -117,10 +118,10 @@ class BenchmarkResult:
     total_tests: int
     passed: int
     failed: int
-    scores: Dict[str, float]
+    scores: dict[str, float]
     duration_seconds: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    details: List[Dict[str, Any]] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    details: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def pass_rate(self) -> float:
@@ -136,8 +137,8 @@ class RegressionAlert:
     baseline_value: float
     change_percent: float
     severity: str  # "low", "medium", "high"
-    detected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    context: Dict[str, Any] = field(default_factory=dict)
+    detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class PerformanceEvaluator:
@@ -155,7 +156,7 @@ class PerformanceEvaluator:
 
         # Evaluate single response
         metrics = await evaluator.evaluate_response(
-            agent_type="deepseek",
+            agent_type="claude",
             prompt="Explain RSI",
             response=agent_response,
             latency_ms=1500
@@ -169,7 +170,7 @@ class PerformanceEvaluator:
     """
 
     # Benchmark test cases
-    BENCHMARK_TESTS = {
+    BENCHMARK_TESTS: dict[str, list[dict[str, Any]]] = {
         "code_generation": [
             {
                 "prompt": "Write a Python function to calculate RSI",
@@ -231,7 +232,7 @@ class PerformanceEvaluator:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
+        persist_path: str | None = None,
         baseline_window_days: int = 7,
     ):
         """
@@ -244,12 +245,12 @@ class PerformanceEvaluator:
         self.persist_path = Path(persist_path) if persist_path else None
         self.baseline_window = timedelta(days=baseline_window_days)
 
-        self.evaluation_history: List[EvaluationResult] = []
-        self.benchmark_history: List[BenchmarkResult] = []
-        self.regression_alerts: List[RegressionAlert] = []
+        self.evaluation_history: list[EvaluationResult] = []
+        self.benchmark_history: list[BenchmarkResult] = []
+        self.regression_alerts: list[RegressionAlert] = []
 
         # Current baseline metrics
-        self.baseline_metrics: Dict[str, float] = {}
+        self.baseline_metrics: dict[str, float] = {}
 
         # Statistics
         self.stats = {
@@ -272,7 +273,7 @@ class PerformanceEvaluator:
         response: str,
         latency_ms: float = 0.0,
         task_type: str = "general",
-        expected: Optional[str] = None,
+        expected: str | None = None,
         tokens_used: int = 0,
         is_error: bool = False,
     ) -> PerformanceMetrics:
@@ -280,7 +281,7 @@ class PerformanceEvaluator:
         Evaluate a single agent response
 
         Args:
-            agent_type: Type of agent (deepseek, perplexity, etc.)
+            agent_type: Type of agent (claude, perplexity, etc.)
             prompt: Original prompt
             response: Agent response
             latency_ms: Response latency in milliseconds
@@ -316,9 +317,7 @@ class PerformanceEvaluator:
 
         # Efficiency (quality per token)
         if tokens_used > 0:
-            quality_score = (
-                metrics.accuracy + metrics.helpfulness + metrics.safety
-            ) / 3
+            quality_score = (metrics.accuracy + metrics.helpfulness + metrics.safety) / 3
             metrics.efficiency = quality_score / (tokens_used / 1000)  # per 1k tokens
 
         # Store evaluation
@@ -352,7 +351,7 @@ class PerformanceEvaluator:
 
     async def run_benchmark_suite(
         self,
-        agent_fn: Optional[Callable[[str], str]] = None,
+        agent_fn: Callable[[str], Awaitable[str]] | None = None,
         suite_name: str = "full",
     ) -> BenchmarkResult:
         """
@@ -370,15 +369,12 @@ class PerformanceEvaluator:
                 for test in category_tests:
                     tests.append({"category": category, **test})
         else:
-            tests = [
-                {"category": suite_name, **t}
-                for t in self.BENCHMARK_TESTS.get(suite_name, [])
-            ]
+            tests = [{"category": suite_name, **t} for t in self.BENCHMARK_TESTS.get(suite_name, [])]
 
         passed = 0
         failed = 0
-        scores: Dict[str, List[float]] = {}
-        details: List[Dict[str, Any]] = []
+        scores: dict[str, list[float]] = {}
+        details: list[dict[str, Any]] = []
 
         for test in tests:
             category = test["category"]
@@ -402,10 +398,9 @@ class PerformanceEvaluator:
                 test_score = found / len(keywords)
                 test_passed = test_score >= 0.6
 
-            if "min_length" in test:
-                if len(response) < test["min_length"]:
-                    test_passed = False
-                    test_score *= 0.5
+            if "min_length" in test and len(response) < test["min_length"]:
+                test_passed = False
+                test_score *= 0.5
 
             if "expected_behavior" in test and test["expected_behavior"] == "refuse":
                 forbidden = test.get("forbidden_patterns", [])
@@ -438,7 +433,7 @@ class PerformanceEvaluator:
         duration = time.time() - start_time
 
         # Average scores by category
-        avg_scores = {cat: statistics.mean(vals) for cat, vals in scores.items()}
+        avg_scores = {cat: statistics.mean(vals) for cat, vals in scores.items() if vals}
 
         result = BenchmarkResult(
             suite_name=suite_name,
@@ -453,13 +448,11 @@ class PerformanceEvaluator:
         self.benchmark_history.append(result)
         self.stats["total_benchmarks"] += 1
 
-        logger.info(
-            f"🎯 Benchmark complete: {passed}/{len(tests)} passed, scores={avg_scores}"
-        )
+        logger.info(f"🎯 Benchmark complete: {passed}/{len(tests)} passed, scores={avg_scores}")
 
         return result
 
-    def detect_regressions(self) -> List[RegressionAlert]:
+    def detect_regressions(self) -> list[RegressionAlert]:
         """
         Detect performance regressions compared to baseline
 
@@ -492,13 +485,7 @@ class PerformanceEvaluator:
                 is_regression = change > threshold
 
             if is_regression:
-                severity = (
-                    "high"
-                    if change > threshold * 2
-                    else "medium"
-                    if change > threshold * 1.5
-                    else "low"
-                )
+                severity = "high" if change > threshold * 2 else "medium" if change > threshold * 1.5 else "low"
 
                 alert = RegressionAlert(
                     metric=metric,
@@ -524,7 +511,7 @@ class PerformanceEvaluator:
 
         return alerts
 
-    async def generate_improvement_plan(self) -> Dict[str, Any]:
+    async def generate_improvement_plan(self) -> dict[str, Any]:
         """
         Generate improvement plan based on performance analysis
 
@@ -533,8 +520,8 @@ class PerformanceEvaluator:
         """
         current = self._calculate_current_metrics()
 
-        plan = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+        plan: dict[str, Any] = {
+            "generated_at": datetime.now(UTC).isoformat(),
             "current_overall_score": sum(current.values()) / max(len(current), 1) * 100,
             "weakest_areas": [],
             "recommendations": [],
@@ -591,11 +578,9 @@ class PerformanceEvaluator:
             )
 
         # Priority actions
-        plan["priority_actions"] = [
-            rec
-            for rec in plan["recommendations"]
-            if rec["priority"] in ["critical", "high"]
-        ][:3]
+        plan["priority_actions"] = [rec for rec in plan["recommendations"] if rec["priority"] in ["critical", "high"]][
+            :3
+        ]
 
         return plan
 
@@ -604,7 +589,7 @@ class PerformanceEvaluator:
         metric: str,
         window_days: int = 7,
         granularity: str = "day",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get metric trends over time
 
@@ -613,7 +598,7 @@ class PerformanceEvaluator:
             window_days: Number of days to analyze
             granularity: "day" or "hour"
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+        cutoff = datetime.now(UTC) - timedelta(days=window_days)
 
         relevant = [e for e in self.evaluation_history if e.timestamp >= cutoff]
 
@@ -621,7 +606,7 @@ class PerformanceEvaluator:
             return []
 
         # Group by time bucket
-        buckets: Dict[str, List[float]] = {}
+        buckets: dict[str, list[float]] = {}
 
         for evaluation in relevant:
             if granularity == "day":
@@ -692,8 +677,8 @@ class PerformanceEvaluator:
         score = 0.5
 
         # Response addresses the prompt
-        prompt_keywords = set(w.lower() for w in prompt.split() if len(w) > 3)
-        response_keywords = set(w.lower() for w in response.split() if len(w) > 3)
+        prompt_keywords = {w.lower() for w in prompt.split() if len(w) > 3}
+        response_keywords = {w.lower() for w in response.split() if len(w) > 3}
 
         if prompt_keywords:
             relevance = len(prompt_keywords & response_keywords) / len(prompt_keywords)
@@ -705,9 +690,10 @@ class PerformanceEvaluator:
             score += 0.1
 
         # Contains actionable content for code requests
-        if any(w in prompt.lower() for w in ["code", "function", "write", "create"]):
-            if "def " in response or "function" in response or "```" in response:
-                score += 0.1
+        if any(w in prompt.lower() for w in ["code", "function", "write", "create"]) and (
+            "def " in response or "function" in response or "```" in response
+        ):
+            score += 0.1
 
         return min(1.0, score)
 
@@ -740,7 +726,7 @@ class PerformanceEvaluator:
 
     def _calculate_baseline(self) -> None:
         """Calculate baseline metrics from historical data"""
-        cutoff = datetime.now(timezone.utc) - self.baseline_window
+        cutoff = datetime.now(UTC) - self.baseline_window
 
         relevant = [e for e in self.evaluation_history if e.timestamp >= cutoff]
 
@@ -748,7 +734,7 @@ class PerformanceEvaluator:
             return
 
         # Calculate averages
-        metrics_sums: Dict[str, List[float]] = {
+        metrics_sums: dict[str, list[float]] = {
             "accuracy": [],
             "helpfulness": [],
             "safety": [],
@@ -764,20 +750,16 @@ class PerformanceEvaluator:
             metrics_sums["latency_ms"].append(metrics.latency_ms)
             metrics_sums["error_rate"].append(metrics.error_rate)
 
-        self.baseline_metrics = {
-            key: statistics.mean(values)
-            for key, values in metrics_sums.items()
-            if values
-        }
+        self.baseline_metrics = {key: statistics.mean(values) for key, values in metrics_sums.items() if values}
 
-    def _calculate_current_metrics(self, n_recent: int = 50) -> Dict[str, float]:
+    def _calculate_current_metrics(self, n_recent: int = 50) -> dict[str, float]:
         """Calculate current metrics from recent evaluations"""
         recent = self.evaluation_history[-n_recent:] if self.evaluation_history else []
 
         if not recent:
             return {}
 
-        metrics_sums: Dict[str, List[float]] = {
+        metrics_sums: dict[str, list[float]] = {
             "accuracy": [],
             "helpfulness": [],
             "safety": [],
@@ -793,11 +775,7 @@ class PerformanceEvaluator:
             metrics_sums["latency_ms"].append(metrics.latency_ms)
             metrics_sums["error_rate"].append(metrics.error_rate)
 
-        return {
-            key: statistics.mean(values)
-            for key, values in metrics_sums.items()
-            if values
-        }
+        return {key: statistics.mean(values) for key, values in metrics_sums.items() if values}
 
     def _check_regression(self, metrics: PerformanceMetrics) -> None:
         """Quick check for significant regression in single evaluation"""
@@ -841,22 +819,20 @@ class PerformanceEvaluator:
             count = len(list(eval_path.glob("*.json")))
             logger.info(f"📂 Found {count} persisted evaluations")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get evaluator statistics"""
         return {
             **self.stats,
             "baseline_metrics": self.baseline_metrics,
             "current_metrics": self._calculate_current_metrics(),
-            "active_alerts": len(
-                [a for a in self.regression_alerts if a.severity == "high"]
-            ),
+            "active_alerts": len([a for a in self.regression_alerts if a.severity == "high"]),
         }
 
 
 __all__ = [
+    "BenchmarkResult",
+    "EvaluationResult",
     "PerformanceEvaluator",
     "PerformanceMetrics",
-    "EvaluationResult",
-    "BenchmarkResult",
     "RegressionAlert",
 ]

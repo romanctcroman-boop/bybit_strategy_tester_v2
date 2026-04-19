@@ -1,12 +1,40 @@
 """
 🚀 Universal Optimizer - Unified API for GPU and CPU optimization
 
-Provides a single interface for strategy optimization, automatically
-selecting the best available backend:
+⚠️ DEPRECATED: This module is deprecated for new development.
+
+This optimizer is RSI-only and doesn't support:
+- Pyramiding
+- ATR-based SL/TP
+- Multi-level TP
+- Trailing stop
+- Custom strategies
+
+For new projects, use NumbaEngineV2 directly with parameter grid:
+
+    from backend.backtesting.engine_selector import get_engine
+    from backend.backtesting.interfaces import BacktestInput
+    import itertools
+
+    engine = get_engine("numba")  # NumbaEngineV2 with full V4 support
+
+    param_grid = itertools.product(
+        rsi_periods, stop_losses, take_profits, ...
+    )
+
+    results = []
+    for params in param_grid:
+        input_data = BacktestInput(...params...)
+        output = engine.run(input_data)
+        results.append(output.metrics)
+
+    best = max(results, key=lambda x: x["sharpe_ratio"])
+
+For RSI-only optimization (legacy), this module still works:
 - GPU (CuPy + CUDA): ~200K combinations/sec - for large grids (>10K combinations)
 - CPU (Numba JIT): ~1K combinations/sec - fallback when GPU unavailable
 
-Usage:
+Usage (deprecated):
     from backend.backtesting.optimizer import UniversalOptimizer, optimize
 
     # Auto-select best backend
@@ -19,7 +47,7 @@ Usage:
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal
+from typing import Any, Literal
 
 import pandas as pd
 from loguru import logger
@@ -65,22 +93,22 @@ class OptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]  # Unified name (was best_results/top_results)
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]  # Unified name (was best_results/top_results)
+    performance_stats: dict[str, Any]
     backend_used: str  # "gpu" or "cpu"
     combinations_per_second: float = 0.0
 
     # Aliases for backwards compatibility
     @property
-    def best_results(self) -> List[Dict[str, Any]]:
+    def best_results(self) -> list[dict[str, Any]]:
         """Alias for top_results (FastOptimizer compatibility)"""
         return self.top_results
 
     @property
-    def results(self) -> List[Dict[str, Any]]:
+    def results(self) -> list[dict[str, Any]]:
         """Alias for top_results"""
         return self.top_results
 
@@ -101,6 +129,15 @@ class UniversalOptimizer:
     """
 
     def __init__(self, backend: Literal["auto", "gpu", "cpu"] = "auto"):
+        import warnings
+
+        warnings.warn(
+            "UniversalOptimizer is deprecated (RSI-only). "
+            "Use NumbaEngineV2 with BacktestInput for full V4 support "
+            "(pyramiding, ATR, multi-TP, trailing).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.backend = backend
         self._gpu_optimizer = None
         self._cpu_optimizer = None
@@ -112,18 +149,12 @@ class UniversalOptimizer:
                 logger.info("🚀 UniversalOptimizer: Using GPU backend (auto-detected)")
             elif _NUMBA_OPTIMIZER_AVAILABLE:
                 self._use_gpu = False
-                logger.info(
-                    "⚡ UniversalOptimizer: Using CPU/Numba backend (GPU not available)"
-                )
+                logger.info("⚡ UniversalOptimizer: Using CPU/Numba backend (GPU not available)")
             else:
-                raise RuntimeError(
-                    "No optimizer backend available! Install CuPy or Numba."
-                )
+                raise RuntimeError("No optimizer backend available! Install CuPy or Numba.")
         elif backend == "gpu":
             if not _GPU_OPTIMIZER_AVAILABLE or not GPU_AVAILABLE:
-                raise RuntimeError(
-                    "GPU backend requested but not available. Check CUDA/CuPy installation."
-                )
+                raise RuntimeError("GPU backend requested but not available. Check CUDA/CuPy installation.")
             self._use_gpu = True
             logger.info("🚀 UniversalOptimizer: Using GPU backend (forced)")
         elif backend == "cpu":
@@ -132,9 +163,7 @@ class UniversalOptimizer:
             self._use_gpu = False
             logger.info("⚡ UniversalOptimizer: Using CPU/Numba backend (forced)")
         else:
-            raise ValueError(
-                f"Invalid backend: {backend}. Use 'auto', 'gpu', or 'cpu'."
-            )
+            raise ValueError(f"Invalid backend: {backend}. Use 'auto', 'gpu', or 'cpu'.")
 
     def _get_gpu_optimizer(self) -> "GPUGridOptimizer":
         """Lazy-load GPU optimizer"""
@@ -151,14 +180,14 @@ class UniversalOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 10,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         slippage: float = 0.0005,
         optimize_metric: str = "sharpe_ratio",
         direction: str = "both",
@@ -264,11 +293,11 @@ class UniversalOptimizer:
 
 def optimize(
     candles: pd.DataFrame,
-    rsi_period_range: List[int],
-    rsi_overbought_range: List[int],
-    rsi_oversold_range: List[int],
-    stop_loss_range: List[float],
-    take_profit_range: List[float],
+    rsi_period_range: list[int],
+    rsi_overbought_range: list[int],
+    rsi_oversold_range: list[int],
+    stop_loss_range: list[float],
+    take_profit_range: list[float],
     backend: Literal["auto", "gpu", "cpu"] = "auto",
     **kwargs,
 ) -> OptimizationResult:
@@ -303,7 +332,7 @@ def optimize(
 
 
 # Module-level info
-def get_available_backends() -> Dict[str, bool]:
+def get_available_backends() -> dict[str, bool]:
     """Return which backends are available"""
     return {
         "gpu": _GPU_OPTIMIZER_AVAILABLE and GPU_AVAILABLE,

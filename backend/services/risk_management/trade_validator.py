@@ -6,10 +6,11 @@ Pre-trade checks for position sizing, exposure, and strategy constraints.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,8 @@ class ValidationConfig:
     max_positions_per_symbol: int = 1
 
     # Symbol restrictions
-    blocked_symbols: List[str] = None
-    allowed_symbols: List[str] = None  # If set, only these symbols allowed
+    blocked_symbols: list[str] = None
+    allowed_symbols: list[str] = None  # If set, only these symbols allowed
 
     def __post_init__(self):
         if self.blocked_symbols is None:
@@ -95,15 +96,15 @@ class TradeRequest:
     side: str  # "buy" or "sell"
     order_type: str  # "market", "limit", "stop_market", "stop_limit"
     quantity: float
-    price: Optional[float] = None  # Required for limit orders
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    price: float | None = None  # Required for limit orders
+    stop_loss: float | None = None
+    take_profit: float | None = None
     leverage: float = 1.0
-    strategy_id: Optional[str] = None
+    strategy_id: str | None = None
     reduce_only: bool = False
     time_in_force: str = "GTC"
-    client_order_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    client_order_id: str | None = None
+    metadata: dict[str, Any] | None = None
 
     @property
     def is_limit(self) -> bool:
@@ -124,10 +125,10 @@ class ValidationReport:
     request: TradeRequest
     result: ValidationResult
     approved: bool
-    rejection_reasons: List[RejectionReason]
-    warnings: List[str]
-    modifications: Dict[str, Any]  # Suggested modifications
-    details: Dict[str, Any]
+    rejection_reasons: list[RejectionReason]
+    warnings: list[str]
+    modifications: dict[str, Any]  # Suggested modifications
+    details: dict[str, Any]
     validated_at: datetime
     validation_time_ms: float
 
@@ -135,8 +136,8 @@ class ValidationReport:
     def approve(
         cls,
         request: TradeRequest,
-        warnings: List[str] = None,
-        details: Dict[str, Any] = None,
+        warnings: list[str] | None = None,
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create approved validation report."""
@@ -156,8 +157,8 @@ class ValidationReport:
     def reject(
         cls,
         request: TradeRequest,
-        reasons: List[RejectionReason],
-        details: Dict[str, Any] = None,
+        reasons: list[RejectionReason],
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create rejected validation report."""
@@ -177,9 +178,9 @@ class ValidationReport:
     def modify(
         cls,
         request: TradeRequest,
-        modifications: Dict[str, Any],
-        warnings: List[str] = None,
-        details: Dict[str, Any] = None,
+        modifications: dict[str, Any],
+        warnings: list[str] | None = None,
+        details: dict[str, Any] | None = None,
         validation_time_ms: float = 0,
     ) -> "ValidationReport":
         """Create modified validation report with suggested changes."""
@@ -206,10 +207,10 @@ class AccountState:
     total_pnl: float
     daily_pnl: float
     open_positions_count: int
-    positions_by_symbol: Dict[str, int]  # symbol -> position count
+    positions_by_symbol: dict[str, int]  # symbol -> position count
     trades_today: int
     trades_this_hour: int
-    last_trade_time: Optional[datetime]
+    last_trade_time: datetime | None
     is_trading_paused: bool = False
     current_drawdown_pct: float = 0.0
 
@@ -227,22 +228,16 @@ class TradeValidator:
     - Risk/reward validation
     """
 
-    def __init__(self, config: Optional[ValidationConfig] = None):
+    def __init__(self, config: ValidationConfig | None = None):
         """Initialize TradeValidator."""
         self.config = config or ValidationConfig()
-        self._custom_validators: List[
-            Callable[[TradeRequest, AccountState], Optional[RejectionReason]]
-        ] = []
-        self._price_cache: Dict[str, float] = {}
-        self._last_price_update: Dict[str, datetime] = {}
+        self._custom_validators: list[Callable[[TradeRequest, AccountState], RejectionReason | None]] = []
+        self._price_cache: dict[str, float] = {}
+        self._last_price_update: dict[str, datetime] = {}
 
         # Callbacks
-        self.on_rejection: Optional[
-            Callable[[TradeRequest, List[RejectionReason]], None]
-        ] = None
-        self.on_approval: Optional[Callable[[TradeRequest, ValidationReport], None]] = (
-            None
-        )
+        self.on_rejection: Callable[[TradeRequest, list[RejectionReason]], None] | None = None
+        self.on_approval: Callable[[TradeRequest, ValidationReport], None] | None = None
 
         logger.info("TradeValidator initialized")
 
@@ -251,28 +246,26 @@ class TradeValidator:
         self._price_cache[symbol] = price
         self._last_price_update[symbol] = datetime.now()
 
-    def update_prices(self, prices: Dict[str, float]):
+    def update_prices(self, prices: dict[str, float]):
         """Batch update prices."""
         now = datetime.now()
         for symbol, price in prices.items():
             self._price_cache[symbol] = price
             self._last_price_update[symbol] = now
 
-    def get_price(self, symbol: str) -> Optional[float]:
+    def get_price(self, symbol: str) -> float | None:
         """Get cached price for a symbol."""
         return self._price_cache.get(symbol)
 
     def add_custom_validator(
         self,
-        validator: Callable[[TradeRequest, AccountState], Optional[RejectionReason]],
+        validator: Callable[[TradeRequest, AccountState], RejectionReason | None],
     ):
         """Add a custom validation function."""
         self._custom_validators.append(validator)
         logger.info(f"Added custom validator: {validator.__name__}")
 
-    def validate(
-        self, request: TradeRequest, account_state: AccountState
-    ) -> ValidationReport:
+    def validate(self, request: TradeRequest, account_state: AccountState) -> ValidationReport:
         """
         Validate a trade request against all rules.
 
@@ -287,9 +280,9 @@ class TradeValidator:
 
         start_time = time.time()
 
-        rejection_reasons: List[RejectionReason] = []
-        warnings: List[str] = []
-        details: Dict[str, Any] = {}
+        rejection_reasons: list[RejectionReason] = []
+        warnings: list[str] = []
+        details: dict[str, Any] = {}
 
         # Check trading status
         if account_state.is_trading_paused:
@@ -315,15 +308,11 @@ class TradeValidator:
         details["current_price"] = current_price
 
         # Balance checks
-        balance_errors = self._validate_balance(
-            notional_value, request.leverage, account_state
-        )
+        balance_errors = self._validate_balance(notional_value, request.leverage, account_state)
         rejection_reasons.extend(balance_errors)
 
         # Order size checks
-        size_errors = self._validate_order_size(
-            notional_value, account_state.total_equity
-        )
+        size_errors = self._validate_order_size(notional_value, account_state.total_equity)
         rejection_reasons.extend(size_errors)
 
         # Leverage check
@@ -360,7 +349,7 @@ class TradeValidator:
                     rejection_reasons.append(error)
             except Exception as e:
                 logger.error(f"Custom validator error: {e}")
-                warnings.append(f"Custom validation failed: {str(e)}")
+                warnings.append(f"Custom validation failed: {e!s}")
 
         validation_time_ms = (time.time() - start_time) * 1000
 
@@ -398,7 +387,7 @@ class TradeValidator:
 
         return report
 
-    def _validate_order_params(self, request: TradeRequest) -> List[RejectionReason]:
+    def _validate_order_params(self, request: TradeRequest) -> list[RejectionReason]:
         """Validate basic order parameters."""
         errors = []
 
@@ -419,7 +408,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_symbol(self, symbol: str) -> Optional[RejectionReason]:
+    def _validate_symbol(self, symbol: str) -> RejectionReason | None:
         """Validate symbol is allowed."""
         if symbol in self.config.blocked_symbols:
             return RejectionReason.SYMBOL_BLOCKED
@@ -431,7 +420,7 @@ class TradeValidator:
 
     def _validate_balance(
         self, notional_value: float, leverage: float, account_state: AccountState
-    ) -> List[RejectionReason]:
+    ) -> list[RejectionReason]:
         """Validate account balance is sufficient."""
         errors = []
 
@@ -453,9 +442,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_order_size(
-        self, notional_value: float, equity: float
-    ) -> List[RejectionReason]:
+    def _validate_order_size(self, notional_value: float, equity: float) -> list[RejectionReason]:
         """Validate order size limits."""
         errors = []
 
@@ -472,9 +459,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_position_limits(
-        self, request: TradeRequest, account_state: AccountState
-    ) -> List[RejectionReason]:
+    def _validate_position_limits(self, request: TradeRequest, account_state: AccountState) -> list[RejectionReason]:
         """Validate position count limits."""
         errors = []
 
@@ -490,7 +475,7 @@ class TradeValidator:
 
         return errors
 
-    def _validate_frequency(self, account_state: AccountState) -> List[RejectionReason]:
+    def _validate_frequency(self, account_state: AccountState) -> list[RejectionReason]:
         """Validate trading frequency limits."""
         errors = []
 
@@ -504,15 +489,21 @@ class TradeValidator:
 
         # Minimum interval between trades
         if account_state.last_trade_time:
-            elapsed = (datetime.now() - account_state.last_trade_time).total_seconds()
+            _last = account_state.last_trade_time
+            # Normalise: always compare in the same timezone domain
+            if getattr(_last, "tzinfo", None) is not None:
+                # last_trade_time is aware → use UTC-aware now for correct delta
+                _now = datetime.now(UTC)
+            else:
+                # last_trade_time is naive → use naive now
+                _now = datetime.now()
+            elapsed = (_now - _last).total_seconds()
             if elapsed < self.config.min_trade_interval_seconds:
                 errors.append(RejectionReason.COOLDOWN_ACTIVE)
 
         return errors
 
-    def _validate_risk_reward(
-        self, request: TradeRequest, current_price: float
-    ) -> Optional[RejectionReason]:
+    def _validate_risk_reward(self, request: TradeRequest, current_price: float) -> RejectionReason | None:
         """Validate risk/reward ratio if stop loss and take profit are set."""
         if not request.stop_loss or not request.take_profit:
             return None
@@ -537,19 +528,15 @@ class TradeValidator:
 
         return None
 
-    def quick_check(
-        self, symbol: str, side: str, quantity: float, account_state: AccountState
-    ) -> bool:
+    def quick_check(self, symbol: str, side: str, quantity: float, account_state: AccountState) -> bool:
         """Quick validation without full report."""
-        request = TradeRequest(
-            symbol=symbol, side=side, order_type="market", quantity=quantity
-        )
+        request = TradeRequest(symbol=symbol, side=side, order_type="market", quantity=quantity)
         report = self.validate(request, account_state)
         return report.approved
 
     def calculate_max_quantity(
         self, symbol: str, side: str, account_state: AccountState, leverage: float = 1.0
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Calculate maximum allowed quantity for a symbol.
 
@@ -573,9 +560,7 @@ class TradeValidator:
         max_notional_balance = usable_balance * leverage
 
         # Max from percentage limit
-        max_notional_pct = account_state.total_equity * (
-            self.config.max_order_size_pct / 100
-        )
+        max_notional_pct = account_state.total_equity * (self.config.max_order_size_pct / 100)
 
         # Max from absolute limit
         max_notional_abs = self.config.max_order_size_usd
@@ -588,7 +573,7 @@ class TradeValidator:
 
         return max(0, max_quantity)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get validator statistics."""
         return {
             "config": {
@@ -609,9 +594,7 @@ class TradeValidatorBuilder:
     def __init__(self):
         self._config = ValidationConfig()
 
-    def with_balance_limits(
-        self, min_balance: float = 100.0, min_free_pct: float = 10.0
-    ) -> "TradeValidatorBuilder":
+    def with_balance_limits(self, min_balance: float = 100.0, min_free_pct: float = 10.0) -> "TradeValidatorBuilder":
         """Set balance limits."""
         self._config.min_balance_usd = min_balance
         self._config.min_free_balance_pct = min_free_pct
@@ -626,9 +609,7 @@ class TradeValidatorBuilder:
         self._config.max_order_size_pct = max_pct
         return self
 
-    def with_leverage_limit(
-        self, max_leverage: float = 10.0
-    ) -> "TradeValidatorBuilder":
+    def with_leverage_limit(self, max_leverage: float = 10.0) -> "TradeValidatorBuilder":
         """Set maximum leverage."""
         self._config.max_leverage = max_leverage
         return self
@@ -645,20 +626,18 @@ class TradeValidatorBuilder:
         self._config.min_trade_interval_seconds = min_interval_seconds
         return self
 
-    def with_position_limits(
-        self, max_positions: int = 20, max_per_symbol: int = 1
-    ) -> "TradeValidatorBuilder":
+    def with_position_limits(self, max_positions: int = 20, max_per_symbol: int = 1) -> "TradeValidatorBuilder":
         """Set position limits."""
         self._config.max_open_positions = max_positions
         self._config.max_positions_per_symbol = max_per_symbol
         return self
 
-    def with_blocked_symbols(self, symbols: List[str]) -> "TradeValidatorBuilder":
+    def with_blocked_symbols(self, symbols: list[str]) -> "TradeValidatorBuilder":
         """Set blocked symbols."""
         self._config.blocked_symbols = symbols
         return self
 
-    def with_allowed_symbols(self, symbols: List[str]) -> "TradeValidatorBuilder":
+    def with_allowed_symbols(self, symbols: list[str]) -> "TradeValidatorBuilder":
         """Set allowed symbols (whitelist)."""
         self._config.allowed_symbols = symbols
         return self

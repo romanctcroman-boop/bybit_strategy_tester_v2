@@ -1,42 +1,32 @@
 """
 Advanced Consensus Mechanisms for Multi-Agent Systems
 
-This package provides sophisticated decision-making through agent collaboration:
-- Multi-Agent Deliberation: Structured debate and refinement
-- Specialized Domain Agents: Expert agents for specific tasks
-- Voting Strategies: Multiple consensus algorithms
-- Evidence Chain Building: Traceable reasoning
-
-Based on research:
-- "Multi-Agent Debate" (Du et al., 2023)
-- "Society of Mind" (Minsky, 1986)
-- "Swarm Intelligence" patterns
+This package provides consensus decision-making through agent collaboration.
+Note: the debate/deliberation system has been removed.
 """
 
-from backend.agents.consensus.deliberation import (
-    MultiAgentDeliberation,
-    AgentVote,
-    VotingStrategy,
-    DeliberationResult,
+from backend.agents.consensus.consensus_engine import (
+    AgentPerformance,
+    ConsensusEngine,
+    ConsensusMethod,
+    ConsensusResult,
 )
-from backend.agents.consensus.domain_agents import (
-    DomainAgent,
-    TradingStrategyAgent,
-    RiskManagementAgent,
-    CodeAuditAgent,
-    MarketResearchAgent,
-    DomainAgentRegistry,
+from backend.agents.consensus.risk_veto_guard import (
+    RiskVetoGuard,
+    VetoConfig,
+    VetoDecision,
+    VetoReason,
+    get_risk_veto_guard,
 )
 
 __all__ = [
-    "MultiAgentDeliberation",
-    "AgentVote",
-    "VotingStrategy",
-    "DeliberationResult",
-    "DomainAgent",
-    "TradingStrategyAgent",
-    "RiskManagementAgent",
-    "CodeAuditAgent",
-    "MarketResearchAgent",
-    "DomainAgentRegistry",
+    "AgentPerformance",
+    "ConsensusEngine",
+    "ConsensusMethod",
+    "ConsensusResult",
+    "RiskVetoGuard",
+    "VetoConfig",
+    "VetoDecision",
+    "VetoReason",
+    "get_risk_veto_guard",
 ]

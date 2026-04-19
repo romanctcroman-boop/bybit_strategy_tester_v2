@@ -4,20 +4,21 @@ Implements Bayesian hyperparameter optimization using Optuna (state-of-the-art)
 Based on world best practices 2024-2026
 """
 
-from typing import Dict, Any, Optional, Callable, List, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Optional
 
 # Optuna is optional dependency
 try:
     import optuna
-    from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
-    from optuna.pruners import MedianPruner, HyperbandPruner
+    from optuna.pruners import HyperbandPruner, MedianPruner
+    from optuna.samplers import CmaEsSampler, RandomSampler, TPESampler
 
     OPTUNA_AVAILABLE = True
 except ImportError:
     OPTUNA_AVAILABLE = False
-    optuna = None
+    optuna = None  # type: ignore[assignment]
 
 from loguru import logger
 
@@ -26,7 +27,7 @@ from loguru import logger
 class OptunaOptimizationResult:
     """Result container for Optuna optimization"""
 
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_value: float
     best_trial_number: int
     n_trials: int
@@ -34,16 +35,14 @@ class OptunaOptimizationResult:
     study_name: str
 
     # Detailed results
-    all_trials: List[Dict[str, Any]] = field(default_factory=list)
-    pareto_front: List[Dict[str, Any]] = field(
-        default_factory=list
-    )  # For multi-objective
+    all_trials: list[dict[str, Any]] = field(default_factory=list)
+    pareto_front: list[dict[str, Any]] = field(default_factory=list)  # For multi-objective
 
     # Convergence info
-    value_history: List[float] = field(default_factory=list)
-    best_value_history: List[float] = field(default_factory=list)
+    value_history: list[float] = field(default_factory=list)
+    best_value_history: list[float] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_value": round(self.best_value, 6),
@@ -89,9 +88,7 @@ class OptunaOptimizer:
             n_warmup_steps: Steps before pruning can occur
         """
         if not OPTUNA_AVAILABLE:
-            raise ImportError(
-                "Optuna is not installed. Install with: pip install optuna"
-            )
+            raise ImportError("Optuna is not installed. Install with: pip install optuna")
 
         self.sampler_type = sampler_type
         self.pruner_type = pruner_type
@@ -132,11 +129,11 @@ class OptunaOptimizer:
     def optimize_strategy(
         self,
         objective_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        timeout: Optional[float] = None,
-        study_name: Optional[str] = None,
+        timeout: float | None = None,
+        study_name: str | None = None,
         direction: str = "maximize",
         show_progress: bool = True,
     ) -> OptunaOptimizationResult:
@@ -200,8 +197,8 @@ class OptunaOptimizer:
 
         # Collect all trial info
         all_trials = []
-        value_history = []
-        best_value_history = []
+        value_history: list[float] = []
+        best_value_history: list[float] = []
         running_best = float("-inf") if direction == "maximize" else float("inf")
 
         for trial in study.trials:
@@ -210,28 +207,24 @@ class OptunaOptimizer:
                     "number": trial.number,
                     "params": trial.params,
                     "value": trial.value,
-                    "datetime": trial.datetime_complete.isoformat()
-                    if trial.datetime_complete
-                    else None,
+                    "datetime": trial.datetime_complete.isoformat() if trial.datetime_complete else None,
                 }
                 all_trials.append(trial_info)
-                value_history.append(trial.value)
+                trial_val: float = trial.value if trial.value is not None else 0.0
+                value_history.append(trial_val)
 
-                if direction == "maximize":
-                    running_best = max(running_best, trial.value)
-                else:
-                    running_best = min(running_best, trial.value)
+                running_best = max(running_best, trial_val) if direction == "maximize" else min(running_best, trial_val)
                 best_value_history.append(running_best)
 
-        logger.info(
-            f"Optimization complete: {n_trials} trials in {optimization_time:.1f}s"
-        )
+        logger.info(f"Optimization complete: {n_trials} trials in {optimization_time:.1f}s")
         logger.info(f"Best value: {best_trial.value:.6f}")
         logger.info(f"Best params: {best_trial.params}")
 
+        best_value: float = best_trial.value if best_trial.value is not None else 0.0
+
         return OptunaOptimizationResult(
             best_params=best_trial.params,
-            best_value=best_trial.value,
+            best_value=best_value,
             best_trial_number=best_trial.number,
             n_trials=len(all_trials),
             optimization_time_seconds=optimization_time,
@@ -244,12 +237,12 @@ class OptunaOptimizer:
     def optimize_multi_objective(
         self,
         objective_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        directions: List[str] = ["maximize", "maximize"],
-        metric_names: List[str] = ["sharpe", "return"],
-        study_name: Optional[str] = None,
+        directions: list[str] | None = None,
+        metric_names: list[str] | None = None,
+        study_name: str | None = None,
     ) -> OptunaOptimizationResult:
         """
         Multi-objective optimization (e.g., maximize Sharpe AND minimize DrawDown).
@@ -266,27 +259,26 @@ class OptunaOptimizer:
         Returns:
             OptunaOptimizationResult with Pareto-optimal solutions
         """
+        if directions is None:
+            directions = ["maximize", "maximize"]
+        if metric_names is None:
+            metric_names = ["sharpe", "return"]
         start_time = datetime.now()
 
         if study_name is None:
             study_name = f"multi_obj_{start_time.strftime('%Y%m%d_%H%M%S')}"
 
         # Create multi-objective study
-        study = optuna.create_study(
-            study_name=study_name, directions=directions, sampler=self._create_sampler()
-        )
+        study = optuna.create_study(study_name=study_name, directions=directions, sampler=self._create_sampler())
 
-        def objective(trial: "optuna.Trial") -> Tuple:
+        def objective(trial: "optuna.Trial") -> tuple:
             params = self._sample_params(trial, param_space)
             try:
                 values = objective_fn(params)
                 return values
             except Exception as e:
                 logger.warning(f"Trial {trial.number} failed: {e}")
-                worst_values = tuple(
-                    float("-inf") if d == "maximize" else float("inf")
-                    for d in directions
-                )
+                worst_values = tuple(float("-inf") if d == "maximize" else float("inf") for d in directions)
                 return worst_values
 
         study.optimize(
@@ -308,7 +300,7 @@ class OptunaOptimizer:
             pareto_solution = {
                 "number": trial.number,
                 "params": trial.params,
-                "values": {name: val for name, val in zip(metric_names, trial.values)},
+                "values": dict(zip(metric_names, trial.values, strict=False)),
             }
             pareto_front.append(pareto_solution)
 
@@ -328,33 +320,36 @@ class OptunaOptimizer:
             pareto_front=pareto_front,
         )
 
-    def _sample_params(
-        self, trial: "optuna.Trial", param_space: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _sample_params(self, trial: "optuna.Trial", param_space: dict[str, Any]) -> dict[str, Any]:
         """Sample parameters from the search space"""
         params = {}
 
         for name, spec in param_space.items():
             param_type = spec.get("type", "float")
 
+            if param_type == "categorical":
+                params[name] = trial.suggest_categorical(name, spec["choices"])
+                continue
+
+            # Guard: skip specs where low >= high — Optuna would raise ValueError
+            low = spec.get("low", 0)
+            high = spec.get("high", 1)
+            if low >= high:
+                logger.warning(f"_sample_params: skipping param '{name}' — low={low} >= high={high}")
+                continue
+
             if param_type == "float":
                 params[name] = trial.suggest_float(
                     name,
-                    spec["low"],
-                    spec["high"],
+                    low,
+                    high,
                     step=spec.get("step"),
                     log=spec.get("log", False),
                 )
             elif param_type == "int":
-                params[name] = trial.suggest_int(
-                    name, spec["low"], spec["high"], step=spec.get("step", 1)
-                )
-            elif param_type == "categorical":
-                params[name] = trial.suggest_categorical(name, spec["choices"])
+                params[name] = trial.suggest_int(name, int(low), int(high), step=spec.get("step", 1))
             elif param_type == "loguniform":
-                params[name] = trial.suggest_float(
-                    name, spec["low"], spec["high"], log=True
-                )
+                params[name] = trial.suggest_float(name, low, high, log=True)
 
         return params
 
@@ -366,9 +361,7 @@ class TradingStrategyOptimizer:
     Combines Optuna with backtesting engine for easy strategy optimization.
     """
 
-    def __init__(
-        self, backtest_engine, metric: str = "sharpe_ratio", sampler_type: str = "tpe"
-    ):
+    def __init__(self, backtest_engine, metric: str = "sharpe_ratio", sampler_type: str = "tpe"):
         """
         Initialize trading strategy optimizer.
 
@@ -385,10 +378,10 @@ class TradingStrategyOptimizer:
         self,
         data,
         strategy_class,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        config_base: Optional[Dict] = None,
+        config_base: dict | None = None,
     ) -> OptunaOptimizationResult:
         """
         Optimize strategy parameters.
@@ -429,7 +422,7 @@ class TradingStrategyOptimizer:
 
 
 # Example usage factory function
-def create_rsi_param_space() -> Dict[str, Any]:
+def create_rsi_param_space() -> dict[str, Any]:
     """Create parameter space for RSI strategy optimization"""
     return {
         "period": {"type": "int", "low": 5, "high": 30, "step": 1},
@@ -438,15 +431,15 @@ def create_rsi_param_space() -> Dict[str, Any]:
     }
 
 
-def create_sltp_param_space() -> Dict[str, Any]:
+def create_sltp_param_space() -> dict[str, Any]:
     """Create parameter space for SL/TP optimization"""
     return {
-        "stop_loss": {"type": "float", "low": 0.01, "high": 0.10, "step": 0.005},
+        "stop_loss": {"type": "float", "low": 0.001, "high": 0.10, "step": 0.005},
         "take_profit": {"type": "float", "low": 0.02, "high": 0.20, "step": 0.01},
     }
 
 
-def create_full_strategy_param_space() -> Dict[str, Any]:
+def create_full_strategy_param_space() -> dict[str, Any]:
     """Full strategy parameter space"""
     return {
         # Strategy params
@@ -454,7 +447,7 @@ def create_full_strategy_param_space() -> Dict[str, Any]:
         "rsi_overbought": {"type": "int", "low": 65, "high": 85},
         "rsi_oversold": {"type": "int", "low": 15, "high": 35},
         # Risk params
-        "stop_loss": {"type": "float", "low": 0.01, "high": 0.10, "step": 0.005},
+        "stop_loss": {"type": "float", "low": 0.001, "high": 0.10, "step": 0.005},
         "take_profit": {"type": "float", "low": 0.02, "high": 0.20, "step": 0.01},
         # Position sizing
         "position_size": {"type": "float", "low": 0.1, "high": 1.0, "step": 0.1},

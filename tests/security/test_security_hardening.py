@@ -149,12 +149,11 @@ class TestInputValidation:
 
     def test_price_validation(self):
         """Price should only accept positive numbers."""
-        from typing import Optional
 
         from pydantic import BaseModel, Field
 
         class PriceInput(BaseModel):
-            price: Optional[float] = Field(None, gt=0)
+            price: float | None = Field(None, gt=0)
 
         # Valid
         valid = PriceInput(price=50000.0)
@@ -348,9 +347,7 @@ class TestRateLimiting:
 
                 # Remove old requests
                 self.requests[client_id] = [
-                    t
-                    for t in self.requests[client_id]
-                    if current_time - t < self.window_seconds
+                    t for t in self.requests[client_id] if current_time - t < self.window_seconds
                 ]
 
                 if len(self.requests[client_id]) >= self.max_requests:
@@ -384,9 +381,7 @@ class TestRateLimiting:
                     self.requests[client_id] = []
 
                 self.requests[client_id] = [
-                    t
-                    for t in self.requests[client_id]
-                    if current_time - t < self.window_seconds
+                    t for t in self.requests[client_id] if current_time - t < self.window_seconds
                 ]
 
                 if len(self.requests[client_id]) >= self.max_requests:
@@ -495,10 +490,7 @@ class TestSensitiveDataProtection:
         def sanitize_for_log(data: Any) -> Any:
             """Sanitize data for logging."""
             if isinstance(data, dict):
-                return {
-                    k: "***" if "password" in k.lower() else sanitize_for_log(v)
-                    for k, v in data.items()
-                }
+                return {k: "***" if "password" in k.lower() else sanitize_for_log(v) for k, v in data.items()}
             return data
 
         login_request = {
@@ -521,9 +513,7 @@ class TestSensitiveDataProtection:
             return str(error)
 
         # Simulated database error with sensitive info
-        db_error = Exception(
-            "Connection to postgres://admin:password@db:5432/app failed"
-        )
+        db_error = Exception("Connection to postgres://admin:password@db:5432/app failed")
 
         # In production, should not expose connection string
         safe_msg = safe_error_message(db_error, is_production=True)
@@ -599,9 +589,7 @@ class TestJSONSecurity:
                 current = current["nested"]
             return result
 
-        def validate_json_depth(
-            data: dict, max_depth: int = 10, current_depth: int = 0
-        ) -> bool:
+        def validate_json_depth(data: dict, max_depth: int = 10, current_depth: int = 0) -> bool:
             """Validate JSON depth doesn't exceed limit."""
             if current_depth > max_depth:
                 return False

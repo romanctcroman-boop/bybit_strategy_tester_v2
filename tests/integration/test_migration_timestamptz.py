@@ -1,7 +1,25 @@
-import psycopg2
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import psycopg2
+import pytest
 from testcontainers.postgres import PostgresContainer
+
+
+def _docker_available() -> bool:
+    """Return True if a Docker daemon is reachable."""
+    try:
+        import docker  # type: ignore[import-not-found]
+
+        docker.from_env().ping()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker daemon unavailable (skip testcontainers-based test)",
+)
 
 
 def get_column_type(conn, table_name, column_name):
@@ -50,7 +68,7 @@ def test_convert_timestamps_to_timestamptz():
         )
 
         # Insert a row with timezone-aware UTC datetime (avoid deprecated utcnow usage)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         cur.execute(
             "INSERT INTO backtests (started_at, updated_at, completed_at) VALUES (%s, %s, %s)",
             (now_utc, now_utc, now_utc),
@@ -61,9 +79,15 @@ def test_convert_timestamps_to_timestamptz():
         assert "timestamp without time zone" in t1
 
         # Apply migration SQL (like the Alembic template)
-        cur.execute("ALTER TABLE backtests ALTER COLUMN started_at TYPE timestamptz USING started_at AT TIME ZONE 'UTC';")
-        cur.execute("ALTER TABLE backtests ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'UTC';")
-        cur.execute("ALTER TABLE backtests ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'UTC';")
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN started_at TYPE timestamptz USING started_at AT TIME ZONE 'UTC';"
+        )
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'UTC';"
+        )
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'UTC';"
+        )
 
         # Verify the column type changed to timestamptz
         t2 = get_column_type(conn, "backtests", "started_at")

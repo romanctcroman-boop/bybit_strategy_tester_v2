@@ -8,12 +8,11 @@ Extracted from app.py lifespan for better modularity.
 import concurrent.futures
 import logging
 import time
-from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Core pairs for startup warmup
-DEFAULT_WARMUP_PAIRS: List[Tuple[str, str]] = [
+DEFAULT_WARMUP_PAIRS: list[tuple[str, str]] = [
     ("BTCUSDT", "15"),
     ("BTCUSDT", "60"),
     ("BTCUSDT", "D"),  # Daily for volatility/risk calculations
@@ -21,7 +20,7 @@ DEFAULT_WARMUP_PAIRS: List[Tuple[str, str]] = [
 
 
 def warmup_cache(
-    pairs: List[Tuple[str, str]] = None,
+    pairs: list[tuple[str, str]] | None = None,
     timeout_seconds: int = 10,
     limit: int = 500,
 ) -> bool:
@@ -74,9 +73,7 @@ def warmup_cache(
             try:
                 future.result(timeout=timeout_seconds)
             except concurrent.futures.TimeoutError:
-                logger.info(
-                    f"SmartKline cache warmup timed out ({timeout_seconds}s), continuing..."
-                )
+                logger.info(f"SmartKline cache warmup timed out ({timeout_seconds}s), continuing...")
 
         return True
 
@@ -85,4 +82,4 @@ def warmup_cache(
         return False
 
 
-__all__ = ["warmup_cache", "DEFAULT_WARMUP_PAIRS"]
+__all__ = ["DEFAULT_WARMUP_PAIRS", "warmup_cache"]

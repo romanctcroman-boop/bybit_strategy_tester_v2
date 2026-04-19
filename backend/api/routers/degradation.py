@@ -4,8 +4,7 @@ Provides API endpoints for monitoring and managing degradation status.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -34,8 +33,8 @@ class ServiceStatusResponse(BaseModel):
     success_rate: float
     failure_count: int
     success_count: int
-    degraded_since: Optional[str] = None
-    error_message: Optional[str] = None
+    degraded_since: str | None = None
+    error_message: str | None = None
 
 
 class CacheStatsResponse(BaseModel):
@@ -54,10 +53,10 @@ class SystemStatusResponse(BaseModel):
     """Overall system degradation status."""
 
     overall_status: str
-    services: Dict[str, ServiceStatusResponse]
+    services: dict[str, ServiceStatusResponse]
     cache_stats: CacheStatsResponse
-    fallback_handlers: List[str]
-    static_fallbacks: List[str]
+    fallback_handlers: list[str]
+    static_fallbacks: list[str]
     timestamp: str
 
 
@@ -71,7 +70,7 @@ class CacheEntryInfo(BaseModel):
     age_seconds: float
     is_expired: bool
     access_count: int
-    last_accessed: Optional[str] = None
+    last_accessed: str | None = None
 
 
 # ============================================================================
@@ -109,14 +108,14 @@ async def get_degradation_status():
             cache_stats=CacheStatsResponse(**report["cache_stats"]),
             fallback_handlers=report["fallback_handlers"],
             static_fallbacks=report["static_fallbacks"],
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except Exception as e:
         logger.error(f"Error getting degradation status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/services", response_model=List[ServiceStatusResponse])
+@router.get("/services", response_model=list[ServiceStatusResponse])
 async def list_services():
     """
     List all registered services with their health status.
@@ -136,9 +135,7 @@ async def list_services():
                     success_rate=round(svc.success_rate, 2),
                     failure_count=svc.failure_count,
                     success_count=svc.success_count,
-                    degraded_since=svc.degraded_since.isoformat()
-                    if svc.degraded_since
-                    else None,
+                    degraded_since=svc.degraded_since.isoformat() if svc.degraded_since else None,
                     error_message=svc.error_message,
                 )
             )
@@ -176,9 +173,7 @@ async def get_service_status(service_name: str):
             success_rate=round(svc.success_rate, 2),
             failure_count=svc.failure_count,
             success_count=svc.success_count,
-            degraded_since=svc.degraded_since.isoformat()
-            if svc.degraded_since
-            else None,
+            degraded_since=svc.degraded_since.isoformat() if svc.degraded_since else None,
             error_message=svc.error_message,
         )
     except HTTPException:
@@ -205,7 +200,7 @@ async def get_cache_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/cache/entries", response_model=List[CacheEntryInfo])
+@router.get("/cache/entries", response_model=list[CacheEntryInfo])
 async def list_cache_entries():
     """
     List all cache entries with metadata.
@@ -227,9 +222,7 @@ async def list_cache_entries():
                     age_seconds=round(entry.age_seconds, 2),
                     is_expired=entry.is_expired,
                     access_count=entry.access_count,
-                    last_accessed=entry.last_accessed.isoformat()
-                    if entry.last_accessed
-                    else None,
+                    last_accessed=entry.last_accessed.isoformat() if entry.last_accessed else None,
                 )
             )
 

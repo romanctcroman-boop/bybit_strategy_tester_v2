@@ -6,13 +6,13 @@ import pytest
 # Check if pyarrow or polars actually work (not just partially installed)
 def _check_parquet_lib():
     try:
-        import pyarrow
+        import pyarrow  # noqa: F401
 
         return True
     except ImportError:
         pass
     try:
-        import polars
+        import polars  # noqa: F401
 
         return True
     except ImportError:
@@ -33,12 +33,32 @@ repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["BYBIT_PERSIST_KLINES"] = "1"
 
-from backend.database import Base, SessionLocal, engine
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from backend.database import Base
 from backend.models.bybit_kline_audit import BybitKlineAudit
+
+# Create a dedicated in-memory engine for tests — isolated from production DB.
+# Setting DATABASE_URL env var does not work if backend.database was already imported.
+_test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+_TestSessionLocal = sessionmaker(bind=_test_engine)
+
+# Import modules without patching at collection time — patching is done in setup_module()
+import backend.database as _dbmod
+import backend.services.archival_service as _archival_mod
 from backend.services.archival_service import ArchivalService, ArchiveConfig
+
+# These will be set in setup_module() to avoid corrupting global state during collection
+_orig_engine = None
+_orig_session = None
 
 
 def make_row(symbol: str, ms: int):
@@ -57,7 +77,26 @@ def make_row(symbol: str, ms: int):
 
 
 def setup_module(module):
-    Base.metadata.create_all(bind=engine)
+    global _orig_engine, _orig_session
+    # Patch backend.database at test execution time (NOT collection time) to avoid
+    # corrupting backend.database.engine for other test modules during pytest collection.
+    _orig_engine = _dbmod.engine
+    _orig_session = _dbmod.SessionLocal
+    _dbmod.engine = _test_engine
+    _dbmod.SessionLocal = _TestSessionLocal
+    _archival_mod.engine = _test_engine
+    _archival_mod.SessionLocal = _TestSessionLocal
+    Base.metadata.create_all(bind=_test_engine)
+
+
+def teardown_module(module):
+    # Restore original engine/session to avoid side effects on other tests
+    _dbmod.engine = _orig_engine
+    _dbmod.SessionLocal = _orig_session
+    _archival_mod.engine = _orig_engine
+    _archival_mod.SessionLocal = _orig_session
+    Base.metadata.drop_all(bind=_test_engine)
+    _test_engine.dispose()
 
 
 def test_archive_and_restore_idempotent(tmp_path: Path):
@@ -65,7 +104,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     sym = "ARCHIVE_BTCUSDT"
 
     # Clean up any existing data for this symbol first
-    s = SessionLocal()
+    s = _TestSessionLocal()
     try:
         s.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == sym).delete()
         s.commit()
@@ -73,14 +112,9 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
         s.close()
 
     # Insert a few rows
-    s = SessionLocal()
+    s = _TestSessionLocal()
     try:
-        rows = [
-            make_row(
-                sym, int(datetime(2025, 1, 1, 12, i, tzinfo=UTC).timestamp() * 1000)
-            )
-            for i in range(3)
-        ]
+        rows = [make_row(sym, int(datetime(2025, 1, 1, 12, i, tzinfo=UTC).timestamp() * 1000)) for i in range(3)]
         for r in rows:
             s.add(r)
         s.commit()
@@ -97,7 +131,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     assert n == 3
 
     # wipe table (only this symbol to avoid affecting other tests)
-    s = SessionLocal()
+    s = _TestSessionLocal()
     try:
         s.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == sym).delete()
         s.commit()
@@ -113,7 +147,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     assert restored2 == 3  # attempted rows; DB uniqueness prevents duplicates
 
     # verify restored rows retained interval metadata
-    s = SessionLocal()
+    s = _TestSessionLocal()
     try:
         restored_rows = (
             s.query(BybitKlineAudit)
@@ -123,8 +157,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
         )
         assert len(restored_rows) == 3
         assert {row.interval for row in restored_rows} == {"1"}
-        assert [row.open_time for row in restored_rows] == sorted(
-            [row.open_time for row in restored_rows]
-        )
+        open_times: list[int] = [int(row.open_time) for row in restored_rows]  # type: ignore[arg-type]
+        assert open_times == sorted(open_times)  # type: ignore[type-var]
     finally:
         s.close()

@@ -12,9 +12,9 @@ Includes:
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .builder import (
     BlockType,
@@ -52,24 +52,24 @@ class StrategyTemplate:
     name: str
     category: TemplateCategory
     description: str
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     difficulty: str = "beginner"  # beginner, intermediate, advanced
-    timeframes: List[str] = field(default_factory=lambda: ["1h", "4h", "1d"])
+    timeframes: list[str] = field(default_factory=lambda: ["1h", "4h", "1d"])
     author: str = "System"
     version: str = "1.0"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Template data
-    graph_data: Dict[str, Any] = field(default_factory=dict)
+    graph_data: dict[str, Any] = field(default_factory=dict)
 
     # Documentation
     how_it_works: str = ""
     parameters_description: str = ""
-    recommended_markets: List[str] = field(default_factory=list)
+    recommended_markets: list[str] = field(default_factory=list)
     expected_performance: str = ""
     risks: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -99,7 +99,7 @@ class StrategyTemplateManager:
     """
 
     def __init__(self):
-        self.templates: Dict[str, StrategyTemplate] = {}
+        self.templates: dict[str, StrategyTemplate] = {}
         self.builder = StrategyBuilder()
 
         # Load built-in templates
@@ -137,16 +137,16 @@ class StrategyTemplateManager:
         # Scalping Strategy
         self.templates["scalping"] = self._create_scalping_template()
 
-    def get_template(self, template_id: str) -> Optional[StrategyTemplate]:
+    def get_template(self, template_id: str) -> StrategyTemplate | None:
         """Get a template by ID"""
         return self.templates.get(template_id)
 
     def list_templates(
         self,
-        category: Optional[TemplateCategory] = None,
-        difficulty: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[StrategyTemplate]:
+        category: TemplateCategory | None = None,
+        difficulty: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[StrategyTemplate]:
         """List templates with optional filtering"""
         result = list(self.templates.values())
 
@@ -164,10 +164,10 @@ class StrategyTemplateManager:
     def instantiate_template(
         self,
         template_id: str,
-        name: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
-        timeframe: Optional[str] = None,
-    ) -> Optional[StrategyGraph]:
+        name: str | None = None,
+        symbols: list[str] | None = None,
+        timeframe: str | None = None,
+    ) -> StrategyGraph | None:
         """
         Create a new strategy from a template
 
@@ -188,8 +188,8 @@ class StrategyTemplateManager:
         graph_data = template.graph_data.copy()
         graph_data["id"] = str(uuid.uuid4())
         graph_data["name"] = name or f"{template.name} Strategy"
-        graph_data["created_at"] = datetime.now(timezone.utc).isoformat()
-        graph_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        graph_data["created_at"] = datetime.now(UTC).isoformat()
+        graph_data["updated_at"] = datetime.now(UTC).isoformat()
 
         if symbols:
             graph_data["symbols"] = symbols
@@ -241,9 +241,7 @@ class StrategyTemplateManager:
 
         # Add blocks
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 14}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 14})
 
         # Oversold condition (RSI < 30)
         oversold = self.builder.add_block(
@@ -443,18 +441,12 @@ class StrategyTemplateManager:
 
     def _create_ema_crossover_template(self) -> StrategyTemplate:
         """Create EMA crossover template"""
-        graph = self.builder.create_strategy(
-            name="EMA Crossover", description="Trade EMA crossovers", timeframe="4h"
-        )
+        graph = self.builder.create_strategy(name="EMA Crossover", description="Trade EMA crossovers", timeframe="4h")
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        fast_ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 9}
-        )
-        slow_ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 21}
-        )
+        fast_ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 9})
+        slow_ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 21})
 
         cross = self.builder.add_block(graph, BlockType.CONDITION_CROSS, x=500, y=200)
 
@@ -502,15 +494,9 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        ema_fast = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 8}
-        )
-        ema_mid = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=200, parameters={"period": 21}
-        )
-        ema_slow = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 55}
-        )
+        ema_fast = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 8})
+        ema_mid = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=200, parameters={"period": 21})
+        ema_slow = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=300, parameters={"period": 55})
 
         # Fast > Mid
         cond1 = self.builder.add_block(
@@ -582,9 +568,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=100, parameters={"period": 14}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=100, parameters={"period": 14})
         macd = self.builder.add_block(
             graph,
             BlockType.INDICATOR_MACD,
@@ -603,9 +587,7 @@ class StrategyTemplateManager:
         )
 
         # MACD crossover
-        macd_cross = self.builder.add_block(
-            graph, BlockType.CONDITION_CROSS, x=500, y=300
-        )
+        macd_cross = self.builder.add_block(graph, BlockType.CONDITION_CROSS, x=500, y=300)
 
         # Both conditions
         and_cond = self.builder.add_block(graph, BlockType.CONDITION_AND, x=700, y=200)
@@ -618,9 +600,7 @@ class StrategyTemplateManager:
         self.builder.connect(graph, macd.id, "macd_line", macd_cross.id, "fast")
         self.builder.connect(graph, macd.id, "signal_line", macd_cross.id, "slow")
         self.builder.connect(graph, rsi_cond.id, "below", and_cond.id, "condition1")
-        self.builder.connect(
-            graph, macd_cross.id, "cross_above", and_cond.id, "condition2"
-        )
+        self.builder.connect(graph, macd_cross.id, "cross_above", and_cond.id, "condition2")
         self.builder.connect(graph, and_cond.id, "result", buy.id, "trigger")
 
         return StrategyTemplate(
@@ -661,12 +641,8 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        ema = self.builder.add_block(
-            graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 50}
-        )
-        atr = self.builder.add_block(
-            graph, BlockType.INDICATOR_ATR, x=300, y=300, parameters={"period": 14}
-        )
+        ema = self.builder.add_block(graph, BlockType.INDICATOR_EMA, x=300, y=100, parameters={"period": 50})
+        atr = self.builder.add_block(graph, BlockType.INDICATOR_ATR, x=300, y=300, parameters={"period": 14})
 
         # Price > EMA
         trend_cond = self.builder.add_block(
@@ -803,9 +779,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        sma = self.builder.add_block(
-            graph, BlockType.INDICATOR_SMA, x=300, y=100, parameters={"period": 20}
-        )
+        sma = self.builder.add_block(graph, BlockType.INDICATOR_SMA, x=300, y=100, parameters={"period": 20})
         bb = self.builder.add_block(
             graph,
             BlockType.INDICATOR_BOLLINGER,
@@ -875,9 +849,7 @@ class StrategyTemplateManager:
 
         candles = self.builder.add_block(graph, BlockType.CANDLE_DATA, x=100, y=200)
 
-        rsi = self.builder.add_block(
-            graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 7}
-        )
+        rsi = self.builder.add_block(graph, BlockType.INDICATOR_RSI, x=300, y=200, parameters={"period": 7})
 
         # RSI < 20 (very oversold)
         oversold = self.builder.add_block(
@@ -897,12 +869,8 @@ class StrategyTemplateManager:
             parameters={"threshold": 80},
         )
 
-        buy = self.builder.add_block(
-            graph, BlockType.ACTION_BUY, x=700, y=100, parameters={"size_pct": 50}
-        )
-        sell = self.builder.add_block(
-            graph, BlockType.ACTION_SELL, x=700, y=300, parameters={"size_pct": 100}
-        )
+        buy = self.builder.add_block(graph, BlockType.ACTION_BUY, x=700, y=100, parameters={"size_pct": 50})
+        sell = self.builder.add_block(graph, BlockType.ACTION_SELL, x=700, y=300, parameters={"size_pct": 100})
 
         sl = self.builder.add_block(
             graph,

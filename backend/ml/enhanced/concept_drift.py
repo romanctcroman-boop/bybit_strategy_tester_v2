@@ -12,9 +12,9 @@ invalidate model predictions. Uses statistical tests:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from scipy import stats
@@ -37,13 +37,13 @@ class DriftResult:
     """Result of drift detection"""
 
     is_drift: bool
-    drift_type: Optional[DriftType]
+    drift_type: DriftType | None
     confidence: float
-    p_value: Optional[float]
-    statistic: Optional[float]
-    feature_name: Optional[str]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    details: Dict[str, Any] = field(default_factory=dict)
+    p_value: float | None
+    statistic: float | None
+    feature_name: str | None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,7 +54,7 @@ class DriftAlert:
     severity: str  # "low", "medium", "high", "critical"
     drift_result: DriftResult
     recommended_action: str
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class ConceptDriftDetector:
@@ -76,7 +76,7 @@ class ConceptDriftDetector:
         window_size: int = 1000,
         significance_level: float = 0.05,
         min_samples: int = 30,
-        methods: Optional[List[str]] = None,
+        methods: list[str] | None = None,
     ):
         self.window_size = window_size
         self.significance_level = significance_level
@@ -84,11 +84,11 @@ class ConceptDriftDetector:
         self.methods = methods or ["ks", "psi", "page_hinkley"]
 
         # Reference distribution
-        self.reference_data: Optional[np.ndarray] = None
-        self.reference_stats: Dict[str, Any] = {}
+        self.reference_data: np.ndarray | None = None
+        self.reference_stats: dict[str, Any] = {}
 
         # Streaming data
-        self.current_window: List[float] = []
+        self.current_window: list[float] = []
 
         # Page-Hinkley state
         self.ph_sum: float = 0.0
@@ -97,13 +97,13 @@ class ConceptDriftDetector:
         self.ph_delta: float = 0.005
 
         # ADWIN state
-        self.adwin_window: List[float] = []
+        self.adwin_window: list[float] = []
         self.adwin_total: float = 0.0
         self.adwin_variance: float = 0.0
         self.adwin_width: int = 0
 
         # Drift history
-        self.drift_history: List[DriftResult] = []
+        self.drift_history: list[DriftResult] = []
 
     def fit(self, reference_data: np.ndarray) -> None:
         """
@@ -129,9 +129,7 @@ class ConceptDriftDetector:
 
         logger.info(f"Fitted on {len(self.reference_data)} reference samples")
 
-    def detect(
-        self, current_data: np.ndarray, feature_name: Optional[str] = None
-    ) -> DriftResult:
+    def detect(self, current_data: np.ndarray, feature_name: str | None = None) -> DriftResult:
         """
         Detect drift between reference and current data
 
@@ -196,14 +194,11 @@ class ConceptDriftDetector:
         self.drift_history.append(result)
 
         if drift_detected:
-            logger.warning(
-                f"Drift detected for {feature_name}: "
-                f"type={drift_type}, confidence={confidence:.2f}"
-            )
+            logger.warning(f"Drift detected for {feature_name}: type={drift_type}, confidence={confidence:.2f}")
 
         return result
 
-    def _ks_test(self, current: np.ndarray) -> Dict[str, Any]:
+    def _ks_test(self, current: np.ndarray) -> dict[str, Any]:
         """Kolmogorov-Smirnov test for distribution difference"""
         statistic, p_value = stats.ks_2samp(self.reference_data, current)
         is_drift = p_value < self.significance_level
@@ -217,7 +212,7 @@ class ConceptDriftDetector:
             "threshold": self.significance_level,
         }
 
-    def _psi_test(self, current: np.ndarray, threshold: float = 0.25) -> Dict[str, Any]:
+    def _psi_test(self, current: np.ndarray, threshold: float = 0.25) -> dict[str, Any]:
         """
         Population Stability Index (PSI)
 
@@ -255,16 +250,10 @@ class ConceptDriftDetector:
             "psi_value": float(psi),
             "confidence": float(confidence),
             "thresholds": {"no_change": 0.1, "moderate": 0.25, "significant": 0.5},
-            "interpretation": (
-                "no_change"
-                if psi < 0.1
-                else "moderate_change"
-                if psi < 0.25
-                else "significant_shift"
-            ),
+            "interpretation": ("no_change" if psi < 0.1 else "moderate_change" if psi < 0.25 else "significant_shift"),
         }
 
-    def _chi_squared_test(self, current: np.ndarray) -> Dict[str, Any]:
+    def _chi_squared_test(self, current: np.ndarray) -> dict[str, Any]:
         """Chi-squared test for categorical/binned data"""
         bins = self.reference_stats["bin_edges"]
 
@@ -283,7 +272,16 @@ class ConceptDriftDetector:
                 "error": "No valid bins",
             }
 
-        statistic, p_value = stats.chisquare(observed[mask], expected_scaled[mask])
+        obs_masked = observed[mask].astype(float)
+        exp_masked = expected_scaled[mask].astype(float)
+
+        # Rescale expected to match observed sum (required by scipy chisquare)
+        obs_sum = obs_masked.sum()
+        exp_sum = exp_masked.sum()
+        if exp_sum > 0 and obs_sum > 0:
+            exp_masked = exp_masked * (obs_sum / exp_sum)
+
+        statistic, p_value = stats.chisquare(obs_masked, exp_masked)
 
         is_drift = p_value < self.significance_level
 
@@ -295,7 +293,7 @@ class ConceptDriftDetector:
             "confidence": 1 - p_value if is_drift else p_value,
         }
 
-    def _page_hinkley_test(self, current: np.ndarray) -> Dict[str, Any]:
+    def _page_hinkley_test(self, current: np.ndarray) -> dict[str, Any]:
         """
         Page-Hinkley test for detecting change in mean
         Good for streaming data
@@ -326,9 +324,7 @@ class ConceptDriftDetector:
             "confidence": float(confidence),
         }
 
-    def _wasserstein_test(
-        self, current: np.ndarray, threshold: float = 0.1
-    ) -> Dict[str, Any]:
+    def _wasserstein_test(self, current: np.ndarray, threshold: float = 0.1) -> dict[str, Any]:
         """
         Wasserstein (Earth Mover's) distance
         Measures the minimum "cost" to transform one distribution into another
@@ -350,9 +346,7 @@ class ConceptDriftDetector:
             "confidence": float(confidence),
         }
 
-    def _classify_drift_type(
-        self, results: Dict[str, Any], current: np.ndarray
-    ) -> Optional[DriftType]:
+    def _classify_drift_type(self, results: dict[str, Any], current: np.ndarray) -> DriftType | None:
         """Classify the type of drift based on detection patterns"""
         if not any(r.get("is_drift", False) for r in results.values()):
             return None
@@ -389,7 +383,7 @@ class ConceptDriftDetector:
         self.adwin_window = []
         self.drift_history = []
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary of drift detection history"""
         if not self.drift_history:
             return {"total_checks": 0, "drift_count": 0}
@@ -402,18 +396,10 @@ class ConceptDriftDetector:
             "drift_rate": drift_count / len(self.drift_history),
             "avg_confidence": np.mean([d.confidence for d in self.drift_history]),
             "last_drift": next(
-                (
-                    d.timestamp.isoformat()
-                    for d in reversed(self.drift_history)
-                    if d.is_drift
-                ),
+                (d.timestamp.isoformat() for d in reversed(self.drift_history) if d.is_drift),
                 None,
             ),
-            "drift_types": [
-                d.drift_type.value
-                for d in self.drift_history
-                if d.is_drift and d.drift_type
-            ],
+            "drift_types": [d.drift_type.value for d in self.drift_history if d.is_drift and d.drift_type],
         }
 
 
@@ -429,7 +415,7 @@ class MultiVariateDriftDetector:
 
     def __init__(
         self,
-        feature_names: List[str],
+        feature_names: list[str],
         window_size: int = 1000,
         significance_level: float = 0.05,
     ):
@@ -438,25 +424,21 @@ class MultiVariateDriftDetector:
         self.significance_level = significance_level
 
         # Per-feature detectors
-        self.detectors: Dict[str, ConceptDriftDetector] = {
-            name: ConceptDriftDetector(window_size, significance_level)
-            for name in feature_names
+        self.detectors: dict[str, ConceptDriftDetector] = {
+            name: ConceptDriftDetector(window_size, significance_level) for name in feature_names
         }
 
         # Reference correlation matrix
-        self.reference_corr: Optional[np.ndarray] = None
-        self.reference_mean: Optional[np.ndarray] = None
-        self.reference_cov: Optional[np.ndarray] = None
+        self.reference_corr: np.ndarray | None = None
+        self.reference_mean: np.ndarray | None = None
+        self.reference_cov: np.ndarray | None = None
 
     def fit(self, reference_data: np.ndarray) -> None:
         """
         Fit on reference data (n_samples, n_features)
         """
         if reference_data.shape[1] != len(self.feature_names):
-            raise ValueError(
-                f"Expected {len(self.feature_names)} features, "
-                f"got {reference_data.shape[1]}"
-            )
+            raise ValueError(f"Expected {len(self.feature_names)} features, got {reference_data.shape[1]}")
 
         # Fit individual detectors
         for i, name in enumerate(self.feature_names):
@@ -467,11 +449,9 @@ class MultiVariateDriftDetector:
         self.reference_cov = np.cov(reference_data, rowvar=False)
         self.reference_corr = np.corrcoef(reference_data, rowvar=False)
 
-        logger.info(
-            f"Fitted MultiVariateDriftDetector on {len(self.feature_names)} features"
-        )
+        logger.info(f"Fitted MultiVariateDriftDetector on {len(self.feature_names)} features")
 
-    def detect(self, current_data: np.ndarray) -> Dict[str, Any]:
+    def detect(self, current_data: np.ndarray) -> dict[str, Any]:
         """
         Detect drift across all features
 
@@ -516,17 +496,13 @@ class MultiVariateDriftDetector:
             "is_drift": any_univariate or multivariate_drift or correlation_drift,
             "drifted_features": drifted_features,
             "drift_count": len(drifted_features),
-            "severity": self._calculate_severity(
-                len(drifted_features), multivariate_drift, correlation_drift
-            ),
-            "recommended_action": self._get_recommendation(
-                drifted_features, multivariate_drift, correlation_drift
-            ),
+            "severity": self._calculate_severity(len(drifted_features), multivariate_drift, correlation_drift),
+            "recommended_action": self._get_recommendation(drifted_features, multivariate_drift, correlation_drift),
         }
 
         return results
 
-    def _hotelling_t2_test(self, current_data: np.ndarray) -> Dict[str, Any]:
+    def _hotelling_t2_test(self, current_data: np.ndarray) -> dict[str, Any]:
         """
         Hotelling's T-squared test for multivariate mean shift
         """
@@ -559,7 +535,7 @@ class MultiVariateDriftDetector:
         except np.linalg.LinAlgError:
             return {"error": "Singular covariance matrix"}
 
-    def _correlation_drift(self, current_data: np.ndarray) -> Dict[str, Any]:
+    def _correlation_drift(self, current_data: np.ndarray) -> dict[str, Any]:
         """
         Detect changes in feature correlation structure
         """
@@ -594,9 +570,7 @@ class MultiVariateDriftDetector:
             "max_change": float(diff_matrix[max_idx]),
         }
 
-    def _calculate_severity(
-        self, drift_count: int, multivariate_drift: bool, correlation_drift: bool
-    ) -> str:
+    def _calculate_severity(self, drift_count: int, multivariate_drift: bool, correlation_drift: bool) -> str:
         """Calculate overall drift severity"""
         n_features = len(self.feature_names)
 
@@ -619,7 +593,7 @@ class MultiVariateDriftDetector:
 
     def _get_recommendation(
         self,
-        drifted_features: List[str],
+        drifted_features: list[str],
         multivariate_drift: bool,
         correlation_drift: bool,
     ) -> str:
@@ -632,18 +606,12 @@ class MultiVariateDriftDetector:
         if len(drifted_features) > len(self.feature_names) // 2:
             recommendations.append("Full model retraining recommended")
         elif drifted_features:
-            recommendations.append(
-                f"Consider retraining with focus on: {', '.join(drifted_features[:3])}"
-            )
+            recommendations.append(f"Consider retraining with focus on: {', '.join(drifted_features[:3])}")
 
         if correlation_drift:
-            recommendations.append(
-                "Feature relationships have changed - review feature engineering"
-            )
+            recommendations.append("Feature relationships have changed - review feature engineering")
 
         if multivariate_drift:
-            recommendations.append(
-                "Overall data distribution has shifted significantly"
-            )
+            recommendations.append("Overall data distribution has shifted significantly")
 
         return "; ".join(recommendations) if recommendations else "Monitor closely"

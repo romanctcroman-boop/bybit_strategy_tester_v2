@@ -4,7 +4,7 @@ Endpoints for health checks and metrics export
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from starlette.responses import Response
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 
 @router.get("/health", summary="System Health Check")
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     """
     System health check endpoint
 
@@ -36,11 +36,7 @@ async def health_check() -> Dict[str, Any]:
             "status": "healthy",
             "components": {
                 "api": {"status": "healthy"},
-                "cache": {
-                    "status": "connected"
-                    if cache_manager.redis_connected
-                    else "disconnected"
-                },
+                "cache": {"status": "connected" if cache_manager.redis_connected else "disconnected"},
                 "ai_agents": {"status": "ready"},
                 "backtest_engine": {"status": "ready"},
             },
@@ -83,7 +79,7 @@ async def prometheus_metrics():
 
 
 @router.get("/metrics/json", summary="Metrics as JSON")
-async def metrics_json() -> Dict[str, Any]:
+async def metrics_json() -> dict[str, Any]:
     """
     Export all metrics as JSON
 
@@ -98,7 +94,7 @@ async def metrics_json() -> Dict[str, Any]:
 
 
 @router.get("/cache/stats", summary="Cache Performance Statistics")
-async def cache_stats() -> Dict[str, Any]:
+async def cache_stats() -> dict[str, Any]:
     """
     Get detailed cache performance statistics
 
@@ -141,7 +137,7 @@ async def cache_stats() -> Dict[str, Any]:
 
 
 @router.get("/ai-agents/status", summary="AI Agents Status")
-async def ai_agents_status() -> Dict[str, Any]:
+async def ai_agents_status() -> dict[str, Any]:
     """
     Get status of all AI agents
 
@@ -163,9 +159,7 @@ async def ai_agents_status() -> Dict[str, Any]:
             deepseek_health = False
 
         try:
-            perplexity_health = agent.health_monitor.get_component_health(
-                "perplexity_api"
-            )
+            perplexity_health = agent.health_monitor.get_component_health("perplexity_api")
         except Exception:
             perplexity_health = False
 
@@ -216,7 +210,7 @@ async def ai_agents_status() -> Dict[str, Any]:
 
 
 @router.post("/cache/clear", summary="Clear Cache")
-async def clear_cache() -> Dict[str, Any]:
+async def clear_cache() -> dict[str, Any]:
     """
     Clear all cached AI responses
 

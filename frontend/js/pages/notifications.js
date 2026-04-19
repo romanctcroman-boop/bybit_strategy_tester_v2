@@ -1,9 +1,9 @@
 /**
  * 📄 Notifications Page JavaScript
- * 
+ *
  * Page-specific scripts for notifications.html
  * Extracted during Phase 1 Week 3: JS Extraction
- * 
+ *
  * @version 1.0.0
  * @date 2025-12-21
  */
@@ -84,7 +84,7 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
             { symbol: 'ETHUSDT', condition: 'Below', targetPrice: 3300, currentPrice: 3456.78, status: 'active', channels: ['push'] },
             { symbol: 'SOLUSDT', condition: 'Above', targetPrice: 200, currentPrice: 198.45, status: 'active', channels: ['push', 'telegram'] },
             { symbol: 'BTCUSDT', condition: 'Below', targetPrice: 95000, currentPrice: 97234.50, status: 'active', channels: ['push', 'email', 'telegram'] },
-            { symbol: 'DOGEUSDT', condition: 'Above', targetPrice: 0.35, currentPrice: 0.32, status: 'triggered', channels: ['push'] },
+            { symbol: 'DOGEUSDT', condition: 'Above', targetPrice: 0.35, currentPrice: 0.32, status: 'triggered', channels: ['push'] }
         ];
 
         // Initialize
@@ -181,7 +181,7 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                 btn.addEventListener('click', () => {
                     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                    
+
                     btn.classList.add('active');
                     document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
                 });

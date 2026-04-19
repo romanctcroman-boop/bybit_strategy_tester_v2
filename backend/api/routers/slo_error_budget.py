@@ -9,7 +9,7 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -51,7 +51,7 @@ class ErrorBudgetStateResponse(BaseModel):
     burn_rate_6h: float
     burn_rate_24h: float
     status: str
-    time_until_exhausted_hours: Optional[float]
+    time_until_exhausted_hours: float | None
     window_start: str
     window_end: str
 
@@ -134,9 +134,7 @@ async def get_all_budgets() -> dict[str, ErrorBudgetStateResponse]:
             burn_rate_24h=state.burn_rate_24h,
             status=state.status.value,
             time_until_exhausted_hours=(
-                state.time_until_exhausted.total_seconds() / 3600
-                if state.time_until_exhausted
-                else None
+                state.time_until_exhausted.total_seconds() / 3600 if state.time_until_exhausted else None
             ),
             window_start=state.window_start.isoformat(),
             window_end=state.window_end.isoformat(),
@@ -169,9 +167,7 @@ async def get_budget(slo_name: str) -> ErrorBudgetStateResponse:
         burn_rate_24h=state.burn_rate_24h,
         status=state.status.value,
         time_until_exhausted_hours=(
-            state.time_until_exhausted.total_seconds() / 3600
-            if state.time_until_exhausted
-            else None
+            state.time_until_exhausted.total_seconds() / 3600 if state.time_until_exhausted else None
         ),
         window_start=state.window_start.isoformat(),
         window_end=state.window_end.isoformat(),
@@ -232,10 +228,7 @@ async def get_dashboard() -> DashboardSummaryResponse:
 @router.get("/types", summary="List SLO types")
 async def list_slo_types() -> list[dict[str, str]]:
     """List all available SLO types."""
-    return [
-        {"type": t.value, "description": t.name.replace("_", " ").title()}
-        for t in SLOType
-    ]
+    return [{"type": t.value, "description": t.name.replace("_", " ").title()} for t in SLOType]
 
 
 @router.get("/statuses", summary="List budget statuses")

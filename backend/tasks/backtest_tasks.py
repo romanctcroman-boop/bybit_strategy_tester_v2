@@ -4,8 +4,8 @@ Backtest Tasks
 Celery tasks to run backtests in the background.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from celery import Task
 from loguru import logger
@@ -30,7 +30,7 @@ class BacktestTask(Task):
                 if backtest:
                     backtest.status = "failed"
                     backtest.error_message = str(exc)
-                    backtest.updated_at = datetime.now(timezone.utc)
+                    backtest.updated_at = datetime.now(UTC)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -50,13 +50,13 @@ class BacktestTask(Task):
 def run_backtest_task(
     self,
     backtest_id: int,
-    strategy_config: Dict[str, Any],
+    strategy_config: dict[str, Any],
     symbol: str,
     interval: str,
     start_date: str,
     end_date: str,
     initial_capital: float = 10000.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a backtest task (Celery).
 
     Attempts to claim the backtest row atomically via DataService.claim_backtest_to_run.
@@ -78,7 +78,7 @@ def run_backtest_task(
             logger.info(f"Backtest {backtest_id} already completed; skipping")
             return {"backtest_id": backtest_id, "status": "completed"}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if hasattr(ds, "claim_backtest_to_run"):
             claimed = ds.claim_backtest_to_run(backtest_id, now, stale_seconds=300)
             status = claimed.get("status") if isinstance(claimed, dict) else None
@@ -94,24 +94,23 @@ def run_backtest_task(
                 return {"backtest_id": backtest_id, "status": "running"}
 
             if status == "error":
-                raise RuntimeError(
-                    f"Failed to claim backtest: {claimed.get('message')}"
-                )
+                raise RuntimeError(f"Failed to claim backtest: {claimed.get('message')}")
             # if status == 'claimed' we continue
         else:
             # Legacy path: mark running if not already running/recent
             running_since = getattr(backtest, "started_at", None)
-            if getattr(backtest, "status", None) == "running" and running_since:
-                if now - running_since < timedelta(hours=24):
-                    logger.info(f"Backtest {backtest_id} is already running; skipping")
-                    return {"backtest_id": backtest_id, "status": "running"}
+            if (
+                getattr(backtest, "status", None) == "running"
+                and running_since
+                and now - running_since < timedelta(hours=24)
+            ):
+                logger.info(f"Backtest {backtest_id} is already running; skipping")
+                return {"backtest_id": backtest_id, "status": "running"}
 
             ds.update_backtest(backtest_id, status="running", started_at=now)
 
         logger.info("📥 Loading market data...")
-        candles = ds.get_market_data(
-            symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date
-        )
+        candles = ds.get_market_data(symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date)
 
         if candles is None:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -123,7 +122,7 @@ def run_backtest_task(
             None,
             data_service=ds,
             initial_capital=initial_capital,
-            commission=0.0006,
+            commission=0.0007,  # 0.07% TradingView parity
             slippage=0.0001,
         )
         results = engine.run(data=candles, strategy_config=strategy_config)
@@ -154,7 +153,7 @@ def run_backtest_task(
                 backtest_id,
                 status="failed",
                 error_message=str(e),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
         except Exception as db_error:
             logger.error(f"Failed to update backtest status: {db_error}")
@@ -167,9 +166,7 @@ def run_backtest_task(
             max_retries = getattr(self, "max_retries", 0)
 
         if retries < max_retries:
-            logger.info(
-                f"Retrying backtest {backtest_id} (attempt {retries + 1}/{max_retries})"
-            )
+            logger.info(f"Retrying backtest {backtest_id} (attempt {retries + 1}/{max_retries})")
             if self is not None and hasattr(self, "retry"):
                 raise self.retry(exc=e)
             # If running in tests or self lacks retry, re-raise the exception to surface failure
@@ -186,7 +183,7 @@ def run_backtest_task(
 
 
 @celery_app.task(name="backend.tasks.backtest_tasks.bulk_backtest")
-def bulk_backtest_task(backtest_configs: list) -> Dict[str, Any]:
+def bulk_backtest_task(backtest_configs: list) -> dict[str, Any]:
     """Run multiple backtests in parallel (delegates to individual tasks)."""
     logger.info(f"🚀 Starting bulk backtest: {len(backtest_configs)} backtests")
     from celery import group

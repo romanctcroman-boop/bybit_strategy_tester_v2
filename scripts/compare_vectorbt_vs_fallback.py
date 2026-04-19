@@ -5,8 +5,13 @@ _run_fallback and reports differences in metrics, trades and equity.
 """
 
 import json
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
+
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root))
 
 import numpy as np
 import pandas as pd
@@ -16,15 +21,13 @@ from backend.backtesting.fast_optimizer import load_candles_fast
 from backend.backtesting.models import BacktestConfig
 from backend.backtesting.strategies import get_strategy
 
-ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "data.sqlite3"
+ROOT = project_root
+DB_PATH = Path(os.environ.get("DATABASE_PATH", str(ROOT / "data.sqlite3")))
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:
     # data columns: open_time, open_price, high_price, low_price, close_price, volume
-    df = pd.DataFrame(
-        data, columns=["open_time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume"])
     # open_time likely in ms
     try:
         df["open_time"] = pd.to_datetime(df["open_time"].astype("int64"), unit="ms")
@@ -105,12 +108,8 @@ def main():
         "equity": {
             "fallback_final": res_fallback.final_equity,
             "vectorbt_final": res_vectorbt.final_equity,
-            "equity_len_fallback": len(res_fallback.equity_curve.equity)
-            if res_fallback.equity_curve
-            else 0,
-            "equity_len_vectorbt": len(res_vectorbt.equity_curve.equity)
-            if res_vectorbt.equity_curve
-            else 0,
+            "equity_len_fallback": len(res_fallback.equity_curve.equity) if res_fallback.equity_curve else 0,
+            "equity_len_vectorbt": len(res_vectorbt.equity_curve.equity) if res_vectorbt.equity_curve else 0,
         },
     }
 
@@ -135,18 +134,12 @@ def main():
 
     # sample trades
     sample = {
-        "fallback_trades_sample": [
-            t.__dict__ if hasattr(t, "__dict__") else t for t in res_fallback.trades[:5]
-        ],
-        "vectorbt_trades_sample": [
-            t.__dict__ if hasattr(t, "__dict__") else t for t in res_vectorbt.trades[:5]
-        ],
+        "fallback_trades_sample": [t.__dict__ if hasattr(t, "__dict__") else t for t in res_fallback.trades[:5]],
+        "vectorbt_trades_sample": [t.__dict__ if hasattr(t, "__dict__") else t for t in res_vectorbt.trades[:5]],
     }
 
     out = {
-        "config": config.model_dump()
-        if hasattr(config, "model_dump")
-        else config.dict(),
+        "config": config.model_dump() if hasattr(config, "model_dump") else config.dict(),
         "summary": diff,
         "sample_trades": sample,
     }

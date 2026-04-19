@@ -1,29 +1,35 @@
 """
 Test TwoStageOptimizer with Numba JIT Integration
 """
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-import time
-import pandas as pd
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import sqlite3
-from loguru import logger
+import time
+
+import pandas as pd
 
 print("=" * 70)
 print("🚀 TESTING NUMBA-ACCELERATED TWO-STAGE OPTIMIZER")
 print("=" * 70)
 
 # Load test data
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
-df = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
+df = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     AND open_time >= 1735689600000
     AND open_time < 1737504000000
     ORDER BY open_time ASC
-""", conn)
+""",
+    conn,
+)
 conn.close()
 
 print(f"📊 Loaded {len(df)} 1H candles")
@@ -61,7 +67,7 @@ result_fast = optimizer_fast.optimize(
 )
 fast_time = time.time() - start_fast
 
-print(f"\n📊 Fast Mode Results:")
+print("\n📊 Fast Mode Results:")
 print(f"   Total time: {fast_time:.2f}s")
 print(f"   Stage 1: {result_fast.stage1_execution_time:.2f}s ({result_fast.stage1_tested} combinations)")
 print(f"   Stage 2: {result_fast.stage2_execution_time:.2f}s ({result_fast.stage2_validated} validated)")
@@ -102,7 +108,7 @@ result_precision = optimizer_precision.optimize(
 )
 precision_time = time.time() - start_precision
 
-print(f"\n📊 Precision Mode Results:")
+print("\n📊 Precision Mode Results:")
 print(f"   Total time: {precision_time:.2f}s")
 print(f"   Stage 2: {result_precision.stage2_execution_time:.2f}s ({result_precision.stage2_validated} validated)")
 print(f"   Best Sharpe: {result_precision.best_validated_sharpe:.3f}")

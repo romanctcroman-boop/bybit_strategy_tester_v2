@@ -11,10 +11,11 @@ Features:
 
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -40,7 +41,7 @@ class AutoMLConfig:
     """Configuration for AutoML pipeline"""
 
     # Search space
-    model_types: List[ModelType] = field(
+    model_types: list[ModelType] = field(
         default_factory=lambda: [
             ModelType.RANDOM_FOREST,
             ModelType.GRADIENT_BOOSTING,
@@ -62,7 +63,7 @@ class AutoMLConfig:
 
     # Feature selection
     feature_selection: bool = True
-    max_features: Optional[int] = None
+    max_features: int | None = None
     min_feature_importance: float = 0.01
 
     # Ensemble
@@ -84,10 +85,10 @@ class ModelCandidate:
 
     model_id: str
     model_type: ModelType
-    hyperparameters: Dict[str, Any]
+    hyperparameters: dict[str, Any]
 
     # Performance
-    cv_scores: List[float] = field(default_factory=list)
+    cv_scores: list[float] = field(default_factory=list)
     mean_score: float = 0.0
     std_score: float = 0.0
 
@@ -97,13 +98,13 @@ class ModelCandidate:
 
     # Model info
     model_size_mb: float = 0.0
-    feature_importance: Dict[str, float] = field(default_factory=dict)
-    selected_features: List[str] = field(default_factory=list)
+    feature_importance: dict[str, float] = field(default_factory=dict)
+    selected_features: list[str] = field(default_factory=list)
 
     # Trained model
     model: Any = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary (excluding model)"""
         return {
             "model_id": self.model_id,
@@ -128,30 +129,30 @@ class PipelineResult:
     config: AutoMLConfig
 
     # Best model
-    best_model: Optional[ModelCandidate] = None
+    best_model: ModelCandidate | None = None
     best_score: float = 0.0
 
     # All candidates
-    candidates: List[ModelCandidate] = field(default_factory=list)
+    candidates: list[ModelCandidate] = field(default_factory=list)
 
     # Ensemble
     ensemble_model: Any = None
     ensemble_score: float = 0.0
 
     # Selected features
-    selected_features: List[str] = field(default_factory=list)
-    feature_importance: Dict[str, float] = field(default_factory=dict)
+    selected_features: list[str] = field(default_factory=list)
+    feature_importance: dict[str, float] = field(default_factory=dict)
 
     # Timing
     total_time_seconds: float = 0.0
     trials_completed: int = 0
 
     # Metadata
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
     status: str = "running"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "run_id": self.run_id,
@@ -179,42 +180,42 @@ class AutoMLPipeline:
         predictions = best_model.predict(X_test)
     """
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
-        self.results: List[PipelineResult] = []
+        self.results: list[PipelineResult] = []
 
         # Optuna study
         self.study = None
 
         # Model factory
-        self._model_factories: Dict[ModelType, Callable] = {}
+        self._model_factories: dict[ModelType, Callable] = {}
         self._setup_model_factories()
 
     def _setup_model_factories(self) -> None:
         """Setup model creation functions"""
 
-        def create_random_forest(params: Dict) -> Any:
+        def create_random_forest(params: dict) -> Any:
             from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
             is_classifier = params.pop("is_classifier", True)
             cls = RandomForestClassifier if is_classifier else RandomForestRegressor
             return cls(**params)
 
-        def create_gradient_boosting(params: Dict) -> Any:
+        def create_gradient_boosting(params: dict) -> Any:
             from sklearn.ensemble import (
                 GradientBoostingClassifier,
                 GradientBoostingRegressor,
             )
 
             is_classifier = params.pop("is_classifier", True)
-            cls = (
-                GradientBoostingClassifier
-                if is_classifier
-                else GradientBoostingRegressor
-            )
+            # Remove XGBoost/LightGBM-specific params not supported by sklearn
+            params.pop("reg_alpha", None)
+            params.pop("reg_lambda", None)
+            params.pop("colsample_bytree", None)
+            cls = GradientBoostingClassifier if is_classifier else GradientBoostingRegressor
             return cls(**params)
 
-        def create_xgboost(params: Dict) -> Any:
+        def create_xgboost(params: dict) -> Any:
             try:
                 import xgboost as xgb
 
@@ -225,7 +226,7 @@ class AutoMLPipeline:
                 logger.warning("XGBoost not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_lightgbm(params: Dict) -> Any:
+        def create_lightgbm(params: dict) -> Any:
             try:
                 import lightgbm as lgb
 
@@ -236,7 +237,7 @@ class AutoMLPipeline:
                 logger.warning("LightGBM not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_catboost(params: Dict) -> Any:
+        def create_catboost(params: dict) -> Any:
             try:
                 from catboost import CatBoostClassifier, CatBoostRegressor
 
@@ -247,21 +248,26 @@ class AutoMLPipeline:
                 logger.warning("CatBoost not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_linear(params: Dict) -> Any:
+        def create_linear(params: dict) -> Any:
             from sklearn.linear_model import LogisticRegression, Ridge
 
             is_classifier = params.pop("is_classifier", True)
+            if not is_classifier:
+                # Ridge uses 'alpha' not 'C'; convert if needed
+                c_value = params.pop("C", None)
+                if c_value is not None and "alpha" not in params:
+                    params["alpha"] = 1.0 / max(c_value, 1e-10)
             cls = LogisticRegression if is_classifier else Ridge
             return cls(**params)
 
-        def create_svm(params: Dict) -> Any:
+        def create_svm(params: dict) -> Any:
             from sklearn.svm import SVC, SVR
 
             is_classifier = params.pop("is_classifier", True)
             cls = SVC if is_classifier else SVR
             return cls(**params)
 
-        def create_neural_network(params: Dict) -> Any:
+        def create_neural_network(params: dict) -> Any:
             from sklearn.neural_network import MLPClassifier, MLPRegressor
 
             is_classifier = params.pop("is_classifier", True)
@@ -279,9 +285,7 @@ class AutoMLPipeline:
             ModelType.NEURAL_NETWORK: create_neural_network,
         }
 
-    def _get_hyperparameter_space(
-        self, model_type: ModelType, trial: Any
-    ) -> Dict[str, Any]:
+    def _get_hyperparameter_space(self, model_type: ModelType, trial: Any) -> dict[str, Any]:
         """Get hyperparameter search space for model type"""
 
         if model_type == ModelType.RANDOM_FOREST:
@@ -290,9 +294,7 @@ class AutoMLPipeline:
                 "max_depth": trial.suggest_int("max_depth", 3, 20),
                 "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
                 "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
-                "max_features": trial.suggest_categorical(
-                    "max_features", ["sqrt", "log2", None]
-                ),
+                "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", None]),
             }
 
         elif model_type in [
@@ -303,9 +305,7 @@ class AutoMLPipeline:
             return {
                 "n_estimators": trial.suggest_int("n_estimators", 50, 500),
                 "max_depth": trial.suggest_int("max_depth", 3, 15),
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 0.01, 0.3, log=True
-                ),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
                 "subsample": trial.suggest_float("subsample", 0.5, 1.0),
                 "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0)
                 if model_type != ModelType.GRADIENT_BOOSTING
@@ -318,9 +318,7 @@ class AutoMLPipeline:
             return {
                 "iterations": trial.suggest_int("iterations", 100, 1000),
                 "depth": trial.suggest_int("depth", 4, 10),
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 0.01, 0.3, log=True
-                ),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
                 "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1, 10),
                 "border_count": trial.suggest_int("border_count", 32, 255),
             }
@@ -333,23 +331,17 @@ class AutoMLPipeline:
         elif model_type == ModelType.SVM:
             return {
                 "C": trial.suggest_float("C", 1e-3, 100, log=True),
-                "kernel": trial.suggest_categorical(
-                    "kernel", ["rbf", "linear", "poly"]
-                ),
+                "kernel": trial.suggest_categorical("kernel", ["rbf", "linear", "poly"]),
                 "gamma": trial.suggest_categorical("gamma", ["scale", "auto"]),
             }
 
         elif model_type == ModelType.NEURAL_NETWORK:
             n_layers = trial.suggest_int("n_layers", 1, 3)
-            hidden_layer_sizes = tuple(
-                trial.suggest_int(f"layer_{i}", 32, 256) for i in range(n_layers)
-            )
+            hidden_layer_sizes = tuple(trial.suggest_int(f"layer_{i}", 32, 256) for i in range(n_layers))
             return {
                 "hidden_layer_sizes": hidden_layer_sizes,
                 "alpha": trial.suggest_float("alpha", 1e-5, 1e-1, log=True),
-                "learning_rate_init": trial.suggest_float(
-                    "learning_rate_init", 1e-4, 1e-2, log=True
-                ),
+                "learning_rate_init": trial.suggest_float("learning_rate_init", 1e-4, 1e-2, log=True),
             }
 
         return {}
@@ -358,9 +350,9 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: Optional[List[str]] = None,
+        feature_names: list[str] | None = None,
         is_classifier: bool = True,
-        custom_scorer: Optional[Callable] = None,
+        custom_scorer: Callable | None = None,
     ) -> PipelineResult:
         """
         Run the AutoML pipeline
@@ -384,20 +376,16 @@ class AutoMLPipeline:
             cross_val_score,
         )
 
-        run_id = hashlib.md5(f"{datetime.now(timezone.utc)}".encode()).hexdigest()[:12]
+        run_id = hashlib.sha256(f"{datetime.now(UTC)}".encode()).hexdigest()[:12]
 
-        result = PipelineResult(
-            run_id=run_id, config=self.config, started_at=datetime.now(timezone.utc)
-        )
+        result = PipelineResult(run_id=run_id, config=self.config, started_at=datetime.now(UTC))
 
         if feature_names is None:
             feature_names = [f"feature_{i}" for i in range(X.shape[1])]
 
         # Feature selection
         if self.config.feature_selection:
-            X, selected_features, importance = await self._select_features(
-                X, y, feature_names, is_classifier
-            )
+            X, selected_features, importance = await self._select_features(X, y, feature_names, is_classifier)
             result.selected_features = selected_features
             result.feature_importance = importance
         else:
@@ -410,15 +398,11 @@ class AutoMLPipeline:
             cv = StratifiedKFold(n_splits=self.config.cv_folds, shuffle=True)
 
         # Optuna objective
-        candidates: List[ModelCandidate] = []
+        candidates: list[ModelCandidate] = []
 
         def objective(trial: optuna.Trial) -> float:
             # Select model type
-            model_type = ModelType(
-                trial.suggest_categorical(
-                    "model_type", [m.value for m in self.config.model_types]
-                )
-            )
+            model_type = ModelType(trial.suggest_categorical("model_type", [m.value for m in self.config.model_types]))
 
             # Get hyperparameters
             params = self._get_hyperparameter_space(model_type, trial)
@@ -444,9 +428,7 @@ class AutoMLPipeline:
                         X,
                         y,
                         cv=cv,
-                        scoring="accuracy"
-                        if is_classifier
-                        else "neg_mean_squared_error",
+                        scoring="accuracy" if is_classifier else "neg_mean_squared_error",
                     )
 
                 mean_score = np.mean(scores)
@@ -454,11 +436,7 @@ class AutoMLPipeline:
 
             except Exception as e:
                 logger.warning(f"Model {model_type.value} failed: {e}")
-                return (
-                    float("-inf")
-                    if self.config.direction == "maximize"
-                    else float("inf")
-                )
+                return float("-inf") if self.config.direction == "maximize" else float("inf")
 
             training_time = time.time() - start_time
 
@@ -486,9 +464,7 @@ class AutoMLPipeline:
         try:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-            self.study = optuna.create_study(
-                direction=self.config.direction, study_name=run_id
-            )
+            self.study = optuna.create_study(direction=self.config.direction, study_name=run_id)
 
             self.study.optimize(
                 objective,
@@ -521,23 +497,17 @@ class AutoMLPipeline:
             result.best_model.model.fit(X, y)
 
         # Create ensemble
-        if (
-            self.config.create_ensemble
-            and len(result.candidates) >= self.config.top_n_models
-        ):
+        if self.config.create_ensemble and len(result.candidates) >= self.config.top_n_models:
             result.ensemble_model, result.ensemble_score = await self._create_ensemble(
                 X, y, result.candidates[: self.config.top_n_models], cv, is_classifier
             )
 
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         result.status = "completed"
 
         self.results.append(result)
 
-        logger.info(
-            f"AutoML completed: {result.trials_completed} trials, "
-            f"best score: {result.best_score:.4f}"
-        )
+        logger.info(f"AutoML completed: {result.trials_completed} trials, best score: {result.best_score:.4f}")
 
         return result
 
@@ -545,7 +515,7 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
         is_classifier: bool,
     ) -> tuple:
         """Select important features"""
@@ -562,7 +532,7 @@ class AutoMLPipeline:
         estimator.fit(X, y)
 
         # Get importances
-        importance = dict(zip(feature_names, estimator.feature_importances_))
+        importance = dict(zip(feature_names, estimator.feature_importances_, strict=False))
 
         # Select features
         selector = SelectFromModel(
@@ -575,7 +545,7 @@ class AutoMLPipeline:
 
         # Get selected feature names
         mask = selector.get_support()
-        selected_features = [name for name, m in zip(feature_names, mask) if m]
+        selected_features = [name for name, m in zip(feature_names, mask, strict=False) if m]
 
         logger.info(f"Selected {len(selected_features)}/{len(feature_names)} features")
 
@@ -585,7 +555,7 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        top_models: List[ModelCandidate],
+        top_models: list[ModelCandidate],
         cv: Any,
         is_classifier: bool,
     ) -> tuple:
@@ -624,7 +594,7 @@ class AutoMLPipeline:
 
         return ensemble, ensemble_score
 
-    def get_best_params(self) -> Optional[Dict[str, Any]]:
+    def get_best_params(self) -> dict[str, Any] | None:
         """Get best hyperparameters from last run"""
         if not self.results:
             return None
@@ -634,7 +604,7 @@ class AutoMLPipeline:
             return last_result.best_model.hyperparameters
         return None
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance from last run"""
         if not self.results:
             return {}

@@ -3,12 +3,12 @@
 Integrates all new optimization modules into a unified interface
 """
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 # Import new modules
@@ -16,23 +16,19 @@ from backend.core.extended_metrics import (
     ExtendedMetricsCalculator,
     ExtendedMetricsResult,
 )
-
-from backend.optimization.optuna_optimizer import (
-    OptunaOptimizer,
-    OptunaOptimizationResult,
-    OPTUNA_AVAILABLE,
-)
-
-from backend.optimization.ray_optimizer import (
-    RayParallelOptimizer,
-    MultiprocessingOptimizer,
-    get_parallel_optimizer,
-    RAY_AVAILABLE,
-)
-
-from backend.validation.walk_forward import WalkForwardValidator, WalkForwardResult
-
 from backend.ml.regime_detection import RegimeDetectionResult, get_regime_detector
+from backend.optimization.optuna_optimizer import (
+    OPTUNA_AVAILABLE,
+    OptunaOptimizationResult,
+    OptunaOptimizer,
+)
+from backend.optimization.ray_optimizer import (
+    RAY_AVAILABLE,
+    MultiprocessingOptimizer,
+    RayParallelOptimizer,
+    get_parallel_optimizer,
+)
+from backend.validation.walk_forward import WalkForwardResult, WalkForwardValidator
 
 
 @dataclass
@@ -40,7 +36,7 @@ class AdvancedOptimizationResult:
     """Complete result from advanced optimization"""
 
     # Basic optimization results
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_sharpe: float
     best_sortino: float
     best_calmar: float
@@ -49,12 +45,12 @@ class AdvancedOptimizationResult:
     extended_metrics: ExtendedMetricsResult
 
     # Walk-forward validation (if performed)
-    walk_forward_result: Optional[WalkForwardResult] = None
+    walk_forward_result: WalkForwardResult | None = None
     is_robust: bool = False
     robustness_score: float = 0.0
 
     # Regime analysis (if performed)
-    regime_result: Optional[RegimeDetectionResult] = None
+    regime_result: RegimeDetectionResult | None = None
     current_regime: str = "Unknown"
 
     # Optimization statistics
@@ -63,17 +59,15 @@ class AdvancedOptimizationResult:
     optimization_method: str = "grid"
 
     # Top N results
-    top_results: List[Dict[str, Any]] = field(default_factory=list)
+    top_results: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_sharpe": round(self.best_sharpe, 4),
             "best_sortino": round(self.best_sortino, 4),
             "best_calmar": round(self.best_calmar, 4),
-            "extended_metrics": self.extended_metrics.to_dict()
-            if self.extended_metrics
-            else {},
+            "extended_metrics": self.extended_metrics.to_dict() if self.extended_metrics else {},
             "is_robust": self.is_robust,
             "robustness_score": round(self.robustness_score, 2),
             "current_regime": self.current_regime,
@@ -152,8 +146,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         n_trials: int = 100,
         metric: str = "sharpe_ratio",
         validate: bool = True,
@@ -190,29 +184,21 @@ class AdvancedOptimizationEngine:
 
         # Step 2: Optimization
         if self.optimization_method == "optuna" and self.optuna_optimizer:
-            opt_result = self._optimize_optuna(
-                data, strategy_class, param_space, base_config, n_trials, metric
-            )
+            opt_result = self._optimize_optuna(data, strategy_class, param_space, base_config, n_trials, metric)
             best_params = opt_result.best_params
             best_value = opt_result.best_value
             total_tested = opt_result.n_trials
-            top_results = (
-                opt_result.top_results if hasattr(opt_result, "top_results") else []
-            )
+            top_results = opt_result.top_results if hasattr(opt_result, "top_results") else []
         else:
             # Fallback to grid/random
-            opt_result = self._optimize_grid(
-                data, strategy_class, param_space, base_config, metric
-            )
+            opt_result = self._optimize_grid(data, strategy_class, param_space, base_config, metric)
             best_params = opt_result["best_params"]
             best_value = opt_result["best_value"]
             total_tested = opt_result["total_tested"]
             top_results = opt_result.get("top_results", [])
 
         # Step 3: Run final backtest with best params
-        final_result = self._run_backtest(
-            data, strategy_class, best_params, base_config
-        )
+        final_result = self._run_backtest(data, strategy_class, best_params, base_config)
 
         # Step 4: Calculate extended metrics
         if self.use_extended_metrics and hasattr(final_result, "equity_curve"):
@@ -229,9 +215,7 @@ class AdvancedOptimizationEngine:
 
         if validate and self.use_walk_forward and self.walk_forward:
             try:
-                wf_result = self._run_walk_forward(
-                    data, strategy_class, param_space, base_config
-                )
+                wf_result = self._run_walk_forward(data, strategy_class, param_space, base_config)
                 is_robust = wf_result.is_robust
                 robustness_score = wf_result.robustness_score
                 logger.info(f"Walk-Forward: {wf_result.validation_status.value}")
@@ -247,9 +231,7 @@ class AdvancedOptimizationEngine:
         # Create result
         result = AdvancedOptimizationResult(
             best_params=best_params,
-            best_sharpe=extended_metrics.sharpe_ratio
-            if extended_metrics
-            else best_value,
+            best_sharpe=extended_metrics.sharpe_ratio if extended_metrics else best_value,
             best_sortino=extended_metrics.sortino_ratio if extended_metrics else 0,
             best_calmar=extended_metrics.calmar_ratio if extended_metrics else 0,
             extended_metrics=extended_metrics,
@@ -257,9 +239,7 @@ class AdvancedOptimizationEngine:
             is_robust=is_robust,
             robustness_score=robustness_score,
             regime_result=regime_result,
-            current_regime=regime_result.current_regime_name
-            if regime_result
-            else "Unknown",
+            current_regime=regime_result.current_regime_name if regime_result else "Unknown",
             total_combinations_tested=total_tested,
             optimization_time_seconds=optimization_time,
             optimization_method=self.optimization_method,
@@ -272,8 +252,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         n_trials: int,
         metric: str,
     ) -> OptunaOptimizationResult:
@@ -294,10 +274,10 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         metric: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run grid search optimization"""
         from itertools import product
 
@@ -305,7 +285,7 @@ class AdvancedOptimizationEngine:
         param_names = list(param_space.keys())
         param_values = []
 
-        for name, spec in param_space.items():
+        for _name, spec in param_space.items():
             if spec["type"] == "int":
                 values = list(range(spec["low"], spec["high"] + 1, spec.get("step", 1)))
             elif spec["type"] == "float":
@@ -320,7 +300,7 @@ class AdvancedOptimizationEngine:
         # Run backtests
         results = []
         for combo in combinations:
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=False))
             try:
                 result = self._run_backtest(data, strategy_class, params, base_config)
                 value = getattr(result.metrics, metric, 0)
@@ -342,8 +322,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        params: Dict[str, Any],
-        base_config: Dict[str, Any],
+        params: dict[str, Any],
+        base_config: dict[str, Any],
     ):
         """Run single backtest"""
         from backend.backtesting.models import BacktestConfig
@@ -377,16 +357,14 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
     ) -> WalkForwardResult:
         """Run walk-forward validation"""
 
         def optimizer_fn(is_data, ps):
             # Simple grid optimization on IS period
-            result = self._optimize_grid(
-                is_data, strategy_class, ps, base_config, "sharpe_ratio"
-            )
+            result = self._optimize_grid(is_data, strategy_class, ps, base_config, "sharpe_ratio")
             return result["best_params"]
 
         def backtest_fn(data_slice, strategy, params):

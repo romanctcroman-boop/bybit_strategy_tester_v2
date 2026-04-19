@@ -15,9 +15,9 @@ Intrabar Engine: Universal Bar Magnifier
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Generator, Optional
 
 import numpy as np
 import pandas as pd
@@ -89,8 +89,8 @@ class IntrabarEngine:
 
     def __init__(self, config: IntrabarConfig = None):
         self.config = config or IntrabarConfig()
-        self.m1_data: Optional[pd.DataFrame] = None
-        self.m1_timestamps: Optional[np.ndarray] = None
+        self.m1_data: pd.DataFrame | None = None
+        self.m1_timestamps: np.ndarray | None = None
 
         # Кэш для быстрого поиска 1m баров
         self._m1_index: dict[int, int] = {}  # timestamp_ms -> index
@@ -141,9 +141,7 @@ class IntrabarEngine:
         mask = (self.m1_timestamps >= bar_start_ms) & (self.m1_timestamps < bar_end_ms)
         return self.m1_data.iloc[mask]
 
-    def generate_ticks_for_m1_bar(
-        self, m1_bar: pd.Series, bar_index: int
-    ) -> Generator[PseudoTick, None, None]:
+    def generate_ticks_for_m1_bar(self, m1_bar: pd.Series, bar_index: int) -> Generator[PseudoTick]:
         """
         Сгенерировать последовательность псевдотиков из одного 1m бара.
 
@@ -156,13 +154,13 @@ class IntrabarEngine:
         """
         o = float(m1_bar["open"])
         h = float(m1_bar["high"])
-        l = float(m1_bar["low"])
+        low_val = float(m1_bar["low"])
         c = float(m1_bar["close"])
         v = float(m1_bar.get("volume", 0))
         ts = int(m1_bar["open_time"])
 
         # Определяем порядок обхода
-        path = self._get_ohlc_path(o, h, l, c)
+        path = self._get_ohlc_path(o, h, low_val, c)
 
         # Распределение объёма
         volumes = self._distribute_volume(v, len(path))
@@ -185,14 +183,9 @@ class IntrabarEngine:
             # Если нужны промежуточные тики (subticks)
             if self.config.subticks_per_segment > 0 and i < len(path) - 1:
                 next_price = path[i + 1][0]
-                for st in self._generate_subticks(
-                    price, next_price, tick_time, ts, bar_index
-                ):
-                    yield st
+                yield from self._generate_subticks(price, next_price, tick_time, ts, bar_index)
 
-    def _get_ohlc_path(
-        self, o: float, h: float, l: float, c: float
-    ) -> list[tuple[float, str]]:
+    def _get_ohlc_path(self, o: float, h: float, low_val: float, c: float) -> list[tuple[float, str]]:
         """
         Определить порядок обхода OHLC.
 
@@ -200,25 +193,25 @@ class IntrabarEngine:
             List of (price, type) tuples
         """
         if self.config.ohlc_path == OHLCPath.O_H_L_C:
-            return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.O_L_H_C:
-            return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+            return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.CONSERVATIVE_LONG:
             # Для лонга: сначала worst (low), потом best (high)
-            return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+            return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.CONSERVATIVE_SHORT:
             # Для шорта: сначала worst (high), потом best (low)
-            return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
 
         else:  # O_HL_HEURISTIC - TradingView style
             # Если Open ближе к High → сначала High, потом Low
-            if abs(o - h) < abs(o - l):
-                return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            if abs(o - h) < abs(o - low_val):
+                return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
             else:
-                return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+                return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
     def _generate_subticks(
         self,
@@ -227,7 +220,7 @@ class IntrabarEngine:
         time_from: int,
         source_bar_time: int,
         bar_index: int,
-    ) -> Generator[PseudoTick, None, None]:
+    ) -> Generator[PseudoTick]:
         """Генерировать промежуточные тики между двумя точками."""
         n = self.config.subticks_per_segment
         for i in range(1, n + 1):
@@ -257,9 +250,7 @@ class IntrabarEngine:
         else:
             return [0.0] * n_ticks
 
-    def generate_ticks(
-        self, bar_start_ms: int, bar_end_ms: int
-    ) -> Generator[PseudoTick, None, None]:
+    def generate_ticks(self, bar_start_ms: int, bar_end_ms: int) -> Generator[PseudoTick]:
         """
         Генерировать все псевдотики для бара старшего ТФ.
 
@@ -274,9 +265,7 @@ class IntrabarEngine:
 
         if len(m1_bars) == 0:
             # Нет 1m данных - возвращаем пустой генератор
-            logger.debug(
-                f"[INTRABAR_ENGINE] No 1m bars for {bar_start_ms}-{bar_end_ms}"
-            )
+            logger.debug(f"[INTRABAR_ENGINE] No 1m bars for {bar_start_ms}-{bar_end_ms}")
             return
 
         for idx, (_, m1_bar) in enumerate(m1_bars.iterrows()):

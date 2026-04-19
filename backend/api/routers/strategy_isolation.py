@@ -7,7 +7,6 @@ Created: 2025-12-21
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -44,9 +43,9 @@ class RegisterStrategyRequest(BaseModel):
     """Request to register a new strategy"""
 
     strategy_name: str = Field(..., min_length=1, max_length=100)
-    strategy_id: Optional[str] = Field(default=None, max_length=50)
+    strategy_id: str | None = Field(default=None, max_length=50)
     isolation_level: IsolationLevel = Field(default=IsolationLevel.SOFT)
-    quota: Optional[ResourceQuotaRequest] = None
+    quota: ResourceQuotaRequest | None = None
 
 
 class UpdateQuotaRequest(BaseModel):
@@ -64,7 +63,7 @@ class StrategyActionRequest(BaseModel):
 class QuotaCheckRequest(BaseModel):
     """Request to check quota for a trade"""
 
-    trade_size_usdt: Optional[float] = Field(default=None, ge=0)
+    trade_size_usdt: float | None = Field(default=None, ge=0)
 
 
 class RecordErrorRequest(BaseModel):
@@ -76,8 +75,8 @@ class RecordErrorRequest(BaseModel):
 class ResourceUsageUpdate(BaseModel):
     """Update resource usage metrics"""
 
-    memory_mb: Optional[float] = Field(default=None, ge=0)
-    cpu_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    memory_mb: float | None = Field(default=None, ge=0)
+    cpu_percent: float | None = Field(default=None, ge=0, le=100)
 
 
 # Endpoints
@@ -152,9 +151,7 @@ async def unregister_strategy(strategy_id: str):
 
 
 @router.post("/strategies/{strategy_id}/start")
-async def start_strategy(
-    strategy_id: str, request: Optional[StrategyActionRequest] = None
-):
+async def start_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Start strategy execution"""
     manager = get_isolation_manager()
 
@@ -180,9 +177,7 @@ async def start_strategy(
 
 
 @router.post("/strategies/{strategy_id}/stop")
-async def stop_strategy(
-    strategy_id: str, request: Optional[StrategyActionRequest] = None
-):
+async def stop_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Stop strategy execution"""
     manager = get_isolation_manager()
 
@@ -200,9 +195,7 @@ async def stop_strategy(
 
 
 @router.post("/strategies/{strategy_id}/pause")
-async def pause_strategy(
-    strategy_id: str, request: Optional[StrategyActionRequest] = None
-):
+async def pause_strategy(strategy_id: str, request: StrategyActionRequest | None = None):
     """Pause strategy execution"""
     manager = get_isolation_manager()
 
@@ -255,9 +248,7 @@ async def update_strategy_quota(strategy_id: str, request: UpdateQuotaRequest):
 
 
 @router.post("/strategies/{strategy_id}/check-quota")
-async def check_strategy_quota(
-    strategy_id: str, request: Optional[QuotaCheckRequest] = None
-):
+async def check_strategy_quota(strategy_id: str, request: QuotaCheckRequest | None = None):
     """Check if strategy is within quota limits"""
     manager = get_isolation_manager()
 
@@ -354,9 +345,7 @@ async def get_circuit_breaker_status(strategy_id: str):
         "triggered_at": context.circuit_breaker_triggered_at.isoformat()
         if context.circuit_breaker_triggered_at
         else None,
-        "cooldown_until": context.cooldown_until.isoformat()
-        if context.cooldown_until
-        else None,
+        "cooldown_until": context.cooldown_until.isoformat() if context.cooldown_until else None,
         "state": context.state.value,
     }
 

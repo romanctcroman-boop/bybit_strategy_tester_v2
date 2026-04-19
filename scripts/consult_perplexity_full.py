@@ -1,12 +1,15 @@
 """
 FULL Perplexity API consultation about VectorBT limitations
-Uses sonar-reasoning-pro model for deep analysis with web search capabilities
+Uses sonar-pro model for analysis with web search capabilities
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 import httpx
-import json
 
 from backend.security.key_manager import get_key_manager
 
@@ -27,8 +30,8 @@ STAGE 1: VectorBT (vectorized)
   - Speed: 5,000-80,000 combinations/sec
   - Accuracy: ~85%
   - Uses: vectorbt.Portfolio.from_signals()
-  
-STAGE 2: Fallback (sequential)  
+
+STAGE 2: Fallback (sequential)
   - Validates TOP-50 candidates from Stage 1
   - Speed: ~1 combination/sec
   - Accuracy: 100%
@@ -105,28 +108,29 @@ Please provide:
 6. **Links to relevant documentation or research papers**
 """
 
+
 def main():
     print("=" * 70)
     print("PERPLEXITY FULL CONSULTATION: VectorBT Limitations")
     print("=" * 70)
-    
+
     # Get API key
     km = get_key_manager()
     api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
-    
+
     if not api_key:
         print("❌ Perplexity API key not found")
         return
-    
+
     print("✅ API key loaded")
-    
-    # Use sonar-reasoning-pro for deep analysis with web search
+
+    # Use sonar-pro for analysis with web search
     payload = {
-        "model": "sonar-reasoning-pro",  # DeepSeek-R1 + Chain-of-Thought
+        "model": "sonar-pro",  # Cost-effective model
         "messages": [
             {
-                "role": "system", 
-                "content": "You are an expert in quantitative finance, algorithmic trading, backtesting engines, and high-performance computing. You have deep knowledge of VectorBT, Numba, NumPy, and vectorized computation. Provide technical, actionable advice with code examples."
+                "role": "system",
+                "content": "You are an expert in quantitative finance, algorithmic trading, backtesting engines, and high-performance computing. You have deep knowledge of VectorBT, Numba, NumPy, and vectorized computation. Provide technical, actionable advice with code examples.",
             },
             {"role": "user", "content": FULL_PROMPT},
         ],
@@ -134,81 +138,80 @@ def main():
         "temperature": 0.2,
         "web_search_options": {
             "search_recency_filter": "month"  # Recent results
-        }
+        },
     }
-    
-    print(f"\n📤 Sending FULL request to Perplexity...")
+
+    print("\n📤 Sending FULL request to Perplexity...")
     print(f"   Model: {payload['model']} (reasoning + web search)")
     print(f"   Prompt length: {len(FULL_PROMPT)} chars")
     print(f"   Max tokens: {payload['max_tokens']}")
     print("\n⏳ This may take 1-3 minutes for deep analysis with web search...")
-    
+
     # Make request with long timeout
     try:
         with httpx.Client(timeout=300.0) as client:  # 5 minute timeout
             response = client.post(
                 "https://api.perplexity.ai/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
-        
+
         print(f"\n📥 Response received: {response.status_code}")
-        
+
         if response.status_code == 200:
             data = response.json()
             message = data["choices"][0]["message"]
             content = message.get("content", "")
             citations = data.get("citations", [])
             usage = data.get("usage", {})
-            
+
             print(f"   Total tokens: {usage.get('total_tokens', 'N/A')}")
             print(f"   Citations: {len(citations)} sources")
-            
+
             # Save full response
             with open("perplexity_vectorbt_consultation.md", "w", encoding="utf-8") as f:
                 f.write("# Perplexity VectorBT Consultation\n\n")
                 f.write(f"Model: {payload['model']}\n")
                 f.write(f"Tokens: {usage.get('total_tokens', 'N/A')}\n\n")
-                
+
                 f.write("## Response\n\n")
                 f.write(content)
-                
+
                 if citations:
                     f.write("\n\n---\n\n## Citations\n\n")
                     for i, citation in enumerate(citations, 1):
                         f.write(f"{i}. {citation}\n")
-            
+
             print("\n" + "=" * 70)
             print("PERPLEXITY RESPONSE")
             print("=" * 70)
-            
+
             print("\n--- ANSWER ---")
             print(content[:6000])
             if len(content) > 6000:
                 print(f"\n... ({len(content)} chars total, see file)")
-            
+
             if citations:
                 print(f"\n--- CITATIONS ({len(citations)} sources) ---")
                 for i, citation in enumerate(citations[:5], 1):
                     print(f"  {i}. {citation[:80]}...")
                 if len(citations) > 5:
                     print(f"  ... and {len(citations) - 5} more")
-            
+
             print("\n📄 Full response saved to: perplexity_vectorbt_consultation.md")
-            
+
         else:
             print(f"❌ Error: {response.status_code}")
             print(response.text)
-            
+
     except httpx.TimeoutException:
         print("❌ Request timed out (5 minutes)")
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

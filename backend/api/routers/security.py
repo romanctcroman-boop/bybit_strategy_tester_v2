@@ -5,13 +5,18 @@ Provides REST API endpoints for:
 - Key Usage Audit Logging
 - Secure Configuration Handler
 - IP Whitelisting
+
+SECURITY: All endpoints require security API key authentication.
 """
 
+import hmac
+import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from backend.services.ip_whitelist import (
@@ -31,7 +36,50 @@ from backend.services.secure_config import (
     get_config_handler,
 )
 
-router = APIRouter(prefix="/security", tags=["security"])
+logger = logging.getLogger(__name__)
+
+# Security API key header
+security_api_key_header = APIKeyHeader(name="X-Security-Key", auto_error=False)
+
+
+async def verify_security_key(api_key: str = Depends(security_api_key_header)) -> str:
+    """
+    Verify security API key for protected endpoints.
+
+    Uses constant-time comparison to prevent timing attacks.
+
+    Raises:
+        HTTPException: If key is missing, not configured, or invalid.
+    """
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Security API key required",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    # Check SECURITY_API_KEY or fallback to ADMIN_API_KEY
+    expected_key = os.environ.get("SECURITY_API_KEY") or os.environ.get("ADMIN_API_KEY")
+    if not expected_key:
+        logger.error("SECURITY_API_KEY or ADMIN_API_KEY not configured in environment")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Security authentication not configured",
+        )
+
+    # Constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(api_key.encode(), expected_key.encode()):
+        logger.warning("Invalid security key attempt")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid security key",
+        )
+
+    return api_key
+
+
+# All security routes require authentication
+router = APIRouter(prefix="/security", tags=["security"], dependencies=[Depends(verify_security_key)])
 
 
 # ============================================
@@ -45,9 +93,9 @@ class LogKeyAccessRequest(BaseModel):
     key_id: str = Field(..., description="Key identifier")
     key_provider: KeyProvider = Field(..., description="Key provider")
     access_type: KeyAccessType = Field(..., description="Type of access")
-    user_id: Optional[str] = None
+    user_id: str | None = None
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
     latency_ms: float = 0.0
     metadata: dict = Field(default_factory=dict)
 
@@ -59,8 +107,8 @@ class AddIPRuleRequest(BaseModel):
     is_whitelist: bool = Field(default=True)
     action_types: list[str] = Field(default=["all"])
     description: str = ""
-    expires_in_hours: Optional[int] = None
-    created_by: Optional[str] = None
+    expires_in_hours: int | None = None
+    created_by: str | None = None
 
 
 class CheckIPRequest(BaseModel):
@@ -82,7 +130,7 @@ class AddVariableRequest(BaseModel):
     name: str
     config_type: str = "string"
     required: bool = False
-    default_value: Optional[str] = None
+    default_value: str | None = None
     description: str = ""
     is_sensitive: bool = False
 
@@ -138,9 +186,9 @@ async def log_key_access(request: LogKeyAccessRequest, req: Request):
 
 @router.get("/audit/events")
 async def get_audit_events(
-    key_id: Optional[str] = Query(None),
-    access_type: Optional[str] = Query(None),
-    success_only: Optional[bool] = Query(None),
+    key_id: str | None = Query(None),
+    access_type: str | None = Query(None),
+    success_only: bool | None = Query(None),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
     """Get audit events."""
@@ -182,8 +230,8 @@ async def get_audit_events(
 
 @router.get("/audit/anomalies")
 async def get_anomalies(
-    key_id: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
+    key_id: str | None = Query(None),
+    severity: str | None = Query(None),
     unacknowledged_only: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
@@ -331,7 +379,7 @@ async def add_ip_rule(request: AddIPRuleRequest):
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid action type: {str(e)}",
+            detail=f"Invalid action type: {e!s}",
         )
 
     expires_at = None
@@ -364,7 +412,7 @@ async def add_ip_rule(request: AddIPRuleRequest):
 
 @router.get("/ip/rules")
 async def get_ip_rules(
-    is_whitelist: Optional[bool] = Query(None),
+    is_whitelist: bool | None = Query(None),
     enabled_only: bool = Query(default=False),
 ):
     """Get IP rules."""
@@ -437,7 +485,7 @@ async def disable_ip_rule(rule_id: str):
 
 @router.get("/ip/blocked")
 async def get_blocked_requests(
-    ip_address: Optional[str] = Query(None),
+    ip_address: str | None = Query(None),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
     """Get blocked request records."""
@@ -467,10 +515,7 @@ async def get_auto_blocked():
     service = get_ip_whitelist_service()
     blocked = service.get_auto_blocked()
 
-    return [
-        {"ip_address": ip, "blocked_until": until.isoformat()}
-        for ip, until in blocked.items()
-    ]
+    return [{"ip_address": ip, "blocked_until": until.isoformat()} for ip, until in blocked.items()]
 
 
 @router.post("/ip/unblock/{ip_address}")
@@ -605,7 +650,7 @@ async def get_variable_info(name: str):
 
 @router.get("/config/issues")
 async def get_config_issues(
-    severity: Optional[str] = Query(None),
+    severity: str | None = Query(None),
 ):
     """Get configuration issues."""
     handler = get_config_handler()

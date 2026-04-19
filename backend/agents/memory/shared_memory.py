@@ -14,13 +14,13 @@ from __future__ import annotations
 import asyncio
 import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, TypeVar
 
 from loguru import logger
-
 
 T = TypeVar("T")
 
@@ -41,13 +41,13 @@ class SharedValue:
 
     value: Any
     version: int = 0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_by: Optional[str] = None
-    lock_holder: Optional[str] = None
-    lock_expires_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_by: str | None = None
+    lock_holder: str | None = None
+    lock_expires_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "value": self.value,
@@ -63,24 +63,22 @@ class Transaction:
     """Transaction for atomic operations"""
 
     id: str = field(default_factory=lambda: f"tx_{uuid.uuid4().hex[:12]}")
-    agent_id: Optional[str] = None
-    operations: List[Tuple[str, str, Any]] = field(
-        default_factory=list
-    )  # (op, key, value)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    agent_id: str | None = None
+    operations: list[tuple[str, str, Any]] = field(default_factory=list)  # (op, key, value)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     committed: bool = False
 
-    def set(self, key: str, value: Any) -> "Transaction":
+    def set(self, key: str, value: Any) -> Transaction:
         """Add SET operation"""
         self.operations.append(("SET", key, value))
         return self
 
-    def delete(self, key: str) -> "Transaction":
+    def delete(self, key: str) -> Transaction:
         """Add DELETE operation"""
         self.operations.append(("DELETE", key, None))
         return self
 
-    def increment(self, key: str, delta: float = 1.0) -> "Transaction":
+    def increment(self, key: str, delta: float = 1.0) -> Transaction:
         """Add INCREMENT operation"""
         self.operations.append(("INCREMENT", key, delta))
         return self
@@ -105,8 +103,8 @@ class MemoryEvent:
     event_type: SharedMemoryEvent
     key: str
     value: Any
-    agent_id: Optional[str] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    agent_id: str | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SharedMemory:
@@ -149,26 +147,32 @@ class SharedMemory:
         conflict_resolution: ConflictResolution = ConflictResolution.LAST_WRITE_WINS,
         lock_timeout_seconds: int = 30,
     ):
-        self._data: Dict[str, SharedValue] = {}
-        self._lock = asyncio.Lock()
+        self._data: dict[str, SharedValue] = {}
+        self._lock: asyncio.Lock | None = None  # Lazy init for event loop compatibility
         self._thread_lock = threading.RLock()
 
         self.conflict_resolution = conflict_resolution
         self.lock_timeout_seconds = lock_timeout_seconds
 
-        self._subscribers: Dict[str, List[Callable]] = {}  # key -> callbacks
-        self._global_subscribers: List[Callable] = []
+        self._subscribers: dict[str, list[Callable]] = {}  # key -> callbacks
+        self._global_subscribers: list[Callable] = []
 
-        self._pending_transactions: Dict[str, Transaction] = {}
+        self._pending_transactions: dict[str, Transaction] = {}
 
         logger.info("🧠 SharedMemory initialized")
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create asyncio lock (lazy initialization for event loop compatibility)"""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def set(
         self,
         agent_id: str,
         key: str,
         value: Any,
-        expected_version: Optional[int] = None,
+        expected_version: int | None = None,
     ) -> bool:
         """
         Set value with optional optimistic locking
@@ -182,27 +186,26 @@ class SharedMemory:
         Returns:
             True if successful, False if version conflict
         """
-        async with self._lock:
-            now = datetime.now(timezone.utc)
+        async with self._get_lock():
+            now = datetime.now(UTC)
 
             if key in self._data:
                 existing = self._data[key]
 
                 # Check optimistic lock
-                if (
-                    expected_version is not None
-                    and existing.version != expected_version
-                ):
-                    logger.warning(
-                        f"Version conflict on {key}: expected {expected_version}, got {existing.version}"
-                    )
+                if expected_version is not None and existing.version != expected_version:
+                    logger.warning(f"Version conflict on {key}: expected {expected_version}, got {existing.version}")
                     return False
 
                 # Check pessimistic lock
-                if existing.lock_holder and existing.lock_holder != agent_id:
-                    if existing.lock_expires_at and existing.lock_expires_at > now:
-                        logger.warning(f"Key {key} is locked by {existing.lock_holder}")
-                        return False
+                if (
+                    existing.lock_holder
+                    and existing.lock_holder != agent_id
+                    and existing.lock_expires_at
+                    and existing.lock_expires_at > now
+                ):
+                    logger.warning(f"Key {key} is locked by {existing.lock_holder}")
+                    return False
 
                 # Update existing
                 existing.value = value
@@ -234,14 +237,14 @@ class SharedMemory:
 
     async def get(self, key: str, default: Any = None) -> Any:
         """Get value by key"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 return self._data[key].value
             return default
 
-    async def get_with_version(self, key: str) -> Tuple[Any, int]:
+    async def get_with_version(self, key: str) -> tuple[Any, int]:
         """Get value with version for optimistic locking"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 sv = self._data[key]
                 return sv.value, sv.version
@@ -249,13 +252,13 @@ class SharedMemory:
 
     async def delete(self, agent_id: str, key: str) -> bool:
         """Delete key"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 sv = self._data[key]
 
                 # Check lock
                 if sv.lock_holder and sv.lock_holder != agent_id:
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     if sv.lock_expires_at and sv.lock_expires_at > now:
                         return False
 
@@ -280,7 +283,7 @@ class SharedMemory:
         delta: float = 1.0,
     ) -> float:
         """Atomic increment operation"""
-        async with self._lock:
+        async with self._get_lock():
             current = 0.0
             if key in self._data:
                 current = float(self._data[key].value)
@@ -298,7 +301,7 @@ class SharedMemory:
         new_value: Any,
     ) -> bool:
         """Atomic compare-and-swap operation"""
-        async with self._lock:
+        async with self._get_lock():
             current = self._data.get(key)
 
             if current is None:
@@ -317,16 +320,14 @@ class SharedMemory:
         self,
         agent_id: str,
         key: str,
-        timeout_seconds: Optional[int] = None,
+        timeout_seconds: int | None = None,
     ) -> bool:
         """Acquire pessimistic lock on key"""
         timeout = timeout_seconds or self.lock_timeout_seconds
 
-        async with self._lock:
-            now = datetime.now(timezone.utc)
-            expires_at = datetime.fromtimestamp(
-                now.timestamp() + timeout, tz=timezone.utc
-            )
+        async with self._get_lock():
+            now = datetime.now(UTC)
+            expires_at = datetime.fromtimestamp(now.timestamp() + timeout, tz=UTC)
 
             if key not in self._data:
                 self._data[key] = SharedValue(
@@ -339,9 +340,8 @@ class SharedMemory:
             sv = self._data[key]
 
             # Check if already locked by another agent
-            if sv.lock_holder and sv.lock_holder != agent_id:
-                if sv.lock_expires_at and sv.lock_expires_at > now:
-                    return False
+            if sv.lock_holder and sv.lock_holder != agent_id and sv.lock_expires_at and sv.lock_expires_at > now:
+                return False
 
             # Acquire lock
             sv.lock_holder = agent_id
@@ -360,7 +360,7 @@ class SharedMemory:
 
     async def release_lock(self, agent_id: str, key: str) -> bool:
         """Release lock on key"""
-        async with self._lock:
+        async with self._get_lock():
             if key not in self._data:
                 return False
 
@@ -383,7 +383,7 @@ class SharedMemory:
 
             return True
 
-    def transaction(self, agent_id: str) -> "_TransactionContext":
+    def transaction(self, agent_id: str) -> _TransactionContext:
         """Create transaction context manager"""
         return _TransactionContext(self, agent_id)
 
@@ -395,15 +395,15 @@ class SharedMemory:
 
     async def commit_transaction(self, tx: Transaction) -> bool:
         """Commit transaction"""
-        async with self._lock:
+        async with self._get_lock():
             try:
                 for op, key, value in tx.operations:
                     if op == "SET":
-                        await self.set(tx.agent_id, key, value)
+                        await self.set(tx.agent_id or "", key, value)
                     elif op == "DELETE":
-                        await self.delete(tx.agent_id, key)
+                        await self.delete(tx.agent_id or "", key)
                     elif op == "INCREMENT":
-                        await self.increment(tx.agent_id, key, value)
+                        await self.increment(tx.agent_id or "", key, value)
 
                 tx.committed = True
                 self._pending_transactions.pop(tx.id, None)
@@ -439,7 +439,7 @@ class SharedMemory:
 
     def subscribe(
         self,
-        key: Optional[str],
+        key: str | None,
         callback: Callable[[MemoryEvent], Any],
     ) -> str:
         """Subscribe to changes on key (or all if key is None)"""
@@ -454,7 +454,7 @@ class SharedMemory:
 
         return subscription_id
 
-    def unsubscribe(self, key: Optional[str], callback: Callable) -> None:
+    def unsubscribe(self, key: str | None, callback: Callable) -> None:
         """Unsubscribe from changes"""
         if key is None:
             if callback in self._global_subscribers:
@@ -486,28 +486,26 @@ class SharedMemory:
             except Exception as e:
                 logger.error(f"Global subscriber error: {e}")
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all key-value pairs"""
-        async with self._lock:
+        async with self._get_lock():
             return {key: sv.value for key, sv in self._data.items()}
 
-    async def keys(self) -> List[str]:
+    async def keys(self) -> list[str]:
         """Get all keys"""
-        async with self._lock:
+        async with self._get_lock():
             return list(self._data.keys())
 
     async def clear(self, agent_id: str) -> None:
         """Clear all data"""
-        async with self._lock:
+        async with self._get_lock():
             self._data.clear()
             logger.info(f"SharedMemory cleared by {agent_id}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get memory statistics"""
         with self._thread_lock:
-            locked_keys = [
-                key for key, sv in self._data.items() if sv.lock_holder is not None
-            ]
+            locked_keys = [key for key, sv in self._data.items() if sv.lock_holder is not None]
 
             return {
                 "total_keys": len(self._data),
@@ -524,7 +522,7 @@ class _TransactionContext:
     def __init__(self, memory: SharedMemory, agent_id: str):
         self.memory = memory
         self.agent_id = agent_id
-        self.tx: Optional[Transaction] = None
+        self.tx: Transaction | None = None
 
     async def __aenter__(self) -> Transaction:
         self.tx = await self.memory.begin_transaction(self.agent_id)
@@ -532,9 +530,9 @@ class _TransactionContext:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            await self.memory.commit_transaction(self.tx)
+            await self.memory.commit_transaction(self.tx)  # type: ignore[arg-type]
         else:
-            await self.memory.rollback_transaction(self.tx)
+            await self.memory.rollback_transaction(self.tx)  # type: ignore[arg-type]
         return False
 
 
@@ -551,13 +549,13 @@ class DistributedSharedMemory(SharedMemory):
     def __init__(
         self,
         node_id: str,
-        peers: Optional[List[str]] = None,
+        peers: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.node_id = node_id
         self.peers = peers or []
-        self._vector_clock: Dict[str, int] = {node_id: 0}
+        self._vector_clock: dict[str, int] = {node_id: 0}
 
         logger.info(f"🌐 DistributedSharedMemory initialized: {node_id}")
 
@@ -566,16 +564,14 @@ class DistributedSharedMemory(SharedMemory):
         agent_id: str,
         key: str,
         value: Any,
-        expected_version: Optional[int] = None,
+        expected_version: int | None = None,
     ) -> bool:
         """Set with vector clock update"""
         result = await super().set(agent_id, key, value, expected_version)
 
         if result:
             # Update vector clock
-            self._vector_clock[self.node_id] = (
-                self._vector_clock.get(self.node_id, 0) + 1
-            )
+            self._vector_clock[self.node_id] = self._vector_clock.get(self.node_id, 0) + 1
 
             # Replicate to peers (placeholder)
             # await self._replicate_to_peers(key, value)
@@ -585,8 +581,8 @@ class DistributedSharedMemory(SharedMemory):
     async def sync_from_peer(
         self,
         peer_id: str,
-        data: Dict[str, Any],
-        peer_clock: Dict[str, int],
+        data: dict[str, Any],
+        peer_clock: dict[str, int],
     ) -> None:
         """Sync data from peer"""
         # Merge vector clocks
@@ -607,7 +603,7 @@ class DistributedSharedMemory(SharedMemory):
 
 
 # Global shared memory instance
-_global_shared_memory: Optional[SharedMemory] = None
+_global_shared_memory: SharedMemory | None = None
 
 
 def get_shared_memory() -> SharedMemory:
@@ -620,11 +616,11 @@ def get_shared_memory() -> SharedMemory:
 
 __all__ = [
     "ConflictResolution",
-    "SharedValue",
-    "Transaction",
-    "SharedMemoryEvent",
+    "DistributedSharedMemory",
     "MemoryEvent",
     "SharedMemory",
-    "DistributedSharedMemory",
+    "SharedMemoryEvent",
+    "SharedValue",
+    "Transaction",
     "get_shared_memory",
 ]

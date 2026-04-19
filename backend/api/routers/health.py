@@ -10,9 +10,10 @@ Provides endpoints to check:
 - Prometheus metrics
 """
 
+import inspect
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -61,7 +62,7 @@ def startup_probe():
     return {"status": "ok"}
 
 
-@router.get("", response_model=Dict[str, Any])
+@router.get("", response_model=dict[str, Any])
 async def health_check():
     """
     Overall health check.
@@ -112,13 +113,14 @@ async def health_check():
 
         session = SessionLocal()
         try:
-            session.execute(
-                text("SELECT 1")
-            )  # ✅ Fixed: explicit text() for SQLAlchemy 2.0
+            session.execute(text("SELECT 1"))
             checks["database"] = {
                 "status": "ok",
                 "message": "Database connection successful",
             }
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 
@@ -159,7 +161,7 @@ async def health_check():
     # Build response
     response = {
         "status": overall_status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks,
         "config": {
             "cache_enabled": config.CACHE_ENABLED,
@@ -170,14 +172,12 @@ async def health_check():
 
     # Return 503 if unhealthy
     if overall_status == "unhealthy":
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response)
 
     return response
 
 
-@router.get("/bybit", response_model=Dict[str, Any])
+@router.get("/bybit", response_model=dict[str, Any])
 async def bybit_health():
     """
     Detailed Bybit API health check.
@@ -218,7 +218,7 @@ async def bybit_health():
     success_rate = (successful / total) * 100 if total > 0 else 0
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "success_rate": round(success_rate, 2),
         "successful": successful,
         "total": total,
@@ -253,21 +253,23 @@ async def readiness_check():
             not_ready_reasons.append("Bybit API not responding with data")
     except Exception as e:
         checks["bybit_api"] = False
-        not_ready_reasons.append(f"Bybit API error: {str(e)}")
+        not_ready_reasons.append(f"Bybit API error: {e!s}")
 
     # 2. Check Redis connectivity (for circuit breaker persistence)
     try:
         from backend.agents.circuit_breaker_manager import get_circuit_manager
 
         manager = get_circuit_manager()
-        if manager._persistence_enabled and manager._redis:
-            await manager._redis.ping()
+        if manager._persistence_enabled and manager._persistence_redis:
+            result = manager._persistence_redis.ping()
+            if inspect.isawaitable(result):
+                await result
             checks["redis"] = True
         else:
-            checks["redis"] = None  # Not enabled
+            checks["redis"] = None  # type: ignore[assignment]  # Not enabled
     except Exception as e:
         checks["redis"] = False
-        not_ready_reasons.append(f"Redis connection failed: {str(e)}")
+        not_ready_reasons.append(f"Redis connection failed: {e!s}")
 
     # 3. Check agent config loaded
     try:
@@ -277,19 +279,19 @@ async def readiness_check():
         checks["agent_config"] = cfg.meta.version >= 1
     except Exception as e:
         checks["agent_config"] = False
-        not_ready_reasons.append(f"Agent config not loaded: {str(e)}")
+        not_ready_reasons.append(f"Agent config not loaded: {e!s}")
 
     # 4. Check circuit breakers initialized
     try:
         from backend.agents.circuit_breaker_manager import get_circuit_manager
 
         manager = get_circuit_manager()
-        checks["circuit_breakers"] = len(manager._breakers) > 0
+        checks["circuit_breakers"] = len(manager.breakers) > 0
         if not checks["circuit_breakers"]:
             not_ready_reasons.append("No circuit breakers registered")
     except Exception as e:
         checks["circuit_breakers"] = False
-        not_ready_reasons.append(f"Circuit breaker manager error: {str(e)}")
+        not_ready_reasons.append(f"Circuit breaker manager error: {e!s}")
 
     # Determine overall readiness
     critical_checks = ["bybit_api", "agent_config", "circuit_breakers"]
@@ -304,14 +306,14 @@ async def readiness_check():
                 "status": "not_ready",
                 "checks": checks,
                 "reasons": not_ready_reasons,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
     return {
         "status": "ready",
         "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -324,11 +326,11 @@ async def liveness_check():
     """
     return {
         "status": "alive",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
-@router.get("/db_pool", response_model=Dict[str, Any])
+@router.get("/db_pool", response_model=dict[str, Any])
 async def database_pool_status():
     """
     Week 1, Day 3: Database connection pool monitoring.
@@ -360,7 +362,7 @@ async def database_pool_status():
         leak_detected = monitor.check_connection_leaks()
 
         response = {
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "pool_status": statistics,
             "recommendations": recommendations,
             "leak_detected": leak_detected,
@@ -375,12 +377,8 @@ async def database_pool_status():
 
         # Return 503 if pool is critical
         if statistics["health"] == "critical":
-            logger.warning(
-                f"Database pool in critical state: {statistics['utilization']}% utilization"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response
-            )
+            logger.warning(f"Database pool in critical state: {statistics['utilization']}% utilization")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response)
 
         return response
 
@@ -388,9 +386,7 @@ async def database_pool_status():
         raise
     except Exception as e:
         logger.error("Failed to get DB pool status", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get DB pool status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get DB pool status: {e!s}")
 
 
 @router.get("/metrics")
@@ -416,12 +412,10 @@ async def metrics_endpoint():
         return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error("Failed to generate metrics", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {e!s}")
 
 
-@router.get("/phase2", response_model=Dict[str, Any])
+@router.get("/phase2", response_model=dict[str, Any])
 async def phase2_status():
     """
     Phase 2 deployment status endpoint.
@@ -465,49 +459,45 @@ async def phase2_status():
             config_status = {
                 "yaml_loaded": True,
                 "config_file": "backend/config/agents.yaml",
-                "circuit_breakers": len(config.circuit_breakers),
+                "circuit_breaker": "enabled",
                 "prompt_max_length": config.prompt.max_length,
-                "tool_calls_max": config.budget.tool_calls_max,
             }
         except Exception as e:
             config_status = {
                 "yaml_loaded": False,
-                "error": f"Config not loaded or file missing: {str(e)}",
+                "error": f"Config not loaded or file missing: {e!s}",
             }
 
         # Build response
+        breakers_data: dict[str, Any] = {}
         response = {
             "phase2_enabled": True,
             "persistence": {
                 "enabled": circuit_mgr._persistence_enabled,
                 "redis_connected": circuit_mgr._persistence_redis is not None,
-                "autosave_interval": circuit_mgr._autosave_interval
-                if circuit_mgr._persistence_enabled
-                else None,
+                "autosave_interval": circuit_mgr._autosave_interval if circuit_mgr._persistence_enabled else None,
                 "breakers_tracked": len(circuit_mgr._configs),
             },
             "config": config_status,
-            "breakers": {},
+            "breakers": breakers_data,
         }
 
         # Add breaker details
-        for name, config in metrics.breakers.items():
-            response["breakers"][name] = {
-                "total_calls": config["total_calls"],
-                "failed_calls": config["failed_calls"],
-                "successful_calls": config["successful_calls"],
-                "total_trips": config["total_trips"],
-                "current_state": config["current_state"],
-                "success_rate_24h": config["success_rate_24h"],
+        for name, breaker_info in metrics.breakers.items():
+            breakers_data[name] = {
+                "total_calls": breaker_info["total_calls"],
+                "failed_calls": breaker_info["failed_calls"],
+                "successful_calls": breaker_info["successful_calls"],
+                "total_trips": breaker_info["total_trips"],
+                "current_state": breaker_info["current_state"],
+                "success_rate_24h": breaker_info["success_rate_24h"],
             }
 
         return response
 
     except Exception as e:
         logger.error("Failed to get Phase 2 status", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get Phase 2 status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get Phase 2 status: {e!s}")
 
 
 # =============================================================================
@@ -515,7 +505,7 @@ async def phase2_status():
 # =============================================================================
 
 
-@router.get("/database", response_model=Dict[str, Any])
+@router.get("/database", response_model=dict[str, Any])
 async def database_health():
     """
     Detailed database health check.
@@ -537,12 +527,10 @@ async def database_health():
 
     except Exception as e:
         logger.error("Database health check failed", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Database health check failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Database health check failed: {e!s}")
 
 
-@router.get("/database/metrics", response_model=Dict[str, Any])
+@router.get("/database/metrics", response_model=dict[str, Any])
 async def database_metrics():
     """
     Get database metrics as JSON.
@@ -560,9 +548,7 @@ async def database_metrics():
 
     except Exception as e:
         logger.error("Failed to get database metrics", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get database metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get database metrics: {e!s}")
 
 
 @router.get("/database/metrics/prometheus")
@@ -582,6 +568,103 @@ async def database_metrics_prometheus():
 
     except Exception as e:
         logger.error("Failed to get Prometheus metrics", extra={"error": str(e)})
+        raise HTTPException(status_code=500, detail=f"Failed to get Prometheus metrics: {e!s}")
+
+
+# =============================================================================
+# COMPREHENSIVE HEALTH CHECK (NEW: Based on MONITORING_SYSTEM_AUDIT_2026_01_28)
+# =============================================================================
+
+
+@router.get("/comprehensive", response_model=dict[str, Any])
+async def comprehensive_health_check():
+    """
+    Comprehensive system health check.
+
+    Checks all critical system components:
+    - Database connectivity
+    - Redis connectivity
+    - Bybit API status
+    - Disk space
+    - Memory usage
+    - CPU usage
+
+    Returns overall system health status with details for each component.
+
+    Returns:
+        SystemHealthReport with status of all components
+
+    Status Codes:
+        200: All components healthy or degraded
+        503: One or more critical components unhealthy
+    """
+    try:
+        from backend.monitoring.health_checks import get_health_checker
+
+        checker = get_health_checker()
+        report = await checker.check_all(force=True)
+
+        result = report.to_dict()
+
+        # Return 503 if overall status is unhealthy
+        if result["overall_status"] == "unhealthy":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=result,
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Comprehensive health check failed", extra={"error": str(e)})
         raise HTTPException(
-            status_code=500, detail=f"Failed to get Prometheus metrics: {str(e)}"
+            status_code=500,
+            detail=f"Comprehensive health check failed: {e!s}",
+        )
+
+
+@router.get("/comprehensive/{component}", response_model=dict[str, Any])
+async def component_health_check(component: str):
+    """
+    Check health of a specific component.
+
+    Args:
+        component: Component name (database, redis, bybit_api, disk, memory, cpu)
+
+    Returns:
+        HealthCheckResult for the specified component
+    """
+    from backend.monitoring.health_checks import get_health_checker
+
+    checker = get_health_checker()
+
+    # Map component names to check methods
+    check_methods = {
+        "database": checker.check_database,
+        "redis": checker.check_redis,
+        "bybit_api": checker.check_bybit_api,
+        "disk": checker.check_disk_space,
+        "memory": checker.check_memory,
+        "cpu": checker.check_cpu,
+    }
+
+    if component not in check_methods:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown component: {component}. Available: {list(check_methods.keys())}",
+        )
+
+    try:
+        result = await check_methods[component]()
+        return result.to_dict()
+    except Exception as e:
+        logger.error(
+            f"Component health check failed: {component}",
+            extra={"error": str(e)},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Component health check failed: {e!s}",
         )

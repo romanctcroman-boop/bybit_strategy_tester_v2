@@ -47,8 +47,13 @@ function Test-RedisInstalled {
 }
 
 function Test-RedisRunning {
-    $connection = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue
-    return $null -ne $connection
+    try {
+        $connection = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue 2>$null
+        return $null -ne $connection
+    }
+    catch {
+        return $false
+    }
 }
 
 function Get-RedisPath {
@@ -82,25 +87,25 @@ switch ($Action) {
             else {
                 Write-Host "[INFO] Redis is not running" -ForegroundColor Yellow
             }
-            exit 0
+            return
         }
         else {
             Write-Host "[INFO] Redis is not installed (optional for local development)" -ForegroundColor Yellow
             Write-Host "       Install from: https://github.com/microsoftarchive/redis/releases" -ForegroundColor Gray
-            exit 0
+            return
         }
     }
     
     'start' {
         if (Test-RedisRunning) {
             Write-Host "[OK] Redis already running on port $RedisPort" -ForegroundColor Green
-            exit 0
+            return
         }
         
         $redisPath = Get-RedisPath
         if (-not $redisPath) {
             Write-Host "[SKIP] Redis not installed (optional service)" -ForegroundColor Yellow
-            exit 0
+            return
         }
         
         Write-Host "[INFO] Starting Redis server..." -ForegroundColor Cyan
@@ -118,11 +123,14 @@ switch ($Action) {
     'stop' {
         if (-not (Test-RedisRunning)) {
             Write-Host "[INFO] Redis is not running" -ForegroundColor Gray
-            exit 0
+            return
         }
         
         Write-Host "[INFO] Stopping Redis..." -ForegroundColor Yellow
-        $connections = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue
+        try {
+            $connections = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue 2>$null
+        }
+        catch { $connections = $null }
         if ($connections) {
             foreach ($conn in $connections) {
                 $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
@@ -136,9 +144,14 @@ switch ($Action) {
     
     'status' {
         if (Test-RedisRunning) {
-            $connections = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue
-            $procId = $connections[0].OwningProcess
-            Write-Host "[OK] Redis is running (PID: $procId, Port: $RedisPort)" -ForegroundColor Green
+            try {
+                $connections = Get-NetTCPConnection -LocalPort $RedisPort -ErrorAction SilentlyContinue 2>$null
+                $procId = $connections[0].OwningProcess
+                Write-Host "[OK] Redis is running (PID: $procId, Port: $RedisPort)" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "[OK] Redis is running on port $RedisPort" -ForegroundColor Green
+            }
         }
         else {
             Write-Host "[INFO] Redis is not running" -ForegroundColor Yellow

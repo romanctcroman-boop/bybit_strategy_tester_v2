@@ -114,36 +114,36 @@ function formatDate(date, format = 'datetime') {
     if (isNaN(d.getTime())) return '—';
 
     switch (format) {
-    case 'date':
-        return d.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
+        case 'date':
+            return d.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
 
-    case 'time':
-        return d.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
+        case 'time':
+            return d.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
 
-    case 'datetime':
-        return d.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        });
+        case 'datetime':
+            return d.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
 
-    case 'relative':
-        return formatRelativeTime(d);
+        case 'relative':
+            return formatRelativeTime(d);
 
-    default:
-        return d.toISOString();
+        default:
+            return d.toISOString();
     }
 }
 
@@ -250,7 +250,10 @@ function sanitizeHTML(html) {
  * @returns {boolean} Is valid
  */
 function isValidSymbol(symbol) {
-    return /^[A-Z]{2,10}USDT?$/.test(symbol);
+    // Bybit perpetual symbols: 3–10 uppercase base letters followed by USDT or USDC
+    // Examples: BTCUSDT, ETHUSDT, SOLUSDC, 10000PEPUSDT
+    // Rejects: 'AAUSDT' (only 2 base chars), 'btcusdt' (lowercase), 'BTCUSD' (no T/C)
+    return /^[A-Z0-9]{3,12}(USDT|USDC)$/.test(symbol);
 }
 
 /**
@@ -321,14 +324,19 @@ function setStorage(key, value) {
  * Debounce function calls
  * @param {Function} fn - Function to debounce
  * @param {number} delay - Delay in ms
- * @returns {Function} Debounced function
+ * @returns {Function} Debounced function with optional .cancel()
  */
 function debounce(fn, delay = 300) {
     let timeoutId;
-    return function (...args) {
+    const debounced = function (...args) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => fn.apply(this, args), delay);
     };
+    debounced.cancel = function () {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+    };
+    return debounced;
 }
 
 /**

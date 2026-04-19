@@ -14,11 +14,26 @@ Based on observability best practices:
 - Structured logging
 """
 
+from backend.agents.monitoring.alerting import (
+    Alert,
+    AlertManager,
+    AlertRule,
+    AlertSeverity,
+)
+from backend.agents.monitoring.dashboard import (
+    DashboardDataProvider,
+    DashboardWidget,
+    WidgetType,
+)
 from backend.agents.monitoring.metrics_collector import (
-    MetricsCollector,
     Metric,
-    MetricType,
     MetricAggregation,
+    MetricsCollector,
+    MetricType,
+)
+from backend.agents.monitoring.system_monitor import (
+    SystemMonitor,
+    get_system_monitor,
 )
 from backend.agents.monitoring.tracing import (
     DistributedTracer,
@@ -26,32 +41,23 @@ from backend.agents.monitoring.tracing import (
     SpanContext,
     TraceExporter,
 )
-from backend.agents.monitoring.alerting import (
-    AlertManager,
-    Alert,
-    AlertSeverity,
-    AlertRule,
-)
-from backend.agents.monitoring.dashboard import (
-    DashboardDataProvider,
-    DashboardWidget,
-    WidgetType,
-)
 
 __all__ = [
-    "MetricsCollector",
-    "Metric",
-    "MetricType",
-    "MetricAggregation",
-    "DistributedTracer",
-    "Span",
-    "SpanContext",
-    "TraceExporter",
-    "AlertManager",
     "Alert",
-    "AlertSeverity",
+    "AlertManager",
     "AlertRule",
+    "AlertSeverity",
     "DashboardDataProvider",
     "DashboardWidget",
+    "DistributedTracer",
+    "Metric",
+    "MetricAggregation",
+    "MetricType",
+    "MetricsCollector",
+    "Span",
+    "SpanContext",
+    "SystemMonitor",
+    "TraceExporter",
     "WidgetType",
+    "get_system_monitor",
 ]

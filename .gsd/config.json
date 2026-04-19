@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "project": "bybit-strategy-tester-v2",
+  "initialized": "2026-02-18",
+  "settings": {
+    "auto_commit": false,
+    "auto_verify": true,
+    "max_plans_per_phase": 4,
+    "max_tasks_per_plan": 3,
+    "quality_gate": {
+      "tests": "pytest tests/ -v -m \"not slow\"",
+      "lint": "ruff check . --fix",
+      "format": "ruff format .",
+      "coverage_min": 80,
+      "engine_coverage_min": 95
+    },
+    "domain_checks": {
+      "commission_rate": 0.0007,
+      "gold_standard_engine": "FallbackEngineV4",
+      "data_start_date": "2025-01-01",
+      "supported_timeframes": ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
+    }
+  }
+}

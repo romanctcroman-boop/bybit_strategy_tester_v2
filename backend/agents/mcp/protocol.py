@@ -18,9 +18,10 @@ import asyncio
 import json
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -68,15 +69,15 @@ class MCPMessage:
     """MCP protocol message"""
 
     jsonrpc: str = "2.0"
-    id: Optional[str] = None
-    method: Optional[str] = None
-    params: Optional[Dict[str, Any]] = None
-    result: Optional[Any] = None
-    error: Optional[Dict[str, Any]] = None
+    id: str | None = None
+    method: str | None = None
+    params: dict[str, Any] | None = None
+    result: Any | None = None
+    error: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
-        data = {"jsonrpc": self.jsonrpc}
+        data: dict[str, Any] = {"jsonrpc": self.jsonrpc}
         if self.id:
             data["id"] = self.id
         if self.method:
@@ -90,7 +91,7 @@ class MCPMessage:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MCPMessage":
+    def from_dict(cls, data: dict[str, Any]) -> MCPMessage:
         """Create from dictionary"""
         return cls(
             jsonrpc=data.get("jsonrpc", "2.0"),
@@ -102,9 +103,7 @@ class MCPMessage:
         )
 
     @classmethod
-    def request(
-        cls, method: str, params: Optional[Dict[str, Any]] = None
-    ) -> "MCPMessage":
+    def request(cls, method: str, params: dict[str, Any] | None = None) -> MCPMessage:
         """Create request message"""
         return cls(
             id=str(uuid.uuid4()),
@@ -113,14 +112,12 @@ class MCPMessage:
         )
 
     @classmethod
-    def response(cls, id: str, result: Any) -> "MCPMessage":
+    def response(cls, id: str, result: Any) -> MCPMessage:
         """Create response message"""
         return cls(id=id, result=result)
 
     @classmethod
-    def error_response(
-        cls, id: str, code: int, message: str, data: Any = None
-    ) -> "MCPMessage":
+    def error_response(cls, id: str, code: int, message: str, data: Any = None) -> MCPMessage:
         """Create error response"""
         error = {"code": code, "message": message}
         if data:
@@ -134,10 +131,10 @@ class MCPTool:
 
     name: str
     description: str
-    input_schema: Dict[str, Any]
-    handler: Optional[Callable] = None
+    input_schema: dict[str, Any]
+    handler: Callable | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to MCP format"""
         return {
             "name": self.name,
@@ -152,10 +149,10 @@ class MCPResource:
 
     uri: str
     name: str
-    description: Optional[str] = None
-    mime_type: Optional[str] = None
+    description: str | None = None
+    mime_type: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to MCP format"""
         data = {
             "uri": self.uri,
@@ -173,12 +170,12 @@ class MCPPrompt:
     """MCP Prompt template"""
 
     name: str
-    description: Optional[str] = None
-    arguments: Optional[List[Dict[str, Any]]] = None
+    description: str | None = None
+    arguments: list[dict[str, Any]] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to MCP format"""
-        data = {"name": self.name}
+        data: dict[str, Any] = {"name": self.name}
         if self.description:
             data["description"] = self.description
         if self.arguments:
@@ -196,9 +193,9 @@ class MCPCapabilities:
     sampling: bool = False
     logging: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
-        caps = {}
+        caps: dict[str, Any] = {}
         if self.tools:
             caps["tools"] = {}
         if self.resources:
@@ -237,9 +234,9 @@ class InMemoryTransport(MCPTransport):
     def __init__(self):
         self.incoming: asyncio.Queue[MCPMessage] = asyncio.Queue()
         self.outgoing: asyncio.Queue[MCPMessage] = asyncio.Queue()
-        self.peer: Optional["InMemoryTransport"] = None
+        self.peer: InMemoryTransport | None = None
 
-    def connect(self, peer: "InMemoryTransport") -> None:
+    def connect(self, peer: InMemoryTransport) -> None:
         """Connect to peer transport"""
         self.peer = peer
         peer.peer = self
@@ -281,19 +278,20 @@ class MCPServer:
         self,
         name: str,
         version: str = "1.0.0",
-        capabilities: Optional[MCPCapabilities] = None,
+        capabilities: MCPCapabilities | None = None,
     ):
         self.name = name
         self.version = version
         self.capabilities = capabilities or MCPCapabilities()
 
-        self.tools: Dict[str, MCPTool] = {}
-        self.resources: Dict[str, MCPResource] = {}
-        self.prompts: Dict[str, MCPPrompt] = {}
+        self.tools: dict[str, MCPTool] = {}
+        self.resources: dict[str, MCPResource] = {}
+        self.prompts: dict[str, MCPPrompt] = {}
 
-        self.transport: Optional[MCPTransport] = None
+        self.transport: MCPTransport | None = None
         self._running = False
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
         # Register standard handlers
         self._register_standard_handlers()
@@ -314,8 +312,8 @@ class MCPServer:
 
     def tool(
         self,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> Callable:
         """Decorator to register a tool"""
 
@@ -336,15 +334,15 @@ class MCPServer:
 
                 param_type = "string"
                 if param.annotation != inspect.Parameter.empty:
-                    if param.annotation == int:
+                    if param.annotation is int:
                         param_type = "integer"
-                    elif param.annotation == float:
+                    elif param.annotation is float:
                         param_type = "number"
-                    elif param.annotation == bool:
+                    elif param.annotation is bool:
                         param_type = "boolean"
-                    elif param.annotation == list:
+                    elif param.annotation is list:
                         param_type = "array"
-                    elif param.annotation == dict:
+                    elif param.annotation is dict:
                         param_type = "object"
 
                 properties[param_name] = {"type": param_type}
@@ -382,7 +380,7 @@ class MCPServer:
         self.prompts[prompt.name] = prompt
         logger.debug(f"📝 Added prompt: {prompt.name}")
 
-    async def start(self, transport: Optional[MCPTransport] = None) -> None:
+    async def start(self, transport: MCPTransport | None = None) -> None:
         """Start the server"""
         self.transport = transport or InMemoryTransport()
         self._running = True
@@ -390,7 +388,9 @@ class MCPServer:
         logger.info(f"🚀 MCPServer '{self.name}' started")
 
         # Start message handler loop
-        asyncio.create_task(self._message_loop())
+        task = asyncio.create_task(self._message_loop())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def stop(self) -> None:
         """Stop the server"""
@@ -403,9 +403,11 @@ class MCPServer:
         """Main message processing loop"""
         while self._running:
             try:
+                if not self.transport:
+                    break
                 message = await asyncio.wait_for(self.transport.receive(), timeout=1.0)
                 await self._handle_message(message)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 logger.error(f"Message handling error: {e}")
@@ -415,27 +417,29 @@ class MCPServer:
         if not message.method:
             return
 
+        msg_id = message.id or ""
         handler = self._handlers.get(message.method)
         if handler:
             try:
                 result = await handler(message.params or {})
-                response = MCPMessage.response(message.id, result)
+                response = MCPMessage.response(msg_id, result)
             except Exception as e:
                 response = MCPMessage.error_response(
-                    message.id,
+                    msg_id,
                     -32603,
                     str(e),
                 )
         else:
             response = MCPMessage.error_response(
-                message.id,
+                msg_id,
                 -32601,
                 f"Method not found: {message.method}",
             )
 
-        await self.transport.send(response)
+        if self.transport:
+            await self.transport.send(response)
 
-    async def _handle_initialize(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle initialize request"""
         return {
             "protocolVersion": "2024-11-05",
@@ -446,11 +450,11 @@ class MCPServer:
             },
         }
 
-    async def _handle_tools_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_tools_list(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle tools/list request"""
         return {"tools": [tool.to_dict() for tool in self.tools.values()]}
 
-    async def _handle_tools_call(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_tools_call(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle tools/call request"""
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
@@ -472,18 +476,16 @@ class MCPServer:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(result)
-                    if not isinstance(result, str)
-                    else result,
+                    "text": json.dumps(result) if not isinstance(result, str) else result,
                 }
             ]
         }
 
-    async def _handle_resources_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_resources_list(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle resources/list request"""
         return {"resources": [res.to_dict() for res in self.resources.values()]}
 
-    async def _handle_resources_read(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_resources_read(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle resources/read request"""
         uri = params.get("uri")
 
@@ -501,11 +503,11 @@ class MCPServer:
             ]
         }
 
-    async def _handle_prompts_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_prompts_list(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle prompts/list request"""
         return {"prompts": [prompt.to_dict() for prompt in self.prompts.values()]}
 
-    async def _handle_prompts_get(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_prompts_get(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle prompts/get request"""
         name = params.get("name")
 
@@ -542,21 +544,24 @@ class MCPClient:
     """
 
     def __init__(self):
-        self.transport: Optional[MCPTransport] = None
-        self.server_info: Optional[Dict[str, Any]] = None
-        self.capabilities: Optional[Dict[str, Any]] = None
-        self._pending_requests: Dict[str, asyncio.Future] = {}
+        self.transport: MCPTransport | None = None
+        self.server_info: dict[str, Any] | None = None
+        self.capabilities: dict[str, Any] | None = None
+        self._pending_requests: dict[str, asyncio.Future[Any]] = {}
         self._running = False
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
         logger.info("🔌 MCPClient initialized")
 
-    async def connect(self, transport: MCPTransport) -> Dict[str, Any]:
+    async def connect(self, transport: MCPTransport) -> dict[str, Any]:
         """Connect to server and initialize"""
         self.transport = transport
         self._running = True
 
         # Start response handler
-        asyncio.create_task(self._response_loop())
+        task = asyncio.create_task(self._response_loop())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
         # Send initialize request
         result = await self._send_request(
@@ -588,18 +593,18 @@ class MCPClient:
         """Handle incoming responses"""
         while self._running:
             try:
+                if not self.transport:
+                    break
                 message = await asyncio.wait_for(self.transport.receive(), timeout=1.0)
 
                 if message.id and message.id in self._pending_requests:
                     future = self._pending_requests.pop(message.id)
                     if message.error:
-                        future.set_exception(
-                            Exception(message.error.get("message", "Unknown error"))
-                        )
+                        future.set_exception(Exception(message.error.get("message", "Unknown error")))
                     else:
                         future.set_result(message.result)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 logger.error(f"Response handling error: {e}")
@@ -607,24 +612,28 @@ class MCPClient:
     async def _send_request(
         self,
         method: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         """Send request and wait for response"""
-        message = MCPMessage.request(method, params)
+        if not self.transport:
+            raise RuntimeError("Not connected to server")
 
-        future = asyncio.get_event_loop().create_future()
-        self._pending_requests[message.id] = future
+        message = MCPMessage.request(method, params)
+        msg_id = message.id or ""
+
+        future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
+        self._pending_requests[msg_id] = future
 
         await self.transport.send(message)
 
         try:
             result = await asyncio.wait_for(future, timeout=30.0)
             return result
-        except asyncio.TimeoutError:
-            self._pending_requests.pop(message.id, None)
+        except TimeoutError:
+            self._pending_requests.pop(msg_id, None)
             raise TimeoutError(f"Request timed out: {method}")
 
-    async def list_tools(self) -> List[Dict[str, Any]]:
+    async def list_tools(self) -> list[dict[str, Any]]:
         """List available tools"""
         result = await self._send_request(MCPMethod.TOOLS_LIST.value)
         return result.get("tools", [])
@@ -632,7 +641,7 @@ class MCPClient:
     async def call_tool(
         self,
         name: str,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: dict[str, Any] | None = None,
     ) -> Any:
         """Call a tool"""
         result = await self._send_request(
@@ -650,7 +659,7 @@ class MCPClient:
                 return text
         return result
 
-    async def list_resources(self) -> List[Dict[str, Any]]:
+    async def list_resources(self) -> list[dict[str, Any]]:
         """List available resources"""
         result = await self._send_request(MCPMethod.RESOURCES_LIST.value)
         return result.get("resources", [])
@@ -663,7 +672,7 @@ class MCPClient:
         )
         return result
 
-    async def list_prompts(self) -> List[Dict[str, Any]]:
+    async def list_prompts(self) -> list[dict[str, Any]]:
         """List available prompts"""
         result = await self._send_request(MCPMethod.PROMPTS_LIST.value)
         return result.get("prompts", [])
@@ -671,7 +680,7 @@ class MCPClient:
     async def get_prompt(
         self,
         name: str,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: dict[str, Any] | None = None,
     ) -> Any:
         """Get a prompt"""
         result = await self._send_request(
@@ -690,15 +699,20 @@ def create_trading_mcp_server() -> MCPServer:
     )
 
     @server.tool("calculate_rsi")
-    async def calculate_rsi(prices: list, period: int = 14) -> Dict[str, Any]:
-        """Calculate RSI (Relative Strength Index)"""
+    async def calculate_rsi(prices: list, period: int = 14) -> dict[str, Any]:
+        """Calculate RSI (Relative Strength Index).
+
+        NOTE: For strategy building, use the universal 'rsi' block in Strategy Builder.
+        The universal RSI supports Range filter, Cross level, and Legacy modes.
+        This tool is for ad-hoc RSI value calculation only.
+        """
         import numpy as np
 
         if len(prices) < period + 1:
             return {"error": "Not enough data"}
 
-        prices = np.array(prices)
-        deltas = np.diff(prices)
+        price_arr = np.array(prices)
+        deltas = np.diff(price_arr)
 
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
@@ -720,14 +734,14 @@ def create_trading_mcp_server() -> MCPServer:
         fast_period: int = 12,
         slow_period: int = 26,
         signal_period: int = 9,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate MACD indicator"""
         import numpy as np
 
         if len(prices) < slow_period:
             return {"error": "Not enough data"}
 
-        prices = np.array(prices)
+        price_arr = np.array(prices)
 
         def ema(data, period):
             alpha = 2 / (period + 1)
@@ -737,8 +751,8 @@ def create_trading_mcp_server() -> MCPServer:
                 result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
             return result
 
-        ema_fast = ema(prices, fast_period)
-        ema_slow = ema(prices, slow_period)
+        ema_fast = ema(price_arr, fast_period)
+        ema_slow = ema(price_arr, slow_period)
         macd_line = ema_fast - ema_slow
         signal_line = ema(macd_line, signal_period)
         histogram = macd_line - signal_line
@@ -753,7 +767,7 @@ def create_trading_mcp_server() -> MCPServer:
     async def analyze_market(
         symbol: str,
         timeframe: str = "4h",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze market conditions for a symbol"""
         # Mock analysis
         return {
@@ -809,16 +823,16 @@ def create_trading_mcp_server() -> MCPServer:
 
 
 __all__ = [
+    "InMemoryTransport",
+    "MCPCapabilities",
+    "MCPClient",
+    "MCPMessage",
     "MCPMessageType",
     "MCPMethod",
-    "MCPMessage",
-    "MCPTool",
-    "MCPResource",
     "MCPPrompt",
-    "MCPCapabilities",
-    "MCPTransport",
-    "InMemoryTransport",
+    "MCPResource",
     "MCPServer",
-    "MCPClient",
+    "MCPTool",
+    "MCPTransport",
     "create_trading_mcp_server",
 ]

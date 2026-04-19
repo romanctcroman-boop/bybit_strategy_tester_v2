@@ -74,9 +74,7 @@ def downgrade():
     op.drop_index("ix_bybit_kline_audit_symbol_interval_time", "bybit_kline_audit")
 
     # Step 2: Drop new unique constraint
-    op.drop_constraint(
-        "uix_symbol_interval_open_time", "bybit_kline_audit", type_="unique"
-    )
+    op.drop_constraint("uix_symbol_interval_open_time", "bybit_kline_audit", type_="unique")
 
     # Step 3: Recreate old unique constraint (symbol, open_time)
     op.create_unique_constraint(

@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -17,6 +17,17 @@ from pydantic import BaseModel
 from backend.api.websocket_auth import get_ws_authenticator
 from backend.core.metrics import get_metrics
 from backend.services.tick_service import Trade, get_tick_service
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +58,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
     Returns:
         Tuple of (allowed: bool, reason: str).
     """
-    global active_connections  # noqa: PLW0603
+    global active_connections
 
     async with active_connections_lock:
         # Check per-worker limit (most important for stability)
@@ -60,9 +71,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
         # Check per-IP limit (prevent abuse)
         now = time.time()
         # Clean old entries (older than TTL)
-        connection_ips[client_ip] = [
-            ts for ts in connection_ips[client_ip] if now - ts < CONNECTION_HISTORY_TTL
-        ]
+        connection_ips[client_ip] = [ts for ts in connection_ips[client_ip] if now - ts < CONNECTION_HISTORY_TTL]
 
         if len(connection_ips[client_ip]) >= MAX_CONNECTIONS_PER_IP:
             return False, f"Too many connections from IP ({MAX_CONNECTIONS_PER_IP} max)"
@@ -85,7 +94,7 @@ async def release_connection(_client_ip: str) -> None:
     Args:
         _client_ip: Client IP address (unused, kept for rate limiting history).
     """
-    global active_connections  # noqa: PLW0603
+    global active_connections
 
     async with active_connections_lock:
         active_connections = max(0, active_connections - 1)
@@ -227,10 +236,10 @@ async def tick_service_health():
     last_trade_age_ms = None
     if last_trade_time:
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             last_dt = datetime.fromisoformat(last_trade_time.replace("Z", "+00:00"))
-            age = (datetime.now(timezone.utc) - last_dt).total_seconds()
+            age = (datetime.now(UTC) - last_dt).total_seconds()
             last_trade_age_ms = int(age * 1000)
             is_stale = age > 60  # Stale if no trade in 60 seconds
         except Exception:
@@ -285,7 +294,7 @@ async def start_tick_service(
         service.get_aggregator(symbol, ticks)
 
     # Start in background
-    asyncio.create_task(service.start(symbols))
+    _fire_and_forget(service.start(symbols))
 
     return {"status": "starting", "symbols": symbols, "ticks_per_bar": ticks}
 
@@ -338,9 +347,7 @@ async def tick_websocket(
     auth_result = await authenticator.authenticate(websocket, token)
 
     if not auth_result.authenticated:
-        await websocket.close(
-            code=4001, reason=auth_result.error or "Authentication failed"
-        )
+        await websocket.close(code=4001, reason=auth_result.error or "Authentication failed")
         logger.warning(f"WebSocket auth failed from {client_ip}: {auth_result.error}")
         return
 
@@ -362,7 +369,7 @@ async def tick_websocket(
 
         # Ensure service is running
         if not service.is_running():
-            asyncio.create_task(service.start([symbol]))
+            _fire_and_forget(service.start([symbol]))
 
         # Ensure aggregator exists
         service.get_aggregator(symbol, ticks)
@@ -424,9 +431,7 @@ async def tick_websocket(
             # Priority 1: Send completed candle immediately
             if pending_candle is not None:
                 try:
-                    await websocket.send_json(
-                        {"type": "candle", "data": pending_candle}
-                    )
+                    await websocket.send_json({"type": "candle", "data": pending_candle})
                     pending_candle = None
                 except Exception:
                     break
@@ -441,9 +446,7 @@ async def tick_websocket(
             if current:
                 try:
                     # Add server timestamp for latency monitoring
-                    current["server_time"] = int(
-                        datetime.now(timezone.utc).timestamp() * 1000
-                    )
+                    current["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
                     await websocket.send_json({"type": "current", "data": current})
                 except Exception:
                     break
@@ -455,9 +458,7 @@ async def tick_websocket(
 
                 # Send in a single message to reduce per-message overhead.
                 try:
-                    await websocket.send_json(
-                        {"type": "trades", "data": trades_to_send}
-                    )
+                    await websocket.send_json({"type": "trades", "data": trades_to_send})
                 except Exception:
                     break
 
@@ -477,7 +478,4 @@ async def tick_websocket(
 
         # Release connection slot
         await release_connection(client_ip)
-        logger.info(
-            f"Tick WS closed: {symbol} (IP: {client_ip}, "
-            f"Remaining: {active_connections})"
-        )
+        logger.info(f"Tick WS closed: {symbol} (IP: {client_ip}, Remaining: {active_connections})")

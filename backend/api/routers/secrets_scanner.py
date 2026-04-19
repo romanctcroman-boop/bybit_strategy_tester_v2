@@ -6,7 +6,6 @@ Provides REST API endpoints for scanning repository for leaked credentials.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -35,9 +34,7 @@ class ScanHistoryRequest(BaseModel):
     """Request to scan git history."""
 
     repo_path: str = Field(..., description="Path to git repository")
-    max_commits: int = Field(
-        default=100, ge=1, le=1000, description="Maximum commits to scan"
-    )
+    max_commits: int = Field(default=100, ge=1, le=1000, description="Maximum commits to scan")
 
 
 class AddPatternRequest(BaseModel):
@@ -67,9 +64,9 @@ class FindingResponse(BaseModel):
     line_number: int
     line_content: str
     pattern_name: str
-    commit_hash: Optional[str] = None
-    author: Optional[str] = None
-    commit_date: Optional[datetime] = None
+    commit_hash: str | None = None
+    author: str | None = None
+    commit_date: datetime | None = None
     is_false_positive: bool
     remediation: str
 
@@ -79,7 +76,7 @@ class ScanResultResponse(BaseModel):
 
     scan_id: str
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     status: str
     files_scanned: int
     findings_count: int
@@ -267,9 +264,7 @@ async def get_scan(scan_id: str):
 @router.get("/scans/{scan_id}/report")
 async def get_scan_report(
     scan_id: str,
-    format_type: str = Query(
-        default="json", enum=["json", "markdown"], description="Report format"
-    ),
+    format_type: str = Query(default="json", enum=["json", "markdown"], description="Report format"),
 ):
     """Generate a report for a scan."""
     scanner = get_secrets_scanner()
@@ -320,7 +315,7 @@ async def add_pattern(request: AddPatternRequest):
     except re.error as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid regex pattern: {str(e)}",
+            detail=f"Invalid regex pattern: {e!s}",
         )
 
     pattern = SecretPattern(
@@ -370,9 +365,7 @@ async def list_secret_types():
 @router.get("/severity-levels")
 async def list_severity_levels():
     """List all severity levels."""
-    return {
-        "severity_levels": [{"id": sl.value, "name": sl.name} for sl in SeverityLevel]
-    }
+    return {"severity_levels": [{"id": sl.value, "name": sl.name} for sl in SeverityLevel]}
 
 
 @router.get("/health")

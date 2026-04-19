@@ -10,12 +10,12 @@ Tests cover:
 """
 
 import copy
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
-from backend.api.app import app
 
+from backend.api.app import app
 
 client = TestClient(app)
 
@@ -23,6 +23,7 @@ client = TestClient(app)
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def mock_healthy_components():
@@ -33,36 +34,36 @@ def mock_healthy_components():
             "status": "healthy",
             "response_time_ms": 15.5,
             "details": {"pool_size": 5, "checked_out": 2, "utilization_pct": 40.0},
-            "last_check": "2025-01-01T00:00:00Z"
+            "last_check": "2025-01-01T00:00:00Z",
         },
         {
             "name": "redis",
             "status": "healthy",
             "response_time_ms": 5.2,
             "details": {"connected": True, "queue_depth": 10},
-            "last_check": "2025-01-01T00:00:00Z"
+            "last_check": "2025-01-01T00:00:00Z",
         },
         {
             "name": "celery",
             "status": "healthy",
             "response_time_ms": 20.1,
             "details": {"worker_count": 2, "active_tasks": 5},
-            "last_check": "2025-01-01T00:00:00Z"
+            "last_check": "2025-01-01T00:00:00Z",
         },
         {
             "name": "disk",
             "status": "healthy",
             "response_time_ms": 2.3,
             "details": {"used_pct": 45.5, "free_gb": 100.5},
-            "last_check": "2025-01-01T00:00:00Z"
+            "last_check": "2025-01-01T00:00:00Z",
         },
         {
             "name": "bybit_api",
             "status": "healthy",
             "response_time_ms": 120.5,
             "details": {"candles_fetched": 10, "latest_price": 50000.0},
-            "last_check": "2025-01-01T00:00:00Z"
-        }
+            "last_check": "2025-01-01T00:00:00Z",
+        },
     ]
 
 
@@ -131,6 +132,7 @@ def agent_breaker_snapshot(monkeypatch):
 # TESTS: Enhanced Health Check
 # ============================================================================
 
+
 class TestEnhancedHealthCheck:
     """Tests for GET /api/v1/health/enhanced"""
 
@@ -186,6 +188,7 @@ class TestEnhancedHealthCheck:
 # TESTS: Health Dashboard
 # ============================================================================
 
+
 class TestHealthDashboard:
     """Tests for GET /api/v1/health/dashboard"""
 
@@ -229,6 +232,7 @@ class TestHealthDashboard:
 # ============================================================================
 # TESTS: Component Health
 # ============================================================================
+
 
 class TestComponentHealth:
     """Tests for GET /api/v1/health/components/{name}"""
@@ -281,6 +285,7 @@ class TestComponentHealth:
 # TESTS: Health Summary
 # ============================================================================
 
+
 class TestHealthSummary:
     """Tests for GET /api/v1/health/summary"""
 
@@ -318,6 +323,7 @@ class TestHealthSummary:
 # ============================================================================
 # INTEGRATION TESTS
 # ============================================================================
+
 
 class TestIntegration:
     """Integration tests for health monitoring workflow"""
@@ -387,39 +393,35 @@ class TestIntegration:
 # UNIT TESTS (Mocked)
 # ============================================================================
 
+
 class TestHealthCheckUnit:
     """Unit tests with mocked components"""
 
     @pytest.mark.asyncio
-    @patch('backend.api.routers.health_monitoring.check_database_health')
-    @patch('backend.api.routers.health_monitoring.check_redis_health')
-    @patch('backend.api.routers.health_monitoring.check_celery_health')
-    @patch('backend.api.routers.health_monitoring.check_disk_health')
-    @patch('backend.api.routers.health_monitoring.check_api_health')
+    @patch("backend.api.routers.health_monitoring.check_database_health")
+    @patch("backend.api.routers.health_monitoring.check_redis_health")
+    @patch("backend.api.routers.health_monitoring.check_celery_health")
+    @patch("backend.api.routers.health_monitoring.check_disk_health")
+    @patch("backend.api.routers.health_monitoring.check_api_health")
     async def test_all_healthy_returns_200(self, mock_api, mock_disk, mock_celery, mock_redis, mock_db):
         """Should return 200 when all components are healthy"""
         from backend.api.routers.health_monitoring import ComponentHealth
 
         # Mock all components as healthy
         mock_db.return_value = ComponentHealth(
-            name="database", status="healthy", response_time_ms=10.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="database", status="healthy", response_time_ms=10.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_redis.return_value = ComponentHealth(
-            name="redis", status="healthy", response_time_ms=5.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="redis", status="healthy", response_time_ms=5.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_celery.return_value = ComponentHealth(
-            name="celery", status="healthy", response_time_ms=20.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="celery", status="healthy", response_time_ms=20.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_disk.return_value = ComponentHealth(
-            name="disk", status="healthy", response_time_ms=2.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="disk", status="healthy", response_time_ms=2.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_api.return_value = ComponentHealth(
-            name="bybit_api", status="healthy", response_time_ms=100.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="bybit_api", status="healthy", response_time_ms=100.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
 
         response = client.get("/api/v1/health/enhanced")
@@ -429,35 +431,34 @@ class TestHealthCheckUnit:
         assert data["overall_status"] == "healthy"
 
     @pytest.mark.asyncio
-    @patch('backend.api.routers.health_monitoring.check_database_health')
-    @patch('backend.api.routers.health_monitoring.check_redis_health')
-    @patch('backend.api.routers.health_monitoring.check_celery_health')
-    @patch('backend.api.routers.health_monitoring.check_disk_health')
-    @patch('backend.api.routers.health_monitoring.check_api_health')
+    @patch("backend.api.routers.health_monitoring.check_database_health")
+    @patch("backend.api.routers.health_monitoring.check_redis_health")
+    @patch("backend.api.routers.health_monitoring.check_celery_health")
+    @patch("backend.api.routers.health_monitoring.check_disk_health")
+    @patch("backend.api.routers.health_monitoring.check_api_health")
     async def test_one_unhealthy_returns_503(self, mock_api, mock_disk, mock_celery, mock_redis, mock_db):
         """Should return 503 when any component is unhealthy"""
         from backend.api.routers.health_monitoring import ComponentHealth
 
         # Mock DB as unhealthy
         mock_db.return_value = ComponentHealth(
-            name="database", status="unhealthy", response_time_ms=1000.0,
-            details={"error": "Connection failed"}, last_check="2025-01-01T00:00:00Z"
+            name="database",
+            status="unhealthy",
+            response_time_ms=1000.0,
+            details={"error": "Connection failed"},
+            last_check="2025-01-01T00:00:00Z",
         )
         mock_redis.return_value = ComponentHealth(
-            name="redis", status="healthy", response_time_ms=5.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="redis", status="healthy", response_time_ms=5.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_celery.return_value = ComponentHealth(
-            name="celery", status="healthy", response_time_ms=20.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="celery", status="healthy", response_time_ms=20.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_disk.return_value = ComponentHealth(
-            name="disk", status="healthy", response_time_ms=2.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="disk", status="healthy", response_time_ms=2.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
         mock_api.return_value = ComponentHealth(
-            name="bybit_api", status="healthy", response_time_ms=100.0,
-            details={}, last_check="2025-01-01T00:00:00Z"
+            name="bybit_api", status="healthy", response_time_ms=100.0, details={}, last_check="2025-01-01T00:00:00Z"
         )
 
         response = client.get("/api/v1/health/enhanced")

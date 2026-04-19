@@ -11,7 +11,7 @@ This is a clean, standalone script to avoid editing the corrupted original.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -33,9 +33,7 @@ def dump(obj: Any, path: Path) -> None:
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:
-    df = pd.DataFrame(
-        data, columns=["open_time", "open", "high", "low", "close", "volume"]
-    )
+    df = pd.DataFrame(data, columns=["open_time", "open", "high", "low", "close", "volume"])
     try:
         df["open_time"] = pd.to_datetime(df["open_time"].astype("int64"), unit="ms")
     except Exception:
@@ -46,7 +44,7 @@ def to_dataframe(data: np.ndarray) -> pd.DataFrame:
     return df
 
 
-def trade_to_dict(t: Any) -> Dict[str, Any]:
+def trade_to_dict(t: Any) -> dict[str, Any]:
     try:
         return t.model_dump() if hasattr(t, "model_dump") else t.dict()
     except Exception:
@@ -56,7 +54,7 @@ def trade_to_dict(t: Any) -> Dict[str, Any]:
             return t.__dict__ if hasattr(t, "__dict__") else dict(t)
 
 
-def _parse_dt(v: Any) -> Optional[datetime]:
+def _parse_dt(v: Any) -> datetime | None:
     if v is None:
         return None
     if isinstance(v, datetime):
@@ -75,10 +73,10 @@ def _parse_dt(v: Any) -> Optional[datetime]:
 
 
 def pairwise_match(
-    fb_trades: List[Dict[str, Any]],
-    vb_trades: List[Dict[str, Any]],
+    fb_trades: list[dict[str, Any]],
+    vb_trades: list[dict[str, Any]],
     max_time_diff_seconds: int = 86400,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     for t in fb_trades:
         t["entry_dt"] = _parse_dt(t.get("entry_time"))
         t["exit_dt"] = _parse_dt(t.get("exit_time"))
@@ -87,15 +85,15 @@ def pairwise_match(
         t["exit_dt"] = _parse_dt(t.get("exit_time"))
 
     used_vb = set()
-    matches: List[Dict[str, Any]] = []
+    matches: list[dict[str, Any]] = []
 
-    def num(x: Any) -> Optional[float]:
+    def num(x: Any) -> float | None:
         try:
             return float(x)
         except Exception:
             return None
 
-    def pct_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:
+    def pct_diff(a: float | None, b: float | None) -> float | None:
         if a is None or b is None:
             return None
         if b == 0:
@@ -117,11 +115,7 @@ def pairwise_match(
                 best_dt = dt
                 best_j = j
 
-        if (
-            best_j is not None
-            and best_dt is not None
-            and best_dt <= max_time_diff_seconds
-        ):
+        if best_j is not None and best_dt is not None and best_dt <= max_time_diff_seconds:
             used_vb.add(best_j)
             vt = vb_trades[best_j]
 
@@ -129,9 +123,7 @@ def pairwise_match(
             exit_time_diff = None
             try:
                 if ft.get("exit_dt") and vt.get("exit_dt"):
-                    exit_time_diff = abs(
-                        (ft["exit_dt"] - vt["exit_dt"]).total_seconds()
-                    )
+                    exit_time_diff = abs((ft["exit_dt"] - vt["exit_dt"]).total_seconds())
             except Exception:
                 exit_time_diff = None
 
@@ -158,25 +150,19 @@ def pairwise_match(
                 "entry_price": {
                     "fallback": entry_price_a,
                     "vectorbt": entry_price_b,
-                    "diff": None
-                    if entry_price_a is None or entry_price_b is None
-                    else entry_price_a - entry_price_b,
+                    "diff": None if entry_price_a is None or entry_price_b is None else entry_price_a - entry_price_b,
                     "pct_diff": pct_diff(entry_price_a, entry_price_b),
                 },
                 "exit_price": {
                     "fallback": exit_price_a,
                     "vectorbt": exit_price_b,
-                    "diff": None
-                    if exit_price_a is None or exit_price_b is None
-                    else exit_price_a - exit_price_b,
+                    "diff": None if exit_price_a is None or exit_price_b is None else exit_price_a - exit_price_b,
                     "pct_diff": pct_diff(exit_price_a, exit_price_b),
                 },
                 "size": {
                     "fallback": size_a,
                     "vectorbt": size_b,
-                    "diff": None
-                    if size_a is None or size_b is None
-                    else size_a - size_b,
+                    "diff": None if size_a is None or size_b is None else size_a - size_b,
                 },
                 "pnl": {
                     "fallback": pnl_a,
@@ -187,9 +173,7 @@ def pairwise_match(
                 "fees": {
                     "fallback": fees_a,
                     "vectorbt": fees_b,
-                    "diff": None
-                    if fees_a is None or fees_b is None
-                    else fees_a - fees_b,
+                    "diff": None if fees_a is None or fees_b is None else fees_a - fees_b,
                 },
                 "mfe": {
                     "fallback": mfe_a,
@@ -215,11 +199,7 @@ def pairwise_match(
                 }
             )
 
-    unmatched_vb = [
-        {"vectorbt_idx": j, "vectorbt": vt}
-        for j, vt in enumerate(vb_trades)
-        if j not in used_vb
-    ]
+    unmatched_vb = [{"vectorbt_idx": j, "vectorbt": vt} for j, vt in enumerate(vb_trades) if j not in used_vb]
 
     return {"matches": matches, "unmatched_vectorbt": unmatched_vb}
 
@@ -265,9 +245,7 @@ def main() -> int:
     vb_trades = [trade_to_dict(t) for t in res_vectorbt.trades]
 
     cfg_obj = (
-        config.model_dump()
-        if hasattr(config, "model_dump")
-        else (config.dict() if hasattr(config, "dict") else {})
+        config.model_dump() if hasattr(config, "model_dump") else (config.dict() if hasattr(config, "dict") else {})
     )
     dump(
         {"config": cfg_obj, "trades": fb_trades},
@@ -286,9 +264,7 @@ def main() -> int:
     print("Wrote match result to logs/full_trade_matches.json")
 
     # Print quick summary
-    matched = sum(
-        1 for m in match_result.get("matches", []) if m.get("vectorbt_idx") is not None
-    )
+    matched = sum(1 for m in match_result.get("matches", []) if m.get("vectorbt_idx") is not None)
     unmatched_vb = len(match_result.get("unmatched_vectorbt", []))
     print(f"Matched pairs: {matched}, Unmatched vectorbt trades: {unmatched_vb}")
 

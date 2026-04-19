@@ -1,0 +1,177 @@
+# 🧪 Strategy Builder - Руководство по тестированию
+
+> **Дата**: 2026-01-29  
+> **Цель**: Проверить, что можно собрать стратегию
+
+---
+
+## ✅ Пошаговая инструкция
+
+### Шаг 1: Откройте страницу
+```
+http://localhost:8000/frontend/strategy-builder.html
+```
+
+### Шаг 2: Откройте консоль браузера (F12)
+Это необходимо для отслеживания работы системы
+
+### Шаг 3: Раскройте категорию блоков
+1. Найдите в левой панели категорию "INDICATORS (8)"
+2. Кликните на заголовок категории
+3. Категория должна раскрыться
+4. Должны появиться блоки: RSI, MACD, EMA, SMA, и т.д.
+
+**Проверка в консоли:**
+```
+[Strategy Builder] Category header clicked - letting sidebar-toggle handle
+```
+
+### Шаг 4: Добавьте блок на canvas
+
+**Способ 1: Клик по блоку**
+1. Кликните на блок "RSI" в раскрытой категории
+2. Блок должен появиться на canvas (центральная область)
+3. Блок должен быть выделен (подсвечен)
+
+**Проверка в консоли:**
+```
+[Strategy Builder] Block item clicked: rsi, type: indicator
+[Strategy Builder] addBlockToCanvas called: blockId=rsi, blockType=indicator
+[Strategy Builder] Block definition found: {id: "rsi", name: "RSI", ...}
+[Strategy Builder] Created block: {id: "block_...", type: "rsi", ...}
+[Strategy Builder] Total blocks: 2
+[Strategy Builder] Block added to canvas successfully
+```
+
+**Способ 2: Drag & Drop**
+1. Зажмите блок "RSI" мышью
+2. Перетащите на canvas
+3. Отпустите кнопку мыши
+4. Блок должен появиться на canvas
+
+**Проверка в консоли:**
+```
+[Strategy Builder] Canvas drop event
+[Strategy Builder] Dropped block: rsi, type: indicator
+[Strategy Builder] Drop position: x=..., y=...
+[Strategy Builder] addBlockToCanvas called: ...
+```
+
+### Шаг 5: Добавьте еще блоки
+1. Раскройте категорию "CONDITIONS (6)"
+2. Добавьте блок "Crossover" на canvas
+3. Раскройте категорию "INPUTS (4)"
+4. Добавьте блок "Price" на canvas
+
+### Шаг 6: Создайте соединение между блоками
+1. Кликните на выходной порт блока (правая сторона блока)
+2. Перетащите линию к входному порту другого блока (левая сторона)
+3. Отпустите кнопку мыши
+4. Должна появиться линия соединения
+
+### Шаг 7: Подключите к Main Strategy Node
+1. Найдите блок "Strategy" на canvas (это главный узел)
+2. Подключите выход условия к входу "Entry Long" или "Entry Short"
+3. Стратегия должна быть готова к тестированию
+
+---
+
+## 🐛 Диагностика проблем
+
+### Проблема: Категория не раскрывается
+
+**Проверка:**
+```javascript
+// В консоли браузера
+const category = document.querySelector(".block-category");
+console.log("Category collapsed:", category.classList.contains("collapsed"));
+category.classList.remove("collapsed");
+```
+
+**Решение:** Если категория не раскрывается, возможно проблема в `sidebar-toggle.js`
+
+### Проблема: Блок не добавляется при клике
+
+**Проверка:**
+1. Убедитесь, что категория раскрыта
+2. Проверьте консоль на ошибки
+3. Попробуйте добавить блок вручную:
+
+```javascript
+// В консоли браузера
+if (typeof addBlockToCanvas === 'function') {
+  addBlockToCanvas('rsi', 'indicator');
+} else {
+  console.error("addBlockToCanvas function not found");
+}
+```
+
+### Проблема: Блоки не видны в категории
+
+**Проверка:**
+```javascript
+// В консоли браузера
+const blocks = document.querySelectorAll(".block-item");
+console.log("Block items found:", blocks.length);
+
+// Проверить первую категорию
+const firstCategory = document.querySelector(".block-category");
+const blockList = firstCategory.querySelector(".block-list");
+console.log("Block list display:", window.getComputedStyle(blockList).display);
+```
+
+---
+
+## 📊 Ожидаемый результат
+
+После выполнения всех шагов:
+- ✅ На canvas должно быть минимум 3 блока
+- ✅ Блоки должны быть соединены линиями
+- ✅ Main Strategy Node должен иметь подключенные входы
+- ✅ Валидация должна показывать "Valid" или предупреждения
+
+---
+
+## 🔍 Проверка в консоли
+
+После добавления блока должны появиться логи:
+```
+[Strategy Builder] Block categories clicked: ...
+[Strategy Builder] Block item clicked: rsi, type: indicator
+[Strategy Builder] addBlockToCanvas called: blockId=rsi, blockType=indicator
+[Strategy Builder] Block definition found: {...}
+[Strategy Builder] Created block: {...}
+[Strategy Builder] Total blocks: 2
+[Strategy Builder] renderBlocks called, blocks count: 2
+[Strategy Builder] Block added to canvas successfully
+```
+
+---
+
+## 🧪 E2E: выбор тикеров на реальных данных (Bybit, все TF в БД)
+
+Все действия выполняются **из фронтенда** (Strategy Builder): выбор тикера → запрос к Bybit → загрузка всех таймфреймов в БД. Скрипт повторяет это для трёх тикеров подряд.
+
+**Требования:**
+- Запущен бэкенд: `.\start_all.ps1` или `uvicorn` на `http://localhost:8000`.
+- Доступ к Bybit API (сеть).
+- Playwright: `py -3.14 -m pip install playwright` и `py -3.14 -m playwright install chromium` (через `-m`, если Scripts не в PATH).
+
+**Запуск:**
+```powershell
+# С видимым браузером (по умолчанию: DOGEUSDT → BNBUSDT → BTCUSDT)
+py -3.14 scripts/e2e_ticker_sync_real_bybit.py
+
+# Headless
+py -3.14 scripts/e2e_ticker_sync_real_bybit.py --headless
+
+# Свои тикеры
+py -3.14 scripts/e2e_ticker_sync_real_bybit.py --symbols ETHUSDT SOLUSDT XRPUSDT
+```
+
+**Что проверяется:** открытие Strategy Builder → клик по полю Symbol → выбор тикера из списка → ожидание завершения синхронизации (реальный запрос к Bybit, загрузка всех TF в БД) → смена тикера и повтор для следующего символа.
+
+---
+
+**Статус**: ✅ Готово к тестированию  
+**Время**: ~5-10 минут (ручной flow); E2E ticker sync: до ~6 минут (3 тикера × до 2 мин на sync)

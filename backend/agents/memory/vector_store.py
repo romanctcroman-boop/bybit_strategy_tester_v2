@@ -6,7 +6,7 @@ Uses ChromaDB for local vector storage with optional API-based embedding generat
 
 Supports:
 - Local sentence-transformers embeddings (offline)
-- DeepSeek API embeddings (online)
+- Claude API embeddings (online)
 - Hybrid approach (local with API fallback)
 """
 
@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -34,7 +35,7 @@ class SearchResult:
     content: str
     distance: float
     score: float  # Similarity score (1 - normalized distance)
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class VectorMemoryStore:
@@ -44,7 +45,7 @@ class VectorMemoryStore:
     Uses ChromaDB for local persistent vector storage.
     Supports multiple embedding strategies:
     1. Local: sentence-transformers (no API needed)
-    2. Remote: DeepSeek/OpenAI API
+    2. Remote: Claude/OpenAI API
     3. Hybrid: Local with remote fallback
 
     Example:
@@ -68,8 +69,8 @@ class VectorMemoryStore:
     def __init__(
         self,
         collection_name: str = DEFAULT_COLLECTION_NAME,
-        persist_path: Optional[str] = None,
-        embedding_fn: Optional[Callable[[str], List[float]]] = None,
+        persist_path: str | None = None,
+        embedding_fn: Callable[[str], list[float]] | None = None,
         use_local_embeddings: bool = True,
     ):
         """
@@ -136,10 +137,7 @@ class VectorMemoryStore:
             logger.debug(f"ChromaDB collection initialized: {self.collection_name}")
 
         except ImportError:
-            logger.warning(
-                "ChromaDB not installed. Run: pip install chromadb\n"
-                "Vector search will be unavailable."
-            )
+            logger.warning("ChromaDB not installed. Run: pip install chromadb\nVector search will be unavailable.")
             self._client = None
             self._collection = None
 
@@ -166,7 +164,7 @@ class VectorMemoryStore:
             )
             self._local_model = None
 
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
+    async def get_embedding(self, text: str) -> list[float] | None:
         """
         Get embedding for text
 
@@ -202,11 +200,11 @@ class VectorMemoryStore:
 
     async def add(
         self,
-        texts: List[str],
-        ids: Optional[List[str]] = None,
-        metadatas: Optional[List[Dict[str, Any]]] = None,
-        embeddings: Optional[List[List[float]]] = None,
-    ) -> List[str]:
+        texts: list[str],
+        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
+        embeddings: list[list[float]] | None = None,
+    ) -> list[str]:
         """
         Add documents to vector store
 
@@ -281,12 +279,12 @@ class VectorMemoryStore:
 
     async def query(
         self,
-        query_text: Optional[str] = None,
-        query_embedding: Optional[List[float]] = None,
+        query_text: str | None = None,
+        query_embedding: list[float] | None = None,
         n_results: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+        where: dict[str, Any] | None = None,
+        include: list[str] | None = None,
+    ) -> list[SearchResult]:
         """
         Query similar documents
 
@@ -363,8 +361,8 @@ class VectorMemoryStore:
 
     async def delete(
         self,
-        ids: Optional[List[str]] = None,
-        where: Optional[Dict[str, Any]] = None,
+        ids: list[str] | None = None,
+        where: dict[str, Any] | None = None,
     ) -> int:
         """
         Delete documents from vector store
@@ -421,19 +419,152 @@ class VectorMemoryStore:
         except Exception as e:
             logger.error(f"Failed to clear collection: {e}")
 
+    # ========================================================================
+    # BACKTEST MEMORY — store and retrieve backtest results semantically
+    # Added 2026-02-11 per Agent Ecosystem Audit (P0)
+    # ========================================================================
 
-class DeepSeekEmbeddingProvider:
+    async def save_backtest_result(
+        self,
+        backtest_id: str,
+        strategy_type: str,
+        strategy_params: dict[str, Any],
+        metrics: dict[str, Any],
+        symbol: str = "BTCUSDT",
+        interval: str = "15",
+    ) -> str | None:
+        """
+        Save a backtest result as a searchable memory entry.
+
+        Creates a textual summary of the backtest for semantic retrieval,
+        allowing agents to find similar past results.
+
+        Args:
+            backtest_id: Unique identifier for the backtest
+            strategy_type: Strategy name (e.g. 'rsi', 'macd')
+            strategy_params: Strategy parameters dict
+            metrics: Metrics dict with win_rate, total_return, sharpe_ratio, etc.
+            symbol: Trading pair
+            interval: Timeframe
+
+        Returns:
+            Document ID if saved, None on failure
+        """
+        try:
+            # Build a searchable text description
+            win_rate = metrics.get("win_rate", 0)
+            total_return = metrics.get("total_return_pct", metrics.get("total_return", 0))
+            sharpe = metrics.get("sharpe_ratio", 0)
+            max_dd = metrics.get("max_drawdown_pct", metrics.get("max_drawdown", 0))
+            total_trades = metrics.get("total_trades", 0)
+            profit_factor = metrics.get("profit_factor", 0)
+
+            params_str = ", ".join(f"{k}={v}" for k, v in strategy_params.items())
+
+            text = (
+                f"Backtest: {strategy_type} strategy on {symbol} {interval}m. "
+                f"Parameters: {params_str}. "
+                f"Results: {total_trades} trades, {win_rate:.1f}% win rate, "
+                f"{total_return:.2f}% return, Sharpe {sharpe:.3f}, "
+                f"Max drawdown {max_dd:.2f}%, Profit factor {profit_factor:.3f}. "
+                f"{'Profitable' if total_return > 0 else 'Unprofitable'} strategy."
+            )
+
+            metadata = {
+                "type": "backtest_result",
+                "backtest_id": str(backtest_id),
+                "strategy_type": strategy_type,
+                "symbol": symbol,
+                "interval": interval,
+                "win_rate": float(win_rate),
+                "total_return": float(total_return),
+                "sharpe_ratio": float(sharpe),
+                "max_drawdown": float(max_dd),
+                "total_trades": int(total_trades),
+                "profit_factor": float(profit_factor),
+                "profitable": total_return > 0,
+            }
+
+            doc_id = f"backtest_{backtest_id}"
+
+            ids = await self.add(
+                texts=[text],
+                ids=[doc_id],
+                metadatas=[metadata],
+            )
+
+            if ids:
+                logger.info(f"Saved backtest {backtest_id} to vector memory")
+                return ids[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to save backtest to memory: {e}")
+            return None
+
+    async def find_similar_results(
+        self,
+        query: str,
+        top_k: int = 5,
+        strategy_type: str | None = None,
+        profitable_only: bool = False,
+    ) -> list[SearchResult]:
+        """
+        Find similar backtest results using semantic search.
+
+        Args:
+            query: Natural language query (e.g. "RSI strategy with high win rate")
+            top_k: Number of results to return
+            strategy_type: Optional filter by strategy type
+            profitable_only: Only return profitable backtests
+
+        Returns:
+            List of SearchResult objects with backtest metadata
+        """
+        try:
+            where_filter: dict[str, Any] = {"type": "backtest_result"}
+
+            if strategy_type:
+                where_filter = {
+                    "$and": [
+                        {"type": "backtest_result"},
+                        {"strategy_type": strategy_type},
+                    ]
+                }
+
+            if profitable_only:
+                profit_filter = {"profitable": True}
+                if "$and" in where_filter:
+                    where_filter["$and"].append(profit_filter)
+                else:
+                    where_filter = {"$and": [where_filter, profit_filter]}
+
+            results = await self.query(
+                query_text=query,
+                n_results=top_k,
+                where=where_filter,
+            )
+
+            logger.debug(f"Found {len(results)} similar backtest results for: {query[:50]}...")
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to search backtest memory: {e}")
+            return []
+
+
+class ClaudeEmbeddingProvider:
     """
-    DeepSeek API-based embedding provider
+    Claude API-based embedding provider
 
-    Uses DeepSeek's embedding endpoint for high-quality embeddings.
-    Requires DEEPSEEK_API_KEY to be configured.
+    Uses Claude's embedding endpoint for high-quality embeddings.
+    Requires Claude_API_KEY to be configured.
     """
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        model: str = "deepseek-chat",  # DeepSeek doesn't have separate embedding model yet
+        api_key: str | None = None,
+        model: str = "claude-haiku-4-5-20251001",  # Claude doesn't have separate embedding model yet
     ):
         self.api_key = api_key
         self.model = model
@@ -446,25 +577,25 @@ class DeepSeekEmbeddingProvider:
 
             km = KeyManager()
             try:
-                self.api_key = km.get_decrypted_key("DEEPSEEK_API_KEY")
+                self.api_key = km.get_decrypted_key("Claude_API_KEY")
             except Exception:
-                logger.warning("DeepSeek API key not available for embeddings")
+                logger.warning("Claude API key not available for embeddings")
 
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
-        """Get embedding from DeepSeek API"""
+    async def get_embedding(self, text: str) -> list[float] | None:
+        """Get embedding from Claude API"""
         if not self.api_key:
             return None
 
-        # Note: DeepSeek doesn't have a dedicated embedding endpoint yet
+        # Note: Claude doesn't have a dedicated embedding endpoint yet
         # This is a placeholder for when they add one
         # For now, use local embeddings or sentence-transformers
 
-        logger.debug("DeepSeek embedding API not yet available, using fallback")
+        logger.debug("Claude embedding API not yet available, using fallback")
         return None
 
 
 __all__ = [
-    "VectorMemoryStore",
+    "ClaudeEmbeddingProvider",
     "SearchResult",
-    "DeepSeekEmbeddingProvider",
+    "VectorMemoryStore",
 ]

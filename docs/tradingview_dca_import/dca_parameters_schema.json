@@ -1,0 +1,874 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Multi DCA Strategy Parameters",
+  "description": "Parameters schema based on TradingView Multi DCA Strategy [Dimkud]",
+  "type": "object",
+  "properties": {
+    "basic_settings": {
+      "type": "object",
+      "properties": {
+        "display_visualization": { "type": "boolean", "default": true },
+        "show_signals": { "type": "boolean", "default": true }
+      }
+    },
+    "time_filter": {
+      "type": "object",
+      "properties": {
+        "days_enabled": {
+          "type": "object",
+          "properties": {
+            "sunday": { "type": "boolean", "default": true },
+            "monday": { "type": "boolean", "default": true },
+            "tuesday": { "type": "boolean", "default": true },
+            "wednesday": { "type": "boolean", "default": true },
+            "thursday": { "type": "boolean", "default": true },
+            "friday": { "type": "boolean", "default": true },
+            "saturday": { "type": "boolean", "default": true }
+          }
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date",
+          "default": "2025-01-01"
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date",
+          "default": "2030-12-31"
+        }
+      }
+    },
+    "grid_settings": {
+      "type": "object",
+      "properties": {
+        "activate_dca_grid": { "type": "boolean", "default": true },
+        "direction": {
+          "type": "string",
+          "enum": ["long", "short"],
+          "default": "long"
+        },
+        "deposit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 100
+        },
+        "leverage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 1
+        },
+        "grid_size_percent": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 15
+        },
+        "order_count": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 15,
+          "default": 5
+        },
+        "martingale_multiplier": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1.8,
+          "default": 1.0
+        },
+        "logarithmic_steps": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 1.4,
+          "default": 1.0
+        },
+        "close_on_big_drawdown": { "type": "boolean", "default": false },
+        "drawdown_to_close": { "type": "number", "minimum": 0, "default": 95 },
+        "change_tp_if_many_orders": { "type": "boolean", "default": false },
+        "new_tp_value": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 30,
+          "default": 0.5
+        },
+        "tp_trigger_order_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15,
+          "default": 3
+        },
+        "alert_first_order_only": { "type": "boolean", "default": false }
+      }
+    },
+    "static_sl_tp": {
+      "type": "object",
+      "properties": {
+        "take_profit_percent": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 30,
+          "default": 1.5
+        },
+        "stop_loss_percent": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 15,
+          "default": 5
+        },
+        "use_long": { "type": "boolean", "default": true },
+        "use_short": { "type": "boolean", "default": true },
+        "close_only_in_profit": { "type": "boolean", "default": false },
+        "activate_breakeven": { "type": "boolean", "default": false },
+        "breakeven_trigger_percent": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30,
+          "default": 1.0
+        },
+        "new_breakeven_sl": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30,
+          "default": 0.1
+        }
+      }
+    },
+    "multiple_take_profits": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "tp1": {
+          "type": "object",
+          "properties": {
+            "profit_percent": { "type": "number", "default": 0.5 },
+            "close_percent": { "type": "number", "default": 25 }
+          }
+        },
+        "tp2": {
+          "type": "object",
+          "properties": {
+            "profit_percent": { "type": "number", "default": 1.0 },
+            "close_percent": { "type": "number", "default": 25 }
+          }
+        },
+        "tp3": {
+          "type": "object",
+          "properties": {
+            "profit_percent": { "type": "number", "default": 1.5 },
+            "close_percent": { "type": "number", "default": 25 }
+          }
+        },
+        "tp4": {
+          "type": "object",
+          "properties": {
+            "profit_percent": { "type": "number", "default": 2.0 },
+            "close_percent": { "type": "number", "default": 100 }
+          }
+        }
+      }
+    },
+    "indent_order": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "indent_percent": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "default": 0.1
+        },
+        "cancel_after_bars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 10
+        }
+      }
+    },
+    "trailing_stop": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "activation_percent": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30,
+          "default": 1.0
+        },
+        "distance_percent": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30,
+          "default": 0.5
+        }
+      }
+    },
+    "atr_stop_loss": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "use_wicks": { "type": "boolean", "default": false },
+        "smoothing_method": {
+          "type": "string",
+          "enum": ["WMA", "RMA", "SMA", "EMA"],
+          "default": "RMA"
+        },
+        "period": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 150,
+          "default": 14
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4,
+          "default": 2.0
+        }
+      }
+    },
+    "atr_take_profit": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "use_wicks": { "type": "boolean", "default": false },
+        "smoothing_method": {
+          "type": "string",
+          "enum": ["WMA", "RMA", "SMA", "EMA"],
+          "default": "RMA"
+        },
+        "period": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 150,
+          "default": 14
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4,
+          "default": 3.0
+        }
+      }
+    },
+    "pyramiding": {
+      "type": "object",
+      "properties": {
+        "min_distance_enabled": { "type": "boolean", "default": false },
+        "min_distance_percent": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10,
+          "default": 1.0
+        }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "atr_volatility": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "comparison": {
+              "type": "string",
+              "enum": ["atr1_lt_atr2", "atr1_gt_atr2"],
+              "default": "atr1_lt_atr2"
+            },
+            "threshold_percent": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 50,
+              "default": 10
+            },
+            "atr1_length": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 20,
+              "default": 10
+            },
+            "atr2_length": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 100,
+              "default": 50
+            },
+            "smoothing": {
+              "type": "string",
+              "enum": ["WMA", "RMA", "SMA", "EMA"],
+              "default": "RMA"
+            }
+          }
+        },
+        "volume": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "comparison": {
+              "type": "string",
+              "enum": ["vol1_lt_vol2", "vol1_gt_vol2"],
+              "default": "vol1_gt_vol2"
+            },
+            "threshold_percent": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 50,
+              "default": 10
+            },
+            "vol1_length": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 20,
+              "default": 10
+            },
+            "vol2_length": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 100,
+              "default": 50
+            },
+            "smoothing": {
+              "type": "string",
+              "enum": ["WMA", "RMA", "SMA", "EMA"],
+              "default": "SMA"
+            }
+          }
+        },
+        "supertrend": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "generate_signals": { "type": "boolean", "default": false },
+            "use_btcusdt_source": { "type": "boolean", "default": false },
+            "opposite_signal": { "type": "boolean", "default": false },
+            "show_indicator": { "type": "boolean", "default": true },
+            "atr_period": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "atr_multiplier": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 50,
+              "default": 3.0
+            },
+            "timeframe": { "type": "string", "default": "Chart" }
+          }
+        },
+        "two_mas": {
+          "type": "object",
+          "properties": {
+            "ma1_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 9
+            },
+            "ma1_type": {
+              "type": "string",
+              "enum": ["WMA", "RMA", "SMA", "EMA"],
+              "default": "EMA"
+            },
+            "ma1_source": {
+              "type": "string",
+              "enum": [
+                "close",
+                "open",
+                "high",
+                "low",
+                "hl2",
+                "hlc3",
+                "ohlc4",
+                "hlcc4"
+              ],
+              "default": "close"
+            },
+            "ma2_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 21
+            },
+            "ma2_type": {
+              "type": "string",
+              "enum": ["WMA", "RMA", "SMA", "EMA"],
+              "default": "EMA"
+            },
+            "ma2_source": {
+              "type": "string",
+              "enum": [
+                "close",
+                "open",
+                "high",
+                "low",
+                "hl2",
+                "hlc3",
+                "ohlc4",
+                "hlcc4"
+              ],
+              "default": "close"
+            },
+            "show_mas": { "type": "boolean", "default": true },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "use_cross_signal": { "type": "boolean", "default": false },
+            "opposite_cross_signal": { "type": "boolean", "default": false },
+            "signal_memory_enabled": { "type": "boolean", "default": false },
+            "signal_memory_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            },
+            "use_ma1_as_filter": { "type": "boolean", "default": false },
+            "opposite_filter": { "type": "boolean", "default": false }
+          }
+        },
+        "rsi": {
+          "type": "object",
+          "properties": {
+            "length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 14
+            },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "use_btcusdt_source": { "type": "boolean", "default": false },
+            "use_long_range": { "type": "boolean", "default": false },
+            "long_rsi_more": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 30
+            },
+            "long_rsi_less": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 50
+            },
+            "use_short_range": { "type": "boolean", "default": false },
+            "short_rsi_less": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 70
+            },
+            "short_rsi_more": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 50
+            },
+            "use_cross_level": { "type": "boolean", "default": false },
+            "long_cross_level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 30
+            },
+            "short_cross_level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 70
+            },
+            "opposite_cross_signal": { "type": "boolean", "default": false },
+            "signal_memory_enabled": { "type": "boolean", "default": false },
+            "signal_memory_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            }
+          }
+        },
+        "stochastic": {
+          "type": "object",
+          "properties": {
+            "k_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 14
+            },
+            "k_smoothing": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            },
+            "d_smoothing": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "use_btcusdt_source": { "type": "boolean", "default": false },
+            "use_range_filter": { "type": "boolean", "default": false },
+            "long_stoch_more": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 20
+            },
+            "long_stoch_less": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 80
+            },
+            "short_stoch_less": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 80
+            },
+            "short_stoch_more": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 20
+            },
+            "use_cross_level": { "type": "boolean", "default": false },
+            "long_cross_level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 20
+            },
+            "short_cross_level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 80
+            },
+            "use_kd_cross": { "type": "boolean", "default": false },
+            "opposite_kd_signal": { "type": "boolean", "default": false },
+            "signal_memory_enabled": { "type": "boolean", "default": false },
+            "signal_memory_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            }
+          }
+        }
+      }
+    },
+    "signals": {
+      "type": "object",
+      "properties": {
+        "highest_lowest_bar": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "lookback_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "price_change_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
+            },
+            "atr_change_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 30,
+              "default": 0
+            },
+            "atr_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 14
+            }
+          }
+        },
+        "block_if_worse_than": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "max_adverse_percent": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 30,
+              "default": 1.0
+            }
+          }
+        },
+        "macd": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "fast_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 12
+            },
+            "slow_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 26
+            },
+            "signal_smoothing": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 9
+            },
+            "source": { "type": "string", "default": "close" },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "use_btcusdt_source": { "type": "boolean", "default": false },
+            "use_level_cross": { "type": "boolean", "default": false },
+            "level_cross_value": { "type": "number", "default": 0 },
+            "opposite_level_cross": { "type": "boolean", "default": false },
+            "use_signal_cross": { "type": "boolean", "default": false },
+            "signal_only_if_macd_lt_zero": {
+              "type": "boolean",
+              "default": false
+            },
+            "opposite_signal_cross": { "type": "boolean", "default": false },
+            "disable_signal_memory": { "type": "boolean", "default": false }
+          }
+        },
+        "divergence": {
+          "type": "object",
+          "properties": {
+            "pivot_interval": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9,
+              "default": 5
+            },
+            "act_without_confirmation": { "type": "boolean", "default": false },
+            "show_lines": { "type": "boolean", "default": true },
+            "signal_memory_enabled": { "type": "boolean", "default": false },
+            "signal_memory_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            },
+            "use_rsi": { "type": "boolean", "default": true },
+            "rsi_period": { "type": "integer", "default": 14 },
+            "use_stochastic": { "type": "boolean", "default": false },
+            "stoch_length": { "type": "integer", "default": 14 },
+            "use_momentum": { "type": "boolean", "default": false },
+            "momentum_length": { "type": "integer", "default": 10 },
+            "use_cmf": { "type": "boolean", "default": false },
+            "cmf_period": { "type": "integer", "default": 12 },
+            "use_obv": { "type": "boolean", "default": false },
+            "use_mfi": { "type": "boolean", "default": false },
+            "mfi_length": { "type": "integer", "default": 14 }
+          }
+        },
+        "price_action": {
+          "type": "object",
+          "properties": {
+            "signal_memory_enabled": { "type": "boolean", "default": false },
+            "signal_memory_bars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 3
+            },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "use_trend": { "type": "boolean", "default": true },
+            "fast_ema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 7
+            },
+            "medium_ema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "slow_ema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "patterns": {
+              "type": "object",
+              "properties": {
+                "dark_cloud_cover": { "type": "boolean", "default": false },
+                "falling_three_methods": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "gravestone_doji": { "type": "boolean", "default": false },
+                "hanging_man": { "type": "boolean", "default": false },
+                "long_upper_shadow": { "type": "boolean", "default": false },
+                "marubozu_black": { "type": "boolean", "default": false },
+                "shooting_star": { "type": "boolean", "default": false },
+                "tweezer_top": { "type": "boolean", "default": false },
+                "doji": { "type": "boolean", "default": false },
+                "doji_star": { "type": "boolean", "default": false },
+                "engulfing": { "type": "boolean", "default": true },
+                "harami": { "type": "boolean", "default": false },
+                "inverted_hammer": { "type": "boolean", "default": false },
+                "dragonfly_doji": { "type": "boolean", "default": false },
+                "hammer": { "type": "boolean", "default": true },
+                "long_lower_shadow": { "type": "boolean", "default": false },
+                "marubozu_white": { "type": "boolean", "default": false },
+                "piercing": { "type": "boolean", "default": false },
+                "rising_three_methods": { "type": "boolean", "default": false },
+                "tweezer_bottom": { "type": "boolean", "default": false }
+              }
+            }
+          }
+        }
+      }
+    },
+    "close_conditions": {
+      "type": "object",
+      "properties": {
+        "by_time": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "bars_since_order": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "profit_only": { "type": "boolean", "default": false },
+            "min_profit_percent": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 20,
+              "default": 0.5
+            }
+          }
+        },
+        "by_channel": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "band_position": {
+              "type": "string",
+              "enum": ["breakout", "rebound"],
+              "default": "rebound"
+            },
+            "channel_type": {
+              "type": "string",
+              "enum": ["keltner", "bollinger"],
+              "default": "bollinger"
+            },
+            "close_condition": {
+              "type": "string",
+              "enum": [
+                "close_out_then_in",
+                "wick_out",
+                "wick_out_then_in",
+                "out_of_band"
+              ],
+              "default": "wick_out"
+            },
+            "keltner_length": { "type": "integer", "default": 20 },
+            "keltner_mult": { "type": "number", "default": 1.5 },
+            "bb_length": { "type": "integer", "default": 20 },
+            "bb_deviation": { "type": "number", "default": 2.0 }
+          }
+        },
+        "by_ma_cross": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "show_mas": { "type": "boolean", "default": true },
+            "profit_only": { "type": "boolean", "default": false },
+            "min_profit_percent": { "type": "number", "default": 0.5 },
+            "ma1_length": { "type": "integer", "default": 9 },
+            "ma2_length": { "type": "integer", "default": 21 }
+          }
+        },
+        "by_rsi": {
+          "type": "object",
+          "properties": {
+            "length": { "type": "integer", "default": 14 },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "profit_only": { "type": "boolean", "default": false },
+            "min_profit_percent": { "type": "number", "default": 0.5 },
+            "reach_enabled": { "type": "boolean", "default": false },
+            "long_reach_more": { "type": "number", "default": 70 },
+            "long_reach_less": { "type": "number", "default": 100 },
+            "short_reach_less": { "type": "number", "default": 30 },
+            "short_reach_more": { "type": "number", "default": 0 },
+            "cross_enabled": { "type": "boolean", "default": false },
+            "long_cross_level": { "type": "number", "default": 70 },
+            "short_cross_level": { "type": "number", "default": 30 }
+          }
+        },
+        "by_stochastic": {
+          "type": "object",
+          "properties": {
+            "k_length": { "type": "integer", "default": 14 },
+            "k_smoothing": { "type": "integer", "default": 3 },
+            "d_smoothing": { "type": "integer", "default": 3 },
+            "timeframe": { "type": "string", "default": "Chart" },
+            "profit_only": { "type": "boolean", "default": false },
+            "min_profit_percent": { "type": "number", "default": 0.5 },
+            "reach_enabled": { "type": "boolean", "default": false },
+            "long_reach_more": { "type": "number", "default": 80 },
+            "long_reach_less": { "type": "number", "default": 100 },
+            "short_reach_less": { "type": "number", "default": 20 },
+            "short_reach_more": { "type": "number", "default": 0 },
+            "cross_enabled": { "type": "boolean", "default": false },
+            "long_cross_level": { "type": "number", "default": 80 },
+            "short_cross_level": { "type": "number", "default": 20 }
+          }
+        },
+        "by_psar": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "opposite": { "type": "boolean", "default": false },
+            "profit_only": { "type": "boolean", "default": false },
+            "min_profit_percent": { "type": "number", "default": 0.5 },
+            "start": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 0.1,
+              "default": 0.02
+            },
+            "increment": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 0.1,
+              "default": 0.02
+            },
+            "maximum": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 0.5,
+              "default": 0.2
+            },
+            "close_on_nth_bar": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

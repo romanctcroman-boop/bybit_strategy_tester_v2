@@ -13,9 +13,9 @@ import math
 import statistics
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +51,11 @@ class RiskAlert:
     message: str
     value: float
     threshold: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    strategy_id: Optional[str] = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    strategy_id: str | None = None
     acknowledged: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "alert_type": self.alert_type.value,
@@ -83,9 +83,9 @@ class PositionRisk:
     exposure: float
     exposure_pct: float
     risk_score: float  # 0-100
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    liquidation_price: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    liquidation_price: float | None = None
     leverage: float = 1.0
 
 
@@ -130,7 +130,7 @@ class RiskCalculator:
     """Calculates various risk metrics."""
 
     @staticmethod
-    def calculate_var(returns: List[float], confidence: float = 0.95) -> float:
+    def calculate_var(returns: list[float], confidence: float = 0.95) -> float:
         """Calculate Value at Risk using historical method."""
         if not returns or len(returns) < 2:
             return 0.0
@@ -139,7 +139,7 @@ class RiskCalculator:
         return abs(sorted_returns[max(0, index)])
 
     @staticmethod
-    def calculate_max_drawdown(equity_curve: List[float]) -> float:
+    def calculate_max_drawdown(equity_curve: list[float]) -> float:
         """Calculate maximum drawdown from equity curve."""
         if not equity_curve or len(equity_curve) < 2:
             return 0.0
@@ -156,7 +156,7 @@ class RiskCalculator:
         return max_dd * 100  # Return as percentage
 
     @staticmethod
-    def calculate_current_drawdown(equity_curve: List[float]) -> float:
+    def calculate_current_drawdown(equity_curve: list[float]) -> float:
         """Calculate current drawdown from peak."""
         if not equity_curve or len(equity_curve) < 2:
             return 0.0
@@ -167,9 +167,7 @@ class RiskCalculator:
         return ((peak - current) / peak * 100) if peak > 0 else 0.0
 
     @staticmethod
-    def calculate_sharpe_ratio(
-        returns: List[float], risk_free_rate: float = 0.0
-    ) -> float:
+    def calculate_sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
         """Calculate Sharpe ratio."""
         if not returns or len(returns) < 2:
             return 0.0
@@ -183,9 +181,7 @@ class RiskCalculator:
         return (avg_return - risk_free_rate) / std_dev * math.sqrt(252)
 
     @staticmethod
-    def calculate_sortino_ratio(
-        returns: List[float], risk_free_rate: float = 0.0
-    ) -> float:
+    def calculate_sortino_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
         """Calculate Sortino ratio (downside deviation only)."""
         if not returns or len(returns) < 2:
             return 0.0
@@ -202,7 +198,7 @@ class RiskCalculator:
         return (avg_return - risk_free_rate) / downside_dev * math.sqrt(252)
 
     @staticmethod
-    def calculate_win_rate(trades: List[Dict[str, float]]) -> float:
+    def calculate_win_rate(trades: list[dict[str, float]]) -> float:
         """Calculate win rate from trades."""
         if not trades:
             return 0.0
@@ -211,7 +207,7 @@ class RiskCalculator:
         return (winning / len(trades)) * 100
 
     @staticmethod
-    def calculate_profit_factor(trades: List[Dict[str, float]]) -> float:
+    def calculate_profit_factor(trades: list[dict[str, float]]) -> float:
         """Calculate profit factor (gross profit / gross loss)."""
         if not trades:
             return 0.0
@@ -244,19 +240,19 @@ class RiskDashboardService:
     Central service for risk monitoring and alerting.
     """
 
-    def __init__(self, thresholds: Optional[RiskThresholds] = None):
+    def __init__(self, thresholds: RiskThresholds | None = None):
         self.thresholds = thresholds or RiskThresholds()
         self.calculator = RiskCalculator()
 
         # Data storage
-        self.positions: Dict[str, PositionRisk] = {}
-        self.alerts: List[RiskAlert] = []
-        self.equity_history: List[float] = []
-        self.returns_history: List[float] = []
-        self.trades_history: List[Dict[str, Any]] = []
+        self.positions: dict[str, PositionRisk] = {}
+        self.alerts: list[RiskAlert] = []
+        self.equity_history: list[float] = []
+        self.returns_history: list[float] = []
+        self.trades_history: list[dict[str, Any]] = []
 
         # State
-        self.last_update: Optional[datetime] = None
+        self.last_update: datetime | None = None
         self.alert_counter = 0
 
         # Metrics
@@ -271,7 +267,7 @@ class RiskDashboardService:
     def update_position(self, position: PositionRisk):
         """Update or add a position."""
         self.positions[position.symbol] = position
-        self.last_update = datetime.now(timezone.utc)
+        self.last_update = datetime.now(UTC)
         self._check_position_alerts(position)
 
     def remove_position(self, symbol: str):
@@ -297,14 +293,14 @@ class RiskDashboardService:
                 if len(self.returns_history) > 1000:
                     self.returns_history = self.returns_history[-1000:]
 
-        self.last_update = datetime.now(timezone.utc)
+        self.last_update = datetime.now(UTC)
 
-    def record_trade(self, trade: Dict[str, Any]):
+    def record_trade(self, trade: dict[str, Any]):
         """Record a completed trade."""
         self.trades_history.append(
             {
                 **trade,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 
@@ -317,14 +313,10 @@ class RiskDashboardService:
         # Calculate totals
         total_equity = self.equity_history[-1] if self.equity_history else 0.0
         total_exposure = sum(p.exposure for p in self.positions.values())
-        exposure_pct = (
-            (total_exposure / total_equity * 100) if total_equity > 0 else 0.0
-        )
+        exposure_pct = (total_exposure / total_equity * 100) if total_equity > 0 else 0.0
 
         unrealized_pnl = sum(p.unrealized_pnl for p in self.positions.values())
-        unrealized_pnl_pct = (
-            (unrealized_pnl / total_equity * 100) if total_equity > 0 else 0.0
-        )
+        unrealized_pnl_pct = (unrealized_pnl / total_equity * 100) if total_equity > 0 else 0.0
 
         # Calculate drawdown
         max_dd = self.calculator.calculate_max_drawdown(self.equity_history)
@@ -343,18 +335,12 @@ class RiskDashboardService:
         profit_factor = self.calculator.calculate_profit_factor(self.trades_history)
 
         # Today's realized P&L
-        today = datetime.now(timezone.utc).date()
-        today_trades = [
-            t
-            for t in self.trades_history
-            if datetime.fromisoformat(t["timestamp"]).date() == today
-        ]
+        today = datetime.now(UTC).date()
+        today_trades = [t for t in self.trades_history if datetime.fromisoformat(t["timestamp"]).date() == today]
         realized_today = sum(t.get("pnl", 0) for t in today_trades)
 
         # Risk score
-        risk_score = self.calculator.calculate_risk_score(
-            current_dd, exposure_pct, var_95, self.thresholds
-        )
+        risk_score = self.calculator.calculate_risk_score(current_dd, exposure_pct, var_95, self.thresholds)
 
         return PortfolioRisk(
             total_equity=total_equity,
@@ -381,15 +367,11 @@ class RiskDashboardService:
         total_equity = self.equity_history[-1] if self.equity_history else 1.0
 
         # Position size alert
-        position_pct = (
-            (position.exposure / total_equity * 100) if total_equity > 0 else 0
-        )
+        position_pct = (position.exposure / total_equity * 100) if total_equity > 0 else 0
         if position_pct > self.thresholds.max_position_size_pct:
             self._create_alert(
                 AlertType.POSITION_SIZE,
-                RiskLevel.HIGH
-                if position_pct > self.thresholds.max_position_size_pct * 1.5
-                else RiskLevel.MEDIUM,
+                RiskLevel.HIGH if position_pct > self.thresholds.max_position_size_pct * 1.5 else RiskLevel.MEDIUM,
                 f"Position size for {position.symbol} exceeds threshold",
                 position_pct,
                 self.thresholds.max_position_size_pct,
@@ -447,7 +429,7 @@ class RiskDashboardService:
         message: str,
         value: float,
         threshold: float,
-        strategy_id: Optional[str] = None,
+        strategy_id: str | None = None,
     ):
         """Create and store a new alert."""
         alert = RiskAlert(
@@ -483,9 +465,9 @@ class RiskDashboardService:
     def get_alerts(
         self,
         unacknowledged_only: bool = False,
-        level: Optional[RiskLevel] = None,
+        level: RiskLevel | None = None,
         limit: int = 50,
-    ) -> List[RiskAlert]:
+    ) -> list[RiskAlert]:
         """Get alerts with optional filtering."""
         alerts = self.alerts
 
@@ -497,7 +479,7 @@ class RiskDashboardService:
 
         return alerts[-limit:]
 
-    def get_risk_summary(self) -> Dict[str, Any]:
+    def get_risk_summary(self) -> dict[str, Any]:
         """Get comprehensive risk summary."""
         portfolio = self.get_portfolio_risk()
 
@@ -527,9 +509,7 @@ class RiskDashboardService:
             },
             "positions_count": portfolio.positions_count,
             "active_alerts": len(unack_alerts),
-            "critical_alerts": len(
-                [a for a in unack_alerts if a.level == RiskLevel.CRITICAL]
-            ),
+            "critical_alerts": len([a for a in unack_alerts if a.level == RiskLevel.CRITICAL]),
             "thresholds": {
                 "max_drawdown": self.thresholds.max_drawdown_pct,
                 "max_exposure": self.thresholds.max_exposure_pct,
@@ -538,7 +518,7 @@ class RiskDashboardService:
             "last_update": self.last_update.isoformat() if self.last_update else None,
         }
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get service metrics."""
         return {
             "positions_tracked": len(self.positions),
@@ -552,7 +532,7 @@ class RiskDashboardService:
 
 
 # Global instance
-_risk_dashboard: Optional[RiskDashboardService] = None
+_risk_dashboard: RiskDashboardService | None = None
 
 
 def get_risk_dashboard() -> RiskDashboardService:

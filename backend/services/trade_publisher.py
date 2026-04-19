@@ -9,11 +9,11 @@ Architecture:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Optional, Set
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 import websockets
@@ -39,11 +39,11 @@ class TradePublisher:
 
     def __init__(self, redis_url: str = "redis://localhost:6379"):
         self.redis_url = redis_url
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
 
         self._running = False
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
-        self._ws_task: Optional[asyncio.Task] = None
+        self._ws: websockets.WebSocketClientProtocol | None = None
+        self._ws_task: asyncio.Task | None = None
 
         # Reconnection settings
         self._reconnect_delay = 5
@@ -52,7 +52,7 @@ class TradePublisher:
         self._reconnect_multiplier = 1.5
 
         # Subscribed symbols
-        self._subscribed_symbols: Set[str] = set()
+        self._subscribed_symbols: set[str] = set()
 
         # Statistics
         self._stats = {
@@ -81,7 +81,7 @@ class TradePublisher:
 
         self._subscribed_symbols = set(symbols)
         self._running = True
-        self._stats["uptime_start"] = datetime.now(timezone.utc).isoformat()
+        self._stats["uptime_start"] = datetime.now(UTC).isoformat()
 
         await self.connect_redis()
 
@@ -97,10 +97,8 @@ class TradePublisher:
 
         if self._ws_task:
             self._ws_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._ws_task
-            except asyncio.CancelledError:
-                pass
 
         if self.redis_client:
             await self.redis_client.close()
@@ -126,10 +124,7 @@ class TradePublisher:
                 )
 
             if self._running:
-                logger.info(
-                    f"Reconnecting in {self._reconnect_delay:.1f}s "
-                    f"(attempt #{self._stats['reconnects']})..."
-                )
+                logger.info(f"Reconnecting in {self._reconnect_delay:.1f}s (attempt #{self._stats['reconnects']})...")
                 await asyncio.sleep(self._reconnect_delay)
 
     async def _connect_and_listen(self):
@@ -147,9 +142,7 @@ class TradePublisher:
             # Subscribe to trade streams
             subscribe_msg = {
                 "op": "subscribe",
-                "args": [
-                    f"publicTrade.{symbol}" for symbol in self._subscribed_symbols
-                ],
+                "args": [f"publicTrade.{symbol}" for symbol in self._subscribed_symbols],
             }
             await ws.send(json.dumps(subscribe_msg))
             logger.info(f"Subscribed to: {subscribe_msg['args']}")
@@ -199,7 +192,7 @@ class TradePublisher:
         await self.redis_client.publish(channel, json.dumps(trade_msg))
 
         self._stats["trades_published"] += 1
-        self._stats["last_trade_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["last_trade_time"] = datetime.now(UTC).isoformat()
 
         # Log slow publishing (>5ms is suspicious)
         elapsed = (time.perf_counter() - t0) * 1000
@@ -237,7 +230,7 @@ class TradePublisher:
 
 
 # Singleton instance
-_trade_publisher: Optional[TradePublisher] = None
+_trade_publisher: TradePublisher | None = None
 
 
 def get_trade_publisher(redis_url: str = "redis://localhost:6379") -> TradePublisher:

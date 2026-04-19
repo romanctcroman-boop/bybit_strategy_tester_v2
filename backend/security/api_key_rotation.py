@@ -11,8 +11,6 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
-
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +38,15 @@ class APIKeyRotationManager:
         self.rotation_days = rotation_days
         self.metadata = self._load_metadata()
 
-        logger.info(
-            f"API Key Rotation Manager initialized (rotation_days={rotation_days})"
-        )
+        logger.info(f"API Key Rotation Manager initialized (rotation_days={rotation_days})")
 
-    def _load_metadata(self) -> Dict:
+    def _load_metadata(self) -> dict:
         """Load key metadata from file"""
         if not self.metadata_file.exists():
             return {"keys": {}, "audit_log": []}
 
         try:
-            with open(self.metadata_file, "r", encoding="utf-8") as f:
+            with open(self.metadata_file, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to load metadata: {e}")
@@ -71,7 +67,7 @@ class APIKeyRotationManager:
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
 
-    def _add_audit_log(self, action: str, key_id: str, details: Dict = None):
+    def _add_audit_log(self, action: str, key_id: str, details: dict | None = None):
         """Add entry to audit log"""
         entry = {
             "timestamp": datetime.now().isoformat(),
@@ -114,9 +110,7 @@ class APIKeyRotationManager:
             "last_used": None,
         }
 
-        self._add_audit_log(
-            "register", key_hash, {"service": service, "name": key_name}
-        )
+        self._add_audit_log("register", key_hash, {"service": service, "name": key_name})
 
         logger.info(f"Registered API key: {key_name} ({service})")
 
@@ -150,7 +144,7 @@ class APIKeyRotationManager:
 
             logger.info(f"Recorded rotation for key {key_hash}")
 
-    def check_rotation_needed(self) -> List[Dict]:
+    def check_rotation_needed(self) -> list[dict]:
         """
         Check which keys need rotation
 
@@ -177,7 +171,7 @@ class APIKeyRotationManager:
 
         return needs_rotation
 
-    def get_expiring_soon(self, days_threshold: int = 7) -> List[Dict]:
+    def get_expiring_soon(self, days_threshold: int = 7) -> list[dict]:
         """
         Get keys expiring within threshold
 
@@ -201,26 +195,20 @@ class APIKeyRotationManager:
                         "name": info["name"],
                         "service": info["service"],
                         "days_until_expiry": days_until_expiry,
-                        "expiry_date": (
-                            last_rotated + timedelta(days=self.rotation_days)
-                        ).isoformat(),
+                        "expiry_date": (last_rotated + timedelta(days=self.rotation_days)).isoformat(),
                     }
                 )
 
         return expiring
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get rotation statistics"""
         total_keys = len(self.metadata["keys"])
         needs_rotation = len(self.check_rotation_needed())
         expiring_soon = len(self.get_expiring_soon())
 
-        total_usage = sum(
-            info["usage_count"] for info in self.metadata["keys"].values()
-        )
-        total_rotations = sum(
-            info["rotation_count"] for info in self.metadata["keys"].values()
-        )
+        total_usage = sum(info["usage_count"] for info in self.metadata["keys"].values())
+        total_rotations = sum(info["rotation_count"] for info in self.metadata["keys"].values())
 
         return {
             "total_keys": total_keys,
@@ -251,18 +239,12 @@ class APIKeyRotationManager:
         if needs_rotation:
             report.append("\n## ⚠️  Keys Requiring Immediate Rotation\n")
             for key in needs_rotation:
-                report.append(
-                    f"- **{key['name']}** ({key['service']}) - "
-                    f"{key['days_old']} days old"
-                )
+                report.append(f"- **{key['name']}** ({key['service']}) - {key['days_old']} days old")
 
         if expiring:
             report.append("\n## 🔔 Keys Expiring Soon\n")
             for key in expiring:
-                report.append(
-                    f"- **{key['name']}** ({key['service']}) - "
-                    f"expires in {key['days_until_expiry']} days"
-                )
+                report.append(f"- **{key['name']}** ({key['service']}) - expires in {key['days_until_expiry']} days")
 
         if not needs_rotation and not expiring:
             report.append("\n## ✅ All Keys Up to Date\n")
@@ -272,7 +254,7 @@ class APIKeyRotationManager:
 
 
 # Global instance
-_rotation_manager: Optional[APIKeyRotationManager] = None
+_rotation_manager: APIKeyRotationManager | None = None
 
 
 def get_rotation_manager() -> APIKeyRotationManager:
@@ -280,9 +262,7 @@ def get_rotation_manager() -> APIKeyRotationManager:
     global _rotation_manager
 
     if _rotation_manager is None:
-        metadata_file = (
-            Path(__file__).parent.parent.parent / "config" / "api_key_metadata.json"
-        )
+        metadata_file = Path(__file__).parent.parent.parent / "config" / "api_key_metadata.json"
         _rotation_manager = APIKeyRotationManager(metadata_file)
 
     return _rotation_manager

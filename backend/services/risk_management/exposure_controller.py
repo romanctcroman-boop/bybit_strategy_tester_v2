@@ -10,10 +10,11 @@ Controls and limits trading exposure:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +98,12 @@ class ExposureCheckResult:
     """Result of exposure check."""
 
     allowed: bool
-    violations: List[ExposureViolationType]
-    messages: List[str]
-    current_exposure: Dict[str, float]
-    limits: Dict[str, float]
+    violations: list[ExposureViolationType]
+    messages: list[str]
+    current_exposure: dict[str, float]
+    limits: dict[str, float]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "allowed": self.allowed,
             "violations": [v.value for v in self.violations],
@@ -148,19 +149,19 @@ class ExposureController:
     def __init__(
         self,
         equity: float,
-        limits: Optional[ExposureLimits] = None,
+        limits: ExposureLimits | None = None,
     ):
         self.equity = equity
         self.limits = limits or ExposureLimits()
 
         # Current positions
-        self.positions: Dict[str, Position] = {}
+        self.positions: dict[str, Position] = {}
 
         # Correlation matrix (symbol -> {symbol -> correlation})
-        self.correlations: Dict[str, Dict[str, float]] = {}
+        self.correlations: dict[str, dict[str, float]] = {}
 
         # Sector mappings
-        self.sector_map: Dict[str, str] = {}
+        self.sector_map: dict[str, str] = {}
 
         # Daily tracking
         self.daily_pnl: float = 0.0
@@ -168,17 +169,14 @@ class ExposureController:
         self.peak_equity: float = equity
 
         # State
-        self.cooling_until: Optional[datetime] = None
-        self.violations_today: List[ExposureViolationType] = []
+        self.cooling_until: datetime | None = None
+        self.violations_today: list[ExposureViolationType] = []
 
         # Callbacks
-        self.on_limit_breach: Optional[Callable[[ExposureViolationType, str], None]] = (
-            None
-        )
+        self.on_limit_breach: Callable[[ExposureViolationType, str], None] | None = None
 
         logger.info(
-            f"ExposureController initialized: equity=${equity:.2f}, "
-            f"max_position={self.limits.max_position_size_pct}%"
+            f"ExposureController initialized: equity=${equity:.2f}, max_position={self.limits.max_position_size_pct}%"
         )
 
     @property
@@ -192,6 +190,46 @@ class ExposureController:
     def used_margin(self) -> float:
         """Calculate total used margin."""
         return sum(p.notional_value / p.leverage for p in self.positions.values())
+
+    @property
+    def total_pnl(self) -> float:
+        """Calculate total unrealized P&L across all positions."""
+        return sum(p.unrealized_pnl for p in self.positions.values())
+
+    def can_add_position(
+        self,
+        symbol: str,
+        side: str,
+        size: float,
+        entry_price: float,
+        leverage: float = 1.0,
+    ) -> dict[str, Any]:
+        """
+        Check if a new position can be added.
+
+        Args:
+            symbol: Trading symbol
+            side: 'long' or 'short'
+            size: Position size in base currency
+            entry_price: Entry price
+            leverage: Position leverage
+
+        Returns:
+            Dict with 'allowed' (bool) and 'reason' (str if not allowed)
+        """
+        result = self.check_new_position(
+            symbol=symbol,
+            side=side,
+            size=size,
+            entry_price=entry_price,
+            leverage=leverage,
+        )
+
+        if result.allowed:
+            return {"allowed": True}
+        else:
+            reason = "; ".join(result.messages) if result.messages else "Exposure limit exceeded"
+            return {"allowed": False, "reason": reason}
 
     def update_equity(self, equity: float):
         """Update current equity."""
@@ -262,7 +300,7 @@ class ExposureController:
         messages = []
 
         # Check cooling period
-        if self.cooling_until and datetime.now(timezone.utc) < self.cooling_until:
+        if self.cooling_until and datetime.now(UTC) < self.cooling_until:
             violations.append(ExposureViolationType.DAILY_LOSS_LIMIT)
             messages.append(f"Trading paused until {self.cooling_until.isoformat()}")
             return self._build_result(False, violations, messages)
@@ -274,31 +312,24 @@ class ExposureController:
         # 1. Check max position size (%)
         if position_pct > self.limits.max_position_size_pct:
             violations.append(ExposureViolationType.MAX_POSITION_SIZE)
-            messages.append(
-                f"Position size {position_pct:.1f}% exceeds "
-                f"limit {self.limits.max_position_size_pct}%"
-            )
+            messages.append(f"Position size {position_pct:.1f}% exceeds limit {self.limits.max_position_size_pct}%")
 
         # 2. Check max position size (USD)
         if position_value > self.limits.max_position_size_usd:
             violations.append(ExposureViolationType.MAX_POSITION_SIZE)
             messages.append(
-                f"Position value ${position_value:.0f} exceeds "
-                f"limit ${self.limits.max_position_size_usd:.0f}"
+                f"Position value ${position_value:.0f} exceeds limit ${self.limits.max_position_size_usd:.0f}"
             )
 
         # 3. Check max positions count
-        if len(self.positions) >= self.limits.max_positions:
-            if symbol not in self.positions:  # Adding new position
-                violations.append(ExposureViolationType.MAX_POSITIONS)
-                messages.append(f"Max positions ({self.limits.max_positions}) reached")
+        if len(self.positions) >= self.limits.max_positions and symbol not in self.positions:  # Adding new position
+            violations.append(ExposureViolationType.MAX_POSITIONS)
+            messages.append(f"Max positions ({self.limits.max_positions}) reached")
 
         # 4. Check leverage
         if leverage > self.limits.max_leverage:
             violations.append(ExposureViolationType.MAX_LEVERAGE)
-            messages.append(
-                f"Leverage {leverage}x exceeds limit {self.limits.max_leverage}x"
-            )
+            messages.append(f"Leverage {leverage}x exceeds limit {self.limits.max_leverage}x")
 
         # 5. Check total exposure
         exposure_check = self._check_total_exposure(symbol, side, position_value)
@@ -306,14 +337,11 @@ class ExposureController:
         messages.extend(exposure_check["messages"])
 
         # 6. Check portfolio leverage
-        portfolio_leverage = self._calculate_portfolio_leverage(
-            symbol, side, position_value
-        )
+        portfolio_leverage = self._calculate_portfolio_leverage(symbol, side, position_value)
         if portfolio_leverage > self.limits.max_portfolio_leverage:
             violations.append(ExposureViolationType.MAX_LEVERAGE)
             messages.append(
-                f"Portfolio leverage {portfolio_leverage:.1f}x exceeds "
-                f"limit {self.limits.max_portfolio_leverage}x"
+                f"Portfolio leverage {portfolio_leverage:.1f}x exceeds limit {self.limits.max_portfolio_leverage}x"
             )
 
         # 7. Check correlation limits
@@ -331,9 +359,7 @@ class ExposureController:
         # 9. Check daily loss limit
         if self._is_daily_loss_exceeded():
             violations.append(ExposureViolationType.DAILY_LOSS_LIMIT)
-            messages.append(
-                f"Daily loss limit {self.limits.max_daily_loss_pct}% exceeded"
-            )
+            messages.append(f"Daily loss limit {self.limits.max_daily_loss_pct}% exceeded")
 
         # 10. Check drawdown limit
         if self._is_drawdown_exceeded():
@@ -363,9 +389,7 @@ class ExposureController:
         """Check if increasing an existing position is allowed."""
         position = self.positions.get(symbol)
         if not position:
-            return self.check_new_position(
-                symbol, "long", additional_size, current_price, 1.0
-            )
+            return self.check_new_position(symbol, "long", additional_size, current_price, 1.0)
 
         # Calculate new total size
         new_size = position.size + additional_size
@@ -383,18 +407,14 @@ class ExposureController:
         symbol: str,
         side: str,
         position_value: float,
-    ) -> Dict[str, List]:
+    ) -> dict[str, list]:
         """Check total portfolio exposure limits."""
         violations = []
         messages = []
 
         # Calculate current exposure
-        long_exposure = sum(
-            p.notional_value for p in self.positions.values() if p.side == "long"
-        )
-        short_exposure = sum(
-            p.notional_value for p in self.positions.values() if p.side == "short"
-        )
+        long_exposure = sum(p.notional_value for p in self.positions.values() if p.side == "long")
+        short_exposure = sum(p.notional_value for p in self.positions.values() if p.side == "short")
 
         # Add new position
         if side == "long":
@@ -413,31 +433,19 @@ class ExposureController:
 
         if total_pct > self.limits.max_total_exposure_pct:
             violations.append(ExposureViolationType.MAX_TOTAL_EXPOSURE)
-            messages.append(
-                f"Total exposure {total_pct:.1f}% exceeds "
-                f"limit {self.limits.max_total_exposure_pct}%"
-            )
+            messages.append(f"Total exposure {total_pct:.1f}% exceeds limit {self.limits.max_total_exposure_pct}%")
 
         if long_pct > self.limits.max_long_exposure_pct:
             violations.append(ExposureViolationType.MAX_TOTAL_EXPOSURE)
-            messages.append(
-                f"Long exposure {long_pct:.1f}% exceeds "
-                f"limit {self.limits.max_long_exposure_pct}%"
-            )
+            messages.append(f"Long exposure {long_pct:.1f}% exceeds limit {self.limits.max_long_exposure_pct}%")
 
         if short_pct > self.limits.max_short_exposure_pct:
             violations.append(ExposureViolationType.MAX_TOTAL_EXPOSURE)
-            messages.append(
-                f"Short exposure {short_pct:.1f}% exceeds "
-                f"limit {self.limits.max_short_exposure_pct}%"
-            )
+            messages.append(f"Short exposure {short_pct:.1f}% exceeds limit {self.limits.max_short_exposure_pct}%")
 
         if net_pct > self.limits.max_net_exposure_pct:
             violations.append(ExposureViolationType.MAX_TOTAL_EXPOSURE)
-            messages.append(
-                f"Net exposure {net_pct:.1f}% exceeds "
-                f"limit {self.limits.max_net_exposure_pct}%"
-            )
+            messages.append(f"Net exposure {net_pct:.1f}% exceeds limit {self.limits.max_net_exposure_pct}%")
 
         return {"violations": violations, "messages": messages}
 
@@ -455,7 +463,7 @@ class ExposureController:
             return total_exposure / self.equity
         return 0.0
 
-    def _check_correlation(self, new_symbol: str) -> Dict[str, List]:
+    def _check_correlation(self, new_symbol: str) -> dict[str, list]:
         """Check correlation limits for new position."""
         violations = []
         messages = []
@@ -473,9 +481,7 @@ class ExposureController:
 
         if correlated_count >= self.limits.max_correlated_positions:
             violations.append(ExposureViolationType.MAX_CORRELATION)
-            messages.append(
-                f"Too many correlated positions: {', '.join(correlated_symbols)}"
-            )
+            messages.append(f"Too many correlated positions: {', '.join(correlated_symbols)}")
 
         return {"violations": violations, "messages": messages}
 
@@ -483,7 +489,7 @@ class ExposureController:
         self,
         symbol: str,
         position_value: float,
-    ) -> Dict[str, List]:
+    ) -> dict[str, list]:
         """Check sector exposure limits."""
         violations = []
         messages = []
@@ -492,9 +498,7 @@ class ExposureController:
 
         # Calculate current sector exposure
         sector_exposure = sum(
-            p.notional_value
-            for p in self.positions.values()
-            if self.sector_map.get(p.symbol) == sector
+            p.notional_value for p in self.positions.values() if self.sector_map.get(p.symbol) == sector
         )
         sector_exposure += position_value
 
@@ -503,8 +507,7 @@ class ExposureController:
         if sector_pct > self.limits.max_sector_exposure_pct:
             violations.append(ExposureViolationType.MAX_SECTOR_EXPOSURE)
             messages.append(
-                f"Sector '{sector}' exposure {sector_pct:.1f}% exceeds "
-                f"limit {self.limits.max_sector_exposure_pct}%"
+                f"Sector '{sector}' exposure {sector_pct:.1f}% exceeds limit {self.limits.max_sector_exposure_pct}%"
             )
 
         return {"violations": violations, "messages": messages}
@@ -528,52 +531,60 @@ class ExposureController:
     def _check_loss_limits(self):
         """Check loss limits and set cooling period if needed."""
         if self._is_daily_loss_exceeded() or self._is_drawdown_exceeded():
-            self.cooling_until = datetime.now(timezone.utc) + timedelta(
-                seconds=self.limits.cooling_period_after_violation
-            )
+            self.cooling_until = datetime.now(UTC) + timedelta(seconds=self.limits.cooling_period_after_violation)
 
-            logger.warning(
-                f"Loss limit breached! Trading paused until "
-                f"{self.cooling_until.isoformat()}"
-            )
+            logger.warning(f"Loss limit breached! Trading paused until {self.cooling_until.isoformat()}")
+
+    def get_max_position_size(
+        self,
+        symbol: str,
+        current_price: float,
+    ) -> float:
+        """
+        Calculate maximum allowed position size based on exposure limits.
+
+        Args:
+            symbol: Trading symbol
+            current_price: Current price for calculation
+
+        Returns:
+            Maximum position size in base currency
+        """
+        if self.equity <= 0 or current_price <= 0:
+            return 0.0
+
+        # Calculate max from position size limit
+        max_position_value = self.equity * (self.limits.max_position_size_pct / 100)
+        max_from_position = max_position_value / current_price
+
+        # Calculate available exposure capacity
+        current_exposure = sum(p.notional_value for p in self.positions.values())
+        max_total_value = self.equity * (self.limits.max_total_exposure_pct / 100)
+        available_exposure = max(0, max_total_value - current_exposure)
+        max_from_exposure = available_exposure / current_price
+
+        # Return the smaller of the two limits
+        return min(max_from_position, max_from_exposure)
 
     def _build_result(
         self,
         allowed: bool,
-        violations: List[ExposureViolationType],
-        messages: List[str],
+        violations: list[ExposureViolationType],
+        messages: list[str],
     ) -> ExposureCheckResult:
         """Build exposure check result."""
         # Calculate current exposure metrics
-        long_exp = sum(
-            p.notional_value for p in self.positions.values() if p.side == "long"
-        )
-        short_exp = sum(
-            p.notional_value for p in self.positions.values() if p.side == "short"
-        )
+        long_exp = sum(p.notional_value for p in self.positions.values() if p.side == "long")
+        short_exp = sum(p.notional_value for p in self.positions.values() if p.side == "short")
 
         current = {
-            "total_exposure_pct": (
-                (long_exp + short_exp) / self.equity * 100 if self.equity > 0 else 0
-            ),
+            "total_exposure_pct": ((long_exp + short_exp) / self.equity * 100 if self.equity > 0 else 0),
             "long_exposure_pct": long_exp / self.equity * 100 if self.equity > 0 else 0,
-            "short_exposure_pct": short_exp / self.equity * 100
-            if self.equity > 0
-            else 0,
-            "net_exposure_pct": (
-                abs(long_exp - short_exp) / self.equity * 100 if self.equity > 0 else 0
-            ),
+            "short_exposure_pct": short_exp / self.equity * 100 if self.equity > 0 else 0,
+            "net_exposure_pct": (abs(long_exp - short_exp) / self.equity * 100 if self.equity > 0 else 0),
             "positions_count": len(self.positions),
-            "daily_pnl_pct": (
-                self.daily_pnl / self.daily_start_equity * 100
-                if self.daily_start_equity > 0
-                else 0
-            ),
-            "drawdown_pct": (
-                (self.peak_equity - self.equity) / self.peak_equity * 100
-                if self.peak_equity > 0
-                else 0
-            ),
+            "daily_pnl_pct": (self.daily_pnl / self.daily_start_equity * 100 if self.daily_start_equity > 0 else 0),
+            "drawdown_pct": ((self.peak_equity - self.equity) / self.peak_equity * 100 if self.peak_equity > 0 else 0),
         }
 
         limits = {
@@ -593,18 +604,14 @@ class ExposureController:
             limits=limits,
         )
 
-    def get_current_exposure(self) -> Dict[str, Any]:
+    def get_current_exposure(self) -> dict[str, Any]:
         """Get current exposure metrics."""
-        long_exp = sum(
-            p.notional_value for p in self.positions.values() if p.side == "long"
-        )
-        short_exp = sum(
-            p.notional_value for p in self.positions.values() if p.side == "short"
-        )
+        long_exp = sum(p.notional_value for p in self.positions.values() if p.side == "long")
+        short_exp = sum(p.notional_value for p in self.positions.values() if p.side == "short")
         total_exp = long_exp + short_exp
 
         # Sector breakdown
-        sector_exposure = {}
+        sector_exposure: dict[str, float] = {}
         for p in self.positions.values():
             sector = self.sector_map.get(p.symbol, "other")
             sector_exposure[sector] = sector_exposure.get(sector, 0) + p.notional_value
@@ -612,31 +619,20 @@ class ExposureController:
         return {
             "equity": self.equity,
             "total_exposure": total_exp,
-            "total_exposure_pct": total_exp / self.equity * 100
-            if self.equity > 0
-            else 0,
+            "total_exposure_pct": total_exp / self.equity * 100 if self.equity > 0 else 0,
             "long_exposure": long_exp,
             "long_exposure_pct": long_exp / self.equity * 100 if self.equity > 0 else 0,
             "short_exposure": short_exp,
-            "short_exposure_pct": short_exp / self.equity * 100
-            if self.equity > 0
-            else 0,
+            "short_exposure_pct": short_exp / self.equity * 100 if self.equity > 0 else 0,
             "net_exposure": long_exp - short_exp,
-            "net_exposure_pct": (long_exp - short_exp) / self.equity * 100
-            if self.equity > 0
-            else 0,
+            "net_exposure_pct": (long_exp - short_exp) / self.equity * 100 if self.equity > 0 else 0,
             "portfolio_leverage": total_exp / self.equity if self.equity > 0 else 0,
             "positions_count": len(self.positions),
             "daily_pnl": self.daily_pnl,
-            "daily_pnl_pct": self.daily_pnl / self.daily_start_equity * 100
-            if self.daily_start_equity > 0
-            else 0,
-            "drawdown_pct": (self.peak_equity - self.equity) / self.peak_equity * 100
-            if self.peak_equity > 0
-            else 0,
+            "daily_pnl_pct": self.daily_pnl / self.daily_start_equity * 100 if self.daily_start_equity > 0 else 0,
+            "drawdown_pct": (self.peak_equity - self.equity) / self.peak_equity * 100 if self.peak_equity > 0 else 0,
             "sector_exposure": sector_exposure,
-            "is_in_cooling": self.cooling_until
-            and datetime.now(timezone.utc) < self.cooling_until,
+            "is_in_cooling": self.cooling_until and datetime.now(UTC) < self.cooling_until,
             "violations_today": [v.value for v in self.violations_today],
         }
 

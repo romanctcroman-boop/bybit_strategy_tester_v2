@@ -1,654 +1,318 @@
 """
-Live Trading API Router.
+📈 Live Trading API Router
 
-REST and WebSocket endpoints for live trading operations.
-
-Endpoints:
-- POST /live/start - Start live trading
-- POST /live/stop - Stop live trading
-- GET /live/status - Get trading status
-- POST /live/order - Place order
-- DELETE /live/order/{id} - Cancel order
+REST API for live trading:
+- POST /live/order - Submit order
 - GET /live/positions - Get positions
-- POST /live/close/{symbol} - Close position
-- WS /live/ws - Real-time trading updates
+- POST /live/close - Close position
+- GET /live/performance - Get performance
+
+Example request:
+```json
+{
+  "symbol": "BTCUSDT",
+  "side": "buy",
+  "quantity": 0.1,
+  "type": "market"
+}
+```
 """
 
-import asyncio
-import json
+# mypy: disable-error-code="arg-type, assignment, var-annotated, return-value, union-attr, operator, attr-defined, misc, dict-item"
+
 import logging
-import os
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-
-from backend.services.live_trading.order_executor import (
-    OrderExecutor,
-    TimeInForce,
-)
-from backend.services.live_trading.position_manager import PositionManager
-from backend.services.live_trading.strategy_runner import LiveStrategyRunner
-from backend.services.trading_engine_interface import OrderSide
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["Live Trading"])
+router = APIRouter(prefix="/live", tags=["Live Trading"])
+
+# Global instances (in production, use dependency injection)
+_paper_engine = None
+_risk_limits = None
+_position_tracker = None
 
 
-# ==============================================================================
-# Pydantic Models
-# ==============================================================================
+def get_paper_engine():
+    """Get paper trading engine"""
+    global _paper_engine
+    if _paper_engine is None:
+        from backend.trading.paper_trading import PaperTradingEngine
+
+        _paper_engine = PaperTradingEngine(
+            initial_balance=10000.0,
+            commission=0.0007,
+        )
+    return _paper_engine
+
+
+def get_risk_limits():
+    """Get risk limits"""
+    global _risk_limits
+    if _risk_limits is None:
+        from backend.trading.risk_limits import RiskLimits
+
+        _risk_limits = RiskLimits(
+            max_daily_loss=1000.0,
+            max_trade_loss=200.0,
+            max_position_size=10000.0,
+            max_drawdown=0.1,
+        )
+    return _risk_limits
+
+
+def get_position_tracker():
+    """Get position tracker"""
+    global _position_tracker
+    if _position_tracker is None:
+        from backend.trading.position_tracker import PositionTracker
+
+        _position_tracker = PositionTracker()
+    return _position_tracker
 
 
 class OrderRequest(BaseModel):
-    """Order request model."""
+    """Order request"""
 
-    symbol: str = Field(..., description="Trading pair, e.g., BTCUSDT")
+    symbol: str
     side: str = Field(..., description="buy or sell")
-    order_type: str = Field("market", description="market, limit, stop_market")
-    qty: float = Field(..., gt=0, description="Order quantity")
-    price: Optional[float] = Field(None, description="Limit price")
-    trigger_price: Optional[float] = Field(None, description="Stop trigger price")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
-    reduce_only: bool = Field(False, description="Reduce only flag")
-    time_in_force: str = Field("GTC", description="GTC, IOC, FOK, PostOnly")
+    quantity: float = Field(..., gt=0)
+    type: str = Field(default="market", description="market or limit")
+    price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
-class StrategyStartRequest(BaseModel):
-    """Strategy start request."""
+class OrderResponse(BaseModel):
+    """Order response"""
 
-    name: str = Field(..., description="Strategy name")
-    symbol: str = Field(..., description="Trading pair")
-    timeframe: str = Field("1", description="Candle timeframe")
-    position_size_percent: float = Field(
-        5.0, ge=0.1, le=100, description="Position size %"
-    )
-    leverage: float = Field(1.0, ge=1, le=100, description="Leverage")
-    stop_loss_percent: Optional[float] = Field(2.0, description="Stop loss %")
-    take_profit_percent: Optional[float] = Field(4.0, description="Take profit %")
-    paper_trading: bool = Field(True, description="Paper trading mode")
+    success: bool
+    trade_id: str | None = None
+    entry_price: float | None = None
+    quantity: float = 0.0
+    balance: float = 0.0
+    equity: float = 0.0
+    error: str | None = None
 
 
-class SetSLTPRequest(BaseModel):
-    """Set SL/TP request."""
+class ClosePositionRequest(BaseModel):
+    """Close position request"""
 
     symbol: str
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    price: float | None = None
 
 
-class LeverageRequest(BaseModel):
-    """Set leverage request."""
+class PositionInfo(BaseModel):
+    """Position information"""
 
     symbol: str
-    leverage: float = Field(..., ge=1, le=100)
+    quantity: float
+    side: str
+    entry_price: float
+    current_price: float
+    unrealized_pnl: float
+    unrealized_pnl_percent: float
 
 
-# ==============================================================================
-# Singleton Instances
-# ==============================================================================
+class PerformanceInfo(BaseModel):
+    """Performance information"""
+
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    win_rate: float
+    total_pnl: float
+    avg_pnl: float
+    max_drawdown: float
+    final_balance: float
+    return_percent: float
 
 
-# Global instances (initialized on first use)
-_executor: Optional[OrderExecutor] = None
-_position_manager: Optional[PositionManager] = None
-_strategy_runner: Optional[LiveStrategyRunner] = None
-_ws_connections: list[WebSocket] = []
-
-
-def get_api_credentials() -> tuple[str, str]:
-    """Get API credentials from environment."""
-    api_key = os.environ.get("BYBIT_API_KEY", "")
-    api_secret = os.environ.get("BYBIT_API_SECRET", "")
-
-    if not api_key or not api_secret:
-        raise HTTPException(
-            status_code=400,
-            detail="BYBIT_API_KEY and BYBIT_API_SECRET environment variables required",
-        )
-
-    return api_key, api_secret
-
-
-def is_testnet() -> bool:
-    """Check if testnet mode is enabled."""
-    return os.environ.get("BYBIT_TESTNET", "true").lower() in ("true", "1", "yes")
-
-
-async def get_executor() -> OrderExecutor:
-    """Get or create OrderExecutor instance."""
-    global _executor
-
-    if _executor is None:
-        api_key, api_secret = get_api_credentials()
-        _executor = OrderExecutor(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-        )
-
-    return _executor
-
-
-async def get_position_manager() -> PositionManager:
-    """Get or create PositionManager instance."""
-    global _position_manager
-
-    if _position_manager is None:
-        api_key, api_secret = get_api_credentials()
-        _position_manager = PositionManager(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-        )
-
-    return _position_manager
-
-
-async def get_strategy_runner() -> LiveStrategyRunner:
-    """Get or create LiveStrategyRunner instance."""
-    global _strategy_runner
-
-    if _strategy_runner is None:
-        api_key, api_secret = get_api_credentials()
-        _strategy_runner = LiveStrategyRunner(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-            paper_trading=True,  # Default to paper trading
-        )
-
-    return _strategy_runner
-
-
-# ==============================================================================
-# Order Endpoints
-# ==============================================================================
-
-
-@router.post("/order")
-async def place_order(request: OrderRequest):
+@router.post("/order", response_model=OrderResponse)
+async def submit_order(request: OrderRequest):
     """
-    Place a trading order.
-
-    Examples:
-    - Market buy: {"symbol": "BTCUSDT", "side": "buy", "qty": 0.001}
-    - Limit sell: {"symbol": "BTCUSDT", "side": "sell", "qty": 0.001, "order_type": "limit", "price": 50000}
-    - With SL/TP: {"symbol": "BTCUSDT", "side": "buy", "qty": 0.001, "stop_loss": 48000, "take_profit": 52000}
+    Submit paper trading order.
     """
-    executor = await get_executor()
-
-    # Map string to enum
-    side = OrderSide.BUY if request.side.lower() == "buy" else OrderSide.SELL
-
-    # Map time in force
-    tif_map = {
-        "GTC": TimeInForce.GTC,
-        "IOC": TimeInForce.IOC,
-        "FOK": TimeInForce.FOK,
-        "PostOnly": TimeInForce.POST_ONLY,
-    }
-    time_in_force = tif_map.get(request.time_in_force, TimeInForce.GTC)
-
-    # Place order based on type
-    if request.order_type.lower() == "market":
-        result = await executor.place_market_order(
-            symbol=request.symbol,
-            side=side,
-            qty=request.qty,
-            reduce_only=request.reduce_only,
-            stop_loss=request.stop_loss,
-            take_profit=request.take_profit,
-        )
-    elif request.order_type.lower() == "limit":
-        if not request.price:
-            raise HTTPException(
-                status_code=400, detail="Price required for limit order"
-            )
-        result = await executor.place_limit_order(
-            symbol=request.symbol,
-            side=side,
-            qty=request.qty,
-            price=request.price,
-            time_in_force=time_in_force,
-            reduce_only=request.reduce_only,
-            stop_loss=request.stop_loss,
-            take_profit=request.take_profit,
-        )
-    elif request.order_type.lower() == "stop_market":
-        if not request.trigger_price:
-            raise HTTPException(
-                status_code=400, detail="Trigger price required for stop order"
-            )
-        result = await executor.place_stop_market_order(
-            symbol=request.symbol,
-            side=side,
-            qty=request.qty,
-            trigger_price=request.trigger_price,
-            reduce_only=request.reduce_only,
-        )
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown order type: {request.order_type}"
-        )
-
-    if result.success:
-        return {
-            "success": True,
-            "order_id": result.order.order_id if result.order else None,
-            "client_order_id": result.order.client_order_id if result.order else None,
-            "latency_ms": result.latency_ms,
-        }
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Order failed: {result.error_code} - {result.error_message}",
-        )
-
-
-@router.delete("/order/{order_id}")
-async def cancel_order(
-    order_id: str,
-    symbol: str = Query(..., description="Trading pair"),
-):
-    """Cancel an order by ID."""
-    executor = await get_executor()
-
-    result = await executor.cancel_order(
-        symbol=symbol,
-        order_id=order_id,
-    )
-
-    if result.success:
-        return {"success": True, "message": f"Order {order_id} cancelled"}
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Cancel failed: {result.error_message}"
-        )
-
-
-@router.delete("/orders")
-async def cancel_all_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
-):
-    """Cancel all open orders."""
-    executor = await get_executor()
-
-    result = await executor.cancel_all_orders(symbol=symbol)
-
-    if result.success:
-        return {"success": True, "message": "All orders cancelled"}
-    else:
-        raise HTTPException(status_code=400, detail=result.error_message)
-
-
-@router.get("/orders")
-async def get_open_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
-):
-    """Get all open orders."""
-    executor = await get_executor()
-
-    orders = await executor.get_open_orders(symbol=symbol)
-
-    return {
-        "orders": [o.to_dict() for o in orders],
-        "count": len(orders),
-    }
-
-
-@router.get("/orders/history")
-async def get_order_history(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
-    limit: int = Query(50, ge=1, le=200),
-):
-    """Get order history."""
-    executor = await get_executor()
-
-    orders = await executor.get_order_history(symbol=symbol, limit=limit)
-
-    return {
-        "orders": [o.to_dict() for o in orders],
-        "count": len(orders),
-    }
-
-
-# ==============================================================================
-# Position Endpoints
-# ==============================================================================
-
-
-@router.get("/positions")
-async def get_positions(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
-):
-    """Get all open positions."""
-    executor = await get_executor()
-
-    positions = await executor.get_positions(symbol=symbol)
-
-    return {
-        "positions": positions,
-        "count": len(positions),
-    }
-
-
-@router.post("/positions/close/{symbol}")
-async def close_position(
-    symbol: str,
-    qty: Optional[float] = Query(None, description="Quantity to close (None = full)"),
-):
-    """Close a position."""
-    manager = await get_position_manager()
-
-    # Initialize if needed
-    if not manager._running:
-        await manager._load_initial_state()
-
-    success = await manager.close_position(symbol, qty)
-
-    if success:
-        return {"success": True, "message": f"Position {symbol} close initiated"}
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to close position {symbol}"
-        )
-
-
-@router.post("/positions/close-all")
-async def close_all_positions():
-    """Close all open positions."""
-    manager = await get_position_manager()
-
-    if not manager._running:
-        await manager._load_initial_state()
-
-    results = await manager.close_all_positions()
-
-    return {
-        "results": results,
-        "closed": sum(1 for v in results.values() if v),
-        "failed": sum(1 for v in results.values() if not v),
-    }
-
-
-@router.post("/positions/sl-tp")
-async def set_position_sl_tp(request: SetSLTPRequest):
-    """Set stop loss and/or take profit for a position."""
-    manager = await get_position_manager()
-
-    if not manager._running:
-        await manager._load_initial_state()
-
-    success = await manager.set_position_sl_tp(
-        symbol=request.symbol,
-        stop_loss=request.stop_loss,
-        take_profit=request.take_profit,
-    )
-
-    if success:
-        return {"success": True, "message": f"SL/TP set for {request.symbol}"}
-    else:
-        raise HTTPException(status_code=400, detail="Failed to set SL/TP")
-
-
-# ==============================================================================
-# Account Endpoints
-# ==============================================================================
-
-
-@router.get("/balance")
-async def get_balance(account_type: str = Query("UNIFIED", description="Account type")):
-    """Get wallet balance."""
-    executor = await get_executor()
-
-    balance = await executor.get_wallet_balance(account_type)
-
-    return balance
-
-
-@router.post("/leverage")
-async def set_leverage(request: LeverageRequest):
-    """Set leverage for a symbol."""
-    executor = await get_executor()
-
-    success = await executor.set_leverage(request.symbol, request.leverage)
-
-    if success:
-        return {"success": True, "message": f"Leverage set to {request.leverage}x"}
-    else:
-        raise HTTPException(status_code=400, detail="Failed to set leverage")
-
-
-# ==============================================================================
-# Strategy Runner Endpoints
-# ==============================================================================
-
-
-@router.get("/status")
-async def get_trading_status():
-    """Get live trading status."""
-    global _strategy_runner
-
-    if _strategy_runner is None:
-        return {
-            "running": False,
-            "paper_trading": None,
-            "strategies": {},
-            "message": "Strategy runner not initialized",
-        }
-
-    return _strategy_runner.get_status()
-
-
-@router.post("/start")
-async def start_trading(
-    paper_trading: bool = Query(True, description="Enable paper trading"),
-):
-    """Start live trading with default monitoring."""
-    runner = await get_strategy_runner()
-
-    if runner._running:
-        return {"success": False, "message": "Already running"}
-
-    runner.paper_trading = paper_trading
-
     try:
-        await runner.start()
-        return {
-            "success": True,
-            "message": f"Trading started ({'paper' if paper_trading else 'live'} mode)",
-            "testnet": is_testnet(),
-        }
+        paper_engine = get_paper_engine()
+        risk_limits = get_risk_limits()
+
+        # Check risk limits
+        risk_check = risk_limits.check_all()
+
+        if not risk_check.allowed:
+            return OrderResponse(
+                success=False,
+                error=risk_check.reason,
+                quantity=0,
+                balance=paper_engine.balance,
+                equity=paper_engine.equity,
+            )
+
+        # Get current price (mock - in production, get from WebSocket)
+        current_price = 50000.0  # Mock price
+
+        # Update price
+        paper_engine.update_price(request.symbol, current_price)
+
+        # Open position
+        result = paper_engine.open_position(
+            symbol=request.symbol,
+            side=request.side,
+            quantity=request.quantity,
+            price=request.price or current_price,
+        )
+
+        if result.success:
+            # Update risk limits
+            risk_limits.increment_trades()
+
+            return OrderResponse(
+                success=True,
+                trade_id=result.trade.id if result.trade else None,
+                entry_price=result.trade.entry_price if result.trade else current_price,
+                quantity=request.quantity,
+                balance=result.balance,
+                equity=result.equity,
+            )
+        else:
+            return OrderResponse(
+                success=False,
+                error=result.error,
+                quantity=0,
+                balance=result.balance,
+                equity=result.equity,
+            )
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Order failed: {e}", exc_info=True)
+        return OrderResponse(
+            success=False,
+            error=str(e),
+            quantity=0,
+            balance=0,
+            equity=0,
+        )
 
 
-@router.post("/stop")
-async def stop_trading():
-    """Stop live trading."""
-    global _strategy_runner
-
-    if _strategy_runner is None or not _strategy_runner._running:
-        return {"success": False, "message": "Not running"}
-
-    await _strategy_runner.stop()
-
-    return {"success": True, "message": "Trading stopped"}
-
-
-@router.post("/paper/balance")
-async def set_paper_balance(
-    balance: float = Query(..., gt=0, description="New balance"),
-):
-    """Set paper trading balance."""
-    runner = await get_strategy_runner()
-
-    runner.set_paper_balance(balance)
-
-    return {"success": True, "balance": balance}
-
-
-@router.get("/paper/balance")
-async def get_paper_balance():
-    """Get paper trading balance."""
-    runner = await get_strategy_runner()
-
-    return {"balance": runner.get_paper_balance()}
-
-
-# ==============================================================================
-# WebSocket Endpoint
-# ==============================================================================
-
-
-@router.websocket("/ws")
-async def live_trading_websocket(websocket: WebSocket):
-    """
-    WebSocket for real-time trading updates.
-
-    Streams:
-    - Position updates
-    - Order updates
-    - Wallet updates
-    - Trade executions
-    - Strategy signals
-
-    Usage:
-        const ws = new WebSocket('ws://localhost:8000/api/v1/live/ws');
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log(data.type, data.data);
-        };
-    """
-    await websocket.accept()
-    _ws_connections.append(websocket)
-
-    logger.info(f"Live trading WebSocket connected. Total: {len(_ws_connections)}")
-
+@router.get("/positions", response_model=list[PositionInfo])
+async def get_positions():
+    """Get all open positions"""
     try:
-        # Get or create position manager
-        manager = await get_position_manager()
+        paper_engine = get_paper_engine()
+        positions = paper_engine.get_positions()
 
-        # Register callbacks for streaming
-        async def on_position_update(summary):
-            await broadcast_message("position", summary)
+        return [
+            PositionInfo(
+                symbol=symbol,
+                quantity=data["quantity"],
+                side=data["side"],
+                entry_price=data["entry_price"],
+                current_price=data["current_price"],
+                unrealized_pnl=data["unrealized_pnl"],
+                unrealized_pnl_percent=data["unrealized_pnl_percent"],
+            )
+            for symbol, data in positions.items()
+        ]
 
-        async def on_wallet_update(wallet):
-            await broadcast_message("wallet", wallet)
+    except Exception as e:
+        logger.error(f"Get positions failed: {e}", exc_info=True)
+        return []
 
-        async def on_execution(executions):
-            await broadcast_message("execution", executions)
 
-        manager.on_position_update(on_position_update)
-        manager.on_wallet_update(on_wallet_update)
-        manager.on_execution(on_execution)
+@router.post("/close")
+async def close_position(request: ClosePositionRequest):
+    """Close position"""
+    try:
+        paper_engine = get_paper_engine()
+        risk_limits = get_risk_limits()
 
-        # Start manager if not running
-        if not manager._running:
-            await manager.start()
+        # Get current price
+        current_price = 50000.0  # Mock
 
-        # Send initial state
-        await websocket.send_json(
-            {
-                "type": "connected",
-                "data": {
-                    "testnet": is_testnet(),
-                    "positions": manager.get_position_summary(),
-                },
+        # Close position
+        result = paper_engine.close_position(
+            symbol=request.symbol,
+            price=request.price or current_price,
+        )
+
+        if result.success:
+            # Update risk limits
+            if result.trade:
+                risk_limits.update_pnl(result.trade.pnl)
+
+            return {
+                "success": True,
+                "trade": result.trade.to_dict() if result.trade else None,
+                "balance": result.balance,
+                "equity": result.equity,
             }
-        )
+        else:
+            return {
+                "success": False,
+                "error": result.error,
+            }
 
-        # Keep connection alive
-        while True:
-            try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-
-                # Handle incoming commands
-                try:
-                    cmd = json.loads(data)
-                    await handle_ws_command(websocket, cmd, manager)
-                except json.JSONDecodeError:
-                    await websocket.send_json({"error": "Invalid JSON"})
-
-            except asyncio.TimeoutError:
-                # Send ping/keepalive
-                await websocket.send_json({"type": "ping"})
-
-    except WebSocketDisconnect:
-        logger.info("Live trading WebSocket disconnected")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-    finally:
-        if websocket in _ws_connections:
-            _ws_connections.remove(websocket)
+        logger.error(f"Close position failed: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
 
 
-async def broadcast_message(msg_type: str, data: dict):
-    """Broadcast message to all connected WebSocket clients."""
-    message = {"type": msg_type, "data": data}
+@router.get("/performance", response_model=PerformanceInfo)
+async def get_performance():
+    """Get trading performance"""
+    try:
+        paper_engine = get_paper_engine()
+        perf = paper_engine.get_performance()
 
-    for ws in _ws_connections[:]:  # Copy list to avoid modification during iteration
-        try:
-            await ws.send_json(message)
-        except Exception:
-            _ws_connections.remove(ws)
-
-
-async def handle_ws_command(
-    websocket: WebSocket,
-    cmd: dict,
-    manager: PositionManager,
-):
-    """Handle incoming WebSocket command."""
-    action = cmd.get("action", "")
-
-    if action == "get_positions":
-        summary = manager.get_position_summary()
-        await websocket.send_json({"type": "positions", "data": summary})
-
-    elif action == "get_wallet":
-        wallet = manager.get_wallet()
-        await websocket.send_json(
-            {"type": "wallet", "data": wallet.to_dict() if wallet else {}}
+        return PerformanceInfo(
+            total_trades=perf["total_trades"],
+            winning_trades=perf["winning_trades"],
+            losing_trades=perf["losing_trades"],
+            win_rate=perf["win_rate"],
+            total_pnl=perf["total_pnl"],
+            avg_pnl=perf["avg_pnl"],
+            max_drawdown=perf["max_drawdown"],
+            final_balance=perf["final_balance"],
+            return_percent=perf["return_percent"],
         )
 
-    elif action == "close_position":
-        symbol = cmd.get("symbol")
-        if symbol:
-            success = await manager.close_position(symbol)
-            await websocket.send_json(
-                {"type": "close_result", "data": {"symbol": symbol, "success": success}}
-            )
-
-    elif action == "pong":
-        pass  # Keepalive response
-
-    else:
-        await websocket.send_json({"error": f"Unknown action: {action}"})
-
-
-# ==============================================================================
-# Cleanup
-# ==============================================================================
+    except Exception as e:
+        logger.error(f"Get performance failed: {e}", exc_info=True)
+        return PerformanceInfo(
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            total_pnl=0.0,
+            avg_pnl=0.0,
+            max_drawdown=0.0,
+            final_balance=0.0,
+            return_percent=0.0,
+        )
 
 
-async def cleanup():
-    """Cleanup on shutdown."""
-    global _executor, _position_manager, _strategy_runner
+@router.get("/risk-status")
+async def get_risk_status():
+    """Get risk limits status"""
+    try:
+        risk_limits = get_risk_limits()
 
-    if _strategy_runner:
-        await _strategy_runner.stop()
-        _strategy_runner = None
+        return {
+            "daily_pnl": risk_limits.daily_pnl,
+            "daily_trades": risk_limits.daily_trades,
+            "circuit_breaker_active": risk_limits.circuit_breaker_active,
+            "limits": {
+                "max_daily_loss": risk_limits.max_daily_loss,
+                "max_trade_loss": risk_limits.max_trade_loss,
+                "max_position_size": risk_limits.max_position_size,
+                "max_drawdown": risk_limits.max_drawdown,
+                "max_trades_per_day": risk_limits.max_trades_per_day,
+            },
+        }
 
-    if _position_manager:
-        await _position_manager.stop()
-        _position_manager = None
-
-    if _executor:
-        await _executor.close()
-        _executor = None
-
-    logger.info("Live trading cleanup complete")
+    except Exception as e:
+        logger.error(f"Get risk status failed: {e}", exc_info=True)
+        return {}

@@ -1,49 +1,49 @@
 """Debug script for list_backtests endpoint"""
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from backend.backtesting.models import BacktestConfig, BacktestResult, BacktestStatus, PerformanceMetrics
 from backend.database import SessionLocal
 from backend.database.models import Backtest as BacktestModel
-from backend.backtesting.models import BacktestConfig, PerformanceMetrics, EquityCurve, BacktestResult, BacktestStatus
 
 db = SessionLocal()
 
 try:
     backtests = db.query(BacktestModel).order_by(BacktestModel.created_at.desc()).limit(100).all()
     print(f"Found {len(backtests)} backtests in DB")
-    
+
     for i, bt in enumerate(backtests):
         print(f"\n=== Backtest {i+1}: {bt.id[:8]}... ===")
         print(f"  strategy_type: {bt.strategy_type}, symbol: {bt.symbol}")
-        
+
         try:
             # Step 1: Parse dates
             start_dt = bt.start_date
             end_dt = bt.end_date
             if start_dt and start_dt.tzinfo is None:
-                start_dt = start_dt.replace(tzinfo=timezone.utc)
+                start_dt = start_dt.replace(tzinfo=UTC)
             if end_dt and end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=timezone.utc)
+                end_dt = end_dt.replace(tzinfo=UTC)
             print("  [OK] Dates parsed")
-            
+
             # Step 2: Create BacktestConfig
             config = BacktestConfig(
                 symbol=bt.symbol or "BTCUSDT",
                 interval=bt.timeframe or "30",
-                start_date=start_dt or datetime.now(timezone.utc),
-                end_date=end_dt or datetime.now(timezone.utc),
+                start_date=start_dt or datetime.now(UTC),
+                end_date=end_dt or datetime.now(UTC),
                 initial_capital=bt.initial_capital or 10000.0,
                 strategy_type=bt.strategy_type or "rsi",
                 strategy_params=bt.parameters.get("strategy_params", {}) if bt.parameters else {},
             )
             print("  [OK] Config created")
-            
+
             # Step 3: Get optimization metrics
             opt_metrics = bt.parameters.get("optimization_metrics", {}) if bt.parameters else {}
-            
+
             # Step 4: Create PerformanceMetrics
             net_profit = (bt.final_capital - bt.initial_capital) if bt.final_capital and bt.initial_capital else 0
-            
+
             metrics = PerformanceMetrics(
                 net_profit=opt_metrics.get("net_profit", net_profit),
                 net_profit_pct=opt_metrics.get("net_profit_pct", bt.total_return or 0),
@@ -70,12 +70,12 @@ try:
                 avg_trade_duration_hours=opt_metrics.get("avg_trade_duration_hours", 0),
             )
             print("  [OK] Metrics created")
-            
+
             # Step 5: Create BacktestResult
             result = BacktestResult(
                 id=bt.id,
                 status=BacktestStatus.COMPLETED,
-                created_at=bt.created_at or datetime.now(timezone.utc),
+                created_at=bt.created_at or datetime.now(UTC),
                 config=config,
                 metrics=metrics,
                 trades=[],
@@ -85,7 +85,7 @@ try:
                 final_pnl_pct=bt.total_return or 0,
             )
             print("  [OK] BacktestResult created")
-            
+
         except Exception as e:
             print(f"  [ERROR] {e}")
             traceback.print_exc()

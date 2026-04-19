@@ -1,4 +1,7 @@
-﻿# Byte-compiled / optimized / DLL files
+# MCP config (contains API tokens)
+.mcp.json
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -191,9 +194,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 
@@ -214,7 +217,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
- 
+
 # --- Node / Vite / Frontend artifacts ---
 # Do not track node_modules or build outputs
 node_modules/
@@ -271,6 +274,9 @@ ai_audit_results/API.txt
 *_RESULTS.json
 *_results.json
 
+# Playwright traces/screenshots/html (CI artifacts — не хранить в git)
+test-traces/
+
 # Logs
 *.log
 logs/
@@ -320,6 +326,87 @@ adapt_*.py
 complete_*.py
 collaborative_*.py
 deep_*.py
+
+# Root-level underscore-prefixed diagnostic/temp scripts (_check_*.py, _bt_stats.py …)
+_*.py
+_*.ps1
+_*.bat
+_*.txt
+_*.json
+_*.md
+
+# Root-level session screenshots and debug images
+ai_build_*.png
+ai_modal_*.png
+ai_build2_*.png
+before_rerun.png
+canvas_state.png
+current_state.png
+page_current.png
+page_dvh_fix.png
+rsi_fixed.png
+snap_current.md
+state_after_build.md
+
+# Root-level one-off eval / debug scripts (not in tests/)
+eval_*.py
+eval_results/
+dump_connections.py
+read_output.py
+run_debug_*.py
+run_pipeline_*.py
+
+# Root-level pytest output logs
+pytest_*.txt
+
+# Numeric junk files (e.g. "0", "1.0" from crashed runs)
+/0
+/1.0
+
+# Claude Code worktrees and Playwright MCP cache
+.claude/worktrees/
+.playwright-mcp/
+
+# Upload temp dir
+uploads/
+
+# Investigation/debug one-off scripts in scripts/ (underscore-prefixed)
+scripts/_investigate_*.py
+scripts/_debug_*.py
+scripts/_check_*.py
+scripts/_compare_*.py
+scripts/_test_*.py
+scripts/_trace_*.py
+scripts/_inspect_*.py
+scripts/_find_*.py
+scripts/_fix_*.py
+scripts/_dump_*.py
+scripts/_diff_*.py
+scripts/_diag_*.py
+scripts/_tmp_*.py
+scripts/_macd_debug.py
+scripts/_quick_trade_cmp.py
+scripts/_rsi_threshold_analysis.py
+scripts/_schema_check.py
+scripts/_sharpe_monthly14.py
+scripts/_show_strat.py
+scripts/_simulate_trades.py
+scripts/_verify_cross_range.py
+scripts/_deep_compare_out.txt
+scripts/_eth15m_2025.json
+scripts/_btc_spot_vs_linear.py
+scripts/_db_contents.py
+scripts/_db_inspect.py
+scripts/_deep_compare_trades.py
+scripts/_deep_dive_jan28.py
+scripts/debug_*.py
+scripts/compare_macd_tv.py
+scripts/inspect_last_backtest_mfe_mae.py
+scripts/list_tables.py
+scripts/test_api_equity_alignment.py
+scripts/test_equity_trades_alignment.py
+scripts/test_mfe_fix*.py
+scripts/trace_missing_long.py
 
 # Temporary JSON files
 analysis_*.json
@@ -414,3 +501,110 @@ openapi*.json
 
 # Agent skills (embedded repo)
 .agent/skills/
+
+# Agent MCP config (contains env variable references, may have had secrets)
+.agent/mcp.json
+
+# Agent backup files
+.agent/*.bak*
+.agent/*.old
+
+# One-off scripts (secrets cleanup etc.)
+scripts/remove_secrets_from_history.py
+
+# ==============================================================================
+# Additional entries (2026-01-27 cleanup)
+# ==============================================================================
+
+# Agent memory and docs (local runtime)
+agent_memory/
+.agent/docs/
+
+# Cache directories
+cache/
+.cache/
+
+# Model registry (local ML artifacts)
+model_registry/
+
+# Feature store (local ML features)
+feature_store/
+
+# Coverage reports
+htmlcov_*/
+htmlcov/
+
+# Test directories (auto-generated)
+test_e2e_test_*/
+test_eval_test_*/
+test_memory_test_*/
+test_integration_test_*/
+test_reflection_test_*/
+test_rlhf_test_*/
+test_feedback/
+test_memory/
+
+# Temporary test files in root (debug/dev)
+/test_*.py
+!/tests/test_*.py
+
+# Journal files
+journal/
+
+# DeepSeek consultations (temporary)
+deepseek_*.md
+
+# Validation reports
+validation_reports.json
+
+# ==============================================================================
+# Additional entries (2026-02-08 sync cleanup)
+# ==============================================================================
+
+# Debug scripts in root (temporary dev files)
+/debug_*.py
+/verify_*.py
+/simple_api_*.py
+/run_api_*.py
+/quick_api_test.py
+
+# Temporary batch files
+/run_*.bat
+/test_api.bat
+
+# Debug/test output text files in root
+/api_backtest_debug.txt
+/api_response.json
+/api_test_*.txt
+/backtest_flow_output.txt
+/bisect*.txt
+/curl_test_result.txt
+/dca_debug_output*.txt
+/dca_test_output.txt
+/debug_*.txt
+/endpoint_check.txt
+/engine_adapter_output*.txt
+/eval_criteria_test_result.txt
+/eval_test_v2_result.txt
+/final_api_result.txt
+/final_eval_result.txt
+/find_data_result.txt
+/fix_output.txt
+/full_run.txt
+/get_test_result.txt
+/health_*.txt
+/mega_test_*.txt
+/opt_result*.txt
+/quick_result.txt
+/signal_gen_output*.txt
+
+# Backup files
+*.bak
+
+# Additional database files
+mlflow.db
+*.db
+
+# GSD workflow (temporary files)
+.gsd/CONTINUE-HERE.md
+.gsd/debug/

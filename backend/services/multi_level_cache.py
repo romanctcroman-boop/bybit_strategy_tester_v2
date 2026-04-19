@@ -19,9 +19,10 @@ import json
 import logging
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class CacheLevel(str, Enum):
 
 
 @dataclass
-class CacheEntry(Generic[T]):
+class CacheEntry[T]:
     """Cache entry with metadata."""
 
     key: str
@@ -45,7 +46,7 @@ class CacheEntry(Generic[T]):
     created_at: float = field(default_factory=time.time)
     last_accessed: float = field(default_factory=time.time)
     access_count: int = 0
-    ttl_seconds: Optional[int] = None
+    ttl_seconds: int | None = None
     level: CacheLevel = CacheLevel.L1_MEMORY
 
     @property
@@ -87,7 +88,7 @@ class CacheStats:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "hits": self.hits,
@@ -116,7 +117,7 @@ class L1MemoryCache:
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lock = asyncio.Lock()
 
-    async def get(self, key: str) -> Optional[CacheEntry]:
+    async def get(self, key: str) -> CacheEntry | None:
         """Get value from cache."""
         async with self._lock:
             if key not in self._cache:
@@ -133,9 +134,7 @@ class L1MemoryCache:
             entry.touch()
             return entry
 
-    async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
-    ) -> None:
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """Set value in cache."""
         async with self._lock:
             # Evict if at capacity
@@ -176,7 +175,7 @@ class L2RedisCache:
     Distributed and larger than L1.
     """
 
-    def __init__(self, redis_url: Optional[str] = None, prefix: str = "cache:l2:"):
+    def __init__(self, redis_url: str | None = None, prefix: str = "cache:l2:"):
         self.redis_url = redis_url or "redis://localhost:6379/0"
         self.prefix = prefix
         self._redis = None
@@ -193,7 +192,7 @@ class L2RedisCache:
                 return None
         return self._redis
 
-    async def get(self, key: str) -> Optional[CacheEntry]:
+    async def get(self, key: str) -> CacheEntry | None:
         """Get value from Redis."""
         redis = await self._get_redis()
         if redis is None:
@@ -225,9 +224,7 @@ class L2RedisCache:
             logger.error(f"Redis get error: {e}")
             return None
 
-    async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
-    ) -> None:
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """Set value in Redis."""
         redis = await self._get_redis()
         if redis is None:
@@ -292,7 +289,7 @@ class MultiLevelCache:
     def __init__(
         self,
         l1_max_size: int = 1000,
-        redis_url: Optional[str] = None,
+        redis_url: str | None = None,
         enable_l2: bool = True,
         enable_l3: bool = False,  # Database layer (not implemented yet)
         promotion_threshold: int = 3,  # Promote to L1 after N accesses
@@ -339,7 +336,7 @@ class MultiLevelCache:
         self,
         key: str,
         value: Any,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         level: CacheLevel = CacheLevel.L1_MEMORY,
     ) -> None:
         """
@@ -389,9 +386,7 @@ class MultiLevelCache:
 
         # Update average
         if self._hit_latencies:
-            self.stats.avg_hit_latency_ms = sum(self._hit_latencies[-100:]) / len(
-                self._hit_latencies[-100:]
-            )
+            self.stats.avg_hit_latency_ms = sum(self._hit_latencies[-100:]) / len(self._hit_latencies[-100:])
 
     def _record_miss(self, start_time: float) -> None:
         """Record cache miss."""
@@ -400,11 +395,9 @@ class MultiLevelCache:
         self._miss_latencies.append(latency_ms)
 
         if self._miss_latencies:
-            self.stats.avg_miss_latency_ms = sum(self._miss_latencies[-100:]) / len(
-                self._miss_latencies[-100:]
-            )
+            self.stats.avg_miss_latency_ms = sum(self._miss_latencies[-100:]) / len(self._miss_latencies[-100:])
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
             **self.stats.to_dict(),
@@ -416,11 +409,11 @@ class MultiLevelCache:
 
 
 def cache_key(*args, **kwargs) -> str:
-    """Generate a cache key from arguments."""
+    """Generate a cache key from arguments using SHA256."""
     key_parts = [str(arg) for arg in args]
     key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
     key_str = ":".join(key_parts)
-    return hashlib.md5(key_str.encode()).hexdigest()
+    return hashlib.sha256(key_str.encode()).hexdigest()
 
 
 def cached(
@@ -459,7 +452,7 @@ def cached(
 
 
 # Global cache instance
-_global_cache: Optional[MultiLevelCache] = None
+_global_cache: MultiLevelCache | None = None
 
 
 def get_multi_level_cache() -> MultiLevelCache:
@@ -472,13 +465,13 @@ def get_multi_level_cache() -> MultiLevelCache:
 
 # Export
 __all__ = [
-    "MultiLevelCache",
     "CacheEntry",
-    "CacheStats",
     "CacheLevel",
+    "CacheStats",
     "L1MemoryCache",
     "L2RedisCache",
-    "cached",
+    "MultiLevelCache",
     "cache_key",
+    "cached",
     "get_multi_level_cache",
 ]

@@ -5,11 +5,12 @@ Coverage Target: 100%
 Tests: DeepSeek API client for health checks
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
-from backend.api.deepseek_client import DeepSeekClient
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
+
+from backend.api.deepseek_client import DeepSeekClient
 
 # ==================== INITIALIZATION TESTS ====================
 
@@ -78,8 +79,7 @@ class TestConnectionMethod:
 
             assert result is True
             mock_client.get.assert_called_once_with(
-                "https://api.deepseek.com/v1/models",
-                headers={"Authorization": "Bearer valid_key"}
+                "https://api.deepseek.com/v1/models", headers={"Authorization": "Bearer valid_key"}
             )
 
     @pytest.mark.asyncio

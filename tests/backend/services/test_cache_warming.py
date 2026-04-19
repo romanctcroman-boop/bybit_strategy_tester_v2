@@ -42,9 +42,7 @@ class TestWarmingTarget:
         """Test WarmingTarget can be created with valid data"""
         from backend.services.cache_warming import WarmingPriority, WarmingTarget
 
-        target = WarmingTarget(
-            symbol="BTCUSDT", interval="15", priority=WarmingPriority.CRITICAL
-        )
+        target = WarmingTarget(symbol="BTCUSDT", interval="15", priority=WarmingPriority.CRITICAL)
 
         assert target.symbol == "BTCUSDT"
         assert target.interval == "15"

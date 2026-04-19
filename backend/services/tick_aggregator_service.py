@@ -9,11 +9,11 @@ Architecture:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 from collections import deque
 from dataclasses import dataclass
-from typing import Optional
 
 import redis.asyncio as redis
 
@@ -80,9 +80,7 @@ class TickAggregator:
     def __init__(self, ticks_per_bar: int = 100):
         self.ticks_per_bar = ticks_per_bar
         self.current_trades: list[Trade] = []
-        self.completed_candles: deque[TickCandle] = deque(
-            maxlen=500
-        )  # Reduced for memory
+        self.completed_candles: deque[TickCandle] = deque(maxlen=500)  # Reduced for memory
 
         # Cached incremental values
         self._current_high = 0.0
@@ -90,7 +88,7 @@ class TickAggregator:
         self._current_buy_vol = 0.0
         self._current_sell_vol = 0.0
 
-    def add_trade(self, trade: Trade) -> Optional[TickCandle]:
+    def add_trade(self, trade: Trade) -> TickCandle | None:
         """Add trade and return candle if complete."""
         self.current_trades.append(trade)
 
@@ -136,7 +134,7 @@ class TickAggregator:
             trade_count=len(self.current_trades),
         )
 
-    def get_current_candle_progress(self) -> Optional[dict]:
+    def get_current_candle_progress(self) -> dict | None:
         """Get current incomplete candle for progress tracking."""
         if not self.current_trades:
             return None
@@ -174,13 +172,13 @@ class TickAggregatorService:
         self.ticks_per_bar = ticks_per_bar
         self.redis_url = redis_url
 
-        self.redis_client: Optional[redis.Redis] = None
-        self.pubsub: Optional[redis.client.PubSub] = None
+        self.redis_client: redis.Redis | None = None
+        self.pubsub: redis.client.PubSub | None = None
 
         self.aggregator = TickAggregator(ticks_per_bar)
 
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
         # Stats
         self._stats = {
@@ -203,9 +201,7 @@ class TickAggregatorService:
             decode_responses=True,
         )
 
-        logger.info(
-            f"Started TickAggregator: {self.symbol}, {self.ticks_per_bar} ticks/bar"
-        )
+        logger.info(f"Started TickAggregator: {self.symbol}, {self.ticks_per_bar} ticks/bar")
 
         # Start listening
         self._task = asyncio.create_task(self._listen_loop())
@@ -216,10 +212,8 @@ class TickAggregatorService:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         if self.pubsub:
             await self.pubsub.unsubscribe()
@@ -275,8 +269,7 @@ class TickAggregatorService:
 
         if self._stats["candles_published"] % 10 == 0:
             logger.info(
-                f"Aggregator {self.symbol}/{self.ticks_per_bar}: "
-                f"{self._stats['candles_published']} candles published"
+                f"Aggregator {self.symbol}/{self.ticks_per_bar}: {self._stats['candles_published']} candles published"
             )
 
     def get_stats(self) -> dict:

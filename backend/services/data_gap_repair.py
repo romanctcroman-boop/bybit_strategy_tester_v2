@@ -15,9 +15,8 @@ import logging
 import sqlite3
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ class GapInfo:
 class DataGapRepairService:
     """Service to detect and repair data gaps in kline database."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(DB_PATH)
         self._adapter = None
 
@@ -135,12 +134,8 @@ class DataGapRepairService:
             missing_candles = int(gap_ms / interval_ms) - 1
 
             # Parse datetime to check for weekend
-            gap_start_dt = datetime.fromisoformat(
-                row["open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=timezone.utc)
-            gap_end_dt = datetime.fromisoformat(
-                row["next_open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=timezone.utc)
+            gap_start_dt = datetime.fromisoformat(row["open_time_dt"].replace("+00:00", "")).replace(tzinfo=UTC)
+            gap_end_dt = datetime.fromisoformat(row["next_open_time_dt"].replace("+00:00", "")).replace(tzinfo=UTC)
 
             # Check if this is a weekend gap (Friday 21:00 UTC to Sunday 21:00 UTC typical)
             is_weekend = gap_start_dt.weekday() >= 4 and gap_end_dt.weekday() <= 1
@@ -257,8 +252,8 @@ class DataGapRepairService:
 
         logger.info(
             f"Fetching {expected_candles} candles for {symbol}:{interval} "
-            f"from {datetime.fromtimestamp(start_time / 1000, tz=timezone.utc)} "
-            f"to {datetime.fromtimestamp(end_time / 1000, tz=timezone.utc)}"
+            f"from {datetime.fromtimestamp(start_time / 1000, tz=UTC)} "
+            f"to {datetime.fromtimestamp(end_time / 1000, tz=UTC)}"
         )
 
         # Bybit API limits to 1000 candles per request
@@ -355,9 +350,7 @@ class DataGapRepairService:
         for candle in candles:
             try:
                 # Prepare datetime string
-                open_time_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=timezone.utc
-                ).isoformat()
+                open_time_dt = datetime.fromtimestamp(candle["open_time"] / 1000, tz=UTC).isoformat()
 
                 # Use INSERT OR REPLACE to handle existing candles
                 conn.execute(
@@ -449,8 +442,7 @@ class DataGapRepairService:
 
         # Count total candles
         cursor = conn.execute(
-            "SELECT COUNT(*), MIN(open_time), MAX(open_time) "
-            "FROM bybit_kline_audit WHERE symbol = ? AND interval = ?",
+            "SELECT COUNT(*), MIN(open_time), MAX(open_time) FROM bybit_kline_audit WHERE symbol = ? AND interval = ?",
             (symbol, interval),
         )
         row = cursor.fetchone()
@@ -470,9 +462,7 @@ class DataGapRepairService:
         conn.close()
 
         # Find gaps
-        timestamp_gaps = self.find_timestamp_gaps(
-            symbol, interval, max_gaps=100, skip_weekends=False
-        )
+        timestamp_gaps = self.find_timestamp_gaps(symbol, interval, max_gaps=100, skip_weekends=False)
         weekend_gaps = [g for g in timestamp_gaps if g.is_weekend]
         data_gaps = [g for g in timestamp_gaps if not g.is_weekend]
 
@@ -489,7 +479,7 @@ class DataGapRepairService:
 
 
 # Singleton instance
-_repair_service: Optional[DataGapRepairService] = None
+_repair_service: DataGapRepairService | None = None
 
 
 def get_repair_service() -> DataGapRepairService:
@@ -533,9 +523,7 @@ if __name__ == "__main__":
                 try:
                     summary = service.get_repair_summary(symbol, interval)
                     if summary["total_candles"] > 0:
-                        status = (
-                            "⚠️ NEEDS REPAIR" if summary["needs_repair"] else "✅ OK"
-                        )
+                        status = "⚠️ NEEDS REPAIR" if summary["needs_repair"] else "✅ OK"
                         print(
                             f"{symbol}:{interval:>3} | "
                             f"{summary['total_candles']:>6} candles | "

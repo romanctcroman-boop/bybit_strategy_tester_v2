@@ -7,10 +7,10 @@ sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
-from numba import njit
 import vectorbt as vbt
-from vectorbt.portfolio.nb import order_nb, order_nothing_nb
+from numba import njit
 from vectorbt.portfolio.enums import Direction
+from vectorbt.portfolio.nb import order_nb, order_nothing_nb
 
 
 @njit
@@ -18,20 +18,20 @@ def simple_order_func_nb(c, entries, fees, slippage, leverage, state_arr):
     """Simple order func to test state persistence."""
     col = c.from_col
     i = c.i
-    
+
     if c.call_idx >= 1:
         return -1, order_nothing_nb()
-    
+
     position_now = c.last_position[col]
     tracked_cash = state_arr[0]  # Read from mutable array
-    
+
     close_now = c.close[i, col]
-    
+
     # Entry
     if position_now == 0 and entries[i, 0]:
         entry_px = close_now * (1.0 - slippage)
         size = (tracked_cash * 1.0) / (entry_px * (1.0 + fees))
-        
+
         # Update state
         position_value = size * entry_px
         entry_fees = position_value * fees
@@ -39,16 +39,16 @@ def simple_order_func_nb(c, entries, fees, slippage, leverage, state_arr):
         state_arr[0] = new_cash
         state_arr[1] = entry_px  # entry price
         state_arr[2] = size
-        
+
         print("Bar", i, "Entry: cash before=", tracked_cash, "size=", size, "cash after=", new_cash)
-        
+
         return col, order_nb(
             size=size,
             price=entry_px,
             fees=fees,
             direction=Direction.ShortOnly
         )
-    
+
     # Exit at fixed bar offset (simulate SL)
     if position_now < 0:
         entry_price = state_arr[1]
@@ -62,25 +62,26 @@ def simple_order_func_nb(c, entries, fees, slippage, leverage, state_arr):
                     position_value = abs(position_now) * exit_px
                     exit_fees = position_value * fees
                     pnl = (entry_price - exit_px) * abs(position_now) * leverage - exit_fees
-                    
+
                     new_cash = state_arr[0] + position_value + pnl
                     state_arr[0] = new_cash
                     state_arr[1] = 0.0
                     state_arr[2] = 0.0
-                    
+
                     print("Bar", i, "Exit: pnl=", pnl, "cash after=", new_cash)
-                    
+
                     return col, order_nb(
                         size=-position_now,
                         price=exit_px,
                         fees=fees,
                     )
-    
+
     return -1, order_nothing_nb()
 
 
 # Load data
 import sqlite3
+
 db_path = ROOT / "data.sqlite3"
 conn = sqlite3.connect(str(db_path))
 df = pd.read_sql(

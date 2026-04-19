@@ -1,182 +1,198 @@
 # ============================================
-# Uvicorn Service Controller (Windows / PowerShell)
+# Uvicorn Server Management Script
 # ============================================
-# Provides: start | stop | status | tail
-#
-# Why this exists:
-# - VS Code tasks run scripts as plain commands. On Windows PowerShell you must
-#   call scripts via the call operator (&) or with -File.
-# - We keep PID/log files so status/stop work reliably.
-# - We wait for port 8000 to start listening to avoid "task succeeded" while
-#   the server immediately crashed.
+# Usage:
+#   .\start_uvicorn.ps1 start  - Start server
+#   .\start_uvicorn.ps1 stop   - Stop server
+#   .\start_uvicorn.ps1 status - Check status
+# ============================================
 
-[CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start', 'stop', 'status', 'tail')]
-    [string]$Action = 'status',
-
-    [string]$AppModule = 'backend.api.app:app',
-    [string]$BindHost = '0.0.0.0',
-    [int]$Port = 8000,
-    [int]$Workers = 4,
-
-    [int]$StartupTimeoutSeconds = 120
+    [ValidateSet("start", "stop", "status", "tail")]
+    [string]$Action = "start"
 )
 
-$ErrorActionPreference = 'Continue'
-$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$ErrorActionPreference = "Continue"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+$RunDir = Join-Path $ProjectRoot ".run"
+$PidFile = Join-Path $RunDir "uvicorn.pid"
+$LogFile = Join-Path $RunDir "uvicorn.log"
+$LogFileErr = Join-Path $RunDir "uvicorn_err.log"
 
-# Try .venv314 first, then fall back to .venv
-$VenvPython314 = Join-Path $ProjectRoot '.venv314\Scripts\python.exe'
-$VenvPythonLegacy = Join-Path $ProjectRoot '.venv\Scripts\python.exe'
-if (Test-Path $VenvPython314) {
-    $VenvPython = $VenvPython314
+# Ensure .run directory exists
+if (-not (Test-Path $RunDir)) {
+    New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
 }
-else {
-    $VenvPython = $VenvPythonLegacy
+
+function Get-UvicornProcess {
+    $procId = $null
+    if (Test-Path $PidFile) {
+        $pidContent = Get-Content $PidFile -ErrorAction SilentlyContinue
+        if ($pidContent) {
+            $procId = [int]$pidContent
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            # Verify it's actually a python/uvicorn process, not a reused PID
+            if ($proc -and $proc.ProcessName -like "python*") {
+                return $proc
+            }
+            # PID file is stale — remove it
+            Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+    # Fallback: check port 8000
+    try {
+        $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue 2>$null
+    }
+    catch { $conn = $null }
+    if ($conn) {
+        return Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+    }
+    return $null
 }
 
-$StateDir = Join-Path $ProjectRoot '.run'
-$PidFile = Join-Path $StateDir 'uvicorn.pid'
-$LogFile = Join-Path $StateDir 'uvicorn.log'
+function Start-UvicornServer {
+    $existing = Get-UvicornProcess
+    if ($existing) {
+        Write-Host "[INFO] Uvicorn already running (PID: $($existing.Id))" -ForegroundColor Yellow
+        return
+    }
 
-function Set-StateDir {
-    if (-not (Test-Path $StateDir)) {
-        New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
+    Write-Host "[INFO] Starting Uvicorn server..." -ForegroundColor Cyan
+
+    # Clear old log file
+    if (Test-Path $LogFile) {
+        try {
+            Remove-Item $LogFile -Force -ErrorAction Stop
+        }
+        catch {
+            # File might be locked, try to clear content
+            try {
+                Set-Content $LogFile -Value "" -Force -ErrorAction Stop
+            }
+            catch {
+                # Use temp file as fallback
+                $LogFile = Join-Path $env:TEMP "bybit_uvicorn.log"
+                Write-Host "[WARN] Using temp log file: $LogFile" -ForegroundColor Yellow
+            }
+        }
+    }
+
+    # Start Uvicorn with output redirected to log files via bat wrapper
+    # (bat file handles >> redirection reliably on Windows)
+    $stdoutLog = $LogFile
+    $stderrLog = $LogFileErr
+    $batFile = Join-Path $PSScriptRoot "run_uvicorn.bat"
+
+    # Clear old logs
+    Set-Content $stdoutLog -Value "" -Force -ErrorAction SilentlyContinue
+    Set-Content $stderrLog -Value "" -Force -ErrorAction SilentlyContinue
+
+    try {
+        $process = Start-Process -FilePath $batFile `
+            -ArgumentList "`"$VenvPython`"", "`"$ProjectRoot`"", "`"$stdoutLog`"", "`"$stderrLog`"" `
+            -WorkingDirectory $ProjectRoot `
+            -PassThru `
+            -WindowStyle Hidden
+        
+        # Wait for uvicorn to bind the port
+        Start-Sleep -Seconds 3
+
+        # Detect the actual python/uvicorn process via port 8000 (not the cmd.exe wrapper)
+        $uvicornProc = $null
+        try {
+            $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue 2>$null
+            if ($conn) {
+                $uvicornProc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+            }
+        }
+        catch { }
+
+        if ($uvicornProc) {
+            Set-Content -Path $PidFile -Value $uvicornProc.Id -Force
+            Write-Host "[OK] Uvicorn started (PID: $($uvicornProc.Id), process: $($uvicornProc.ProcessName))" -ForegroundColor Green
+            Write-Host "     Log file: $LogFile" -ForegroundColor Gray
+        }
+        elseif ($process -and $process.Id) {
+            # Fallback: save bat wrapper PID (port detection failed)
+            Set-Content -Path $PidFile -Value $process.Id -Force
+            Write-Host "[OK] Uvicorn started (bat PID: $($process.Id))" -ForegroundColor Green
+            Write-Host "     Log file: $LogFile" -ForegroundColor Gray
+        }
+        else {
+            Write-Host "[ERROR] Failed to start Uvicorn" -ForegroundColor Red
+        }
+    }
+    catch {
+        Write-Host "[ERROR] Failed to start Uvicorn: $_" -ForegroundColor Red
     }
 }
 
-function Get-UvicornPid {
+function Stop-UvicornServer {
+    $proc = Get-UvicornProcess
+    if ($proc) {
+        Write-Host "[INFO] Stopping Uvicorn (PID: $($proc.Id))..." -ForegroundColor Yellow
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+        
+        # Verify stopped
+        $check = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+        if (-not $check) {
+            Write-Host "[OK] Uvicorn stopped" -ForegroundColor Green
+        }
+        else {
+            Write-Host "[WARN] Process may still be running" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "[INFO] Uvicorn is not running" -ForegroundColor Gray
+    }
+    
+    # Clean up PID file
     if (Test-Path $PidFile) {
         try {
-            $uvicornPid = (Get-Content $PidFile -ErrorAction Stop | Select-Object -First 1).Trim()
-            if ($uvicornPid -match '^\d+$') { return [int]$uvicornPid }
+            Remove-Item $PidFile -Force -ErrorAction Stop
         }
-        catch {}
+        catch {
+            Set-Content $PidFile -Value "" -Force -ErrorAction SilentlyContinue
+        }
     }
-    return $null
 }
 
-function Test-PidAlive([int]$TargetPid) {
-    try { Get-Process -Id $TargetPid -ErrorAction Stop | Out-Null; return $true } catch { return $false }
-}
+function Get-UvicornStatus {
+    $proc = Get-UvicornProcess
+    if ($proc) {
+        Write-Host "[OK] Uvicorn is running (PID: $($proc.Id))" -ForegroundColor Green
+        Write-Host "     stdout log: $LogFile" -ForegroundColor Gray
+        Write-Host "     stderr log: $LogFileErr" -ForegroundColor Gray
 
-function Get-ListenerPid([int]$port) {
-    try {
-        $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop | Select-Object -First 1
-        if ($null -ne $conn) { return [int]$conn.OwningProcess }
+        # Check if responding
+        try {
+            $null = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/health" -TimeoutSec 5 -ErrorAction Stop
+            Write-Host "[OK] Server responding" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "[WARN] Server not responding to health check" -ForegroundColor Yellow
+        }
     }
-    catch {}
-    return $null
-}
-
-function Wait-For-Listen([int]$port, [int]$timeoutSeconds) {
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    while ($sw.Elapsed.TotalSeconds -lt $timeoutSeconds) {
-        $listenerPid = Get-ListenerPid -port $port
-        if ($listenerPid) { return $listenerPid }
-        Start-Sleep -Milliseconds 300
+    else {
+        Write-Host "[INFO] Uvicorn is not running" -ForegroundColor Gray
     }
-    return $null
 }
 
+function Get-UvicornLogs {
+    param([int]$Lines = 100)
+    Write-Host "=== STDOUT ($LogFile) ===" -ForegroundColor Cyan
+    if (Test-Path $LogFile) { Get-Content $LogFile -Tail $Lines } else { Write-Host "(no file)" -ForegroundColor Gray }
+    Write-Host "=== STDERR ($LogFileErr) ===" -ForegroundColor Yellow
+    if (Test-Path $LogFileErr) { Get-Content $LogFileErr -Tail $Lines } else { Write-Host "(no file)" -ForegroundColor Gray }
+}
+
+# Execute action
 switch ($Action) {
-    'start' {
-        Set-StateDir
-
-        # Add CUDA to PATH for GPU acceleration
-        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin"
-        if (Test-Path $cudaPath) {
-            $env:PATH = "$cudaPath;$env:PATH"
-            Write-Host "[INFO] CUDA path added: $cudaPath" -ForegroundColor Cyan
-        }
-
-        if (-not (Test-Path $VenvPython)) {
-            Write-Host "[ERROR] venv python not found: $VenvPython" -ForegroundColor Red
-            exit 1
-        }
-
-        # If already listening, report and exit OK
-        $listenerPid = Get-ListenerPid -port $Port
-        if ($listenerPid) {
-            Set-Content -Path $PidFile -Value $listenerPid -Encoding ascii
-            Write-Host "[OK] Uvicorn already listening on port $Port (PID: $listenerPid)" -ForegroundColor Green
-            exit 0
-        }
-
-        # Start in a new PowerShell window so it keeps running.
-        # IMPORTANT: use -File to run the venv python reliably.
-        # Add CUDA path to child process for GPU acceleration
-        # --timeout-keep-alive 600 for long-running optimization requests
-        $startArgs = @(
-            '-NoExit',
-            '-Command',
-            "`$env:PYTHONPATH = '$ProjectRoot'; `$env:PATH = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin;' + `$env:PATH; cd '$ProjectRoot'; & '$VenvPython' -m uvicorn $AppModule --host $BindHost --port $Port --workers $Workers --timeout-keep-alive 600 2>&1 | Tee-Object -FilePath '$LogFile'"
-        )
-
-        Start-Process -FilePath 'powershell.exe' -ArgumentList $startArgs -WindowStyle Normal -PassThru | Out-Null
-        # Note: powershell.exe PID is not the python PID; we rely on port-listener PID.
-
-        $listenerPid = Wait-For-Listen -port $Port -timeoutSeconds $StartupTimeoutSeconds
-        if (-not $listenerPid) {
-            Write-Host "[ERROR] Uvicorn did not start listening on port $Port within ${StartupTimeoutSeconds}s." -ForegroundColor Red
-            Write-Host "        Check logs: $LogFile" -ForegroundColor Yellow
-            exit 1
-        }
-
-        Set-Content -Path $PidFile -Value $listenerPid -Encoding ascii
-        Write-Host "[OK] Uvicorn listening on port $Port (PID: $listenerPid)" -ForegroundColor Green
-        Write-Host "[INFO] Logs: $LogFile" -ForegroundColor Gray
-        exit 0
-    }
-
-    'stop' {
-        Set-StateDir
-
-        $uvicornPid = Get-UvicornPid
-        if ($uvicornPid -and (Test-PidAlive $uvicornPid)) {
-            Write-Host "[INFO] Stopping Uvicorn PID $uvicornPid..." -ForegroundColor Yellow
-            try { Stop-Process -Id $uvicornPid -Force -ErrorAction Stop } catch {}
-            Start-Sleep -Seconds 1
-        }
-
-        # Fallback: if something still listens on the port, kill that.
-        $listenerPid = Get-ListenerPid -port $Port
-        if ($listenerPid) {
-            Write-Host "[INFO] Killing listener on port $Port (PID: $listenerPid)..." -ForegroundColor Yellow
-            try { Stop-Process -Id $listenerPid -Force -ErrorAction Stop } catch {}
-        }
-
-        if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
-        Write-Host "[OK] Uvicorn stopped" -ForegroundColor Green
-        exit 0
-    }
-
-    'status' {
-        $listenerPid = Get-ListenerPid -port $Port
-        if ($listenerPid) {
-            Write-Host "[OK] LISTENING :$Port (PID: $listenerPid)" -ForegroundColor Green
-            exit 0
-        }
-
-        $uvicornPid = Get-UvicornPid
-        if ($uvicornPid -and (Test-PidAlive $uvicornPid)) {
-            Write-Host "[WARN] PID file exists ($uvicornPid) but port $Port is not listening" -ForegroundColor Yellow
-            Write-Host "       Check logs: $LogFile" -ForegroundColor Yellow
-            exit 1
-        }
-
-        Write-Host "[DOWN] Not listening on :$Port" -ForegroundColor Red
-        exit 1
-    }
-
-    'tail' {
-        Set-StateDir
-        if (-not (Test-Path $LogFile)) {
-            Write-Host "[INFO] Log file not found yet: $LogFile" -ForegroundColor Yellow
-            exit 0
-        }
-        Get-Content -Path $LogFile -Wait
-    }
+    "start" { Start-UvicornServer }
+    "stop" { Stop-UvicornServer }
+    "status" { Get-UvicornStatus }
+    "tail" { Get-UvicornLogs -Lines 200 }
 }

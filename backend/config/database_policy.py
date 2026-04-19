@@ -11,7 +11,7 @@ Policy:
 - Sliding window: when data exceeds limit, oldest month is trimmed
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # =============================================================================
 # DATA RETENTION POLICY CONSTANTS
@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 # Minimum start date for all historical data
 # No data before this date will be stored in the database
-DATA_START_DATE = datetime(2025, 1, 1, tzinfo=timezone.utc)
+DATA_START_DATE = datetime(2025, 1, 1, tzinfo=UTC)
 
 # Data start timestamp in milliseconds (for DB queries)
 DATA_START_TIMESTAMP_MS = int(DATA_START_DATE.timestamp() * 1000)
@@ -87,19 +87,19 @@ def calculate_cutoff_date(min_date: datetime, months: int = 1) -> datetime:
 # =============================================================================
 
 __all__ = [
+    "DAILY_INTERVAL",
     # Constants
     "DATA_START_DATE",
     "DATA_START_TIMESTAMP_MS",
-    "RETENTION_YEARS",
+    "DEFAULT_INITIAL_CANDLES",
+    "DEFAULT_WARMUP_PAIRS",
+    "MANDATORY_INTERVALS",
     "MAX_RETENTION_DAYS",
     "RETENTION_CHECK_DAYS",
-    "DEFAULT_WARMUP_PAIRS",
-    "DAILY_INTERVAL",
-    "DEFAULT_INITIAL_CANDLES",
-    "MANDATORY_INTERVALS",
+    "RETENTION_YEARS",
+    "calculate_cutoff_date",
     # Functions
     "get_data_start_timestamp_ms",
-    "is_timestamp_valid",
     "get_min_allowed_date",
-    "calculate_cutoff_date",
+    "is_timestamp_valid",
 ]

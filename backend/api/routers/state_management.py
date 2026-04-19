@@ -6,7 +6,7 @@ Provides REST API endpoints for unified state management.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -48,13 +48,9 @@ class CreateOrderRequest(BaseModel):
     side: str = Field(..., description="Order side: buy or sell")
     order_type: str = Field(..., description="Order type: market, limit, etc.")
     quantity: float = Field(..., gt=0, le=1_000_000, description="Order quantity")
-    price: Optional[float] = Field(
-        None, gt=0, description="Limit price (for limit orders)"
-    )
-    client_order_id: Optional[str] = Field(
-        None, max_length=64, description="Client order ID"
-    )
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    price: float | None = Field(None, gt=0, description="Limit price (for limit orders)")
+    client_order_id: str | None = Field(None, max_length=64, description="Client order ID")
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
     @field_validator("symbol")
     @classmethod
@@ -62,9 +58,7 @@ class CreateOrderRequest(BaseModel):
         """Validate trading symbol format."""
         v = v.upper().strip()
         if not VALID_SYMBOLS_PATTERN.match(v):
-            raise ValueError(
-                f"Invalid symbol format: {v}. Expected format: BTCUSDT, ETHUSDT, etc."
-            )
+            raise ValueError(f"Invalid symbol format: {v}. Expected format: BTCUSDT, ETHUSDT, etc.")
         return v
 
     @field_validator("side")
@@ -73,9 +67,7 @@ class CreateOrderRequest(BaseModel):
         """Validate order side."""
         v = v.lower().strip()
         if v not in VALID_ORDER_SIDES:
-            raise ValueError(
-                f"Invalid order side: {v}. Must be one of: {VALID_ORDER_SIDES}"
-            )
+            raise ValueError(f"Invalid order side: {v}. Must be one of: {VALID_ORDER_SIDES}")
         return v
 
     @field_validator("order_type")
@@ -84,9 +76,7 @@ class CreateOrderRequest(BaseModel):
         """Validate order type."""
         v = v.lower().strip()
         if v not in VALID_ORDER_TYPES:
-            raise ValueError(
-                f"Invalid order type: {v}. Must be one of: {VALID_ORDER_TYPES}"
-            )
+            raise ValueError(f"Invalid order type: {v}. Must be one of: {VALID_ORDER_TYPES}")
         return v
 
     @field_validator("quantity")
@@ -103,11 +93,11 @@ class CreateOrderRequest(BaseModel):
 class UpdateOrderRequest(BaseModel):
     """Update order request."""
 
-    status: Optional[str] = None
-    filled_quantity: Optional[float] = None
-    average_price: Optional[float] = None
-    exchange_order_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    status: str | None = None
+    filled_quantity: float | None = None
+    average_price: float | None = None
+    exchange_order_id: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class OrderResponse(BaseModel):
@@ -118,15 +108,15 @@ class OrderResponse(BaseModel):
     side: str
     order_type: str
     quantity: float
-    price: Optional[float]
+    price: float | None
     status: str
     filled_quantity: float
     average_price: float
     created_at: str
     updated_at: str
-    exchange_order_id: Optional[str]
-    client_order_id: Optional[str]
-    metadata: Dict[str, Any]
+    exchange_order_id: str | None
+    client_order_id: str | None
+    metadata: dict[str, Any]
 
 
 class OpenPositionRequest(BaseModel):
@@ -137,18 +127,18 @@ class OpenPositionRequest(BaseModel):
     quantity: float = Field(..., gt=0, description="Position quantity")
     entry_price: float = Field(..., gt=0, description="Entry price")
     leverage: float = Field(1.0, ge=1, description="Leverage")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    stop_loss: float | None = Field(None, description="Stop loss price")
+    take_profit: float | None = Field(None, description="Take profit price")
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
 
 class UpdatePositionRequest(BaseModel):
     """Update position request."""
 
-    current_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    metadata: Optional[Dict[str, Any]] = None
+    current_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ClosePositionRequest(BaseModel):
@@ -172,9 +162,9 @@ class PositionResponse(BaseModel):
     margin_used: float
     created_at: str
     updated_at: str
-    stop_loss: Optional[float]
-    take_profit: Optional[float]
-    metadata: Dict[str, Any]
+    stop_loss: float | None
+    take_profit: float | None
+    metadata: dict[str, Any]
 
 
 class StateMetricsResponse(BaseModel):
@@ -189,7 +179,7 @@ class StateMetricsResponse(BaseModel):
     failed_events: int
     conflicts_detected: int
     conflicts_resolved: int
-    last_sync: Optional[str]
+    last_sync: str | None
     sync_latency_ms: float
     redis_latency_ms: float
     postgres_latency_ms: float
@@ -204,8 +194,8 @@ class ConflictResponse(BaseModel):
     redis_timestamp: str
     postgres_timestamp: str
     resolved: bool
-    resolution: Optional[str]
-    resolved_at: Optional[str]
+    resolution: str | None
+    resolved_at: str | None
 
 
 class SyncResponse(BaseModel):
@@ -215,7 +205,7 @@ class SyncResponse(BaseModel):
     synced_positions: int
     conflicts_detected: int
     conflicts_resolved: int
-    errors: List[str]
+    errors: list[str]
 
 
 class HealthResponse(BaseModel):
@@ -223,8 +213,8 @@ class HealthResponse(BaseModel):
 
     status: str
     running: bool
-    metrics: Dict[str, Any]
-    event_queue: Dict[str, int]
+    metrics: dict[str, Any]
+    event_queue: dict[str, int]
 
 
 # ============================================================================
@@ -241,9 +231,7 @@ def order_to_response(order: Order) -> OrderResponse:
         order_type=order.order_type,
         quantity=order.quantity,
         price=order.price,
-        status=order.status.value
-        if isinstance(order.status, OrderStatus)
-        else order.status,
+        status=order.status.value if isinstance(order.status, OrderStatus) else order.status,
         filled_quantity=order.filled_quantity,
         average_price=order.average_price,
         created_at=order.created_at.isoformat() if order.created_at else "",
@@ -259,9 +247,7 @@ def position_to_response(position: Position) -> PositionResponse:
     return PositionResponse(
         position_id=position.position_id,
         symbol=position.symbol,
-        side=position.side.value
-        if isinstance(position.side, PositionSide)
-        else position.side,
+        side=position.side.value if isinstance(position.side, PositionSide) else position.side,
         quantity=position.quantity,
         entry_price=position.entry_price,
         current_price=position.current_price,
@@ -319,9 +305,7 @@ async def create_order(request: CreateOrderRequest):
                     detail=f"Max exposure limit reached: {current_exposure:.1f}% >= {max_exposure:.1f}%",
                 )
 
-            logger.info(
-                f"Risk check passed for order: {request.symbol} {request.side} {request.quantity}"
-            )
+            logger.info(f"Risk check passed for order: {request.symbol} {request.side} {request.quantity}")
         except ImportError:
             logger.warning("Risk dashboard not available, skipping risk checks")
         except HTTPException:
@@ -343,9 +327,7 @@ async def create_order(request: CreateOrderRequest):
         )
 
         created_order = await manager.create_order(order)
-        logger.info(
-            f"Order created: {created_order.order_id} - {request.symbol} {request.side} {request.quantity}"
-        )
+        logger.info(f"Order created: {created_order.order_id} - {request.symbol} {request.side} {request.quantity}")
         return order_to_response(created_order)
     except HTTPException:
         raise
@@ -357,17 +339,15 @@ async def create_order(request: CreateOrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/orders", response_model=List[OrderResponse])
+@router.get("/orders", response_model=list[OrderResponse])
 async def list_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
     source: str = Query("redis", description="Data source: redis or postgres"),
 ):
     """List orders."""
     try:
         manager = get_state_manager()
-        state_source = (
-            StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
-        )
+        state_source = StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
         orders = await manager.list_orders(symbol=symbol, source=state_source)
         return [order_to_response(o) for o in orders]
     except Exception as e:
@@ -383,9 +363,7 @@ async def get_order(
     """Get order by ID."""
     try:
         manager = get_state_manager()
-        state_source = (
-            StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
-        )
+        state_source = StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
         order = await manager.get_order(order_id, source=state_source)
 
         if not order:
@@ -478,17 +456,15 @@ async def open_position(request: OpenPositionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/positions", response_model=List[PositionResponse])
+@router.get("/positions", response_model=list[PositionResponse])
 async def list_positions(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
     source: str = Query("redis", description="Data source: redis or postgres"),
 ):
     """List positions."""
     try:
         manager = get_state_manager()
-        state_source = (
-            StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
-        )
+        state_source = StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
         positions = await manager.list_positions(symbol=symbol, source=state_source)
         return [position_to_response(p) for p in positions]
     except Exception as e:
@@ -504,15 +480,11 @@ async def get_position(
     """Get position by ID."""
     try:
         manager = get_state_manager()
-        state_source = (
-            StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
-        )
+        state_source = StateSource.POSTGRES if source.lower() == "postgres" else StateSource.REDIS
         position = await manager.get_position(position_id, source=state_source)
 
         if not position:
-            raise HTTPException(
-                status_code=404, detail=f"Position {position_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
 
         return position_to_response(position)
     except HTTPException:
@@ -530,9 +502,7 @@ async def update_position(position_id: str, request: UpdatePositionRequest):
         position = await manager.get_position(position_id)
 
         if not position:
-            raise HTTPException(
-                status_code=404, detail=f"Position {position_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
 
         if request.current_price is not None:
             position.current_price = request.current_price
@@ -560,9 +530,7 @@ async def close_position(position_id: str, request: ClosePositionRequest):
         position = await manager.close_position(position_id, request.close_price)
 
         if not position:
-            raise HTTPException(
-                status_code=404, detail=f"Position {position_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
 
         return position_to_response(position)
     except HTTPException:
@@ -615,9 +583,9 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/conflicts", response_model=List[ConflictResponse])
+@router.get("/conflicts", response_model=list[ConflictResponse])
 async def get_conflicts(
-    resolved: Optional[bool] = Query(None, description="Filter by resolved status"),
+    resolved: bool | None = Query(None, description="Filter by resolved status"),
 ):
     """Get state conflicts."""
     try:

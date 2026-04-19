@@ -13,7 +13,6 @@ import ast
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class WarningLevel(str, Enum):
@@ -32,8 +31,8 @@ class AnalysisWarning:
     code: str  # e.g., "LOOKAHEAD_001"
     level: WarningLevel
     message: str
-    line_number: Optional[int] = None
-    suggestion: Optional[str] = None
+    line_number: int | None = None
+    suggestion: str | None = None
 
 
 @dataclass
@@ -55,18 +54,12 @@ class StrategyAnalysisResult:
     @property
     def is_safe(self) -> bool:
         """Check if strategy passed all checks"""
-        return not (
-            self.has_lookahead_bias or self.is_repainting or self.has_data_leakage
-        )
+        return not (self.has_lookahead_bias or self.is_repainting or self.has_data_leakage)
 
     @property
     def critical_warnings(self) -> list[AnalysisWarning]:
         """Get only critical warnings"""
-        return [
-            w
-            for w in self.warnings
-            if w.level in (WarningLevel.ERROR, WarningLevel.CRITICAL)
-        ]
+        return [w for w in self.warnings if w.level in (WarningLevel.ERROR, WarningLevel.CRITICAL)]
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization"""
@@ -285,9 +278,7 @@ class StrategyAnalyzer:
 
         self.result = StrategyAnalysisResult()
 
-        if not isinstance(entry_signals, pd.Series) or not isinstance(
-            ohlcv, pd.DataFrame
-        ):
+        if not isinstance(entry_signals, pd.Series) or not isinstance(ohlcv, pd.DataFrame):
             return self.result
 
         # Check 1: Signal generated on bar where exact high/low was touched
@@ -299,16 +290,12 @@ class StrategyAnalyzer:
 
                 # Check if many entries happened at exact high/low (statistically unlikely)
                 # Allow some tolerance for common price levels
-                at_high = np.isclose(
-                    entry_bars["close"], entry_bars["high"], rtol=0.0001
-                )
+                at_high = np.isclose(entry_bars["close"], entry_bars["high"], rtol=0.0001)
                 at_low = np.isclose(entry_bars["close"], entry_bars["low"], rtol=0.0001)
 
                 exact_edge_ratio = (at_high.sum() + at_low.sum()) / len(entry_bars)
 
-                if (
-                    exact_edge_ratio > 0.3
-                ):  # More than 30% at exact high/low is suspicious
+                if exact_edge_ratio > 0.3:  # More than 30% at exact high/low is suspicious
                     self.result.has_lookahead_bias = True
                     self.result.uses_high_low_of_current_bar = True
                     self.result.warnings.append(
@@ -334,9 +321,7 @@ class StrategyAnalyzer:
                 if not in_trade and entry_signals.iloc[i]:
                     in_trade = True
                     entry_price = ohlcv["close"].iloc[i]
-                elif in_trade and (
-                    exit_signals.iloc[i] if exit_signals is not None else False
-                ):
+                elif in_trade and (exit_signals.iloc[i] if exit_signals is not None else False):
                     exit_price = ohlcv["close"].iloc[i]
                     if exit_price > entry_price:
                         wins += 1
@@ -406,11 +391,7 @@ class StrategyAnalyzer:
         for pattern, warning_code, message in self.TRADINGVIEW_PATTERNS:
             for line_num, line in enumerate(lines, 1):
                 if re.search(pattern, line, re.IGNORECASE):
-                    level = (
-                        WarningLevel.INFO
-                        if warning_code == "TV_002"
-                        else WarningLevel.WARNING
-                    )
+                    level = WarningLevel.INFO if warning_code == "TV_002" else WarningLevel.WARNING
                     self.result.warnings.append(
                         AnalysisWarning(
                             code=warning_code,
@@ -444,38 +425,39 @@ class StrategyAnalyzer:
 
             for node in ast.walk(tree):
                 # Check for iloc with negative index (future access)
-                if isinstance(node, ast.Subscript):
-                    if isinstance(node.slice, ast.UnaryOp):
-                        if isinstance(node.slice.op, ast.USub):
-                            if isinstance(node.slice.operand, ast.Constant):
-                                val = node.slice.operand.value
-                                if isinstance(val, int) and val > 0:
-                                    self.result.warnings.append(
-                                        AnalysisWarning(
-                                            code="AST_001",
-                                            level=WarningLevel.WARNING,
-                                            message=f"Negative index [-{val}] may indicate future data access",
-                                            line_number=node.lineno,
-                                        )
-                                    )
+                if (
+                    isinstance(node, ast.Subscript)
+                    and isinstance(node.slice, ast.UnaryOp)
+                    and isinstance(node.slice.op, ast.USub)
+                    and isinstance(node.slice.operand, ast.Constant)
+                ):
+                    val = node.slice.operand.value
+                    if isinstance(val, int) and val > 0:
+                        self.result.warnings.append(
+                            AnalysisWarning(
+                                code="AST_001",
+                                level=WarningLevel.WARNING,
+                                message=f"Negative index [-{val}] may indicate future data access",
+                                line_number=node.lineno,
+                            )
+                        )
 
                 # Check for DataFrame operations that might leak
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Attribute):
-                        attr_name = node.func.attr
-                        if attr_name in ("pct_change", "diff", "rolling"):
-                            # These are OK if used properly
-                            pass
-                        elif attr_name == "apply":
-                            # Custom apply might have issues
-                            self.result.warnings.append(
-                                AnalysisWarning(
-                                    code="AST_002",
-                                    level=WarningLevel.INFO,
-                                    message="DataFrame.apply() - ensure function doesn't access future data",
-                                    line_number=node.lineno,
-                                )
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                    attr_name = node.func.attr
+                    if attr_name in ("pct_change", "diff", "rolling"):
+                        # These are OK if used properly
+                        pass
+                    elif attr_name == "apply":
+                        # Custom apply might have issues
+                        self.result.warnings.append(
+                            AnalysisWarning(
+                                code="AST_002",
+                                level=WarningLevel.INFO,
+                                message="DataFrame.apply() - ensure function doesn't access future data",
+                                line_number=node.lineno,
                             )
+                        )
 
         except SyntaxError:
             # Not valid Python, skip AST analysis
@@ -490,10 +472,7 @@ class StrategyAnalyzer:
             if "forward" in warning.message.lower():
                 self.result.has_forward_fill = True
 
-            if (
-                "close" in warning.message.lower()
-                and "current" in warning.message.lower()
-            ):
+            if "close" in warning.message.lower() and "current" in warning.message.lower():
                 self.result.uses_close_for_entry_on_same_bar = True
 
 

@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>MFE/MAE Bar Test — 26 Identical Trades</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #131722;
+                color: #d1d4dc;
+                font-family: monospace;
+            }
+            h2 {
+                padding: 10px 16px;
+                font-size: 13px;
+                color: #9098a1;
+            }
+            #chart-container {
+                position: relative;
+                width: 100%;
+                height: 300px;
+            }
+            #controls {
+                padding: 10px 16px;
+                display: flex;
+                gap: 16px;
+                align-items: center;
+                font-size: 12px;
+            }
+            label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+            }
+            button {
+                background: #2962ff;
+                color: #fff;
+                border: none;
+                padding: 5px 12px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            #log {
+                padding: 10px 16px;
+                font-size: 11px;
+                color: #9098a1;
+                max-height: 260px;
+                overflow-y: auto;
+                border-top: 1px solid #2a2e39;
+                white-space: pre-wrap;
+            }
+            .ok {
+                color: #26a69a;
+            }
+            .err {
+                color: #ef5350;
+            }
+            .warn {
+                color: #f59e0b;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>MFE/MAE Excursion Bar Test — 26 Identical Synthetic Trades</h2>
+        <div id="controls">
+            <label>
+                <input type="checkbox" id="chkExcursions" checked />
+                Show MFE/MAE bars
+            </label>
+            <button id="btnRerender">Re-render</button>
+            <button id="btnZoomIn">Zoom In ×2</button>
+            <button id="btnZoomOut">Zoom Out ×2</button>
+            <span id="status" style="color: #9098a1">Loading…</span>
+        </div>
+        <div id="chart-container"></div>
+        <div id="log"></div>
+
+        <!-- LWC v5 -->
+        <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
+        <!-- Component under test -->
+        <script src="./js/components/TradingViewEquityChart.js?v=20260308e"></script>
+
+        <script>
+            // ─── Log helper ───────────────────────────────────────────────────────────
+            const logEl = document.getElementById('log');
+            function log(msg, cls = '') {
+                const line = document.createElement('div');
+                if (cls) line.className = cls;
+                line.textContent = msg;
+                logEl.prepend(line);
+            }
+
+            // ─── Generate 26 identical synthetic trades ───────────────────────────────
+            // Start: 2025-01-06 (Monday), one trade per week, each exactly 3 days long
+            // All trades identical: MFE=5%, MAE=2%, PnL=+100
+            const INITIAL_CAPITAL = 10000;
+            const NUM_TRADES = 26;
+            const TRADE_DURATION_DAYS = 3; // entry → exit
+            const GAP_BETWEEN_DAYS = 4; // gap between exit and next entry
+            const CYCLE_DAYS = TRADE_DURATION_DAYS + GAP_BETWEEN_DAYS; // 7 days per trade
+
+            // Base: 2025-01-06 00:00 UTC
+            const BASE_UTC = Date.UTC(2025, 0, 6, 0, 0, 0) / 1000; // unix seconds
+
+            const trades = [];
+            const timestamps = []; // every day in the range
+            const equity = []; // equity curve value at each timestamp
+
+            let capital = INITIAL_CAPITAL;
+
+            // Build day-by-day equity curve + trades
+            const totalDays = NUM_TRADES * CYCLE_DAYS + 5;
+
+            for (let day = 0; day < totalDays; day++) {
+                const ts = BASE_UTC + day * 86400;
+                timestamps.push(ts);
+
+                // Determine which trade cycle this day belongs to
+                const tradeIdx = Math.floor(day / CYCLE_DAYS);
+                const dayInCycle = day % CYCLE_DAYS;
+
+                if (tradeIdx < NUM_TRADES && dayInCycle < TRADE_DURATION_DAYS) {
+                    // In a trade: linearly interpolate equity from capital to capital+100
+                    const progress = dayInCycle / TRADE_DURATION_DAYS;
+                    equity.push(capital + 100 * progress);
+                } else {
+                    equity.push(capital);
+                }
+
+                // On exit day: close the trade
+                if (tradeIdx < NUM_TRADES && dayInCycle === TRADE_DURATION_DAYS - 1) {
+                    const entryTs = BASE_UTC + tradeIdx * CYCLE_DAYS * 86400;
+                    const exitTs = BASE_UTC + (tradeIdx * CYCLE_DAYS + TRADE_DURATION_DAYS - 1) * 86400;
+
+                    // Add UTC+3 offset (10800s) since _toUnixSec subtracts it
+                    // Actually: component adds 10800 to all times, so we pass raw UTC here
+                    // and the component will add +10800 internally... wait.
+                    // _toUnixSec: if value is a number, returns it as-is (no tz adjustment for numeric)
+                    // Let's just use ISO strings to be safe — component parses those with tz offset.
+                    const entryISO = new Date(entryTs * 1000).toISOString();
+                    const exitISO = new Date(exitTs * 1000).toISOString();
+
+                    trades.push({
+                        trade_id: tradeIdx + 1,
+                        entry_time: entryISO,
+                        exit_time: exitISO,
+                        pnl: 100,
+                        // Identical MFE/MAE for all 26 trades — bars should be same height
+                        mfe_pct: 5.0, // 5% MFE
+                        mae_pct: 2.0, // 2% MAE
+                        mfe: 500, // $500 abs (5% of 10000)
+                        mae: 200 // $200 abs (2% of 10000)
+                    });
+
+                    capital += 100;
+                }
+            }
+
+            // Final equity value
+            equity[equity.length - 1] = capital;
+
+            // Convert timestamps to ISO strings (the component accepts these)
+            const tsISO = timestamps.map((t) => new Date(t * 1000).toISOString());
+
+            const syntheticData = {
+                timestamps: tsISO,
+                equity: equity,
+                trades: trades,
+                initial_capital: INITIAL_CAPITAL,
+                symbol: 'BTCUSDT',
+                timeframe: 'D'
+            };
+
+            log(`Generated ${trades.length} trades, ${timestamps.length} equity points`, 'ok');
+            log(`Trade 1: entry=${trades[0].entry_time} exit=${trades[0].exit_time}`);
+            log(`Trade 26: entry=${trades[25].entry_time} exit=${trades[25].exit_time}`);
+            log(`MFE=5% MAE=2% PnL=+100 for ALL trades — bars should be IDENTICAL`);
+
+            // ─── Render ───────────────────────────────────────────────────────────────
+            let chart = null;
+
+            function render() {
+                if (chart) {
+                    try {
+                        chart.destroy();
+                    } catch (e) {}
+                }
+                // Resize container to fit window
+                document.getElementById('chart-container').style.height = '300px';
+
+                chart = new TradingViewEquityChart('chart-container', {
+                    showTradeExcursions: document.getElementById('chkExcursions').checked
+                });
+                chart.render(syntheticData);
+                document.getElementById('status').textContent = 'Rendered';
+                log('--- render() called ---');
+
+                // After render, inspect what barSpacing LWC reports
+                setTimeout(() => {
+                    try {
+                        const lw = chart._lwChart;
+                        const bs = lw.timeScale().options().barSpacing;
+                        const tsW = lw.timeScale().width();
+                        const contW = document.getElementById('chart-container').clientWidth;
+                        log(`barSpacing=${bs.toFixed(2)}  tsWidth=${tsW}  containerW=${contW}`, 'ok');
+                        log(
+                            `expected globalBarW = clamp(round(${bs.toFixed(2)}*0.8), 4, 20) = ${Math.min(Math.max(Math.round(bs * 0.8), 4), 20)}px`,
+                            'ok'
+                        );
+                    } catch (e) {
+                        log('barSpacing read error: ' + e.message, 'err');
+                    }
+                }, 200);
+            }
+
+            render();
+
+            // ─── Controls ─────────────────────────────────────────────────────────────
+            document.getElementById('chkExcursions').addEventListener('change', (e) => {
+                chart.toggleTradeExcursions(e.target.checked);
+                log(`toggleTradeExcursions(${e.target.checked})`);
+            });
+
+            document.getElementById('btnRerender').addEventListener('click', render);
+
+            document.getElementById('btnZoomIn').addEventListener('click', () => {
+                try {
+                    const lw = chart._lwChart;
+                    const cur = lw.timeScale().getVisibleLogicalRange();
+                    if (!cur) return;
+                    const mid = (cur.from + cur.to) / 2;
+                    const half = (cur.to - cur.from) / 4;
+                    lw.timeScale().setVisibleLogicalRange({ from: mid - half, to: mid + half });
+                    const bs = lw.timeScale().options().barSpacing;
+                    log(
+                        `ZoomIn → barSpacing=${bs.toFixed(2)} → globalBarW=${Math.min(Math.max(Math.round(bs * 0.8), 4), 20)}px`
+                    );
+                } catch (e) {
+                    log('zoom error: ' + e.message, 'err');
+                }
+            });
+
+            document.getElementById('btnZoomOut').addEventListener('click', () => {
+                try {
+                    const lw = chart._lwChart;
+                    const cur = lw.timeScale().getVisibleLogicalRange();
+                    if (!cur) return;
+                    const mid = (cur.from + cur.to) / 2;
+                    const half = cur.to - cur.from;
+                    lw.timeScale().setVisibleLogicalRange({ from: mid - half, to: mid + half });
+                    const bs = lw.timeScale().options().barSpacing;
+                    log(
+                        `ZoomOut → barSpacing=${bs.toFixed(2)} → globalBarW=${Math.min(Math.max(Math.round(bs * 0.8), 4), 20)}px`
+                    );
+                } catch (e) {
+                    log('zoom error: ' + e.message, 'err');
+                }
+            });
+
+            // ─── Patch draw to log barSpacing on every redraw ─────────────────────────
+            // We monkey-patch scheduleRedraw via subscribing to visible range
+            if (chart._lwChart) {
+                chart._lwChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+                    try {
+                        const bs = chart._lwChart.timeScale().options().barSpacing;
+                        const gw = Math.min(Math.max(Math.round(bs * 0.8), 4), 20);
+                        document.getElementById('status').textContent = `barSpacing=${bs.toFixed(1)} → barW=${gw}px`;
+                    } catch (e) {}
+                });
+            }
+        </script>
+    </body>
+</html>

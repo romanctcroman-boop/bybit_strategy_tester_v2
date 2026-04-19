@@ -1,11 +1,14 @@
 """
 Direct DeepSeek API call for VectorBT consultation (simplified version)
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 import httpx
-import json
 
 from backend.security.key_manager import get_key_manager
 
@@ -35,76 +38,79 @@ PROMPT = """# VectorBT vs Fallback Engine: Консультация
 Дай краткие, практичные рекомендации с примерами кода где возможно.
 """
 
+
 def main():
     print("=" * 70)
     print("DEEPSEEK DIRECT API CALL")
     print("=" * 70)
-    
+
     # Get API key
     km = get_key_manager()
     api_key = km.get_decrypted_key("DEEPSEEK_API_KEY")
-    
+
     if not api_key:
         print("❌ DeepSeek API key not found")
         return
-    
+
     print("✅ API key loaded")
-    
+
     # Prepare request - use deepseek-chat for faster response
     payload = {
         "model": "deepseek-chat",  # Use chat model (faster than reasoner)
         "messages": [
-            {"role": "system", "content": "You are an expert Python developer specializing in quantitative finance, backtesting, and VectorBT library."},
+            {
+                "role": "system",
+                "content": "You are an expert Python developer specializing in quantitative finance, backtesting, and VectorBT library.",
+            },
             {"role": "user", "content": PROMPT},
         ],
         "max_tokens": 4000,
         "temperature": 0.7,
     }
-    
-    print(f"\n📤 Sending request...")
+
+    print("\n📤 Sending request...")
     print(f"   Model: {payload['model']}")
     print(f"   Prompt length: {len(PROMPT)} chars")
-    
+
     # Make request
     try:
         with httpx.Client(timeout=120.0) as client:
             response = client.post(
                 "https://api.deepseek.com/v1/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
-        
+
         print(f"\n📥 Response received: {response.status_code}")
-        
+
         if response.status_code == 200:
             data = response.json()
             content = data["choices"][0]["message"]["content"]
             usage = data.get("usage", {})
-            
+
             print(f"   Tokens used: {usage.get('total_tokens', 'N/A')}")
-            
+
             print("\n" + "=" * 70)
             print("DEEPSEEK RESPONSE")
             print("=" * 70)
             print(content)
-            
+
             # Save to file
             with open("deepseek_vectorbt_consultation.md", "w", encoding="utf-8") as f:
                 f.write("# DeepSeek VectorBT Consultation\n\n")
                 f.write(content)
-            
+
             print("\n📄 Response saved to: deepseek_vectorbt_consultation.md")
-            
+
         else:
             print(f"❌ Error: {response.text}")
-            
+
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

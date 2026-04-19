@@ -12,9 +12,9 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class NewsArticle:
     content: str
     source: NewsSource
     url: str = ""
-    published_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     author: str = ""
     symbols: list[str] = field(default_factory=list)
     raw_data: dict[str, Any] = field(default_factory=dict)
@@ -89,7 +89,7 @@ class SentimentResult:
     mentioned_symbols: list[str]
     key_phrases: list[str]
     impact_score: float  # 0 to 1 (potential market impact)
-    analyzed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    analyzed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -366,8 +366,8 @@ class NewsNLPAnalyzer:
         """
         self.lexicon = CryptoSentimentLexicon()
         self.use_transformers = use_transformers
-        self._transformer_model: Optional[Any] = None
-        self._tokenizer: Optional[Any] = None
+        self._transformer_model: Any | None = None
+        self._tokenizer: Any | None = None
 
         if use_transformers:
             self._load_transformer_model()
@@ -385,9 +385,7 @@ class NewsNLPAnalyzer:
             # Use FinBERT for financial sentiment
             model_name = "ProsusAI/finbert"
             self._tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self._transformer_model = (
-                AutoModelForSequenceClassification.from_pretrained(model_name)
-            )
+            self._transformer_model = AutoModelForSequenceClassification.from_pretrained(model_name)
             logger.info(f"Loaded transformer model: {model_name}")
         except ImportError:
             logger.warning("transformers package not installed, using lexicon only")
@@ -434,9 +432,7 @@ class NewsNLPAnalyzer:
         key_phrases = self._extract_key_phrases(text)
 
         # Calculate impact score
-        impact_score = self._calculate_impact_score(
-            sentiment_score, confidence, symbols, category
-        )
+        impact_score = self._calculate_impact_score(sentiment_score, confidence, symbols, category)
 
         result = SentimentResult(
             article_id=article.article_id,
@@ -455,9 +451,9 @@ class NewsNLPAnalyzer:
         return result
 
     def _get_cache_key(self, article: NewsArticle) -> str:
-        """Generate cache key for article."""
+        """Generate cache key for article using SHA256."""
         content = f"{article.title}:{article.content[:500]}"
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.sha256(content.encode()).hexdigest()
 
     def _cache_result(self, key: str, result: SentimentResult) -> None:
         """Cache analysis result."""
@@ -610,9 +606,7 @@ class NewsNLPAnalyzer:
         sentences = re.split(r"[.!?]", text)
         key_phrases = []
 
-        all_keywords = set(self.lexicon.BULLISH_TERMS.keys()) | set(
-            self.lexicon.BEARISH_TERMS.keys()
-        )
+        all_keywords = set(self.lexicon.BULLISH_TERMS.keys()) | set(self.lexicon.BEARISH_TERMS.keys())
 
         for sentence in sentences:
             sentence = sentence.strip()
@@ -707,7 +701,7 @@ class SentimentAggregator:
                 "dominant_category": None,
             }
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         weighted_scores: list[float] = []
         weighted_confidences: list[float] = []
         category_counts: dict[NewsCategory, int] = {}
@@ -741,11 +735,7 @@ class SentimentAggregator:
         else:
             sentiment = Sentiment.NEUTRAL
 
-        dominant_category = (
-            max(category_counts.keys(), key=lambda x: category_counts[x])
-            if category_counts
-            else None
-        )
+        dominant_category = max(category_counts.keys(), key=lambda x: category_counts[x]) if category_counts else None
 
         return {
             "symbol": symbol,
@@ -761,16 +751,10 @@ class SentimentAggregator:
         symbol_activity = []
 
         for symbol, results in self._results.items():
-            recent_results = [
-                r
-                for r in results
-                if (datetime.now(timezone.utc) - r.analyzed_at).total_seconds() < 86400
-            ]
+            recent_results = [r for r in results if (datetime.now(UTC) - r.analyzed_at).total_seconds() < 86400]
 
             if recent_results:
-                avg_impact = sum(r.impact_score for r in recent_results) / len(
-                    recent_results
-                )
+                avg_impact = sum(r.impact_score for r in recent_results) / len(recent_results)
                 symbol_activity.append(
                     {
                         "symbol": symbol,
@@ -781,9 +765,7 @@ class SentimentAggregator:
                 )
 
         # Sort by news count * impact
-        symbol_activity.sort(
-            key=lambda x: x["news_count"] * x["avg_impact"], reverse=True
-        )
+        symbol_activity.sort(key=lambda x: x["news_count"] * x["avg_impact"], reverse=True)
 
         return symbol_activity[:top_n]
 
@@ -792,8 +774,8 @@ class SentimentAggregator:
 # Global Instance
 # ============================================================================
 
-_analyzer: Optional[NewsNLPAnalyzer] = None
-_aggregator: Optional[SentimentAggregator] = None
+_analyzer: NewsNLPAnalyzer | None = None
+_aggregator: SentimentAggregator | None = None
 
 
 def get_news_analyzer(use_transformers: bool = False) -> NewsNLPAnalyzer:

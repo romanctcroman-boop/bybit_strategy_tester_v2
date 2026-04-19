@@ -55,10 +55,10 @@ class ConfigVariable:
     name: str
     config_type: ConfigType
     required: bool = False
-    default_value: Optional[str] = None
+    default_value: str | None = None
     description: str = ""
     is_sensitive: bool = False
-    validation_pattern: Optional[str] = None
+    validation_pattern: str | None = None
 
 
 @dataclass
@@ -70,7 +70,7 @@ class ConfigIssue:
     variable: str
     message: str
     recommendation: str
-    file_path: Optional[str] = None
+    file_path: str | None = None
 
 
 @dataclass
@@ -189,9 +189,7 @@ class SecureConfigHandler:
     _instance: Optional["SecureConfigHandler"] = None
 
     def __init__(self):
-        self._variables: dict[str, ConfigVariable] = {
-            v.name: v for v in DEFAULT_VARIABLES
-        }
+        self._variables: dict[str, ConfigVariable] = {v.name: v for v in DEFAULT_VARIABLES}
         self._config_values: dict[str, str] = {}
         self._issues: list[ConfigIssue] = []
         self._issue_count = 0
@@ -216,21 +214,13 @@ class SecureConfigHandler:
             return self._variables[name].is_sensitive
 
         # Check patterns
-        for pattern in SENSITIVE_PATTERNS:
-            if re.match(pattern, name, re.IGNORECASE):
-                return True
-
-        return False
+        return any(re.match(pattern, name, re.IGNORECASE) for pattern in SENSITIVE_PATTERNS)
 
     def mask_value(self, value: str, visible_chars: int = 4) -> str:
         """Mask a sensitive value."""
         if len(value) <= visible_chars * 2:
             return "*" * len(value)
-        return (
-            value[:visible_chars]
-            + "*" * (len(value) - visible_chars * 2)
-            + value[-visible_chars:]
-        )
+        return value[:visible_chars] + "*" * (len(value) - visible_chars * 2) + value[-visible_chars:]
 
     def check_file_permissions(self, file_path: Path) -> list[ConfigIssue]:
         """Check file permissions for security issues."""
@@ -300,9 +290,7 @@ class SecureConfigHandler:
     def set_secure_permissions(self, file_path: Path) -> bool:
         """Set secure permissions on a file (Unix only)."""
         if os.name == "nt":
-            logger.info(
-                f"Windows: Secure permissions require manual setup for {file_path}"
-            )
+            logger.info(f"Windows: Secure permissions require manual setup for {file_path}")
             return True
 
         try:
@@ -322,8 +310,8 @@ class SecureConfigHandler:
             return values
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                for line_num, line in enumerate(f, 1):
+            with open(file_path, encoding="utf-8") as f:
+                for _line_num, line in enumerate(f, 1):
                     line = line.strip()
 
                     # Skip comments and empty lines
@@ -337,9 +325,9 @@ class SecureConfigHandler:
                         value = value.strip()
 
                         # Remove quotes
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        elif value.startswith("'") and value.endswith("'"):
+                        if (value.startswith('"') and value.endswith('"')) or (
+                            value.startswith("'") and value.endswith("'")
+                        ):
                             value = value[1:-1]
 
                         values[key] = value
@@ -355,8 +343,8 @@ class SecureConfigHandler:
 
     def validate_config(
         self,
-        config_values: Optional[dict[str, str]] = None,
-        file_path: Optional[Path] = None,
+        config_values: dict[str, str] | None = None,
+        file_path: Path | None = None,
     ) -> ConfigValidationResult:
         """Validate configuration values."""
         values = config_values or self._config_values
@@ -444,9 +432,7 @@ class SecureConfigHandler:
 
         self._issues.extend(issues)
 
-        is_valid = not any(
-            i.severity in [ConfigSeverity.CRITICAL, ConfigSeverity.HIGH] for i in issues
-        )
+        is_valid = not any(i.severity in [ConfigSeverity.CRITICAL, ConfigSeverity.HIGH] for i in issues)
 
         return ConfigValidationResult(
             is_valid=is_valid,
@@ -547,8 +533,8 @@ class SecureConfigHandler:
 
     def get_issues(
         self,
-        severity: Optional[ConfigSeverity] = None,
-        variable: Optional[str] = None,
+        severity: ConfigSeverity | None = None,
+        variable: str | None = None,
     ) -> list[ConfigIssue]:
         """Get configuration issues."""
         issues = self._issues
@@ -571,7 +557,7 @@ class SecureConfigHandler:
             "checksum": self.get_checksum(),
         }
 
-    def get_variable_info(self, name: str) -> Optional[dict]:
+    def get_variable_info(self, name: str) -> dict | None:
         """Get information about a variable."""
         if name not in self._variables:
             return None

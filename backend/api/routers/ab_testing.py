@@ -7,7 +7,8 @@ Provides REST endpoints for managing A/B experiments:
 - Get results and dashboards
 """
 
-from typing import Any, Dict, List, Optional
+import contextlib
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -34,7 +35,7 @@ class VariantCreate(BaseModel):
 
     name: str
     weight: float = Field(default=0.5, ge=0, le=1)
-    config: Dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     is_control: bool = False
 
 
@@ -43,23 +44,23 @@ class ExperimentCreate(BaseModel):
 
     name: str
     description: str = ""
-    variants: List[VariantCreate]
+    variants: list[VariantCreate]
     allocation_strategy: str = "deterministic"
     min_samples_per_variant: int = Field(default=100, ge=10)
     confidence_level: float = Field(default=0.95, ge=0.8, le=0.99)
     primary_metric: str = "pnl"
-    target_symbols: Optional[List[str]] = None
-    target_users: Optional[List[str]] = None
-    guardrail_metrics: Optional[Dict[str, List[float]]] = None
+    target_symbols: list[str] | None = None
+    target_users: list[str] | None = None
+    guardrail_metrics: dict[str, list[float]] | None = None
 
 
 class QuickExperimentCreate(BaseModel):
     """Simplified model for quick A/B test creation."""
 
     name: str
-    control_config: Dict[str, Any]
-    treatment_config: Dict[str, Any]
-    target_symbols: Optional[List[str]] = None
+    control_config: dict[str, Any]
+    treatment_config: dict[str, Any]
+    target_symbols: list[str] | None = None
     traffic_split: float = Field(default=0.5, ge=0.1, le=0.9)
 
 
@@ -77,7 +78,7 @@ class TradeRecord(BaseModel):
     variant_name: str
     pnl: float
     win: bool
-    metrics: Optional[Dict[str, float]] = None
+    metrics: dict[str, float] | None = None
 
 
 class ExperimentResponse(BaseModel):
@@ -86,10 +87,10 @@ class ExperimentResponse(BaseModel):
     id: str
     name: str
     status: str
-    variants: List[str]
+    variants: list[str]
     total_samples: int
     created_at: str
-    started_at: Optional[str] = None
+    started_at: str | None = None
 
 
 class ExperimentResultResponse(BaseModel):
@@ -97,22 +98,22 @@ class ExperimentResultResponse(BaseModel):
 
     experiment_id: str
     status: str
-    winner: Optional[str] = None
+    winner: str | None = None
     confidence: float
     p_value: float
     effect_size: float
     total_samples: int
     recommendation: str
-    warnings: List[str]
-    variant_stats: Dict[str, Any]
+    warnings: list[str]
+    variant_stats: dict[str, Any]
 
 
 class VariantAllocationResponse(BaseModel):
     """Response for variant allocation."""
 
-    experiment_id: Optional[str] = None
-    variant_name: Optional[str] = None
-    variant_config: Optional[Dict[str, Any]] = None
+    experiment_id: str | None = None
+    variant_name: str | None = None
+    variant_config: dict[str, Any] | None = None
     is_control: bool = True
 
 
@@ -136,16 +137,11 @@ async def create_experiment(request: ExperimentCreate) -> ExperimentResponse:
             "time_based": AllocationStrategy.TIME_BASED,
             "symbol_based": AllocationStrategy.SYMBOL_BASED,
         }
-        allocation = strategy_map.get(
-            request.allocation_strategy.lower(), AllocationStrategy.DETERMINISTIC
-        )
+        allocation = strategy_map.get(request.allocation_strategy.lower(), AllocationStrategy.DETERMINISTIC)
 
         # Convert variants
         variants = [
-            Variant(
-                name=v.name, weight=v.weight, config=v.config, is_control=v.is_control
-            )
-            for v in request.variants
+            Variant(name=v.name, weight=v.weight, config=v.config, is_control=v.is_control) for v in request.variants
         ]
 
         # Convert guardrails
@@ -164,9 +160,7 @@ async def create_experiment(request: ExperimentCreate) -> ExperimentResponse:
             min_samples_per_variant=request.min_samples_per_variant,
             confidence_level=request.confidence_level,
             primary_metric=request.primary_metric,
-            target_symbols=set(request.target_symbols)
-            if request.target_symbols
-            else None,
+            target_symbols=set(request.target_symbols) if request.target_symbols else None,
             target_users=set(request.target_users) if request.target_users else None,
             guardrail_metrics=guardrails,
         )
@@ -217,19 +211,17 @@ async def create_quick_experiment(request: QuickExperimentCreate) -> ExperimentR
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/experiments", response_model=List[ExperimentResponse])
+@router.get("/experiments", response_model=list[ExperimentResponse])
 async def list_experiments(
-    status_filter: Optional[str] = None,
-) -> List[ExperimentResponse]:
+    status_filter: str | None = None,
+) -> list[ExperimentResponse]:
     """List all experiments."""
     manager = get_experiment_manager()
 
     exp_status = None
     if status_filter:
-        try:
+        with contextlib.suppress(ValueError):
             exp_status = ExperimentStatus(status_filter.lower())
-        except ValueError:
-            pass
 
     experiments = manager.list_experiments(status=exp_status)
 
@@ -247,8 +239,8 @@ async def list_experiments(
     ]
 
 
-@router.get("/experiments/{experiment_id}", response_model=Dict[str, Any])
-async def get_experiment(experiment_id: str) -> Dict[str, Any]:
+@router.get("/experiments/{experiment_id}", response_model=dict[str, Any])
+async def get_experiment(experiment_id: str) -> dict[str, Any]:
     """Get experiment details and dashboard data."""
     manager = get_experiment_manager()
     data = manager.get_dashboard_data(experiment_id)
@@ -290,9 +282,7 @@ async def start_experiment(experiment_id: str) -> ExperimentResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post(
-    "/experiments/{experiment_id}/stop", response_model=ExperimentResultResponse
-)
+@router.post("/experiments/{experiment_id}/stop", response_model=ExperimentResultResponse)
 async def stop_experiment(experiment_id: str) -> ExperimentResultResponse:
     """Stop an experiment and get results."""
     manager = get_experiment_manager()
@@ -317,7 +307,7 @@ async def stop_experiment(experiment_id: str) -> ExperimentResultResponse:
 
 
 @router.post("/experiments/{experiment_id}/pause")
-async def pause_experiment(experiment_id: str) -> Dict[str, str]:
+async def pause_experiment(experiment_id: str) -> dict[str, str]:
     """Pause an experiment."""
     manager = get_experiment_manager()
     exp = manager.experiments.get(experiment_id)
@@ -336,7 +326,7 @@ async def pause_experiment(experiment_id: str) -> Dict[str, str]:
 
 
 @router.post("/experiments/{experiment_id}/resume")
-async def resume_experiment(experiment_id: str) -> Dict[str, str]:
+async def resume_experiment(experiment_id: str) -> dict[str, str]:
     """Resume a paused experiment."""
     manager = get_experiment_manager()
     exp = manager.experiments.get(experiment_id)
@@ -354,9 +344,7 @@ async def resume_experiment(experiment_id: str) -> Dict[str, str]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get(
-    "/experiments/{experiment_id}/results", response_model=ExperimentResultResponse
-)
+@router.get("/experiments/{experiment_id}/results", response_model=ExperimentResultResponse)
 async def get_experiment_results(experiment_id: str) -> ExperimentResultResponse:
     """Get current results for an experiment."""
     manager = get_experiment_manager()
@@ -385,7 +373,7 @@ async def get_experiment_results(experiment_id: str) -> ExperimentResultResponse
 
 
 @router.post("/experiments/{experiment_id}/metrics")
-async def record_metric(experiment_id: str, request: MetricRecord) -> Dict[str, str]:
+async def record_metric(experiment_id: str, request: MetricRecord) -> dict[str, str]:
     """Record a metric for an experiment variant."""
     manager = get_experiment_manager()
     exp = manager.experiments.get(experiment_id)
@@ -406,7 +394,7 @@ async def record_metric(experiment_id: str, request: MetricRecord) -> Dict[str, 
 
 
 @router.post("/experiments/{experiment_id}/trades")
-async def record_trade(experiment_id: str, request: TradeRecord) -> Dict[str, str]:
+async def record_trade(experiment_id: str, request: TradeRecord) -> dict[str, str]:
     """Record a trade result for an experiment variant."""
     manager = get_experiment_manager()
 
@@ -422,9 +410,7 @@ async def record_trade(experiment_id: str, request: TradeRecord) -> Dict[str, st
 
 
 @router.get("/allocate", response_model=VariantAllocationResponse)
-async def allocate_variant(
-    symbol: str, user_id: Optional[str] = None
-) -> VariantAllocationResponse:
+async def allocate_variant(symbol: str, user_id: str | None = None) -> VariantAllocationResponse:
     """Get the variant allocation for a request."""
     manager = get_experiment_manager()
 

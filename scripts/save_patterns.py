@@ -2,7 +2,7 @@
 
 import re
 
-with open('frontend/js/pages/backtest_results.js', 'r', encoding='utf-8') as f:
+with open("frontend/js/pages/backtest_results.js", encoding="utf-8") as f:
     text = f.read()
 
 # Find all string literals containing potential mojibake
@@ -10,7 +10,7 @@ patterns = []
 for match in re.finditer(r"'([^']{2,})'", text):
     content = match.group(1)
     # Check if it contains mojibake characters
-    if '\u0420' in content or '\u0421' in content or ('\u0440' in content and '\u045f' in content):
+    if "\u0420" in content or "\u0421" in content or ("\u0440" in content and "\u045f" in content):
         if len(content) > 5:  # Skip short patterns
             patterns.append(content)
 
@@ -22,10 +22,10 @@ for p in patterns:
         seen.add(p)
         unique.append(p)
 
-with open('scripts/patterns.txt', 'w', encoding='utf-8') as f:
+with open("scripts/patterns.txt", "w", encoding="utf-8") as f:
     for p in unique:
         # Print as hex escape
-        escaped = ''.join(f'\\u{ord(c):04x}' if ord(c) > 127 else c for c in p)
+        escaped = "".join(f"\\u{ord(c):04x}" if ord(c) > 127 else c for c in p)
         f.write(f"# {repr(p)[:60]}...\n")
         f.write(f"('{escaped}', 'REPLACE_ME'),\n\n")
 

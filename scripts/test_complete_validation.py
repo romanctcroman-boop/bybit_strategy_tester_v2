@@ -3,20 +3,21 @@
 Включает ВСЕ параметры:
 - Bar Magnifier
 - OHLC Path Model
-- Subticks  
+- Subticks
 - Two-Stage Optimization
 - И все остальные параметры
 """
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-import numpy as np
-import pandas as pd
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import sqlite3
-import time
-from datetime import datetime
 from dataclasses import fields
-from itertools import product
+from datetime import datetime
+
+import pandas as pd
 
 print("=" * 120)
 print("🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ: 147 МЕТРИК × ВСЕ ПАРАМЕТРЫ")
@@ -28,36 +29,42 @@ print(f"Время: {datetime.now()}")
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
 print("\n📊 Загрузка данных...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # 1H данные
-df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+df_1h = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
     ORDER BY open_time ASC
     LIMIT 500
-""", conn)
-df_1h['open_time'] = pd.to_datetime(df_1h['open_time'], unit='ms')
-df_1h.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1h["open_time"] = pd.to_datetime(df_1h["open_time"], unit="ms")
+df_1h.set_index("open_time", inplace=True)
 
 # 1M данные для Bar Magnifier
-df_1m = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+df_1m = pd.read_sql(
+    """
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '1'
     ORDER BY open_time ASC
-""", conn)
-df_1m['open_time'] = pd.to_datetime(df_1m['open_time'], unit='ms')
-df_1m.set_index('open_time', inplace=True)
+""",
+    conn,
+)
+df_1m["open_time"] = pd.to_datetime(df_1m["open_time"], unit="ms")
+df_1m.set_index("open_time", inplace=True)
 
 # Фильтруем 1M данные по диапазону 1H
 df_1m = df_1m[(df_1m.index >= df_1h.index[0]) & (df_1m.index <= df_1h.index[-1])]
 
-start_date = df_1h.index[0].strftime('%Y-%m-%d %H:%M')
-end_date = df_1h.index[-1].strftime('%Y-%m-%d %H:%M')
+start_date = df_1h.index[0].strftime("%Y-%m-%d %H:%M")
+end_date = df_1h.index[-1].strftime("%Y-%m-%d %H:%M")
 
 print(f"   📅 Дата начала:    {start_date}")
 print(f"   📅 Дата окончания: {end_date}")
@@ -209,28 +216,29 @@ TEST_CONFIGS = [
 ]
 
 for i, cfg in enumerate(TEST_CONFIGS):
-    bm_status = "✅ ON" if cfg['bar_magnifier'] else "❌ OFF"
+    bm_status = "✅ ON" if cfg["bar_magnifier"] else "❌ OFF"
     print(f"""
-   [{i+1}] {cfg['name']}
-       ├─ Торговая пара:     {cfg['symbol']}
-       ├─ Таймфрейм:         {cfg['interval']}
-       ├─ Начальный капитал: ${cfg['initial_capital']:,}
-       ├─ Тип ордера:        {cfg['order_type']}
-       ├─ Размер позиции:    {cfg['position_size']*100:.1f}%
-       ├─ Стоп-лосс:         {cfg['stop_loss']*100:.1f}%
-       ├─ Тейк-профит:       {cfg['take_profit']*100:.1f}%
-       ├─ Режим позиций:     {cfg['direction']}
-       ├─ Пирамидинг:        {cfg['pyramiding']}
-       ├─ Комиссия:          {cfg['taker_fee']*100:.3f}%
-       ├─ Проскальзывание:   {cfg['slippage']*100:.3f}%
-       ├─ Плечо:             {cfg['leverage']}x
+   [{i + 1}] {cfg["name"]}
+       ├─ Торговая пара:     {cfg["symbol"]}
+       ├─ Таймфрейм:         {cfg["interval"]}
+       ├─ Начальный капитал: ${cfg["initial_capital"]:,}
+       ├─ Тип ордера:        {cfg["order_type"]}
+       ├─ Размер позиции:    {cfg["position_size"] * 100:.1f}%
+       ├─ Стоп-лосс:         {cfg["stop_loss"] * 100:.1f}%
+       ├─ Тейк-профит:       {cfg["take_profit"] * 100:.1f}%
+       ├─ Режим позиций:     {cfg["direction"]}
+       ├─ Пирамидинг:        {cfg["pyramiding"]}
+       ├─ Комиссия:          {cfg["taker_fee"] * 100:.3f}%
+       ├─ Проскальзывание:   {cfg["slippage"] * 100:.3f}%
+       ├─ Плечо:             {cfg["leverage"]}x
        ├─ Bar Magnifier:     {bm_status}
-       ├─ Исполнение:        {cfg['execution']}
-       ├─ Лимит просадки:    {cfg['max_drawdown_limit']*100:.1f}%
-       ├─ Тип стратегии:     {cfg['strategy_type']}
-       ├─ OHLC Path Model:   {cfg['ohlc_path_model']}
-       └─ Subticks:          {cfg['subticks']}
+       ├─ Исполнение:        {cfg["execution"]}
+       ├─ Лимит просадки:    {cfg["max_drawdown_limit"] * 100:.1f}%
+       ├─ Тип стратегии:     {cfg["strategy_type"]}
+       ├─ OHLC Path Model:   {cfg["ohlc_path_model"]}
+       └─ Subticks:          {cfg["subticks"]}
 """)
+
 
 # ============================================================================
 # ФУНКЦИИ
@@ -244,14 +252,14 @@ def calculate_rsi(close, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics
 
 fallback = FallbackEngineV2()
 numba_engine = NumbaEngineV2()
@@ -264,7 +272,7 @@ dir_map = {
 }
 
 # RSI сигналы
-rsi = calculate_rsi(df_1h['close'], period=14)
+rsi = calculate_rsi(df_1h["close"], period=14)
 long_entries = (rsi < 30).values
 long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
@@ -283,33 +291,33 @@ total_matches = 0
 problems = []
 
 for i, cfg in enumerate(TEST_CONFIGS):
-    print(f"\n{'='*80}")
-    print(f"[{i+1}/{len(TEST_CONFIGS)}] {cfg['name']}")
-    print(f"{'='*80}")
-    
+    print(f"\n{'=' * 80}")
+    print(f"[{i + 1}/{len(TEST_CONFIGS)}] {cfg['name']}")
+    print(f"{'=' * 80}")
+
     # Создание input
     input_data = BacktestInput(
         candles=df_1h,
-        candles_1m=df_1m if cfg['bar_magnifier'] else None,
+        candles_1m=df_1m if cfg["bar_magnifier"] else None,
         long_entries=long_entries,
         long_exits=long_exits,
         short_entries=short_entries,
         short_exits=short_exits,
-        symbol=cfg['symbol'],
-        interval=cfg['interval'],
-        initial_capital=cfg['initial_capital'],
-        position_size=cfg['position_size'],
-        leverage=cfg['leverage'],
-        stop_loss=cfg['stop_loss'],
-        take_profit=cfg['take_profit'],
-        direction=dir_map[cfg['direction']],
-        taker_fee=cfg['taker_fee'],
-        slippage=cfg['slippage'],
-        use_bar_magnifier=cfg['bar_magnifier'],
-        max_drawdown_limit=cfg['max_drawdown_limit'],
-        pyramiding=cfg['pyramiding'],
+        symbol=cfg["symbol"],
+        interval=cfg["interval"],
+        initial_capital=cfg["initial_capital"],
+        position_size=cfg["position_size"],
+        leverage=cfg["leverage"],
+        stop_loss=cfg["stop_loss"],
+        take_profit=cfg["take_profit"],
+        direction=dir_map[cfg["direction"]],
+        taker_fee=cfg["taker_fee"],
+        slippage=cfg["slippage"],
+        use_bar_magnifier=cfg["bar_magnifier"],
+        max_drawdown_limit=cfg["max_drawdown_limit"],
+        pyramiding=cfg["pyramiding"],
     )
-    
+
     # Запуск обоих движков
     try:
         fb_result = fallback.run(input_data)
@@ -317,34 +325,39 @@ for i, cfg in enumerate(TEST_CONFIGS):
     except Exception as e:
         print(f"   ❌ ОШИБКА: {e}")
         continue
-    
+
     # Extended Metrics
     fb_ext = ext_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = ext_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Сравнение ВСЕХ метрик
     fb_m = fb_result.metrics
     nb_m = nb_result.metrics
-    
+
     # Категории метрик
     all_categories = [
-        ("BacktestMetrics", [f.name for f in fields(BacktestMetrics) if not f.name.startswith('_')], fb_m, nb_m),
-        ("ExtendedMetrics", [f.name for f in fields(ExtendedMetricsResult) if not f.name.startswith('_')], fb_ext, nb_ext),
+        ("BacktestMetrics", [f.name for f in fields(BacktestMetrics) if not f.name.startswith("_")], fb_m, nb_m),
+        (
+            "ExtendedMetrics",
+            [f.name for f in fields(ExtendedMetricsResult) if not f.name.startswith("_")],
+            fb_ext,
+            nb_ext,
+        ),
     ]
-    
+
     config_matches = 0
     config_total = 0
-    
-    print(f"\n   📊 СРАВНЕНИЕ МЕТРИК:")
-    
+
+    print("\n   📊 СРАВНЕНИЕ МЕТРИК:")
+
     for cat_name, cat_fields, fb_obj, nb_obj in all_categories:
         cat_matches = 0
         cat_total = 0
-        
+
         for field_name in cat_fields:
             fb_val = getattr(fb_obj, field_name, 0)
             nb_val = getattr(nb_obj, field_name, 0)
-            
+
             # Проверка совпадения
             if fb_val is None and nb_val is None:
                 match = True
@@ -353,33 +366,31 @@ for i, cfg in enumerate(TEST_CONFIGS):
             else:
                 fb_f = float(fb_val) if fb_val is not None else 0.0
                 nb_f = float(nb_val) if nb_val is not None else 0.0
-                
-                if abs(fb_f) < 1e-10 and abs(nb_f) < 1e-10:
-                    match = True
-                elif abs(fb_f - nb_f) < 1e-6:
+
+                if (abs(fb_f) < 1e-10 and abs(nb_f) < 1e-10) or abs(fb_f - nb_f) < 1e-6:
                     match = True
                 elif abs(fb_f) > 1e-10:
                     pct_diff = abs(fb_f - nb_f) / abs(fb_f) * 100
                     match = pct_diff < 0.01
                 else:
                     match = fb_f == nb_f
-            
+
             cat_matches += 1 if match else 0
             cat_total += 1
-            
+
             if not match:
-                problems.append((cfg['name'], cat_name, field_name, fb_val, nb_val))
-        
+                problems.append((cfg["name"], cat_name, field_name, fb_val, nb_val))
+
         config_matches += cat_matches
         config_total += cat_total
         status = "✅" if cat_matches == cat_total else "⚠️"
         print(f"   {status} {cat_name}: {cat_matches}/{cat_total}")
-    
+
     total_metrics += config_total
     total_matches += config_matches
-    
+
     pct = config_matches / config_total * 100 if config_total > 0 else 0
-    bm_icon = "🔬" if cfg['bar_magnifier'] else "📊"
+    bm_icon = "🔬" if cfg["bar_magnifier"] else "📊"
     print(f"\n   {bm_icon} Bar Magnifier: {'ON' if cfg['bar_magnifier'] else 'OFF'}")
     print(f"   📈 Trades: {fb_m.total_trades}, Net Profit: ${fb_m.net_profit:,.2f}")
     print(f"   ✅ ИТОГО: {config_matches}/{config_total} ({pct:.1f}%)")
@@ -396,8 +407,8 @@ overall_pct = total_matches / total_metrics * 100 if total_metrics > 0 else 0
 print(f"""
    📋 ИТОГИ:
    ├─ Конфигураций протестировано: {len(TEST_CONFIGS)}
-   ├─ С Bar Magnifier:            {sum(1 for c in TEST_CONFIGS if c['bar_magnifier'])}
-   ├─ Без Bar Magnifier:          {sum(1 for c in TEST_CONFIGS if not c['bar_magnifier'])}
+   ├─ С Bar Magnifier:            {sum(1 for c in TEST_CONFIGS if c["bar_magnifier"])}
+   ├─ Без Bar Magnifier:          {sum(1 for c in TEST_CONFIGS if not c["bar_magnifier"])}
    ├─ Метрик проверено:           {total_metrics:,}
    ├─ Совпадений:                 {total_matches:,}
    └─ Процент совпадения:         {overall_pct:.2f}%
@@ -408,14 +419,14 @@ if problems:
     for name, cat, field, fb, nb in problems[:10]:
         print(f"      - {name} / {cat}.{field}: FB={fb}, NB={nb}")
 else:
-    print(f"""
-   ████████╗███████╗███████╗████████╗    ██████╗  █████╗ ███████╗███████╗███████╗██████╗ 
+    print("""
+   ████████╗███████╗███████╗████████╗    ██████╗  █████╗ ███████╗███████╗███████╗██████╗
    ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝    ██╔══██╗██╔══██╗██╔════╝██╔════╝██╔════╝██╔══██╗
       ██║   █████╗  ███████╗   ██║       ██████╔╝███████║███████╗███████╗█████╗  ██║  ██║
       ██║   ██╔══╝  ╚════██║   ██║       ██╔═══╝ ██╔══██║╚════██║╚════██║██╔══╝  ██║  ██║
       ██║   ███████╗███████║   ██║       ██║     ██║  ██║███████║███████║███████╗██████╔╝
-      ╚═╝   ╚══════╝╚══════╝   ╚═╝       ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═════╝ 
-   
+      ╚═╝   ╚══════╝╚══════╝   ╚═╝       ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═════╝
+
    🎉 100% ВАЛИДАЦИЯ ПРОЙДЕНА!
    ✅ ВСЕ КОНФИГУРАЦИИ (включая Bar Magnifier) ДАЛИ ИДЕНТИЧНЫЕ РЕЗУЛЬТАТЫ!
    ✅ FallbackEngineV2 и NumbaEngineV2 ПОЛНОСТЬЮ СОГЛАСОВАНЫ!

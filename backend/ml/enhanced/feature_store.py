@@ -12,11 +12,12 @@ Centralized feature management system:
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -57,24 +58,24 @@ class FeatureDefinition:
     nullable: bool = False
 
     # Computation
-    dependencies: List[str] = field(default_factory=list)  # Other features
-    computation_fn: Optional[str] = None  # Function name/code
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)  # Other features
+    computation_fn: str | None = None  # Function name/code
+    parameters: dict[str, Any] = field(default_factory=dict)
 
     # Statistics (populated during training)
-    mean: Optional[float] = None
-    std: Optional[float] = None
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    unique_values: Optional[List[Any]] = None
+    mean: float | None = None
+    std: float | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    unique_values: list[Any] | None = None
 
     # Metadata
     owner: str = ""
-    tags: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    tags: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "name": self.name,
@@ -99,7 +100,7 @@ class FeatureDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FeatureDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "FeatureDefinition":
         """Create from dictionary"""
         data = data.copy()
         data["feature_type"] = FeatureType(data["feature_type"])
@@ -117,7 +118,7 @@ class FeatureGroup:
 
     name: str
     description: str
-    features: List[str]  # Feature names
+    features: list[str]  # Feature names
 
     # Entity info (what the features describe)
     entity_type: str = "trade"  # "trade", "candle", "order", etc.
@@ -129,10 +130,10 @@ class FeatureGroup:
     refresh_interval_seconds: int = 300
 
     # Metadata
-    tags: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    tags: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "name": self.name,
@@ -154,11 +155,11 @@ class FeatureVersion:
 
     version: str
     created_at: datetime
-    feature_definitions: Dict[str, FeatureDefinition]
-    feature_groups: Dict[str, FeatureGroup]
+    feature_definitions: dict[str, FeatureDefinition]
+    feature_groups: dict[str, FeatureGroup]
     description: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "version": self.version,
@@ -200,16 +201,16 @@ class FeatureStore:
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         # In-memory storage
-        self.features: Dict[str, FeatureDefinition] = {}
-        self.groups: Dict[str, FeatureGroup] = {}
-        self.versions: Dict[str, FeatureVersion] = {}
+        self.features: dict[str, FeatureDefinition] = {}
+        self.groups: dict[str, FeatureGroup] = {}
+        self.versions: dict[str, FeatureVersion] = {}
 
         # Computation functions registry
-        self.computation_registry: Dict[str, Callable] = {}
+        self.computation_registry: dict[str, Callable] = {}
 
         # Cache
-        self.feature_cache: Dict[str, np.ndarray] = {}
-        self.cache_timestamps: Dict[str, datetime] = {}
+        self.feature_cache: dict[str, np.ndarray] = {}
+        self.cache_timestamps: dict[str, datetime] = {}
 
         # Load existing definitions
         self._load_store()
@@ -223,21 +224,17 @@ class FeatureStore:
 
         if index_path.exists():
             try:
-                with open(index_path, "r") as f:
+                with open(index_path) as f:
                     data = json.load(f)
 
                 for name, feat_data in data.get("features", {}).items():
                     self.features[name] = FeatureDefinition.from_dict(feat_data)
 
                 for name, group_data in data.get("groups", {}).items():
-                    group_data["created_at"] = datetime.fromisoformat(
-                        group_data["created_at"]
-                    )
+                    group_data["created_at"] = datetime.fromisoformat(group_data["created_at"])
                     self.groups[name] = FeatureGroup(**group_data)
 
-                logger.info(
-                    f"Loaded {len(self.features)} features, {len(self.groups)} groups"
-                )
+                logger.info(f"Loaded {len(self.features)} features, {len(self.groups)} groups")
             except Exception as e:
                 logger.error(f"Failed to load feature store: {e}")
 
@@ -248,7 +245,7 @@ class FeatureStore:
         data = {
             "features": {name: feat.to_dict() for name, feat in self.features.items()},
             "groups": {name: group.to_dict() for name, group in self.groups.items()},
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
         with open(index_path, "w") as f:
@@ -296,18 +293,14 @@ class FeatureStore:
                 result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
             return result
 
-        def compute_macd(
-            data: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9
-        ) -> np.ndarray:
+        def compute_macd(data: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> np.ndarray:
             """Compute MACD"""
             ema_fast = compute_ema(data, fast)
             ema_slow = compute_ema(data, slow)
             macd_line = ema_fast - ema_slow
             return macd_line
 
-        def compute_bollinger(
-            data: np.ndarray, period: int = 20, std_dev: float = 2.0
-        ) -> np.ndarray:
+        def compute_bollinger(data: np.ndarray, period: int = 20, std_dev: float = 2.0) -> np.ndarray:
             """Compute Bollinger Band width"""
             sma = compute_sma(data, period)
             rolling_std = np.zeros(len(data))
@@ -316,15 +309,11 @@ class FeatureStore:
             bb_width = (std_dev * 2 * rolling_std) / (sma + 1e-10)
             return bb_width
 
-        def compute_atr(
-            high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 14
-        ) -> np.ndarray:
+        def compute_atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 14) -> np.ndarray:
             """Compute Average True Range"""
             tr = np.maximum(
                 high - low,
-                np.maximum(
-                    np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))
-                ),
+                np.maximum(np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))),
             )
             tr[0] = high[0] - low[0]
             return compute_ema(tr, period)
@@ -332,9 +321,7 @@ class FeatureStore:
         def compute_returns(data: np.ndarray, period: int = 1) -> np.ndarray:
             """Compute returns"""
             returns = np.zeros(len(data))
-            returns[period:] = (data[period:] - data[:-period]) / (
-                data[:-period] + 1e-10
-            )
+            returns[period:] = (data[period:] - data[:-period]) / (data[:-period] + 1e-10)
             return returns
 
         def compute_volatility(data: np.ndarray, period: int = 20) -> np.ndarray:
@@ -371,9 +358,7 @@ class FeatureStore:
         self.computation_registry[name] = fn
         logger.info(f"Registered computation: {name}")
 
-    def register_feature(
-        self, feature: FeatureDefinition, update_if_exists: bool = True
-    ) -> None:
+    def register_feature(self, feature: FeatureDefinition, update_if_exists: bool = True) -> None:
         """
         Register a feature definition
 
@@ -401,19 +386,19 @@ class FeatureStore:
 
         logger.info(f"Created group: {group.name} with {len(group.features)} features")
 
-    def get_feature(self, name: str) -> Optional[FeatureDefinition]:
+    def get_feature(self, name: str) -> FeatureDefinition | None:
         """Get feature definition by name"""
         return self.features.get(name)
 
-    def get_group(self, name: str) -> Optional[FeatureGroup]:
+    def get_group(self, name: str) -> FeatureGroup | None:
         """Get feature group by name"""
         return self.groups.get(name)
 
     def list_features(
         self,
-        tags: Optional[List[str]] = None,
-        feature_type: Optional[FeatureType] = None,
-    ) -> List[FeatureDefinition]:
+        tags: list[str] | None = None,
+        feature_type: FeatureType | None = None,
+    ) -> list[FeatureDefinition]:
         """List features with optional filtering"""
         result = list(self.features.values())
 
@@ -425,17 +410,17 @@ class FeatureStore:
 
         return result
 
-    def list_groups(self) -> List[FeatureGroup]:
+    def list_groups(self) -> list[FeatureGroup]:
         """List all feature groups"""
         return list(self.groups.values())
 
     async def compute(
         self,
-        data: Dict[str, np.ndarray],
-        features: Optional[List[str]] = None,
-        group: Optional[str] = None,
+        data: dict[str, np.ndarray],
+        features: list[str] | None = None,
+        group: str | None = None,
         use_cache: bool = True,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """
         Compute features from input data
 
@@ -479,7 +464,7 @@ class FeatureStore:
 
                 # Cache result
                 self.feature_cache[cache_key] = computed
-                self.cache_timestamps[cache_key] = datetime.now(timezone.utc)
+                self.cache_timestamps[cache_key] = datetime.now(UTC)
 
             except Exception as e:
                 logger.error(f"Failed to compute {feat_name}: {e}")
@@ -492,8 +477,8 @@ class FeatureStore:
     async def _compute_single(
         self,
         feature: FeatureDefinition,
-        data: Dict[str, np.ndarray],
-        already_computed: Dict[str, np.ndarray],
+        data: dict[str, np.ndarray],
+        already_computed: dict[str, np.ndarray],
     ) -> np.ndarray:
         """Compute a single feature"""
         # Check dependencies
@@ -501,9 +486,7 @@ class FeatureStore:
             if dep not in already_computed and dep not in data:
                 dep_def = self.features.get(dep)
                 if dep_def:
-                    already_computed[dep] = await self._compute_single(
-                        dep_def, data, already_computed
-                    )
+                    already_computed[dep] = await self._compute_single(dep_def, data, already_computed)
 
         # Get computation function
         if feature.computation_fn is None:
@@ -528,7 +511,7 @@ class FeatureStore:
         if len(sig.parameters) == 1:
             # Simple function with just data
             result = fn(
-                input_data.get("close", input_data.get(list(input_data.keys())[0])),
+                input_data.get("close", input_data.get(next(iter(input_data.keys())))),
                 **params,
             )
         else:
@@ -540,10 +523,10 @@ class FeatureStore:
 
         return result
 
-    def _get_cache_key(self, feature_name: str, data: Dict[str, np.ndarray]) -> str:
-        """Generate cache key for feature computation"""
+    def _get_cache_key(self, feature_name: str, data: dict[str, np.ndarray]) -> str:
+        """Generate cache key for feature computation using SHA256"""
         # Hash based on feature name and data shape/sample
-        data_hash = hashlib.md5()
+        data_hash = hashlib.sha256()
         for k, v in sorted(data.items()):
             data_hash.update(k.encode())
             data_hash.update(str(v.shape).encode())
@@ -553,9 +536,7 @@ class FeatureStore:
 
         return f"{feature_name}_{data_hash.hexdigest()[:16]}"
 
-    def clear_cache(
-        self, feature_name: Optional[str] = None, older_than: Optional[datetime] = None
-    ) -> int:
+    def clear_cache(self, feature_name: str | None = None, older_than: datetime | None = None) -> int:
         """
         Clear feature cache
 
@@ -612,7 +593,7 @@ class FeatureStore:
         feat.std = float(np.std(values))
         feat.min_value = float(np.min(values))
         feat.max_value = float(np.max(values))
-        feat.updated_at = datetime.now(timezone.utc)
+        feat.updated_at = datetime.now(UTC)
 
         if feat.feature_type == FeatureType.CATEGORICAL:
             feat.unique_values = list(np.unique(values))[:100]  # Limit
@@ -623,7 +604,7 @@ class FeatureStore:
         """Create a versioned snapshot of current feature definitions"""
         fv = FeatureVersion(
             version=version,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             feature_definitions=self.features.copy(),
             feature_groups=self.groups.copy(),
             description=description,
@@ -639,14 +620,8 @@ class FeatureStore:
                     "version": version,
                     "description": description,
                     "created_at": fv.created_at.isoformat(),
-                    "features": {
-                        name: feat.to_dict()
-                        for name, feat in fv.feature_definitions.items()
-                    },
-                    "groups": {
-                        name: group.to_dict()
-                        for name, group in fv.feature_groups.items()
-                    },
+                    "features": {name: feat.to_dict() for name, feat in fv.feature_definitions.items()},
+                    "groups": {name: group.to_dict() for name, group in fv.feature_groups.items()},
                 },
                 f,
                 indent=2,
@@ -664,18 +639,15 @@ class FeatureStore:
             return False
 
         try:
-            with open(version_path, "r") as f:
+            with open(version_path) as f:
                 data = json.load(f)
 
             self.features = {
-                name: FeatureDefinition.from_dict(feat_data)
-                for name, feat_data in data.get("features", {}).items()
+                name: FeatureDefinition.from_dict(feat_data) for name, feat_data in data.get("features", {}).items()
             }
 
             for name, group_data in data.get("groups", {}).items():
-                group_data["created_at"] = datetime.fromisoformat(
-                    group_data["created_at"]
-                )
+                group_data["created_at"] = datetime.fromisoformat(group_data["created_at"])
                 self.groups[name] = FeatureGroup(**group_data)
 
             logger.info(f"Loaded feature store version: {version}")
@@ -685,7 +657,7 @@ class FeatureStore:
             logger.error(f"Failed to load version {version}: {e}")
             return False
 
-    def get_lineage(self, feature_name: str) -> Dict[str, Any]:
+    def get_lineage(self, feature_name: str) -> dict[str, Any]:
         """Get lineage (dependencies) for a feature"""
         if feature_name not in self.features:
             return {}
@@ -723,7 +695,7 @@ class FeatureStore:
         data = {
             "features": {name: feat.to_dict() for name, feat in self.features.items()},
             "groups": {name: group.to_dict() for name, group in self.groups.items()},
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "total_features": len(self.features),
             "total_groups": len(self.groups),
         }
@@ -735,7 +707,7 @@ class FeatureStore:
 
     def import_definitions(self, path: str, merge: bool = True) -> int:
         """Import feature definitions from a file"""
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
 
         imported = 0
@@ -747,9 +719,7 @@ class FeatureStore:
 
         for name, group_data in data.get("groups", {}).items():
             if merge or name not in self.groups:
-                group_data["created_at"] = datetime.fromisoformat(
-                    group_data["created_at"]
-                )
+                group_data["created_at"] = datetime.fromisoformat(group_data["created_at"])
                 self.groups[name] = FeatureGroup(**group_data)
 
         self._save_store()

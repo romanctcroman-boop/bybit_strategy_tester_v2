@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 from .crypto import CryptoManager
 from .master_key_manager import get_master_key_manager
@@ -31,14 +31,14 @@ class KeyManager:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(KeyManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
         if not KeyManager._initialized:
             # Store encrypted secrets only; decrypt lazily per request
-            self._encrypted_secrets: Dict[str, str] = {}
-            self._crypto: Optional[CryptoManager] = None
+            self._encrypted_secrets: dict[str, str] = {}
+            self._crypto: CryptoManager | None = None
             self._load_crypto_manager()
             self._load_encrypted_secrets()
             KeyManager._initialized = True
@@ -77,14 +77,12 @@ class KeyManager:
             return
 
         try:
-            with open(encrypted_path, "r", encoding="utf-8") as f:
+            with open(encrypted_path, encoding="utf-8") as f:
                 encrypted_secrets = json.load(f)
 
             # Keep encrypted payloads in memory; decrypt lazily on demand
             self._encrypted_secrets = encrypted_secrets
-            logger.info(
-                "Registered %s encrypted API keys", len(self._encrypted_secrets)
-            )
+            logger.info("Registered %s encrypted API keys", len(self._encrypted_secrets))
 
         except Exception as e:
             logger.warning("Failed to load encrypted secrets: %s", e)
@@ -126,7 +124,7 @@ class KeyManager:
             f"  2. Or encrypted_secrets.json via Settings UI"
         )
 
-    def list_keys_masked(self) -> Dict[str, str]:
+    def list_keys_masked(self) -> dict[str, str]:
         """
         List all available keys with masked values.
 
@@ -136,7 +134,7 @@ class KeyManager:
         masked = {}
 
         # From encrypted cache (decrypt lazily just for masking)
-        for key_name in self._encrypted_secrets.keys():
+        for key_name in self._encrypted_secrets:
             try:
                 value = self.get_decrypted_key(key_name)
             except ValueError:
@@ -152,6 +150,7 @@ class KeyManager:
             "DEEPSEEK_API_KEY",
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
+            "QWEN_API_KEY",
         ]
 
         for key_name in known_keys:
@@ -165,7 +164,7 @@ class KeyManager:
 
         return masked
 
-    def save_encrypted_keys(self, keys: Dict[str, str]):
+    def save_encrypted_keys(self, keys: dict[str, str]):
         """
         Encrypt and save API keys to file.
 
@@ -212,14 +211,12 @@ class KeyManager:
         if os.getenv(key_name):
             return True
         if key_name in self._encrypted_secrets:
-            if require_decryptable and not self._crypto:
-                return False
-            return True
+            return not (require_decryptable and not self._crypto)
         return False
 
 
 # Global singleton instance
-_key_manager: Optional[KeyManager] = None
+_key_manager: KeyManager | None = None
 
 
 def get_key_manager() -> KeyManager:

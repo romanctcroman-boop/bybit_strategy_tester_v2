@@ -20,12 +20,14 @@ Usage:
         pass
 """
 
+import contextlib
 import functools
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar
+from typing import Any, TypeVar
 
 try:
     from tenacity import (
@@ -83,7 +85,7 @@ class RetryConfig:
     jitter: bool = True
 
     # Which exceptions to retry
-    retry_on: Tuple[Type[Exception], ...] = field(
+    retry_on: tuple[type[Exception], ...] = field(
         default_factory=lambda: (
             sqlite3.OperationalError,
             sqlite3.DatabaseError,
@@ -91,7 +93,7 @@ class RetryConfig:
     )
 
     # Custom error checker (optional)
-    should_retry_func: Optional[Callable[[Exception], bool]] = None
+    should_retry_func: Callable[[Exception], bool] | None = None
 
 
 class RetryMetrics:
@@ -119,9 +121,7 @@ class RetryMetrics:
             "total_attempts": self.total_attempts,
             "successful_retries": self.successful_retries,
             "failed_retries": self.failed_retries,
-            "avg_time_ms": self.total_retry_time_ms / self.total_attempts
-            if self.total_attempts > 0
-            else 0,
+            "avg_time_ms": self.total_retry_time_ms / self.total_attempts if self.total_attempts > 0 else 0,
         }
 
 
@@ -168,8 +168,8 @@ def is_retryable_error(exc: Exception) -> bool:
 
 
 def with_db_retry(
-    config: Optional[RetryConfig] = None,
-    logger: Optional[logging.Logger] = None,
+    config: RetryConfig | None = None,
+    logger: logging.Logger | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator for retrying database operations with exponential backoff.
@@ -221,16 +221,12 @@ def with_db_retry(
                     try:
                         result = func(*args, **kwargs)
                         duration_ms = (time.perf_counter() - start_time) * 1000
-                        _retry_metrics.record_attempt(
-                            attempt, duration_ms, success=True
-                        )
+                        _retry_metrics.record_attempt(attempt, duration_ms, success=True)
                         return result
 
                     except config.retry_on as e:
                         duration_ms = (time.perf_counter() - start_time) * 1000
-                        _retry_metrics.record_attempt(
-                            attempt, duration_ms, success=False
-                        )
+                        _retry_metrics.record_attempt(attempt, duration_ms, success=False)
 
                         last_exception = e
 
@@ -239,9 +235,7 @@ def with_db_retry(
                             raise
 
                         if attempt < config.max_attempts:
-                            logger.warning(
-                                f"Retry {attempt}/{config.max_attempts} for {func.__name__}: {e}"
-                            )
+                            logger.warning(f"Retry {attempt}/{config.max_attempts} for {func.__name__}: {e}")
 
                             # Add jitter if enabled
                             actual_delay = delay
@@ -251,13 +245,9 @@ def with_db_retry(
                                 actual_delay = delay * (0.5 + random.random())
 
                             time.sleep(actual_delay)
-                            delay = min(
-                                delay * config.exponential_base, config.max_delay
-                            )
+                            delay = min(delay * config.exponential_base, config.max_delay)
                         else:
-                            logger.error(
-                                f"All {config.max_attempts} attempts failed for {func.__name__}: {e}"
-                            )
+                            logger.error(f"All {config.max_attempts} attempts failed for {func.__name__}: {e}")
 
                 raise last_exception  # type: ignore
 
@@ -315,11 +305,11 @@ class RetryableTransaction:
     def __init__(
         self,
         connection: sqlite3.Connection,
-        config: Optional[RetryConfig] = None,
+        config: RetryConfig | None = None,
     ):
         self.connection = connection
         self.config = config or RetryConfig()
-        self.cursor: Optional[sqlite3.Cursor] = None
+        self.cursor: sqlite3.Cursor | None = None
         self._in_transaction = False
 
     def __enter__(self):
@@ -333,10 +323,8 @@ class RetryableTransaction:
             self._commit_with_retry()
         else:
             # Error - rollback
-            try:
+            with contextlib.suppress(Exception):
                 self.connection.rollback()
-            except Exception:
-                pass
 
         self._in_transaction = False
         if self.cursor:

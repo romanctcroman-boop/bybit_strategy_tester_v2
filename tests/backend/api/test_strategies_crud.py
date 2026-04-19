@@ -4,7 +4,7 @@ Unit tests that test models/schemas directly and API tests via a test-only FastA
 to avoid MCP lifespan issues.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -237,7 +237,7 @@ class TestStrategyModel:
 
         # Soft delete
         strategy.is_deleted = True
-        strategy.deleted_at = datetime.now(timezone.utc)
+        strategy.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         assert strategy.is_deleted is True
@@ -264,9 +264,7 @@ class TestStrategyModel:
     def test_query_by_type(self, db_session):
         """Test querying strategies by type"""
         # Create multiple strategies
-        for i, stype in enumerate(
-            [StrategyType.SMA_CROSSOVER, StrategyType.RSI, StrategyType.RSI]
-        ):
+        for i, stype in enumerate([StrategyType.SMA_CROSSOVER, StrategyType.RSI, StrategyType.RSI]):
             strategy = Strategy(
                 name=f"Strategy {i}",
                 strategy_type=stype,
@@ -276,18 +274,10 @@ class TestStrategyModel:
         db_session.commit()
 
         # Query by type
-        rsi_strategies = (
-            db_session.query(Strategy)
-            .filter(Strategy.strategy_type == StrategyType.RSI)
-            .all()
-        )
+        rsi_strategies = db_session.query(Strategy).filter(Strategy.strategy_type == StrategyType.RSI).all()
         assert len(rsi_strategies) == 2
 
-        sma_strategies = (
-            db_session.query(Strategy)
-            .filter(Strategy.strategy_type == StrategyType.SMA_CROSSOVER)
-            .all()
-        )
+        sma_strategies = db_session.query(Strategy).filter(Strategy.strategy_type == StrategyType.SMA_CROSSOVER).all()
         assert len(sma_strategies) == 1
 
     def test_query_active_strategies(self, db_session):
@@ -338,7 +328,7 @@ class TestStrategyModel:
         strategy.win_rate = 0.65
         strategy.total_trades = 150
         strategy.backtest_count = 5
-        strategy.last_backtest_at = datetime.now(timezone.utc)
+        strategy.last_backtest_at = datetime.now(UTC)
         db_session.commit()
 
         # Verify
@@ -808,17 +798,13 @@ class TestUpdateStrategy:
         strategy_id = create_response.json()["id"]
 
         # Update status
-        response = client.put(
-            f"/api/v1/strategies/{strategy_id}", json={"status": "active"}
-        )
+        response = client.put(f"/api/v1/strategies/{strategy_id}", json={"status": "active"})
         assert response.status_code == 200
         assert response.json()["status"] == "active"
 
     def test_update_not_found(self, client):
         """Test updating non-existent strategy"""
-        response = client.put(
-            "/api/v1/strategies/non-existent-id", json={"name": "New Name"}
-        )
+        response = client.put("/api/v1/strategies/non-existent-id", json={"name": "New Name"})
         assert response.status_code == 404
 
 
@@ -881,9 +867,7 @@ class TestDuplicateStrategy:
         original_id = create_response.json()["id"]
 
         # Duplicate with custom name
-        response = client.post(
-            f"/api/v1/strategies/{original_id}/duplicate?new_name=My Custom Copy"
-        )
+        response = client.post(f"/api/v1/strategies/{original_id}/duplicate?new_name=My Custom Copy")
         assert response.status_code == 201
         assert response.json()["name"] == "My Custom Copy"
 

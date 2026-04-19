@@ -26,8 +26,8 @@ const sessionStorageMock = {
 };
 global.sessionStorage = sessionStorageMock;
 
-// Mock fetch API
-global.fetch = vi.fn();
+// Mock fetch API (return Promise so .then() works in strategy_builder init)
+global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 
 // Mock WebSocket
 global.WebSocket = vi.fn(() => ({
@@ -57,6 +57,9 @@ global.IntersectionObserver = vi.fn(() => ({
   unobserve: vi.fn(),
   disconnect: vi.fn()
 }));
+
+// Mock alert for strategy_builder and other pages
+global.alert = vi.fn();
 
 // Clean up after each test
 afterEach(() => {

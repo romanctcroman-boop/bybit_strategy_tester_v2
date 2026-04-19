@@ -88,9 +88,7 @@ class TradingAPIUser(HttpUser):
             "quantity": round(random.uniform(0.001, 0.1), 4),
         }
 
-        with self.client.post(
-            "/api/v1/state/orders", json=order, catch_response=True
-        ) as response:
+        with self.client.post("/api/v1/state/orders", json=order, catch_response=True) as response:
             if response.status_code in (201, 400, 403, 500):
                 response.success()
             else:
@@ -232,9 +230,7 @@ class StressTestUser(HttpUser):
 # ============================================================================
 
 
-def run_quick_load_test(
-    host: str = "http://localhost:8000", duration_seconds: int = 10
-):
+def run_quick_load_test(host: str = "http://localhost:8000", duration_seconds: int = 10):
     """
     Run a quick load test programmatically.
 

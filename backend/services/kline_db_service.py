@@ -10,8 +10,22 @@ Features:
 - Uses queue-based architecture for reliability
 - Prevents database lock issues
 - Auto-reconnect on failures
+
+Architecture decision (Рек. 8 — 2026-03-04):
+    FROZEN — Variant C. This service exists and is started by the task runner,
+    but is NOT used as a write backend by KlineDataManager or any other core path.
+    KlineDataManager uses BybitAdapter._persist_klines_to_db() directly (WAL-mode
+    SQLite, raw UPSERT). This service's write-queue architecture was evaluated but
+    not adopted because the direct UPSERT path is simpler and equally reliable.
+
+    TODO: evaluate for deletion in a future cleanup pass.
+    Blockers before deletion:
+    - Confirm no external process sends requests to its socket/queue.
+    - Remove from "Start All Services" task dependency if unused.
+    See also: docs/DECISIONS.md
 """
 
+import contextlib
 import json
 import logging
 import signal
@@ -19,11 +33,11 @@ import sqlite3
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -67,13 +81,13 @@ class KlineDBService:
 
     _instance: Optional["KlineDBService"] = None
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(PROJECT_ROOT / "data.sqlite3")
         self._write_queue: Queue = Queue(maxsize=10000)
         self._read_lock = Lock()
         self._running = Event()
-        self._writer_thread: Optional[Thread] = None
-        self._connection: Optional[sqlite3.Connection] = None
+        self._writer_thread: Thread | None = None
+        self._connection: sqlite3.Connection | None = None
         self._stats = {
             "inserts": 0,
             "updates": 0,
@@ -84,7 +98,7 @@ class KlineDBService:
         logger.info(f"KlineDBService initialized with DB: {self.db_path}")
 
     @classmethod
-    def get_instance(cls, db_path: Optional[str] = None) -> "KlineDBService":
+    def get_instance(cls, db_path: str | None = None) -> "KlineDBService":
         """Get singleton instance."""
         if cls._instance is None:
             cls._instance = cls(db_path)
@@ -133,9 +147,7 @@ class KlineDBService:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
-            self._connection = sqlite3.connect(
-                self.db_path, check_same_thread=False, timeout=30.0
-            )
+            self._connection = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
             self._connection.row_factory = sqlite3.Row
             # Enable WAL mode for better concurrency
             self._connection.execute("PRAGMA journal_mode=WAL")
@@ -168,19 +180,15 @@ class KlineDBService:
         """)
 
         # Ensure unique index on (symbol, interval, open_time)
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS uix_symbol_interval_open_time
                 ON bybit_kline_audit(symbol, interval, open_time)
             """)
-        except sqlite3.OperationalError:
-            pass  # Index may already exist
 
         # Drop old index if exists
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("DROP INDEX IF EXISTS uix_symbol_open_time")
-        except sqlite3.OperationalError:
-            pass
 
         conn.commit()
         logger.info("Database schema verified")
@@ -188,7 +196,7 @@ class KlineDBService:
     def _write_loop(self):
         """Background thread for processing write queue."""
         logger.info("Write loop started")
-        batch: List[KlineRecord] = []
+        batch: list[KlineRecord] = []
         batch_size = 100
         flush_interval = 1.0  # seconds
         last_flush = time.time()
@@ -204,9 +212,7 @@ class KlineDBService:
 
                 # Flush if batch is full or timeout
                 current_time = time.time()
-                if len(batch) >= batch_size or (
-                    batch and current_time - last_flush > flush_interval
-                ):
+                if len(batch) >= batch_size or (batch and current_time - last_flush > flush_interval):
                     self._flush_batch(batch)
                     batch = []
                     last_flush = current_time
@@ -222,7 +228,7 @@ class KlineDBService:
 
         logger.info("Write loop stopped")
 
-    def _flush_batch(self, batch: List[KlineRecord]):
+    def _flush_batch(self, batch: list[KlineRecord]):
         """Flush a batch of records to database."""
         if not batch:
             return
@@ -256,9 +262,7 @@ class KlineDBService:
                         record.symbol,
                         record.interval,
                         record.open_time,
-                        record.open_time_dt.isoformat()
-                        if record.open_time_dt
-                        else None,
+                        record.open_time_dt.isoformat() if record.open_time_dt else None,
                         record.open_price,
                         record.high_price,
                         record.low_price,
@@ -289,7 +293,7 @@ class KlineDBService:
     # Public API
     # =========================================================================
 
-    def queue_klines(self, symbol: str, interval: str, candles: List[Dict]) -> int:
+    def queue_klines(self, symbol: str, interval: str, candles: list[dict]) -> int:
         """
         Queue candles for database insertion.
 
@@ -306,9 +310,7 @@ class KlineDBService:
                     symbol=symbol,
                     interval=interval,
                     open_time=open_time,
-                    open_time_dt=datetime.fromtimestamp(
-                        open_time / 1000, tz=timezone.utc
-                    ),
+                    open_time_dt=datetime.fromtimestamp(open_time / 1000, tz=UTC),
                     open_price=float(candle.get("open", 0)),
                     high_price=float(candle.get("high", 0)),
                     low_price=float(candle.get("low", 0)),
@@ -333,8 +335,8 @@ class KlineDBService:
         symbol: str,
         interval: str,
         limit: int = 500,
-        end_time: Optional[int] = None,
-    ) -> List[Dict]:
+        end_time: int | None = None,
+    ) -> list[dict]:
         """
         Get klines from database.
 
@@ -397,9 +399,7 @@ class KlineDBService:
                 self._stats["errors"] += 1
                 return []
 
-    def get_coverage(
-        self, symbol: str, interval: str
-    ) -> Optional[Tuple[int, int, int]]:
+    def get_coverage(self, symbol: str, interval: str) -> tuple[int, int, int] | None:
         """
         Get database coverage for a symbol/interval.
 
@@ -429,7 +429,7 @@ class KlineDBService:
                 logger.error(f"Coverage check error: {e}")
                 return None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get service statistics."""
         return {
             **self._stats,
@@ -437,7 +437,7 @@ class KlineDBService:
             "running": self._running.is_set(),
         }
 
-    def get_all_symbols_summary(self) -> List[Dict]:
+    def get_all_symbols_summary(self) -> list[dict]:
         """Get summary of all symbols in database."""
         with self._read_lock:
             try:

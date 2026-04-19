@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Symbols API</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .result {
+        background: #f0f0f0;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .success {
+        border-left: 4px solid green;
+      }
+      .error {
+        border-left: 4px solid red;
+      }
+      pre {
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Symbols API Test</h1>
+
+    <button onclick="testAPI()">Test API</button>
+
+    <div id="results"></div>
+
+    <script>
+      async function testAPI() {
+        const results = document.getElementById("results");
+        results.innerHTML = "<p>Testing...</p>";
+
+        try {
+          // Test 1: Direct fetch to symbols-list
+          const res1 = await fetch(
+            "/api/v1/marketdata/symbols-list?category=linear",
+          );
+          const data1 = await res1.json();
+
+          results.innerHTML += `
+                <div class="result ${res1.ok ? "success" : "error"}">
+                    <h3>Test 1: Direct API Call</h3>
+                    <p>Status: ${res1.status}</p>
+                    <p>Symbols count: ${(data1.symbols || []).length}</p>
+                    <p>First 10: ${(data1.symbols || []).slice(0, 10).join(", ")}</p>
+                </div>
+            `;
+
+          // Test 2: Check if window.location.origin works
+          const base = window.location.origin;
+          const url = `${base}/api/v1/marketdata/symbols-list?category=linear`;
+
+          results.innerHTML += `
+                <div class="result success">
+                    <h3>Test 2: URL Construction</h3>
+                    <p>Base URL: ${base}</p>
+                    <p>Full URL: ${url}</p>
+                </div>
+            `;
+
+          // Test 3: Fetch with constructed URL
+          const res3 = await fetch(url);
+          const data3 = await res3.json();
+
+          results.innerHTML += `
+                <div class="result ${res3.ok ? "success" : "error"}">
+                    <h3>Test 3: Fetch with constructed URL</h3>
+                    <p>Status: ${res3.status}</p>
+                    <p>Symbols count: ${(data3.symbols || []).length}</p>
+                </div>
+            `;
+
+          // Test 4: Check spot
+          const res4 = await fetch(
+            "/api/v1/marketdata/symbols-list?category=spot",
+          );
+          const data4 = await res4.json();
+
+          results.innerHTML += `
+                <div class="result ${res4.ok ? "success" : "error"}">
+                    <h3>Test 4: Spot symbols</h3>
+                    <p>Status: ${res4.status}</p>
+                    <p>Symbols count: ${(data4.symbols || []).length}</p>
+                    <p>First 10: ${(data4.symbols || []).slice(0, 10).join(", ")}</p>
+                </div>
+            `;
+        } catch (e) {
+          results.innerHTML += `
+                <div class="result error">
+                    <h3>Error</h3>
+                    <pre>${e.message}\n${e.stack}</pre>
+                </div>
+            `;
+        }
+      }
+
+      // Auto-run on load
+      window.onload = testAPI;
+    </script>
+  </body>
+</html>

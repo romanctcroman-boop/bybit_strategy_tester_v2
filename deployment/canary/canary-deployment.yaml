@@ -1,0 +1,62 @@
+# Canary Deployment for Bybit Strategy Tester
+#
+# Implements progressive rollout: 10% → 25% → 50% → 100%
+# with automatic rollback on error-rate threshold.
+#
+# Requires: Kubernetes cluster with Istio or nginx-ingress.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bybit-strategy-tester-canary
+  namespace: bybit
+  labels:
+    app: bybit-strategy-tester
+    track: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bybit-strategy-tester
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: bybit-strategy-tester
+        track: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/romanctcroman-boop/bybit-strategy-tester:canary
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: bybit-secrets
+            - configMapRef:
+                name: bybit-config
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi

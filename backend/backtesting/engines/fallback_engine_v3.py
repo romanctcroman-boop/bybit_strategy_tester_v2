@@ -1,5 +1,9 @@
 """
-🎯 FALLBACK ENGINE V3 - Эталонный движок с ПОЛНОЙ поддержкой пирамидинга
+🎯 FALLBACK ENGINE V3 - Движок с пирамидингом (DEPRECATED)
+
+⚠️ DEPRECATED: Используйте FallbackEngine (V4) для новых проектов.
+V4 включает все фичи V3 плюс multi-TP, ATR, trailing.
+V3 оставлен для обратной совместимости.
 
 Особенности:
 - 100% точность (эталон для сравнения)
@@ -7,30 +11,41 @@
 - Средневзвешенная цена входа для TP/SL
 - close_entries_rule: ALL, FIFO, LIFO
 - Полная поддержка Bar Magnifier (тиковые вычисления)
+- НЕТ: multi-TP, ATR SL/TP, trailing
 
 Скорость: ~1x (базовая)
+
+Миграция: from backend.backtesting.engines import FallbackEngine
 """
+
+import time
+import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any, Optional, Tuple
-import time
 
+from backend.backtesting.formulas import (
+    calc_sharpe_monthly_tv,
+    calc_sortino_monthly_tv,
+)
 from backend.backtesting.interfaces import (
-    BaseBacktestEngine,
     BacktestInput,
-    BacktestOutput,
     BacktestMetrics,
-    TradeRecord,
-    TradeDirection,
+    BacktestOutput,
+    BaseBacktestEngine,
     ExitReason,
+    TradeDirection,
+    TradeRecord,
 )
 from backend.backtesting.pyramiding import PyramidingManager
 
 
 class FallbackEngineV3(BaseBacktestEngine):
     """
-    Fallback Engine V3 - Эталонный Python-based движок с пирамидингом.
+    Fallback Engine V3 - Python-based движок с пирамидингом.
+
+    ⚠️ DEPRECATED: Используйте FallbackEngine (V4) для новых проектов.
 
     Преимущества:
     - Полная поддержка пирамидинга
@@ -41,7 +56,16 @@ class FallbackEngineV3(BaseBacktestEngine):
 
     Недостатки:
     - Медленный (Python loops)
+    - НЕТ: multi-TP, ATR, trailing
     """
+
+    def __init__(self):
+        warnings.warn(
+            "FallbackEngineV3 is deprecated. Use FallbackEngine (V4) for new projects. "
+            "V4 includes all V3 features plus multi-TP, ATR, trailing.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @property
     def name(self) -> str:
@@ -92,26 +116,10 @@ class FallbackEngineV3(BaseBacktestEngine):
             timestamps = pd.to_datetime(candles.index).to_numpy()
 
         # Сигналы
-        long_entries = (
-            input_data.long_entries
-            if input_data.long_entries is not None
-            else np.zeros(n, dtype=bool)
-        )
-        long_exits = (
-            input_data.long_exits
-            if input_data.long_exits is not None
-            else np.zeros(n, dtype=bool)
-        )
-        short_entries = (
-            input_data.short_entries
-            if input_data.short_entries is not None
-            else np.zeros(n, dtype=bool)
-        )
-        short_exits = (
-            input_data.short_exits
-            if input_data.short_exits is not None
-            else np.zeros(n, dtype=bool)
-        )
+        long_entries = input_data.long_entries if input_data.long_entries is not None else np.zeros(n, dtype=bool)
+        long_exits = input_data.long_exits if input_data.long_exits is not None else np.zeros(n, dtype=bool)
+        short_entries = input_data.short_entries if input_data.short_entries is not None else np.zeros(n, dtype=bool)
+        short_exits = input_data.short_exits if input_data.short_exits is not None else np.zeros(n, dtype=bool)
 
         # Параметры
         capital = input_data.initial_capital
@@ -136,10 +144,37 @@ class FallbackEngineV3(BaseBacktestEngine):
             close_rule=close_entries_rule,
         )
 
+        # === DCA ПАРАМЕТРЫ ===
+        dca_enabled = getattr(input_data, "dca_enabled", False)
+        dca_safety_orders = getattr(input_data, "dca_safety_orders", 0)
+        dca_price_deviation = getattr(input_data, "dca_price_deviation", 0.01)
+        dca_step_scale = getattr(input_data, "dca_step_scale", 1.4)
+        dca_volume_scale = getattr(input_data, "dca_volume_scale", 1.0)
+        dca_base_order_size = getattr(input_data, "dca_base_order_size", 0.1)
+        dca_safety_order_size = getattr(input_data, "dca_safety_order_size", 0.1)
+
+        # Рассчитать уровни DCA (SO1 at -1%, SO2 at -1% - 1.4% = -2.4%, etc.)
+        dca_levels: list[float] = []  # Cumulative deviation levels
+        dca_volumes: list[float] = []  # Volume for each SO
+        if dca_enabled and dca_safety_orders > 0:
+            cumulative_deviation = 0.0
+            current_deviation = dca_price_deviation
+            current_volume = dca_safety_order_size
+            for _ in range(dca_safety_orders):
+                cumulative_deviation += current_deviation
+                dca_levels.append(cumulative_deviation)
+                dca_volumes.append(current_volume)
+                current_deviation *= dca_step_scale
+                current_volume *= dca_volume_scale
+
+        # DCA состояние (pending safety orders)
+        # Структура: {"direction": "long"/"short", "base_price": float, "filled": [bool, ...]}
+        dca_state: dict | None = None
+
         # Состояние
         cash = capital
         equity_curve = [capital]
-        trades: List[TradeRecord] = []
+        trades: list[TradeRecord] = []
 
         # Pending exits
         pending_long_exit = False
@@ -149,12 +184,8 @@ class FallbackEngineV3(BaseBacktestEngine):
         pending_short_exit_reason = None
         pending_short_exit_price = 0.0
 
-        # Bar Magnifier индекс
-        bar_magnifier_index = (
-            self._build_bar_magnifier_index(candles, candles_1m)
-            if use_bar_magnifier
-            else None
-        )
+        # Bar Magnifier индекс (reserved for intrabar simulation)
+        bar_magnifier_index = self._build_bar_magnifier_index(candles, candles_1m) if use_bar_magnifier else None
 
         # === ОСНОВНОЙ ЦИКЛ ===
         for i in range(1, n):
@@ -245,14 +276,8 @@ class FallbackEngineV3(BaseBacktestEngine):
             # === ПРОВЕРКА SL/TP ДЛЯ LONG ===
             if pyramid_mgr.has_position("long") and not pending_long_exit:
                 avg_entry = pyramid_mgr.get_avg_entry_price("long")
-                tp_price = (
-                    pyramid_mgr.get_tp_price("long", take_profit)
-                    if take_profit
-                    else None
-                )
-                sl_price = (
-                    pyramid_mgr.get_sl_price("long", stop_loss) if stop_loss else None
-                )
+                tp_price = pyramid_mgr.get_tp_price("long", take_profit) if take_profit else None
+                sl_price = pyramid_mgr.get_sl_price("long", stop_loss) if stop_loss else None
 
                 exit_reason = self._check_exit_conditions_simple(
                     is_long=True,
@@ -277,14 +302,8 @@ class FallbackEngineV3(BaseBacktestEngine):
             # === ПРОВЕРКА SL/TP ДЛЯ SHORT ===
             if pyramid_mgr.has_position("short") and not pending_short_exit:
                 avg_entry = pyramid_mgr.get_avg_entry_price("short")
-                tp_price = (
-                    pyramid_mgr.get_tp_price("short", take_profit)
-                    if take_profit
-                    else None
-                )
-                sl_price = (
-                    pyramid_mgr.get_sl_price("short", stop_loss) if stop_loss else None
-                )
+                tp_price = pyramid_mgr.get_tp_price("short", take_profit) if take_profit else None
+                sl_price = pyramid_mgr.get_sl_price("short", stop_loss) if stop_loss else None
 
                 exit_reason = self._check_exit_conditions_simple(
                     is_long=False,
@@ -307,21 +326,13 @@ class FallbackEngineV3(BaseBacktestEngine):
                         pending_short_exit_price = close_price
 
             # === СИГНАЛ ВЫХОДА LONG ===
-            if (
-                long_exits[i]
-                and pyramid_mgr.has_position("long")
-                and not pending_long_exit
-            ):
+            if long_exits[i] and pyramid_mgr.has_position("long") and not pending_long_exit:
                 pending_long_exit = True
                 pending_long_exit_reason = ExitReason.SIGNAL
                 pending_long_exit_price = close_price
 
             # === СИГНАЛ ВЫХОДА SHORT ===
-            if (
-                short_exits[i]
-                and pyramid_mgr.has_position("short")
-                and not pending_short_exit
-            ):
+            if short_exits[i] and pyramid_mgr.has_position("short") and not pending_short_exit:
                 pending_short_exit = True
                 pending_short_exit_reason = ExitReason.SIGNAL
                 pending_short_exit_price = close_price
@@ -329,6 +340,7 @@ class FallbackEngineV3(BaseBacktestEngine):
             # === ВХОД В LONG (с пирамидингом) ===
             # Условия: есть сигнал, разрешённое направление, не последний бар, можно добавить (пирамидинг)
             # Нет противоположной позиции (нельзя держать long и short одновременно)
+            # Note: pyramid_mgr.can_add_entry() already checks if position is open
             can_enter_long = (
                 long_entries[i]
                 and direction in (TradeDirection.LONG, TradeDirection.BOTH)
@@ -340,10 +352,7 @@ class FallbackEngineV3(BaseBacktestEngine):
             if can_enter_long:
                 entry_price = open_prices[i + 1]
 
-                if use_fixed_amount and fixed_amount > 0:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount and fixed_amount > 0 else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -365,7 +374,16 @@ class FallbackEngineV3(BaseBacktestEngine):
                         entry_time=entry_time,
                     )
 
+                    # DCA: Инициализация состояния при базовом ордере
+                    if dca_enabled and dca_levels:
+                        dca_state = {
+                            "direction": "long",
+                            "base_price": entry_price,
+                            "filled": [False] * len(dca_levels),
+                        }
+
             # === ВХОД В SHORT (с пирамидингом) ===
+            # Note: pyramid_mgr.can_add_entry() already checks if position is open
             can_enter_short = (
                 short_entries[i]
                 and direction in (TradeDirection.SHORT, TradeDirection.BOTH)
@@ -379,10 +397,7 @@ class FallbackEngineV3(BaseBacktestEngine):
             if can_enter_short:
                 entry_price = open_prices[i + 1]
 
-                if use_fixed_amount and fixed_amount > 0:
-                    allocated = min(fixed_amount, cash)
-                else:
-                    allocated = cash * position_size
+                allocated = min(fixed_amount, cash) if use_fixed_amount and fixed_amount > 0 else cash * position_size
 
                 if allocated >= 1.0:
                     notional = allocated * leverage
@@ -404,28 +419,141 @@ class FallbackEngineV3(BaseBacktestEngine):
                         entry_time=entry_time,
                     )
 
+                    # DCA: Инициализация состояния при базовом ордере
+                    if dca_enabled and dca_levels:
+                        dca_state = {
+                            "direction": "short",
+                            "base_price": entry_price,
+                            "filled": [False] * len(dca_levels),
+                        }
+
+            # === DCA: ПРОВЕРКА SAFETY ORDERS ===
+            # Если DCA включен и есть открытая позиция - проверяем уровни
+            if dca_enabled and dca_levels:
+                # === DCA LONG: проверяем падение цены до SO уровней ===
+                if pyramid_mgr.has_position("long") and not pending_long_exit:
+                    # Инициализируем DCA состояние при первом входе
+                    if dca_state is None or dca_state.get("direction") != "long":
+                        base_price = pyramid_mgr.get_avg_entry_price("long")
+                        dca_state = {
+                            "direction": "long",
+                            "base_price": base_price,
+                            "filled": [False] * len(dca_levels),
+                        }
+
+                    # Проверяем каждый SO уровень
+                    base_price = dca_state["base_price"]
+                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes, strict=False)):
+                        if dca_state["filled"][so_idx]:
+                            continue  # Уже заполнен
+
+                        # SO trigger price (для LONG - цена падает)
+                        so_trigger_price = base_price * (1 - deviation)
+
+                        # Проверяем достигла ли low цена уровня SO
+                        if low_price <= so_trigger_price and pyramid_mgr.can_add_entry("long"):
+                            # Размер SO
+                            if use_fixed_amount and fixed_amount > 0:
+                                so_allocated = min(fixed_amount * so_volume, cash)
+                            else:
+                                so_allocated = cash * so_volume
+
+                            if so_allocated >= 1.0:
+                                so_notional = so_allocated * leverage
+                                so_size = so_notional / so_trigger_price
+
+                                cash -= so_allocated
+
+                                so_entry_time = (
+                                    pd.Timestamp(timestamps[i]).to_pydatetime()
+                                    if hasattr(timestamps[i], "to_pydatetime")
+                                    else timestamps[i]
+                                )
+                                pyramid_mgr.add_entry(
+                                    direction="long",
+                                    entry_price=so_trigger_price,
+                                    size=so_size,
+                                    allocated_capital=so_allocated,
+                                    entry_bar_idx=i,
+                                    entry_time=so_entry_time,
+                                )
+                                dca_state["filled"][so_idx] = True
+
+                # === DCA SHORT: проверяем рост цены до SO уровней ===
+                elif pyramid_mgr.has_position("short") and not pending_short_exit:
+                    # Инициализируем DCA состояние при первом входе
+                    if dca_state is None or dca_state.get("direction") != "short":
+                        base_price = pyramid_mgr.get_avg_entry_price("short")
+                        dca_state = {
+                            "direction": "short",
+                            "base_price": base_price,
+                            "filled": [False] * len(dca_levels),
+                        }
+
+                    # Проверяем каждый SO уровень
+                    base_price = dca_state["base_price"]
+                    for so_idx, (deviation, so_volume) in enumerate(zip(dca_levels, dca_volumes, strict=False)):
+                        if dca_state["filled"][so_idx]:
+                            continue  # Уже заполнен
+
+                        # SO trigger price (для SHORT - цена растёт)
+                        so_trigger_price = base_price * (1 + deviation)
+
+                        # Проверяем достигла ли high цена уровня SO
+                        if high_price >= so_trigger_price and pyramid_mgr.can_add_entry("short"):
+                            # Размер SO
+                            if use_fixed_amount and fixed_amount > 0:
+                                so_allocated = min(fixed_amount * so_volume, cash)
+                            else:
+                                so_allocated = cash * so_volume
+
+                            if so_allocated >= 1.0:
+                                so_notional = so_allocated * leverage
+                                so_size = so_notional / so_trigger_price
+
+                                cash -= so_allocated
+
+                                so_entry_time = (
+                                    pd.Timestamp(timestamps[i]).to_pydatetime()
+                                    if hasattr(timestamps[i], "to_pydatetime")
+                                    else timestamps[i]
+                                )
+                                pyramid_mgr.add_entry(
+                                    direction="short",
+                                    entry_price=so_trigger_price,
+                                    size=so_size,
+                                    allocated_capital=so_allocated,
+                                    entry_bar_idx=i,
+                                    entry_time=so_entry_time,
+                                )
+                                dca_state["filled"][so_idx] = True
+
+                # Сброс DCA состояния при закрытии позиции
+                if not pyramid_mgr.has_position("long") and not pyramid_mgr.has_position("short"):
+                    dca_state = None
+
             # === ОБНОВЛЕНИЕ EQUITY ===
+            # V2 equity formula: cash + unrealized_pnl + size * entry_price
+            # size * entry_price = notional = allocated * leverage
             equity = cash
             if pyramid_mgr.has_position("long"):
                 total_size = pyramid_mgr.get_total_size("long")
                 avg_entry = pyramid_mgr.get_avg_entry_price("long")
-                total_alloc = pyramid_mgr.get_total_allocated("long")
+                notional = total_size * avg_entry  # This is allocated * leverage
                 unrealized_pnl = (close_price - avg_entry) * total_size
-                equity += total_alloc + unrealized_pnl
+                equity += notional + unrealized_pnl
             if pyramid_mgr.has_position("short"):
                 total_size = pyramid_mgr.get_total_size("short")
                 avg_entry = pyramid_mgr.get_avg_entry_price("short")
-                total_alloc = pyramid_mgr.get_total_allocated("short")
+                notional = total_size * avg_entry  # This is allocated * leverage
                 unrealized_pnl = (avg_entry - close_price) * total_size
-                equity += total_alloc + unrealized_pnl
+                equity += notional + unrealized_pnl
 
             equity_curve.append(equity)
 
         # === ЗАКРЫТИЕ ОТКРЫТЫХ ПОЗИЦИЙ (END_OF_DATA) ===
         final_time = (
-            pd.Timestamp(timestamps[-1]).to_pydatetime()
-            if hasattr(timestamps[-1], "to_pydatetime")
-            else timestamps[-1]
+            pd.Timestamp(timestamps[-1]).to_pydatetime() if hasattr(timestamps[-1], "to_pydatetime") else timestamps[-1]
         )
 
         if pyramid_mgr.has_position("long"):
@@ -487,7 +615,7 @@ class FallbackEngineV3(BaseBacktestEngine):
                 )
 
         # === РАСЧЁТ МЕТРИК ===
-        metrics = self._calculate_metrics(trades, equity_curve, capital)
+        metrics = self._calculate_metrics(trades, equity_curve, capital, candles_index=candles.index)
 
         execution_time = time.time() - start_time
 
@@ -512,7 +640,7 @@ class FallbackEngineV3(BaseBacktestEngine):
         open_price: float,
         stop_loss: float,
         take_profit: float,
-    ) -> Optional[ExitReason]:
+    ) -> ExitReason | None:
         """Simple SL/TP check using OHLC heuristic"""
         if is_long:
             sl_price = entry_price * (1 - stop_loss) if stop_loss else 0
@@ -548,9 +676,7 @@ class FallbackEngineV3(BaseBacktestEngine):
 
         return None
 
-    def _build_bar_magnifier_index(
-        self, candles: pd.DataFrame, candles_1m: pd.DataFrame
-    ) -> Optional[Dict]:
+    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> dict | None:
         """Build index for Bar Magnifier"""
         if candles_1m is None or len(candles_1m) == 0:
             return None
@@ -558,9 +684,10 @@ class FallbackEngineV3(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
-        equity_curve: List[float],
+        trades: list[TradeRecord],
+        equity_curve: list[float],
         initial_capital: float,
+        candles_index=None,
     ) -> BacktestMetrics:
         """Calculate backtest metrics"""
         metrics = BacktestMetrics()
@@ -571,7 +698,8 @@ class FallbackEngineV3(BaseBacktestEngine):
         # Basic metrics
         pnls = [t.pnl for t in trades]
         metrics.net_profit = sum(pnls)
-        metrics.total_return = (metrics.net_profit / initial_capital) * 100
+        # Safe division for total return
+        metrics.total_return = (metrics.net_profit / initial_capital) * 100 if initial_capital > 0 else 0.0
 
         metrics.total_trades = len(trades)
         metrics.winning_trades = sum(1 for t in trades if t.pnl > 0)
@@ -624,26 +752,25 @@ class FallbackEngineV3(BaseBacktestEngine):
             metrics.short_win_rate = metrics.short_winning_trades / metrics.short_trades
             metrics.short_profit = sum(t.pnl for t in short_trades)
 
-        # Sharpe ratio (simplified)
-        if len(pnls) > 1:
-            returns = np.array(pnls) / initial_capital
-            if np.std(returns) > 0:
-                metrics.sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252)
+        # Sharpe / Sortino (TradingView monthly formula — trade PnL bucketed by entry month)
+        equity_arr_metrics = np.array(equity_curve)
+        metrics.sharpe_ratio = calc_sharpe_monthly_tv(equity_arr_metrics, candles_index, initial_capital, trades=trades)
+        metrics.sortino_ratio = calc_sortino_monthly_tv(
+            equity_arr_metrics, candles_index, initial_capital, trades=trades
+        )
 
         # Expectancy
         if metrics.total_trades > 0:
-            metrics.expectancy = (metrics.win_rate * metrics.avg_win) + (
-                (1 - metrics.win_rate) * metrics.avg_loss
-            )
+            metrics.expectancy = (metrics.win_rate * metrics.avg_win) + ((1 - metrics.win_rate) * metrics.avg_loss)
 
         return metrics
 
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """Optimization not implemented for V3"""
         return []

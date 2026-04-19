@@ -8,8 +8,8 @@ The file also includes minimal Alembic revision identifiers so Alembic's script 
 the `versions/` directory during `alembic upgrade` runs. The shim delegates the real logic to the template module.
 """
 
-import importlib.util  # noqa: E402
-from pathlib import Path  # noqa: E402
+import importlib.util
+from pathlib import Path
 
 # Alembic revision identifiers (shim values; real migration logic lives in the template module)
 revision = "0001_convert_timestamps_to_timestamptz"
@@ -23,7 +23,7 @@ spec = importlib.util.spec_from_file_location("mig_src", str(_src))
 _mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(_mod)
 
-upgrade_sqls = getattr(_mod, "upgrade_sqls")
-downgrade_sqls = getattr(_mod, "downgrade_sqls")
+upgrade_sqls = _mod.upgrade_sqls
+downgrade_sqls = _mod.downgrade_sqls
 
-__all__ = ["upgrade_sqls", "downgrade_sqls"]
+__all__ = ["downgrade_sqls", "upgrade_sqls"]

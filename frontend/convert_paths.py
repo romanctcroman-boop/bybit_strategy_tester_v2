@@ -13,7 +13,7 @@ def convert_paths_in_file(filepath):
     """Convert /frontend/ paths to relative ./ paths"""
     print(f"📄 Processing: {filepath.name}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
 
     original = content

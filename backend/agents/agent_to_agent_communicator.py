@@ -1,10 +1,10 @@
 """Agent-to-agent communication orchestrator.
 
-This module wires DeepSeek, Perplexity, and Copilot style agents together so
-that they can exchange structured messages, run multi-turn conversations, build
-parallel consensus, and iterate toward better answers. It intentionally mirrors
-what the original implementation provided (see WEEK2_DAY3_AGENT_TO_AGENT_COMPLETE)
-so that the extensive pytest suite in
+This module wires Claude, Perplexity, and Copilot style agents together
+so that they can exchange structured messages, run multi-turn conversations,
+build parallel consensus, and iterate toward better answers. It intentionally
+mirrors what the original implementation provided (see
+WEEK2_DAY3_AGENT_TO_AGENT_COMPLETE) so that the extensive pytest suite in
 ``tests/backend/test_agent_to_agent_communicator.py`` keeps passing.
 """
 
@@ -14,10 +14,11 @@ import asyncio
 import re
 import shutil
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 from redis import asyncio as redis
@@ -29,6 +30,7 @@ from backend.agents.interface import (
     AgentResponse,
     get_agent_interface,
 )
+from backend.agents.llm.base_client import LLMClientFactory, LLMConfig, LLMMessage, LLMProvider
 from backend.agents.models import AgentType, CommunicationPattern, MessageType
 from backend.agents.unified_agent_interface import AgentChannel
 
@@ -48,20 +50,20 @@ class AgentMessage:
     message_type: MessageType
     content: str
     conversation_id: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     iteration: int = 1
     max_iterations: int = 5
     confidence_score: float = 0.0
-    timestamp: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    timestamp: str | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if self.metadata is None:
             self.metadata = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "from_agent": self.from_agent.value,
@@ -78,7 +80,7 @@ class AgentMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentMessage":
+    def from_dict(cls, data: dict[str, Any]) -> AgentMessage:
         return cls(
             message_id=data["message_id"],
             from_agent=AgentType(data["from_agent"]),
@@ -115,13 +117,13 @@ class AgentToAgentCommunicator:
     ):
         self.agent_interface = get_agent_interface()
         self.redis_url = redis_url
-        self.redis_client: Optional[redis.Redis] = None
-        self.message_handlers: Dict[AgentType, MessageHandler] = {
-            AgentType.DEEPSEEK: self._handle_deepseek_message,
+        self.redis_client: redis.Redis | None = None
+        self.message_handlers: dict[AgentType, MessageHandler] = {
             AgentType.PERPLEXITY: self._handle_perplexity_message,
+            AgentType.CLAUDE: self._handle_claude_message,
             AgentType.COPILOT: self._handle_copilot_message,
         }
-        self.conversation_cache: Dict[str, List[AgentMessage]] = {}
+        self.conversation_cache: dict[str, list[AgentMessage]] = {}
         self.max_conversation_age = timedelta(minutes=30)
         self.memory_manager = memory_manager or self._create_memory_manager()
 
@@ -143,11 +145,11 @@ class AgentToAgentCommunicator:
             logger.debug(f"Telemetry memory manager unavailable: {exc}")
             return None
 
-    def _record_telemetry(self, event: str, payload: Dict[str, Any]) -> None:
+    def _record_telemetry(self, event: str, payload: dict[str, Any]) -> None:
         if not self.memory_manager:
             return
         try:
-            self.memory_manager.record_event(event, payload)
+            self.memory_manager.store_message(event, payload)
         except Exception as exc:  # pragma: no cover - logging best effort
             logger.debug(f"Telemetry write skipped ({event}): {exc}")
 
@@ -155,9 +157,7 @@ class AgentToAgentCommunicator:
         await self._check_conversation_loop(message)
         handler = self.message_handlers.get(message.to_agent)
         if not handler:
-            error_response = self._create_error_message(
-                message, f"No handler for agent {message.to_agent.value}"
-            )
+            error_response = self._create_error_message(message, f"No handler for agent {message.to_agent.value}")
             self._record_telemetry(
                 "communicator_route",
                 {
@@ -215,43 +215,10 @@ class AgentToAgentCommunicator:
         ttl = int(self.max_conversation_age.total_seconds())
         await redis_client.setex(key, ttl, message.from_agent.value)
 
-    async def _handle_deepseek_message(self, message: AgentMessage) -> AgentMessage:
-        from_mcp_tool = message.context.get("from_mcp_tool", False)
-        use_file_access = message.context.get("use_file_access", False)
-        force_direct = FORCE_DIRECT_AGENT_API or use_file_access or from_mcp_tool
-        preferred_channel = (
-            AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
-        )
-        logger.info(
-            "🔀 DeepSeek routing via {} (use_file_access={}, from_mcp={})",
-            preferred_channel.value,
-            use_file_access,
-            from_mcp_tool,
-        )
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK,
-            task_type=message.context.get("task_type", "analyze"),
-            prompt=message.content,
-            code=message.context.get("code"),
-            context=message.context,
-        )
-        agent_response = await self.agent_interface.send_request(
-            request,
-            preferred_channel=preferred_channel,
-        )
-        return self._build_agent_reply(
-            original_message=message,
-            agent_type=AgentType.DEEPSEEK,
-            agent_response=agent_response,
-            success_confidence=0.9,
-        )
-
     async def _handle_perplexity_message(self, message: AgentMessage) -> AgentMessage:
         from_mcp_tool = message.context.get("from_mcp_tool", False)
         force_direct = FORCE_DIRECT_AGENT_API or from_mcp_tool
-        preferred_channel = (
-            AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
-        )
+        preferred_channel = AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
         logger.info(
             "🔀 Perplexity routing via {} (from_mcp={})",
             preferred_channel.value,
@@ -275,21 +242,137 @@ class AgentToAgentCommunicator:
             success_confidence=0.85,
         )
 
+    async def _handle_claude_message(self, message: AgentMessage) -> AgentMessage:
+        """Route a message to Claude (Anthropic) via ClaudeClient.
+
+        Claude uses the Anthropic Messages API which is NOT OpenAI-compatible,
+        so it bypasses unified_agent_interface and calls ClaudeClient directly.
+        Claude acts as a synthesis critic and strategic reasoner in consensus rounds.
+
+        Fix 2026-04-17: key is now obtained via APIKeyPoolManager (health/rotation/
+        cooldown) instead of direct ``os.environ`` lookup. Errors mark the key
+        (rate-limit / auth / generic) so circuit-breaker logic works for Claude too.
+        """
+        logger.info("🔀 Claude routing via ClaudeClient (Anthropic Messages API)")
+
+        # Resolve API key through the pool (adds health tracking + rotation)
+        api_key: str | None = None
+        pool_key = None
+        try:
+            from backend.agents.api_key_pool import APIKeyPoolManager
+            from backend.agents.models import AgentType as _AgentType
+            from backend.security.key_manager import KeyManager
+
+            pool = APIKeyPoolManager()
+            pool_key = await pool.get_active_key(_AgentType.CLAUDE)
+            if pool_key is not None:
+                key_name = getattr(pool_key, "key_name", "ANTHROPIC_API_KEY")
+                api_key = KeyManager().get_decrypted_key(key_name)
+        except Exception as exc:
+            logger.warning(f"Claude key pool lookup failed, falling back to env: {exc}")
+
+        # Fallback: env var (keeps backward compat in dev without key manager)
+        if not api_key:
+            import os as _os
+
+            api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
+
+        if not api_key:
+            return AgentMessage(
+                message_id=str(uuid.uuid4()),
+                from_agent=AgentType.CLAUDE,
+                to_agent=message.from_agent,
+                message_type=MessageType.RESPONSE,
+                content="ANTHROPIC_API_KEY not configured — Claude unavailable.",
+                context=message.context,
+                conversation_id=message.conversation_id,
+                iteration=message.iteration + 1,
+                confidence_score=0.0,
+                metadata={"status": "no_key"},
+            )
+
+        config = LLMConfig(
+            provider=LLMProvider.ANTHROPIC,
+            api_key=api_key,
+            model="claude-haiku-4-5-20251001",
+            temperature=0.7,
+            max_tokens=4096,
+        )
+        client = LLMClientFactory.create(config)
+        try:
+            messages = [LLMMessage(role="user", content=message.content)]
+            response = await client.chat(messages)
+            response_text = response.content
+            confidence = 0.90
+            metadata: dict[str, Any] = {"status": "ok", "model": "claude-haiku-4-5-20251001"}
+            # Record success on the pool key so cooldown/error counters update
+            if pool_key is not None:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    APIKeyPoolManager().mark_success(pool_key)
+                except Exception:  # best-effort telemetry
+                    pass
+        except Exception as exc:
+            logger.warning(f"⚠️ Claude API error: {exc}")
+            response_text = f"Claude unavailable: {exc}"
+            confidence = 0.0
+            metadata = {"status": "error", "error": str(exc)}
+            # Classify error on the pool key
+            if pool_key is not None:
+                try:
+                    from backend.agents.api_key_pool import APIKeyPoolManager
+
+                    pool_mgr = APIKeyPoolManager()
+                    err_str = str(exc).lower()
+                    if "429" in err_str or "rate" in err_str:
+                        pool_mgr.mark_rate_limit(pool_key)
+                    elif "401" in err_str or "403" in err_str or "auth" in err_str:
+                        pool_mgr.mark_auth_error(pool_key)
+                    else:
+                        pool_mgr.mark_error(pool_key)
+                except Exception as pool_update_err:
+                    # Pool telemetry is best-effort; don't mask original LLM error
+                    logger.debug(f"[claude] pool telemetry update failed: {pool_update_err}")
+
+        return AgentMessage(
+            message_id=str(uuid.uuid4()),
+            from_agent=AgentType.CLAUDE,
+            to_agent=message.from_agent,
+            message_type=MessageType.RESPONSE,
+            content=response_text,
+            context=message.context,
+            conversation_id=message.conversation_id,
+            iteration=message.iteration + 1,
+            confidence_score=confidence,
+            metadata=metadata,
+        )
+
     async def _handle_copilot_message(self, message: AgentMessage) -> AgentMessage:
-        placeholder = (
-            "Copilot placeholder — VS Code extension bridge pending integration."
+        """Handle Copilot messages - intentionally disabled.
+
+        The VS Code extension bridge is not yet integrated.  This handler
+        returns a well-structured response so callers always get a valid
+        ``AgentMessage`` rather than a cryptic error.
+        """
+        logger.warning(
+            "Copilot handler invoked but VS Code bridge is not integrated - "
+            "returning disabled response (conversation_id={})",
+            message.conversation_id,
         )
         return AgentMessage(
             message_id=str(uuid.uuid4()),
             from_agent=AgentType.COPILOT,
             to_agent=message.from_agent,
             message_type=MessageType.RESPONSE,
-            content=placeholder,
+            content=(
+                "Copilot integration is intentionally disabled. The VS Code extension bridge is pending implementation."
+            ),
             context=message.context,
             conversation_id=message.conversation_id,
             iteration=message.iteration + 1,
-            confidence_score=0.5,
-            metadata={"status": "placeholder_response"},
+            confidence_score=0.0,
+            metadata={"status": "disabled", "reason": "vscode_bridge_pending"},
         )
 
     def _build_agent_reply(
@@ -332,7 +415,7 @@ class AgentToAgentCommunicator:
         initial_message: AgentMessage,
         max_turns: int = 10,
         pattern: CommunicationPattern = CommunicationPattern.SEQUENTIAL,
-    ) -> List[AgentMessage]:
+    ) -> list[AgentMessage]:
         history = [initial_message]
         current_message = initial_message
 
@@ -346,18 +429,16 @@ class AgentToAgentCommunicator:
             if response.iteration >= response.max_iterations:
                 break
 
-            current_message = await self._determine_next_message(
-                response, pattern, history
-            )
+            current_message = await self._determine_next_message(response, pattern, history)
 
         return history
 
     async def parallel_consensus(
         self,
         question: str,
-        agents: List[AgentType],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        agents: list[AgentType],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         conversation_id = str(uuid.uuid4())
         context = context or {}
 
@@ -384,9 +465,7 @@ class AgentToAgentCommunicator:
             }
             for resp in responses
         ]
-        combined_answer = "\n\n".join(
-            f"{resp.from_agent.value}: {resp.content}" for resp in responses
-        )
+        combined_answer = "\n\n".join(f"{resp.from_agent.value}: {resp.content}" for resp in responses)
 
         return {
             "question": question,
@@ -403,10 +482,10 @@ class AgentToAgentCommunicator:
         improver_agent: AgentType,
         max_iterations: int = 5,
         min_confidence: float = 0.8,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         conversation_id = str(uuid.uuid4())
         current_content = initial_task
-        iteration_log: List[Dict[str, Any]] = []
+        iteration_log: list[dict[str, Any]] = []
         final_confidence = 0.0
 
         for iteration in range(1, max_iterations + 1):
@@ -467,7 +546,7 @@ class AgentToAgentCommunicator:
         target_file: str | None = None,
         cycle: int | None = None,
         timeout_seconds: int = 300,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run Phase 6-style validation via both agents with telemetry hooks."""
 
         request_context = {
@@ -476,7 +555,7 @@ class AgentToAgentCommunicator:
         }
 
         ds_request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK,
+            agent_type=AgentType.CLAUDE,
             task_type="review",
             prompt=validation_prompt,
             code=(implementation_content or "")[:5000],
@@ -490,38 +569,28 @@ class AgentToAgentCommunicator:
             context=request_context,
         )
 
-        ds_response = await self._run_validation_request(ds_request, AgentType.DEEPSEEK)
-        pp_response = await self._run_validation_request(
-            pp_request, AgentType.PERPLEXITY
-        )
+        claude_response = await self._run_validation_request(ds_request, AgentType.CLAUDE)
+        pp_response = await self._run_validation_request(pp_request, AgentType.PERPLEXITY)
 
-        ds_summary = self._summarize_validation_response(
-            AgentType.DEEPSEEK, ds_response
-        )
-        pp_summary = self._summarize_validation_response(
-            AgentType.PERPLEXITY, pp_response
-        )
+        claude_summary = self._summarize_validation_response(AgentType.CLAUDE, claude_response)
+        pp_summary = self._summarize_validation_response(AgentType.PERPLEXITY, pp_response)
 
         validated = (
-            ds_summary["verdict"] == "VALIDATED"
+            claude_summary["verdict"] == "VALIDATED"
             and pp_summary["verdict"] == "VALIDATED"
-            and not ds_summary["critical_issues"]
+            and not claude_summary["critical_issues"]
             and not pp_summary["critical_issues"]
         )
 
         rolled_back = False
-        if (
-            (ds_summary["critical_issues"] or pp_summary["critical_issues"])
-            and backup_file
-            and target_file
-        ):
+        if (claude_summary["critical_issues"] or pp_summary["critical_issues"]) and backup_file and target_file:
             rolled_back = await self._rollback_to_backup(backup_file, target_file)
 
         payload = {
             "success": True,
             "validated": validated,
             "rolled_back": rolled_back,
-            "deepseek_validation": ds_summary,
+            "claude_validation": claude_summary,
             "perplexity_validation": pp_summary,
         }
 
@@ -531,7 +600,7 @@ class AgentToAgentCommunicator:
                 "cycle": cycle,
                 "validated": validated,
                 "rolled_back": rolled_back,
-                "deepseek": ds_summary,
+                "claude": claude_summary,
                 "perplexity": pp_summary,
                 "backup_available": bool(backup_file),
             },
@@ -539,9 +608,7 @@ class AgentToAgentCommunicator:
 
         return payload
 
-    async def _run_validation_request(
-        self, request: AgentRequest, agent_type: AgentType
-    ) -> AgentResponse:
+    async def _run_validation_request(self, request: AgentRequest, agent_type: AgentType) -> AgentResponse:
         try:
             return await self.agent_interface.send_request(request)
         except Exception as exc:  # pragma: no cover - network/agent failure
@@ -553,14 +620,10 @@ class AgentToAgentCommunicator:
                 error=str(exc),
             )
 
-    def _summarize_validation_response(
-        self, agent_type: AgentType, response: AgentResponse
-    ) -> Dict[str, Any]:
+    def _summarize_validation_response(self, agent_type: AgentType, response: AgentResponse) -> dict[str, Any]:
         text = (response.content or "").strip()
         text_lower = text.lower()
-        validated = response.success and any(
-            keyword in text_lower for keyword in self._VALIDATION_KEYWORDS
-        )
+        validated = response.success and any(keyword in text_lower for keyword in self._VALIDATION_KEYWORDS)
         critical = any(keyword in text_lower for keyword in self._CRITICAL_KEYWORDS)
         verdict = "VALIDATED" if validated and not critical else "NOT_VALIDATED"
         return {
@@ -592,9 +655,7 @@ class AgentToAgentCommunicator:
             logger.error(f"Rollback failed: {exc}")
             return False
 
-    async def _should_end_conversation(
-        self, response: AgentMessage, history: List[AgentMessage]
-    ) -> bool:
+    async def _should_end_conversation(self, response: AgentMessage, history: list[AgentMessage]) -> bool:
         if response.message_type in (MessageType.COMPLETION, MessageType.ERROR):
             return True
         if response.iteration >= response.max_iterations:
@@ -610,23 +671,22 @@ class AgentToAgentCommunicator:
         self,
         response: AgentMessage,
         pattern: CommunicationPattern,
-        history: List[AgentMessage],
+        history: list[AgentMessage],
     ) -> AgentMessage:
         next_iteration = response.iteration + 1
         next_agent = response.from_agent
 
-        if pattern == CommunicationPattern.COLLABORATIVE:
-            next_agent = (
-                AgentType.PERPLEXITY
-                if response.from_agent == AgentType.DEEPSEEK
-                else AgentType.DEEPSEEK
-            )
-        elif pattern == CommunicationPattern.SEQUENTIAL:
-            next_agent = (
-                AgentType.DEEPSEEK
-                if response.from_agent != AgentType.DEEPSEEK
-                else AgentType.PERPLEXITY
-            )
+        # Round-robin order for collaborative / sequential patterns
+        _ROTATION = {
+            AgentType.CLAUDE: AgentType.PERPLEXITY,
+            AgentType.PERPLEXITY: AgentType.CLAUDE,
+        }
+
+        if pattern in (
+            CommunicationPattern.COLLABORATIVE,
+            CommunicationPattern.SEQUENTIAL,
+        ):
+            next_agent = _ROTATION.get(response.from_agent, AgentType.CLAUDE)
         else:
             return response
 
@@ -642,9 +702,7 @@ class AgentToAgentCommunicator:
             max_iterations=response.max_iterations,
         )
 
-    async def _calculate_consensus_confidence(
-        self, responses: List[AgentMessage]
-    ) -> float:
+    async def _calculate_consensus_confidence(self, responses: list[AgentMessage]) -> float:
         if not responses:
             return 0.0
         scores = [msg.confidence_score for msg in responses if msg.confidence_score]
@@ -693,7 +751,7 @@ class AgentToAgentCommunicator:
             await self.redis_client.close()
 
 
-_communicator_instance: Optional[AgentToAgentCommunicator] = None
+_communicator_instance: AgentToAgentCommunicator | None = None
 
 
 def get_communicator() -> AgentToAgentCommunicator:
@@ -708,8 +766,8 @@ AgentCommunicator = AgentToAgentCommunicator
 
 
 __all__ = [
-    "AgentToAgentCommunicator",
     "AgentCommunicator",
-    "get_communicator",
     "AgentMessage",
+    "AgentToAgentCommunicator",
+    "get_communicator",
 ]

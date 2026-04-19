@@ -13,10 +13,11 @@
 import hashlib
 import json
 import pickle
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Tuple
-from datetime import datetime, timedelta
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -30,14 +31,15 @@ class OptimizationCache:
     Level 2: Disk cache for optimization results (persistent)
     """
 
-    CACHE_DIR = Path("d:/bybit_strategy_tester_v2/.cache")
+    # Dynamic path resolution - works on any system
+    CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache"
     MAX_MEMORY_ITEMS = 1000
     MAX_DISK_SIZE_MB = 500
     EXPIRY_DAYS = 7
 
     def __init__(self, enabled: bool = True):
         self.enabled = enabled
-        self._memory_cache: Dict[str, Any] = {}
+        self._memory_cache: dict[str, Any] = {}
         self._memory_cache_order = []  # LRU order
 
         # Create cache directory
@@ -59,13 +61,13 @@ class OptimizationCache:
     # =========================================================
 
     def _make_key(self, *args, **kwargs) -> str:
-        """Create a unique hash key from arguments."""
+        """Create a unique hash key from arguments using SHA256."""
         key_data = {
             "args": [self._serialize_arg(a) for a in args],
             "kwargs": {k: self._serialize_arg(v) for k, v in sorted(kwargs.items())},
         }
         key_str = json.dumps(key_data, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.sha256(key_str.encode()).hexdigest()
 
     def _serialize_arg(self, arg) -> Any:
         """Serialize argument for hashing."""
@@ -76,21 +78,19 @@ class OptimizationCache:
                 "shape": arg.shape,
                 "first": arg.iloc[0].to_dict() if len(arg) > 0 else None,
                 "last": arg.iloc[-1].to_dict() if len(arg) > 0 else None,
-                "hash": hashlib.md5(
-                    pd.util.hash_pandas_object(arg).values.tobytes()
-                ).hexdigest()[:8],
+                "hash": hashlib.sha256(pd.util.hash_pandas_object(arg).values.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, pd.Series):
             return {
                 "type": "Series",
                 "len": len(arg),
-                "hash": hashlib.md5(arg.values.tobytes()).hexdigest()[:8],
+                "hash": hashlib.sha256(arg.values.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, np.ndarray):
             return {
                 "type": "ndarray",
                 "shape": arg.shape,
-                "hash": hashlib.md5(arg.tobytes()).hexdigest()[:8],
+                "hash": hashlib.sha256(arg.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, (dict, list, tuple, str, int, float, bool, type(None))):
             return arg
@@ -101,7 +101,7 @@ class OptimizationCache:
     # MEMORY CACHE (Level 1)
     # =========================================================
 
-    def get_memory(self, key: str) -> Tuple[bool, Any]:
+    def get_memory(self, key: str) -> tuple[bool, Any]:
         """Get from memory cache."""
         if not self.enabled:
             return False, None
@@ -137,7 +137,7 @@ class OptimizationCache:
         """Get disk path for cache key."""
         return self.CACHE_DIR / f"{key}.pkl"
 
-    def get_disk(self, key: str) -> Tuple[bool, Any]:
+    def get_disk(self, key: str) -> tuple[bool, Any]:
         """Get from disk cache."""
         if not self.enabled:
             return False, None
@@ -150,10 +150,7 @@ class OptimizationCache:
                     data = pickle.load(f)
 
                 # Check expiry
-                if (
-                    data.get("expires_at")
-                    and datetime.fromisoformat(data["expires_at"]) < datetime.now()
-                ):
+                if data.get("expires_at") and datetime.fromisoformat(data["expires_at"]) < datetime.now():
                     path.unlink()
                     return False, None
 
@@ -166,7 +163,7 @@ class OptimizationCache:
         self.stats["disk_misses"] += 1
         return False, None
 
-    def set_disk(self, key: str, value: Any, expires_days: int = None):
+    def set_disk(self, key: str, value: Any, expires_days: int | None = None):
         """Set in disk cache."""
         if not self.enabled:
             return
@@ -199,10 +196,7 @@ class OptimizationCache:
                 with open(path, "rb") as f:
                     data = pickle.load(f)
 
-                if (
-                    data.get("expires_at")
-                    and datetime.fromisoformat(data["expires_at"]) < datetime.now()
-                ):
+                if data.get("expires_at") and datetime.fromisoformat(data["expires_at"]) < datetime.now():
                     path.unlink()
                     removed += 1
             except Exception:
@@ -216,7 +210,7 @@ class OptimizationCache:
     # HIGH-LEVEL API
     # =========================================================
 
-    def get(self, key: str) -> Tuple[bool, Any]:
+    def get(self, key: str) -> tuple[bool, Any]:
         """Get from cache (checks memory first, then disk)."""
         # Try memory
         hit, value = self.get_memory(key)
@@ -247,7 +241,7 @@ class OptimizationCache:
             for path in self.CACHE_DIR.glob("*.pkl"):
                 path.unlink()
 
-        self.stats = {k: 0 for k in self.stats}
+        self.stats = dict.fromkeys(self.stats, 0)
         logger.info("🗑️ Cache cleared")
 
     def print_stats(self):
@@ -257,19 +251,20 @@ class OptimizationCache:
         total = total_hits + total_misses
         hit_rate = total_hits / total if total > 0 else 0
 
-        print("\n📊 CACHE STATISTICS")
-        print("-" * 40)
-        print(f"Memory hits:  {self.stats['memory_hits']}")
-        print(f"Memory misses: {self.stats['memory_misses']}")
-        print(f"Disk hits:    {self.stats['disk_hits']}")
-        print(f"Disk misses:  {self.stats['disk_misses']}")
-        print(f"Hit rate:     {hit_rate:.1%}")
-        print(f"Memory items: {len(self._memory_cache)}")
-
-        # Disk size
+        disk_size_mb = 0.0
         if self.CACHE_DIR.exists():
-            disk_size = sum(f.stat().st_size for f in self.CACHE_DIR.glob("*.pkl"))
-            print(f"Disk size:    {disk_size / 1024 / 1024:.2f} MB")
+            disk_size_mb = sum(f.stat().st_size for f in self.CACHE_DIR.glob("*.pkl")) / 1024 / 1024
+
+        logger.info(
+            "Cache statistics",
+            memory_hits=self.stats["memory_hits"],
+            memory_misses=self.stats["memory_misses"],
+            disk_hits=self.stats["disk_hits"],
+            disk_misses=self.stats["disk_misses"],
+            hit_rate=f"{hit_rate:.1%}",
+            memory_items=len(self._memory_cache),
+            disk_size_mb=f"{disk_size_mb:.2f}",
+        )
 
 
 # =========================================================

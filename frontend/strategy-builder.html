@@ -1,243 +1,987 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Security Headers are set via HTTP response headers by middleware (security_headers.py) -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
 
-    <title>Strategy Builder - Bybit Strategy Tester v2</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- External CSS (Phase 1) -->
-    <link rel="stylesheet" href="./css/variables.css">
-    <link rel="stylesheet" href="./css/components.css">
-    <link rel="stylesheet" href="./css/common.css">
-    <link rel="stylesheet" href="./css/strategy_builder.css">
+  <title>Strategy Builder - Bybit Strategy Tester v2</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+  <!-- External CSS (Phase 1) -->
+  <link rel="stylesheet" href="./css/variables.css?v=20260204d" />
+  <link rel="stylesheet" href="./css/components.css?v=20260204d" />
+  <link rel="stylesheet" href="./css/common.css?v=20260204d" />
+  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260314b" />
+  <link rel="stylesheet" href="./css/optimization_components.css?v=20260412a" />
 
-    </head>
+  <!-- auto-event-binding.js removed - using native event listeners in strategy_builder.js -->
+</head>
+
 <body>
-    <div class="app-layout">
-        <!-- Navbar -->
-        <nav class="navbar">
-            <div class="navbar-left">
-                <a href="dashboard.html" class="navbar-brand" title="Back to Dashboard" aria-label="Back to Dashboard">
-                    <i class="bi bi-arrow-left"></i>
-                </a>
-                <div class="strategy-name">
-                    <i class="bi bi-diagram-3"></i>
-                    <label for="strategyName" class="visually-hidden">Strategy name</label>
-                    <input type="text" id="strategyName" value="New Strategy" placeholder="Strategy name..." title="Strategy name">
-                </div>
-                <span class="text-secondary text-sm">
-                    <i class="bi bi-clock"></i> Last saved: Never
-                </span>
-            </div>
-            <div class="navbar-actions">
-                <button class="btn btn-secondary" onclick="openTemplatesModal()">
-                    <i class="bi bi-collection"></i> Templates
-                </button>
-                <button class="btn btn-secondary" onclick="validateStrategy()">
-                    <i class="bi bi-check-circle"></i> Validate
-                </button>
-                <button class="btn btn-secondary" onclick="generateCode()">
-                    <i class="bi bi-code-slash"></i> Generate Code
-                </button>
-                <button class="btn btn-primary" onclick="saveStrategy()">
-                    <i class="bi bi-save"></i> Save
-                </button>
-                <button class="btn btn-success" onclick="runBacktest()">
-                    <i class="bi bi-play-fill"></i> Backtest
-                </button>
-            </div>
-        </nav>
+  <div class="app-layout">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="navbar-left">
+        <a href="dashboard.html" class="navbar-brand" title="Back to Dashboard" aria-label="Back to Dashboard">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="strategy-name">
+          <i class="bi bi-diagram-3"></i>
+          <label for="strategyName" class="visually-hidden">Strategy name</label>
+          <input type="text" id="strategyName" value="New Strategy" placeholder="Strategy name..."
+            title="Strategy name" />
+        </div>
+        <span class="text-secondary text-sm">
+          <i class="bi bi-clock"></i> Last saved: Never
+        </span>
+        <!-- Global Loading Indicator -->
+        <span class="global-loading-indicator hidden" id="globalLoadingIndicator">
+          <span class="loading-spinner"></span>
+          <span class="loading-text">Loading...</span>
+        </span>
+      </div>
+      <div class="navbar-actions">
+        <button class="btn btn-secondary" id="btnMyStrategies" title="My saved strategies">
+          <i class="bi bi-folder2-open"></i> My Strategies
+        </button>
+        <button class="btn btn-secondary hidden" id="btnVersions" title="Версии стратегии">
+          <i class="bi bi-clock-history"></i> Versions
+        </button>
+        <button class="btn btn-secondary" id="btnValidate">
+          <i class="bi bi-check-circle"></i> Validate
+        </button>
+        <button class="btn btn-secondary" id="btnGenerateCode">
+          <i class="bi bi-code-slash"></i> Generate Code
+        </button>
+        <button class="btn btn-primary" id="btnSave">
+          <i class="bi bi-save"></i> Save
+        </button>
+        <button class="btn btn-success" id="btnBacktest">
+          <i class="bi bi-play-fill"></i> Backtest
+        </button>
+      </div>
+    </nav>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Left Sidebar - Block Library -->
-            <div class="sidebar-left">
-                <div class="sidebar-header">
-                    <span class="sidebar-title">Block Library</span>
-                    <button class="btn btn-icon btn-secondary btn-sm" title="Collapse sidebar" aria-label="Collapse sidebar">
-                        <i class="bi bi-chevron-left"></i>
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Left Sidebar - Block Library -->
+      <div class="sidebar-left" id="sidebarLeft">
+        <!-- Tab handle for collapsed state -->
+        <div class="sidebar-tab-left" id="toggleLeftSidebarBtn" title="Block Library">
+          <i class="bi bi-chevron-right tab-arrow"></i>
+        </div>
+        <div class="sidebar-header">
+          <span class="sidebar-title">Библиотека</span>
+          <button class="btn-icon-sm" id="refreshLibraryBtn" title="Refresh library">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div class="block-categories" id="blockCategories">
+          <!-- Populated by JavaScript -->
+        </div>
+        <div class="sidebar-search">
+          <label for="blockSearch" class="visually-hidden">Search blocks</label>
+          <input type="text" class="search-input" id="blockSearch" placeholder="Search blocks..."
+            title="Search blocks" />
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="canvas-area">
+        <div class="canvas-toolbar">
+          <div class="toolbar-group">
+            <button id="btnUndo" class="btn btn-icon btn-secondary" title="Undo">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+            <button id="btnRedo" class="btn btn-icon btn-secondary" title="Redo">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btnDuplicate" class="btn btn-icon btn-secondary" title="Duplicate">
+              <i class="bi bi-copy"></i>
+            </button>
+            <button id="btnClearAll" class="btn btn-icon btn-secondary btn-clear-all" title="Очистить всё и сбросить к началу">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btnAlignLeft" class="btn btn-icon btn-secondary" title="Align Left">
+              <i class="bi bi-align-start"></i>
+            </button>
+            <button id="btnAlignCenter" class="btn btn-icon btn-secondary" title="Align Center">
+              <i class="bi bi-align-center"></i>
+            </button>
+            <button id="btnAlignRight" class="btn btn-icon btn-secondary" title="Align Right">
+              <i class="bi bi-align-end"></i>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btnAutoLayout" class="btn btn-icon btn-secondary" title="Auto Layout">
+              <i class="bi bi-grid-3x3"></i>
+            </button>
+            <button class="btn btn-icon btn-secondary" title="Fit to Screen">
+              <i class="bi bi-fullscreen"></i>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btnAiBuild" class="btn btn-sm btn-ai-build" title="AI Agent builds and backtests a strategy automatically">
+              <i class="bi bi-robot"></i> AI Build
+            </button>
+          </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+          <svg class="canvas" id="connectionsCanvas">
+            <!-- Connection lines rendered here -->
+          </svg>
+          <div id="blocksContainer">
+            <!-- Strategy blocks rendered here -->
+          </div>
+        </div>
+
+        <!-- Zoom Controls — вне canvas-container, чтобы не обрезалось overflow -->
+        <div class="zoom-controls">
+          <button class="zoom-btn" title="Zoom out" aria-label="Zoom out">
+            <i class="bi bi-dash"></i>
+          </button>
+          <span class="zoom-level" id="zoomLevel">100%</span>
+          <button class="zoom-btn" title="Zoom in" aria-label="Zoom in">
+            <i class="bi bi-plus"></i>
+          </button>
+          <button class="zoom-btn" title="Reset zoom" aria-label="Reset zoom">
+            <i class="bi bi-arrows-angle-expand"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating Windows Container - все окна на одном уровне -->
+      <div class="floating-windows-container" id="propertiesPanel">
+
+        <!-- Окно Basic (Параметры) - голубое -->
+        <div class="floating-window floating-window-collapsed" data-tab="basic" id="floatingWindowBasic">
+          <div class="floating-window-spine" data-tab="basic" title="Параметры">
+            <span>Параметры</span>
+          </div>
+          <div class="floating-window-inner">
+            <div class="floating-window-title">Параметры</div>
+            <div class="floating-window-body" id="strategyBasicProps">
+              <div class="property-row property-row-vertical">
+                <span class="property-label">Название стратегии</span>
+                <input type="text" class="property-input property-input-full" id="strategyNameDisplay"
+                  placeholder="Название стратегии" title="Синхронизируется с полем в шапке страницы" />
+              </div>
+              <div class="property-row property-row-two-cols" id="marketDirectionRow">
+                <div class="property-col-half">
+                  <label for="builderMarketType" class="property-label">Тип рынка</label>
+                  <select class="property-select property-select-full" id="builderMarketType"
+                    title="SPOT = данные идентичны TradingView для паритета сигналов. LINEAR = перпетуальные фьючерсы для реальной торговли.">
+                    <option value="spot">SPOT (TradingView Parity)</option>
+                    <option value="linear" selected>Futures (LINEAR/Perpetual)</option>
+                  </select>
+                </div>
+                <div class="property-col-half">
+                  <label for="builderDirection" class="property-label">Тип позиции</label>
+                  <select class="property-select property-select-full" id="builderDirection"
+                    title="Разрешённые направления торговли">
+                    <option value="both">Long &amp; Short</option>
+                    <option value="long">Только Long</option>
+                    <option value="short">Только Short</option>
+                  </select>
+                </div>
+              </div>
+              <div class="property-row property-row-two-cols symbol-picker-wrap">
+                <div class="property-col-half">
+                  <label for="backtestSymbol" class="property-label">Symbol</label>
+                  <div class="symbol-picker">
+                    <input type="text" class="property-input property-input-full" id="backtestSymbol" autocomplete="off"
+                      placeholder="Поиск тикера (Bybit)..." value=""
+                      title="Тикеры с Bybit по типу рынка; введите для поиска" />
+                    <ul class="symbol-picker-dropdown" id="backtestSymbolDropdown" role="listbox"
+                      aria-label="Available trading symbols" aria-hidden="true"></ul>
+                  </div>
+                </div>
+                <div class="property-col-half">
+                  <label for="strategyTimeframe" class="property-label">Таймфрейм</label>
+                  <select class="property-select property-select-full" id="strategyTimeframe"
+                    title="Таймфреймы: 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M">
+                    <option value="1">1m</option>
+                    <option value="5">5m</option>
+                    <option value="15" selected>15m</option>
+                    <option value="30">30m</option>
+                    <option value="60">1h</option>
+                    <option value="240">4h</option>
+                    <option value="D">1D</option>
+                    <option value="W">1W</option>
+                    <option value="M">1M</option>
+                  </select>
+                </div>
+              </div>
+              <hr class="property-divider" aria-hidden="true" />
+              <div id="propertiesDataStatusRow" class="property-row property-row-vertical data-status-row hidden">
+                <div id="propertiesDataStatusIndicator" class="data-status">
+                  <span class="status-icon">⏳</span>
+                  <span class="status-text">Проверка данных...</span>
+                </div>
+                <div id="propertiesCandleLoadingProgress" class="properties-loading-strip hidden">
+                  <div id="propertiesCandleLoadingBar" class="properties-loading-bar" role="progressbar"
+                    aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
+                    aria-label="Прогресс синхронизации БД с биржей" title="Синхронизация данных..."></div>
+                </div>
+              </div>
+              <div class="property-row property-row-two-cols" data-props-version="2">
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestCapital" class="property-label">Initial Capital ($)</label>
+                  <input type="number" class="property-input property-input-full" id="backtestCapital" value="10000"
+                    min="100" step="100" />
+                </div>
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestPositionSizeType" class="property-label">Тип размера ордера</label>
+                  <select class="property-select property-select-full" id="backtestPositionSizeType"
+                    title="Как считать размер позиции">
+                    <option value="percent">% от капитала</option>
+                    <option value="fixed_amount">Сумма в $ (фикс.)</option>
+                    <option value="contracts">Контракты/Лоты</option>
+                  </select>
+                </div>
+              </div>
+              <div class="property-row property-row-two-cols">
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestPositionSize" id="backtestPositionSizeLabel" class="property-label">Размер
+                    позиции (%)</label>
+                  <input type="number" class="property-input property-input-full" id="backtestPositionSize" value="100"
+                    min="1" max="100" step="1" />
+                </div>
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestCommission" class="property-label">Commission %</label>
+                  <input type="number" class="property-input property-input-full" id="backtestCommission" value="0.07"
+                    min="0" max="1" step="0.005" title="0.07% = TradingView parity (0.0007). 0.055% = Bybit Linear taker fee. 0% = без комиссии (для тестов)" />
+                </div>
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestSlippage" class="property-label">Slippage %</label>
+                  <input type="number" class="property-input property-input-full" id="backtestSlippage" value="0.05"
+                    min="0" max="5" step="0.01" title="Проскальзывание в %. 0.05% = DEFAULT_SLIPPAGE (0.0005). 0% = без проскальзывания (TradingView parity)" />
+                </div>
+              </div>
+              <div class="property-row property-row-vertical properties-leverage-block">
+                <label for="backtestLeverage" class="property-label">Плечо:
+                  <span id="backtestLeverageValue" class="leverage-value">10x</span></label>
+                <input type="range" class="property-input-full properties-leverage-range" id="backtestLeverageRange"
+                  min="1" max="100" step="1" value="10" title="Кредитное плечо 1–100x (обновляется динамически по данным биржи)" />
+                <input type="hidden" id="backtestLeverage" value="10" />
+                <div id="backtestLeverageRiskIndicator" class="leverage-risk-indicator properties-leverage-risk"></div>
+              </div>
+              <div class="property-row property-row-vertical">
+                <label for="backtestPyramiding" class="property-label">Pyramiding (макс. одновременных позиций)</label>
+                <input type="number" class="property-input property-input-full" id="backtestPyramiding" value="1"
+                  min="0" max="99" step="1" title="Макс. одновременных входов в одном направлении (0-99, совместимо с TradingView)" />
+              </div>
+              <div class="property-row property-row-two-cols">
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestStartDate" class="property-label">Start Date</label>
+                  <input type="date" class="property-input property-input-full" id="backtestStartDate"
+                    value="2025-01-01" min="2025-01-01" title="Данные в БД начинаются с 2025-01-01" />
+                </div>
+                <div class="property-row property-row-vertical property-col-half">
+                  <label for="backtestEndDate" class="property-label date-label-with-reset">
+                    End Date
+                    <button type="button" id="resetEndDateBtn" class="btn-icon-sm btn-reset-date"
+                      title="Reset to today">
+                      <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
+                  </label>
+                  <input type="date" class="property-input property-input-full" id="backtestEndDate"
+                    title="End date for backtest/optimization" />
                 </div>
-                <div class="sidebar-search">
-                    <label for="blockSearch" class="visually-hidden">Search blocks</label>
-                    <input type="text" class="search-input" id="blockSearch" placeholder="Search blocks..." title="Search blocks">
+              </div>
+              <div class="property-row property-row-vertical">
+                <span class="property-label property-label-secondary">TIME FILTER (USE FOR TESTS)</span>
+                <div class="days-to-block-row" aria-label="Days to block">
+                  <label class="day-block-item" title="Sunday – block"><input type="checkbox" id="dayBlockSu" />
+                    Su</label>
+                  <label class="day-block-item" title="Monday – block"><input type="checkbox" id="dayBlockMo" />
+                    Mo</label>
+                  <label class="day-block-item" title="Tuesday – block"><input type="checkbox" id="dayBlockTu" />
+                    Tu</label>
+                  <label class="day-block-item" title="Wednesday – block"><input type="checkbox" id="dayBlockWe" />
+                    We</label>
+                  <label class="day-block-item" title="Thursday – block"><input type="checkbox" id="dayBlockTh" />
+                    Th</label>
+                  <label class="day-block-item" title="Friday – block"><input type="checkbox" id="dayBlockFr" />
+                    Fr</label>
+                  <label class="day-block-item" title="Saturday – block"><input type="checkbox" id="dayBlockSa" />
+                    Sa</label>
+                  <span class="days-to-block-caption">– Days To Block</span>
                 </div>
-                <div class="block-categories" id="blockCategories">
-                    <!-- Populated by JavaScript -->
-                </div>
+              </div>
             </div>
-
-            <!-- Canvas Area -->
-            <div class="canvas-area">
-                <div class="canvas-toolbar">
-                    <div class="toolbar-group">
-                        <button class="btn btn-icon btn-secondary" onclick="undo()" title="Undo">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
-                        <button class="btn btn-icon btn-secondary" onclick="redo()" title="Redo">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-icon btn-secondary" onclick="deleteSelected()" title="Delete">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                        <button class="btn btn-icon btn-secondary" onclick="duplicateSelected()" title="Duplicate">
-                            <i class="bi bi-copy"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('left')" title="Align Left">
-                            <i class="bi bi-align-start"></i>
-                        </button>
-                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('center')" title="Align Center">
-                            <i class="bi bi-align-center"></i>
-                        </button>
-                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('right')" title="Align Right">
-                            <i class="bi bi-align-end"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-icon btn-secondary" onclick="autoLayout()" title="Auto Layout">
-                            <i class="bi bi-grid-3x3"></i>
-                        </button>
-                        <button class="btn btn-icon btn-secondary" onclick="fitToScreen()" title="Fit to Screen">
-                            <i class="bi bi-fullscreen"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="canvas-container" id="canvasContainer">
-                    <svg class="canvas" id="connectionsCanvas">
-                        <!-- Connection lines rendered here -->
-                    </svg>
-                    <div id="blocksContainer">
-                        <!-- Strategy blocks rendered here -->
-                    </div>
-
-                    <!-- Zoom Controls -->
-                    <div class="zoom-controls">
-                        <button class="zoom-btn" onclick="zoomOut()" title="Zoom out" aria-label="Zoom out">
-                            <i class="bi bi-dash"></i>
-                        </button>
-                        <span class="zoom-level" id="zoomLevel">100%</span>
-                        <button class="zoom-btn" onclick="zoomIn()" title="Zoom in" aria-label="Zoom in">
-                            <i class="bi bi-plus"></i>
-                        </button>
-                        <button class="zoom-btn" onclick="resetZoom()" title="Reset zoom" aria-label="Reset zoom">
-                            <i class="bi bi-arrows-angle-expand"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Sidebar - Properties -->
-            <div class="sidebar-right">
-                <div class="sidebar-header">
-                    <span class="sidebar-title">Properties</span>
-                </div>
-                <div class="properties-panel" id="propertiesPanel">
-                    <div class="properties-section">
-                        <div class="properties-section-header">
-                            <span class="properties-section-title">Block Properties</span>
-                            <i class="bi bi-chevron-down"></i>
-                        </div>
-                        <div class="properties-section-content" id="blockProperties">
-                            <p class="text-secondary text-center py-3">
-                                Select a block to view its properties
-                            </p>
-                        </div>
-                    </div>
-                    <div class="properties-section">
-                        <div class="properties-section-header">
-                            <span class="properties-section-title">Strategy Settings</span>
-                            <i class="bi bi-chevron-down"></i>
-                        </div>
-                        <div class="properties-section-content">
-                            <div class="property-row">
-                                <span class="property-label">Timeframe</span>
-                                <select class="property-select" id="strategyTimeframe" title="Strategy Timeframe">
-                                    <option value="1m">1 minute</option>
-                                    <option value="5m">5 minutes</option>
-                                    <option value="15m" selected>15 minutes</option>
-                                    <option value="1h">1 hour</option>
-                                    <option value="4h">4 hours</option>
-                                    <option value="1d">1 day</option>
-                                </select>
-                            </div>
-                            <div class="property-row">
-                                <span class="property-label">Symbol</span>
-                                <select class="property-select" id="strategySymbol" title="Strategy Symbol">
-                                    <option value="BTCUSDT">BTCUSDT</option>
-                                    <option value="ETHUSDT">ETHUSDT</option>
-                                    <option value="SOLUSDT">SOLUSDT</option>
-                                </select>
-                            </div>
-                            <div class="property-row">
-                                <span class="property-label">Market Type</span>
-                                <select class="property-select" id="strategyMarketType" title="Market Type - SPOT matches TradingView signals, Futures for perpetual trading">
-                                    <option value="spot" title="Use SPOT data - matches TradingView exactly">📊 SPOT (TradingView Parity)</option>
-                                    <option value="linear" selected title="Use perpetual futures data">📈 Futures (LINEAR/Perpetual)</option>
-                                </select>
-                                <small class="text-secondary d-block mt-1" style="font-size: 0.75rem;">
-                                    <i class="bi bi-info-circle"></i> SPOT matches TV signals, Futures for live perpetual trading
-                                </small>
-                            </div>
-                            <div class="property-row">
-                                <label for="initialCapital" class="property-label">Initial Capital</label>
-                                <input type="number" class="property-input" id="initialCapital" value="10000" title="Initial capital for backtesting">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Validation Panel -->
-                <div class="validation-panel">
-                    <div class="validation-header">
-                        <span class="validation-title">Validation</span>
-                        <span class="validation-status valid" id="validationStatus">
-                            <i class="bi bi-check-circle-fill"></i> Valid
-                        </span>
-                    </div>
-                    <div class="validation-list" id="validationList">
-                        <div class="validation-item info">
-                            <i class="bi bi-info-circle"></i>
-                            <span>Add blocks to start building your strategy</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Templates Modal -->
-    <div class="modal-overlay" id="templatesModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">Strategy Templates</h3>
-                <button class="modal-close" onclick="closeTemplatesModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="templates-grid" id="templatesGrid">
-                    <!-- Populated by JavaScript -->
+        <!-- Окно Evaluation - розовое -->
+        <div class="floating-window floating-window-collapsed" data-tab="evaluation" id="floatingWindowEvaluation">
+          <div class="floating-window-spine" data-tab="evaluation" title="Evaluation">
+            <span>Evaluation</span>
+          </div>
+          <div class="floating-window-inner">
+            <div class="floating-window-title">Evaluation</div>
+            <div class="floating-window-body" id="evaluationCriteriaSection">
+              <div class="property-row" style="background:#1a1a2e;border-radius:4px;padding:6px 8px;margin-bottom:6px;font-size:0.76rem;color:#a0a0c0;line-height:1.4">
+                <strong style="color:#c084fc">Optimization criteria</strong> — used when running parameter optimization.<br>
+                <span style="color:#7c7c9c">AI pipeline ranks by: <em>Sharpe × Sortino × ln(1+trades) / (1+DD%)</em></span>
+              </div>
+              <div class="property-row property-row-vertical">
+                <label for="primaryMetric" class="property-label">Primary Metric</label>
+                <select class="property-select property-select-full" id="primaryMetric" title="Main metric to optimize">
+                  <option value="sharpe_ratio" selected>Sharpe Ratio</option>
+                  <option value="sortino_ratio">Sortino Ratio</option>
+                  <option value="total_return">Total Return %</option>
+                  <option value="calmar_ratio">Calmar Ratio</option>
+                  <option value="profit_factor">Profit Factor</option>
+                  <option value="win_rate">Win Rate %</option>
+                </select>
+              </div>
+              <div class="property-row property-row-vertical">
+                <label class="property-label">Secondary Metrics</label>
+                <div class="criteria-checkbox-list">
+                  <label class="criteria-checkbox-item">
+                    <input type="checkbox" id="metricWinRate" checked title="Win Rate" />
+                    <span>Win Rate</span>
+                  </label>
+                  <label class="criteria-checkbox-item">
+                    <input type="checkbox" id="metricMaxDD" checked title="Max Drawdown" />
+                    <span>Max Drawdown</span>
+                  </label>
+                  <label class="criteria-checkbox-item">
+                    <input type="checkbox" id="metricProfitFactor" checked title="Profit Factor" />
+                    <span>Profit Factor</span>
+                  </label>
+                  <label class="criteria-checkbox-item">
+                    <input type="checkbox" id="metricExpectancy" title="Expectancy" />
+                    <span>Expectancy</span>
+                  </label>
+                  <label class="criteria-checkbox-item">
+                    <input type="checkbox" id="metricCAGR" title="CAGR" />
+                    <span>CAGR</span>
+                  </label>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeTemplatesModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="loadSelectedTemplate()">
-                    <i class="bi bi-check-lg"></i> Use Template
+              </div>
+              <div class="property-row property-row-vertical">
+                <label class="property-label">Constraints</label>
+                <div class="constraints-list" id="constraintsList">
+                  <div class="constraint-item">
+                    <select class="constraint-metric" title="Constraint metric">
+                      <option value="max_drawdown">Max DD</option>
+                    </select>
+                    <select class="constraint-operator" title="Operator">
+                      <option value="<=">&le;</option>
+                    </select>
+                    <input type="number" class="constraint-value" value="15" title="Value" />
+                    <span class="constraint-unit">%</span>
+                    <button class="constraint-remove" title="Remove" aria-label="Remove constraint">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                  <div class="constraint-item">
+                    <select class="constraint-metric" title="Constraint metric">
+                      <option value="min_trades">Min Trades</option>
+                    </select>
+                    <select class="constraint-operator" title="Operator">
+                      <option value=">=">&ge;</option>
+                    </select>
+                    <input type="number" class="constraint-value" value="50" title="Value" />
+                    <span class="constraint-unit"></span>
+                    <button class="constraint-remove" title="Remove" aria-label="Remove constraint">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+                <button class="btn-add-constraint" id="btnAddConstraint" title="Add constraint">
+                  <i class="bi bi-plus"></i> Add Constraint
                 </button>
+              </div>
             </div>
+          </div>
         </div>
-    </div>
 
-    <script type="module" src="./js/pages/strategy_builder.js"></script>
+        <!-- Окно Optimization - красное -->
+        <div class="floating-window floating-window-collapsed" data-tab="optimization" id="floatingWindowOptimization">
+          <div class="floating-window-spine" data-tab="optimization" title="Optimization">
+            <span>Optimization</span>
+          </div>
+          <div class="floating-window-inner">
+            <div class="floating-window-title">Optimization</div>
+            <div class="floating-window-body" id="optimizationConfigSection">
+              <div class="property-row property-row-vertical">
+                <label for="optMethod" class="property-label">Method</label>
+                <select class="property-select property-select-full" id="optMethod" title="Optimization method">
+                  <option value="bayesian" selected>Bayesian (TPE) - Recommended</option>
+                  <option value="grid_search">Grid Search (Exhaustive)</option>
+                  <option value="random_search">Random Search (Fast)</option>
+                  <option value="walk_forward">Walk-Forward Analysis</option>
+                </select>
+              </div>
+              <div class="property-row property-row-vertical">
+                <label class="property-label">Parameter Ranges</label>
+                <div class="param-ranges-list" id="paramRangesList">
+                  <p class="text-muted text-sm">
+                    <i class="bi bi-info-circle"></i>
+                    Add indicator blocks to configure parameter ranges
+                  </p>
+                </div>
+              </div>
+              <div class="property-row">
+                <label for="optMaxTrials" class="property-label">Max Trials</label>
+                <input type="number" class="property-input" id="optMaxTrials" value="200" min="10" max="10000"
+                  title="Maximum optimization trials" />
+              </div>
+              <div class="property-row">
+                <label for="optWorkers" class="property-label">Workers</label>
+                <input type="number" class="property-input" id="optWorkers" value="4" min="1" max="16"
+                  title="Parallel workers" />
+              </div>
+
+              <!-- ── Optimization Hardening (2026-04-18) ─────────────── -->
+              <div class="property-row property-row-vertical" style="margin-top:10px;">
+                <label class="property-label" title="4-phase workflow from docs/architecture/OPTIMIZATION_HARDENING.md">
+                  Hardening Preset
+                </label>
+                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Hardening preset"
+                     style="display:flex;gap:4px;">
+                  <button type="button" class="btn btn-outline-secondary opt-preset-btn" data-preset="coarse"
+                          title="Phase 1 — Coarse: 200 trials, fast scan, all guards on">Coarse</button>
+                  <button type="button" class="btn btn-outline-primary opt-preset-btn" data-preset="main"
+                          title="Phase 2 — Main: max(200, 50·D) trials, parallel, full hardening">Main</button>
+                  <button type="button" class="btn btn-outline-success opt-preset-btn" data-preset="refine"
+                          title="Phase 3 — Refine: low trials + post-grid local refinement around top-K">Refine</button>
+                  <button type="button" class="btn btn-outline-info opt-preset-btn" data-preset="confirm"
+                          title="Phase 4 — Confirm: OOS validation only, no further search">Confirm</button>
+                </div>
+              </div>
+              <details id="optHardeningDetails" style="margin-top:8px;">
+                <summary class="property-label" style="cursor:pointer;">
+                  Hardening options <span class="text-muted text-sm">(advanced)</span>
+                </summary>
+                <div class="property-row" style="margin-top:6px;">
+                  <label class="property-label" for="optUseHyperband" title="Use HyperbandPruner instead of MedianPruner">
+                    <input type="checkbox" id="optUseHyperband" /> Hyperband pruner
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label class="property-label" for="optApplyGuards" title="Annotate top results with anti-phantom-optimum guards">
+                    <input type="checkbox" id="optApplyGuards" /> Apply overfit guards
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label class="property-label" for="optPostGridRefine" title="Refine top-K with ±pct local Cartesian grid">
+                    <input type="checkbox" id="optPostGridRefine" /> Post-grid refine
+                  </label>
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridTopK" class="property-label">Refine top-K</label>
+                  <input type="number" class="property-input" id="optPostGridTopK" value="5" min="1" max="20" />
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridPct" class="property-label">Refine ±pct</label>
+                  <input type="number" class="property-input" id="optPostGridPct" value="0.20" step="0.05" min="0.05" max="0.50" />
+                </div>
+                <div class="property-row">
+                  <label for="optPostGridSteps" class="property-label">Steps/dim</label>
+                  <input type="number" class="property-input" id="optPostGridSteps" value="3" min="2" max="7" />
+                </div>
+              </details>
+
+              <button class="btn btn-primary w-100 mt-3" id="btnStartOptimization">
+                <i class="bi bi-play-fill"></i> Start Optimization
+              </button>
+            </div>
+
+            <!-- Progress bar — OUTSIDE optimizationConfigSection so OptimizationConfigPanel doesn't overwrite it -->
+            <div id="optProgressSection">
+              <div class="opt-progress-container opt-progress-container--compact">
+                <!-- Stage steps -->
+                <div class="opt-stages">
+                  <div class="opt-stage active" id="optStage1">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Data</span>
+                  </div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage2">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Compile</span>
+                  </div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage3">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Search</span>
+                  </div>
+                  <!-- Optional hardening pills (shown only when the backend
+                       reports a post_grid_refine / overfit_guards stage). -->
+                  <div class="opt-stage-line" id="optStageRefineLine" style="display:none"></div>
+                  <div class="opt-stage" id="optStageRefine" style="display:none" title="Post-grid refinement: ±pct grid around top-K trials">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Refine</span>
+                  </div>
+                  <div class="opt-stage-line" id="optStageGuardsLine" style="display:none"></div>
+                  <div class="opt-stage" id="optStageGuards" style="display:none" title="Overfit guards: anti-phantom-optimum checks on top-K results">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Guards</span>
+                  </div>
+                  <div class="opt-stage-line"></div>
+                  <div class="opt-stage" id="optStage4">
+                    <div class="opt-stage-dot"></div>
+                    <span class="opt-stage-label">Done</span>
+                  </div>
+                </div>
+                <!-- Progress bar -->
+                <div class="opt-progress-header">
+                  <span class="opt-progress-label" id="optProgressLabel">Initializing...</span>
+                  <span id="optProgressPercent" class="opt-progress-value">0%</span>
+                </div>
+                <div class="opt-progress-bar">
+                  <div id="optProgressFill" class="opt-progress-fill" style="width:0%"></div>
+                </div>
+                <!-- Stats row: speed · ETA · best score -->
+                <div class="opt-stats-row">
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">Speed</span>
+                    <span class="opt-stat-value" id="optStatSpeed">—</span>
+                  </div>
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">ETA</span>
+                    <span class="opt-stat-value" id="optStatEta">—</span>
+                  </div>
+                  <div class="opt-stat">
+                    <span class="opt-stat-label">Best score</span>
+                    <span class="opt-stat-value" id="optStatScore">—</span>
+                  </div>
+                </div>
+                <div id="optProgressDetails"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Окно Database - зелёное -->
+        <div class="floating-window floating-window-collapsed" data-tab="database" id="floatingWindowDatabase">
+          <div class="floating-window-spine" data-tab="database" title="База данных">
+            <span>Б/Д</span>
+          </div>
+          <div class="floating-window-inner">
+            <div class="floating-window-title">База данных</div>
+            <div class="floating-window-body" id="dunnahBaseSection">
+              <p class="text-muted text-sm mb-2">Тикеры в БД по группам (Symbol + Market Type). Удаление или
+                блокировка догрузки.</p>
+              <div class="dunnah-base-toolbar mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnDunnahRefresh"
+                  title="Обновить список">
+                  <i class="bi bi-arrow-clockwise"></i> Обновить
+                </button>
+              </div>
+              <div class="dunnah-base-groups" id="dunnahBaseGroups">
+                <p class="text-muted text-sm">Загрузка...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Окно Results - жёлтое -->
+        <div class="floating-window floating-window-collapsed" data-tab="results" id="floatingWindowResults">
+          <div class="floating-window-spine" data-tab="results" title="Results">
+            <span>Results</span>
+          </div>
+          <div class="floating-window-inner">
+            <div class="floating-window-title">Results</div>
+            <div class="floating-window-body" id="resultsQuickViewSection">
+              <div class="results-quick-summary" id="resultsQuickSummary">
+                <p class="text-muted text-sm text-center">
+                  <i class="bi bi-bar-chart"></i>
+                  Run optimization to see results
+                </p>
+              </div>
+              <a href="optimization-results.html" class="btn btn-outline-primary btn-sm w-100 mt-2 d-none"
+                id="btnViewFullResults">
+                <i class="bi bi-box-arrow-up-right"></i> View Full Results
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Sidebar - Validation (hidden: validation panel is position:fixed, this container is unused) -->
+      <!-- Right Sidebar - removed: validation panel is position:fixed and rendered independently -->
+
+      <!-- Validation Popup Panel (position:fixed, opened by Validate button) -->
+      <div class="validation-panel">
+        <div class="validation-header">
+          <span class="validation-title">Validation</span>
+          <span class="validation-status valid" id="validationStatus">
+            <i class="bi bi-check-circle-fill"></i> Valid
+          </span>
+        </div>
+        <div class="validation-list" id="validationList">
+          <div class="validation-item info">
+            <i class="bi bi-info-circle"></i>
+            <span>Add blocks to start building your strategy</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Versions Modal -->
+      <div class="modal-overlay" id="versionsModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-clock-history"></i> Strategy Versions</h3>
+            <button class="modal-close" id="btnCloseVersionsModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted text-sm mb-2">Восстановить предыдущую версию стратегии.</p>
+            <div id="versionsList" class="versions-list">
+              <p class="text-muted">Загрузка...</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="btnCloseVersions">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Strategies Modal -->
+      <div class="modal-overlay" id="myStrategiesModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-folder2-open"></i> My Strategies</h3>
+            <button class="modal-close" id="btnCloseMyStrategies">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="strategies-list-toolbar">
+              <div class="strategies-toolbar-left">
+                <label class="strategies-select-all" title="Select all">
+                  <input type="checkbox" id="strategiesSelectAll" />
+                  <span>All</span>
+                </label>
+                <button class="btn btn-sm btn-danger strategies-batch-delete hidden" id="btnBatchDelete"
+                  title="Delete selected">
+                  <i class="bi bi-trash"></i> Delete Selected (<span id="batchDeleteCount">0</span>)
+                </button>
+              </div>
+              <div class="strategies-toolbar-right">
+                <label for="strategiesSearch" class="visually-hidden">Search strategies</label>
+                <input type="text" class="search-input" id="strategiesSearch"
+                  placeholder="Search strategies..." title="Search strategies" />
+                <span class="strategies-count" id="strategiesCount"></span>
+              </div>
+            </div>
+            <div class="strategies-list" id="strategiesList">
+              <p class="text-muted text-center">Loading...</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="btnCloseMyStrategies2">Close</button>
+            <button class="btn btn-primary" id="btnNewStrategy">
+              <i class="bi bi-plus-lg"></i> New Strategy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backtest Results Modal -->
+      <div class="modal-overlay" id="backtestResultsModal">
+        <div class="modal modal-xl">
+          <div class="modal-header">
+            <h3 class="modal-title">
+              <i class="bi bi-bar-chart-fill text-primary"></i>
+              Backtest Results
+            </h3>
+            <button class="modal-close" id="btnCloseBacktestResults">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body" id="backtestResultsContent">
+            <!-- Summary Cards Row -->
+            <div class="results-summary-cards" id="resultsSummaryCards">
+              <!-- Populated by JavaScript -->
+            </div>
+
+            <!-- Tabs for different views -->
+            <div class="results-tabs">
+              <button class="results-tab active" data-tab="overview">
+                <i class="bi bi-speedometer2"></i> Overview
+              </button>
+              <button class="results-tab" data-tab="equity">
+                <i class="bi bi-graph-up-arrow"></i> Equity Curve
+              </button>
+              <button class="results-tab" data-tab="trades">
+                <i class="bi bi-list-ul"></i> Trades
+              </button>
+              <button class="results-tab" data-tab="metrics">
+                <i class="bi bi-calculator"></i> All Metrics
+              </button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="results-tab-content active" id="tab-overview">
+              <div class="metrics-grid" id="metricsOverview">
+                <!-- Populated by JavaScript -->
+              </div>
+            </div>
+
+            <div class="results-tab-content" id="tab-equity">
+              <div id="equityChartContainer" style="width:100%;height:360px;min-height:360px;"></div>
+              <!-- Legend row: Buy&Hold + Trade Excursions toggles -->
+              <div class="equity-chart-legend">
+                <label>
+                  <input type="checkbox" id="legendBuyHold">
+                  <span class="legend-color-bh"></span>
+                  Покупка и удержание
+                </label>
+                <label>
+                  <input type="checkbox" id="legendTradesRunupDrawdown" checked>
+                  <span class="legend-color-excursions"></span>
+                  Отклонения сделок
+                </label>
+              </div>
+            </div>
+
+            <div class="results-tab-content" id="tab-trades">
+              <div class="trades-table-container">
+                <table class="trades-table" id="tradesTable">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Entry Time</th>
+                      <th>Exit Time</th>
+                      <th>Side</th>
+                      <th>Entry Price</th>
+                      <th>Exit Price</th>
+                      <th>Qty</th>
+                      <th>PnL</th>
+                      <th>PnL %</th>
+                      <th>MFE</th>
+                      <th>MAE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tradesTableBody">
+                    <!-- Populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="results-tab-content" id="tab-metrics">
+              <div class="all-metrics-grid" id="allMetricsGrid">
+                <!-- Populated by JavaScript -->
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="btnCloseBacktestResults2">
+              <i class="bi bi-x-lg"></i> Close
+            </button>
+            <button class="btn btn-outline-primary" id="btnExportBacktestResults">
+              <i class="bi bi-download"></i> Export Results
+            </button>
+            <button class="btn btn-primary" id="btnViewFullBacktestResults">
+              <i class="bi bi-box-arrow-up-right"></i> Full Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart.js + adapter for TradingViewEquityChart -->
+      <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+      <script src="./js/components/TradingViewEquityChart.js?v=20260308e"></script>
+
+      <!-- Production Init (must load before all other scripts) -->
+      <script src="./js/init-production.js"></script>
+      <script src="./js/sidebar-toggle.js?v=1773520387"></script>
+      <script src="./js/pages/strategy_builder_debug.js"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260330g"></script>
+      <script src="./js/pages/symbol_picker_debug.js" defer></script>
+      <script src="./js/pages/optimization_panels.js?v=20260412b"></script>
+      <script type="module" src="./js/pages/optimization.js"></script>
+      <script src="./js/pages/evaluation_criteria_panel.js?v=20260204"></script>
+      <script src="./js/pages/optimization_config_panel.js?v=1773520393"></script>
+
+      <!-- AI Build Modal -->
+      <div id="aiBuildModal" class="ai-build-modal hidden">
+        <div class="ai-build-modal-content">
+          <div class="ai-build-header">
+            <h3><i class="bi bi-robot"></i> AI Strategy Builder</h3>
+            <!-- Inline run status — shown while AI build is running -->
+            <div id="aiBuildHeaderStatus" class="ai-build-header-status hidden">
+              <div class="ai-spinner-ring-sm"></div>
+              <span id="aiBuildStage">Starting AI workflow…</span>
+              <span id="aiBuildElapsed" class="ai-build-timer"></span>
+            </div>
+            <button class="btn btn-icon btn-secondary" id="btnCloseAiBuild" title="Close AI Builder">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <!-- Config form -->
+          <div id="aiBuildConfig" class="ai-build-body">
+
+            <!-- § Backtest parameters (read-only summary) -->
+            <div class="ai-build-summary" id="aiBuildSummary"></div>
+
+            <!-- § Mode: new strategy or optimize existing -->
+            <div class="ai-form-section">
+              <div class="ai-form-section-label">Mode</div>
+              <div class="ai-build-row">
+                <label>Existing strategy <small class="text-muted">(leave empty to create new)</small></label>
+                <div class="d-flex gap-2 align-items-center">
+                  <select id="aiExistingStrategy" class="form-select form-select-sm"
+                    title="Select a saved strategy from DB to optimize its parameters">
+                    <option value="">— Create New Strategy —</option>
+                  </select>
+                  <button class="btn btn-outline-secondary btn-sm" id="btnRefreshStrategies" title="Reload strategy list">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+                <small id="aiExistingStrategyHint" class="text-muted">
+                  <i class="bi bi-stars text-warning"></i> <b>Optimize mode</b> — AI will improve parameters of the selected strategy
+                </small>
+              </div>
+            </div>
+
+            <!-- § Strategy definition -->
+            <div class="ai-form-section">
+              <div class="ai-form-section-label">Strategy</div>
+              <div class="ai-build-row">
+                <label>Name <small class="text-muted" id="aiNameHint">(name for new strategy)</small></label>
+                <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm"
+                  title="Strategy name">
+              </div>
+              <div class="ai-build-row">
+                <label>Description <small class="text-muted">(optional — AI designs blocks from your text)</small></label>
+                <textarea id="aiDescription" rows="2" class="form-control form-control-sm"
+                  placeholder="e.g. RSI mean-reversion with EMA trend filter, SL 1.5%, TP 3%"
+                  title="Describe the strategy in plain language. Leave empty to use a preset below."></textarea>
+              </div>
+            </div>
+
+            <!-- § Targets -->
+            <div class="ai-form-section">
+              <div class="ai-form-section-label">Targets</div>
+              <div class="ai-build-row-half">
+                <div>
+                  <label>Max Iterations</label>
+                  <input type="number" id="aiMaxIter" value="3" min="1" max="10" class="form-control form-control-sm"
+                    title="Max optimization iterations">
+                </div>
+                <div>
+                  <label>Min Sharpe</label>
+                  <input type="number" id="aiMinSharpe" value="0.5" step="0.1" class="form-control form-control-sm"
+                    title="Minimum Sharpe ratio to accept">
+                </div>
+              </div>
+            </div>
+
+            <!-- § Agents -->
+            <div class="ai-form-section">
+              <div class="ai-form-section-label">Agents</div>
+              <div class="ai-build-row">
+                <label class="form-check-label">
+                  <input type="checkbox" id="aiDeliberation" class="form-check-input">
+                  AI Deliberation <small class="text-muted">(Claude + Perplexity consensus — uses API credits)</small>
+                </label>
+              </div>
+              <div class="ai-build-row d-flex align-items-center gap-2" id="aiAgentRow">
+                <label class="text-muted small mb-0" for="aiAgentSelect">Single-agent:</label>
+                <select id="aiAgentSelect" class="form-select form-select-sm w-auto"
+                  title="Primary LLM agent when AI Deliberation is off">
+                  <option value="claude" selected>Claude</option>
+                  <option value="perplexity">Perplexity</option>
+                </select>
+              </div>
+              <div class="ai-build-row">
+                <label class="form-check-label">
+                  <input type="checkbox" id="aiUseOptimizer" class="form-check-input">
+                  Optimizer Sweep <small class="text-muted">(grid/bayesian sweep per iteration — slower, finds better params)</small>
+                </label>
+              </div>
+            </div>
+
+            <!-- § Preset blocks (Build mode only) -->
+            <div class="ai-form-section" id="aiPresetSection">
+              <div class="ai-form-section-label">Preset Blocks <small class="text-muted" style="font-weight:400;text-transform:none">(ignored when description is filled)</small></div>
+              <select id="aiPreset" class="form-select form-select-sm" title="Select preset strategy blocks">
+                <option value="rsi">RSI Overbought / Oversold</option>
+                <option value="ema_cross">EMA Crossover (9 / 21)</option>
+                <option value="macd">MACD Signal Cross</option>
+                <option value="bb">Bollinger Bands Breakout</option>
+                <option value="custom">Let AI decide (from description)</option>
+              </select>
+              <pre id="aiBlocksPreview" class="ai-blocks-preview"></pre>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-1" id="btnRunAiBuild">
+              <i class="bi bi-play-fill"></i> Build & Backtest
+            </button>
+          </div>
+
+          <!-- Progress — spinner is in header; body = agent monitor only -->
+          <div id="aiBuildProgress" class="hidden">
+            <!-- Agent Activity Monitor — 3-column layout, one per agent -->
+            <div id="agentMonitor" class="agent-monitor hidden">
+              <div class="agent-monitor-header">
+                <span class="agent-monitor-title">
+                  <i class="bi bi-activity"></i> Agent Activity
+                </span>
+                <button class="agent-monitor-toggle" id="btnToggleAgentMonitor" title="Hide agent panel">
+                  <i class="bi bi-chevron-up"></i>
+                </button>
+              </div>
+              <div class="agent-cols" id="agentCols">
+                <div class="agent-col" data-agent="claude">
+                  <div class="agent-col-header">
+                    <i class="bi bi-stars"></i>
+                    <span>Claude</span>
+                    <span class="agent-badge" id="agentBadge-claude">0</span>
+                  </div>
+                  <div class="agent-col-feed" id="agentFeed-claude"></div>
+                </div>
+                <div class="agent-col" data-agent="perplexity">
+                  <div class="agent-col-header">
+                    <i class="bi bi-search"></i>
+                    <span>Perplexity</span>
+                    <span class="agent-badge" id="agentBadge-perplexity">0</span>
+                  </div>
+                  <div class="agent-col-feed" id="agentFeed-perplexity"></div>
+                </div>
+                <div class="agent-col" data-agent="claude">
+                  <div class="agent-col-header">
+                    <i class="bi bi-robot"></i>
+                    <span>Claude</span>
+                    <span class="agent-badge" id="agentBadge-claude">0</span>
+                  </div>
+                  <div class="agent-col-feed" id="agentFeed-claude"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div id="aiBuildResults" class="ai-build-body hidden">
+            <div id="aiBuildResultContent"></div>
+            <button class="btn btn-secondary w-100 mt-2" id="btnResetAiBuild">
+              <i class="bi bi-arrow-repeat"></i> Build Another
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Build logic moved to strategy_builder.js (CSP-compliant) -->
 </body>
+
 </html>

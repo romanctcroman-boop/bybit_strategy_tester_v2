@@ -1,0 +1,56 @@
+{
+  "name": "Qwen",
+  "model": "qwen-plus",
+  "description": "Qwen AI assistant configuration for Bybit Strategy Tester v2",
+  "version": "1.0",
+  "skills": [
+    {
+      "name": "backtest-execution",
+      "path": ".qwen/skills/backtest-execution/",
+      "description": "Skills related to backtesting execution"
+    },
+    {
+      "name": "code-development",
+      "path": ".qwen/skills/code-development/",
+      "description": "Skills for code development tasks"
+    },
+    {
+      "name": "debugging",
+      "path": ".qwen/skills/debugging/",
+      "description": "Skills for debugging and bug fixing"
+    },
+    {
+      "name": "documentation",
+      "path": ".qwen/skills/documentation/",
+      "description": "Skills for documentation generation"
+    },
+    {
+      "name": "safe-refactoring",
+      "path": ".qwen/skills/safe-refactoring/",
+      "description": "Skills for safe refactoring operations"
+    },
+    {
+      "name": "strategy-development",
+      "path": ".qwen/skills/strategy-development/",
+      "description": "Skills for trading strategy development"
+    },
+    {
+      "name": "test-generation",
+      "path": ".qwen/skills/test-generation/",
+      "description": "Skills for test case generation"
+    }
+  ],
+  "settings": {
+    "temperature": 0.1,
+    "top_p": 0.9,
+    "max_tokens": 4096
+  },
+  "capabilities": [
+    "code_generation",
+    "code_refactoring",
+    "debugging",
+    "strategy_analysis",
+    "backtesting",
+    "documentation"
+  ]
+}

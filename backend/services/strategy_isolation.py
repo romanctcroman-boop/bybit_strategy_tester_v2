@@ -13,11 +13,12 @@ Created: 2025-12-21
 import asyncio
 import logging
 import uuid
-from contextlib import asynccontextmanager
+from collections.abc import Callable
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class ResourceUsage:
     daily_pnl_usdt: float = 0.0
     current_drawdown_percent: float = 0.0
     api_calls_last_minute: int = 0
-    last_updated: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -108,9 +109,9 @@ class StrategyContext:
     usage: ResourceUsage
 
     # Execution tracking
-    started_at: Optional[datetime] = None
-    last_trade_at: Optional[datetime] = None
-    last_error: Optional[str] = None
+    started_at: datetime | None = None
+    last_trade_at: datetime | None = None
+    last_error: str | None = None
     error_count: int = 0
     trade_count_total: int = 0
     total_pnl_usdt: float = 0.0
@@ -118,13 +119,13 @@ class StrategyContext:
 
     # Circuit breaker state
     circuit_breaker_triggered: bool = False
-    circuit_breaker_reason: Optional[str] = None
-    circuit_breaker_triggered_at: Optional[datetime] = None
-    cooldown_until: Optional[datetime] = None
+    circuit_breaker_reason: str | None = None
+    circuit_breaker_triggered_at: datetime | None = None
+    cooldown_until: datetime | None = None
 
     # Callbacks
-    on_limit_breach: Optional[Callable] = field(default=None, repr=False)
-    on_state_change: Optional[Callable] = field(default=None, repr=False)
+    on_limit_breach: Callable | None = field(default=None, repr=False)
+    on_state_change: Callable | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -135,9 +136,7 @@ class StrategyContext:
             "quota": self.quota.to_dict(),
             "usage": self.usage.to_dict(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "last_trade_at": self.last_trade_at.isoformat()
-            if self.last_trade_at
-            else None,
+            "last_trade_at": self.last_trade_at.isoformat() if self.last_trade_at else None,
             "last_error": self.last_error,
             "error_count": self.error_count,
             "trade_count_total": self.trade_count_total,
@@ -149,9 +148,7 @@ class StrategyContext:
                 "triggered_at": self.circuit_breaker_triggered_at.isoformat()
                 if self.circuit_breaker_triggered_at
                 else None,
-                "cooldown_until": self.cooldown_until.isoformat()
-                if self.cooldown_until
-                else None,
+                "cooldown_until": self.cooldown_until.isoformat() if self.cooldown_until else None,
             },
         }
 
@@ -164,9 +161,7 @@ class QuotaViolation(Exception):
         self.quota_type = quota_type
         self.current = current
         self.limit = limit
-        super().__init__(
-            f"Strategy {strategy_id} exceeded {quota_type}: {current} > {limit}"
-        )
+        super().__init__(f"Strategy {strategy_id} exceeded {quota_type}: {current} > {limit}")
 
 
 class StrategyIsolationManager:
@@ -183,7 +178,7 @@ class StrategyIsolationManager:
 
     def __init__(
         self,
-        default_quota: Optional[ResourceQuota] = None,
+        default_quota: ResourceQuota | None = None,
         default_isolation_level: IsolationLevel = IsolationLevel.SOFT,
         enable_monitoring: bool = True,
         monitoring_interval_seconds: float = 5.0,
@@ -195,7 +190,7 @@ class StrategyIsolationManager:
 
         self._contexts: dict[str, StrategyContext] = {}
         self._lock = asyncio.Lock()
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: asyncio.Task | None = None
         self._running = False
 
         # Event handlers
@@ -203,10 +198,7 @@ class StrategyIsolationManager:
         self._on_circuit_breaker: list[Callable] = []
         self._on_state_change: list[Callable] = []
 
-        logger.info(
-            f"StrategyIsolationManager initialized with "
-            f"isolation_level={default_isolation_level.value}"
-        )
+        logger.info(f"StrategyIsolationManager initialized with isolation_level={default_isolation_level.value}")
 
     async def start(self) -> None:
         """Start the isolation manager"""
@@ -220,18 +212,16 @@ class StrategyIsolationManager:
         self._running = False
         if self._monitoring_task:
             self._monitoring_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._monitoring_task
-            except asyncio.CancelledError:
-                pass
         logger.info("StrategyIsolationManager stopped")
 
     async def register_strategy(
         self,
         strategy_name: str,
-        strategy_id: Optional[str] = None,
-        quota: Optional[ResourceQuota] = None,
-        isolation_level: Optional[IsolationLevel] = None,
+        strategy_id: str | None = None,
+        quota: ResourceQuota | None = None,
+        isolation_level: IsolationLevel | None = None,
     ) -> StrategyContext:
         """
         Register a new strategy with isolated execution context.
@@ -284,7 +274,7 @@ class StrategyIsolationManager:
 
             return True
 
-    def get_context(self, strategy_id: str) -> Optional[StrategyContext]:
+    def get_context(self, strategy_id: str) -> StrategyContext | None:
         """Get strategy context by ID"""
         return self._contexts.get(strategy_id)
 
@@ -302,13 +292,8 @@ class StrategyIsolationManager:
             return True
 
         # Check cooldown
-        if (
-            context.cooldown_until
-            and datetime.now(timezone.utc) < context.cooldown_until
-        ):
-            logger.warning(
-                f"Strategy {strategy_id} is in cooldown until {context.cooldown_until}"
-            )
+        if context.cooldown_until and datetime.now(UTC) < context.cooldown_until:
+            logger.warning(f"Strategy {strategy_id} is in cooldown until {context.cooldown_until}")
             return False
 
         # Reset circuit breaker if was triggered
@@ -319,7 +304,7 @@ class StrategyIsolationManager:
 
         old_state = context.state
         context.state = StrategyState.RUNNING
-        context.started_at = datetime.now(timezone.utc)
+        context.started_at = datetime.now(UTC)
 
         await self._notify_state_change(context, old_state)
         logger.info(f"Started strategy: {strategy_id}")
@@ -357,8 +342,8 @@ class StrategyIsolationManager:
     async def check_quota(
         self,
         strategy_id: str,
-        trade_size_usdt: Optional[float] = None,
-    ) -> tuple[bool, Optional[str]]:
+        trade_size_usdt: float | None = None,
+    ) -> tuple[bool, str | None]:
         """
         Check if strategy is within quota limits.
 
@@ -429,9 +414,7 @@ class StrategyIsolationManager:
             raise ValueError(f"Strategy {strategy_id} not found")
 
         if context.state != StrategyState.RUNNING:
-            raise RuntimeError(
-                f"Strategy {strategy_id} is not running (state: {context.state})"
-            )
+            raise RuntimeError(f"Strategy {strategy_id} is not running (state: {context.state})")
 
         # Check quota before trade
         allowed, reason = await self.check_quota(strategy_id, trade_size_usdt)
@@ -456,7 +439,7 @@ class StrategyIsolationManager:
                 self.context.usage.daily_pnl_usdt += pnl
                 self.context.trade_count_total += 1
                 self.context.total_pnl_usdt += pnl
-                self.context.last_trade_at = datetime.now(timezone.utc)
+                self.context.last_trade_at = datetime.now(UTC)
 
                 # Update peak equity and drawdown
                 current_equity = self.context.peak_equity_usdt + pnl
@@ -464,11 +447,7 @@ class StrategyIsolationManager:
                     self.context.peak_equity_usdt = current_equity
 
                 if self.context.peak_equity_usdt > 0:
-                    drawdown = (
-                        (self.context.peak_equity_usdt - current_equity)
-                        / self.context.peak_equity_usdt
-                        * 100
-                    )
+                    drawdown = (self.context.peak_equity_usdt - current_equity) / self.context.peak_equity_usdt * 100
                     self.context.usage.current_drawdown_percent = max(0, drawdown)
 
         helper = TradeContextHelper(context, trade_size_usdt)
@@ -478,10 +457,8 @@ class StrategyIsolationManager:
         finally:
             # Cleanup
             context.usage.open_trades = max(0, context.usage.open_trades - 1)
-            context.usage.current_position_usdt = max(
-                0, context.usage.current_position_usdt - trade_size_usdt
-            )
-            context.usage.last_updated = datetime.now(timezone.utc)
+            context.usage.current_position_usdt = max(0, context.usage.current_position_usdt - trade_size_usdt)
+            context.usage.last_updated = datetime.now(UTC)
 
     async def record_error(self, strategy_id: str, error: str) -> None:
         """Record an error for a strategy"""
@@ -494,9 +471,7 @@ class StrategyIsolationManager:
 
         # Auto-pause on too many errors
         if context.error_count >= 5:
-            await self._trigger_circuit_breaker(
-                context, f"Too many errors ({context.error_count})"
-            )
+            await self._trigger_circuit_breaker(context, f"Too many errors ({context.error_count})")
 
     async def reset_daily_counters(self) -> None:
         """Reset daily counters for all strategies"""
@@ -512,8 +487,8 @@ class StrategyIsolationManager:
     async def update_resource_usage(
         self,
         strategy_id: str,
-        memory_mb: Optional[float] = None,
-        cpu_percent: Optional[float] = None,
+        memory_mb: float | None = None,
+        cpu_percent: float | None = None,
     ) -> None:
         """Update resource usage metrics for a strategy"""
         context = self._contexts.get(strategy_id)
@@ -533,7 +508,7 @@ class StrategyIsolationManager:
         if cpu_percent is not None:
             context.usage.cpu_percent = cpu_percent
 
-        context.usage.last_updated = datetime.now(timezone.utc)
+        context.usage.last_updated = datetime.now(UTC)
 
     async def _trigger_circuit_breaker(
         self,
@@ -544,22 +519,19 @@ class StrategyIsolationManager:
         """Trigger circuit breaker for a strategy"""
         context.circuit_breaker_triggered = True
         context.circuit_breaker_reason = reason
-        context.circuit_breaker_triggered_at = datetime.now(timezone.utc)
-        context.cooldown_until = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
+        context.circuit_breaker_triggered_at = datetime.now(UTC)
+        context.cooldown_until = datetime.now(UTC).replace(tzinfo=UTC)
 
         # Calculate cooldown end time
         from datetime import timedelta
 
-        context.cooldown_until = datetime.now(timezone.utc) + timedelta(
-            seconds=cooldown_seconds
-        )
+        context.cooldown_until = datetime.now(UTC) + timedelta(seconds=cooldown_seconds)
 
         old_state = context.state
         context.state = StrategyState.COOLDOWN
 
         logger.warning(
-            f"Circuit breaker triggered for {context.strategy_id}: {reason}. "
-            f"Cooldown until {context.cooldown_until}"
+            f"Circuit breaker triggered for {context.strategy_id}: {reason}. Cooldown until {context.cooldown_until}"
         )
 
         # Notify handlers
@@ -597,15 +569,13 @@ class StrategyIsolationManager:
 
                 for context in self._contexts.values():
                     # Decay API call counter
-                    context.usage.api_calls_last_minute = max(
-                        0, context.usage.api_calls_last_minute - 1
-                    )
+                    context.usage.api_calls_last_minute = max(0, context.usage.api_calls_last_minute - 1)
 
                     # Check if cooldown has expired
                     if (
                         context.state == StrategyState.COOLDOWN
                         and context.cooldown_until
-                        and datetime.now(timezone.utc) >= context.cooldown_until
+                        and datetime.now(UTC) >= context.cooldown_until
                     ):
                         old_state = context.state
                         context.state = StrategyState.IDLE
@@ -649,7 +619,7 @@ class StrategyIsolationManager:
 
 
 # Singleton instance
-_isolation_manager: Optional[StrategyIsolationManager] = None
+_isolation_manager: StrategyIsolationManager | None = None
 
 
 def get_isolation_manager() -> StrategyIsolationManager:

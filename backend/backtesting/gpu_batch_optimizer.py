@@ -7,11 +7,15 @@ All combinations share the same candle data, only signals differ.
 Performance: ~10-50x faster than sequential single-process optimization.
 """
 
-from typing import List, Dict, Any, Tuple
-import numpy as np
 import time
-from loguru import logger
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+from loguru import logger
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # GPU availability check
 GPU_AVAILABLE = False
@@ -29,7 +33,7 @@ except ImportError:
 class BatchOptimizationResult:
     """Result for a single parameter combination."""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     total_return: float
     net_profit: float
     max_drawdown: float
@@ -52,19 +56,17 @@ class GPUBatchOptimizer:
         if self.gpu_available:
             logger.info("🚀 GPUBatchOptimizer initialized with CUDA support")
         else:
-            logger.warning(
-                "⚠️ GPUBatchOptimizer: CuPy not available, using NumPy fallback"
-            )
+            logger.warning("⚠️ GPUBatchOptimizer: CuPy not available, using NumPy fallback")
 
     def optimize_rsi_batch(
         self,
         candles: "pd.DataFrame",
-        param_combinations: List[Tuple],  # (period, overbought, oversold, sl, tp)
+        param_combinations: list[tuple],  # (period, overbought, oversold, sl, tp)
         initial_capital: float = 10000.0,
         leverage: int = 10,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         direction: str = "both",
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """
         Run batch optimization for RSI strategy.
 
@@ -116,9 +118,7 @@ class GPUBatchOptimizer:
 
         elapsed = time.time() - start_time
         speed = n_combos / elapsed if elapsed > 0 else 0
-        logger.info(
-            f"✅ GPUBatchOptimizer completed: {elapsed:.2f}s ({speed:.0f} comb/sec)"
-        )
+        logger.info(f"✅ GPUBatchOptimizer completed: {elapsed:.2f}s ({speed:.0f} comb/sec)")
 
         return results
 
@@ -127,12 +127,12 @@ class GPUBatchOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        param_combinations: List[Tuple],
+        param_combinations: list[tuple],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """GPU-accelerated batch optimization using CuPy."""
         n_combos = len(param_combinations)
         n_bars = len(close)
@@ -238,7 +238,7 @@ class GPUBatchOptimizer:
         stop_loss: float,
         take_profit: float,
         direction: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Simplified vectorized backtest on GPU.
         Returns approximate metrics (fast but less accurate than full simulation).
@@ -275,12 +275,12 @@ class GPUBatchOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        param_combinations: List[Tuple],
+        param_combinations: list[tuple],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """CPU fallback for batch optimization."""
         results = []
         period_cache = {}
@@ -370,7 +370,7 @@ class GPUBatchOptimizer:
         stop_loss: float,
         take_profit: float,
         direction: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Simulate trades and calculate metrics."""
         n = len(close)
         allow_long = direction in ("long", "both")
@@ -404,12 +404,7 @@ class GPUBatchOptimizer:
                     exit_triggered = True
 
                 if exit_triggered:
-                    pnl = (
-                        position_size
-                        * (exit_price - entry_price)
-                        / entry_price
-                        * leverage
-                    )
+                    pnl = position_size * (exit_price - entry_price) / entry_price * leverage
                     pnl -= position_size * commission * 2  # Entry + exit fees
                     cash += pnl
                     trades.append(pnl)
@@ -431,12 +426,7 @@ class GPUBatchOptimizer:
                     exit_triggered = True
 
                 if exit_triggered:
-                    pnl = (
-                        position_size
-                        * (entry_price - exit_price)
-                        / entry_price
-                        * leverage
-                    )
+                    pnl = position_size * (entry_price - exit_price) / entry_price * leverage
                     pnl -= position_size * commission * 2
                     cash += pnl
                     trades.append(pnl)
@@ -483,11 +473,7 @@ class GPUBatchOptimizer:
         # Sharpe ratio (simplified)
         if len(trades) > 1:
             returns = np.array(trades) / initial_capital
-            sharpe = (
-                np.mean(returns) / np.std(returns) * np.sqrt(252)
-                if np.std(returns) > 0
-                else 0
-            )
+            sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
         else:
             sharpe = 0
 

@@ -4,7 +4,7 @@ Integration tests for Backtest + Strategy integration.
 Tests the endpoints that connect saved strategies with the backtest engine.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -167,9 +167,7 @@ class TestStrategyBacktestRelationship:
         db_session.commit()
 
         # Query backtests for strategy
-        backtests = (
-            db_session.query(Backtest).filter(Backtest.strategy_id == strategy.id).all()
-        )
+        backtests = db_session.query(Backtest).filter(Backtest.strategy_id == strategy.id).all()
         assert len(backtests) == 5
 
     def test_backtest_without_strategy(self, db_session):
@@ -279,9 +277,7 @@ class TestListBacktestsForStrategy:
         db_session.commit()
 
         # Test first page
-        response = client.get(
-            f"/api/v1/backtests/by-strategy/{strategy.id}?page=1&limit=3"
-        )
+        response = client.get(f"/api/v1/backtests/by-strategy/{strategy.id}?page=1&limit=3")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 10
@@ -314,7 +310,7 @@ class TestStrategyMetricsUpdate:
         strategy.win_rate = 0.65
         strategy.total_trades = 100
         strategy.backtest_count = 1
-        strategy.last_backtest_at = datetime.now(timezone.utc)
+        strategy.last_backtest_at = datetime.now(UTC)
         db_session.commit()
 
         db_session.refresh(strategy)

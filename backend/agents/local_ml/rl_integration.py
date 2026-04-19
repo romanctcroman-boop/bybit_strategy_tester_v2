@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -52,7 +52,7 @@ class RewardShapingConfig:
     drawdown_penalty: float = 1.5
     holding_penalty: float = 0.01
     overtrading_penalty: float = 0.5
-    regime_bonuses: Dict[str, float] = field(default_factory=dict)
+    regime_bonuses: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -157,9 +157,9 @@ CONFIDENCE: [0.0-1.0]
 
     def __init__(
         self,
-        ai_interface: Optional[Any] = None,
-        rl_agent: Optional[Any] = None,
-        config: Optional[AIGuidedTrainingConfig] = None,
+        ai_interface: Any | None = None,
+        rl_agent: Any | None = None,
+        config: AIGuidedTrainingConfig | None = None,
     ):
         """
         Initialize RL-AI integration
@@ -173,7 +173,7 @@ CONFIDENCE: [0.0-1.0]
         self.rl_agent = rl_agent
         self.config = config or AIGuidedTrainingConfig()
 
-        self.current_regime: Optional[MarketRegime] = None
+        self.current_regime: MarketRegime | None = None
         self.reward_config: RewardShapingConfig = RewardShapingConfig()
 
         # Statistics
@@ -184,7 +184,7 @@ CONFIDENCE: [0.0-1.0]
             "regime_changes": 0,
         }
 
-        self.training_history: List[Dict[str, Any]] = []
+        self.training_history: list[dict[str, Any]] = []
 
         logger.info("🤝 RL-AI Integration initialized")
 
@@ -192,7 +192,7 @@ CONFIDENCE: [0.0-1.0]
         self,
         market_data: np.ndarray,
         window: int = 20,
-    ) -> Tuple[MarketRegime, float]:
+    ) -> tuple[MarketRegime, float]:
         """
         Use AI to detect current market regime
 
@@ -250,7 +250,7 @@ CONFIDENCE: [0.0-1.0]
     async def suggest_reward_shaping(
         self,
         regime: MarketRegime,
-        rl_performance: Dict[str, float],
+        rl_performance: dict[str, float],
     ) -> RewardShapingConfig:
         """
         Get AI recommendations for reward shaping
@@ -275,18 +275,10 @@ CONFIDENCE: [0.0-1.0]
 
         # Parse response
         config = RewardShapingConfig(
-            profit_weight=float(
-                self._extract_value(response, "PROFIT_WEIGHT") or "1.0"
-            ),
-            drawdown_penalty=float(
-                self._extract_value(response, "DRAWDOWN_PENALTY") or "1.5"
-            ),
-            holding_penalty=float(
-                self._extract_value(response, "HOLDING_PENALTY") or "0.01"
-            ),
-            overtrading_penalty=float(
-                self._extract_value(response, "OVERTRADING_PENALTY") or "0.5"
-            ),
+            profit_weight=float(self._extract_value(response, "PROFIT_WEIGHT") or "1.0"),
+            drawdown_penalty=float(self._extract_value(response, "DRAWDOWN_PENALTY") or "1.5"),
+            holding_penalty=float(self._extract_value(response, "HOLDING_PENALTY") or "0.01"),
+            overtrading_penalty=float(self._extract_value(response, "OVERTRADING_PENALTY") or "0.5"),
         )
 
         # Add regime-specific bonus
@@ -300,10 +292,10 @@ CONFIDENCE: [0.0-1.0]
 
     async def validate_decision(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         action: int,
         confidence: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Use AI to validate RL agent's decision
 
@@ -354,7 +346,7 @@ CONFIDENCE: [0.0-1.0]
         self,
         market_data: np.ndarray,
         episode_length: int = 1000,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run RL training episode with AI guidance
 
@@ -406,9 +398,7 @@ CONFIDENCE: [0.0-1.0]
                 confidence = np.random.uniform(0.4, 0.9)
 
                 # Validate with AI
-                validation = await self.validate_decision(
-                    current_state, action, confidence
-                )
+                validation = await self.validate_decision(current_state, action, confidence)
 
                 ai_queries_this_episode += 1
 
@@ -429,8 +419,8 @@ CONFIDENCE: [0.0-1.0]
 
     async def get_training_recommendations(
         self,
-        recent_performance: Dict[str, float],
-    ) -> List[TrainingRecommendation]:
+        recent_performance: dict[str, float],
+    ) -> list[TrainingRecommendation]:
         """
         Get AI recommendations for RL training parameters
 
@@ -491,7 +481,7 @@ CONFIDENCE: [0.0-1.0]
     def calculate_shaped_reward(
         self,
         base_reward: float,
-        state: Dict[str, Any],
+        state: dict[str, Any],
     ) -> float:
         """
         Calculate shaped reward using AI recommendations
@@ -521,7 +511,7 @@ CONFIDENCE: [0.0-1.0]
 
         return shaped * self.reward_config.base_reward_scale
 
-    def _extract_state(self, market_data: np.ndarray, step: int) -> Dict[str, Any]:
+    def _extract_state(self, market_data: np.ndarray, step: int) -> dict[str, Any]:
         """Extract state dict from market data"""
         if step >= len(market_data):
             step = len(market_data) - 1
@@ -556,7 +546,7 @@ CONFIDENCE: [0.0-1.0]
                 return line.split(":", 1)[-1].strip()
         return ""
 
-    def _extract_list(self, text: str, field: str) -> List[str]:
+    def _extract_list(self, text: str, field: str) -> list[str]:
         """Extract list items after field"""
         items = []
         in_section = False
@@ -581,12 +571,12 @@ CONFIDENCE: [0.0-1.0]
         """Ask AI for response"""
         if self.ai_interface:
             try:
-                from backend.agents.unified_agent_interface import AgentRequest
                 from backend.agents.models import AgentType
+                from backend.agents.unified_agent_interface import AgentRequest
 
                 request = AgentRequest(
                     task_type="rl_guidance",
-                    agent_type=AgentType.DEEPSEEK,
+                    agent_type=AgentType.CLAUDE,
                     prompt=prompt,
                 )
                 response = await self.ai_interface.send_request(request)
@@ -628,25 +618,20 @@ CONFIDENCE: 0.75
 """
         return "CONFIDENCE: 0.5"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get integration statistics"""
         return {
             **self.stats,
-            "current_regime": self.current_regime.value
-            if self.current_regime
-            else None,
-            "approval_rate": (
-                self.stats["decisions_approved"]
-                / max(self.stats["decisions_validated"], 1)
-            ),
+            "current_regime": self.current_regime.value if self.current_regime else None,
+            "approval_rate": (self.stats["decisions_approved"] / max(self.stats["decisions_validated"], 1)),
             "training_episodes": len(self.training_history),
         }
 
 
 __all__ = [
-    "RLAgentIntegration",
     "AIGuidedTrainingConfig",
-    "RewardShapingConfig",
     "MarketRegime",
+    "RLAgentIntegration",
+    "RewardShapingConfig",
     "TrainingRecommendation",
 ]

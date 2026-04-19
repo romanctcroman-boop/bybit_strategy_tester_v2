@@ -1,11 +1,14 @@
 """
 FULL DeepSeek API call for VectorBT consultation with complete context
 """
+
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 import httpx
-import json
 
 from backend.security.key_manager import get_key_manager
 
@@ -26,8 +29,8 @@ STAGE 1: VectorBT (векторизованный)
   - Скорость: 5,000-80,000 комб/сек
   - Точность: ~85%
   - Использует: vectorbt.Portfolio.from_signals()
-  
-STAGE 2: Fallback (последовательный)  
+
+STAGE 2: Fallback (последовательный)
   - Валидирует TOP-50 кандидатов из Stage 1
   - Скорость: ~1 комб/сек
   - Точность: 100%
@@ -112,105 +115,105 @@ STAGE 2: Fallback (последовательный)
 5. **Архитектурные рекомендации** для нашего Two-Stage подхода
 """
 
+
 def main():
     print("=" * 70)
     print("DEEPSEEK FULL CONSULTATION: VectorBT Limitations")
     print("=" * 70)
-    
+
     # Get API key
     km = get_key_manager()
     api_key = km.get_decrypted_key("DEEPSEEK_API_KEY")
-    
+
     if not api_key:
         print("❌ DeepSeek API key not found")
         return
-    
+
     print("✅ API key loaded")
-    
-    # Use deepseek-reasoner for deep thinking
+
+    # Use deepseek-chat (reasoner is 6-8x more expensive and burns tokens fast)
     payload = {
-        "model": "deepseek-reasoner",  # Full reasoning model
+        "model": "deepseek-chat",  # Was deepseek-reasoner — cost protection
         "messages": [
             {
-                "role": "system", 
-                "content": "You are an expert Python developer specializing in quantitative finance, algorithmic trading, backtesting engines, and vectorized computation. You have deep knowledge of VectorBT, Numba, NumPy, and high-performance computing."
+                "role": "system",
+                "content": "You are an expert Python developer specializing in quantitative finance, algorithmic trading, backtesting engines, and vectorized computation. You have deep knowledge of VectorBT, Numba, NumPy, and high-performance computing.",
             },
             {"role": "user", "content": FULL_PROMPT},
         ],
-        "max_tokens": 16000,  # More tokens for detailed response
+        "max_tokens": 8000,  # Reduced from 16000 for cost control
     }
-    
-    print(f"\n📤 Sending FULL request to DeepSeek...")
+
+    print("\n📤 Sending FULL request to DeepSeek...")
     print(f"   Model: {payload['model']} (thinking mode)")
     print(f"   Prompt length: {len(FULL_PROMPT)} chars")
     print(f"   Max tokens: {payload['max_tokens']}")
     print("\n⏳ This may take 2-5 minutes for deep analysis...")
-    
+
     # Make request with long timeout
     try:
         with httpx.Client(timeout=600.0) as client:  # 10 minute timeout
             response = client.post(
                 "https://api.deepseek.com/v1/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
-        
+
         print(f"\n📥 Response received: {response.status_code}")
-        
+
         if response.status_code == 200:
             data = response.json()
             message = data["choices"][0]["message"]
             content = message.get("content", "")
             reasoning = message.get("reasoning_content", "")  # DeepSeek reasoner specific
             usage = data.get("usage", {})
-            
+
             print(f"   Total tokens: {usage.get('total_tokens', 'N/A')}")
             print(f"   Reasoning tokens: {usage.get('reasoning_tokens', 'N/A')}")
-            
+
             # Save full response
             with open("deepseek_vectorbt_full_consultation.md", "w", encoding="utf-8") as f:
                 f.write("# DeepSeek VectorBT Full Consultation\n\n")
                 f.write(f"Model: {payload['model']}\n")
                 f.write(f"Tokens: {usage.get('total_tokens', 'N/A')}\n\n")
-                
+
                 if reasoning:
                     f.write("## Chain-of-Thought Reasoning\n\n")
                     f.write(reasoning)
                     f.write("\n\n---\n\n")
-                
+
                 f.write("## Final Answer\n\n")
                 f.write(content)
-            
+
             print("\n" + "=" * 70)
             print("DEEPSEEK RESPONSE")
             print("=" * 70)
-            
+
             if reasoning:
                 print("\n--- REASONING (truncated) ---")
                 print(reasoning[:3000])
                 if len(reasoning) > 3000:
                     print(f"\n... ({len(reasoning)} chars total, see file)")
-            
+
             print("\n--- FINAL ANSWER ---")
             print(content[:5000])
             if len(content) > 5000:
                 print(f"\n... ({len(content)} chars total, see file)")
-            
+
             print("\n📄 Full response saved to: deepseek_vectorbt_full_consultation.md")
-            
+
         else:
             print(f"❌ Error: {response.status_code}")
             print(response.text)
-            
+
     except httpx.TimeoutException:
         print("❌ Request timed out (10 minutes)")
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

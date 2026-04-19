@@ -3,15 +3,20 @@ Strategies Router
 Full CRUD endpoints for managing trading strategies.
 """
 
+from __future__ import annotations
+
+import contextlib
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import status as http_status
 from sqlalchemy.orm import Session
 
 from backend.api.schemas import (
+    ParameterMeta,
     StrategyCreate,
     StrategyDefaultParameters,
     StrategyListResponse,
@@ -26,35 +31,42 @@ router = APIRouter()
 
 
 def _strategy_to_response(strategy: Strategy) -> StrategyResponse:
-    """Convert SQLAlchemy Strategy model to StrategyResponse"""
+    """Convert SQLAlchemy Strategy model to StrategyResponse.
+
+    Uses explicit casts for SQLAlchemy ``Column`` descriptors so that
+    Mypy sees plain Python types matching the Pydantic model fields.
+    """
+    st_type: str = cast(StrategyType, strategy.strategy_type).value if strategy.strategy_type else "custom"
+    st_status: str = cast(StrategyStatus, strategy.status).value if strategy.status else "draft"
+    params: dict[str, Any] = cast("dict[str, Any]", strategy.parameters) or {}
+    tag_list: list[str] = cast("list[str]", strategy.tags) or []
+
     return StrategyResponse(
-        id=strategy.id,
-        name=strategy.name,
-        description=strategy.description,
-        strategy_type=strategy.strategy_type.value
-        if strategy.strategy_type
-        else "custom",
-        status=strategy.status.value if strategy.status else "draft",
-        parameters=strategy.parameters or {},
-        symbol=strategy.symbol,
-        timeframe=strategy.timeframe,
-        initial_capital=strategy.initial_capital,
-        position_size=strategy.position_size,
-        stop_loss_pct=strategy.stop_loss_pct,
-        take_profit_pct=strategy.take_profit_pct,
-        max_drawdown_pct=strategy.max_drawdown_pct,
-        total_return=strategy.total_return,
-        sharpe_ratio=strategy.sharpe_ratio,
-        win_rate=strategy.win_rate,
-        total_trades=strategy.total_trades,
-        backtest_count=strategy.backtest_count,
-        created_at=strategy.created_at,
-        updated_at=strategy.updated_at,
-        last_backtest_at=strategy.last_backtest_at,
-        tags=strategy.tags or [],
-        version=strategy.version,
-        is_active=strategy.status != StrategyStatus.ARCHIVED,
-        config=strategy.parameters or {},
+        id=cast(str, strategy.id),
+        name=cast(str, strategy.name),
+        description=cast("str | None", strategy.description),
+        strategy_type=st_type,
+        status=st_status,
+        parameters=params,
+        symbol=cast("str | None", strategy.symbol),
+        timeframe=cast("str | None", strategy.timeframe),
+        initial_capital=cast("float | None", strategy.initial_capital),
+        position_size=cast("float | None", strategy.position_size),
+        stop_loss_pct=cast("float | None", strategy.stop_loss_pct),
+        take_profit_pct=cast("float | None", strategy.take_profit_pct),
+        max_drawdown_pct=cast("float | None", strategy.max_drawdown_pct),
+        total_return=cast("float | None", strategy.total_return),
+        sharpe_ratio=cast("float | None", strategy.sharpe_ratio),
+        win_rate=cast("float | None", strategy.win_rate),
+        total_trades=cast("int | None", strategy.total_trades),
+        backtest_count=cast("int | None", strategy.backtest_count),
+        created_at=cast("datetime | None", strategy.created_at),
+        updated_at=cast("datetime | None", strategy.updated_at),
+        last_backtest_at=cast("datetime | None", strategy.last_backtest_at),
+        tags=tag_list,
+        version=cast(int, strategy.version),
+        is_active=cast(StrategyStatus, strategy.status) != StrategyStatus.ARCHIVED,
+        config=params,
     )
 
 
@@ -62,9 +74,9 @@ def _strategy_to_response(strategy: Strategy) -> StrategyResponse:
 async def list_strategies(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    strategy_type: Optional[str] = Query(None, description="Filter by strategy type"),
-    search: Optional[str] = Query(None, description="Search by name"),
+    status: str | None = Query(None, description="Filter by status"),
+    strategy_type: str | None = Query(None, description="Filter by strategy type"),
+    search: str | None = Query(None, max_length=100, description="Search by name"),
     db: Session = Depends(get_db),
 ):
     """
@@ -103,12 +115,7 @@ async def list_strategies(
 
         # Apply pagination
         offset = (page - 1) * page_size
-        strategies = (
-            query.order_by(Strategy.created_at.desc())
-            .offset(offset)
-            .limit(page_size)
-            .all()
-        )
+        strategies = query.order_by(Strategy.created_at.desc()).offset(offset).limit(page_size).all()
 
         # Convert to response
         items = [_strategy_to_response(s) for s in strategies]
@@ -122,8 +129,8 @@ async def list_strategies(
     except Exception as e:
         logger.error(f"Error listing strategies: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list strategies: {str(e)}",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list strategies: {e!s}",
         )
 
 
@@ -138,22 +145,22 @@ async def get_strategy_types():
             strategy_type="sma_crossover",
             parameters={"fast_period": 10, "slow_period": 30},
             parameters_meta={
-                "fast_period": {
-                    "default": 10,
-                    "min": 2,
-                    "max": 200,
-                    "step": 1,
-                    "param_type": "int",
-                    "description": "Fast SMA period",
-                },
-                "slow_period": {
-                    "default": 30,
-                    "min": 5,
-                    "max": 500,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "Slow SMA period",
-                },
+                "fast_period": ParameterMeta(
+                    default=10,
+                    min=2,
+                    max=200,
+                    step=1,
+                    param_type="int",
+                    description="Fast SMA period",
+                ),
+                "slow_period": ParameterMeta(
+                    default=30,
+                    min=5,
+                    max=500,
+                    step=5,
+                    param_type="int",
+                    description="Slow SMA period",
+                ),
             },
             description="Simple Moving Average Crossover - Buy when fast SMA crosses above slow SMA",
         ),
@@ -161,30 +168,30 @@ async def get_strategy_types():
             strategy_type="rsi",
             parameters={"period": 14, "overbought": 70, "oversold": 30},
             parameters_meta={
-                "period": {
-                    "default": 14,
-                    "min": 2,
-                    "max": 50,
-                    "step": 1,
-                    "param_type": "int",
-                    "description": "RSI period (recommended 7-21)",
-                },
-                "overbought": {
-                    "default": 70,
-                    "min": 50,
-                    "max": 95,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "Overbought threshold",
-                },
-                "oversold": {
-                    "default": 30,
-                    "min": 5,
-                    "max": 50,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "Oversold threshold",
-                },
+                "period": ParameterMeta(
+                    default=14,
+                    min=2,
+                    max=50,
+                    step=1,
+                    param_type="int",
+                    description="RSI period (recommended 7-21)",
+                ),
+                "overbought": ParameterMeta(
+                    default=70,
+                    min=50,
+                    max=95,
+                    step=5,
+                    param_type="int",
+                    description="Overbought threshold",
+                ),
+                "oversold": ParameterMeta(
+                    default=30,
+                    min=5,
+                    max=50,
+                    step=5,
+                    param_type="int",
+                    description="Oversold threshold",
+                ),
             },
             description="RSI Strategy - Buy when oversold, sell when overbought",
         ),
@@ -192,30 +199,30 @@ async def get_strategy_types():
             strategy_type="macd",
             parameters={"fast_period": 12, "slow_period": 26, "signal_period": 9},
             parameters_meta={
-                "fast_period": {
-                    "default": 12,
-                    "min": 2,
-                    "max": 50,
-                    "step": 1,
-                    "param_type": "int",
-                    "description": "MACD fast EMA period",
-                },
-                "slow_period": {
-                    "default": 26,
-                    "min": 10,
-                    "max": 100,
-                    "step": 2,
-                    "param_type": "int",
-                    "description": "MACD slow EMA period",
-                },
-                "signal_period": {
-                    "default": 9,
-                    "min": 2,
-                    "max": 30,
-                    "step": 1,
-                    "param_type": "int",
-                    "description": "MACD signal line period",
-                },
+                "fast_period": ParameterMeta(
+                    default=12,
+                    min=2,
+                    max=50,
+                    step=1,
+                    param_type="int",
+                    description="MACD fast EMA period",
+                ),
+                "slow_period": ParameterMeta(
+                    default=26,
+                    min=10,
+                    max=100,
+                    step=2,
+                    param_type="int",
+                    description="MACD slow EMA period",
+                ),
+                "signal_period": ParameterMeta(
+                    default=9,
+                    min=2,
+                    max=30,
+                    step=1,
+                    param_type="int",
+                    description="MACD signal line period",
+                ),
             },
             description="MACD Strategy - Buy on MACD/Signal crossover",
         ),
@@ -223,22 +230,22 @@ async def get_strategy_types():
             strategy_type="bollinger_bands",
             parameters={"period": 20, "std_dev": 2.0},
             parameters_meta={
-                "period": {
-                    "default": 20,
-                    "min": 5,
-                    "max": 100,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "Bollinger Bands period",
-                },
-                "std_dev": {
-                    "default": 2.0,
-                    "min": 0.5,
-                    "max": 5.0,
-                    "step": 0.25,
-                    "param_type": "float",
-                    "description": "Standard deviation multiplier",
-                },
+                "period": ParameterMeta(
+                    default=20,
+                    min=5,
+                    max=100,
+                    step=5,
+                    param_type="int",
+                    description="Bollinger Bands period",
+                ),
+                "std_dev": ParameterMeta(
+                    default=2.0,
+                    min=0.5,
+                    max=5.0,
+                    step=0.25,
+                    param_type="float",
+                    description="Standard deviation multiplier",
+                ),
             },
             description="Bollinger Bands - Buy at lower band, sell at upper band",
         ),
@@ -252,46 +259,46 @@ async def get_strategy_types():
                 "rsi_oversold": 30,
             },
             parameters_meta={
-                "bb_period": {
-                    "default": 20,
-                    "min": 5,
-                    "max": 100,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "Bollinger Bands period",
-                },
-                "bb_std": {
-                    "default": 2.0,
-                    "min": 0.5,
-                    "max": 5.0,
-                    "step": 0.25,
-                    "param_type": "float",
-                    "description": "BB std deviation",
-                },
-                "rsi_period": {
-                    "default": 14,
-                    "min": 2,
-                    "max": 50,
-                    "step": 1,
-                    "param_type": "int",
-                    "description": "RSI period",
-                },
-                "rsi_overbought": {
-                    "default": 70,
-                    "min": 50,
-                    "max": 95,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "RSI overbought",
-                },
-                "rsi_oversold": {
-                    "default": 30,
-                    "min": 5,
-                    "max": 50,
-                    "step": 5,
-                    "param_type": "int",
-                    "description": "RSI oversold",
-                },
+                "bb_period": ParameterMeta(
+                    default=20,
+                    min=5,
+                    max=100,
+                    step=5,
+                    param_type="int",
+                    description="Bollinger Bands period",
+                ),
+                "bb_std": ParameterMeta(
+                    default=2.0,
+                    min=0.5,
+                    max=5.0,
+                    step=0.25,
+                    param_type="float",
+                    description="BB std deviation",
+                ),
+                "rsi_period": ParameterMeta(
+                    default=14,
+                    min=2,
+                    max=50,
+                    step=1,
+                    param_type="int",
+                    description="RSI period",
+                ),
+                "rsi_overbought": ParameterMeta(
+                    default=70,
+                    min=50,
+                    max=95,
+                    step=5,
+                    param_type="int",
+                    description="RSI overbought",
+                ),
+                "rsi_oversold": ParameterMeta(
+                    default=30,
+                    min=5,
+                    max=50,
+                    step=5,
+                    param_type="int",
+                    description="RSI oversold",
+                ),
             },
             description="Combined Bollinger Bands and RSI strategy",
         ),
@@ -313,24 +320,21 @@ async def get_strategy(
     """
     Get a specific strategy by ID.
     """
-    strategy = (
-        db.query(Strategy)
-        .filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False))
-        .first()
-    )
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False)).first()
 
     if not strategy:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
     return _strategy_to_response(strategy)
 
 
-@router.post("/", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=StrategyResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_strategy(
     strategy_data: StrategyCreate,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """
@@ -356,7 +360,7 @@ async def create_strategy(
             direction = (strategy_data.parameters or {}).get("_direction", "both")
             if direction == "both":
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
                     detail="Стратегия DCA работает только в одном направлении. Выберите 'long' или 'short'.",
                 )
 
@@ -381,8 +385,8 @@ async def create_strategy(
             take_profit_pct=strategy_data.take_profit_pct,
             max_drawdown_pct=strategy_data.max_drawdown_pct,
             tags=strategy_data.tags or [],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         db.add(strategy)
@@ -390,14 +394,15 @@ async def create_strategy(
         db.refresh(strategy)
 
         logger.info(f"Created strategy: {strategy.id} - {strategy.name}")
+        response.headers["Location"] = f"/api/v1/strategies/{strategy.id}"
         return _strategy_to_response(strategy)
 
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating strategy: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create strategy: {str(e)}",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create strategy: {e!s}",
         )
 
 
@@ -412,15 +417,11 @@ async def update_strategy(
 
     Only provided fields will be updated.
     """
-    strategy = (
-        db.query(Strategy)
-        .filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False))
-        .first()
-    )
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False)).first()
 
     if not strategy:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
@@ -435,23 +436,17 @@ async def update_strategy(
                         setattr(
                             strategy,
                             field,
-                            StrategyType(
-                                value.value if hasattr(value, "value") else value
-                            ),
+                            StrategyType(value.value if hasattr(value, "value") else value),
                         )
                     except ValueError:
                         setattr(strategy, field, StrategyType.CUSTOM)
                 elif field == "status":
-                    try:
+                    with contextlib.suppress(ValueError):
                         setattr(
                             strategy,
                             field,
-                            StrategyStatus(
-                                value.value if hasattr(value, "value") else value
-                            ),
+                            StrategyStatus(value.value if hasattr(value, "value") else value),
                         )
-                    except ValueError:
-                        pass
                 elif field not in ("is_active", "config"):  # Skip legacy fields
                     setattr(strategy, field, value)
 
@@ -459,16 +454,17 @@ async def update_strategy(
         # VALIDATION: DCA strategy is uni-directional
         # =========================================================================
         if strategy.strategy_type == StrategyType.DCA:
-            params = strategy.parameters or {}
+            _raw = strategy.parameters
+            params: dict[str, Any] = _raw if isinstance(_raw, dict) else {}
             direction = params.get("_direction", "both")
             if direction == "both":
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
                     detail="Стратегия DCA работает только в одном направлении. Выберите 'long' или 'short'.",
                 )
 
-        strategy.updated_at = datetime.now(timezone.utc)
-        strategy.version += 1
+        strategy.updated_at = datetime.now(UTC)  # type: ignore[assignment]
+        strategy.version += 1  # type: ignore[assignment]
 
         db.commit()
         db.refresh(strategy)
@@ -480,17 +476,15 @@ async def update_strategy(
         db.rollback()
         logger.error(f"Error updating strategy: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update strategy: {str(e)}",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update strategy: {e!s}",
         )
 
 
-@router.delete("/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{strategy_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_strategy(
     strategy_id: str,
-    permanent: bool = Query(
-        False, description="Permanently delete instead of soft delete"
-    ),
+    permanent: bool = Query(False, description="Permanently delete instead of soft delete"),
     db: Session = Depends(get_db),
 ):
     """
@@ -502,7 +496,7 @@ async def delete_strategy(
 
     if not strategy:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
@@ -511,9 +505,9 @@ async def delete_strategy(
             db.delete(strategy)
             logger.info(f"Permanently deleted strategy: {strategy_id}")
         else:
-            strategy.is_deleted = True
-            strategy.deleted_at = datetime.now(timezone.utc)
-            strategy.status = StrategyStatus.ARCHIVED
+            strategy.is_deleted = True  # type: ignore[assignment]
+            strategy.deleted_at = datetime.now(UTC)  # type: ignore[assignment]
+            strategy.status = StrategyStatus.ARCHIVED  # type: ignore[assignment]
             logger.info(f"Soft deleted strategy: {strategy_id}")
 
         db.commit()
@@ -523,21 +517,19 @@ async def delete_strategy(
         db.rollback()
         logger.error(f"Error deleting strategy: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete strategy: {str(e)}",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete strategy: {e!s}",
         )
 
 
 @router.post(
     "/{strategy_id}/duplicate",
     response_model=StrategyResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
 )
 async def duplicate_strategy(
     strategy_id: str,
-    new_name: Optional[str] = Query(
-        None, description="Name for the duplicated strategy"
-    ),
+    new_name: str | None = Query(None, description="Name for the duplicated strategy"),
     db: Session = Depends(get_db),
 ):
     """
@@ -545,15 +537,11 @@ async def duplicate_strategy(
 
     Creates a copy of the strategy with a new ID and optional new name.
     """
-    original = (
-        db.query(Strategy)
-        .filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False))
-        .first()
-    )
+    original = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False)).first()
 
     if not original:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
@@ -575,8 +563,8 @@ async def duplicate_strategy(
             max_drawdown_pct=original.max_drawdown_pct,
             tags=original.tags.copy() if original.tags else [],
             user_id=original.user_id,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         db.add(duplicate)
@@ -590,8 +578,8 @@ async def duplicate_strategy(
         db.rollback()
         logger.error(f"Error duplicating strategy: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to duplicate strategy: {str(e)}",
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to duplicate strategy: {e!s}",
         )
 
 
@@ -603,20 +591,16 @@ async def activate_strategy(
     """
     Activate a strategy (set status to ACTIVE).
     """
-    strategy = (
-        db.query(Strategy)
-        .filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False))
-        .first()
-    )
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False)).first()
 
     if not strategy:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
-    strategy.status = StrategyStatus.ACTIVE
-    strategy.updated_at = datetime.now(timezone.utc)
+    strategy.status = StrategyStatus.ACTIVE  # type: ignore[assignment]
+    strategy.updated_at = datetime.now(UTC)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(strategy)
@@ -633,20 +617,16 @@ async def pause_strategy(
     """
     Pause a strategy (set status to PAUSED).
     """
-    strategy = (
-        db.query(Strategy)
-        .filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False))
-        .first()
-    )
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.is_deleted.is_(False)).first()
 
     if not strategy:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Strategy with id '{strategy_id}' not found",
         )
 
-    strategy.status = StrategyStatus.PAUSED
-    strategy.updated_at = datetime.now(timezone.utc)
+    strategy.status = StrategyStatus.PAUSED  # type: ignore[assignment]
+    strategy.updated_at = datetime.now(UTC)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(strategy)

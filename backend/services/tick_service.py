@@ -9,13 +9,15 @@ Provides:
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Callable, Deque, Dict, List, Optional, Set
+from datetime import UTC, datetime
+from typing import Any
 
 import websockets
 
@@ -23,6 +25,9 @@ from backend.core.expiring_cache import ExpiringSet
 from backend.core.metrics import get_metrics
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
 
 
 @dataclass
@@ -85,17 +90,15 @@ class TickAggregator:
     """Aggregates trades into tick candles."""
 
     ticks_per_bar: int = 100
-    current_trades: List[Trade] = field(default_factory=list)
-    completed_candles: Deque[TickCandle] = field(
-        default_factory=lambda: deque(maxlen=1000)
-    )
+    current_trades: list[Trade] = field(default_factory=list)
+    completed_candles: deque[TickCandle] = field(default_factory=lambda: deque(maxlen=1000))
     # Cached values for current candle (avoid recalculating on each get)
     _current_high: float = 0.0
     _current_low: float = float("inf")
     _current_buy_vol: float = 0.0
     _current_sell_vol: float = 0.0
 
-    def add_trade(self, trade: Trade) -> Optional[TickCandle]:
+    def add_trade(self, trade: Trade) -> TickCandle | None:
         """
         Add a trade and return completed candle if threshold reached.
 
@@ -149,7 +152,7 @@ class TickAggregator:
             trade_count=len(self.current_trades),
         )
 
-    def get_current_candle(self) -> Optional[dict]:
+    def get_current_candle(self) -> dict | None:
         """Get current incomplete candle for real-time updates."""
         if not self.current_trades:
             return None
@@ -170,7 +173,7 @@ class TickAggregator:
             "is_complete": False,
         }
 
-    def get_history(self, limit: int = 100) -> List[dict]:
+    def get_history(self, limit: int = 100) -> list[dict]:
         """Get completed candles history."""
         candles = list(self.completed_candles)[-limit:]
         return [c.to_dict() for c in candles]
@@ -191,51 +194,47 @@ class TickService:
     BYBIT_WS_URL = "wss://stream.bybit.com/v5/public/spot"
     MAX_AGGREGATORS = 500  # Increased to handle 5000 concurrent connections
 
-    def __init__(
-        self, use_redis: bool = False, redis_url: str = "redis://localhost:6379"
-    ):
+    def __init__(self, use_redis: bool = False, redis_url: str = "redis://localhost:6379"):
         self._running = False
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
-        self._ws_task: Optional[asyncio.Task] = None
-        self._reconnect_delay = 5
-        self._initial_reconnect_delay = 5
-        self._max_reconnect_delay = 60
-        self._reconnect_multiplier = 1.5
+        self._ws: Any | None = None
+        self._ws_task: asyncio.Task | None = None
+        self._reconnect_delay: float = 5.0
+        self._initial_reconnect_delay: float = 5.0
+        self._max_reconnect_delay: float = 60.0
+        self._reconnect_multiplier: float = 1.5
 
         # Redis mode for horizontal scaling
         self._use_redis = use_redis
         self._redis_url = redis_url
-        self._redis_subscriber = None
+        self._redis_subscriber: Any | None = None
 
         # Aggregators per symbol and tick count
         # Key: (symbol, ticks_per_bar), Value: TickAggregator
-        self._aggregators: Dict[tuple, TickAggregator] = {}
+        self._aggregators: dict[tuple, TickAggregator] = {}
 
         # OPTIMIZATION: Index for fast lookup by symbol
         # Instead of looping through all 500 aggregators for each trade,
         # we maintain a symbol-based index for O(1) lookup
-        self._aggregators_by_symbol: Dict[
-            str, List[tuple]
-        ] = {}  # symbol -> [(symbol, ticks), ...]
+        self._aggregators_by_symbol: dict[str, list[tuple]] = {}  # symbol -> [(symbol, ticks), ...]
 
         # Subscribed symbols
-        self._subscribed_symbols: Set[str] = set()
+        self._subscribed_symbols: set[str] = set()
 
         # Callbacks for new candles
-        self._candle_callbacks: List[Callable[[str, int, TickCandle], None]] = []
+        self._candle_callbacks: list[Callable[[str, int, TickCandle], None]] = []
 
         # Callbacks for trade updates (real-time)
-        self._trade_callbacks: List[Callable[[str, Trade], None]] = []
+        self._trade_callbacks: list[Callable[[str, Trade], None]] = []
 
         # Recent trades buffer per symbol
-        self._recent_trades: Dict[str, Deque[Trade]] = {}
+        self._recent_trades: dict[str, deque[Trade]] = {}
 
         # Trade deduplication - ExpiringSet with 60s TTL, max 100k trades
         # Prevents duplicate trades (e.g., reconnection, Redis retry)
         self._seen_trades = ExpiringSet(ttl_seconds=60.0, max_size=100000)
 
         # Stats
-        self._stats = {
+        self._stats: dict[str, Any] = {
             "trades_received": 0,
             "trades_duplicates": 0,
             "candles_created": 0,
@@ -256,8 +255,7 @@ class TickService:
                     key=lambda k: len(self._aggregators[k].completed_candles),
                 )
                 logger.warning(
-                    f"Aggregator limit ({self.MAX_AGGREGATORS}) reached. "
-                    f"Removing aggregator for {oldest_key}"
+                    f"Aggregator limit ({self.MAX_AGGREGATORS}) reached. Removing aggregator for {oldest_key}"
                 )
                 # Remove from index
                 old_symbol = oldest_key[0]
@@ -275,13 +273,11 @@ class TickService:
                 self._aggregators_by_symbol[symbol] = []
             self._aggregators_by_symbol[symbol].append(key)
 
-            logger.info(
-                f"Created new aggregator for {symbol} with {ticks_per_bar} ticks/bar"
-            )
+            logger.info(f"Created new aggregator for {symbol} with {ticks_per_bar} ticks/bar")
 
         return self._aggregators[key]
 
-    async def start(self, symbols: List[str] = None):
+    async def start(self, symbols: list[str] | None = None):
         """Start the tick service."""
         if self._running:
             logger.warning("TickService already running")
@@ -300,7 +296,7 @@ class TickService:
             logger.info(f"Starting TickService in DIRECT mode for symbols: {symbols}")
             self._ws_task = asyncio.create_task(self._ws_loop())
 
-    async def _start_redis_subscriber(self, symbols: List[str]):
+    async def _start_redis_subscriber(self, symbols: list[str]):
         """Start Redis subscriber for horizontal scaling."""
         try:
             from backend.services.tick_redis_broadcaster import RedisTickSubscriber
@@ -351,10 +347,8 @@ class TickService:
 
         if self._ws_task:
             self._ws_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._ws_task
-            except asyncio.CancelledError:
-                pass
 
         logger.info("TickService stopped")
 
@@ -390,9 +384,7 @@ class TickService:
 
         remaining = len(self._trade_callbacks) + len(self._candle_callbacks)
         if remaining > 0:
-            logger.warning(
-                f"Force closing {remaining} remaining callbacks after timeout"
-            )
+            logger.warning(f"Force closing {remaining} remaining callbacks after timeout")
 
         # Force stop
         await self.stop()
@@ -417,10 +409,7 @@ class TickService:
                 )
 
             if self._running:
-                logger.info(
-                    f"Reconnecting in {self._reconnect_delay:.1f}s "
-                    f"(attempt #{self._stats['reconnects']})..."
-                )
+                logger.info(f"Reconnecting in {self._reconnect_delay:.1f}s (attempt #{self._stats['reconnects']})...")
                 await asyncio.sleep(self._reconnect_delay)
 
     async def _connect_and_listen(self):
@@ -438,16 +427,14 @@ class TickService:
             # Subscribe to trade streams
             subscribe_msg = {
                 "op": "subscribe",
-                "args": [
-                    f"publicTrade.{symbol}" for symbol in self._subscribed_symbols
-                ],
+                "args": [f"publicTrade.{symbol}" for symbol in self._subscribed_symbols],
             }
             await ws.send(json.dumps(subscribe_msg))
             logger.info(f"Subscribed to: {subscribe_msg['args']}")
 
             # Listen for messages
             async for message in ws:
-                await self._handle_message(message)
+                await self._handle_message(message if isinstance(message, str) else message.decode())
 
     async def _handle_message(self, message: str):
         """Handle incoming WebSocket message."""
@@ -471,7 +458,7 @@ class TickService:
         """Process a single trade - synchronous, fast.
 
         OPTIMIZATION: Direct lookup instead of O(n) loop over all aggregators.
-        Old: Loop all aggregators per trade (500 × 1360/s = 680k ops/s)
+        Old: Loop all aggregators per trade (500 x 1360/s = 680k ops/s)
         New: Direct dict lookup by symbol O(1)
 
         DEDUPLICATION: Uses ExpiringSet to skip duplicates on reconnection.
@@ -486,7 +473,7 @@ class TickService:
             return
 
         self._stats["trades_received"] += 1
-        self._stats["last_trade_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["last_trade_time"] = datetime.now(UTC).isoformat()
 
         # Store in recent trades
         if symbol not in self._recent_trades:
@@ -499,10 +486,8 @@ class TickService:
 
         # Notify trade callbacks (quick, non-blocking)
         for callback in self._trade_callbacks:
-            try:
+            with contextlib.suppress(Exception):
                 callback(symbol, trade)
-            except Exception:
-                pass  # Ignore errors, don't slow down
 
         # OPTIMIZATION: Use symbol index for O(1) lookup
         # Old: for (sym, ticks), agg in aggregators.items(): O(n) = 680k ops/s
@@ -518,11 +503,9 @@ class TickService:
                     # Record candle creation metric
                     metrics.tick_candle_created(symbol, f"{ticks_per_bar}T")
                     # Notify candle callbacks
-                    for callback in self._candle_callbacks:
-                        try:
-                            callback(symbol, ticks_per_bar, candle)
-                        except Exception:
-                            pass  # Ignore errors, don't slow down
+                    for candle_callback in self._candle_callbacks:
+                        with contextlib.suppress(Exception):
+                            candle_callback(symbol, ticks_per_bar, candle)
 
         # Log slow processing (over 5ms is suspicious for a single trade)
         dt = time.perf_counter() - t0
@@ -538,10 +521,8 @@ class TickService:
 
     def remove_candle_callback(self, callback: Callable[[str, int, TickCandle], None]):
         """Unregister callback for completed candles. Prevents memory leaks."""
-        try:
+        with contextlib.suppress(ValueError):
             self._candle_callbacks.remove(callback)
-        except ValueError:
-            pass  # Callback not found, ignore
 
     def add_trade_callback(self, callback: Callable[[str, Trade], None]):
         """Register callback for real-time trades."""
@@ -549,26 +530,20 @@ class TickService:
 
     def remove_trade_callback(self, callback: Callable[[str, Trade], None]):
         """Unregister callback for trades. Prevents memory leaks."""
-        try:
+        with contextlib.suppress(ValueError):
             self._trade_callbacks.remove(callback)
-        except ValueError:
-            pass  # Callback not found, ignore
 
-    def get_tick_candles(
-        self, symbol: str, ticks_per_bar: int = 100, limit: int = 100
-    ) -> List[dict]:
+    def get_tick_candles(self, symbol: str, ticks_per_bar: int = 100, limit: int = 100) -> list[dict]:
         """Get tick candles for symbol."""
         aggregator = self.get_aggregator(symbol, ticks_per_bar)
         return aggregator.get_history(limit)
 
-    def get_current_candle(
-        self, symbol: str, ticks_per_bar: int = 100
-    ) -> Optional[dict]:
+    def get_current_candle(self, symbol: str, ticks_per_bar: int = 100) -> dict | None:
         """Get current incomplete candle."""
         aggregator = self.get_aggregator(symbol, ticks_per_bar)
         return aggregator.get_current_candle()
 
-    def get_recent_trades(self, symbol: str, limit: int = 100) -> List[dict]:
+    def get_recent_trades(self, symbol: str, limit: int = 100) -> list[dict]:
         """Get recent trades for symbol."""
         trades = self._recent_trades.get(symbol, deque())
         return [
@@ -622,10 +597,10 @@ class TickService:
 
 
 # Singleton instance
-_tick_service: Optional[TickService] = None
+_tick_service: TickService | None = None
 
 
-def get_tick_service(use_redis: bool = None, redis_url: str = None) -> TickService:
+def get_tick_service(use_redis: bool | None = None, redis_url: str | None = None) -> TickService:
     """Get the singleton TickService instance.
 
     Args:
@@ -642,12 +617,8 @@ def get_tick_service(use_redis: bool = None, redis_url: str = None) -> TickServi
         # Check environment for Redis mode
         import os
 
-        _use_redis = (
-            use_redis
-            if use_redis is not None
-            else os.environ.get("TICK_USE_REDIS", "").lower() == "true"
-        )
-        _redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
+        _use_redis = use_redis if use_redis is not None else os.environ.get("TICK_USE_REDIS", "").lower() == "true"
+        _redis_url = redis_url or os.environ.get("REDIS_URL") or "redis://localhost:6379"
 
         _tick_service = TickService(use_redis=_use_redis, redis_url=_redis_url)
 
@@ -681,20 +652,17 @@ def setup_signal_handlers():
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    loop.create_task(service.graceful_shutdown(drain_timeout=30.0))
+                    task = loop.create_task(service.graceful_shutdown(drain_timeout=30.0))
+                    _background_tasks.add(task)
+                    task.add_done_callback(_background_tasks.discard)
                 else:
-                    loop.run_until_complete(
-                        service.graceful_shutdown(drain_timeout=30.0)
-                    )
+                    loop.run_until_complete(service.graceful_shutdown(drain_timeout=30.0))
             except Exception as e:
                 logger.error(f"Error during graceful shutdown: {e}")
 
     # Register handlers (Windows doesn't have SIGTERM, use SIGINT)
     signal.signal(signal.SIGINT, handle_shutdown)
-    try:
+    with contextlib.suppress(ValueError, OSError):
         signal.signal(signal.SIGTERM, handle_shutdown)
-    except (ValueError, OSError):
-        # SIGTERM not available on Windows in some contexts
-        pass
 
     logger.info("Signal handlers registered for graceful shutdown")

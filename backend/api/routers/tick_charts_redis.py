@@ -14,8 +14,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -24,6 +23,17 @@ from pydantic import BaseModel
 from backend.services.tick_service import Trade, get_tick_service
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks — prevents GC before completion (RUF006)
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coroutine) -> asyncio.Task:
+    task = asyncio.create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 router = APIRouter(prefix="/ticks", tags=["Tick Charts"])
 
@@ -44,7 +54,7 @@ MAX_CONNECTIONS_PER_WORKER = 800
 MAX_CONNECTIONS_PER_IP = 50
 MAX_CONNECTIONS_GLOBAL = 5000
 
-connection_ips = defaultdict(list)
+connection_ips: dict[str, list[float]] = defaultdict(list)
 active_connections = 0
 active_connections_lock = asyncio.Lock()
 
@@ -61,9 +71,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
             )
 
         now = time.time()
-        connection_ips[client_ip] = [
-            ts for ts in connection_ips[client_ip] if now - ts < 60
-        ]
+        connection_ips[client_ip] = [ts for ts in connection_ips[client_ip] if now - ts < 60]
 
         if len(connection_ips[client_ip]) >= MAX_CONNECTIONS_PER_IP:
             return False, f"Too many connections from IP ({MAX_CONNECTIONS_PER_IP} max)"
@@ -122,7 +130,7 @@ class TickServiceStatus(BaseModel):
     candles_created: int
     reconnects: int
     last_trade_time: str | None
-    subscribed_symbols: List[str]
+    subscribed_symbols: list[str]
 
 
 # =============================================================================
@@ -130,7 +138,7 @@ class TickServiceStatus(BaseModel):
 # =============================================================================
 
 
-@router.get("/candles", response_model=List[TickCandleOut])
+@router.get("/candles", response_model=list[TickCandleOut])
 async def get_tick_candles(
     symbol: str = Query("BTCUSDT", description="Trading pair symbol"),
     ticks: int = Query(100, ge=10, le=10000, description="Ticks per candle (10-10000)"),
@@ -157,9 +165,7 @@ async def get_status():
             return {
                 "mode": "redis",
                 "redis_connected": True,
-                "total_commands_processed": info.get(
-                    "total_commands_processed", "unknown"
-                ),
+                "total_commands_processed": info.get("total_commands_processed", "unknown"),
             }
         except Exception as e:
             return {"mode": "redis", "redis_connected": False, "error": str(e)}
@@ -174,16 +180,14 @@ async def get_status():
 # =============================================================================
 
 
-async def handle_legacy_websocket(
-    websocket: WebSocket, symbol: str, ticks: int, client_ip: str
-):
+async def handle_legacy_websocket(websocket: WebSocket, symbol: str, ticks: int, client_ip: str):
     """Handle WebSocket in legacy mode (TickService singleton)."""
     logger.info(f"Legacy WS: {symbol}, {ticks} ticks (IP: {client_ip})")
 
     service = get_tick_service()
 
     if not service.is_running():
-        asyncio.create_task(service.start([symbol]))
+        _fire_and_forget(service.start([symbol]))
 
     service.get_aggregator(symbol, ticks)
 
@@ -231,7 +235,7 @@ async def handle_legacy_websocket(
 
         current = service.get_current_candle(symbol, ticks)
         if current:
-            current["server_time"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+            current["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
             await websocket.send_json({"type": "current", "data": current})
 
         if pending_trades:
@@ -245,9 +249,7 @@ async def handle_legacy_websocket(
 # =============================================================================
 
 
-async def handle_redis_websocket(
-    websocket: WebSocket, symbol: str, ticks: int, client_ip: str
-):
+async def handle_redis_websocket(websocket: WebSocket, symbol: str, ticks: int, client_ip: str):
     """
     Handle WebSocket in Redis mode.
 
@@ -287,13 +289,13 @@ async def handle_redis_websocket(
         trade_sample_counter = 0
         TRADE_SAMPLE_RATE = 3
 
-        # Listen for Redis messages
-        listen_task = asyncio.create_task(pubsub.listen())
+        # Listen for Redis messages — pubsub.listen() is an async generator
+        listen_gen = pubsub.listen()
 
         while True:
             try:
                 # Get next message from Redis (with timeout)
-                message = await asyncio.wait_for(listen_task.__anext__(), timeout=0.05)
+                message = await asyncio.wait_for(listen_gen.__anext__(), timeout=0.05)
 
                 # Parse Redis message
                 if message["type"] == "message":
@@ -303,9 +305,7 @@ async def handle_redis_websocket(
                     if channel == candle_channel:
                         # Completed candle from aggregator
                         candle_dict = data.get("candle", data)
-                        await websocket.send_json(
-                            {"type": "candle", "data": candle_dict}
-                        )
+                        await websocket.send_json({"type": "candle", "data": candle_dict})
 
                         # Update current candle state
                         current_candle_state = data.get("current_candle")
@@ -319,23 +319,17 @@ async def handle_redis_websocket(
                             if len(pending_trades) > 20:
                                 pending_trades.pop(0)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message within 50ms - send current candle state
                 if current_candle_state:
-                    current_candle_state["server_time"] = int(
-                        datetime.now(timezone.utc).timestamp() * 1000
-                    )
-                    await websocket.send_json(
-                        {"type": "current", "data": current_candle_state}
-                    )
+                    current_candle_state["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
+                    await websocket.send_json({"type": "current", "data": current_candle_state})
 
                 # Send pending trades
                 if pending_trades:
                     trades_to_send = pending_trades.copy()
                     pending_trades.clear()
-                    await websocket.send_json(
-                        {"type": "trades", "data": trades_to_send}
-                    )
+                    await websocket.send_json({"type": "trades", "data": trades_to_send})
 
     except Exception as e:
         logger.error(f"Redis WS error: {e}")
@@ -402,7 +396,4 @@ async def tick_websocket(
         logger.error(f"Tick WebSocket error: {e}")
     finally:
         await release_connection(client_ip)
-        logger.info(
-            f"Tick WebSocket closed: {symbol} (IP: {client_ip}, "
-            f"Remaining: {active_connections})"
-        )
+        logger.info(f"Tick WebSocket closed: {symbol} (IP: {client_ip}, Remaining: {active_connections})")

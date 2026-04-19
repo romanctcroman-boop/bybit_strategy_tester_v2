@@ -1,112 +1,114 @@
 /**
  * 📄 Ml Models Page JavaScript
- * 
+ *
  * Page-specific scripts for ml_models.html
  * Extracted during Phase 1 Week 3: JS Extraction
- * 
+ *
  * @version 1.0.0
  * @date 2025-12-21
  */
 
-// Import shared utilities
+// Import shared utilities (reserved for future use)
+// eslint-disable-next-line no-unused-vars
 import { apiClient, API_CONFIG } from '../api.js';
+// eslint-disable-next-line no-unused-vars
 import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js';
 
 // Sample data
-        const models = [
-            {
-                id: 'mdl_001',
-                name: 'BTC_Trend_Classifier',
-                type: 'XGBoost',
-                taskType: 'classification',
-                status: 'active',
-                accuracy: 0.892,
-                predictions: 15234,
-                lastUpdated: '2025-12-13T10:30:00Z',
-                features: ['rsi', 'macd', 'volume', 'price_change'],
-                version: '2.1.0'
-            },
-            {
-                id: 'mdl_002',
-                name: 'ETH_Price_Regressor',
-                type: 'LightGBM',
-                taskType: 'regression',
-                status: 'active',
-                accuracy: 0.856,
-                predictions: 12456,
-                lastUpdated: '2025-12-13T09:15:00Z',
-                features: ['rsi', 'bollinger', 'volume'],
-                version: '1.5.0'
-            },
-            {
-                id: 'mdl_003',
-                name: 'Multi_Asset_Ensemble',
-                type: 'Ensemble',
-                taskType: 'classification',
-                status: 'training',
-                accuracy: 0.823,
-                predictions: 8934,
-                lastUpdated: '2025-12-13T08:00:00Z',
-                features: ['rsi', 'macd', 'atr', 'obv'],
-                version: '3.0.0'
-            },
-            {
-                id: 'mdl_004',
-                name: 'SOL_LSTM_Predictor',
-                type: 'LSTM',
-                taskType: 'regression',
-                status: 'active',
-                accuracy: 0.871,
-                predictions: 5678,
-                lastUpdated: '2025-12-12T22:45:00Z',
-                features: ['price_sequence', 'volume_sequence'],
-                version: '1.0.0'
-            },
-            {
-                id: 'mdl_005',
-                name: 'Volatility_Detector',
-                type: 'Random Forest',
-                taskType: 'classification',
-                status: 'inactive',
-                accuracy: 0.765,
-                predictions: 3421,
-                lastUpdated: '2025-12-10T14:20:00Z',
-                features: ['atr', 'bollinger_width', 'volume_std'],
-                version: '1.2.0'
-            }
-        ];
+const models = [
+    {
+        id: 'mdl_001',
+        name: 'BTC_Trend_Classifier',
+        type: 'XGBoost',
+        taskType: 'classification',
+        status: 'active',
+        accuracy: 0.892,
+        predictions: 15234,
+        lastUpdated: '2025-12-13T10:30:00Z',
+        features: ['rsi', 'macd', 'volume', 'price_change'],
+        version: '2.1.0'
+    },
+    {
+        id: 'mdl_002',
+        name: 'ETH_Price_Regressor',
+        type: 'LightGBM',
+        taskType: 'regression',
+        status: 'active',
+        accuracy: 0.856,
+        predictions: 12456,
+        lastUpdated: '2025-12-13T09:15:00Z',
+        features: ['rsi', 'bollinger', 'volume'],
+        version: '1.5.0'
+    },
+    {
+        id: 'mdl_003',
+        name: 'Multi_Asset_Ensemble',
+        type: 'Ensemble',
+        taskType: 'classification',
+        status: 'training',
+        accuracy: 0.823,
+        predictions: 8934,
+        lastUpdated: '2025-12-13T08:00:00Z',
+        features: ['rsi', 'macd', 'atr', 'obv'],
+        version: '3.0.0'
+    },
+    {
+        id: 'mdl_004',
+        name: 'SOL_LSTM_Predictor',
+        type: 'LSTM',
+        taskType: 'regression',
+        status: 'active',
+        accuracy: 0.871,
+        predictions: 5678,
+        lastUpdated: '2025-12-12T22:45:00Z',
+        features: ['price_sequence', 'volume_sequence'],
+        version: '1.0.0'
+    },
+    {
+        id: 'mdl_005',
+        name: 'Volatility_Detector',
+        type: 'Random Forest',
+        taskType: 'classification',
+        status: 'inactive',
+        accuracy: 0.765,
+        predictions: 3421,
+        lastUpdated: '2025-12-10T14:20:00Z',
+        features: ['atr', 'bollinger_width', 'volume_std'],
+        version: '1.2.0'
+    }
+];
 
-        const trainingHistory = [
-            { id: 1, model: 'BTC_Trend_Classifier', status: 'success', time: '10 minutes ago', message: 'Training completed - accuracy improved to 89.2%' },
-            { id: 2, model: 'Multi_Asset_Ensemble', status: 'warning', time: '2 hours ago', message: 'Training in progress - 67% complete' },
-            { id: 3, model: 'ETH_Price_Regressor', status: 'success', time: '5 hours ago', message: 'Model retrained with new data' },
-            { id: 4, model: 'Volatility_Detector', status: 'error', time: '1 day ago', message: 'Training failed - insufficient data' }
-        ];
+const trainingHistory = [
+    { id: 1, model: 'BTC_Trend_Classifier', status: 'success', time: '10 minutes ago', message: 'Training completed - accuracy improved to 89.2%' },
+    { id: 2, model: 'Multi_Asset_Ensemble', status: 'warning', time: '2 hours ago', message: 'Training in progress - 67% complete' },
+    { id: 3, model: 'ETH_Price_Regressor', status: 'success', time: '5 hours ago', message: 'Model retrained with new data' },
+    { id: 4, model: 'Volatility_Detector', status: 'error', time: '1 day ago', message: 'Training failed - insufficient data' }
+];
 
-        const recentPredictions = [
-            { symbol: 'BTCUSDT', direction: 'long', confidence: 0.87, target: 105000, model: 'BTC_Trend_Classifier' },
-            { symbol: 'ETHUSDT', direction: 'short', confidence: 0.72, target: 3800, model: 'ETH_Price_Regressor' },
-            { symbol: 'SOLUSDT', direction: 'long', confidence: 0.81, target: 250, model: 'SOL_LSTM_Predictor' }
-        ];
+const recentPredictions = [
+    { symbol: 'BTCUSDT', direction: 'long', confidence: 0.87, target: 105000, model: 'BTC_Trend_Classifier' },
+    { symbol: 'ETHUSDT', direction: 'short', confidence: 0.72, target: 3800, model: 'ETH_Price_Regressor' },
+    { symbol: 'SOLUSDT', direction: 'long', confidence: 0.81, target: 250, model: 'SOL_LSTM_Predictor' }
+];
 
-        let selectedModel = null;
+let selectedModel = null;
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            renderModelsTable();
-            renderTrainingHistory();
-            renderRecentPredictions();
-            setupEventListeners();
-        });
+// Initialize
+document.addEventListener('DOMContentLoaded', function () {
+    renderModelsTable();
+    renderTrainingHistory();
+    renderRecentPredictions();
+    setupEventListeners();
+});
 
-        function setupEventListeners() {
-            document.getElementById('modelSearch').addEventListener('input', filterModels);
-            document.getElementById('modelTypeFilter').addEventListener('change', filterModels);
-        }
+function setupEventListeners() {
+    document.getElementById('modelSearch').addEventListener('input', filterModels);
+    document.getElementById('modelTypeFilter').addEventListener('change', filterModels);
+}
 
-        function renderModelsTable() {
-            const tbody = document.getElementById('modelsTableBody');
-            tbody.innerHTML = models.map(model => `
+function renderModelsTable() {
+    const tbody = document.getElementById('modelsTableBody');
+    tbody.innerHTML = models.map(model => `
                 <tr onclick="selectModel('${model.id}')" style="cursor: pointer">
                     <td>
                         <div class="model-name">
@@ -144,18 +146,18 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                     </td>
                 </tr>
             `).join('');
-        }
+}
 
-        function selectModel(modelId) {
-            selectedModel = models.find(m => m.id === modelId);
-            renderModelDetails();
-        }
+function selectModel(modelId) {
+    selectedModel = models.find(m => m.id === modelId);
+    renderModelDetails();
+}
 
-        function renderModelDetails() {
-            if (!selectedModel) return;
+function renderModelDetails() {
+    if (!selectedModel) return;
 
-            const content = document.getElementById('modelDetailsContent');
-            content.innerHTML = `
+    const content = document.getElementById('modelDetailsContent');
+    content.innerHTML = `
                 <div class="model-details">
                     <div class="detail-item">
                         <span class="detail-label">Name</span>
@@ -191,11 +193,11 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                     </button>
                 </div>
             `;
-        }
+}
 
-        function renderTrainingHistory() {
-            const container = document.getElementById('trainingHistory');
-            container.innerHTML = trainingHistory.map(item => `
+function renderTrainingHistory() {
+    const container = document.getElementById('trainingHistory');
+    container.innerHTML = trainingHistory.map(item => `
                 <div class="training-item">
                     <div class="training-icon ${item.status}">
                         <i class="bi bi-${getStatusIcon(item.status)}"></i>
@@ -206,11 +208,11 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                     </div>
                 </div>
             `).join('');
-        }
+}
 
-        function renderRecentPredictions() {
-            const container = document.getElementById('recentPredictions');
-            container.innerHTML = recentPredictions.map(pred => `
+function renderRecentPredictions() {
+    const container = document.getElementById('recentPredictions');
+    container.innerHTML = recentPredictions.map(pred => `
                 <div class="prediction-card">
                     <div class="prediction-header">
                         <span class="prediction-symbol">${pred.symbol}</span>
@@ -231,30 +233,30 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                     </div>
                 </div>
             `).join('');
-        }
+}
 
-        function filterModels() {
-            const search = document.getElementById('modelSearch').value.toLowerCase();
-            const typeFilter = document.getElementById('modelTypeFilter').value;
-            
-            const filtered = models.filter(model => {
-                const matchesSearch = model.name.toLowerCase().includes(search) || 
-                                     model.type.toLowerCase().includes(search);
-                const matchesType = !typeFilter || model.taskType === typeFilter;
-                return matchesSearch && matchesType;
-            });
+function filterModels() {
+    const search = document.getElementById('modelSearch').value.toLowerCase();
+    const typeFilter = document.getElementById('modelTypeFilter').value;
 
-            renderFilteredModels(filtered);
-        }
+    const filtered = models.filter(model => {
+        const matchesSearch = model.name.toLowerCase().includes(search) ||
+            model.type.toLowerCase().includes(search);
+        const matchesType = !typeFilter || model.taskType === typeFilter;
+        return matchesSearch && matchesType;
+    });
 
-        function renderFilteredModels(filteredModels) {
-            const tbody = document.getElementById('modelsTableBody');
-            if (filteredModels.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary p-4">No models found</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = filteredModels.map(model => `
+    renderFilteredModels(filtered);
+}
+
+function renderFilteredModels(filteredModels) {
+    const tbody = document.getElementById('modelsTableBody');
+    if (filteredModels.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary p-4">No models found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredModels.map(model => `
                 <tr onclick="selectModel('${model.id}')" style="cursor: pointer">
                     <td>
                         <div class="model-name">
@@ -292,124 +294,126 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
                     </td>
                 </tr>
             `).join('');
+}
+
+// Modal functions
+function openNewModelModal() {
+    document.getElementById('newModelModal').classList.add('active');
+}
+
+function closeNewModelModal() {
+    document.getElementById('newModelModal').classList.remove('active');
+}
+
+async function createModel() {
+    const name = document.getElementById('modelName').value;
+    const type = document.getElementById('modelType').value;
+    const taskType = document.getElementById('taskType').value;
+    const symbol = document.getElementById('targetSymbol').value;
+    const description = document.getElementById('modelDescription').value;
+
+    if (!name) {
+        alert('Please enter a model name');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/enhanced-ml/registry/models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                model_type: type,
+                task_type: taskType,
+                symbol,
+                description
+            })
+        });
+
+        if (response.ok) {
+            alert('Model created successfully!');
+            closeNewModelModal();
+            refreshModels();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Failed to create model'}`);
         }
+    } catch (err) {
+        console.error('Error creating model:', err);
+        alert('Model created (demo mode)');
+        closeNewModelModal();
+    }
+}
 
-        // Modal functions
-        function openNewModelModal() {
-            document.getElementById('newModelModal').classList.add('active');
-        }
+// eslint-disable-next-line no-unused-vars
+async function trainModel(modelId) {
+    const model = models.find(m => m.id === modelId);
+    alert(`Starting training for ${model.name}...`);
+}
 
-        function closeNewModelModal() {
-            document.getElementById('newModelModal').classList.remove('active');
-        }
+// eslint-disable-next-line no-unused-vars
+async function deployModel(modelId) {
+    const model = models.find(m => m.id === modelId);
+    alert(`Deploying ${model.name} to production...`);
+}
 
-        async function createModel() {
-            const name = document.getElementById('modelName').value;
-            const type = document.getElementById('modelType').value;
-            const taskType = document.getElementById('taskType').value;
-            const symbol = document.getElementById('targetSymbol').value;
-            const description = document.getElementById('modelDescription').value;
+// eslint-disable-next-line no-unused-vars
+function viewMetrics(modelId) {
+    selectModel(modelId);
+}
 
-            if (!name) {
-                alert('Please enter a model name');
-                return;
-            }
+function refreshModels() {
+    renderModelsTable();
+    renderTrainingHistory();
+    renderRecentPredictions();
+}
 
-            try {
-                const response = await fetch('/api/enhanced-ml/registry/models', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        model_type: type,
-                        task_type: taskType,
-                        symbol,
-                        description
-                    })
-                });
+// Helper functions
+function getModelIcon(type) {
+    const icons = {
+        'XGBoost': 'diagram-3',
+        'LightGBM': 'lightning',
+        'Random Forest': 'tree',
+        'LSTM': 'layers',
+        'Neural Network': 'cpu',
+        'Ensemble': 'collection'
+    };
+    return icons[type] || 'box';
+}
 
-                if (response.ok) {
-                    alert('Model created successfully!');
-                    closeNewModelModal();
-                    refreshModels();
-                } else {
-                    const error = await response.json();
-                    alert(`Error: ${error.detail || 'Failed to create model'}`);
-                }
-            } catch (err) {
-                console.error('Error creating model:', err);
-                alert('Model created (demo mode)');
-                closeNewModelModal();
-            }
-        }
+function getAccuracyClass(accuracy) {
+    if (accuracy >= 0.85) return 'high';
+    if (accuracy >= 0.70) return 'medium';
+    return 'low';
+}
 
-        async function trainModel(modelId) {
-            const model = models.find(m => m.id === modelId);
-            alert(`Starting training for ${model.name}...`);
-        }
+function getStatusIcon(status) {
+    const icons = {
+        'success': 'check-circle-fill',
+        'warning': 'clock-fill',
+        'error': 'x-circle-fill'
+    };
+    return icons[status] || 'circle';
+}
 
-        async function deployModel(modelId) {
-            const model = models.find(m => m.id === modelId);
-            alert(`Deploying ${model.name} to production...`);
-        }
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+// formatNumber - using imported version from utils.js
 
-        function viewMetrics(modelId) {
-            const model = models.find(m => m.id === modelId);
-            selectModel(modelId);
-        }
+function formatRelativeTime(dateStr) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
 
-        function refreshModels() {
-            renderModelsTable();
-            renderTrainingHistory();
-            renderRecentPredictions();
-        }
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-        // Helper functions
-        function getModelIcon(type) {
-            const icons = {
-                'XGBoost': 'diagram-3',
-                'LightGBM': 'lightning',
-                'Random Forest': 'tree',
-                'LSTM': 'layers',
-                'Neural Network': 'cpu',
-                'Ensemble': 'collection'
-            };
-            return icons[type] || 'box';
-        }
-
-        function getAccuracyClass(accuracy) {
-            if (accuracy >= 0.85) return 'high';
-            if (accuracy >= 0.70) return 'medium';
-            return 'low';
-        }
-
-        function getStatusIcon(status) {
-            const icons = {
-                'success': 'check-circle-fill',
-                'warning': 'clock-fill',
-                'error': 'x-circle-fill'
-            };
-            return icons[status] || 'circle';
-        }
-
-        function capitalize(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1);
-        }
-        // formatNumber - using imported version from utils.js
-
-        function formatRelativeTime(dateStr) {
-            const date = new Date(dateStr);
-            const now = new Date();
-            const diff = now - date;
-            
-            const minutes = Math.floor(diff / 60000);
-            const hours = Math.floor(diff / 3600000);
-            const days = Math.floor(diff / 86400000);
-            
-            if (minutes < 60) return `${minutes}m ago`;
-            if (hours < 24) return `${hours}h ago`;
-            return `${days}d ago`;
-        }
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+}
 
 // ============================================
 // EXPORTS
@@ -421,6 +425,14 @@ import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js'
 // Attach to window for backwards compatibility
 if (typeof window !== 'undefined') {
     window.mlmodelsPage = {
-        // Add public methods here
+        refreshModels
     };
+    // Required for inline onclick handlers in ml-models.html
+    window.refreshModels = refreshModels;
+    window.openNewModelModal = openNewModelModal;
+    window.closeNewModelModal = closeNewModelModal;
+    window.createModel = createModel;
+    window.trainModel = trainModel;
+    window.deployModel = deployModel;
+    window.viewMetrics = viewMetrics;
 }

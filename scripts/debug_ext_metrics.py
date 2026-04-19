@@ -2,16 +2,18 @@
 Quick debug - check extended metrics values
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import sqlite3
 
+import pandas as pd
+
 # Load data
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df_1h = pd.read_sql("""
-    SELECT open_time, open_price as open, high_price as high, 
+    SELECT open_time, open_price as open, high_price as high,
            low_price as low, close_price as close, volume
     FROM bybit_kline_audit
     WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -38,9 +40,9 @@ long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
 short_exits = (rsi < 30).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
 
 input_data = BacktestInput(
@@ -74,8 +76,8 @@ print("=" * 80)
 print("EXTENDED METRICS COMPARISON")
 print("=" * 80)
 
-metrics = ["sortino_ratio", "calmar_ratio", "omega_ratio", "recovery_factor", 
-           "ulcer_index", "tail_ratio", "downside_deviation", "upside_potential_ratio", 
+metrics = ["sortino_ratio", "calmar_ratio", "omega_ratio", "recovery_factor",
+           "ulcer_index", "tail_ratio", "downside_deviation", "upside_potential_ratio",
            "gain_to_pain_ratio", "profit_factor"]
 
 print(f"\n{'Metric':<25} {'Fallback':>15} {'Numba':>15} {'Match':>10}")

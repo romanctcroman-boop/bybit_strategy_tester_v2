@@ -14,5 +14,5 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Pre-import backend to ensure correct resolution
-import backend  # noqa: F401
+import backend
 import backend.database  # noqa: F401

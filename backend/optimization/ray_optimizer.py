@@ -4,16 +4,18 @@ Implements distributed computing using Ray framework
 Based on Goldman Sachs and industry best practices 2024-2026
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Callable
+import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-import os
+from typing import Any
+
+import numpy as np
 
 # Ray is optional dependency
 try:
     import ray
-    from ray.util.multiprocessing import Pool as RayPool
+    from ray.util.multiprocessing import Pool as RayPool  # noqa: F401
 
     RAY_AVAILABLE = True
 except ImportError:
@@ -27,7 +29,7 @@ from loguru import logger
 class ParallelOptimizationResult:
     """Result container for parallel optimization"""
 
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_value: float
     total_combinations: int
     completed_combinations: int
@@ -35,13 +37,13 @@ class ParallelOptimizationResult:
     execution_time_seconds: float
 
     # All results
-    all_results: List[Dict[str, Any]] = field(default_factory=list)
+    all_results: list[dict[str, Any]] = field(default_factory=list)
 
     # Top N results
     top_n: int = 10
-    top_results: List[Dict[str, Any]] = field(default_factory=list)
+    top_results: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_value": round(self.best_value, 6),
@@ -69,9 +71,9 @@ class RayParallelOptimizer:
 
     def __init__(
         self,
-        num_cpus: Optional[int] = None,
+        num_cpus: int | None = None,
         num_gpus: int = 0,
-        memory_per_worker: Optional[int] = None,
+        memory_per_worker: int | None = None,
         dashboard: bool = False,
     ):
         """
@@ -103,9 +105,7 @@ class RayParallelOptimizer:
                     ignore_reinit_error=True,
                     logging_level="warning",
                 )
-                logger.info(
-                    f"Ray initialized with {self.num_cpus} CPUs, {self.num_gpus} GPUs"
-                )
+                logger.info(f"Ray initialized with {self.num_cpus} CPUs, {self.num_gpus} GPUs")
             self._initialized = True
 
     def shutdown(self):
@@ -117,7 +117,7 @@ class RayParallelOptimizer:
 
     def parallel_backtest(
         self,
-        configs: List[Dict[str, Any]],
+        configs: list[dict[str, Any]],
         backtest_fn: Callable,
         data,
         metric: str = "sharpe_ratio",
@@ -218,15 +218,11 @@ class RayParallelOptimizer:
             )
 
         # Sort by value (descending for maximize)
-        sorted_results = sorted(
-            successful_results, key=lambda x: x["value"], reverse=True
-        )
+        sorted_results = sorted(successful_results, key=lambda x: x["value"], reverse=True)
         best = sorted_results[0]
 
         # Top N results
-        top_results = [
-            {"params": r["config"], "value": r["value"]} for r in sorted_results[:10]
-        ]
+        top_results = [{"params": r["config"], "value": r["value"]} for r in sorted_results[:10]]
 
         logger.info(f"Optimization complete in {execution_time:.1f}s")
         logger.info(f"Best {metric}: {best['value']:.6f}")
@@ -247,11 +243,11 @@ class RayParallelOptimizer:
         self,
         data,
         strategy_class,
-        param_space: Dict[str, Any],
-        walk_forward_config: Dict[str, int],
+        param_space: dict[str, Any],
+        walk_forward_config: dict[str, int],
         optimizer_fn: Callable,
         backtest_fn: Callable,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Parallel walk-forward optimization.
 
@@ -331,9 +327,7 @@ class RayParallelOptimizer:
 
         # Submit all periods in parallel
         futures = [
-            process_period.remote(
-                p, data_ref, param_space_ref, strategy_class, optimizer_fn, backtest_fn
-            )
+            process_period.remote(p, data_ref, param_space_ref, strategy_class, optimizer_fn, backtest_fn)
             for p in periods
         ]
 
@@ -348,9 +342,7 @@ class RayParallelOptimizer:
             "avg_is_sharpe": np.mean(is_sharpes),
             "avg_oos_sharpe": np.mean(oos_sharpes),
             "avg_degradation": np.mean(is_sharpes) - np.mean(oos_sharpes),
-            "profitable_pct": sum(1 for r in results if r["oos_return"] > 0)
-            / len(results)
-            * 100,
+            "profitable_pct": sum(1 for r in results if r["oos_return"] > 0) / len(results) * 100,
             "periods": results,
         }
 
@@ -362,7 +354,7 @@ class MultiprocessingOptimizer:
     Used when Ray is not available.
     """
 
-    def __init__(self, n_workers: Optional[int] = None):
+    def __init__(self, n_workers: int | None = None):
         """
         Initialize multiprocessing optimizer.
 
@@ -375,7 +367,7 @@ class MultiprocessingOptimizer:
 
     def parallel_backtest(
         self,
-        configs: List[Dict[str, Any]],
+        configs: list[dict[str, Any]],
         backtest_fn: Callable,
         data,
         metric: str = "sharpe_ratio",
@@ -397,9 +389,7 @@ class MultiprocessingOptimizer:
         start_time = datetime.now()
         total = len(configs)
 
-        logger.info(
-            f"Starting multiprocessing optimization: {total} configs, {self.n_workers} workers"
-        )
+        logger.info(f"Starting multiprocessing optimization: {total} configs, {self.n_workers} workers")
 
         # Create worker function
         def worker(config):
@@ -451,10 +441,7 @@ class MultiprocessingOptimizer:
             failed_combinations=failed,
             execution_time_seconds=execution_time,
             all_results=results,
-            top_results=[
-                {"params": r["config"], "value": r["value"]}
-                for r in sorted_results[:10]
-            ],
+            top_results=[{"params": r["config"], "value": r["value"]} for r in sorted_results[:10]],
         )
 
 
@@ -472,7 +459,5 @@ def get_parallel_optimizer(prefer_ray: bool = True) -> Any:
         logger.info("Using Ray for parallel optimization")
         return RayParallelOptimizer()
     else:
-        logger.info(
-            "Using multiprocessing for parallel optimization (Ray not available)"
-        )
+        logger.info("Using multiprocessing for parallel optimization (Ray not available)")
         return MultiprocessingOptimizer()

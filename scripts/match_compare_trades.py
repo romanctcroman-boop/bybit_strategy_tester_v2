@@ -3,7 +3,6 @@ Reads logs/compare_vectorbt_vs_fallback.json and outputs logs/matched_trades.jso
 """
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,11 +68,7 @@ for i, ft in enumerate(fb_trades):
         )
 
 # any vb trades not matched
-unmatched_vb = [
-    {"vectorbt_idx": j, "vectorbt": vt}
-    for j, vt in enumerate(vb_trades)
-    if j not in used_vb
-]
+unmatched_vb = [{"vectorbt_idx": j, "vectorbt": vt} for j, vt in enumerate(vb_trades) if j not in used_vb]
 
 out = {
     "matches": matches,

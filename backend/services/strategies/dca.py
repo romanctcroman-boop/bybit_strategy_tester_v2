@@ -7,8 +7,7 @@ Reduces timing risk by spreading entries over time.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -168,7 +167,7 @@ class DCAStrategy(LibraryStrategy):
 
         # Timing
         self._candles_since_last_buy: int = 0
-        self._last_buy_time: Optional[datetime] = None
+        self._last_buy_time: datetime | None = None
 
         # Peak tracking for dips
         self._recent_high: float = 0.0
@@ -200,7 +199,7 @@ class DCAStrategy(LibraryStrategy):
         drop_percent = ((self._recent_high - current_price) / self._recent_high) * 100
         return drop_percent >= threshold
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate DCA signals."""
         self.add_candle(candle)
 
@@ -220,7 +219,7 @@ class DCAStrategy(LibraryStrategy):
 
         close = candle["close"]
         high = candle["high"]
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
 
         # Update recent high
         if high > self._recent_high:

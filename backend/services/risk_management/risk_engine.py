@@ -6,10 +6,11 @@ for live trading risk control.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from backend.services.risk_management.exposure_controller import (
     ExposureController,
@@ -23,6 +24,7 @@ from backend.services.risk_management.position_sizing import (
 from backend.services.risk_management.stop_loss_manager import (
     StopLossConfig,
     StopLossManager,
+    StopLossOrder,
     StopLossType,
 )
 from backend.services.risk_management.trade_validator import (
@@ -88,17 +90,17 @@ class RiskAssessment:
     approved: bool
     risk_level: RiskLevel
     position_size: float
-    recommended_stop_loss: Optional[float]
-    recommended_take_profit: Optional[float]
+    recommended_stop_loss: float | None
+    recommended_take_profit: float | None
     max_allowed_size: float
     current_exposure_pct: float
     available_capacity_pct: float
-    warnings: List[str]
-    rejection_reasons: List[str]
-    details: Dict[str, Any]
+    warnings: list[str]
+    rejection_reasons: list[str]
+    details: dict[str, Any]
     assessed_at: datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "approved": self.approved,
@@ -132,9 +134,9 @@ class PortfolioRiskSnapshot:
     active_stops: int
     risk_level: RiskLevel
     is_trading_allowed: bool
-    warnings: List[str]
+    warnings: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -166,7 +168,7 @@ class RiskEngine:
     Provides a single interface for all risk management operations.
     """
 
-    def __init__(self, config: Optional[RiskEngineConfig] = None):
+    def __init__(self, config: RiskEngineConfig | None = None):
         """Initialize the Risk Engine."""
         self.config = config or RiskEngineConfig()
 
@@ -179,14 +181,14 @@ class RiskEngine:
         # State
         self._is_running = False
         self._trading_paused = False
-        self._pause_reason: Optional[str] = None
-        self._risk_history: List[PortfolioRiskSnapshot] = []
+        self._pause_reason: str | None = None
+        self._risk_history: list[PortfolioRiskSnapshot] = []
         self._max_history_size = 1000
 
         # Callbacks
-        self.on_risk_alert: Optional[Callable[[str, RiskLevel], None]] = None
-        self.on_trading_paused: Optional[Callable[[str], None]] = None
-        self.on_stop_triggered: Optional[Callable[[str, float, float], None]] = None
+        self.on_risk_alert: Callable[[str, RiskLevel], None] | None = None
+        self.on_trading_paused: Callable[[str], None] | None = None
+        self.on_stop_triggered: Callable[[str, float, float], None] | None = None
 
         logger.info(
             f"RiskEngine initialized: equity=${self.config.initial_equity:.2f}, "
@@ -210,10 +212,10 @@ class RiskEngine:
         )
         self.stop_loss_manager = StopLossManager(stop_config)
 
-        # Wire up stop triggered callback
-        def on_stop_triggered(symbol: str, trigger_price: float, stop_price: float):
+        # Wire up stop triggered callback — StopLossManager passes a StopLossOrder object
+        def on_stop_triggered(stop: StopLossOrder) -> None:
             if self.on_stop_triggered:
-                self.on_stop_triggered(symbol, trigger_price, stop_price)
+                self.on_stop_triggered(stop.symbol, stop.current_stop, stop.current_stop)
 
         self.stop_loss_manager.on_stop_triggered = on_stop_triggered
 
@@ -226,15 +228,12 @@ class RiskEngine:
             max_drawdown_pct=self.config.max_drawdown_pct,
             max_daily_loss_pct=self.config.daily_loss_limit_pct,
         )
-        self.exposure_controller = ExposureController(
-            equity=self.config.initial_equity, limits=exposure_limits
-        )
+        self.exposure_controller = ExposureController(equity=self.config.initial_equity, limits=exposure_limits)
 
         # Wire up limit breach callback
         def on_limit_breach(violation_type, message):
-            if self.config.auto_stop_on_drawdown:
-                if "drawdown" in message.lower() or "loss" in message.lower():
-                    self.pause_trading(f"Risk limit breach: {message}")
+            if self.config.auto_stop_on_drawdown and ("drawdown" in message.lower() or "loss" in message.lower()):
+                self.pause_trading(f"Risk limit breach: {message}")
 
             if self.on_risk_alert:
                 self.on_risk_alert(message, RiskLevel.HIGH)
@@ -259,10 +258,10 @@ class RiskEngine:
         symbol: str,
         side: str,
         entry_price: float,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        volatility: Optional[float] = None,
-        atr: Optional[float] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        volatility: float | None = None,
+        atr: float | None = None,
         win_rate: float = 0.5,
         avg_win: float = 1.0,
         avg_loss: float = 1.0,
@@ -287,15 +286,15 @@ class RiskEngine:
         Returns:
             RiskAssessment with sizing and validation result
         """
-        warnings = []
-        rejection_reasons = []
-        details = {}
+        warnings: list[str] = []
+        rejection_reasons: list[str] = []
+        details: dict[str, Any] = {}
 
         # Get current state
         current_exposure_data = self.exposure_controller.get_current_exposure()
-        current_exposure = current_exposure_data.get("total_exposure_pct", 0)
-        available_exposure = 100 - current_exposure  # Simplified available calculation
-        equity = self.exposure_controller.equity
+        current_exposure: float = float(current_exposure_data.get("total_exposure_pct", 0) or 0)
+        available_exposure: float = 100.0 - current_exposure  # Simplified available calculation
+        equity: float = self.exposure_controller.equity
 
         details["current_equity"] = equity
         details["current_exposure_pct"] = current_exposure
@@ -316,9 +315,7 @@ class RiskEngine:
         details["sizing_details"] = sizing_result.details
 
         # Calculate max allowed size from exposure limits
-        max_from_exposure = self.exposure_controller.get_max_position_size(
-            symbol=symbol, current_price=entry_price
-        )
+        max_from_exposure = self.exposure_controller.get_max_position_size(symbol=symbol, current_price=entry_price)
 
         # Apply the more restrictive limit
         final_size = min(position_size, max_from_exposure)
@@ -326,18 +323,14 @@ class RiskEngine:
 
         if final_size < position_size:
             warnings.append(
-                f"Position size reduced from {position_size:.4f} to {final_size:.4f} "
-                "due to exposure limits"
+                f"Position size reduced from {position_size:.4f} to {final_size:.4f} due to exposure limits"
             )
 
         # Calculate recommended stop loss if not provided
-        recommended_stop = stop_loss
+        recommended_stop: float | None = stop_loss
         if not recommended_stop:
             if atr:
-                if side.lower() == "buy":
-                    recommended_stop = entry_price - (2 * atr)
-                else:
-                    recommended_stop = entry_price + (2 * atr)
+                recommended_stop = entry_price - 2 * atr if side.lower() == "buy" else entry_price + 2 * atr
             else:
                 stop_pct = self.config.default_stop_pct / 100
                 if side.lower() == "buy":
@@ -347,14 +340,11 @@ class RiskEngine:
         details["recommended_stop_loss"] = recommended_stop
 
         # Calculate take profit if not provided
-        recommended_tp = take_profit
+        recommended_tp: float | None = take_profit
         if not recommended_tp and recommended_stop:
             risk = abs(entry_price - recommended_stop)
             rr_target = max(self.config.min_risk_reward, 2.0)  # Target 2:1 RR
-            if side.lower() == "buy":
-                recommended_tp = entry_price + (risk * rr_target)
-            else:
-                recommended_tp = entry_price - (risk * rr_target)
+            recommended_tp = entry_price + risk * rr_target if side.lower() == "buy" else entry_price - risk * rr_target
         details["recommended_take_profit"] = recommended_tp
 
         # Create trade request for validation
@@ -371,13 +361,12 @@ class RiskEngine:
         # Build account state
         account_state = AccountState(
             total_equity=equity,
-            available_balance=self.exposure_controller.equity
-            - self.exposure_controller.used_margin,
+            available_balance=self.exposure_controller.equity - self.exposure_controller.used_margin,
             used_margin=self.exposure_controller.used_margin,
             total_pnl=self.exposure_controller.total_pnl,
             daily_pnl=self.exposure_controller.daily_pnl,
             open_positions_count=len(self.exposure_controller.positions),
-            positions_by_symbol={s: 1 for s in self.exposure_controller.positions},
+            positions_by_symbol=dict.fromkeys(self.exposure_controller.positions, 1),
             trades_today=0,  # Would need external tracking
             trades_this_hour=0,
             last_trade_time=None,
@@ -431,7 +420,7 @@ class RiskEngine:
         self,
         position_size: float,
         entry_price: float,
-        stop_loss: Optional[float],
+        stop_loss: float | None,
         current_exposure: float,
         equity: float,
     ) -> RiskLevel:
@@ -497,7 +486,7 @@ class RiskEngine:
         size: float,
         entry_price: float,
         leverage: float = 1.0,
-        stop_loss: Optional[float] = None,
+        stop_loss: float | None = None,
     ):
         """
         Register an executed trade with the risk engine.
@@ -510,24 +499,22 @@ class RiskEngine:
             side=side,
             size=size,
             entry_price=entry_price,
+            current_price=entry_price,
             leverage=leverage,
         )
         self.exposure_controller.update_position(position)
 
         # Register stop loss if provided
         if stop_loss:
-            self.stop_loss_manager.add_stop(
+            self.stop_loss_manager.create_stop(
                 symbol=symbol,
                 side=side,
-                size=size,
                 entry_price=entry_price,
-                stop_price=stop_loss,
+                position_size=size,
+                initial_stop=stop_loss,
             )
 
-        logger.info(
-            f"Trade registered: {symbol} {side} {size}@{entry_price}, "
-            f"leverage={leverage}x, stop={stop_loss}"
-        )
+        logger.info(f"Trade registered: {symbol} {side} {size}@{entry_price}, leverage={leverage}x, stop={stop_loss}")
 
     def close_position(self, symbol: str, exit_price: float):
         """
@@ -536,7 +523,8 @@ class RiskEngine:
         Call this after a position is closed.
         """
         self.exposure_controller.remove_position(symbol)
-        self.stop_loss_manager.remove_stop(symbol)
+        for _stop in self.stop_loss_manager.get_stops_for_symbol(symbol):
+            del self.stop_loss_manager.stops[_stop.id]
 
         logger.info(f"Position closed: {symbol} @ {exit_price}")
 
@@ -550,7 +538,10 @@ class RiskEngine:
         self.trade_validator.update_price(symbol, current_price)
 
         # Check stop losses
-        triggered = self.stop_loss_manager.check_stops(symbol, current_price)
+        triggered = []
+        for _stop in self.stop_loss_manager.get_stops_for_symbol(symbol):
+            if self.stop_loss_manager.update(_stop.id, current_price):
+                triggered.append(_stop)
 
         return triggered
 
@@ -585,13 +576,7 @@ class RiskEngine:
             return False
 
         # Check exposure limits
-        if (
-            self.exposure_controller.current_drawdown_pct
-            >= self.config.max_drawdown_pct
-        ):
-            return False
-
-        return True
+        return not self.exposure_controller.current_drawdown_pct >= self.config.max_drawdown_pct
 
     def reset_daily(self):
         """Reset daily tracking (call at start of trading day)."""
@@ -684,11 +669,11 @@ class RiskEngine:
         if len(self._risk_history) > self._max_history_size:
             self._risk_history = self._risk_history[-self._max_history_size :]
 
-    def get_risk_history(self, limit: int = 100) -> List[PortfolioRiskSnapshot]:
+    def get_risk_history(self, limit: int = 100) -> list[PortfolioRiskSnapshot]:
         """Get recent risk history."""
         return self._risk_history[-limit:]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get comprehensive risk engine status."""
         snapshot = self.get_risk_snapshot()
 
@@ -708,14 +693,10 @@ class RiskEngine:
             },
             "components": {
                 "position_sizer": "active",
-                "stop_loss_manager": {
-                    "active_stops": len(self.stop_loss_manager.get_active_stops())
-                },
+                "stop_loss_manager": {"active_stops": len(self.stop_loss_manager.get_active_stops())},
                 "exposure_controller": {
                     "positions": len(self.exposure_controller.positions),
-                    "exposure_pct": self.exposure_controller.get_current_exposure().get(
-                        "total_exposure_pct", 0
-                    ),
+                    "exposure_pct": self.exposure_controller.get_current_exposure().get("total_exposure_pct", 0),
                 },
                 "trade_validator": self.trade_validator.get_stats(),
             },

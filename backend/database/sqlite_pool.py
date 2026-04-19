@@ -20,10 +20,9 @@ Usage:
 import logging
 import sqlite3
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +114,7 @@ class SQLiteConnectionPool:
 
             self._initialized = True
             logger.info(
-                f"SQLite pool initialized: {self._pool.qsize()}/{self.pool_size} "
-                f"connections for {db_path.name}"
+                f"SQLite pool initialized: {self._pool.qsize()}/{self.pool_size} connections for {db_path.name}"
             )
 
     def _create_connection(self, for_thread_local: bool = False) -> sqlite3.Connection:
@@ -176,10 +174,7 @@ class SQLiteConnectionPool:
         thread_id = threading.get_ident()
 
         # Check thread-local storage first
-        if (
-            hasattr(_thread_local, "connection")
-            and _thread_local.connection is not None
-        ):
+        if hasattr(_thread_local, "connection") and _thread_local.connection is not None:
             conn = _thread_local.connection
             if self._validate_connection(conn):
                 return conn
@@ -188,8 +183,8 @@ class SQLiteConnectionPool:
                 logger.warning(f"Thread {thread_id} connection invalid, recreating")
                 try:
                     conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Close invalid connection: %s", e)
 
         # Create new connection for this thread
         conn = self._create_connection(for_thread_local=True)
@@ -229,8 +224,8 @@ class SQLiteConnectionPool:
                 logger.warning("Connection invalid, creating new one")
                 try:
                     conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Close invalid pool connection: %s", e)
                 conn = self._create_connection(for_thread_local=False)
 
             self._checkouts += 1
@@ -267,10 +262,8 @@ class SQLiteConnectionPool:
         except Exception:
             # Pool full, close connection
             logger.debug("Pool full, closing connection")
-            try:
+            with suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
 
     @contextmanager
     def connection(self):
@@ -324,9 +317,7 @@ class SQLiteConnectionPool:
                 try:
                     conn.close()
                     closed += 1
-                    logger.debug(
-                        f"Closed thread-local connection for thread {thread_id}"
-                    )
+                    logger.debug(f"Closed thread-local connection for thread {thread_id}")
                 except Exception as e:
                     logger.error(f"Error closing thread connection {thread_id}: {e}")
             self._thread_connections.clear()
@@ -371,22 +362,20 @@ class SQLiteConnectionPool:
 
     def __del__(self):
         """Cleanup on garbage collection."""
-        try:
+        with suppress(Exception):
             self.close_all()
-        except Exception:
-            pass
 
 
 # ============================================================================
 # Global Pool Instance
 # ============================================================================
 
-_pool: Optional[SQLiteConnectionPool] = None
+_pool: SQLiteConnectionPool | None = None
 _pool_lock = threading.Lock()
 
 
 def get_pool(
-    db_path: Optional[str] = None,
+    db_path: str | None = None,
     pool_size: int = 10,
 ) -> SQLiteConnectionPool:
     """

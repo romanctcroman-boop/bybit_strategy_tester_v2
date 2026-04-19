@@ -4,14 +4,17 @@
 
 Отправка данных в DeepSeek и Perplexity для сравнительного анализа.
 """
-import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
 
-import json
-import httpx
-from datetime import datetime
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import os
+from datetime import datetime
+
+import httpx
+from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
@@ -43,10 +46,10 @@ AUDIT_REPORT = """
 - **Проблема**: Python-версия Fallback engine работала медленно (~1.3k симуляций/сек)
 - **Причина**: Интерпретируемый Python код для bar-by-bar симуляции
 - **Решение**: Создан numba_engine.py с JIT-компилируемыми функциями
-- **Файлы**: 
+- **Файлы**:
   - НОВЫЙ: backend/backtesting/numba_engine.py
   - ОБНОВЛЁН: backend/backtesting/two_stage_optimizer.py
-- **Результат**: 
+- **Результат**:
   - Single simulation: 41x speedup (0.77ms → 0.019ms)
   - Batch simulation: 375,000 combinations/second
   - Stage 2 validation: 47x speedup
@@ -102,34 +105,30 @@ print(AUDIT_REPORT)
 # ОТПРАВКА В DEEPSEEK
 # ============================================================
 
+
 def consult_deepseek(question: str) -> str:
     """Send question to DeepSeek API."""
     api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
         return "ERROR: DEEPSEEK_API_KEY not found"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
     payload = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "You are an expert in algorithmic trading, Python optimization, and backtesting systems. Analyze the provided audit and give recommendations."},
-            {"role": "user", "content": question}
+            {
+                "role": "system",
+                "content": "You are an expert in algorithmic trading, Python optimization, and backtesting systems. Analyze the provided audit and give recommendations.",
+            },
+            {"role": "user", "content": question},
         ],
         "temperature": 0.7,
-        "max_tokens": 2000
+        "max_tokens": 2000,
     }
-    
+
     try:
-        response = httpx.post(
-            "https://api.deepseek.com/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60
-        )
+        response = httpx.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
@@ -141,28 +140,23 @@ def consult_perplexity(question: str) -> str:
     api_key = os.getenv("PERPLEXITY_API_KEY")
     if not api_key:
         return "ERROR: PERPLEXITY_API_KEY not found"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
     payload = {
         "model": "sonar",
         "messages": [
-            {"role": "system", "content": "You are an expert in algorithmic trading and Python performance optimization. Analyze the audit and provide actionable recommendations."},
-            {"role": "user", "content": question}
+            {
+                "role": "system",
+                "content": "You are an expert in algorithmic trading and Python performance optimization. Analyze the audit and provide actionable recommendations.",
+            },
+            {"role": "user", "content": question},
         ],
-        "max_tokens": 2000
+        "max_tokens": 2000,
     }
-    
+
     try:
-        response = httpx.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60
-        )
+        response = httpx.post("https://api.perplexity.ai/chat/completions", headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
@@ -202,7 +196,8 @@ print("-" * 50)
 print(perplexity_response)
 
 # Save responses
-with open("d:/bybit_strategy_tester_v2/audit_ai_responses.md", "w", encoding="utf-8") as f:
+output_path = Path(__file__).resolve().parents[1] / "audit_ai_responses.md"
+with open(output_path, "w", encoding="utf-8") as f:
     f.write(f"# AI Audit Responses - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
     f.write("## DeepSeek Response\n\n")
     f.write(deepseek_response)

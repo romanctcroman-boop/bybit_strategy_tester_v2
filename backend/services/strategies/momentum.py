@@ -4,11 +4,18 @@ Momentum Strategies.
 Strategies that trade momentum continuation:
 - RSI Momentum: Trade in direction of strong RSI readings
 - Stochastic Momentum: Trade stochastic crossovers
+
+DEPRECATION NOTE (2026-02-16):
+    RSIMomentumStrategy and StochasticMomentumStrategy are part of the OLD Library system.
+    For new strategies, use the UNIVERSAL indicator blocks in Strategy Builder instead:
+      - Universal RSI block (type='rsi') with Range/Cross/Legacy modes
+      - Universal Stochastic block (type='stochastic') with Range/Cross/KD modes
+    AI agents (DeepSeek, Qwen, Perplexity) MUST use the universal blocks.
+    This file is kept for backward compatibility with existing saved strategies.
 """
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -162,10 +169,10 @@ class RSIMomentumStrategy(LibraryStrategy):
     def __init__(self, config: StrategyConfig, **params):
         super().__init__(config, **params)
 
-        self._prev_rsi: Optional[float] = None
+        self._prev_rsi: float | None = None
         self._in_position: str = ""
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate momentum signals."""
         self.add_candle(candle)
 
@@ -216,25 +223,26 @@ class RSIMomentumStrategy(LibraryStrategy):
                     )
                     self._in_position = "long"
 
-            # Bearish momentum
-            elif self._prev_rsi >= threshold and current_rsi < threshold:
-                if not use_trend or (trend_ema and close < trend_ema):
-                    confidence = 0.7 if current_rsi <= weak_threshold else 0.6
-                    stop_loss = calculate_stop_loss(
-                        close, "sell", current_atr, atr_mult
-                    )
-                    take_profit = calculate_take_profit(close, stop_loss, rr)
+            # Bearish momentum (with trend filter)
+            elif (
+                self._prev_rsi >= threshold
+                and current_rsi < threshold
+                and (not use_trend or (trend_ema and close < trend_ema))
+            ):
+                confidence = 0.7 if current_rsi <= weak_threshold else 0.6
+                stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
+                take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                    signal = self.create_signal(
-                        signal_type=SignalType.SELL,
-                        price=close,
-                        stop_loss=stop_loss,
-                        take_profit=take_profit,
-                        reason=f"Bearish RSI momentum ({current_rsi:.1f} < {threshold})",
-                        confidence=confidence,
-                        rsi=current_rsi,
-                    )
-                    self._in_position = "short"
+                signal = self.create_signal(
+                    signal_type=SignalType.SELL,
+                    price=close,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    reason=f"Bearish RSI momentum ({current_rsi:.1f} < {threshold})",
+                    confidence=confidence,
+                    rsi=current_rsi,
+                )
+                self._in_position = "short"
 
         # Exit on momentum reversal
         elif self._in_position == "long" and current_rsi < threshold:
@@ -396,21 +404,19 @@ class StochasticMomentumStrategy(LibraryStrategy):
     def __init__(self, config: StrategyConfig, **params):
         super().__init__(config, **params)
 
-        self._k_values: List[float] = []
-        self._prev_k: Optional[float] = None
-        self._prev_d: Optional[float] = None
+        self._k_values: list[float] = []
+        self._prev_k: float | None = None
+        self._prev_d: float | None = None
         self._in_position: str = ""
 
-    def _calculate_stochastic(
-        self, k_period: int, d_period: int, smooth_k: int
-    ) -> tuple[float, float]:
+    def _calculate_stochastic(self, k_period: int, d_period: int, smooth_k: int) -> tuple[float, float]:
         """Calculate Stochastic %K and %D."""
         candles = self.get_candles()
         if len(candles) < k_period:
             return (50.0, 50.0)
 
         # Raw %K values
-        raw_k_values = []
+        raw_k_values: list[float] = []
         for i in range(min(k_period + smooth_k, len(candles))):
             end_idx = len(candles) - i
             start_idx = max(0, end_idx - k_period)
@@ -423,10 +429,7 @@ class StochasticMomentumStrategy(LibraryStrategy):
             lowest = min(c["low"] for c in period_candles)
             close = period_candles[-1]["close"]
 
-            if highest == lowest:
-                raw_k = 50.0
-            else:
-                raw_k = ((close - lowest) / (highest - lowest)) * 100
+            raw_k = 50.0 if highest == lowest else ((close - lowest) / (highest - lowest)) * 100
 
             raw_k_values.insert(0, raw_k)
 
@@ -442,14 +445,11 @@ class StochasticMomentumStrategy(LibraryStrategy):
             self._k_values = self._k_values[-50:]
 
         # %D (SMA of %K)
-        if len(self._k_values) >= d_period:
-            d = sum(self._k_values[-d_period:]) / d_period
-        else:
-            d = k
+        d = sum(self._k_values[-d_period:]) / d_period if len(self._k_values) >= d_period else k
 
         return (k, d)
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate stochastic signals."""
         self.add_candle(candle)
 
@@ -472,7 +472,7 @@ class StochasticMomentumStrategy(LibraryStrategy):
 
         close = candle["close"]
 
-        if self._prev_k is None:
+        if self._prev_k is None or self._prev_d is None:
             self._prev_k = k
             self._prev_d = d
             return None

@@ -16,7 +16,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Deque, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class AnomalyStats:
     by_type: dict[str, int] = field(default_factory=dict)
     by_severity: dict[str, int] = field(default_factory=dict)
     by_symbol: dict[str, int] = field(default_factory=dict)
-    last_detection: Optional[datetime] = None
+    last_detection: datetime | None = None
     detection_rate_per_hour: float = 0.0
 
 
@@ -89,7 +89,7 @@ class RollingStatistics:
 
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
-        self.values: Deque[float] = deque(maxlen=window_size)
+        self.values: deque[float] = deque(maxlen=window_size)
         self._sum: float = 0.0
         self._sum_sq: float = 0.0
 
@@ -149,10 +149,10 @@ class IsolationTree:
 
     def __init__(self, height_limit: int = 10):
         self.height_limit = height_limit
-        self.split_feature: Optional[int] = None
-        self.split_value: Optional[float] = None
-        self.left: Optional["IsolationTree"] = None
-        self.right: Optional["IsolationTree"] = None
+        self.split_feature: int | None = None
+        self.split_value: float | None = None
+        self.left: IsolationTree | None = None
+        self.right: IsolationTree | None = None
         self.size: int = 0
 
     def fit(self, data: list[list[float]], current_height: int = 0) -> "IsolationTree":
@@ -179,9 +179,7 @@ class IsolationTree:
         self.split_value = random.uniform(min_val, max_val)
 
         left_data = [row for row in data if row[self.split_feature] < self.split_value]
-        right_data = [
-            row for row in data if row[self.split_feature] >= self.split_value
-        ]
+        right_data = [row for row in data if row[self.split_feature] >= self.split_value]
 
         if left_data:
             self.left = IsolationTree(self.height_limit)
@@ -239,18 +237,13 @@ class IsolationForest:
         """Fit Isolation Forest to data."""
         import random
 
-        if len(data) < self.sample_size:
-            sample_size = len(data)
-        else:
-            sample_size = self.sample_size
+        sample_size = len(data) if len(data) < self.sample_size else self.sample_size
 
-        height_limit = int(math.ceil(math.log2(sample_size)))
+        height_limit = math.ceil(math.log2(sample_size))
 
         self.trees = []
         for _ in range(self.n_trees):
-            sample = (
-                random.sample(data, sample_size) if len(data) > sample_size else data
-            )
+            sample = random.sample(data, sample_size) if len(data) > sample_size else data
             tree = IsolationTree(height_limit)
             tree.fit(sample)
             self.trees.append(tree)
@@ -262,9 +255,7 @@ class IsolationForest:
         self.threshold = scores[threshold_idx] if threshold_idx < len(scores) else 0.5
         self._fitted = True
 
-        logger.info(
-            f"IsolationForest fitted with {self.n_trees} trees, threshold={self.threshold:.4f}"
-        )
+        logger.info(f"IsolationForest fitted with {self.n_trees} trees, threshold={self.threshold:.4f}")
         return self
 
     def anomaly_score(self, point: list[float]) -> float:
@@ -272,9 +263,7 @@ class IsolationForest:
         if not self.trees:
             return 0.0
 
-        avg_path_length = sum(tree.path_length(point) for tree in self.trees) / len(
-            self.trees
-        )
+        avg_path_length = sum(tree.path_length(point) for tree in self.trees) / len(self.trees)
         c = IsolationTree._c(self.sample_size)
 
         if c == 0:
@@ -322,7 +311,7 @@ class MLAnomalyDetector:
         self._min_samples_for_iforest = 100
 
         # Detected anomalies
-        self._anomalies: Deque[AnomalyEvent] = deque(maxlen=history_limit)
+        self._anomalies: deque[AnomalyEvent] = deque(maxlen=history_limit)
         self._stats = AnomalyStats()
 
         # Callbacks
@@ -342,7 +331,7 @@ class MLAnomalyDetector:
             self._rolling_stats[key] = RollingStatistics(self.window_size)
         return self._rolling_stats[key]
 
-    def add_data_point(self, point: DataPoint) -> Optional[AnomalyEvent]:
+    def add_data_point(self, point: DataPoint) -> AnomalyEvent | None:
         """
         Add data point and check for anomalies.
 
@@ -362,9 +351,7 @@ class MLAnomalyDetector:
         stats.add(point.value)
 
         # Add to multivariate buffer
-        self._multivariate_buffer.append(
-            [point.value, point.timestamp, len(self._multivariate_buffer)]
-        )
+        self._multivariate_buffer.append([point.value, point.timestamp, len(self._multivariate_buffer)])
         if len(self._multivariate_buffer) > self.history_limit:
             self._multivariate_buffer.pop(0)
 
@@ -414,9 +401,7 @@ class MLAnomalyDetector:
             z_score=z_score,
             symbol=point.symbol,
             metric_type=point.metric_type,
-            description=self._generate_description(
-                point, stats, z_score, anomaly_type, severity
-            ),
+            description=self._generate_description(point, stats, z_score, anomaly_type, severity),
             metadata=point.metadata,
         )
 
@@ -465,23 +450,15 @@ class MLAnomalyDetector:
 
         # Update statistics
         self._stats.total_detections += 1
-        self._stats.by_type[anomaly.anomaly_type.value] = (
-            self._stats.by_type.get(anomaly.anomaly_type.value, 0) + 1
-        )
-        self._stats.by_severity[anomaly.severity.value] = (
-            self._stats.by_severity.get(anomaly.severity.value, 0) + 1
-        )
-        self._stats.by_symbol[anomaly.symbol] = (
-            self._stats.by_symbol.get(anomaly.symbol, 0) + 1
-        )
+        self._stats.by_type[anomaly.anomaly_type.value] = self._stats.by_type.get(anomaly.anomaly_type.value, 0) + 1
+        self._stats.by_severity[anomaly.severity.value] = self._stats.by_severity.get(anomaly.severity.value, 0) + 1
+        self._stats.by_symbol[anomaly.symbol] = self._stats.by_symbol.get(anomaly.symbol, 0) + 1
         self._stats.last_detection = anomaly.timestamp
 
         # Calculate detection rate
         elapsed_hours = (time.time() - self._start_time) / 3600
         if elapsed_hours > 0:
-            self._stats.detection_rate_per_hour = (
-                self._stats.total_detections / elapsed_hours
-            )
+            self._stats.detection_rate_per_hour = self._stats.total_detections / elapsed_hours
 
         # Trigger callbacks
         for callback in self._callbacks:
@@ -523,9 +500,9 @@ class MLAnomalyDetector:
     def get_recent_anomalies(
         self,
         limit: int = 100,
-        severity: Optional[AnomalySeverity] = None,
-        anomaly_type: Optional[AnomalyType] = None,
-        symbol: Optional[str] = None,
+        severity: AnomalySeverity | None = None,
+        anomaly_type: AnomalyType | None = None,
+        symbol: str | None = None,
     ) -> list[AnomalyEvent]:
         """Get recent anomalies with optional filters."""
         anomalies = list(self._anomalies)
@@ -543,9 +520,7 @@ class MLAnomalyDetector:
         """Get anomaly detection statistics."""
         return self._stats
 
-    def get_rolling_stats(
-        self, symbol: str, metric_type: str
-    ) -> Optional[dict[str, float]]:
+    def get_rolling_stats(self, symbol: str, metric_type: str) -> dict[str, float] | None:
         """Get rolling statistics for a metric."""
         stats = self._rolling_stats.get(self._get_metric_key(symbol, metric_type))
         if not stats:
@@ -576,15 +551,13 @@ class MLAnomalyDetector:
             "multivariate_samples": len(self._multivariate_buffer),
             "isolation_forest_fitted": self._isolation_forest._fitted,
             "total_anomalies": len(self._anomalies),
-            "unacknowledged_anomalies": sum(
-                1 for a in self._anomalies if not a.acknowledged
-            ),
+            "unacknowledged_anomalies": sum(1 for a in self._anomalies if not a.acknowledged),
             "uptime_hours": (time.time() - self._start_time) / 3600,
         }
 
 
 # Global detector instance
-_detector: Optional[MLAnomalyDetector] = None
+_detector: MLAnomalyDetector | None = None
 
 
 def get_anomaly_detector() -> MLAnomalyDetector:

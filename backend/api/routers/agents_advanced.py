@@ -9,10 +9,16 @@ Extended endpoints for the AI Agent System:
 - MCP Tools
 """
 
+import asyncio
+import contextlib
+import functools
+import json
 import logging
-from typing import Any, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -28,16 +34,12 @@ class DeliberationRequest(BaseModel):
     """Multi-agent deliberation request"""
 
     question: str = Field(..., description="Question for agents to deliberate on")
-    agents: List[str] = Field(
+    agents: list[str] = Field(
         default=["deepseek", "perplexity"],
         description="List of agent IDs to participate",
     )
-    max_rounds: int = Field(
-        default=3, ge=1, le=10, description="Maximum deliberation rounds"
-    )
-    min_confidence: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Minimum confidence to reach consensus"
-    )
+    max_rounds: int = Field(default=3, ge=1, le=10, description="Maximum deliberation rounds")
+    min_confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum confidence to reach consensus")
     voting_strategy: str = Field(
         default="weighted",
         description="Voting strategy: majority, weighted, unanimous, or ranked_choice",
@@ -62,9 +64,9 @@ class DeliberationResponse(BaseModel):
     decision: str
     confidence: float
     rounds_used: int
-    votes: Dict[str, Any]
-    evidence_chain: List[str]
-    dissenting_views: List[str]
+    votes: dict[str, Any]
+    evidence_chain: list[str]
+    dissenting_views: list[str]
 
     model_config = {
         "json_schema_extra": {
@@ -88,10 +90,8 @@ class MemoryStoreRequest(BaseModel):
         default="semantic",
         description="Memory type: working, episodic, semantic, or procedural",
     )
-    importance: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Importance score"
-    )
-    tags: List[str] = Field(default=[], description="Tags for categorization")
+    importance: float = Field(default=0.5, ge=0.0, le=1.0, description="Importance score")
+    tags: list[str] = Field(default=[], description="Tags for categorization")
 
 
 class MemoryRecallRequest(BaseModel):
@@ -99,9 +99,7 @@ class MemoryRecallRequest(BaseModel):
 
     query: str = Field(..., description="Query to search for")
     top_k: int = Field(default=5, ge=1, le=50, description="Number of results")
-    memory_types: Optional[List[str]] = Field(
-        default=None, description="Filter by memory types"
-    )
+    memory_types: list[str] | None = Field(default=None, description="Filter by memory types")
 
 
 class SelfImprovementFeedbackRequest(BaseModel):
@@ -109,20 +107,16 @@ class SelfImprovementFeedbackRequest(BaseModel):
 
     prompt: str = Field(..., description="Original prompt")
     response: str = Field(..., description="Agent response")
-    feedback_type: str = Field(
-        default="human", description="Feedback type: human or ai"
-    )
-    score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Quality score (for human feedback)"
-    )
-    reasoning: Optional[str] = Field(None, description="Reasoning for the score")
+    feedback_type: str = Field(default="human", description="Feedback type: human or ai")
+    score: float | None = Field(None, ge=0.0, le=1.0, description="Quality score (for human feedback)")
+    reasoning: str | None = Field(None, description="Reasoning for the score")
 
 
 class ToolCallRequest(BaseModel):
     """MCP tool call request"""
 
     tool_name: str = Field(..., description="Name of the tool to call")
-    arguments: Dict[str, Any] = Field(default={}, description="Tool arguments")
+    arguments: dict[str, Any] = Field(default={}, description="Tool arguments")
 
 
 # ============================================================================
@@ -133,100 +127,30 @@ class ToolCallRequest(BaseModel):
 @router.post("/deliberate", response_model=DeliberationResponse)
 async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
     """
-    Run multi-agent deliberation on a question
+    Multi-agent deliberation endpoint — debate system has been removed.
 
-    Multiple AI agents debate and reach consensus on a decision.
-    Uses structured voting and evidence gathering.
-
-    **Now uses REAL LLM APIs (DeepSeek, Perplexity)!**
+    Returns a neutral placeholder response.
     """
-    try:
-        from backend.agents.consensus.real_llm_deliberation import (
-            get_real_deliberation,
-            VotingStrategy,
-        )
-
-        deliberation = get_real_deliberation()
-
-        # Map string to enum
-        strategy_map = {
-            "majority": VotingStrategy.MAJORITY,
-            "weighted": VotingStrategy.WEIGHTED,
-            "unanimous": VotingStrategy.UNANIMOUS,
-            "ranked_choice": VotingStrategy.RANKED_CHOICE,
-        }
-        voting_strategy = strategy_map.get(
-            request.voting_strategy, VotingStrategy.WEIGHTED
-        )
-
-        result = await deliberation.deliberate(
-            question=request.question,
-            agents=request.agents,
-            max_rounds=request.max_rounds,
-            min_confidence=request.min_confidence,
-            voting_strategy=voting_strategy,
-        )
-
-        # Extract votes from final_votes
-        votes = {}
-        for vote in result.final_votes:
-            votes[vote.agent_id] = vote.confidence
-
-        # Extract dissenting views
-        dissenting_views = [
-            f"{vote.agent_id}: {vote.reasoning or vote.position}"
-            for vote in result.dissenting_opinions
-        ]
-
-        # Extract evidence chain as strings
-        evidence_chain = [
-            e.get("evidence", str(e)) if isinstance(e, dict) else str(e)
-            for e in result.evidence_chain
-        ]
-
-        return DeliberationResponse(
-            decision=result.decision,
-            confidence=result.confidence,
-            rounds_used=len(result.rounds),
-            votes=votes,
-            evidence_chain=evidence_chain,
-            dissenting_views=dissenting_views,
-        )
-
-    except Exception as e:
-        logger.error(f"Deliberation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    logger.info("Debate system removed — skipping deliberation")
+    return DeliberationResponse(
+        decision="Debate system removed.",
+        confidence=0.0,
+        rounds_used=0,
+        votes={},
+        evidence_chain=[],
+        dissenting_views=[],
+    )
 
 
 @router.get("/domain-agents")
 async def list_domain_agents():
     """
-    List available domain-specific agents
+    Domain agents endpoint — debate system has been removed.
 
-    Returns all registered domain agents with their capabilities.
+    Returns an empty agent list.
     """
-    try:
-        from backend.agents.consensus.domain_agents import DomainAgentRegistry
-
-        registry = DomainAgentRegistry()
-        agents = registry.list_agents()
-
-        return {
-            "agents": [
-                {
-                    "id": agent.agent_id,
-                    "type": agent.agent_type,
-                    "specialty": agent.specialty,
-                    "capabilities": agent.capabilities,
-                }
-                for agent in agents
-            ],
-            "total": len(agents),
-        }
-
-    except Exception as e:
-        logger.error(f"Error listing domain agents: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    logger.info("Debate system removed — domain agents not available")
+    return {"agents": [], "total": 0}
 
 
 # ============================================================================
@@ -234,17 +158,12 @@ async def list_domain_agents():
 # ============================================================================
 
 
-_memory_instance = None
-
-
+@functools.lru_cache(maxsize=1)
 def get_memory():
-    """Get or create memory singleton"""
-    global _memory_instance
-    if _memory_instance is None:
-        from backend.agents.memory.hierarchical_memory import HierarchicalMemory
+    """Get or create memory singleton (thread-safe via lru_cache)."""
+    from backend.agents.memory.hierarchical_memory import HierarchicalMemory
 
-        _memory_instance = HierarchicalMemory()
-    return _memory_instance
+    return HierarchicalMemory()
 
 
 @router.post("/memory/store")
@@ -283,7 +202,7 @@ async def store_memory(request: MemoryStoreRequest):
 
     except Exception as e:
         logger.error(f"Memory store error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/memory/recall")
@@ -307,9 +226,7 @@ async def recall_memory(request: MemoryRecallRequest):
                 {
                     "id": r.id,
                     "content": r.content,
-                    "memory_type": r.memory_type.value
-                    if hasattr(r.memory_type, "value")
-                    else str(r.memory_type),
+                    "memory_type": r.memory_type.value if hasattr(r.memory_type, "value") else str(r.memory_type),
                     "importance": r.importance,
                     "similarity": getattr(r, "similarity", None),
                 }
@@ -320,7 +237,7 @@ async def recall_memory(request: MemoryRecallRequest):
 
     except Exception as e:
         logger.error(f"Memory recall error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/memory/stats")
@@ -334,7 +251,7 @@ async def get_memory_stats():
 
     except Exception as e:
         logger.error(f"Memory stats error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/memory/consolidate")
@@ -355,7 +272,7 @@ async def consolidate_memory():
 
     except Exception as e:
         logger.error(f"Memory consolidation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -386,18 +303,18 @@ async def submit_feedback(request: SelfImprovementFeedbackRequest):
         else:
             await rlhf.collect_ai_feedback(
                 prompt=request.prompt,
-                response=request.response,
+                responses=[request.response],
             )
 
         return {
             "success": True,
             "feedback_type": request.feedback_type,
-            "total_feedback": len(rlhf.feedback_data),
+            "total_feedback": rlhf.stats.get("total_feedback", 0),
         }
 
     except Exception as e:
         logger.error(f"Feedback error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/improvement/evaluate")
@@ -412,23 +329,23 @@ async def evaluate_response(request: SelfImprovementFeedbackRequest):
 
         rlhf = RLHFModule()
 
-        evaluation = await rlhf.self_evaluate_response(
+        evaluation = await rlhf.self_evaluate(
             prompt=request.prompt,
             response=request.response,
         )
 
         return {
-            "overall_score": evaluation.overall_score,
-            "accuracy_score": evaluation.accuracy_score,
-            "helpfulness_score": evaluation.helpfulness_score,
-            "safety_score": evaluation.safety_score,
-            "coherence_score": evaluation.coherence_score,
-            "feedback": evaluation.feedback,
+            "overall_score": evaluation.overall,
+            "accuracy_score": evaluation.accuracy,
+            "helpfulness_score": evaluation.helpfulness,
+            "safety_score": evaluation.safety,
+            "coherence_score": evaluation.clarity,
+            "feedback": "",
         }
 
     except Exception as e:
         logger.error(f"Evaluation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/improvement/stats")
@@ -446,7 +363,7 @@ async def get_improvement_stats():
 
     except Exception as e:
         logger.error(f"Improvement stats error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -471,7 +388,7 @@ async def list_mcp_tools():
 
     except Exception as e:
         logger.error(f"MCP tools error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/mcp/tools/call")
@@ -492,7 +409,7 @@ async def call_mcp_tool(request: ToolCallRequest):
 
     except Exception as e:
         logger.error(f"MCP tool call error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/mcp/resources")
@@ -511,7 +428,7 @@ async def list_mcp_resources():
 
     except Exception as e:
         logger.error(f"MCP resources error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -523,19 +440,18 @@ async def list_mcp_resources():
 async def get_agent_metrics():
     """Get AI agent monitoring metrics"""
     try:
-        from backend.agents.monitoring.metrics_collector import MetricsCollector
+        from backend.agents.monitoring.metrics_collector import get_metrics_collector
 
-        collector = MetricsCollector()
+        collector = get_metrics_collector()
 
         return {
-            "counters": dict(collector._counters),
-            "gauges": dict(collector._gauges),
+            "stats": collector.get_stats(),
             "prometheus": collector.export_prometheus(),
         }
 
     except Exception as e:
         logger.error(f"Metrics error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/traces")
@@ -545,26 +461,16 @@ async def get_agent_traces(limit: int = 50):
         from backend.agents.monitoring.tracing import DistributedTracer
 
         tracer = DistributedTracer()
-        spans = list(tracer._completed_spans.values())[-limit:]
+        traces = tracer.get_recent_traces(limit=limit)
 
         return {
-            "traces": [
-                {
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "name": span.name,
-                    "duration_ms": span.duration_ms,
-                    "status": span.status.value if hasattr(span, "status") else "ok",
-                    "attributes": span.attributes,
-                }
-                for span in spans
-            ],
-            "total": len(spans),
+            "traces": [trace.to_dict() for trace in traces],
+            "total": len(traces),
         }
 
     except Exception as e:
         logger.error(f"Traces error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/alerts")
@@ -577,26 +483,17 @@ async def get_agent_alerts():
         alerts = manager.get_active_alerts()
 
         return {
-            "alerts": [
-                {
-                    "id": alert.id,
-                    "rule_name": alert.rule_name,
-                    "severity": alert.severity.value,
-                    "message": alert.message,
-                    "fired_at": alert.fired_at.isoformat(),
-                }
-                for alert in alerts
-            ],
+            "alerts": [alert.to_dict() for alert in alerts],
             "total": len(alerts),
         }
 
     except Exception as e:
         logger.error(f"Alerts error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/anomalies")
-async def get_detected_anomalies(metric_name: Optional[str] = None, limit: int = 100):
+async def get_detected_anomalies(metric_name: str | None = None, limit: int = 100):
     """Get detected anomalies"""
     try:
         from backend.agents.monitoring.ml_anomaly import get_anomaly_detector
@@ -617,7 +514,7 @@ async def get_detected_anomalies(metric_name: Optional[str] = None, limit: int =
 
     except Exception as e:
         logger.error(f"Anomalies error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -630,17 +527,14 @@ async def get_system_overview():
     """Get complete AI agent system overview"""
     try:
         # Collect stats from all subsystems
-        overview = {
-            "status": "operational",
-            "components": {},
-        }
+        components: dict[str, Any] = {}
 
         # Memory stats
         try:
             memory = get_memory()
-            overview["components"]["memory"] = memory.get_stats()
+            components["memory"] = memory.get_stats()
         except Exception:
-            overview["components"]["memory"] = {"status": "unavailable"}
+            components["memory"] = {"status": "unavailable"}
 
         # Self-improvement stats
         try:
@@ -649,35 +543,36 @@ async def get_system_overview():
             )
 
             evaluator = PerformanceEvaluator()
-            overview["components"]["self_improvement"] = evaluator.get_stats()
+            components["self_improvement"] = evaluator.get_stats()
         except Exception:
-            overview["components"]["self_improvement"] = {"status": "unavailable"}
+            components["self_improvement"] = {"status": "unavailable"}
 
         # MCP stats
         try:
             from backend.agents.mcp.tool_registry import get_tool_registry
 
             registry = get_tool_registry()
-            overview["components"]["mcp"] = registry.get_stats()
+            components["mcp"] = registry.get_stats()
         except Exception:
-            overview["components"]["mcp"] = {"status": "unavailable"}
+            components["mcp"] = {"status": "unavailable"}
 
         # Monitoring stats
         try:
             from backend.agents.monitoring.metrics_collector import MetricsCollector
 
             collector = MetricsCollector()
-            overview["components"]["monitoring"] = {
-                "metrics_count": len(collector._counters) + len(collector._gauges),
-            }
+            components["monitoring"] = collector.get_stats()
         except Exception:
-            overview["components"]["monitoring"] = {"status": "unavailable"}
+            components["monitoring"] = {"status": "unavailable"}
 
-        return overview
+        return {
+            "status": "operational",
+            "components": components,
+        }
 
     except Exception as e:
         logger.error(f"System overview error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -688,12 +583,12 @@ async def get_system_overview():
 class BacktestAnalysisRequest(BaseModel):
     """Request for AI backtest analysis"""
 
-    metrics: Dict[str, Any] = Field(..., description="Backtest metrics")
+    metrics: dict[str, Any] = Field(..., description="Backtest metrics")
     strategy_name: str = Field(..., description="Strategy name")
     symbol: str = Field(default="BTCUSDT", description="Trading symbol")
     timeframe: str = Field(default="1h", description="Chart timeframe")
     period: str = Field(default="Unknown", description="Backtest period")
-    agents: List[str] = Field(default=["deepseek"], description="AI agents to use")
+    agents: list[str] = Field(default=["deepseek"], description="AI agents to use")
 
     model_config = {
         "json_schema_extra": {
@@ -719,12 +614,12 @@ class BacktestAnalysisRequest(BaseModel):
 class OptimizationAnalysisRequest(BaseModel):
     """Request for AI optimization analysis"""
 
-    best_params: Dict[str, Any] = Field(..., description="Best parameters found")
+    best_params: dict[str, Any] = Field(..., description="Best parameters found")
     best_sharpe: float = Field(..., description="Best Sharpe ratio")
     best_return: float = Field(..., description="Best return percentage")
     total_trials: int = Field(..., description="Total optimization trials")
     convergence_score: float = Field(default=0.8, description="Convergence score 0-1")
-    param_ranges: Dict[str, Any] = Field(..., description="Parameter search ranges")
+    param_ranges: dict[str, Any] = Field(..., description="Parameter search ranges")
     strategy_name: str = Field(..., description="Strategy name")
     symbol: str = Field(default="BTCUSDT", description="Trading symbol")
     method: str = Field(default="Bayesian", description="Optimization method")
@@ -762,7 +657,7 @@ async def analyze_backtest_with_ai(request: BacktestAnalysisRequest):
 
     except Exception as e:
         logger.error(f"Backtest analysis error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/analyze-optimization")
@@ -799,4 +694,422 @@ async def analyze_optimization_with_ai(request: OptimizationAnalysisRequest):
 
     except Exception as e:
         logger.error(f"Optimization analysis error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ============================================================================
+# KEY VALIDATION & AGENT HEALTH ENDPOINTS
+# ============================================================================
+
+
+@router.get("/keys/preflight")
+async def preflight_key_validation():
+    """
+    Run pre-flight validation of all API keys.
+
+    Sends minimal requests to each provider to verify keys are valid.
+    Returns per-provider status: valid/invalid/unknown.
+    """
+    try:
+        from backend.agents.api_key_pool import APIKeyPoolManager
+
+        pool = APIKeyPoolManager()
+        results = await pool.validate_keys_preflight()
+
+        return {
+            "success": True,
+            "providers": results,
+            "all_valid": all(r.get("valid") is True for r in results.values()),
+            "summary": {
+                "total": len(results),
+                "valid": sum(1 for r in results.values() if r.get("valid") is True),
+                "invalid": sum(1 for r in results.values() if r.get("valid") is False),
+                "unknown": sum(1 for r in results.values() if r.get("valid") is None),
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Pre-flight validation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/keys/pool-metrics")
+async def get_key_pool_metrics():
+    """
+    Get key pool health metrics for all providers.
+
+    Shows pool size, healthy/cooling/disabled counts per provider.
+    """
+    try:
+        from backend.agents.api_key_pool import APIKeyPoolManager
+        from backend.agents.models import AgentType
+
+        pool = APIKeyPoolManager()
+        metrics = {}
+        for agent_type in [AgentType.DEEPSEEK, AgentType.PERPLEXITY, AgentType.QWEN]:
+            metrics[agent_type.value] = pool.get_pool_metrics(agent_type)
+
+        return {"success": True, "providers": metrics}
+
+    except Exception as e:
+        logger.error(f"Pool metrics error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ============================================================================
+# AGENT ACCURACY & DELIBERATION AUDIT
+# ============================================================================
+
+
+@router.get("/deliberation/accuracy")
+async def get_agent_accuracy():
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "accuracy": {}, "deliberation_stats": {}, "note": "Debate system removed"}
+
+
+@router.get("/deliberation/audit-log")
+async def get_deliberation_audit_log(last_n: int = 50):
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "entries": [], "total": 0, "returned": 0, "note": "Debate system removed"}
+
+
+@router.get("/deliberation/history")
+async def get_deliberation_history(limit: int = 20):
+    """Debate system removed — returns empty placeholder."""
+    return {"success": True, "deliberations": [], "total": 0, "note": "Debate system removed"}
+
+
+# ============================================================================
+# STRATEGY BUILDER — AI Agent Integration
+# ============================================================================
+
+
+class BuilderTaskRequest(BaseModel):
+    """Request for AI agent to build a strategy through the Strategy Builder."""
+
+    name: str = Field(default="Agent Strategy", description="Strategy name")
+    symbol: str = Field(default="BTCUSDT", description="Trading pair")
+    timeframe: str = Field(default="15", description="Candle timeframe (1,5,15,30,60,240,D,W,M)")
+    direction: str = Field(default="both", description="Trade direction (long/short/both)")
+    initial_capital: float = Field(default=10000.0, description="Starting capital")
+    leverage: float = Field(default=10.0, description="Leverage multiplier")
+    start_date: str = Field(default="2025-01-01", description="Backtest start date")
+    end_date: str = Field(default="2025-06-01", description="Backtest end date")
+    blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Blocks to add: [{type, params, id, name}]",
+    )
+    connections: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Connections: [{source, source_port, target, target_port}]",
+    )
+    stop_loss: float | None = Field(default=None, description="Stop loss fraction")
+    take_profit: float | None = Field(default=None, description="Take profit fraction")
+    max_iterations: int = Field(default=3, description="Max iteration attempts")
+    min_sharpe: float = Field(
+        default=0.5, description="Minimum acceptable Sharpe ratio (fallback if evaluation_config not set)"
+    )
+    min_win_rate: float = Field(default=0.4, description="Minimum acceptable win rate")
+    enable_deliberation: bool = Field(
+        default=False,
+        description="Use AI multi-agent deliberation (DeepSeek+Perplexity) for planning",
+    )
+    agent: str = Field(
+        default="qwen",
+        description="Primary LLM agent for single-agent calls: qwen | deepseek | perplexity",
+    )
+    existing_strategy_id: str | None = Field(
+        default=None,
+        description="Existing strategy ID to optimize (skip create/blocks/connect stages)",
+    )
+    use_optimizer_mode: bool = Field(
+        default=False,
+        description=(
+            "Optimizer sweep mode: agents suggest param ranges, optimizer finds best values (slower but more thorough)"
+        ),
+    )
+    evaluation_config: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Evaluation panel config — ALL scoring and sorting uses this. "
+            "Fields: primary_metric, secondary_metrics, constraints, sort_order, "
+            "use_composite, weights. If not set, falls back to sharpe_ratio with min_sharpe threshold."
+        ),
+    )
+
+
+@router.post("/builder/task")
+async def run_builder_task(request: BuilderTaskRequest):
+    """
+    Run a full Strategy Builder workflow — create strategy, add blocks,
+    connect them, validate, generate code, and backtest.
+
+    The agent uses the SAME API endpoints as the frontend UI,
+    so all actions are visible to the user in real-time.
+    """
+    try:
+        from backend.agents.workflows.builder_workflow import (
+            BuilderWorkflow,
+            BuilderWorkflowConfig,
+        )
+
+        # Build evaluation_config: prefer explicit evaluation_config from request,
+        # fall back to legacy min_sharpe/min_win_rate fields for backwards compat
+        eval_config = request.evaluation_config or {
+            "primary_metric": "sharpe_ratio",
+            "secondary_metrics": [],
+            "constraints": [
+                {"metric": "win_rate", "operator": ">=", "value": request.min_win_rate},
+            ],
+            "sort_order": [],
+            "use_composite": False,
+            "weights": None,
+            "min_primary": request.min_sharpe,
+        }
+
+        config = BuilderWorkflowConfig(
+            name=request.name,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            direction=request.direction,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            commission=0.0007,  # NEVER change — TradingView parity
+            stop_loss=request.stop_loss,
+            take_profit=request.take_profit,
+            blocks=request.blocks,
+            connections=request.connections,
+            max_iterations=request.max_iterations,
+            min_acceptable_sharpe=request.min_sharpe,
+            min_acceptable_win_rate=request.min_win_rate,
+            enable_deliberation=request.enable_deliberation,
+            agent=request.agent,
+            existing_strategy_id=request.existing_strategy_id,
+            use_optimizer_mode=request.use_optimizer_mode,
+            evaluation_config=eval_config,
+        )
+
+        workflow = BuilderWorkflow()
+        result = await workflow.run(config)
+
+        return {
+            "success": result.status.value == "completed",
+            "workflow": result.to_dict(),
+        }
+
+    except Exception as e:
+        logger.error(f"Builder task error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ---------------------------------------------------------------------------
+# SSE helper
+# ---------------------------------------------------------------------------
+
+
+def _sse_event(event: str, data: Any) -> str:
+    """Format a single Server-Sent Events frame."""
+    payload = json.dumps(data, ensure_ascii=False)
+    return f"event: {event}\ndata: {payload}\n\n"
+
+
+async def _builder_sse_stream(request: "BuilderTaskRequest") -> AsyncIterator[str]:
+    """Yield SSE events as the BuilderWorkflow progresses through stages.
+
+    Strategy:
+    - Monkey-patch ``BuilderWorkflow._result`` status writes via a thin
+      wrapper so each stage change emits a ``stage`` SSE event.
+    - Emit a ``progress`` event every ~2 s during long-running stages.
+    - Emit ``result`` on completion or ``error`` on failure.
+    """
+    from backend.agents.workflows.builder_workflow import (
+        BuilderStage,
+        BuilderWorkflow,
+        BuilderWorkflowConfig,
+    )
+
+    # Build evaluation_config: prefer explicit evaluation_config from request,
+    # fall back to legacy min_sharpe/min_win_rate fields for backwards compat
+    eval_config_sse = request.evaluation_config or {
+        "primary_metric": "sharpe_ratio",
+        "secondary_metrics": [],
+        "constraints": [
+            {"metric": "win_rate", "operator": ">=", "value": request.min_win_rate},
+        ],
+        "sort_order": [],
+        "use_composite": False,
+        "weights": None,
+        "min_primary": request.min_sharpe,
+    }
+
+    config = BuilderWorkflowConfig(
+        name=request.name,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        direction=request.direction,
+        initial_capital=request.initial_capital,
+        leverage=request.leverage,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        commission=0.0007,
+        stop_loss=request.stop_loss,
+        take_profit=request.take_profit,
+        blocks=request.blocks,
+        connections=request.connections,
+        max_iterations=request.max_iterations,
+        min_acceptable_sharpe=request.min_sharpe,
+        min_acceptable_win_rate=request.min_win_rate,
+        enable_deliberation=request.enable_deliberation,
+        agent=request.agent,
+        existing_strategy_id=request.existing_strategy_id,
+        use_optimizer_mode=request.use_optimizer_mode,
+        evaluation_config=eval_config_sse,
+    )
+
+    _stage_labels: dict[str, str] = {
+        BuilderStage.PLANNING: "🔍 Planning strategy…",
+        BuilderStage.CREATING: "🏗️ Creating strategy canvas…",
+        BuilderStage.ADDING_BLOCKS: "🧩 Adding indicator blocks…",
+        BuilderStage.CONNECTING: "🔗 Connecting blocks…",
+        BuilderStage.VALIDATING: "✅ Validating strategy…",
+        BuilderStage.GENERATING_CODE: "💾 Generating Python code…",
+        BuilderStage.BACKTESTING: "📊 Running backtest…",
+        BuilderStage.EVALUATING: "📈 Evaluating results…",
+        BuilderStage.ITERATING: "🔄 Optimizing parameters…",
+        BuilderStage.COMPLETED: "🎉 Done!",
+        BuilderStage.FAILED: "❌ Failed",
+    }
+
+    # Queue for inter-task communication
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    # P1 fix: callback on the instance — no class-level monkey-patch, safe for concurrent requests
+    def _stage_cb(stage: BuilderStage) -> None:
+        queue.put_nowait({"type": "stage", "stage": stage.value, "label": _stage_labels.get(stage, stage.value)})
+
+    def _agent_log_cb(log: dict[str, Any]) -> None:
+        """Forward agent LLM call details to the SSE queue."""
+        queue.put_nowait({"type": "agent_log", **log})
+
+    workflow = BuilderWorkflow(on_stage_change=_stage_cb, on_agent_log=_agent_log_cb)
+
+    # Run workflow in background task
+    async def _run() -> None:
+        try:
+            result = await workflow.run(config)
+            queue.put_nowait({"type": "done", "result": result.to_dict()})
+        except Exception as exc:
+            queue.put_nowait({"type": "error", "message": str(exc)})
+
+    task = asyncio.create_task(_run())
+
+    try:
+        # Yield SSE events from the queue
+        while True:
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=2.0)
+            except TimeoutError:
+                # Heartbeat — keep connection alive
+                current_stage = workflow._result.status.value if workflow._result else "running"
+                yield _sse_event("heartbeat", {"stage": current_stage})
+                continue
+
+            if msg["type"] == "stage":
+                yield _sse_event("stage", {"stage": msg["stage"], "label": msg["label"]})
+
+            elif msg["type"] == "agent_log":
+                yield _sse_event(
+                    "agent_log",
+                    {
+                        "agent": msg.get("agent", "unknown"),
+                        "role": msg.get("role", ""),
+                        "title": msg.get("title", ""),
+                        "prompt_excerpt": msg.get("prompt_excerpt", ""),
+                        "response": msg.get("response", ""),
+                        "ts": msg.get("ts", ""),
+                    },
+                )
+
+            elif msg["type"] == "done":
+                yield _sse_event(
+                    "result",
+                    {
+                        "success": msg["result"].get("status") == "completed",
+                        "workflow": msg["result"],
+                    },
+                )
+                break
+
+            elif msg["type"] == "error":
+                yield _sse_event("error", {"message": msg["message"]})
+                break
+
+    finally:
+        # P2 fix: await task cancellation instead of fire-and-forget
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.shield(asyncio.gather(task, return_exceptions=True))
+
+
+@router.post("/builder/task/stream")
+async def run_builder_task_stream(request: BuilderTaskRequest) -> StreamingResponse:
+    """
+    Run a full Strategy Builder workflow with Server-Sent Events (SSE) progress.
+
+    Same as ``POST /builder/task`` but streams real-time stage updates:
+
+    - ``stage``     — workflow stage changed (planning/backtesting/…)
+    - ``heartbeat`` — keepalive every 2 s while waiting
+    - ``result``    — final workflow result (mirrors /builder/task response)
+    - ``error``     — fatal error
+
+    JavaScript usage::
+
+        const source = new EventSource('/api/v1/agents/advanced/builder/task/stream', {
+            method: 'POST'  // requires fetch-event-source polyfill
+        });
+
+    Or use ``fetch`` with ``text/event-stream`` content-type — see JS implementation
+    in ``strategy_builder.js``.
+    """
+    return StreamingResponse(
+        _builder_sse_stream(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )
+
+
+@router.get("/builder/block-library")
+async def get_builder_block_library():
+    """
+    Get the Strategy Builder block library — all available blocks
+    that agents can use to build strategies.
+    """
+    try:
+        from backend.agents.mcp.tools.strategy_builder import builder_get_block_library
+
+        library = await builder_get_block_library()
+        return {"success": True, "library": library}
+
+    except Exception as e:
+        logger.error(f"Block library error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/builder/strategies")
+async def list_builder_strategies(page: int = 1, page_size: int = 20):
+    """List all strategies in the Strategy Builder."""
+    try:
+        from backend.agents.mcp.tools.strategy_builder import builder_list_strategies
+
+        strategies = await builder_list_strategies(page=page, page_size=page_size)
+        return {"success": True, "data": strategies}
+
+    except Exception as e:
+        logger.error(f"List strategies error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

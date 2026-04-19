@@ -8,7 +8,6 @@ Strategies that trade price breakouts:
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -154,10 +153,10 @@ class ATRBreakoutStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         self._in_position: str = ""
-        self._prev_breakout_level_up: Optional[float] = None
-        self._prev_breakout_level_down: Optional[float] = None
+        self._prev_breakout_level_up: float | None = None
+        self._prev_breakout_level_down: float | None = None
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate breakout signals."""
         self.add_candle(candle)
 
@@ -201,10 +200,7 @@ class ATRBreakoutStrategy(LibraryStrategy):
             # Bullish breakout
             if high >= breakout_up and volume_ok:
                 # Check it's a fresh breakout
-                if (
-                    self._prev_breakout_level_up is None
-                    or self._prev_breakout_level_up < breakout_up * 0.99
-                ):
+                if self._prev_breakout_level_up is None or self._prev_breakout_level_up < breakout_up * 0.99:
                     stop_loss = close - (current_atr * stop_mult)
                     take_profit = calculate_take_profit(close, stop_loss, rr)
 
@@ -221,25 +217,25 @@ class ATRBreakoutStrategy(LibraryStrategy):
                     self._in_position = "long"
 
             # Bearish breakout
-            elif low <= breakout_down and volume_ok:
-                if (
-                    self._prev_breakout_level_down is None
-                    or self._prev_breakout_level_down > breakout_down * 1.01
-                ):
-                    stop_loss = close + (current_atr * stop_mult)
-                    take_profit = calculate_take_profit(close, stop_loss, rr)
+            elif (
+                low <= breakout_down
+                and volume_ok
+                and (self._prev_breakout_level_down is None or self._prev_breakout_level_down > breakout_down * 1.01)
+            ):
+                stop_loss = close + (current_atr * stop_mult)
+                take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                    signal = self.create_signal(
-                        signal_type=SignalType.SELL,
-                        price=close,
-                        stop_loss=stop_loss,
-                        take_profit=take_profit,
-                        reason=f"ATR breakout DOWN (Price: {close:.2f} < Level: {breakout_down:.2f})",
-                        confidence=0.7 if volume_ok else 0.55,
-                        breakout_level=breakout_down,
-                        atr=current_atr,
-                    )
-                    self._in_position = "short"
+                signal = self.create_signal(
+                    signal_type=SignalType.SELL,
+                    price=close,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    reason=f"ATR breakout DOWN (Price: {close:.2f} < Level: {breakout_down:.2f})",
+                    confidence=0.7 if volume_ok else 0.55,
+                    breakout_level=breakout_down,
+                    atr=current_atr,
+                )
+                self._in_position = "short"
 
         # Exit on opposite breakout
         elif self._in_position == "long" and low <= breakout_down:
@@ -374,7 +370,7 @@ class DonchianBreakoutStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         self._in_position: str = ""
-        self._entry_price: Optional[float] = None
+        self._entry_price: float | None = None
 
     def _donchian_channel(self, period: int) -> tuple[float, float]:
         """Calculate Donchian channel (highest high, lowest low)."""
@@ -386,7 +382,7 @@ class DonchianBreakoutStrategy(LibraryStrategy):
 
         return (max(highs), min(lows))
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate Donchian breakout signals."""
         self.add_candle(candle)
 

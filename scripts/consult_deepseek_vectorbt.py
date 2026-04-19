@@ -2,14 +2,17 @@
 Consultation with DeepSeek AI about VectorBT limitations and possible solutions.
 Uses the project's UnifiedAgentInterface with encrypted API keys.
 """
+
 import asyncio
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.agents.unified_agent_interface import (
-    UnifiedAgentInterface,
     AgentRequest,
     AgentType,
+    UnifiedAgentInterface,
 )
 
 PROMPT = """
@@ -28,7 +31,7 @@ STAGE 1: VectorBT (векторизованный)
   - Тестирует 10,000+ комбинаций параметров
   - Скорость: 5,000-80,000 комб/сек
   - Точность: ~85%
-  
+
 STAGE 2: Fallback (последовательный)
   - Валидирует TOP-50 кандидатов
   - Скорость: ~1 комб/сек
@@ -94,11 +97,12 @@ STAGE 2: Fallback (последовательный)
 4. Приоритетность: какие проблемы стоит решать в первую очередь
 """
 
+
 async def main():
     print("=" * 70)
     print("DEEPSEEK CONSULTATION: VectorBT Limitations")
     print("=" * 70)
-    
+
     # Initialize
     try:
         agent = UnifiedAgentInterface(force_direct_api=True)  # Direct API (no MCP)
@@ -106,52 +110,52 @@ async def main():
     except Exception as e:
         print(f"❌ Failed to initialize agent: {e}")
         return
-    
+
     # Check available keys
     deepseek_count = agent.key_manager.count_active(AgentType.DEEPSEEK)
     print(f"🔑 DeepSeek keys available: {deepseek_count}")
-    
+
     if deepseek_count == 0:
         print("❌ No DeepSeek keys available!")
         return
-    
+
     # Create request
     request = AgentRequest(
         agent_type=AgentType.DEEPSEEK,
         task_type="analyze",
         prompt=PROMPT,
-        thinking_mode=True,  # Enable Chain-of-Thought
+        thinking_mode=False,  # Disabled: deepseek-reasoner is 6-8x more expensive
         context={
             "project": "Bybit Strategy Tester",
             "focus": "VectorBT optimization limitations",
-        }
+        },
     )
-    
+
     print("\n📤 Sending request to DeepSeek...")
-    print(f"   Model: deepseek-reasoner (thinking mode)")
+    print("   Model: deepseek-chat (cost-optimized)")
     print(f"   Prompt length: {len(PROMPT)} chars")
-    
+
     # Send request
     try:
         response = await agent.send_request(request)
-        
+
         print("\n" + "=" * 70)
         print("DEEPSEEK RESPONSE")
         print("=" * 70)
-        
+
         if response.success:
             print(f"\n✅ Success! Latency: {response.latency_ms:.0f}ms")
             print(f"   Channel: {response.channel.value}")
-            
+
             if response.reasoning_content:
                 print("\n--- REASONING (Chain-of-Thought) ---")
                 print(response.reasoning_content[:2000])
                 if len(response.reasoning_content) > 2000:
                     print(f"\n... (truncated, {len(response.reasoning_content)} chars total)")
-            
+
             print("\n--- FINAL ANSWER ---")
             print(response.content)
-            
+
             # Save to file
             with open("deepseek_vectorbt_consultation.md", "w", encoding="utf-8") as f:
                 f.write("# DeepSeek VectorBT Consultation\n\n")
@@ -161,16 +165,18 @@ async def main():
                     f.write("\n\n")
                 f.write("## Final Answer\n\n")
                 f.write(response.content)
-            
+
             print("\n📄 Full response saved to: deepseek_vectorbt_consultation.md")
-            
+
         else:
             print(f"\n❌ Failed: {response.error}")
-            
+
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

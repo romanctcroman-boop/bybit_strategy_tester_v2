@@ -14,13 +14,15 @@ Features:
 """
 
 import asyncio
+import inspect
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -42,27 +44,62 @@ class ExecutionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class BudgetExceededError(RuntimeError):
+    """Raised when AgentState.max_cost_usd is exceeded during pipeline execution."""
+
+    def __init__(self, spent: float, limit: float) -> None:
+        super().__init__(f"LLM cost budget exceeded: spent ${spent:.4f} > limit ${limit:.4f}")
+        self.spent = spent
+        self.limit = limit
+
+
 @dataclass
 class AgentState:
     """State object passed between agents in the graph."""
 
     # Core state
-    messages: List[Dict[str, Any]] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
 
     # Execution tracking
-    current_node: Optional[str] = None
-    visited_nodes: List[str] = field(default_factory=list)
-    execution_path: List[Tuple[str, float]] = field(default_factory=list)
+    current_node: str | None = None
+    visited_nodes: list[str] = field(default_factory=list)
+    execution_path: list[tuple[str, float]] = field(default_factory=list)
 
     # Results storage
-    results: Dict[str, Any] = field(default_factory=dict)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
+    results: dict[str, Any] = field(default_factory=dict)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+
+    # Observability — LLM cost & call count accumulated across all nodes
+    total_cost_usd: float = 0.0
+    llm_call_count: int = 0
+
+    # Cost budget — 0.0 means unlimited
+    max_cost_usd: float = 0.0
+    budget_exceeded: bool = False
 
     # Metadata
     session_id: str = field(default_factory=lambda: str(uuid4()))
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    # ── Unified pipeline mode (Фаза 1) ─────────────────────────────────────
+    # "create"   — LLM generates strategy from scratch (default)
+    # "optimize" — existing strategy loaded from DB via seed_graph
+    pipeline_mode: str = "create"
+
+    # Optimization iteration history — each entry: {iteration, best_sharpe, best_params,
+    # opt_score, ranges_used, timestamp}. Populated by A2AParamRangeNode (Фаза 4).
+    opt_iterations: list[dict[str, Any]] = field(default_factory=list)
+
+    # Structured analysis of Optuna top-20 results — populated by OptimizationAnalysisNode (Фаза 3).
+    # Fields: param_clusters, winning_zones, risks, next_ranges, summary
+    opt_insights: dict[str, Any] = field(default_factory=dict)
+
+    # Outcome of AnalysisDebateNode (Фаза 5).
+    # Fields: decision ("proceed"|"reject"|"conditional"), risk_score (0-10),
+    # conditions (list[str]), rationale (str)
+    debate_outcome: dict[str, Any] | None = None
 
     def add_message(self, role: str, content: str, agent: str = "system"):
         """Add a message to the state."""
@@ -71,19 +108,58 @@ class AgentState:
                 "role": role,
                 "content": content,
                 "agent": agent,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def set_result(self, node: str, result: Any):
         """Store result from a node execution."""
         self.results[node] = result
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def get_result(self, node: str) -> Optional[Any]:
+    def get_result(self, node: str) -> Any | None:
         """Get result from a node execution."""
         return self.results.get(node)
+
+    def check_llm_budget(self, estimated_cost_usd: float = 0.0) -> None:
+        """Pre-flight budget check BEFORE making an LLM call.
+
+        Call this before incurring the cost (e.g. before dispatching an LLM
+        request).  Raises immediately if the projected total would exceed
+        the configured budget — this prevents "one request over the line"
+        leaks that would otherwise be caught only AFTER the money is spent.
+
+        Args:
+            estimated_cost_usd: Expected cost of the upcoming call.  Use 0.0
+                for a pure "am I already over budget?" check.
+
+        Raises:
+            BudgetExceededError: if max_cost_usd > 0 and the projected total
+                would exceed it.
+        """
+        if self.max_cost_usd > 0:
+            projected = self.total_cost_usd + max(0.0, estimated_cost_usd)
+            if projected > self.max_cost_usd:
+                self.budget_exceeded = True
+                raise BudgetExceededError(projected, self.max_cost_usd)
+
+    def record_llm_cost(self, cost_usd: float) -> None:
+        """Accumulate LLM API cost and increment call counter.
+
+        Note:
+            Prefer calling :meth:`check_llm_budget(estimated)` BEFORE the
+            actual LLM request, then :meth:`record_llm_cost(actual)` after,
+            so budget overruns are caught pre-flight.
+
+        Raises:
+            BudgetExceededError: if max_cost_usd > 0 and the new total exceeds it.
+        """
+        self.total_cost_usd += cost_usd
+        self.llm_call_count += 1
+        if self.max_cost_usd > 0 and self.total_cost_usd > self.max_cost_usd:
+            self.budget_exceeded = True
+            raise BudgetExceededError(self.total_cost_usd, self.max_cost_usd)
 
     def add_error(self, node: str, error: Exception):
         """Add an error to the state."""
@@ -92,12 +168,12 @@ class AgentState:
                 "node": node,
                 "error_type": type(error).__name__,
                 "error_message": str(error),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary."""
         return {
             "session_id": self.session_id,
@@ -134,7 +210,7 @@ class AgentNode(ABC):
         self.retry_count = retry_count
         self.retry_delay = retry_delay
         self.status = ExecutionStatus.PENDING
-        self.execution_time: Optional[float] = None
+        self.execution_time: float | None = None
 
     @abstractmethod
     async def execute(self, state: AgentState) -> AgentState:
@@ -152,9 +228,7 @@ class AgentNode(ABC):
                 start_time = time.time()
 
                 # Execute with timeout
-                result_state = await asyncio.wait_for(
-                    self.execute(state), timeout=self.timeout
-                )
+                result_state = await asyncio.wait_for(self.execute(state), timeout=self.timeout)
 
                 self.execution_time = time.time() - start_time
                 self.status = ExecutionStatus.COMPLETED
@@ -163,22 +237,16 @@ class AgentNode(ABC):
                 result_state.execution_path.append((self.name, self.execution_time))
                 result_state.visited_nodes.append(self.name)
 
-                logger.info(
-                    f"Agent '{self.name}' completed in {self.execution_time:.2f}s"
-                )
+                logger.info(f"Agent '{self.name}' completed in {self.execution_time:.2f}s")
                 return result_state
 
-            except asyncio.TimeoutError:
-                last_error = TimeoutError(
-                    f"Agent '{self.name}' timed out after {self.timeout}s"
-                )
+            except TimeoutError:
+                last_error = TimeoutError(f"Agent '{self.name}' timed out after {self.timeout}s")
                 logger.warning(f"Agent '{self.name}' timeout (attempt {attempts + 1})")
 
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Agent '{self.name}' failed (attempt {attempts + 1}): {e}"
-                )
+                logger.warning(f"Agent '{self.name}' failed (attempt {attempts + 1}): {e}")
 
             attempts += 1
             if attempts <= self.retry_count:
@@ -205,18 +273,18 @@ class FunctionAgent(AgentNode):
 
     async def execute(self, state: AgentState) -> AgentState:
         """Execute the wrapped function."""
-        if asyncio.iscoroutinefunction(self.func):
+        if inspect.iscoroutinefunction(self.func):
             return await self.func(state)
         return self.func(state)
 
 
 class LLMAgent(AgentNode):
-    """Agent that calls an LLM (DeepSeek/Perplexity) for processing."""
+    """Agent that calls an LLM (Claude/Perplexity) for processing."""
 
     def __init__(
         self,
         name: str,
-        agent_type: str = "deepseek",  # "deepseek" or "perplexity"
+        agent_type: str = "claude",  # "claude" or "perplexity"
         system_prompt: str = "",
         description: str = "",
         **kwargs,
@@ -226,14 +294,22 @@ class LLMAgent(AgentNode):
         self.system_prompt = system_prompt
 
     async def execute(self, state: AgentState) -> AgentState:
-        """Execute LLM call."""
+        """Execute LLM call via AgentToAgentCommunicator.route_message().
+
+        Fix 2026-04-17: previous implementation called a non-existent
+        ``async_send_message`` method and crashed at runtime. Now builds a proper
+        ``AgentMessage`` and routes it through the communicator, which handles
+        provider selection, key pool, circuit breakers, and retries.
+        """
         try:
-            # Import agent communicator
+            # Import agent communicator (lazy to avoid circular deps)
+            import uuid as _uuid
+
             from backend.agents.agent_to_agent_communicator import (
-                AgentType,
-                MessageType,
+                AgentMessage,
                 get_communicator,
             )
+            from backend.agents.models import AgentType, MessageType
 
             communicator = get_communicator()
 
@@ -244,23 +320,30 @@ class LLMAgent(AgentNode):
             if self.system_prompt:
                 prompt = f"{self.system_prompt}\n\n{prompt}"
 
-            # Select agent type
-            if self.agent_type == "perplexity":
-                agent_type = AgentType.PERPLEXITY
-            else:
-                agent_type = AgentType.DEEPSEEK
+            # Select target agent type
+            target = AgentType.PERPLEXITY if self.agent_type == "perplexity" else AgentType.CLAUDE
 
-            # Execute agent call
-            response = await communicator.async_send_message(
-                target=agent_type,
+            msg = AgentMessage(
+                message_id=str(_uuid.uuid4()),
+                from_agent=AgentType.ORCHESTRATOR,
+                to_agent=target,
                 message_type=MessageType.QUERY,
                 content=prompt,
                 context=state.context,
+                conversation_id=state.session_id,
+                iteration=1,
             )
 
-            # Store result
-            state.set_result(self.name, response)
-            state.add_message("assistant", response.get("response", ""), self.name)
+            response = await communicator.route_message(msg)
+
+            # Store structured result
+            payload = {
+                "response": response.content,
+                "confidence": response.confidence_score,
+                "metadata": response.metadata or {},
+            }
+            state.set_result(self.name, payload)
+            state.add_message("assistant", response.content or "", self.name)
 
         except Exception as e:
             logger.error(f"LLM Agent '{self.name}' error: {e}")
@@ -287,18 +370,17 @@ class Edge:
     """Edge connecting two nodes in the graph."""
 
     source: str
-    target: Union[str, List[str]]  # Single node or list for parallel
+    target: str | list[str]  # Single node or list for parallel
     edge_type: EdgeType = EdgeType.DIRECT
-    condition: Optional[Callable[[AgentState], bool]] = None
+    condition: Callable[[AgentState], bool] | None = None
     priority: int = 0
 
     def should_traverse(self, state: AgentState) -> bool:
         """Check if this edge should be traversed."""
         if self.edge_type == EdgeType.DIRECT:
             return True
-        elif self.edge_type == EdgeType.CONDITIONAL:
-            if self.condition:
-                return self.condition(state)
+        elif self.edge_type == EdgeType.CONDITIONAL and self.condition:
+            return self.condition(state)
         return True
 
 
@@ -307,8 +389,8 @@ class ConditionalRouter:
 
     def __init__(self, name: str):
         self.name = name
-        self.routes: List[Tuple[Callable[[AgentState], bool], str]] = []
-        self.default_route: Optional[str] = None
+        self.routes: list[tuple[Callable[[AgentState], bool], str]] = []
+        self.default_route: str | None = None
 
     def add_route(self, condition: Callable[[AgentState], bool], target: str):
         """Add a conditional route."""
@@ -318,7 +400,7 @@ class ConditionalRouter:
         """Set default route."""
         self.default_route = target
 
-    def get_next_node(self, state: AgentState) -> Optional[str]:
+    def get_next_node(self, state: AgentState) -> str | None:
         """Get the next node based on state."""
         for condition, target in self.routes:
             if condition(state):
@@ -339,25 +421,44 @@ class AgentGraph:
     """
 
     def __init__(
-        self, name: str = "agent_graph", description: str = "", max_iterations: int = 50
+        self,
+        name: str = "agent_graph",
+        description: str = "",
+        max_iterations: int = 50,
+        checkpoint_fn: Callable[[AgentState, str], None] | None = None,
+        event_fn: Callable[[str, dict[str, Any]], None] | None = None,
     ):
         self.name = name
         self.description = description
         self.max_iterations = max_iterations
 
+        # Optional checkpoint callback: called after each node with (state, node_name).
+        # Use make_sqlite_checkpointer() to persist state to SQLite.
+        self.checkpoint_fn = checkpoint_fn
+
+        # P2-4: Optional lightweight streaming callback: called after each node with
+        # (node_name, event_dict).  event_dict contains {"node", "status", "session_id",
+        # "iteration", "errors", "has_result"} — no full state to keep it cheap.
+        # Attach an asyncio.Queue consumer via make_pipeline_event_queue() to stream
+        # node completion events to a WebSocket or SSE endpoint.
+        self.event_fn = event_fn
+
         # Graph structure
-        self.nodes: Dict[str, AgentNode] = {}
-        self.edges: Dict[str, List[Edge]] = {}
-        self.routers: Dict[str, ConditionalRouter] = {}
+        self.nodes: dict[str, AgentNode] = {}
+        self.edges: dict[str, list[Edge]] = {}
+        self.routers: dict[str, ConditionalRouter] = {}
 
         # Special nodes
-        self.entry_point: Optional[str] = None
-        self.exit_points: Set[str] = set()
+        self.entry_point: str | None = None
+        self.exit_points: set[str] = set()
 
         # Execution metrics
         self.total_executions = 0
         self.successful_executions = 0
         self.failed_executions = 0
+
+        # Last execution state — used by get_metrics() for timing + cost
+        self._last_state: AgentState | None = None
 
     def add_node(self, node: AgentNode) -> "AgentGraph":
         """Add a node to the graph."""
@@ -368,9 +469,9 @@ class AgentGraph:
     def add_edge(
         self,
         source: str,
-        target: Union[str, List[str]],
+        target: str | list[str],
         edge_type: EdgeType = EdgeType.DIRECT,
-        condition: Optional[Callable[[AgentState], bool]] = None,
+        condition: Callable[[AgentState], bool] | None = None,
         priority: int = 0,
     ) -> "AgentGraph":
         """Add an edge between nodes."""
@@ -381,6 +482,9 @@ class AgentGraph:
         for t in targets:
             if t not in self.nodes and t != "END":
                 raise ValueError(f"Target node '{t}' not found")
+            if t == "END":
+                # Nodes with edges to "END" are terminal — treat same as add_exit_point()
+                self.exit_points.add(source)
 
         edge = Edge(
             source=source,
@@ -393,9 +497,7 @@ class AgentGraph:
         self.edges[source].sort(key=lambda e: e.priority, reverse=True)
         return self
 
-    def add_conditional_edges(
-        self, source: str, router: ConditionalRouter
-    ) -> "AgentGraph":
+    def add_conditional_edges(self, source: str, router: ConditionalRouter) -> "AgentGraph":
         """Add conditional routing from a node."""
         self.routers[source] = router
         return self
@@ -412,7 +514,7 @@ class AgentGraph:
         self.exit_points.add(node_name)
         return self
 
-    def _get_next_nodes(self, current: str, state: AgentState) -> List[str]:
+    def _get_next_nodes(self, current: str, state: AgentState) -> list[str]:
         """Get the next nodes to execute."""
         # Check for conditional router
         if current in self.routers:
@@ -429,17 +531,13 @@ class AgentGraph:
                     else:
                         next_nodes.append(edge.target)
                 else:
-                    targets = (
-                        edge.target if isinstance(edge.target, list) else [edge.target]
-                    )
+                    targets = edge.target if isinstance(edge.target, list) else [edge.target]
                     next_nodes.extend(targets)
                     break  # Only follow first matching edge for non-parallel
 
         return [n for n in next_nodes if n != "END"]
 
-    async def _execute_parallel(
-        self, node_names: List[str], state: AgentState
-    ) -> AgentState:
+    async def _execute_parallel(self, node_names: list[str], state: AgentState) -> AgentState:
         """Execute multiple nodes in parallel."""
         tasks = []
         for name in node_names:
@@ -462,8 +560,8 @@ class AgentGraph:
 
     async def execute(
         self,
-        initial_state: Optional[AgentState] = None,
-        input_message: Optional[str] = None,
+        initial_state: AgentState | None = None,
+        input_message: str | None = None,
     ) -> AgentState:
         """Execute the graph starting from entry point."""
         if not self.entry_point:
@@ -484,9 +582,7 @@ class AgentGraph:
 
         while current_nodes and iterations < self.max_iterations:
             iterations += 1
-            state.current_node = (
-                current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
-            )
+            state.current_node = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
 
             # Execute current nodes (including exit points)
             if len(current_nodes) == 1:
@@ -496,6 +592,31 @@ class AgentGraph:
             else:
                 # Parallel execution
                 state = await self._execute_parallel(current_nodes, state)
+
+            # Checkpoint + event streaming after every node transition
+            completed = current_nodes[0] if len(current_nodes) == 1 else str(current_nodes)
+            if self.checkpoint_fn is not None:
+                try:
+                    self.checkpoint_fn(state, completed)
+                except Exception as _cp_exc:
+                    logger.warning(f"[Checkpoint] Non-critical error: {_cp_exc}")
+
+            # P2-4: emit lightweight streaming event (no full state serialisation)
+            if self.event_fn is not None:
+                try:
+                    self.event_fn(
+                        completed,
+                        {
+                            "node": completed,
+                            "status": "completed",
+                            "session_id": state.session_id,
+                            "iteration": iterations,
+                            "has_result": completed in state.results,
+                            "errors": len(state.errors),
+                        },
+                    )
+                except Exception as _ev_exc:
+                    logger.debug(f"[EventStream] Non-critical error: {_ev_exc}")
 
             # Check for exit AFTER execution
             if all(n in self.exit_points for n in current_nodes):
@@ -516,39 +637,46 @@ class AgentGraph:
         else:
             self.successful_executions += 1
 
+        self._last_state = state
         logger.info(f"Graph '{self.name}' completed in {iterations} iterations")
         return state
 
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get graph execution metrics."""
-        return {
+    def get_metrics(self) -> dict[str, Any]:
+        """Get graph execution metrics including timing and LLM cost from last run."""
+        base: dict[str, Any] = {
             "name": self.name,
             "nodes_count": len(self.nodes),
             "edges_count": sum(len(e) for e in self.edges.values()),
             "total_executions": self.total_executions,
             "successful_executions": self.successful_executions,
             "failed_executions": self.failed_executions,
-            "success_rate": (
-                self.successful_executions / max(self.total_executions, 1) * 100
-            ),
+            "success_rate": (self.successful_executions / max(self.total_executions, 1) * 100),
         }
+        if self._last_state is not None:
+            timing: dict[str, float] = dict(self._last_state.execution_path)
+            base.update(
+                {
+                    "node_timing_s": timing,
+                    "slowest_node": max(timing, key=timing.__getitem__) if timing else None,
+                    "total_wall_time_s": round(sum(timing.values()), 3),
+                    "total_cost_usd": round(self._last_state.total_cost_usd, 6),
+                    "llm_call_count": self._last_state.llm_call_count,
+                }
+            )
+        return base
 
     def visualize(self) -> str:
         """Generate ASCII visualization of the graph."""
         lines = [f"Graph: {self.name}"]
         lines.append("=" * 50)
 
-        for node_name, node in self.nodes.items():
+        for node_name, _node in self.nodes.items():
             prefix = "→ " if node_name == self.entry_point else "  "
             suffix = " [EXIT]" if node_name in self.exit_points else ""
             lines.append(f"{prefix}{node_name}{suffix}")
 
             for edge in self.edges.get(node_name, []):
-                target = (
-                    edge.target
-                    if isinstance(edge.target, str)
-                    else " & ".join(edge.target)
-                )
+                target = edge.target if isinstance(edge.target, str) else " & ".join(edge.target)
                 edge_symbol = "──>" if edge.edge_type == EdgeType.DIRECT else "──?"
                 lines.append(f"    {edge_symbol} {target}")
 
@@ -586,7 +714,7 @@ class TradingAnalysisChain:
 
         tech_analysis = LLMAgent(
             name="technical_analysis",
-            agent_type="deepseek",
+            agent_type="claude",
             system_prompt=(
                 "You are a technical analysis expert. Analyze the following "
                 "market data and identify patterns, trends, and key levels."
@@ -596,7 +724,7 @@ class TradingAnalysisChain:
 
         risk_assessment = LLMAgent(
             name="risk_assessment",
-            agent_type="deepseek",
+            agent_type="claude",
             system_prompt=(
                 "You are a risk management expert. Evaluate the risks and "
                 "provide risk metrics for the trading strategy."
@@ -607,10 +735,7 @@ class TradingAnalysisChain:
         strategy_rec = LLMAgent(
             name="strategy_recommendation",
             agent_type="perplexity",
-            system_prompt=(
-                "Based on the analysis, recommend optimal trading strategies "
-                "with entry/exit points."
-            ),
+            system_prompt=("Based on the analysis, recommend optimal trading strategies with entry/exit points."),
             description="Generate strategy recommendations",
         )
 
@@ -647,7 +772,7 @@ class TradingAnalysisChain:
     def _data_preparation(state: AgentState) -> AgentState:
         """Prepare data for analysis."""
         state.context["data_prepared"] = True
-        state.context["timestamp"] = datetime.now(timezone.utc).isoformat()
+        state.context["timestamp"] = datetime.now(UTC).isoformat()
         state.add_message("system", "Data preparation completed", "data_preparation")
         state.set_result("data_preparation", {"status": "prepared"})
         return state
@@ -657,16 +782,14 @@ class TradingAnalysisChain:
         """Generate final report from all results."""
         report = {
             "session_id": state.session_id,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "technical_analysis": state.get_result("technical_analysis"),
             "risk_assessment": state.get_result("risk_assessment"),
             "recommendations": state.get_result("strategy_recommendation"),
             "errors": state.errors,
         }
         state.set_result("report_generation", report)
-        state.add_message(
-            "system", "Report generated successfully", "report_generation"
-        )
+        state.add_message("system", "Report generated successfully", "report_generation")
         return state
 
 
@@ -675,7 +798,7 @@ class TradingAnalysisChain:
 # ============================================================================
 
 
-_graph_registry: Dict[str, AgentGraph] = {}
+_graph_registry: dict[str, AgentGraph] = {}
 
 
 def register_graph(graph: AgentGraph):
@@ -683,15 +806,139 @@ def register_graph(graph: AgentGraph):
     _graph_registry[graph.name] = graph
 
 
-def get_graph(name: str) -> Optional[AgentGraph]:
+def get_graph(name: str) -> AgentGraph | None:
     """Get a graph from the registry."""
     return _graph_registry.get(name)
 
 
-def list_graphs() -> List[str]:
+def list_graphs() -> list[str]:
     """List all registered graphs."""
     return list(_graph_registry.keys())
 
 
 # Register pre-built chains
 register_graph(TradingAnalysisChain.create_graph())
+
+
+# =============================================================================
+# Checkpoint helpers  (P1-4)
+# =============================================================================
+
+
+def make_sqlite_checkpointer(
+    db_path: str = "",
+    table: str = "pipeline_checkpoints",
+) -> Callable[[AgentState, str], None]:
+    """
+    Return a checkpoint function that persists AgentState snapshots to SQLite.
+
+    Each call stores (session_id, node_name, timestamp, state_json) so that
+    pipelines can be inspected or resumed after crashes.
+
+    Args:
+        db_path: SQLite file path.  Defaults to ``data/pipeline_checkpoints.db``.
+        table:   Table name (default ``pipeline_checkpoints``).
+
+    Returns:
+        A ``checkpoint_fn(state, node_name)`` callable for ``AgentGraph``.
+
+    Usage::
+
+        from backend.agents.langgraph_orchestrator import make_sqlite_checkpointer
+
+        graph = build_trading_strategy_graph()
+        graph.checkpoint_fn = make_sqlite_checkpointer()
+    """
+    import json
+    import os
+    import sqlite3
+    from datetime import UTC, datetime
+
+    if not db_path:
+        _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        db_path = os.path.join(_root, "data", "pipeline_checkpoints.db")
+
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    # Create table once — enable WAL for concurrent reads & set busy timeout
+    with sqlite3.connect(db_path, timeout=10.0) as _conn:
+        try:
+            _conn.execute("PRAGMA journal_mode=WAL")
+            _conn.execute("PRAGMA synchronous=NORMAL")
+            _conn.execute("PRAGMA busy_timeout=10000")
+        except sqlite3.Error as pragma_err:  # pragma: no cover — best-effort
+            logger.debug(f"[checkpointer] PRAGMA setup skipped: {pragma_err}")
+        _conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                node_name   TEXT NOT NULL,
+                ts          TEXT NOT NULL,
+                state_json  TEXT NOT NULL
+            )
+            """
+        )
+        _conn.commit()
+
+    def _checkpoint(state: AgentState, node_name: str) -> None:
+        snapshot = {
+            "visited_nodes": state.visited_nodes,
+            "results_keys": list(state.results.keys()),
+            "errors": state.errors,
+            "total_cost_usd": state.total_cost_usd,
+            "llm_call_count": state.llm_call_count,
+            "budget_exceeded": state.budget_exceeded,
+        }
+        # timeout=10s avoids "database is locked" under concurrent pipelines
+        with sqlite3.connect(db_path, timeout=10.0) as conn:
+            conn.execute("PRAGMA busy_timeout=10000")
+            conn.execute(
+                f"INSERT INTO {table} (session_id, node_name, ts, state_json) VALUES (?,?,?,?)",
+                (state.session_id, node_name, datetime.now(UTC).isoformat(), json.dumps(snapshot)),
+            )
+
+    return _checkpoint
+
+
+def make_pipeline_event_queue() -> "tuple[asyncio.Queue[dict[str, Any]], Callable[[str, dict[str, Any]], None]]":
+    """
+    P2-4: Create a (queue, event_fn) pair for streaming pipeline node events.
+
+    Usage::
+
+        queue, event_fn = make_pipeline_event_queue()
+        graph = build_trading_strategy_graph()
+        graph.event_fn = event_fn
+
+        # In a WebSocket handler:
+        while True:
+            event = await queue.get()
+            if event.get("status") == "done":
+                break
+            await ws.send_json(event)
+
+    The queue receives dicts with shape::
+
+        {
+            "node":       "analyze_market",
+            "status":     "completed",   # or "done" when pipeline finishes
+            "session_id": "...",
+            "iteration":  1,
+            "has_result": True,
+            "errors":     0,
+        }
+
+    Returns:
+        (queue, event_fn) — attach event_fn to ``AgentGraph.event_fn``.
+    """
+    q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    def _event_fn(node_name: str, event: dict[str, Any]) -> None:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            logger.debug(f"[Pipeline] Event queue full — dropping node event for node {node_name!r}")
+            pass  # non-blocking — drop if consumer is slow
+
+    return q, _event_fn

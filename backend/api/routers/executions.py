@@ -47,7 +47,7 @@ class ExecutionSubmitRequest(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def _ensure_unique_tags(cls, value: list[str] | None) -> list[str]:  # noqa: D417 - pydantic hook
+    def _ensure_unique_tags(cls, value: list[str] | None) -> list[str]:
         unique = list(dict.fromkeys(value or []))
         return unique
 
@@ -94,9 +94,7 @@ class ExecutionValidationError(ExecutionManagerError):
 class ExecutionManagerProtocol(Protocol):
     """Interface implemented by execution manager dependencies."""
 
-    async def submit_execution(
-        self, payload: ExecutionSubmitRequest
-    ) -> ExecutionRecord: ...
+    async def submit_execution(self, payload: ExecutionSubmitRequest) -> ExecutionRecord: ...
 
     async def get_execution(self, execution_id: str) -> ExecutionRecord: ...
 
@@ -123,9 +121,7 @@ class InMemoryExecutionManager(ExecutionManagerProtocol):
         self._records: dict[str, ExecutionRecord] = {}
         self._lock = asyncio.Lock()
 
-    async def submit_execution(
-        self, payload: ExecutionSubmitRequest
-    ) -> ExecutionRecord:
+    async def submit_execution(self, payload: ExecutionSubmitRequest) -> ExecutionRecord:
         async with self._lock:
             exec_id = str(uuid.uuid4())
             now = datetime.now(UTC)
@@ -186,16 +182,14 @@ class InMemoryExecutionManager(ExecutionManagerProtocol):
             return updated
 
     async def metrics(self) -> ExecutionMetrics:
-        counts: dict[ExecutionStatus, int] = {status: 0 for status in ExecutionStatus}
+        counts: dict[ExecutionStatus, int] = dict.fromkeys(ExecutionStatus, 0)
         for record in self._records.values():
             counts[record.status] += 1
         total = len(self._records)
         avg_priority = None
         if total > 0:
             avg_priority = sum(rec.priority for rec in self._records.values()) / total
-        return ExecutionMetrics(
-            total=total, by_status=counts, avg_priority=avg_priority
-        )
+        return ExecutionMetrics(total=total, by_status=counts, avg_priority=avg_priority)
 
 
 router = APIRouter(prefix="/executions", tags=["executions"])
@@ -224,9 +218,7 @@ async def _resolve_manager(
 @router.post("/", response_model=ExecutionRecord, status_code=status.HTTP_201_CREATED)
 async def submit_execution(
     payload: ExecutionSubmitRequest,
-    manager: ExecutionManagerProtocol | None = Depends(
-        get_execution_manager_dependency
-    ),
+    manager: ExecutionManagerProtocol | None = Depends(get_execution_manager_dependency),
 ) -> ExecutionRecord:
     """Submit a new execution request."""
 
@@ -234,29 +226,21 @@ async def submit_execution(
     try:
         return await mgr.submit_execution(payload)
     except ExecutionValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ExecutionManagerError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 @router.get("/{execution_id}", response_model=ExecutionRecord)
 async def get_execution(
     execution_id: str = Path(..., description="Execution identifier"),
-    manager: ExecutionManagerProtocol | None = Depends(
-        get_execution_manager_dependency
-    ),
+    manager: ExecutionManagerProtocol | None = Depends(get_execution_manager_dependency),
 ) -> ExecutionRecord:
     mgr = await _resolve_manager(manager)
     try:
         return await mgr.get_execution(execution_id)
     except ExecutionNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/", response_model=ExecutionListResponse)
@@ -264,9 +248,7 @@ async def list_executions(
     status_filter: ExecutionStatus | None = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    manager: ExecutionManagerProtocol | None = Depends(
-        get_execution_manager_dependency
-    ),
+    manager: ExecutionManagerProtocol | None = Depends(get_execution_manager_dependency),
 ) -> ExecutionListResponse:
     mgr = await _resolve_manager(manager)
     items = await mgr.list_executions(status=status_filter, limit=limit, offset=offset)
@@ -276,28 +258,20 @@ async def list_executions(
 @router.post("/{execution_id}/cancel", response_model=ExecutionRecord)
 async def cancel_execution(
     execution_id: str,
-    manager: ExecutionManagerProtocol | None = Depends(
-        get_execution_manager_dependency
-    ),
+    manager: ExecutionManagerProtocol | None = Depends(get_execution_manager_dependency),
 ) -> ExecutionRecord:
     mgr = await _resolve_manager(manager)
     try:
         return await mgr.cancel_execution(execution_id)
     except ExecutionNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ExecutionValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/metrics", response_model=ExecutionMetrics)
 async def execution_metrics(
-    manager: ExecutionManagerProtocol | None = Depends(
-        get_execution_manager_dependency
-    ),
+    manager: ExecutionManagerProtocol | None = Depends(get_execution_manager_dependency),
 ) -> ExecutionMetrics:
     mgr = await _resolve_manager(manager)
     return await mgr.metrics()

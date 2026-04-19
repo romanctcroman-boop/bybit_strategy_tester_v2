@@ -3,14 +3,16 @@ Orchestrator module - Orchestrator Dashboard and Workflow Management
 Provides centralized management and monitoring of strategies and agents
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend.agents.base_config import DEEPSEEK_AVAILABLE, MCP_DISABLED, PERPLEXITY_AVAILABLE
+
 __all__ = [
-    "orchestrator_router",
     "get_orchestrator_status",
+    "orchestrator_router",
 ]
 
 
@@ -20,19 +22,26 @@ class OrchestratorStatus(BaseModel):
     active_strategies: int = 0
     active_agents: int = 0
     system_health: str = "healthy"
-    components: Dict[str, str] = {}
+    components: dict[str, str] = {}
 
 
 def get_orchestrator_status() -> OrchestratorStatus:
-    """Get current orchestrator status"""
+    """Get current orchestrator status derived from runtime flags.
+
+    Component availability is resolved at call-time from ``base_config``
+    constants, which are themselves derived from environment variables
+    (``DEEPSEEK_API_KEY``, ``PERPLEXITY_API_KEY``, ``MCP_DISABLED``).
+    This means the response reflects actual configuration rather than
+    a hardcoded stub.
+    """
     return OrchestratorStatus(
         active_strategies=0,
         active_agents=0,
         system_health="healthy",
         components={
-            "deepseek": "available",
-            "perplexity": "available",
-            "mcp_server": "available",
+            "deepseek": "available" if DEEPSEEK_AVAILABLE else "unavailable",
+            "perplexity": "available" if PERPLEXITY_AVAILABLE else "unavailable",
+            "mcp_server": "disabled" if MCP_DISABLED else "available",
         },
     )
 
@@ -45,20 +54,31 @@ class OrchestratorRouter:
         self.prefix = "/orchestrator"
         self.routes = []
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get orchestrator status"""
         status = get_orchestrator_status()
-        return status.dict()
+        return status.model_dump()
 
-    async def get_dashboard_data(self) -> Dict[str, Any]:
-        """Get dashboard data"""
+    async def get_dashboard_data(self) -> dict[str, Any]:
+        """Get dashboard data with live component status."""
+        import datetime
+
         return {
             "status": "operational",
-            "timestamp": "2025-12-04T11:30:00Z",
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "components": [
-                {"name": "deepseek", "status": "operational"},
-                {"name": "perplexity", "status": "operational"},
-                {"name": "mcp_server", "status": "operational"},
+                {
+                    "name": "deepseek",
+                    "status": "operational" if DEEPSEEK_AVAILABLE else "unavailable",
+                },
+                {
+                    "name": "perplexity",
+                    "status": "operational" if PERPLEXITY_AVAILABLE else "unavailable",
+                },
+                {
+                    "name": "mcp_server",
+                    "status": "disabled" if MCP_DISABLED else "operational",
+                },
             ],
         }
 
@@ -71,21 +91,21 @@ router = APIRouter()
 
 
 @router.get("/status")
-async def get_status() -> Dict[str, Any]:
+async def get_status() -> dict[str, Any]:
     """Get orchestrator status"""
     return await orchestrator_router.get_status()
 
 
 @router.get("/dashboard")
-async def get_dashboard() -> Dict[str, Any]:
+async def get_dashboard() -> dict[str, Any]:
     """Get dashboard data"""
     return await orchestrator_router.get_dashboard_data()
 
 
 __all__ = [
+    "get_orchestrator_status",
     "orchestrator_router",
     "router",
-    "get_orchestrator_status",
 ]
 
 

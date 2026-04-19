@@ -12,9 +12,9 @@ This enables gradual migration from monolith to microservices.
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -73,15 +73,15 @@ class Order:
     side: OrderSide
     order_type: OrderType
     quantity: float
-    price: Optional[float] = None
-    stop_price: Optional[float] = None
+    price: float | None = None
+    stop_price: float | None = None
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0
     average_price: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    exchange_order_id: Optional[str] = None
-    client_order_id: Optional[str] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    exchange_order_id: str | None = None
+    client_order_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -119,9 +119,9 @@ class Position:
     realized_pnl: float = 0.0
     leverage: float = 1.0
     margin: float = 0.0
-    liquidation_price: Optional[float] = None
-    opened_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    liquidation_price: float | None = None
+    opened_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -149,9 +149,9 @@ class TradeResult:
     """Result of a trade operation."""
 
     success: bool
-    order: Optional[Order] = None
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
+    order: Order | None = None
+    error_code: str | None = None
+    error_message: str | None = None
     latency_ms: float = 0.0
 
 
@@ -165,7 +165,7 @@ class AccountBalance:
     locked_balance: float
     margin_balance: float = 0.0
     unrealized_pnl: float = 0.0
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ============================================================================
@@ -191,10 +191,10 @@ class ITradingEngine(ABC):
         side: OrderSide,
         order_type: OrderType,
         quantity: float,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
-        client_order_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
+        client_order_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> TradeResult:
         """Place a new order."""
         pass
@@ -208,25 +208,25 @@ class ITradingEngine(ABC):
     async def modify_order(
         self,
         order_id: str,
-        quantity: Optional[float] = None,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        quantity: float | None = None,
+        price: float | None = None,
+        stop_price: float | None = None,
     ) -> TradeResult:
         """Modify an existing order."""
         pass
 
     @abstractmethod
-    async def get_order(self, order_id: str) -> Optional[Order]:
+    async def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
         pass
 
     @abstractmethod
-    async def get_open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    async def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """Get all open orders, optionally filtered by symbol."""
         pass
 
     @abstractmethod
-    async def get_position(self, symbol: str) -> Optional[Position]:
+    async def get_position(self, symbol: str) -> Position | None:
         """Get position for symbol."""
         pass
 
@@ -236,14 +236,12 @@ class ITradingEngine(ABC):
         pass
 
     @abstractmethod
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: float | None = None) -> TradeResult:
         """Close a position (fully or partially)."""
         pass
 
     @abstractmethod
-    async def get_balance(self, currency: str = "USDT") -> Optional[AccountBalance]:
+    async def get_balance(self, currency: str = "USDT") -> AccountBalance | None:
         """Get account balance."""
         pass
 
@@ -270,7 +268,7 @@ class LocalTradingEngine(ITradingEngine):
         self._orders: dict[str, Order] = {}
         self._positions: dict[str, Position] = {}
         self._balances: dict[str, AccountBalance] = {}
-        self._event_bus: Optional[Any] = None
+        self._event_bus: Any | None = None
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -292,10 +290,10 @@ class LocalTradingEngine(ITradingEngine):
         side: OrderSide,
         order_type: OrderType,
         quantity: float,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
-        client_order_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
+        client_order_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> TradeResult:
         """Place a new order."""
         import time
@@ -377,7 +375,7 @@ class LocalTradingEngine(ITradingEngine):
             )
 
         order.status = OrderStatus.CANCELLED
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         # Publish event
         if self._event_bus:
@@ -391,9 +389,9 @@ class LocalTradingEngine(ITradingEngine):
     async def modify_order(
         self,
         order_id: str,
-        quantity: Optional[float] = None,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        quantity: float | None = None,
+        price: float | None = None,
+        stop_price: float | None = None,
     ) -> TradeResult:
         """Modify an existing order."""
         order = self._orders.get(order_id)
@@ -418,15 +416,15 @@ class LocalTradingEngine(ITradingEngine):
         if stop_price is not None:
             order.stop_price = stop_price
 
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         return TradeResult(success=True, order=order)
 
-    async def get_order(self, order_id: str) -> Optional[Order]:
+    async def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
         return self._orders.get(order_id)
 
-    async def get_open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    async def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """Get all open orders."""
         open_statuses = [OrderStatus.PENDING, OrderStatus.SUBMITTED]
         orders = [o for o in self._orders.values() if o.status in open_statuses]
@@ -436,7 +434,7 @@ class LocalTradingEngine(ITradingEngine):
 
         return orders
 
-    async def get_position(self, symbol: str) -> Optional[Position]:
+    async def get_position(self, symbol: str) -> Position | None:
         """Get position for symbol."""
         return self._positions.get(symbol.upper())
 
@@ -444,9 +442,7 @@ class LocalTradingEngine(ITradingEngine):
         """Get all open positions."""
         return [p for p in self._positions.values() if p.side != PositionSide.NONE]
 
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: float | None = None) -> TradeResult:
         """Close a position."""
         position = self._positions.get(symbol.upper())
         if not position:
@@ -457,9 +453,7 @@ class LocalTradingEngine(ITradingEngine):
             )
 
         # Determine close side
-        close_side = (
-            OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
-        )
+        close_side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
         close_qty = quantity or position.size
 
         return await self.place_order(
@@ -470,7 +464,7 @@ class LocalTradingEngine(ITradingEngine):
             metadata={"close_position": True},
         )
 
-    async def get_balance(self, currency: str = "USDT") -> Optional[AccountBalance]:
+    async def get_balance(self, currency: str = "USDT") -> AccountBalance | None:
         """Get account balance."""
         return self._balances.get(currency.upper())
 
@@ -479,9 +473,7 @@ class LocalTradingEngine(ITradingEngine):
         return {
             "status": "healthy",
             "initialized": self._initialized,
-            "open_orders": len(
-                [o for o in self._orders.values() if o.status == OrderStatus.PENDING]
-            ),
+            "open_orders": len([o for o in self._orders.values() if o.status == OrderStatus.PENDING]),
             "positions": len(self._positions),
             "event_bus_connected": self._event_bus is not None,
         }
@@ -498,6 +490,17 @@ class RemoteTradingEngine(ITradingEngine):
 
     Communicates with trading engine microservice via HTTP/gRPC.
     Used in distributed deployment mode.
+
+    Recommended usage (context manager):
+        async with RemoteTradingEngine("http://localhost:8001") as engine:
+            result = await engine.place_order(...)
+
+    Alternative (manual cleanup):
+        engine = RemoteTradingEngine("http://localhost:8001")
+        try:
+            result = await engine.place_order(...)
+        finally:
+            await engine.close()
     """
 
     def __init__(
@@ -507,10 +510,34 @@ class RemoteTradingEngine(ITradingEngine):
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
+        self._closed = False
+
+    async def __aenter__(self) -> "RemoteTradingEngine":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.close()
+
+    async def close(self) -> None:
+        """Close HTTP client and cleanup resources."""
+        if self._closed:
+            return
+        self._closed = True
+        if self._client is not None:
+            try:
+                await self._client.aclose()
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
+            finally:
+                self._client = None
 
     async def _get_client(self) -> Any:
         """Get or create HTTP client."""
+        if self._closed:
+            raise RuntimeError("RemoteTradingEngine is closed")
         if self._client is None:
             import httpx
 
@@ -537,10 +564,10 @@ class RemoteTradingEngine(ITradingEngine):
         side: OrderSide,
         order_type: OrderType,
         quantity: float,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
-        client_order_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
+        client_order_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> TradeResult:
         """Place order via remote service."""
         try:
@@ -576,9 +603,9 @@ class RemoteTradingEngine(ITradingEngine):
     async def modify_order(
         self,
         order_id: str,
-        quantity: Optional[float] = None,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        quantity: float | None = None,
+        price: float | None = None,
+        stop_price: float | None = None,
     ) -> TradeResult:
         """Modify order via remote service."""
         try:
@@ -591,7 +618,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception as e:
             return TradeResult(success=False, error_message=str(e))
 
-    async def get_order(self, order_id: str) -> Optional[Order]:
+    async def get_order(self, order_id: str) -> Order | None:
         """Get order from remote service."""
         try:
             data = await self._request("GET", f"/api/v1/orders/{order_id}")
@@ -599,7 +626,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception:
             return None
 
-    async def get_open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    async def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """Get open orders from remote service."""
         try:
             params = {"symbol": symbol} if symbol else {}
@@ -608,7 +635,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception:
             return []
 
-    async def get_position(self, symbol: str) -> Optional[Position]:
+    async def get_position(self, symbol: str) -> Position | None:
         """Get position from remote service."""
         try:
             data = await self._request("GET", f"/api/v1/positions/{symbol}")
@@ -624,9 +651,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception:
             return []
 
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: float | None = None) -> TradeResult:
         """Close position via remote service."""
         try:
             await self._request(
@@ -638,7 +663,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception as e:
             return TradeResult(success=False, error_message=str(e))
 
-    async def get_balance(self, currency: str = "USDT") -> Optional[AccountBalance]:
+    async def get_balance(self, currency: str = "USDT") -> AccountBalance | None:
         """Get balance from remote service."""
         try:
             data = await self._request("GET", f"/api/v1/balance/{currency}")
@@ -683,7 +708,7 @@ def create_trading_engine(mode: str = "local", **kwargs: Any) -> ITradingEngine:
 # Global Instance
 # ============================================================================
 
-_trading_engine: Optional[ITradingEngine] = None
+_trading_engine: ITradingEngine | None = None
 
 
 def get_trading_engine() -> ITradingEngine:

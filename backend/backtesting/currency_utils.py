@@ -41,7 +41,8 @@ def get_quote_currency(symbol: str) -> str:
 
     # Check for slash notation (FX)
     if "/" in symbol:
-        return symbol.split("/")[1]
+        parts = symbol.split("/", 1)
+        return parts[1] if len(parts) > 1 and parts[1] else "USDT"
 
     # Default to USDT for crypto
     return "USDT"
@@ -58,7 +59,8 @@ def get_base_currency(symbol: str) -> str:
     """
     quote = get_quote_currency(symbol)
     if "/" in symbol:
-        return symbol.split("/")[0]
+        parts = symbol.split("/", 1)
+        return parts[0] if parts[0] else symbol
     return symbol.replace(quote, "")
 
 
@@ -239,7 +241,7 @@ def price_to_ticks(price: float, symbol: str) -> int:
     Returns:
         Number of ticks
     """
-    return int(round(price / get_min_tick(symbol)))
+    return round(price / get_min_tick(symbol))
 
 
 # Update cache with actual rates (would use API in production)

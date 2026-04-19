@@ -13,9 +13,9 @@ from __future__ import annotations
 import contextvars
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -34,16 +34,16 @@ class ContextScope(Enum):
 class ContextMetadata:
     """Context metadata"""
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-    expires_at: Optional[datetime] = None
-    tags: List[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_by: str | None = None
+    expires_at: datetime | None = None
+    tags: list[str] = field(default_factory=list)
 
     def is_expired(self) -> bool:
         """Check if context has expired"""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
 
 @dataclass
@@ -69,8 +69,8 @@ class Context:
 
     id: str = field(default_factory=lambda: f"ctx_{uuid.uuid4().hex[:12]}")
     scope: ContextScope = ContextScope.REQUEST
-    parent_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    parent_id: str | None = None
+    data: dict[str, Any] = field(default_factory=dict)
     metadata: ContextMetadata = field(default_factory=ContextMetadata)
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -89,11 +89,11 @@ class Context:
         """Check if key exists"""
         return key in self.data
 
-    def update(self, data: Dict[str, Any]) -> None:
+    def update(self, data: dict[str, Any]) -> None:
         """Update multiple values"""
         self.data.update(data)
 
-    def merge_from(self, other: "Context") -> None:
+    def merge_from(self, other: Context) -> None:
         """Merge data from another context"""
         for key, value in other.data.items():
             if key not in self.data:
@@ -101,9 +101,9 @@ class Context:
 
     def create_child(
         self,
-        scope: Optional[ContextScope] = None,
+        scope: ContextScope | None = None,
         inherit_data: bool = True,
-    ) -> "Context":
+    ) -> Context:
         """Create child context"""
         child_data = dict(self.data) if inherit_data else {}
 
@@ -117,7 +117,7 @@ class Context:
             ),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -127,15 +127,13 @@ class Context:
             "metadata": {
                 "created_at": self.metadata.created_at.isoformat(),
                 "created_by": self.metadata.created_by,
-                "expires_at": self.metadata.expires_at.isoformat()
-                if self.metadata.expires_at
-                else None,
+                "expires_at": self.metadata.expires_at.isoformat() if self.metadata.expires_at else None,
                 "tags": self.metadata.tags,
             },
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Context":
+    def from_dict(cls, data: dict[str, Any]) -> Context:
         """Create from dictionary"""
         metadata = data.get("metadata", {})
 
@@ -147,20 +145,16 @@ class Context:
             metadata=ContextMetadata(
                 created_at=datetime.fromisoformat(metadata.get("created_at"))
                 if metadata.get("created_at")
-                else datetime.now(timezone.utc),
+                else datetime.now(UTC),
                 created_by=metadata.get("created_by"),
-                expires_at=datetime.fromisoformat(metadata["expires_at"])
-                if metadata.get("expires_at")
-                else None,
+                expires_at=datetime.fromisoformat(metadata["expires_at"]) if metadata.get("expires_at") else None,
                 tags=metadata.get("tags", []),
             ),
         )
 
 
 # Context variable for async context propagation
-_current_context: contextvars.ContextVar[Optional[Context]] = contextvars.ContextVar(
-    "current_context", default=None
-)
+_current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar("current_context", default=None)
 
 
 class ContextManager:
@@ -187,7 +181,7 @@ class ContextManager:
     """
 
     def __init__(self):
-        self._contexts: Dict[str, Context] = {}
+        self._contexts: dict[str, Context] = {}
         self._global_context = Context(
             id="global",
             scope=ContextScope.GLOBAL,
@@ -204,8 +198,8 @@ class ContextManager:
     def create_context(
         self,
         scope: ContextScope = ContextScope.REQUEST,
-        parent: Optional[Context] = None,
-        data: Optional[Dict[str, Any]] = None,
+        parent: Context | None = None,
+        data: dict[str, Any] | None = None,
         inherit_data: bool = True,
     ) -> Context:
         """Create new context"""
@@ -225,11 +219,11 @@ class ContextManager:
 
         return ctx
 
-    def get_context(self, context_id: str) -> Optional[Context]:
+    def get_context(self, context_id: str) -> Context | None:
         """Get context by ID"""
         return self._contexts.get(context_id)
 
-    def get_current(self) -> Optional[Context]:
+    def get_current(self) -> Context | None:
         """Get current active context"""
         return _current_context.get()
 
@@ -251,11 +245,7 @@ class ContextManager:
 
     def cleanup_expired(self) -> int:
         """Clean up expired contexts"""
-        expired = [
-            ctx_id
-            for ctx_id, ctx in self._contexts.items()
-            if ctx.metadata.is_expired() and ctx_id != "global"
-        ]
+        expired = [ctx_id for ctx_id, ctx in self._contexts.items() if ctx.metadata.is_expired() and ctx_id != "global"]
 
         for ctx_id in expired:
             del self._contexts[ctx_id]
@@ -265,11 +255,11 @@ class ContextManager:
 
         return len(expired)
 
-    def get_children(self, context_id: str) -> List[Context]:
+    def get_children(self, context_id: str) -> list[Context]:
         """Get child contexts"""
         return [ctx for ctx in self._contexts.values() if ctx.parent_id == context_id]
 
-    def get_lineage(self, context_id: str) -> List[Context]:
+    def get_lineage(self, context_id: str) -> list[Context]:
         """Get context lineage (ancestors)"""
         lineage = []
         current = self._contexts.get(context_id)
@@ -287,7 +277,7 @@ class ContextManager:
         self,
         source_id: str,
         target_id: str,
-        keys: Optional[List[str]] = None,
+        keys: list[str] | None = None,
     ) -> None:
         """Share context data between contexts"""
         source = self._contexts.get(source_id)
@@ -305,7 +295,7 @@ class ContextManager:
 
         logger.debug(f"Shared context: {source_id} -> {target_id}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get manager statistics"""
         by_scope = {}
         for ctx in self._contexts.values():
@@ -345,7 +335,7 @@ class _ContextScope:
 
 
 # Convenience functions
-def get_current_context() -> Optional[Context]:
+def get_current_context() -> Context | None:
     """Get current context"""
     return _current_context.get()
 
@@ -366,7 +356,7 @@ def get_context_value(key: str, default: Any = None) -> Any:
 
 
 # Global instance
-_global_context_manager: Optional[ContextManager] = None
+_global_context_manager: ContextManager | None = None
 
 
 def get_context_manager() -> ContextManager:
@@ -378,12 +368,12 @@ def get_context_manager() -> ContextManager:
 
 
 __all__ = [
-    "ContextScope",
-    "ContextMetadata",
     "Context",
     "ContextManager",
+    "ContextMetadata",
+    "ContextScope",
+    "get_context_manager",
+    "get_context_value",
     "get_current_context",
     "set_context_value",
-    "get_context_value",
-    "get_context_manager",
 ]
